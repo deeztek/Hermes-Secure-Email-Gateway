@@ -4,7 +4,11 @@ Hermes Secure Email Gateway is a Free Open Source Email Gateway that provides Sp
 You can find more information about Hermes Secure Email Gateway on our website at:
 https://www.deeztek.com/products/hermes-secure-email-gateway/
 
+<<<<<<< HEAD
 You can download a Vmware or Hyper-V appliance at:
+=======
+You can download an OVA or Hyper-V appliance at:
+>>>>>>> origin/master
 https://www.deeztek.com/products/hermes-secure-email-gateway/download-hermes-secure-email-gateway-appliance/
 
 # Quick Start Guide
@@ -20,6 +24,7 @@ https://www.deeztek.com/contact/
 # Support
 Support for Hermes Secure Email Gateway can be found in our forums located at:
 https://forums.deeztek.com/viewforum.php?f=22
+<<<<<<< HEAD
 
 
 
@@ -28,3 +33,5 @@ https://forums.deeztek.com/viewforum.php?f=22
 
 
 
+=======
+>>>>>>> origin/master
