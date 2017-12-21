@@ -1,0 +1,109 @@
+p, pre, blockquote, h1, h2, h3, h4, h5, h6 {
+	line-height: 1.2;
+	margin-top: 0px;	
+	margin-bottom: 19px;
+}
+
+pre {
+	font-family: 'Courier New', 'Lucida Console', Courier, Monaco, Monospace;
+}
+
+blockquote {
+	margin-bottom: 21.28px;
+	margin-left: 40px;
+	margin-right: 40px;
+}
+
+address {
+	line-height: 1.2;
+	margin: 0px;
+	font-style: italic;
+}
+
+h1 {
+	font-size: 31px;
+}
+h2 {
+	font-size: 24px;
+}
+h3 {
+	font-size: 18px;
+}
+h4 {
+	font-size: 16px;
+}
+h5 {
+	font-size: 13px;
+}
+h6 {
+	font-size: 10px;
+}
+
+html, body, form {
+	margin: 0px;
+	padding: 0px;
+}
+
+.NavBar_ul {
+	position: relative;
+	margin: 0px;
+	padding: 0px;
+}
+.NavBar_li {
+	position: absolute;
+	margin: 0px;
+	padding: 0px;
+	list-style: none;
+}
+.NavBar_a {
+	margin: 0px;
+	padding: 0px;
+	cursor: pointer;
+	text-decoration: none;
+	display: block;
+}
+
+.nof-clearfix:after {
+	content: "."; 
+	display: block; 
+	height: 0; 
+	clear: both; 
+	visibility: hidden;
+}
+
+.nof-clearfix {display: inline-block;}
+
+/* Hides from IE-mac \*/
+* html .nof-clearfix {height: 1%;}
+.nof-clearfix {display: block;}
+/* End hide from IE-mac */
+
+.nof-positioning {
+	margin: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	font-weight: inherit;
+	font-style: inherit;
+	font-size: 100%;
+	font-family: inherit;
+}
+
+.nof-navPositioning {
+	margin: 0px;
+	padding: 0px;
+	cursor: pointer;
+}
+
+.nof-navButtonAnchor {
+	margin: 0px;
+	padding: 0px;
+	cursor: pointer;
+	text-decoration: none;
+}
+
+.nof-ajaxTemplateHide {
+	visibility:hidden;
+	background-color:white;
+	color:white;	
+}
