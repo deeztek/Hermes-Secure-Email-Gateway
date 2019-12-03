@@ -1,4 +1,10 @@
-The script below assumes you have a fully installed and updated Ubuntu 18.04 server and you have a /mnt/data directory for database and email archive storage. 
+**About**
+
+Hermes Secure Email Gateway is a Free Open Source Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization. It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
+
+**Installation**
+
+Hermes SEG can be easily installed in your existing Ubuntu 18.04 server machine by utilizing the **ubuntu_hermes_1804_install.sh** script. The script requires that you have a fully updated Ubuntu 18.04 server installation and that you have a /mnt/data directory for database and email archive storage. 
 
 **Required Information**
 
