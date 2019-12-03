@@ -46,7 +46,6 @@ Look for 250 GB drive you created earlier device ID, usually /dev/sdb. Ensure yo
 * Hit "Enter" for default last sector
 * Hit "w" to write changes to disk and exit
 
-
 **Format Partition**
 
 `sudo mkfs.ext4 /dev/sdb1`
@@ -93,13 +92,13 @@ Reboot and ensure /mnt/data gets mounted automatically
 
 Git clone the Hermes SEG repository:
 
-`sudo git clone https://gitlab.deeztek.com/dedwards/hermes-seg-18.04.git`
+`sudo git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git`
 
-This will clone the repository and create a hermes-seg-18.04 directory in the directory you ran the git clone command from.
+This will clone the repository and create a Hermes-Secure-Email-Gateway directory in the directory you ran the git clone command from.
 
-Change to the hermes-seg-18.04 directory:
+Change to the Hermes-Secure-Email-Gateway directory:
 
-`cd hermes-seg-18.04/`
+`cd Hermes-Secure-Email-Gateway/`
 
 Run the script as root:
 
