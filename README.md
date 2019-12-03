@@ -104,6 +104,14 @@ Run the script as root:
 
 `bash ubuntu_hermes_1804_install.sh`
 
+**Getting Started Guide**
+
+Check out our [Getting Started Guide](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/getting-started/) to get your Hermes SEG installation configured quickly.
+
+**Documentation**
+
+Check out the [Hermes SEG Administrator](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/) and [Hermes SEG User](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/) guides
+
 **Support**
 
 Support can be obtained by visiting our Hermes SEG Support forums at:
