@@ -1,0 +1,54 @@
+# The list is in the form of a Distributed Checksum Clearinghouse whitelist
+#   or blacklist used by a DCC client such as dccproc or dccm or by a DCC server
+#   dccd.  It is often included used by both clients and servers by using 
+# include whitecommon
+
+#   Each line must be in one of the forms
+#count type value
+#      type value
+
+
+#   Rhyolite Software DCC 2.3.167-1.149 $Revision$
+################
+
+
+# Do not tell the DCC servers about purely local mail.
+#   Add lines listing all of the host names of this system.
+#   These lines are best in the whitecommon file included in this file
+#ok	ip	127.0.0.1
+#ok	ip	::1
+#
+# List statically allocated IP addresses that you trust to never send
+#   or forward unsolicited bulk email
+#ok	ip	10.1.2.0/24
+#
+# List secondary MX relays or any MX relays that might forward spam to this
+#	system.
+#mx	ip	10.3.4.5
+#mx	ip	10.6.7.0/28
+#   Use mxdcc instead of mx if the relay does DCC checks
+#mxdcc	ip	10.8.9.10
+
+# List SMTP submission clients such as web browsers that cannot tolerate
+#   4yz temporary rejections but that cannot be trusted to never send spam
+#submit	ip	10.4.5.0/24
+
+
+
+# example mailing lists
+#	entries of type "substitute mail_host" require `dccm -S mail_host`,
+#	    ir or `dccproc -S mail_host`
+#	entries of type "substitute Sender" require `-S Sender`
+#	entries of type "substitute List-ID" require `-S List-ID`
+
+# sendmail.org
+#ok	env_from	owner-sendmail-announce@lists.Sendmail.ORG
+#	env_from	sendmail-announce-request@lists.sendmail.org
+#	env_from	sendmail-beta-request@knecht.Neophilic.COM
+#	substitute mail_host sendmail.org
+
+# Rhyolite.com DCC
+ok  substitute List-ID: Distributed Checksum Clearinghouse <dcc.rhyolite.com>
+
+# BUGTRAQ
+#ok	substitute mail_host securityfocus.com

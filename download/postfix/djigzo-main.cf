@@ -1,0 +1,126 @@
+# postfix main config for CipherMail
+
+# setting starting with djigzo_ will be overwritten when applying the MTA settings
+djigzo_myhostname = gateway.example.com
+djigzo_mydestination = 
+djigzo_mynetworks = 
+djigzo_relayhost = 
+djigzo_relayhost_mx_lookup = 
+djigzo_relayhost_port = 25
+djigzo_relay_domains = 
+djigzo_before_filter_message_size_limit = 10240000
+djigzo_after_filter_message_size_limit = 512000000
+djigzo_mailbox_size_limit = 512000000
+djigzo_smtp_helo_name = 
+djigzo_relay_transport_host = 
+djigzo_relay_transport_host_mx_lookup = 
+djigzo_relay_transport_host_port = 25
+djigzo_reject_unverified_recipient = 
+djigzo_unverified_recipient_reject_code = 450
+djigzo_parent_domain_matches_subdomains = 
+djigzo_rbl_clients = 
+
+# The internet hostname of this mail system
+myhostname = ${djigzo_myhostname}
+
+# The list of domains that are delivered via the $local_transport mail delivery transport
+mydestination = ${djigzo_mydestination}
+
+# The list of "trusted" remote SMTP clients that have more privileges than "strangers".
+mynetworks = 127.0.0.0/8, [::1]/128, ${djigzo_mynetworks}
+
+# What destination domains (and subdomains thereof) this system will relay mail to. 
+relay_domains = ${djigzo_relay_domains}
+
+# What Postfix features match subdomains of "domain.tld" automatically, instead of requiring an explicit ".domain.tld" pattern.
+parent_domain_matches_subdomains = ${djigzo_parent_domain_matches_subdomains}
+
+# The hostname to send in the SMTP EHLO or HELO command. 
+smtp_helo_name = ${djigzo_smtp_helo_name?$djigzo_smtp_helo_name}${djigzo_smtp_helo_name:${myhostname}}
+
+# The default mail delivery transport and next-hop destination for remote delivery to domains listed with $relay_domains
+relay_transport = relay${djigzo_relay_transport_host?:${djigzo_relay_transport_host_mx_lookup:[}${djigzo_relay_transport_host}${djigzo_relay_transport_host_mx_lookup:]}:${djigzo_relay_transport_host_port}}
+
+# The next-hop destination of non-local mail
+relayhost = ${djigzo_relayhost_mx_lookup:${djigzo_relayhost?[}}${djigzo_relayhost}${djigzo_relayhost_mx_lookup:${djigzo_relayhost?]}}${djigzo_relayhost?:${djigzo_relayhost_port}}
+
+# Optional restrictions that the Postfix SMTP server applies in the context of a client RCPT TO command
+smtpd_recipient_restrictions = permit_mynetworks reject_unauth_destination 
+    ${djigzo_rbl_clients} 
+    ${djigzo_reject_unverified_recipient? reject_unverified_recipient}
+
+# The numerical Postfix SMTP server response when a recipient address is rejected by the reject_unverified_recipient restriction     
+unverified_recipient_reject_code = ${djigzo_unverified_recipient_reject_code}
+
+# disable DSN and ETRN ESMTP announce
+smtpd_discard_ehlo_keywords = silent-discard, dsn, etrn
+
+# reject all ETRN
+smtpd_etrn_restrictions = reject
+
+# disable local delivery
+local_transport = error:local mail delivery is disabled
+local_recipient_maps = 
+
+# forward local system accounts 
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+#virtual_alias_maps = hash:/etc/postfix/virtual-aliases
+
+# The maximal size in bytes of a message, including envelope information. 
+message_size_limit = ${djigzo_after_filter_message_size_limit}
+
+# The maximal size of any local(8) individual mailbox or maildir file
+mailbox_size_limit = ${djigzo_mailbox_size_limit}
+
+# The minimal amount of free space in bytes in the queue file system that is needed to receive mail (set to 1.5 * djigzo_after_filter_message_size_limit)
+queue_minfree = 768000000
+
+# What remote SMTP clients are allowed to use the XFORWARD feature
+smtpd_authorized_xforward_hosts = 127.0.0.1/32
+
+# forward incoming email to the Mail Processing Agent (MPA)
+content_filter = djigzo:[127.0.0.1]:10025
+
+# filter email headers
+#header_checks = pcre:/etc/postfix/header-checks
+ 
+# server side TLS configuration
+#smtpd_tls_cert_file = /etc/postfix/tls.pem
+#smtpd_tls_key_file = $smtpd_tls_cert_file
+#smtpd_tls_security_level = may 
+#smtpd_tls_loglevel = 1
+# disable low grade ciphers to prevent FREAK attack
+#smtpd_tls_exclude_ciphers = aNULL, EXPORT, LOW
+
+# client side TLS configuration
+#smtp_tls_CApath = /etc/ssl/certs
+#smtp_tls_security_level = may 
+#smtp_tls_loglevel = 1
+
+#smtp_sasl_auth_enable = yes
+#smtp_sasl_password_maps = hash:/etc/postfix/smtp_client_passwd
+#smtp_sasl_type = cyrus
+#smtp_sasl_security_options = 
+
+# The mail system name that is displayed in Received: headers, in the SMTP greeting banner, and in bounced mail. 
+mail_name = CipherMail
+
+# The text that follows the 220 status code in the SMTP greeting banner. 
+# You MUST specify $myhostname at the start of the text. This is required by the SMTP protocol. 
+smtpd_banner = $myhostname ESMTP $mail_name
+
+# The time after which the sender receives a copy of the message headers of mail that is still queued. 
+# Uncomment the next line to generate "delayed mail" warnings
+#delay_warning_time = 4h
+
+# With locally submitted mail, append the string ".$mydomain" to addresses that have no ".domain" information.
+# appending .domain is the MUA's job.
+append_dot_mydomain = no
+
+biff = no
+recipient_delimiter = +
+
+# list of error classes that are reported to the postmaster. Set to empty by default as it can be result in mail floods
+# if there is some Postfix error.
+notify_classes = 

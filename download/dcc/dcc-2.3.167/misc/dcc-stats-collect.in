@@ -1,0 +1,205 @@
+#! /bin/sh
+
+# collect spam statistics in .rrd files
+#   [-x]	    debugging
+#   [-q]	    quiet
+#   [-S]	    read `cdcc stats` from stdin
+#   [-h dcc_homedir]
+#   [-D data-dir]   where to put the graphs and rrdtool files
+#   [-s stats-file] save raw `cdcc stats` output in stats-file
+#   [-t time]	    seconds since the Epoch when measurements were made
+#   [-T @RRDTOOL@]
+#		    see the FreeBSD package or elsewhere
+#   [-O rrdopts]    "--heartbeat X" or "--step Y"
+#   [-i client-ID]  that DCC servers will accept
+#   [-p password]   that DCC servers will accept
+#   [-C cdcc-cmd]   optional cdcc command before "stats"
+#   host1, host2, ... servers to ask for data
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.36 $Revision$
+#	@configure_input@
+
+DCC_HOMEDIR=@prefix@
+DEBUG=
+# check the args once to get the home directory
+while getopts "xqUSh:D:s:t:T:O:i:p:C:" c; do
+    case $c in
+	x) set -x; DEBUG=-x;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+. $DCC_HOMEDIR/dcc_conf
+
+QUIET=
+UPDATERRD=
+USE_STDIN=
+DATADIR=$DCC_HOMEDIR/stats
+STATSFILE=
+TS=N
+RRDTOOL=@RRDTOOL@
+RRDOPTS=
+CLNT_ID=
+PASSWD=
+CCMDS=
+USAGE="`basename $0`: [-xqUS] [-h homedir] [-D data-dir] [-s stats-file] [-t time]
+    [-T rrdtool] [-O rrdopts] [-i client-ID] [-p password] [-C cdcc-cmd]
+    host1 host2 ..."
+OPTIND=1
+while getopts "xqUSh:D:s:t:T:O:i:p:C:" c; do
+    case $c in
+	x) ;;
+	q) QUIET="-q";;
+	U) UPDATERRD=yes;;
+	S) USE_STDIN="-S";;
+	h) ;;
+	D) DATADIR="$OPTARG";;
+	s) STATSFILE="$OPTARG";;
+	t) TS="$OPTARG";;
+	T) RRDTOOL="$OPTARG";;
+	O) RRDOPTS="$RRDOPTS $OPTARG";;
+	i) CLNT_ID="'-i$OPTARG'";;
+	p) PASSWD="'-p$OPTARG'";;
+	C) if test -z "$CCMDS"; then
+		CCMDS="'-C $OPTARG'"
+	    else
+		CCMDS="$CCMDS'; $OPTARG'"
+	    fi
+	    ;;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -eq 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+cd $DATADIR
+
+# generate a timestamp from a -t value other than -tN that can be used with new
+#   and old `touch` commands to give the .rrd and status files the right mtime
+TTS=
+if test -n "$TS" -a "$TS" != N; then
+    if TTS=`date -r $TS '+%m%d%H%S'  2>/dev/null`; then : ;
+    else
+	# deal with systems that do not have `date -r`
+	TTS=`@PERL@ -e "use POSIX qw(strftime);	       		\
+	    print strftime '%m%d%H%S', localtime($TS);"`
+    fi
+fi
+
+
+for HOST in $*; do
+    HOST="`basename $HOST .rrd`"
+
+    XSTATSFILE=
+    if test -n "$STATSFILE"; then
+	eval XSTATSFILE="$STATSFILE"
+	if test -n "$XSTATSFILE"; then
+	    XSTATSFILE="-s$XSTATSFILE"
+	fi
+    fi
+    LINE=`eval $DCC_LIBEXEC/stats-get $USE_STDIN $DEBUG $QUIET	\
+	    $XSTATSFILE "$CLNT_ID" "$PASSWD" "$CCMDS" $HOST`
+
+    if test -n "$TTS" -a -n "$XSTATSFILE" -a "$XSTATSFILE" != /dev/null; then
+	# touch with an explicit time does not work except for the owner
+	touch $TTS $XSTATSFILE 2>/dev/null
+    fi
+
+    # collect reputation data
+    NUM='[0-9][0-9]*'
+    RLINE=`expr "$LINE" : '.*R\('"$NUM:$NUM:$NUM:$NUM:$NUM:$NUM:$NUM"'\)$'`
+    LINE=`expr "$LINE" : '^\('"$NUM:$NUM:$NUM:$NUM:$NUM:$NUM"'\).*'`
+    if test -n "$RLINE"; then
+	FILE="$HOST-REP.rrd"
+
+	# create the reputations RRD file if it does not exist and we have
+	#   non-zero data
+	if test ! -s $FILE && expr "$RLINE" : '.*:[1-9]' >/dev/null; then
+	    $DCC_LIBEXEC/dcc-stats-init -R $QUIET $DEBUG -h$DCC_HOMEDIR \
+		-D$DATADIR -T "$RRDTOOL" -O "$RRDOPTS" "$FILE"
+	fi
+	if test -s $FILE; then
+	    if $RRDTOOL update $FILE "$TS:$RLINE"; then
+		# ensure that the .rrd file has the right mtime
+		if test -n "$TTS"; then
+		    touch $TTS $FILE 2>/dev/null
+		fi
+	    fi
+	fi
+    fi
+
+    FILE="$HOST.rrd"
+
+    # create the RRD file if it does not exist
+    if test ! -s "$FILE"; then
+	$DCC_LIBEXEC/dcc-stats-init $QUIET $DEBUG -h$DCC_HOMEDIR	\
+	    -D$DATADIR -T "$RRDTOOL" -O "$RRDOPTS" "$FILE"
+    fi
+
+    # determine the version of the database
+    NO_MAX=no
+    HAS_FLOODED=
+    NO_TRAPPED=no
+    eval `$RRDTOOL info $FILE						\
+	    | sed -n -e 's/^rra.*cf = .MAX.*/NO_MAX=/p'			\
+		-e 's/ds.flooded.*DERIVE.*/HAS_FLOODED=yes/p'		\
+		-e 's/ds.trapped.*DERIVE.*/NO_TRAPPED=/p'`
+
+    # rebuild an old database if allowed
+    if test -n "$NO_MAX$HAS_FLOODED$NO_TRAPPED" -a -n "$UPDATERRD"; then
+	$DCC_LIBEXEC/dcc-stats-update $DEBUG -h $DCC_HOMEDIR -T $RRDTOOL
+	NO_MAX=no
+	HAS_FLOODED=
+	NO_TRAPPED=no
+	eval `$RRDTOOL info $FILE					\
+		| sed -n -e 's/^rra.*cf = .MAX.*/NO_MAX=/p'		\
+		    -e 's/ds.flooded.*DERIVE.*/HAS_FLOODED=yes/p'	\
+		    -e 's/ds.trapped.*DERIVE.*/NO_TRAPPED=/p'`
+    fi
+
+    # next file if we have no data
+    if test -z "$LINE"; then
+	continue
+    fi
+
+    # do not add 'trapped' counts to old databases
+    if test -n "$NO_TRAPPED"; then
+	START=`expr "$LINE" : '\(.*\):[0-9]*:[0-9]*:[0-9]*$'`
+	END=`expr "$LINE" : '.*:[0-9]*:\([0-9]*:[0-9]*\)$'`
+	LINE="$START:$END"
+    fi
+    # do not add 'flooded' values to new databases
+    if test -z "$HAS_FLOODED"; then
+	LINE=`expr "$LINE" : '\(.*\):[0-9]*$'`
+    fi
+    if $RRDTOOL update "$FILE" "$TS:$LINE"; then
+	# try to ensure that the .rrd file has the right mtime
+	# touch with an explicit time does not work except for the owner
+	if test -n "$TTS"; then
+	    touch $TTS $FILE 2>/dev/null
+	fi
+    fi
+done

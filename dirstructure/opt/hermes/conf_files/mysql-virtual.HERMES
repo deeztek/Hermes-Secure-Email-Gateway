@@ -1,0 +1,7 @@
+hosts = 127.0.0.1
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+table = virtual_recipients
+select_field = maps
+where_field = virtual_address

@@ -1,0 +1,11 @@
+# whitelist required by greylist DCC server
+#   See the dcc man page for the format of DCC white and blacklists.
+#   Each line must be in one of the forms
+#count [hex] type value
+#      [hex] type value
+#include pathname
+
+# Changes to this file or the files it includes have no effect until `dbclean -G`
+#   is run, perhaps by @libexecdir@/cron-dccd
+
+#include whitecommon

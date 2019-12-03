@@ -1,0 +1,795 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <TITLE>dccifd.8</TITLE>
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <STYLE type="text/css">
+	BODY {background-color:white; color:black}
+	ADDRESS {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+    </STYLE>
+</HEAD>
+<BODY>
+<PRE>
+<!-- Manpage converted by man2html 3.0.1 -->
+<B>dccifd(8)</B>             Distributed Checksum Clearinghouse             <B>dccifd(8)</B>
+
+
+</PRE>
+<H2 ID="NAME">NAME</H2><PRE>
+     <B>dccifd</B> -- Distributed Checksum Clearinghouse Interface Daemon
+
+
+</PRE>
+<H2 ID="SYNOPSIS">SYNOPSIS</H2><PRE>
+     <B>dccifd</B> [<B>-VdbxANPQ</B>] [<B>-G</B> <I>on</I> | <I>off</I> | <I>noIP</I> | <I>IPmask/xx</I>] [<B>-h</B> <I>homedir</I>]
+            [<B>-I</B> <I>user</I>] [<B>-p</B> <I>/sock</I> | <I>lhost,lport,rhost</I>] [<B>-o</B> <I>/sock</I> | <I>host,port</I>]
+            [<B>-D</B> <I>local-domain</I>] [<B>-m</B> <I>map</I>] [<B>-w</B> <I>whiteclnt</I>] [<B>-U</B> <I>userdirs</I>]
+            [<B>-a</B> <I>IGNORE</I> | <I>REJECT</I> | <I>DISCARD</I>] [<B>-t</B> <I>type,</I>[<I>log-thold,</I>]<I>rej-thold</I>]
+            [<B>-g</B> [<I>not-</I>]<I>type</I>] [<B>-S</B> <I>header</I>] [<B>-l</B> <I>logdir</I>] [<B>-R</B> <I>rundir</I>]
+            [<B>-r</B> <I>rejection-msg</I>] [<B>-T</B> <I>tmpdir</I>] [<B>-j</B> <I>maxjobs</I>]
+            [<B>-B</B> <I>dnsbl-option</I>] [<B>-L</B> <I>ltype,facility.level</I>]
+
+
+</PRE>
+<H2 ID="DESCRIPTION">DESCRIPTION</H2><PRE>
+     <B>dccifd</B> is a daemon intended to connect spam filters such as SpamAssasin
+     and mail transfer agents (MTAs) other than sendmail to DCC servers.  The
+     MTA or filter <B>dccifd</B> which in turn reports related checksums to the near-
+     est DCC server and adds an <I>X-DCC</I> SMTP header line to the message.  The
+     MTA is told to reject the message if it is unsolicited bulk.
+
+     <B>Dccifd</B> is similar to the DCC sendmail milter interface, <B><A HREF="dccm.html">dccm(8)</A></B> and the
+     DCC Procmail interface, <B><A HREF="dccproc.html">dccproc(8)</A></B>.  <B>Dccifd</B> is more efficient than
+     <B><A HREF="dccproc.html">dccproc(8)</A></B> but not restricted to use with sendmail like <B><A HREF="dccm.html">dccm(8)</A></B>.  All
+     three send reports of checksums related to mail received by DCC clients
+     and queries about the total number of reports of particular checksums.
+
+     MTA programs use a simple ASCII protocol a subset of SMTP to send a mail
+     message including its SMTP envelope to the daemon.  <B>Dccifd</B> responds with
+     an indication of whether the message is unsolicited bulk and an optional
+     copy of the message with an <I>X-DCC</I> header added.  The ASCII protocol is
+     described below and in the <I>include/dccif.h</I> file in the DCC source.  There
+     is a sample C interface routine in the <I>dcclib/dccif.c</I> file in the DCC
+     source and the <I>dcclib.a</I> library generated from the source.  A <I>Perl</I> ver-
+     sion of the interface routine is in <I>dccifd/dccif.pl</I>.  Test or demonstra-
+     tion programs in the style of <B><A HREF="dccproc.html">dccproc(8)</A></B> that use those interface rou-
+     tines are in <I>@prefix@/build/dcc/dccifd/dccif-test</I>.
+
+     A subset of ESMTP can be used instead of the ASCII protocol to connect
+     <B>dccifd</B> to postfix as a "Before-Queue Content Filter."  See the <B>-o</B> flag.
+
+     Since the checksums of messages that are whitelisted locally by the <B>-w</B>
+     <I>whiteclnt</I> file are not reported to the DCC server, <B>dccifd</B> knows nothing
+     about the total recipient counts for their checksums and so cannot add
+     <I>X-DCC</I> header lines to such messages.
+
+     Enable the daemon and put its parameters in the <I>@prefix@/dcc</I><B>_</B><I>conf</I> file
+     and start the daemon with the <I>@libexecdir@/rcDCC</I> or
+     <I>@libexecdir@/start-dccifd</I> scripts.
+
+     The list of servers that <B>dccifd</B> contacts is in the memory mapped file
+     <I>@prefix@/map</I> shared by local DCC clients.  The file is  maintained with
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>.
+
+   <B ID="OPTIONS">OPTIONS</B>
+     The following options are available:
+
+     <B ID="OPTION-V">-V</B>   displays the version of <B>dccifd</B>.  Two or more <B>-V</B> options show the
+          options with which it was built.
+
+     <B ID="OPTION-d">-d</B>   enables debugging output from the DCC client software.  Additional
+          <B>-d</B> options increase the number of messages.  A single <B>-d</B> logs
+          aborted SMTP transactions including those from some "dictionary
+          attacks."
+
+     <B ID="OPTION-b">-b</B>   causes the daemon to not detach itself from the controlling tty and
+          put itself into the background.
+
+     <B ID="OPTION-x">-x</B>   causes the daemon to try "extra hard" to contact a DCC server.
+          Since it is usually more important to deliver mail than to report
+          its checksums, <B>dccifd</B> normally does not delay too long while trying
+          to contact a DCC server.  It will not try again for several seconds
+          after a failure.  With <B>-x</B>, it will always try to contact the DCC
+          server and it will tell the MTA to answer the DATA command with a
+          4yz temporary failure.
+
+     <B ID="OPTION-A">-A</B>   adds to existing X-DCC headers in the message instead of replacing
+          existing headers of the brand of the current server.
+
+     <B ID="OPTION-N">-N</B>   neither adds, deletes, nor replaces existing X-DCC headers in the
+          message.  Each mail message is logged, rejected, and otherwise han-
+          dled the same.
+
+     <B ID="OPTION-P">-P</B>   The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP
+          header fields, but historically has looked for counts of "many".
+          However, there are situations when <B>dccifd</B> knows that a mail message
+          is extremely bulky and probably spam.  For example, mail from a
+          sender that is blacklisted in <I>whiteclnt</I> gets an X-DCC header that
+          includes <I>bulk</I>.  To acommodate that bug in SpamAssassin, by default
+          whenever <B>dccifd</B> generates an X-DCC header containing "bulk", it also
+          forces the <I>Body</I> count to "many".  <B>-P</B> turns off that kludge and the
+          <I>Body</I> contains the count from the DCC server.
+
+     <B ID="OPTION-Q">-Q</B>   only queries the DCC server about the checksums of messages instead
+          of reporting.  This is useful when <B>dccifd</B> is used to filter mail
+          that has already been reported to a DCC server by another DCC
+          client.  No single mail message should be reported to a DCC server
+          more than once per recipient, because each report will increase the
+          apparent "bulkness" of the message.
+
+          It is better to use <I>MXDCC</I> lines in the global <I>@prefix@/whiteclnt</I>
+          file for your MX mail servers that use DCC than to use <B>-Q</B> with
+          <B>dccifd</B>.
+
+          Do not use <B>-Q</B> except on mail that you know has been reported to a
+          DCC server.  DCC depends on reports of all except known private mail
+          and works only because almost no DCC installations use <B>-Q</B>.
+
+     <B ID="OPTION-G">-G</B> <I>on</I> | <I>off</I> | <I>noIP</I> | <I>IPmask/xx</I>
+          controls <I>greylisting</I>.  At least one working greylist server must be
+          listed in the <I>@prefix@/map</I> file.  If more than one is named, they
+          must "flood" or change checksums and they must use the same <B>-G</B>
+          parameters.  See <B><A HREF="dccd.html">dccd(8)</A></B>.  Usually all dccm or dccifd DCC client
+          processes use the same <B>-G</B> parameters.
+
+          <I>IPmask/xx</I> and <I>noIP</I> remove part or all of the IP address from the
+          greylist triple.
+
+     <B ID="OPTION-h">-h</B> <I>homedir</I>
+          overrides the default DCC home directory, <I>@prefix@</I>.
+
+     <B ID="OPTION-I">-I</B> <I>user</I>
+          specifies the UID and GID of the process.
+
+     <B ID="OPTION-p">-p</B> <I>/sock/name</I> | <I>lhost,lport,rhost</I>
+          overrides the default address at which programs contact <B>dccifd</B>.  The
+          default is a UNIX domain socket named dccifd in the DCC home direc-
+          tory.
+
+          The second form specifies a local host name or IP address, a local
+          TCP port number, and the host name or IP addresses of computers that
+          can use <B>dccifd</B>.  127.0.0.1 is a common choices for <I>lhost</I>.  The
+          string <I>*</I> for <I>lhost</I> specifies IN_ADDRANY or all local IP addresses.
+          127.0.0.1 is a common choice for <I>rhost</I>, but it can be a
+          <I>xxx.xxx.xxx.xxx/mm</I> CIDR block or a <I>xxx.xxx.xxx.xxx-yyy.yyy.yyy.yyy</I>
+          range of IPv4 or IPv6 addresses.
+
+     <B ID="OPTION-o">-o</B> <I>/sock</I> | <I>host,port</I>
+          enables SMTP proxy mode instead of the ASCII protocol and specifies
+          the output connection when <B>dccifd</B> acts as an SMTP proxy.  It is the
+          address of the SMTP server for which <B>dccifd</B> acts as SMTP client.
+          When <I>/sock</I> is <I>/dev/null</I>, <B>dccifd</B> acts as if there were downstream
+          SMTP server that always answers "250 ok".  The string <I>@</I> specifies
+          the same IP address as the incoming TCP connection.
+
+          The input to <B>dccifd</B> in SMTP proxy mode is specified with <B>-p</B>.  For
+          example, <B>-p</B> <I>127.0.0.1,10025,127.0.0.1/32</I> <B>-o</B> <I>127.0.0.1,10026</I> could be
+          used to connect <B>dccifd</B> with Postfix as described in the documenta-
+          tion in version 2.2.1 Postfix documentation.
+
+          See below concerning the subset of ESMTP used in this mode.
+
+     <B ID="OPTION-m">-m</B> <I>map</I>
+          specifies a name or path of the memory mapped parameter file instead
+          of the default <I>@prefix@/map</I>.  It should be created with the <B><A HREF="cdcc.html">cdcc(8)</A></B>
+          command.
+
+     <B ID="OPTION-w">-w</B> <I>whiteclnt</I>
+          specifies an optional file containing filtering parameters as well
+          as SMTP client IP addresses, SMTP envelope values, and header values
+          of mail that is spam or is not spam and does not need a <I>X-DCC</I>
+          header, and whose checksums should not be reported to the DCC
+          server.
+
+          If the pathname <I>whiteclnt</I> is not absolute, it is relative to the DCC
+          home directory.
+
+          The format of the <B>dccifd</B> whiteclnt file is the same as the
+          <I>@prefix@/whitelist</I> files used by <B><A HREF="dbclean.html">dbclean(8)</A></B> and the <I>whiteclnt</I> file
+          used by <B><A HREF="dccproc.html">dccproc(8)</A></B>.  See <B><A HREF="dcc.html">dcc(8)</A></B> for a description of DCC white and
+          blacklists.  Because the contents of the <I>whiteclnt</I> file are used
+          frequently, a companion file is automatically created and main-
+          tained.  It has the same pathname but with an added suffix of <I>.dccw</I>
+          and contains a memory mapped hash table of the main file.
+
+          A whitelist entry ("OK") or two or more semi-whitelistings ("OK2")
+          for one of the message's checksums prevents all of the message's
+          checksums from being reported to the DCC server and the addition of
+          a <I>X-DCC</I> header line by <B>dccifd</B>.  A whitelist entry for a checksum
+          also prevents rejecting or discarding the message based on DCC
+          recipient counts as specified by <B>-a</B> and <B>-t</B>.  Otherwise, one or more
+          checksums with blacklisting entries ("MANY") cause all of the mes-
+          sage's checksums to be reported to the server with an addressee
+          count of "MANY".
+
+          If the message has a single recipient, an <I>env</I><B>_</B><I>To</I> <I>whiteclnt</I> entry of
+          "OK" for the checksum of its recipient address acts like any other
+          <I>whiteclnt</I> entry of "OK."  When the SMTP message has more than one
+          recipient, the effects can be complicated.  When a message has sev-
+          eral recipients with some but not all listed in the <I>whiteclnt</I> file,
+          <B>dccifd</B> tries comply with the wishes of the users who want filtering
+          as well as those who don't by silently not delivering the message to
+          those who want filtering (i.e. are not whitelisted) and delivering
+          the message to users who don't want filtering.
+
+     <B ID="OPTION-U">-U</B> <I>userdirs</I>
+          enables per-user <I>whiteclnt</I> files and log directories.  Each target
+          of a message can have a directory of log files named
+          <I>userdirs/addr/log</I> where <I>addr</I> is the local user or mailbox name com-
+          puted by the MTA.  The name of each user's log directory must be
+          <I>log</I>.  If it is not absolute, <I>userdirs</I> is relative to the DCC home
+          directory.  The directory containing the log files must be named <I>log</I>
+          and it must be writable by the <B>dccifd</B> process.  Each log directory
+          must exist or logging for the corresponding is silently disabled.
+          The files created in the log directory are owned by the UID of the
+          <B>dccifd</B> process, but they have <I>group</I> and <I>other</I> read and write permis-
+          sions copied from the corresponding <I>log</I> directory.  To ensure the
+          privacy of mail, it may be good to make the directories readable
+          only by <I>owner</I> and <I>group</I>, and to use a cron script that changes the
+          owner of each file to match the grandparent <I>addr</I> directory.
+
+          There can also be a per-user whitelist file named
+          <I>userdirs/addr/whiteclnt</I> for each addressee <I>addr.</I> Any checksum that
+          is not white- or blacklisted by an individual addressee's per-user
+          <I>whiteclnt</I> file  is checked in the main <I>@prefix@/whiteclnt</I> file.  A
+          missing per-addressee <I>whiteclnt</I> file is the same as an empty file.
+          Relative paths for files included in per-addressee files are
+          resolved in the DCC home directory.  The <I>whiteclnt</I> files and the
+          <I>addr</I> directories containing them must be writable by the <B>dccifd</B>
+          process.
+
+          <I>Option</I> lines in per-user whiteclnt files can be used to modify many
+          aspects of <B>dccifd</B> filtering, as described in the main dcc man page.
+          For example, an <I>option</I> <I>dcc-off</I> line turns off DCC filtering for
+          individual mailboxes.
+
+     <B ID="OPTION-a">-a</B> <I>IGNORE</I> | <I>REJECT</I> | <I>DISCARD</I>
+          specifies the action taken when <B>dccifd</B> is in proxy mode with <B>-o</B> and
+          DCC server counts or <B>-t</B> thresholds say that a message is unsolicited
+          and bulk.  <I>IGNORE</I> causes the message to be unaffected except for
+          adding the <I>X-DCC</I> header line to the message.  This turns off all
+          filtering except greylisting.
+
+          Spam can also be <I>REJECT</I>ed or when in proxy mode with <B>-o</B> accepted and
+          silently <I>DISCARD</I>ed without being delivered to local mailboxes.  The
+          default is <I>REJECT</I>.
+
+          Mail forwarded via IP addresses marked <I>MX</I> or <I>MXDCC</I> in the main
+          <I>@prefix@/whiteclnt</I> file is treated as if <B>-a</B> <I>DISCARD</I> were specified.
+          This prevents "bouncing" spam.
+
+          The effects of the <B>-w</B> <I>whiteclnt</I> are not affected by <B>-a</B>.
+
+     <B ID="OPTION-t">-t</B> <I>type,</I>[<I>log-thold,</I>]<I>rej-thold</I>
+          sets logging and "spam" thresholds for checksum <I>type</I>.  The checksum
+          types are <I>IP</I>, <I>env</I><B>_</B><I>From</I>, <I>From</I>, <I>Message-ID</I>, <I>substitute</I>, <I>Received</I>,
+          <I>Body</I>, <I>Fuz1</I>, <I>Fuz2</I>, <I>rep-total</I>, and <I>rep</I>.  The first six, <I>IP</I> through
+          <I>substitute</I>, have no effect except when a local DCC server configured
+          with <B>-K</B> is used.  The <I>substitute</I> thresholds apply to the first sub-
+          stitute heading encountered in the mail message.  The string <I>ALL</I>
+          sets thresholds for all types, but is unlikely to be useful except
+          for setting logging thresholds.  The string <I>CMN</I> specifies the com-
+          monly used checksums <I>Body</I>, <I>Fuz1</I>, and <I>Fuz2</I>.  <I>Rej-thold</I> and <I>log-thold</I>
+          must be numbers, the string <I>NEVER</I>, or the string <I>MANY</I> indicating
+          millions of targets.  Counts from the DCC server as large as the
+          threshold for any single type are taken as sufficient evidence that
+          the message should be logged or rejected.
+
+          <I>Log-thold</I> is the threshold at which messages are logged.  It can be
+          handy to log messages at a lower threshold to find solicited bulk
+          mail sources such as mailing lists.  If no logging threshold is set,
+          only rejected mail and messages with complicated combinations of
+          white and blacklisting are logged.  Messages that reach at least one
+          of their rejection thresholds are logged regardless of logging
+          thresholds.
+
+          <I>Rej-thold</I> is the threshold at which messages are considered "bulk,"
+          and so should be rejected or discarded if not whitelisted.
+
+          DCC Reputation thresholds in the commercial version of DCC are con-
+          trolled by thresholds on checksum types <I>rep</I> and <I>rep-total</I>.  The DCC
+          Reputations of IP addresses that the DCC database says have sent
+          more than <I>rep-total,log-thold</I> are computed and messages from those
+          addresses are logged.  Messages from IP addresses with DCC Reputa-
+          tions of at least the <I>rep,rej-thold</I> rejection threshold can be
+          rejected.  The DCC Reputation of an IP address is the percentage of
+          its messages known to have been sent to at least 10 recipients.  The
+          defaults are equivalent to <I>rep,never</I> and <I>rep-total,never,20</I>.
+
+          Bulk DCC Reputations do not reject mail unless enabled by an
+          <I>option</I> <I>DCC-rep-on</I> line a <I>whiteclnt</I> file.
+
+          The checksums of locally whitelisted messages are not checked with
+          the DCC server and so only the number of targets of the current copy
+          of a whitelisted message are compared against the thresholds.
+
+          The default is <I>ALL,NEVER</I>, so that nothing is discarded, rejected, or
+          logged.  A common choice is <I>CMN,25,50</I> to reject or discard mail with
+          common bodies except as overridden by the whitelist of the DCC
+          server, the sendmail <I>${dcc</I><B>_</B><I>isspam}</I> and <I>${dcc</I><B>_</B><I>notspam}</I> macros, and
+          <B>-g</B>, and <B>-w</B>.
+
+     <B ID="OPTION-g">-g</B> [<I>not-</I>]<I>type</I>
+          indicates that whitelisted, <I>OK</I> or <I>OK2</I>, counts from the DCC server
+          for a type of checksum are to be believed.  They should be ignored
+          if prefixed with <I>not-</I>.  <I>Type</I> is one of the same set of strings as
+          for <B>-t</B>.  Only <I>IP</I>, <I>env</I><B>_</B><I>From</I>, and <I>From</I> are likely choices.  By default
+          all three are honored, and hence the need for <I>not-</I>.
+
+     <B ID="OPTION-S">-S</B> <I>hdr</I>
+          adds to the list of substitute or locally chosen headers that are
+          checked with the <B>-w</B> <I>whiteclnt</I> file and sent to the DCC server.  The
+          checksum of the last header of type <I>hdr</I> found in the message is
+          checked.  <I>Hdr</I> can be <I>HELO</I> to specify the SMTP envelope HELO value.
+          <I>Hdr</I> can also be <I>mail</I><B>_</B><I>host</I> to specify the host name from the
+          Mail_from value in the SMTP envelope.  As many as 8 different sub-
+          stitute headers can be specified, but only the checksum of the first
+          will be sent to the DCC server.
+
+     <B ID="OPTION-l">-l</B> <I>logdir</I>
+          specifies a directory in which files containing copies of messages
+          processed by <B>dccifd</B> are kept.  They can be copied to per-user direc-
+          tories specified with <B>-U</B>.  Information about other recipients of a
+          message is deleted from the per-user copies.
+
+          If <I>logdir</I> is in the form <I>D?dir</I>, log files are put into subdirecto-
+          ries of <I>dir</I> the form <I>dir/JJJ</I> where <I>JJJ</I> is the current julian day.
+          <I>H?dir</I> puts logs files into subdirectories of the form <I>dir/JJJ/HH</I>
+          where <I>HH</I> is the current hour.  <I>M?dir</I> puts log files into subdirecto-
+          ries of the form <I>dir/JJJ/HH/MM</I> where <I>MM</I> is the current minute.
+
+          The directory is relative to the DCC home directory if it is not
+          absolute
+
+          <I>Option</I> <I>log-subdirectory-{day,hour,minute}</I> lines in <I>whiteclnt</I> files
+          described in <B><A HREF="dcc.html">dcc(8)</A></B> are an equivalent mechanism for per-user log
+          directories.  Also see the FILES section below concerning the con-
+          tents of log files.
+
+     <B ID="OPTION-R">-R</B> <I>rundir</I>
+          specifies the "run" directory where the file containing the daemon's
+          process ID is stored.  The default value is <I>@dcc_rundir@</I>.
+
+     <B ID="OPTION-T">-T</B> <I>tmpdir</I>
+          changes the default directory for temporary files from the default.
+          The default is the directory specified with <B>-l</B> or the system default
+          if <B>-l</B> is not used.  The system default is often <I>/tmp</I>.
+
+     <B ID="OPTION-D">-D</B> <I>local-domain</I>
+          specifies a host or domain name by which the system is known.  There
+          can be several <B>-D</B> settings.
+
+          To find the per-user log directory and whitelist for each mail
+          recipient, <B>dccifd</B> must know each recipient's user name.  The ASCII
+          protocol used between and the MTA includes an optional user name
+          with each SMTP recipient address.  When the user name is absent when
+          the ASCII protocol is used or when the subset of ESMTP enabled with
+          <B>-o</B> is used, and when the SMTP recipient address includes an <I>at</I> <I>sign</I>
+          (@) each mail address is checked against the list of <I>local-domain</I>s.
+          The part of the recipient address remaining after longest matching
+          <I>local-domain</I> (if any) is taken as the user name.  The match is
+          anchored at the right or the end of the recipient address.  It must
+          start at a period (.) or <I>at</I> <I>sign</I> (@) in the domain name part of the
+          address.
+
+          If <I>local-domain</I> starts with an asterisk (*) indicating a wildcard,
+          preceding sub-domain names are discarded to compute the user name.
+          Otherwise, the computed user name will include any unmatched sub-
+          domain names.
+
+          The default value of <I>local-domain</I> when there are no <B>-D</B> settings is
+          the host name of the system.
+
+     <B ID="OPTION-r">-r</B> <I>rejection-msg</I>
+          specifies the rejection message in <B>-o</B> proxy mode for unsolicited
+          bulk mail or for mail temporarily blocked by <I>greylisting</I> when <B>-G</B> is
+          specified.  The first <B>-r</B> <I>rejection-msg</I> replaces the default bulk
+          mail rejection message, "5.7.1 550 mail %ID from %CIP rejected by
+          DCC".  The second replaces "4.2.1 452 mail %ID from %CIP temporary
+          greylist embargoed".  The third <B>-r</B> <I>rejection-msg</I> replaces the
+          default SMTP rejection message "5.7.1 550 %ID bulk mail reputation;
+          see https://commercial-dcc.rhyolite.com/cgi-bin/reps.cgi?tgt=%CIP"
+          for mail with bulk DCC Reputations.  If <I>rejection-msg</I> is the zero-
+          length string, the <B>-r</B> setting is counted but the corresponding
+          default message is not changed.
+
+          <I>Rejection-msg</I> can contain specific information about the mail mes-
+          sage.  The following strings starting with % are replaced with the
+          corresponding values:
+              %ID       message ID such as the unique part of log file name or
+                        sendmail queue ID
+              %CIP      SMTP client IP address
+              %BTYPE    type of DNS blacklist hit, such as "SMTP client",
+                        "mail_host", or "URL NS"
+              %BTGT     IP address or name declared bad by DNS blacklist
+              %BPROBE   domain name found in DNS blacklist such as
+                        4.3.2.10.example.com
+              %BRESULT  value of the %BPROBE domain name found in DNS black-
+                        list
+
+          A common alternate for the bulk mail rejection message is "4.7.1 451
+          Access denied by DCC" to tell the sending mail system to continue
+          trying.  Use a 4yz response with caution, because it is likely to
+          delay for days a delivery failure message for false positives.  If
+          the rejection message does not start with an RFC 1893 status code
+          and RFC 2821 reply code, 5.7.1 and 550 or 4.2.1 and 452 are used.
+
+          See also <B>-B</B> <I>set:rej-msg</I> to set the status message for mail rejected
+          by DNS blacklists.
+
+     <B ID="OPTION-j">-j</B> <I>maxjobs</I>
+          limits the number of simultaneous requests that will be processed.
+          The default value is the maximum number that seems to be possible
+          given system limits on open files, select() bit masks, and so forth.
+          Start <B>dccifd</B> with <B>-d</B> and see the starting message in the system log
+          to see the limit.
+
+     <B ID="OPTION-B">-B</B> <I>dnsbl-option</I>
+          enables DNS white- and blacklist checks of the SMTP client IP
+          address, SMTP envelope Mail_From sender domain name, and of host
+          names in URLs in the message body.  Body URL blacklisting has too
+          many false positives to use on abuse mailboxes.  It is less effec-
+          tive than greylisting with <B><A HREF="dccm.html">dccm(8)</A></B> or <B>dccifd(8)</B> but can be useful in
+          situations where greylisting cannot be used.  It can be combined
+          with greylisting.
+
+          <I>Dnsbl-option</I> is either one of the <B>-B</B> <I>set:option</I> forms or
+              <B>-B</B> <I>domain</I>[any[<I>,bltype</I>]]
+              <B>-B</B> <I>domain</I>[<I>,IPaddr</I>[<I>/xx</I>[<I>&amp;IPmask</I>][<I>,bltype</I>]]]
+              <B>-B</B> <I>domain</I>[<I>,IPaddrLO</I>[<I>-IPaddrHI</I>[<I>&amp;IPmask</I>][<I>,bltype</I>]]]
+          <I>Domain</I> is a DNS blacklist domain such as <I>example.com</I> that will be
+          searched.  The strings <I>any</I>, <I>IPaddr</I>, <I>IPaddr/xx</I>, or <I>IPaddrLO-IPaddrHI</I>,
+          specifies which IP addresses found in the DNS blacklist after apply-
+          ing the optional IP address mask <I>IPmask</I> say that mail messages
+          should be rejected or accepted with <B>-B</B> <I>set:white</I>.  "127.0.0.2" is
+          assumed if no address(es) are specified.  IPv6 addresses can be
+          specified with the usual colon (:) notation.  Host names can be used
+          instead of numeric addresses.  The type of DNS blacklist is speci-
+          fied by <I>bltype</I> as <I>name</I>, <I>all-names</I>, <I>IPv4</I>, or <I>IPv6</I>.  Given an envelope
+          sender domain name or a domain name in a URL of spam.domain.org and
+          a blacklist of type <I>name</I>, spam.domain.org.example.com will be looked
+          up.  The names spam.domain.org.example.com, domain.org.example.com,
+          and org.example.com will be looked up in blacklists of type
+          <I>all-names</I>.  Use <I>name</I> with DNS blacklists that use wildcards for
+          speed but <I>all-names</I> for other DNS name blacklists.  Blacklist types
+          of <I>IPv4</I> and <I>IPv6</I> require that the domain name in a URL sender
+          address be resolved into an IPv4 or IPv6 address.  The resolved
+          address from the mail message is then written as a reversed string
+          of decimal octets to check the DNS blacklist, as in
+          <I>2.0.0.127.example.com</I>.
+
+          A <I>domain</I> of "."  and type of <I>name</I> can be used to blacklist domain
+          names with specified addresses.  This can be useful to detect URLs
+          with domain names listed in a Response Policy Zone (RPZ).  For exam-
+          ple, the following can be used to reject mail containing URLs listed
+          by a response policy zone that maps evil domain names to 224.0.0.0
+          with an informative status message:
+
+            '-Bset:rej-msg=5.7.1 550 %ID %BTYPE \
+                  https://example.com/query/dbl?domain=%BTGT'
+            -B.,224.0.0.0,name
+
+          More than one blacklist can be specified and blacklists can be
+          grouped with <B>-B</B> <I>set:group=X</I>.  All searching within a group of black-
+          lists is stopped at the first positive result.
+
+          Unlike <B><A HREF="dccproc.html">dccproc(8)</A></B>, positive results are ignored by <B>dccifd</B> after
+          being logged unless an <I>option</I> <I>DNSBL-on</I> or <I>option</I> <I>DNSBLx-on</I> line
+          appears a <I>whiteclnt</I> file.
+
+          <B>-B</B> <I>set:no-client</I>
+               implies that SMTP client IP addresses and reverse DNS domain
+               names should not be checked in the following blacklists.
+               <B>-B</B> <I>set:client</I> restores the default for the following black-
+               lists.
+
+          <B>-B</B> <I>set:no-mail</I><B>_</B><I>host</I>
+               implies that SMTP envelope Mail_From sender domain names should
+               not be checked in the following blacklists.  <B>-B</B> <I>set:mail</I><B>_</B><I>host</I>
+               restores the default.
+
+          <B>-B</B> <I>set:no-URL</I>
+               says that URLs in the message body should not be checked in the
+               in the following blacklists.  <B>-B</B> <I>set:URL</I> restores the default.
+
+          <B>-B</B> <I>set:no-MX</I>
+               says MX servers of sender Mail_From domain names and host names
+               in URLs should not be checked in the following blacklists.
+               <B>-B</B> <I>set:MX</I> restores the default.
+
+          <B>-B</B> <I>set:no-NS</I>
+               says DNS servers of sender Mail_From domain names and host
+               names in URLs should not be checked in the following black-
+               lists.  <B>-B</B> <I>set:NS</I> restores the default.
+
+          <B>-B</B> <I>set:white</I>
+               says the DNS list is a whitelist of names or IP addresses.
+               <B>-B</B> <I>set:black</I> restores the default.  DNS whitelist usually also
+               need <B>-B</B> <I>set:no-mail</I><B>_</B><I>host</I>, <B>-B</B> <I>set:no-URL</I>, <B>-B</B> <I>set:no-MX</I>,
+               <B>-B</B> <I>set:no-NS</I>, and <B>-B</B> <I>set:no-mail</I><B>_</B><I>host</I>.
+
+          <B>-B</B> <I>set:defaults</I>
+               is equivalent to all of <B>-B</B> <I>set:black</I> <B>-B</B> <I>set:client</I>
+               <B>-B</B> <I>set:mail</I><B>_</B><I>host</I> <B>-B</B> <I>set:URL</I> <B>-B</B> <I>set:MX</I> and <B>-B</B> <I>set:NS</I>
+
+          <B>-B</B> <I>set:group=X</I>
+               adds following DNS blacklists specified with <B>-B</B> <I>domain</I>[<I>...</I>] to
+               group 1, 2, 3, or 4.
+
+          <B>-B</B> <I>set:debug=X</I>
+               sets the DNS blacklist logging level
+
+          <B>-B</B> <I>set:msg-secs=S</I>
+               limits <B>dccifd</B> to <I>S</I> seconds total for checking all DNS black-
+               lists.  The default is 25.
+
+          <B>-B</B> <I>set:URL-secs=S</I>
+               limits <B>dccifd</B> to at most <I>S</I> seconds resolving and checking any
+               single URL or IP address.  The default is 11.  Some spam con-
+               tains dozens of URLs and some "spamvertised" URLs contain host
+               names that need minutes to resolve.  Busy mail systems cannot
+               afford to spend minutes checking each incoming mail message.
+
+          <B>-B</B> <I>set:rej-msg="rejection</I> <I>message"</I>
+               sets the SMTP rejection message for the following blacklists.
+               <I>Rejection-msg</I> must be in the same format as for <B>-r</B>.  If
+               <I>rejection</I> <I>message</I> is null, the default is restored.  The
+               default DNS blacklist rejection message is the first message
+               set with <B>-r</B>.
+
+          <B>-B</B> <I>set:max</I><B>_</B><I>helpers=X</I>
+               sets maximum number of helper processes to <I>X</I>.  In order to use
+               typical single-threaded DNS resolver libraries, <B>dccifd</B> uses
+               fleets of helper processes.  It is rarely a good idea to change
+               the default, which is the same as the maximum number of simul-
+               taneous jobs set with <B>-j</B>.
+
+          <B>-B</B> <I>set:progpath=@libexecdir@/dns-helper</I>
+               changes the path to the helper program.
+
+     <B ID="OPTION-L">-L</B> <I>ltype,facility.level</I>
+          specifies how messages should be logged.  <I>Ltype</I> must be <I>error</I>, <I>info</I>,
+          or <I>off</I> to indicate which of the two types of messages are being con-
+          trolled or to turn off all <B>syslog(3)</B> messages from <B>dccifd</B>.  <I>Level</I>
+          must be a <B>syslog(3)</B> level among <I>EMERG</I>, <I>ALERT</I>, <I>CRIT</I>, <I>ERR</I>, <I>WARNING</I>,
+          <I>NOTICE</I>, <I>INFO</I>, and <I>DEBUG</I>.  <I>Facility</I> must be among <I>AUTH</I>, <I>AUTHPRIV</I>,
+          <I>CRON</I>, <I>DAEMON</I>, <I>FTP</I>, <I>KERN</I>, <I>LPR</I>, <I>MAIL</I>, <I>NEWS</I>, <I>USER</I>, <I>UUCP</I>, and <I>LOCAL0</I>
+          through <I>LOCAL7</I>.  The default is equivalent to
+                <B>-L</B> <I>info,MAIL.NOTICE</I> <B>-L</B> <I>error,MAIL.ERR</I>
+
+     <B>dccifd</B> normally sends counts of mail rejected and so forth to the system
+     log at midnight.  The SIGUSR1 signal sends an immediate report to the
+     system log.  The reports will be repeated every 24 hours at the same
+     minute as the signal instead of at midnight.
+
+   <B ID="Protocol">Protocol</B>
+     Unless SMTP proxy mode is enabled with <B>-o</B>, <B>Dccifd</B> uses a simple ASCII
+     protocol to receive mail messages to be checked and to return results.
+     For each message, the MTA must open a connection to the interface daemon,
+     send options, envelope recipients, and the message, receive the results,
+     and close the connection.
+
+     Instead of the ASCII protocol, a subset of ESMTP is enabled by <B>-o</B>.  Only
+     the familiar HELO, EHLO, Mail, Rcpt, DATA, RSET, and QUIT commands and
+     the Postfix extensions XFORWARD and XCLIENT are honored.  Since SMTP has
+     no provisions for user names, the protocol enabled by <B>-o</B> depends on a
+     list of local domain names specified with <B>-D</B> to find per-user log direc-
+     tories and whitelist files.  If neither XFORWARD nor XCLIENT are used,
+     <B>dccifd</B> uses the IP address of the MTA and the value of the HELO command.
+
+     In the ASCII protocol, each of the following lines are sent in order to
+     <B>dccifd</B>.  Each ends with a newline ('\n') character.
+       options     zero or more blank-separated strings among:
+                     <I>spam</I>        the message is already known to be spam
+                     <I>body</I>        return all of the headers with the added
+                                 <I>X-DCC</I> header line and the body
+                     <I>header</I>      return the <I>X-DCC</I> header
+                     <I>cksums</I>      return <I>X-DCC</I> header and the checksums for the
+                                 message.
+                     <I>query</I>       ask the DCC server about the message without
+                                 reporting it, as if <B>dccifd</B> were running with
+                                 <B>-Q</B>.
+                     <I>grey-off</I>    disable greylisting for this message.
+                     <I>grey-query</I>  only query the greylist server for this mes-
+                                 sage.  <B>-G</B> <I>on</I> must be in use.
+                     <I>no-reject</I>   has the same effect as running <B>dccifd</B> with
+                                 <B>-a</B> <I>IGNORE</I>.  It suppresses the overall, one
+                                 character line 'R' result.  This can be use-
+                                 ful when using <B>dccifd</B> only for greylisting.
+                     <I>log</I>         ensure that this message is logged as if
+                                 <B>dccifd</B> were running with <B>-t -all,0,</B>
+                     <I>rcvd-next</I>   causes <B>dccifd</B> to skip a Received: header
+                                 looking for the client IP address and HELO
+                                 value.  Each additional <I>rcvd-next</I> option
+                                 increases the number of Received: headers
+                                 skipped.  <I>MX</I> or <I>MXDCC</I> in the global
+                                 <B>-w</B> <I>whiteclnt</I> file usually work better.
+       client      IP address of the SMTP client in a "dotted" or "coloned"
+                   ASCII string and reverse-DNS host name.  If the host name
+                   is present, it must follow a carriage return character
+                   ('\r') after the IP address.  The client IP address must be
+                   present and non-null if the host name is present.  The
+                   string "0.0.0.0\n" is understood the same as the null
+                   string, meaning that both the IP address and host name are
+                   absent.  If the client IP address is absent, then the IP
+                   address and host name are taken from the first non-local
+                   Received header if it has the standard "name (name [IP
+                   address])..." format.  Non-standard Received headers com-
+                   monly added by qmail as well as Received headers specifying
+                   IP addresses marked <I>MX</I> or <I>MXDCC</I> in the global <B>-w</B> <I>whiteclnt</I>
+                   file are skipped.
+       HELO        SMTP HELO value or nothing, followed by a newline ('\n')
+                   character.  If the HELO value is null and the IP address of
+                   the SMTP client are not supplied, they will be taken from
+                   the same Received: header that supplies the IP address.
+       sender      or SMTP <I>Mail</I> <I>From</I> command value for the env_from checksum.
+                   If the sender is null, the contents of the first Return-
+                   Path: or UNIX style From_ header is used.
+       recipients  or SMTP <I>Rcpt</I> <I>To</I> recipient mailboxes followed by correspond-
+                   ing local user names, one (mailbox,user) pair to a line.
+                   Each optional local user name is separated from the corre-
+                   sponding mailbox recipient address by a carriage return
+                   ('\r').  A local user name can be null if it is not known,
+                   but each recipient mailbox must be non-null.  If there are
+                   no lines of (mailbox,user) pairs and if the <I>spam</I> option is
+                   not included, then the <I>query</I> is assumed.  Mailboxes without
+                   user names will lack per-user log files and cannot invoke a
+                   per-user <I>whiteclnt</I> file.
+
+     The last recipient-user name pair is followed by an empty line and the
+     headers and body of the message.  The end of the body of the mail message
+     is signaled by the MTA half-closing the connection.  See <B>shutdown(2)</B>.
+
+     <B>Dccifd</B> responds with three things.  First is a one character line of the
+     overall result advising the MTA:
+       A    accept the message for all recipients and answer the SMTP DATA
+            command with a 2yz result.
+       G    answer with a 4yz result to embargo the message for greylisting.
+       R    reject the message and answer the DATA command with a 5yz result.
+       S    accept the message for some recipients and so answer the DATA com-
+            mand with a 2yz result.
+       T    temporary failure by the DCC system and so answer with a 4yz
+            result.
+
+     Second is a line of characters indicating the disposition of the message
+     for each corresponding recipient:
+       A    deliver the message
+       G    discard the message during a greylist embargo
+       R    discard the message as spam
+     The SMTP protocol allows only a single result for the DATA command for
+     all recipients that were not rejected before body of the message was
+     offered with the DATA command.  To accept the message for some recipients
+     and reject it for others, the MTA must tell the SMTP client it is accept-
+     ing the message for all recipients and then discard it for those that
+     would reject it.
+
+     Finally, if the <I>body</I> or <I>header</I> strings are in the first line of <I>options</I>
+     sent by the MTA to the daemon, then the <I>X-DCC</I> header line or the entire
+     body with the <I>X-DCC</I> header line follows.
+
+
+</PRE>
+<H2 ID="FILES">FILES</H2><PRE>
+     <SPAN="FILE-@prefix@">@prefix@</SPAN>    is the DCC home directory in which other files are found.
+     <SPAN="FILE-@libexecdir@/start-dccifd">@libexecdir@/start-dccifd</SPAN>
+                 or
+     <SPAN="FILE-@libexecdir@/rcDCC">@libexecdir@/rcDCC</SPAN>
+                 are scripts used to start the daemon.
+     <SPAN="FILE-dcc_conf">dcc_conf</SPAN>    contains parameters used by the scripts to start DCC daemons
+                 and cron jobs.
+     <SPAN="FILE-logdir">logdir</SPAN>      is an optional directory specified with <B>-l</B> and containing
+                 marked mail.  Each file in the directory contains one mes-
+                 sage, at least one of whose checksums reached its <B>-t</B> thresh-
+                 olds or that is interesting for some other reason.  Each file
+                 starts with lines containing the date when the message was
+                 received, the IP address of the SMTP client, and SMTP enve-
+                 lope values.  Those lines are followed by the body of the
+                 SMTP message including its header as it was received.  Only
+                 approximately the first 32 KBytes of the body are recorded
+                 unless modified by <I>./configure</I> <I>--with-max-log-size=xx</I> The
+                 checksums for the message follow the body.  They are followed
+                 by lines indicate that one of the checksums is white- or
+                 blacklisted by the <B>-w</B> <I>whiteclnt</I> file.  Each log file ends
+                 with the <I>X-DCC</I> header line added to the message and the dis-
+                 position of the message.
+     <SPAN="FILE-map">map</SPAN>         is the memory mapped file of information concerning DCC
+                 servers in the DCC home directory.
+     <SPAN="FILE-whiteclnt">whiteclnt</SPAN>   contains the client whitelist in the format described in
+                 <B><A HREF="dcc.html">dcc(8)</A></B>.
+     <SPAN="FILE-whiteclnt.dccw">whiteclnt.dccw</SPAN>
+                 is a memory mapped hash table of the <I>@prefix@/whiteclnt</I> file.
+     <SPAN="FILE-dccifd.pid">dccifd.pid</SPAN>  in the <B>-R</B> <I>rundir</I> directory contains daemon's process ID.
+
+
+</PRE>
+<H2 ID="EXAMPLES">EXAMPLES</H2><PRE>
+     <SPAN="FILE-Dccifd">Dccifd</SPAN> can be used as Postfix Before-Queue Content filter.  In some tests
+     <SPAN="FILE-these">these</SPAN> values for <B>-p</B> and <B>-o</B> in <I>@prefix@/dcc</I><B>_</B><I>conf</I>.
+
+         DCCIFD_ENABLE=on
+         DCCIFD_ARGS="-p 127.0.0.1,10025,127.0.0.1/32 -o 127.0.0.1,10026   ..."
+
+     <SPAN="FILE-worked">worked</SPAN> with these lines in /etc/postfix/master.cf
+
+         smtp      inet  n       -       n       -       -       smtpd
+             -o smtpd_proxy_filter=127.0.0.1:10025
+         127.0.0.1:10026 inet n  -       n       -       -       smtpd
+             -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+             -o smtpd_client_restrictions=
+             -o smtpd_helo_restrictions=
+             -o smtpd_sender_restrictions=
+             -o smtpd_recipient_restrictions=permit_mynetworks,reject
+             -o smtpd_data_restrictions=
+             -o mynetworks=127.0.0.0/8
+             -o receive_override_options=no_unknown_recipient_checks
+
+
+</PRE>
+<H2 ID="SEE-ALSO">SEE ALSO</H2><PRE>
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>, <B><A HREF="dbclean.html">dbclean(8)</A></B>, <B><A HREF="dcc.html">dcc(8)</A></B>, <B><A HREF="dccd.html">dccd(8)</A></B>, <B><A HREF="dblist.html">dblist(8)</A></B>, <B><A HREF="dccm.html">dccm(8)</A></B>, <B><A HREF="dccproc.html">dccproc(8)</A></B>,
+     <B><A HREF="dccsight.html">dccsight(8)</A></B>,
+
+
+</PRE>
+<H2 ID="HISTORY">HISTORY</H2><PRE>
+     <SPAN="FILE-Implementation">Implementation</SPAN> of <B>dccifd</B> Distributed Checksum Clearinghouses are based on
+     <SPAN="FILE-an">an</SPAN> idea of Paul Vixie with code designed and written at <A HREF="https://www.rhyolite.com/">Rhyolite Software</A>
+     <SPAN="FILE-starting">starting</SPAN> in 2000.  was started at <A HREF="https://www.rhyolite.com/">Rhyolite Software</A> in 2002.  This docu-
+     <SPAN="FILE-ment">ment</SPAN> describes version 2.3.167.
+
+
+</PRE>
+<H2 ID="BUGS">BUGS</H2><PRE>
+     <B>dccifd</B> uses <B>-t</B> where <B><A HREF="dccproc.html">dccproc(8)</A></B> uses <B>-c</B>.
+
+     <SPAN="FILE-By">By</SPAN> default <B>dccifd</B> look for its UNIX domain socket in the DCC home direc-
+     <SPAN="FILE-tory">tory</SPAN>, but <B><A HREF="dccm.html">dccm(8)</A></B> looks in its <B>-R</B> <I>rundir</I>.
+
+     <SPAN="FILE-Systems">Systems</SPAN> without <B>setrlimit(2)</B> and <B>getrlimit(2)</B> RLIMIT_NOFILE can have
+     <SPAN="FILE-problems">problems</SPAN> with the default limit on the number of simultaneous jobs, the
+     <SPAN="FILE-value">value</SPAN> of <B>-j</B>.  Every job requires four open files.  These problems are
+     <SPAN="FILE-usually">usually</SPAN> seen with errors messages that say something like
+           dccifd[24448]: DCC: accept(): Result too large
+     <SPAN="FILE-A">A</SPAN> fix is to use a smaller value for <B>-j</B> or to allow <B>dccifd</B> to open more
+     <SPAN="FILE-files.">files.</SPAN>
+
+                                 June 19, 2019
+</PRE>
+<HR>
+<ADDRESS>
+Man(1) output converted with man2html modified for DCC
+$Date 2001/04/29 03:22:18 $
+<BR>
+<A HREF="https://www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+</BODY>
+</HTML>

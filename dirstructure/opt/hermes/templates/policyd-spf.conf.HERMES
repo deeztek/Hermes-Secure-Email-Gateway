@@ -1,0 +1,18 @@
+#  For a fully commented sample config file see policyd-spf.conf.commented
+
+debugLevel = DEBUG-LEVEL 
+TestOnly = TEST-ONLY
+
+HELO_reject = HELO-REJECT
+Mail_From_reject = MAIL-FROM-REJECT
+
+PermError_reject = PERMERROR-REJECT
+TempError_Defer = TEMPERROR-REJECT
+
+skip_addresses = 127.0.0.0/8,::ffff:127.0.0.0/104,::1
+
+#HERMES GENRATED WHITELISTS
+Whitelist = IP-NETWORK-WHITELIST
+HELO_Whitelist = HELO-WHITELIST
+Domain_Whitelist = DOMAIN-WHITELIST
+Domain_Whitelist_PTR = PTR-WHITELIST

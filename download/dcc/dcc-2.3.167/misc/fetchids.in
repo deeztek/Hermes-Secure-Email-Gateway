@@ -1,0 +1,6 @@
+#! /bin/sh
+
+# in previous versions, this script got the IDs of commercial
+#   and other DCC Reputation clients
+
+exit 0

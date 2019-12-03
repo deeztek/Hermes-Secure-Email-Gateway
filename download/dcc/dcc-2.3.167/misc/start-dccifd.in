@@ -1,0 +1,192 @@
+#! /bin/sh
+
+# start dccifd
+
+# This script assumes that it is being run by root or the DCC user, probably
+# while the system is starting.  See the misc/rcDCC script.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.37 $Revision$
+#	@configure_input@
+
+exec 1>&2 </dev/null
+
+LOGGER_TAG=start-dccifd
+DCC_LOGGER="@DCC_LOGGER@"
+DCC_HOMEDIR=@prefix@
+QUIET=yes
+AUTOSTART=
+# check the args once to get the home directory
+while getopts ":xvAh:r:a:" c; do
+    case $c in
+	x) set -x;;
+	v) QUIET=;;
+	A) AUTOSTART=y;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+if test -d $DCC_HOMEDIR; then
+    # in case of relative paths
+    cd $DCC_HOMEDIR
+fi
+if test ! -s $DCC_HOMEDIR/dcc_conf; then
+    eval $DCC_LOGGER \"cannot find $DCC_HOMEDIR/dcc_conf\"
+fi
+. $DCC_HOMEDIR/dcc_conf
+
+if test "$DCC_HOMEDIR" != @prefix@; then
+    DCCIFD_ARGS="-h$DCC_HOMEDIR $DCCIFD_ARGS"
+fi
+
+# add -G to $GREY_CLIENT_ARGS if it is absent
+if test -n "$GREY_CLIENT_ARGS"; then
+    if test X`expr "X$GREY_CLIENT_ARGS" : '.*\(-G\)'` = X; then
+	GREY_CLIENT_ARGS="-G$GREY_CLIENT_ARGS"
+    fi
+    DCCIFD_ARGS="$GREY_CLIENT_ARGS $DCCIFD_ARGS"
+fi
+
+if test -n "$DCCIFD_USERDIRS"; then
+    DCCIFD_ARGS="-U$DCCIFD_USERDIRS $DCCIFD_ARGS"
+fi
+if test -n "$DCCIFD_WHITECLNT"; then
+    DCCIFD_ARGS="-w$DCCIFD_WHITECLNT $DCCIFD_ARGS"
+fi
+if test -n "$DCCIFD_LOGDIR"; then
+    # add extra quotes for '?' not present in dcc_conf
+    if expr "$DCCIFD_LOGDIR" : '[DHM]?' >/dev/null; then
+	DCCIFD_ARGS="'-l$DCCIFD_LOGDIR' $DCCIFD_ARGS"
+    else
+	DCCIFD_ARGS="-l$DCCIFD_LOGDIR $DCCIFD_ARGS"
+    fi
+fi
+
+CKS="$REP_ARGS"
+if test -n "$DCCIFD_LOG_AT$DCCIFD_REJECT_AT"; then
+    for CK in ${DCCIFD_CKSUMS:=CMN} $DCCIFD_XTRA_CKSUMS; do
+	CKS="$CKS -t$CK,$DCCIFD_LOG_AT,$DCCIFD_REJECT_AT"
+    done
+fi
+
+DCCIFD_ARGS="$CKS $DNSBL_ARGS $DCC_LOG_ARGS $DCCIFD_ARGS"
+
+
+
+USAGE="`basename $0`: [-xv] [-h homedir] [-r rundir] [-a args]"
+OPTIND=1
+while getopts "xvAh:r:a:" c; do
+    case $c in
+	x) ;;
+	v) ;;
+	A) ;;
+	h) ;;
+	r) DCC_RUNDIR="$OPTARG";;
+	a) DCCIFD_ARGS="$DCCIFD_ARGS $OPTARG";;
+	*) eval $DCC_LOGGER \"$USAGE\"; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    eval $DCC_LOGGER \"$USAGE\"
+    exit 1
+fi
+
+if test -n "$DCC_RUNDIR" -a "$DCC_RUNDIR" != @dcc_rundir@; then
+    DCCIFD_ARGS="-R$DCC_RUNDIR $DCCIFD_ARGS"
+fi
+
+
+# stop an existing dccifd
+#   signal the process group because on Linux systems signaling the main
+#   process does not work.  See `man sigwait` on a Linux system.
+PID=`cat $DCC_RUNDIR/dccifd.pid 2>/dev/null`
+if test -n "$PID"; then
+    if test -n "$AUTOSTART"; then
+	if kill -0 "$PID" 2>/dev/null; then
+	    eval $DCC_LOGGER \"dccifd already running\"
+	    exit 0
+	fi
+    else
+	CNT=0
+	# try for 20 seconds to let Solaris finish waiting for DNSBL answers
+	while test $CNT -le 20; do
+	    if `kill -15 $PID 2>/dev/null`; then
+		if test -z "$QUIET" -a $CNT -gt 0; then
+		    if test $CNT -eq 1; then
+			echo "    stopping dccifd PID $PID " | tr -d '\012'
+		    else
+			echo "." | tr -d '\012'
+		    fi
+		fi
+		sleep 1
+		CNT=`expr $CNT + 1`
+	    else
+		break
+	    fi
+	done
+	kill -9 $PID 2>/dev/null
+	if test $CNT -gt 1 -a -z "$QUIET"; then
+	    echo
+	fi
+    fi
+fi
+
+
+if test -z "$AUTOSTART"; then
+    case "$DCCIFD_ENABLE" in
+	[oO][nN]);;
+	*) exit 0 ;;
+    esac
+fi
+
+if test ! -x $DCC_LIBEXEC/dccifd; then
+    if test -z "$AUTOSTART"; then
+	eval $DCC_LOGGER \"cannot start dccifd because it has not been installed\"
+    fi
+    exit 0
+fi
+
+if test ! -d $DCC_RUNDIR; then
+    mkdir $DCC_RUNDIR
+fi
+if test -n "$DCCUID"; then
+    chown $DCCUID "$DCC_RUNDIR"
+    if test -d "$DCC_HOMEDIR"; then
+	chown "$DCCUID" "$DCC_HOMEDIR"
+    fi
+    if test -n "$DCCIFD_LOGDIR" -a -d "$DCCIFD_LOGDIR"; then
+	chown "$DCCUID" "$DCCIFD_LOGDIR"
+    fi
+fi
+
+
+# first try to use `su -` to set limits
+#   fall back to -I for systems where su requires a valid shell in
+#	/etc/passwd but the dcc user does not have one
+if test -n "$DCCUID" -a X"$DCCUID" != X"$USER"; then
+    if @DCC_SU@ $DCCUID -c date >/dev/null 2>&1; then
+	@DCC_SU@ $DCCUID -c "$DCC_LIBEXEC/dccifd $DCCIFD_ARGS"
+	exit
+    fi
+    DCCIFD_ARGS="-I$DCCUID $DCCIFD_ARGS"
+fi
+eval $DCC_LIBEXEC/dccifd $DCCIFD_ARGS

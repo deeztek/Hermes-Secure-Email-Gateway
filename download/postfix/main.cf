@@ -1,0 +1,144 @@
+queue_directory = /var/spool/postfix
+command_directory = /usr/sbin
+#daemon_directory = /usr/libexec/postfix
+bounce_queue_lifetime = 5d
+maximal_queue_lifetime = 30d
+data_directory = /var/lib/postfix
+mail_owner = postfix
+unknown_local_recipient_reject_code = 550
+debug_peer_level = 2
+debugger_command =
+         PATH=/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin
+         ddd $daemon_directory/$process_name $process_id & sleep 5
+#sendmail_path =
+#newaliases_path =
+#mailq_path =
+#setgid_group =
+#html_directory =
+#manpage_directory =
+#sample_directory =
+#readme_directory =
+#alias_maps = hash:/etc/postfix/aliases
+#alias_maps = mysql:/etc/postfix/mysql-aliases.cf
+myorigin = domain.tld
+myhostname = hermes.domain.tld
+mynetworks = 
+message_size_limit = 78643200
+local_transport = ERROR: No local mail delivery is allowed
+mydestination =
+local_recipient_maps =
+#virtual_alias_maps = hash:/etc/postfix/virtual
+virtual_alias_maps = mysql:/etc/postfix/mysql-virtual.cf
+
+#relay_recipient_maps = hash:/etc/postfix/relay_recipients
+relay_recipient_maps= mysql:/etc/postfix/mysql-recipients.cf
+
+transport_maps = hash:/etc/postfix/transport
+#transport_maps = mysql:/etc/postfix/mysql-transport.cf
+#relay_domains = hash:/etc/postfix/relay_domains
+relay_domains = mysql:/etc/postfix/mysql-domains.cf
+recipient_delimiter =
+#proxy_interfaces = 192.168.69.1
+smtpd_helo_required = yes
+
+#smtpd_client_restrictions = check_client_access cidr:/etc/postfix/cidr_client_access, check_client_access hash:/etc/postfix/client_access
+
+#smtpd_client_restrictions = permit_mynetworks, check_client_access mysql:/etc/postfix/mysql-clients.cf, permit
+
+#smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/sender_access, reject_non_fqdn_sender, reject_unknown_sender_domain
+
+#smtpd_sender_restrictions = check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_non_fqdn_sender, reject_unknown_sender_domain
+
+#---- smtpd_recipient_restrictions plain config
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, reject_unauth_pipelining
+
+#---- smtpd_recipient_restrictions with SPF ----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policy-spf, reject_unauth_pipelining
+
+
+#----- smtpd_recipient_restrictions with RBLs -----
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain
+
+#smtpd_recipient_restrictions =
+#    permit_mynetworks,
+#    reject_unauth_destination,
+#    check_sender_access mysql:/etc/postfix/mysql-senders.cf,
+#    check_policy_service unix:private/policy-spf
+#    reject_invalid_hostname,
+#    reject_unauth_pipelining,
+#    reject_non_fqdn_sender,
+#    reject_unknown_sender_domain,
+#    reject_non_fqdn_recipient,
+#    reject_unknown_recipient_domain,
+#    check_client_access mysql:/etc/postfix/mysql-rbl_override.cf,
+#    reject_rbl_client zen.spamhaus.org,
+#    reject_rbl_client b.barracudacentral.org,
+#    reject_rbl_client bl.spameatingmonkey.net,
+#    reject_rbl_client dnsbl.ahbl.org,
+#    reject_rbl_client bl.spamcop.net,
+#    reject_rbl_client psbl.surriel.com,
+#    reject_rbl_client bl.mailspike.net,
+#    permit
+
+
+
+#----- smtpd_recipient_restrictions with RBLs and SPF -----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policy-spf, reject_unauth_pipelining, reject_rbl_client bl.spamcop.net, reject_rbl_client cbl.abuseat.org, reject_rbl_client sbl.spamhaus.org, reject_rbl_client zombie.dnsbl.sorbs.net, reject_rbl_client dnsbl.njabl.org
+
+
+#----- smtpd_recipient_restrictions with RBLs and PostGrey -----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, reject_unauth_pipelining, reject_rbl_client bl.spamcop.net, reject_rbl_client cbl.abuseat.org, reject_rbl_client sbl.spamhaus.org, reject_rbl_client zombie.dnsbl.sorbs.net, reject_rbl_client dnsbl.njabl.org, check_policy_service inet:127.0.0.1:10023
+
+#----- smtpd_recipient_restrictions with RBLs and PostGrey and SPF -----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policy-spf, reject_unauth_pipelining, reject_rbl_client bl.spamcop.net, reject_rbl_client cbl.abuseat.org, reject_rbl_client sbl.spamhaus.org, reject_rbl_client zombie.dnsbl.sorbs.net, reject_rbl_client dnsbl.njabl.org, check_policy_service inet:127.0.0.1:10023
+
+#----- smtpd_recipient_restrictions with PostGrey -----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, reject_unauth_pipelining, check_policy_service inet:127.0.0.1:10023
+
+#----- smtpd_recipient_restrictions with PostGrey and SPF  -----
+#smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_policy_service unix:private/policy-spf, reject_unauth_pipelining, check_policy_service inet:127.0.0.1:10023
+
+
+smtpd_data_restrictions = reject_unauth_pipelining
+#header_checks = pcre:/etc/postfix/header_checks
+header_checks = regexp:/etc/postfix/regexp_header_checks
+body_checks = pcre:/etc/postfix/body_checks
+content_filter = amavis:[127.0.0.1]:10021
+receive_override_options = no_address_mappings
+smtpd_banner = $myhostname HERMES Secure Email Gateway ESMTP
+
+
+policy-spf_time_limit = 3600s
+#TLS Policy
+smtp_tls_policy_maps = hash:/etc/postfix/tls_policy
+smtp_tls_note_starttls_offer = yes
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+# TLS parameters
+smtpd_tls_cert_file = /opt/hermes/ssl/hermes-tls.cer
+smtpd_tls_key_file = /opt/hermes/ssl/hermes-tls.key
+smtpd_tls_CAfile = /opt/hermes/ssl/hermes-tls.root.cer
+#smtpd_use_tls=yes
+smtpd_tls_security_level = 
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtpd_tls_loglevel = 1
+postscreen_access_list = permit_mynetworks, cidr:/etc/postfix/postscreen_access.cidr 
+postscreen_blacklist_action = enforce
+postscreen_dnsbl_action = enforce
+postscreen_greet_action = enforce
+postscreen_dnsbl_sites = bl.spameatingmonkey.net*2, list.dnswl.org=127.[0..255].[0..255].0*-2, list.dnswl.org=127.[0..255].[0..255].1*-3, list.dnswl.org=127.[0..255].[0..255].[2..255]*-4, bl.spamcop.net*2, wl.mailspike.net*-2, psbl.surriel.com, dnsbl.sorbs.net*2, bl.mailspike.net*2
+postscreen_dnsbl_sites = bl.spameatingmonkey.net*2, list.dnswl.org=127.[0..255].[0..255].0*-2, list.dnswl.org=127.[0..255].[0..255].1*-3, list.dnswl.org=127.[0..255].[0..255].[2..255]*-4, bl.spamcop.net*2, wl.mailspike.net*-2, psbl.surriel.com, dnsbl.sorbs.net*2, bl.mailspike.net*2
+postscreen_dnsbl_threshold = 3
+postscreen_pipelining_enable = no
+postscreen_non_smtp_command_enable = no
+postscreen_bare_newline_action = enforce
+postscreen_bare_newline_enable = no
+smtp_sasl_password_maps = hash:/etc/postfix/relay_passwd
+relayhost = 
+smtp_sasl_auth_enable = no
+smtpd_relay_restrictions = permit_mynetworks, reject_unauth_destination, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain, check_policy_service unix:private/policy-spf
+milter_protocol = 2
+milter_default_action = accept
+smtpd_milters = 
+non_smtpd_milters = 
+smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/amavis_senderbypass, reject_non_fqdn_sender, reject_unknown_sender_domain

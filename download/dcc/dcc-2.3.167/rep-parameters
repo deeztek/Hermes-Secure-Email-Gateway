@@ -1,0 +1,84 @@
+#! /bin/sh -e
+
+# find reputation user name, pasword, etc. for customrep
+
+exec </dev/null
+
+USERDB=~www/anti-spam/dccrep/users-passwd
+UNAME=
+LOG=/dev/null
+
+USAGE="$0: [-x] [-d userdb] -u user"
+while getopts "xd:u:" c; do
+    case $c in
+	x) set -x
+	    LOG=/tmp/customrep.log
+	    exec 2>>$LOG
+	    chmod a+w $LOG
+	    ;;
+	d) USERDB="$OPTARG";;
+	u) UNAME="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0 -o -z "$UNAME"; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+# try to deal with old common password
+if test "$UNAME" = test-dccrep; then
+    RHOST=`host $REMOTE_ADDR						\
+	    | sed -e 's/.* //' -e 's/\.*$//'				\
+	    | tr '[A-Z]' '[a-z]'`
+    case "$RHOST" in
+	*.maine.edu) UNAME=maine.edu;;
+	*.sonic.net) UNAME=spam.sonic.net;;
+	*.indra.com) UNAME=indra.com;;
+	*.dmv.com) UNAME=dmv.com;;
+	*.maine.edu) UNAME=maine.edu;;
+	*.etherboy.com) UNAME=etherboy.com;;
+	*wu-wien.ac.at) UNAME=wu-wien.ac.at;;
+	*.wu.ac.at) UNAME=wu-wien.ac.at;;
+	*.redhat.com) UNAME=redhat.com;;
+    esac
+fi
+
+VARS="UNAME PASSWD MASTER TESTREP TEST"
+# find the HTTP user name, password, and flags to generate the .updatedcc_pfile
+COUNT=0
+REDIRECT="$UNAME"
+while test -n "$REDIRECT"; do
+    COUNT=`expr $COUNT + 1`
+    if test "$COUNT" -gt 100; then
+	echo "$0: looping" 1>&2; exit 1
+    fi
+    for NM in $VARS; do
+	eval $NM=
+    done
+    LINE=`sed -En -e 's/#.*//'						\
+		-e "s/^$REDIRECT[	 ]+/PASSWD=/p"			\
+		    $USERDB | head -1`
+    if test -z "$LINE"; then
+	echo "could not find authentication for $REDIRECT" >$LOG
+	echo "UPDATEDCC_PFILE=delete"
+	exit 0
+    fi
+    UNAME="$REDIRECT"
+    REDIRECT=
+    eval $LINE
+    if test -n "$REDIRECT"; then
+	continue
+    fi
+    if test -z "$PASSWD"; then
+	echo "could not find password for $UNAME" $LOG
+	exit 1
+    fi
+done
+
+for NM in $VARS; do
+    eval echo $NM="\$$NM"
+done
+
+exit 0

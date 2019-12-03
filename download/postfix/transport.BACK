@@ -1,0 +1,24 @@
+#THIS FILES CONTAINS THE DOMAIN NAMES AND THE CORRESPONDING MAIL SERVER IPS THIS SERVER IS RESPONSIBLE FOR DELIVERY EMAIL TO
+
+firstmd.org smtp:[173.8.28.13]
+newagecomphealth.com smtp:[74.92.155.221]
+deeztek.org smtp:[192.168.10.250]
+getwithme.com smtp:[192.168.10.250]
+grubbcontractors.com smtp:[24.154.92.8]
+hushedmail.com smtp:[192.168.10.250]
+thepediatriccenter.org smtp:[192.168.10.250]
+patuxentcardiology.com smtp:[192.168.10.238]
+glaucomaplus.com smtp:[72.81.131.26]
+bolanderhome.com smtp:[192.168.10.201]
+mydirectmail.org smtp:[192.168.10.250]
+mydirectmail.net smtp:[192.168.10.201]
+cosmeticgyne.com smtp:[74.92.155.221]
+spam@deeztek.com  sa-wrapper:
+ham@deeztek.com sa-wrapper:
+deeztek.com smtp:[192.168.10.201]
+deeztek.net smtp:[192.168.10.238] 
+mycomputersquad.com smtp:[192.168.10.201]
+aol.com smtp:[192.168.10.238] 
+aol2.com smtp:[192.168.10.238] 
+aol3.com smtp:[192.168.10.201] 
+#SERVER_ENTRY

@@ -1,0 +1,187 @@
+#! @PERL@ -wT -I@cgibin@
+
+# List the messages in a user's log directory
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.35 $Revision$
+# @configure_input@
+
+# This file must protected with an equivalent to httpd.conf lines
+#   in the README file.
+
+
+use strict 'subs';
+use POSIX qw(strftime);
+
+use common;
+
+my($msg_num, $msg, $msg_link, $date, $last_date, $from, $result, $subject);
+
+get_log_msgs($query{msg} || undef, 100);
+
+html_head("Messages Logged for $user at $hostname");
+
+print "<H3>";
+print $#msgs_num >= 0 ? ($#msgs_num+1) : "No";
+print " messages logged for <EM>$user</EM> at $hostname at ";
+print strftime "%x %X", localtime;
+print "</H3>\n<P>\n<P class=warn><STRONG>\n";
+print $query{result} ? html_str_encode($query{result}) : "&nbsp;";
+print "</STRONG>\n<P>\n";
+common_buttons();
+
+print "</TABLE>\n";
+
+if ($#msgs_num >= 0) {
+    print <<EOF;
+<P>
+<TABLE   border=1 cellpadding="2%" frame=void rules=rows
+    summary="messages logged for $user at $hostname">
+EOF
+
+    print_links();
+
+    for ($msg_num = $msg_last; $msg_num >= $msg_first; --$msg_num) {
+	$msg = $msgs_num[$msg_num];
+	next if (!$msg);
+
+	$date = $msgs_date{$msg};
+	if ($date =~ s/(.*) .*/$1/
+	    && (!$last_date || $last_date ne $date)) {
+	    $from = !$last_date ? 'From' : '&nbsp;';
+	    $subject = !$last_date ? 'Subject' : '&nbsp;';
+	    $last_date = $date;
+	    if ($msg_part_num) {
+		$date .= " part $msg_part_num";
+		$msg_part_num= 0;
+	    }
+	    print <<EOF;
+<TR><TH>&nbsp;
+    <TH>$date
+    <TH>$from
+    <TH>&nbsp
+    <TH>$subject
+EOF
+	}
+
+	$from = $msgs_from{$msg};
+	$from =~ s/&#34;//g;
+	$from =~ s/^\s*&lt;(.*)&gt;/$1/;
+	$result = $msgs_result{$msg};
+	$result =~ s/:(.*)/:<span class=tiny>$1<\/span>/;
+	$msg_link = "$list_msg_link${url_ques}msg=$msg\" name=$msg>";
+
+	print "<TR><TD class='mono small'>$msg_link";
+	print $msg_num+1;
+	print "</A>\n<TD class=mono>$msg_link$msgs_date{$msg}</A>\n";
+	print <<EOF;
+    <TD>$from
+    <TD class=small>$result
+    <TD>$msgs_subject{$msg}
+EOF
+    }
+
+    print_links();
+
+
+    print <<EOF;
+</TABLE>
+
+<P>
+<TABLE class=small border=0 cellspacing=0 cellpadding=0>
+<TR><TD class=stronger>Grey
+    <TD>greylist embargo
+    <TD class=stronger>OK-Grey
+    <TD>greylist embargo ended
+<TR><TD class=stronger>DCC
+    <TD>bulk according to DCC
+    <TD class=stronger>OK-DCC
+    <TD>not bulk according to DCC
+<TR><TD class=stronger>Rep
+    <TD>bulk DCC Reputation
+<TR><TD class=stronger>MTA
+    <TD>blacklisted by mail system
+    <TD class=stronger>MTA-OK
+    <TD>whitelisted by mail system
+<TR><TD class=stronger>BL
+    <TD>blacklisted in whiteclnt files&nbsp;&nbsp;&nbsp;
+    <TD class=stronger>WL
+    <TD>whitelisted in whiteclnt files
+EOF
+    my $args = "$DNSBL_ARGS $DCCM_ARGS $DCCIFD_ARGS";
+    if ($args =~ /-B/) {
+	if ($args !~ /-B\s*set:group=\d+/i) {
+	    print <<EOF;
+<TR><TD class=stronger>DNSBL&nbsp;
+    <TD>DNS blacklisted
+EOF
+	} else {
+	    print <<EOF;
+<TR><TD class=stronger>DNSBLn&nbsp;
+    <TD>DNS blacklisted
+EOF
+	}
+    }
+
+    print <<EOF;
+<TR><TD><I>italic</I>
+    <TD>checks off
+</TABLE>
+
+EOF
+}
+
+html_footer();
+print "</BODY>\n</HTML>\n";
+
+# re-enable mail notifications
+unlink("$user_dir/notify.marker", "$user_dir/notify.pending",
+       "$user_dir/notify.block");
+close(MARK)
+    if (open(MARK, "> $user_dir/notify.marker"));
+
+
+
+sub print_links {
+    my($msg_num);
+
+    print "<TR><TD colspan=5>\n";
+    print_bounded_link($#msgs_num+1,	"Newest");
+    print_bounded_link($msg_day_last+1, "Next Day");
+    print_bounded_link($msg_newer,	"Newer");
+    print_bounded_link($msg_first-1,	"Older");
+    print_bounded_link($msg_day_first-1,"Previous Day");
+    print_bounded_link(0,		"Oldest");
+}
+
+
+
+sub print_bounded_link {
+    my($msg_num, $name) = @_;
+    my($msg, $val);
+
+    # $name .= ':' . ($msg_num+1);
+
+    $msg_num = 0 if ($msg_num < 0);
+    $msg = $msgs_num[$msg_num];
+    $val = defined($msg) ? "${url_ques}msg=$msg" : '';
+    print "    $list_log_link$val\">$name</A>&nbsp;&nbsp;\n";
+}

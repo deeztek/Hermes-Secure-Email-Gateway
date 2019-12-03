@@ -1,0 +1,162 @@
+#! /bin/sh
+
+# initialize an RRD file to collect DCC statistics
+#   [-x]	    debugging
+#   [-q]	    quiet
+#   [-R]	    reputation database
+#   [-h dcc_homedir]
+#   [-D data-dir]   where to put the rrdtool file
+#   [-T @RRDTOOL@]
+#		    see the FreeBSD package or elsewhere
+#   [-O rrdopts]    "--heartbeat X" or "--step Y"
+#   file	    RRD database that receives the collected data
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.28 $Revision$
+#	@configure_input@
+
+exec 1>&2 </dev/null
+
+DCC_HOMEDIR=@prefix@
+DEBUG=
+# check the args once to get the home directory
+while getopts "xqRh:D:T:O:" c; do
+    case $c in
+	x) set -x; DEBUG=-x=;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+. $DCC_HOMEDIR/dcc_conf
+
+REPS=
+DATADIR=$DCC_HOMEDIR/stats
+RRDTOOL=@RRDTOOL@
+RRDOPTS=
+USAGE="`basename $0`: [-xqR] [-h homedir] [-D data-dir] [-T rrdtool]
+    [-O rrdopts] file.rrd"
+OPTIND=1
+while getopts "xqRh:D:T:O:" c; do
+    case $c in
+	x) ;;				    # handled above
+	q) QUIET=quiet;;
+	R) REPS=yes;;
+	h) ;;				    # handled above
+	D) DATADIR="$OPTARG";;
+	T) RRDTOOL="$OPTARG";;
+	O) RRDOPTS="$RRDOPTS $OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 1; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+FILE=$1
+
+if test ! -d $DATADIR; then
+    mkdir $DATADIR
+fi
+cd $DATADIR
+
+if test "$FILE" = "`basename $FILE .rrd`"; then
+    FILE=$FILE.rrd
+fi
+if test -s "$FILE"; then
+    echo "$FILE already exists" 1>&2
+    exit 1
+fi
+
+
+# assume no server will handle more than 2000 operations/second
+OPSPS=2000
+
+# default sample every 10 minutes.
+STEP=600
+
+# be willing to get STEP and heartbeat from the -O arg(s)
+HBEAT=
+while test -n "$RRDOPTS"; do
+    RRDOPTS=`expr "X$RRDOPTS" : 'X *\(.*\)'`
+    if test -z "$RRDOPTS"; then
+	break;
+    fi
+    X=`expr "X$RRDOPTS" : 'X--heartbeat[	 ][	 ]*\([0-9][0-9]*\)'`
+    if test -n "$X"; then
+	HBEAT=$X
+	RRDOPTS=`expr "X$RRDOPTS" :  "X--heartbeat[	 ]$X *\(.\)"`
+	continue
+    fi
+    X=`expr "X$RRDOPTS" : 'X--step[	 ][	 ]*\([0-9][0-9]*\)'`
+    if test -n "$X"; then
+	STEP=$X
+	RRDOPTS=`expr "X$RRDOPTS" :  "X--step[	 ]$X *\(.\)"`
+	continue
+    fi
+    echo 'unrecognized RRD option "'"$RRDOPTS"'"' 1>&2
+    exit 1
+done
+
+# Use a heartbeat of 31 minutes or 1860 seconds to allow a missed sample as
+#   well as jitter by cron.  If you use a heartbeat equal to the cron
+#   repetition rate, then a single second delay by cron will make the previous
+#   period have no samples and be undefined.
+if test -z "$HBEAT"; then
+    HBEAT=`expr $STEP \* 3 + 60`
+fi
+
+# Keep hourly (or 6-step) average data for 5 years
+HOUR_STEPS=`expr 3600 / $STEP`
+HOUR_ROWS=`expr \( 5 \* 366 \* 24 \* 3600 \) / \( $STEP \* 6 \)`
+
+# Keep 10-minute (or single-step) average data for a month
+FAST_ROWS=`expr 31 \* 24 \* $HOUR_STEPS`
+
+if test "$REPS" = yes; then
+    $RRDTOOL create $FILE --step $STEP --start -61month		\
+	DS:norep:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:rep1:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:rep10:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:rep20:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:rep30:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:rep60:DERIVE:$HBEAT:0:$OPSPS				\
+	DS:hit:DERIVE:$HBEAT:0:$OPSPS				\
+	RRA:AVERAGE:0.5:$HOUR_STEPS:$HOUR_ROWS			\
+	RRA:AVERAGE:0.04:1:$FAST_ROWS
+    exit 0
+fi
+
+# Keep daily database size data for 5 years
+DB_STEPS=`expr \( 3600 \* 24 \) / $STEP`
+DB_ROWS=`expr 5 \* 366`
+
+$RRDTOOL create $FILE --step $STEP --start -61month		\
+    DS:reports:DERIVE:$HBEAT:0:$OPSPS				\
+    DS:bulk:DERIVE:$HBEAT:0:$OPSPS				\
+    DS:spam:DERIVE:$HBEAT:0:$OPSPS				\
+    DS:trapped:DERIVE:$HBEAT:0:$OPSPS				\
+    DS:hashes:GAUGE:$HBEAT:U:U					\
+    RRA:AVERAGE:0.5:$HOUR_STEPS:$HOUR_ROWS			\
+    RRA:AVERAGE:0.04:1:$FAST_ROWS				\
+    RRA:MIN:0.9:$DB_STEPS:$DB_ROWS				\
+    RRA:MAX:0.9:$DB_STEPS:$DB_ROWS

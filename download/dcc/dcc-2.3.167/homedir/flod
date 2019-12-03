@@ -1,0 +1,19 @@
+# Sample DCC server peers
+#   This file contains peers to which the local DCC server should flood
+#   reports of checksums of possible spam.  See dccd(8).
+
+# In this example the two servers, dcc1.domain.com and dcc2.domain.com
+#   authenticate their floods of checksums with the passwords of the
+#   passwd-ID 1000.  See the sample ids file.
+
+# hostname,port	    rem-id [passwd-id] [out-opts] [in-opts]
+#dcc1.domain.com    101	1000
+#dcc2.domain.com    102	1000
+
+# This example floods to a local server using a private IDs.  This is
+#   NOT recommend.  See the description of server-ID remapping in the
+#   flod file description in the dccd man page.
+#temp.domain.com    32700 1000 - 32700-32767->self
+#   The first "-" in that line is significant.
+
+#	Rhyolite Software DCC 2.3.167-1.13 $Revision$

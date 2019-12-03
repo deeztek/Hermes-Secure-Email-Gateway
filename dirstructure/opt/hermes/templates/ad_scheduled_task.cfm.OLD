@@ -1,0 +1,151 @@
+<cfparam name = "success" default = "0">
+<cfparam name = "error" default = "0">
+<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
+select random_letter as random from captcha_list_all2 order by RAND() limit 8
+</cfquery>
+
+<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
+insert into salt
+(salt)
+values
+('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
+</cfquery>
+
+<cfquery name="gettrans" datasource="#datasource#">
+select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
+</cfquery>
+
+<cfset customtrans3=#gettrans.customtrans2#>
+
+<cfquery name="deletetrans" datasource="#datasource#">
+delete from salt where id='#stResult.GENERATED_KEY#'
+</cfquery>
+
+<cfldap action="query"
+name="adresult"
+attributes = "mail"
+START="DN_NAME"
+filter="(&(objectClass=User)(mail=*))"
+server="SERVER_NAME"
+port="389"
+username="USER_NAME"
+password="PASS_WORD">
+
+
+<cfloop query="adresult">
+<cfoutput>
+#TRIM(mail)#<br>
+</cfoutput>
+</cfloop>
+
+
+<cfset FileData = "">
+<cfloop query="adresult">
+<cfset FileData = FileData & mail & Chr(13) & Chr(10)>
+</cfloop>
+
+<cffile action = "write" file = "/var/www/tasks/#customtrans3#_temp" output = "#FileData#" addnewline="yes">
+
+<cffile action="read" file="/var/www/tasks/#customtrans3#_temp" variable="variables.myFile">
+
+<cffile
+    action = "delete"
+    file = "/var/www/tasks/#customtrans3#_temp">
+
+<cfloop index="curLine" list="#variables.myFile#" delimiters="#chr(10)#">
+<cfset success=#success#+1>
+<cfset domainpart = #trim(ListGetAt(curline, 2, "@"))#>
+<cfquery name="checkdomain" datasource="#datasource#">
+select domain from domains where domain='#domainpart#'
+</cfquery>
+
+<cfif #checkdomain.recordcount# GTE 1>
+<cfquery name="checkentry" datasource="#datasource#">
+select recipient from recipients where recipient='#curline#'
+</cfquery>
+
+<cfif #checkentry.recordcount# LT 1>
+<cfquery name="getlicensedusers" datasource="#datasource#">
+select parameter, value from system_settings where parameter='users'
+</cfquery>
+
+<cfif #getlicensedusers.value# GTE 1>
+<cfset usercount=#getlicensedusers.value#>
+<cfelseif #getlicensedusers.value# LT 1>
+<cfset usercount=0>
+</cfif>
+
+<cfquery name="countrecipients" datasource="#datasource#">
+select count(recipient) as rcptcount from recipients where domain is NULL
+</cfquery>
+
+<cfif #countrecipients.rcptcount# GTE 1>
+<cfset rcptcount=#countrecipients.rcptcount#>
+<cfelseif #countrecipients.rcptcount# LT 1>
+<cfset rcptcount=0>
+</cfif>
+
+<cfif #usercount# GTE #rcptcount#>
+
+<cfquery name="insert" datasource="#datasource#">
+insert into recipients
+(policy_id, recipient, status, configured, pdf_enabled, smime_enabled, smime_mode, digital_sign, validity, encryption, algorithm)
+values
+('7', '#recipient#', 'OK', '2', '2', '2', '1', '2', '1825', '4096', 'sha512')
+</cfquery>
+
+<cfelseif #usercount# LT #rcptcount#>
+<cfset error=#error#+1>
+</cfif>
+
+</cfif>
+
+<cfelseif #checkdomain.recordcount# LT 1>
+<cfset error=#error#+1>
+</cfif>
+</cfloop>
+
+<cfexecute name = "/etc/init.d/postfix"
+timeout = "240"
+outputfile ="/dev/null"
+arguments="stop">
+</cfexecute>
+
+<cfexecute name = "/etc/init.d/amavis"
+timeout = "240"
+outputfile ="/dev/null"
+arguments="stop">
+</cfexecute>
+
+
+<cfquery name="dropusers" datasource="#datasource#">
+drop table users
+</cfquery>
+
+<cfquery name="createusers" datasource="#datasource#">
+CREATE TABLE users LIKE recipients
+</cfquery>
+
+<cfquery name="copyusers" datasource="#datasource#">
+INSERT INTO users SELECT * FROM recipients
+</cfquery>
+
+<cfquery name="alterusers" datasource="#datasource#">
+alter table users change recipient email VARBINARY(255)
+</cfquery>
+
+<cfexecute name = "/etc/init.d/postfix"
+timeout = "240"
+outputfile ="/dev/null"
+arguments="start">
+</cfexecute>
+
+<cfexecute name = "/etc/init.d/amavis"
+timeout = "240"
+outputfile ="/dev/null"
+arguments="start">
+</cfexecute>
+
+<cfoutput>#error#</cfoutput>
+
+

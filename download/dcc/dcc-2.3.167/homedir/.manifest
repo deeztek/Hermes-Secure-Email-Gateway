@@ -1,0 +1,15 @@
+Makefile.in
+README
+dcc_conf.in
+fix-map.in
+flod
+grey_flod
+grey_whitelist.in
+ids.in
+make-dcc_conf.in
+map
+map.txt.in
+whiteclnt.in
+whitecommon
+whitelist.in
+.manifest

@@ -1,0 +1,182 @@
+#! /bin/sh -e
+
+# generate a new dcc_conf file from an existing file
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.26 $Revision$
+
+FNAME=dcc_conf
+
+@NO_SUID@
+@PKG_MAKE@
+
+FORCE=
+CUR=
+PROTOTYPE=$FNAME
+SUFFIX=new
+OUT=
+DCC_HOMEDIR=@prefix@
+
+USAGE="$0: [-x] [-F force] [-c cur] [-s out-suffix] [-p prototype] [-o out] [-h homedir]"
+while getopts "xF:c:s:p:o:h:" c; do
+    case $c in
+	x) set -x;;
+	F) FORCE="$OPTARG";;
+	c) CUR="$OPTARG";;
+	s) SUFFIX="$OPTARG";;
+	p) PROTOTYPE="$OPTARG";;
+	o) OUT="$OPTARG";;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0 -o ! -d "$DCC_HOMEDIR"; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+if test -z "$CUR"; then
+    CUR="$DCC_HOMEDIR/$FNAME"
+fi
+if test -z "$OUT"; then
+    OUT="$CUR-$SUFFIX"
+fi
+
+if test ! -s "$PROTOTYPE"; then
+    echo "prototype $PROTOTYPE does not exist" 1>&2
+    exit 1
+fi
+
+if test -n "$FORCE" -o ! -f "$CUR"; then
+    cp $PROTOTYPE $CUR$FORCE
+    chmod 0644 $CUR$FORCE
+    if test -n "@DCCSUID@" -a -z "$NO_SUID" -a -z "$PKG_MAKE"; then
+	set +e		# do not die if the user name is not in the passwd file
+	chown @DCCSUID@ $CUR$FORCE
+    fi
+    exit
+fi
+
+# Use /^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]/ patterns instead of easier to read,
+# probably faster /^[A-Z/ patterns because someone has decided that
+# GNU Awk 3.1.3 (at least on x86_64) should have /^[A-Z]/ match "fi"
+# with IGNORECASE=0 and even in traditional mode.
+
+rm -f $OUT
+awk '(first_file == "") {
+	    first_file = FILENAME;
+	}
+	/^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]/ {
+	    # deal with continuation lines
+	    line = $0;
+	    while (substr(line,length(line)) == "\\") {
+		if (getline <= 0) {
+		    break;
+		}
+		line = line "\n" $0;
+	    }
+	    # divide the line into the variable name or key and its value
+	    inx = index(line, "=");
+	    if (inx == 0) {
+		inx = length(line)+1;
+	    }
+	    key = substr(line, 1, inx-1);
+	    val = substr(line, inx+1);
+	    # only record things in the first file
+	    if (first_file == FILENAME) {
+		defined[key] = 1;
+		mem[key] = val;
+		if (cur_comment) {
+		    comments[key] = cur_comment;
+		    cur_comment = "";
+		}
+	    } else {
+		# on first line of second file, make compatibility adjustments
+		if (!adjusted) {
+		    adjusted = 1;
+		    if (mem["DCCD_ENABLE"] == "") {
+			defined["DCCD_ENABLE"] = 1;
+			if (mem["SRVR_ID"] == "") {
+			    mem["DCCD_ENABLE"] = "off";
+			} else {
+			    mem["DCCD_ENABLE"] = "on";
+			}
+		    }
+		    # fix DCC_RUNDIR=@dcc_rundir@ bug in 1.2.14 and preceding
+		    if (defined["DCC_RUNDIR"]) {
+			if (mem["DCC_RUNDIR"] == "@dcc_rundir@") {
+			    defined["DCC_RUNDIR"] = 0;
+			}
+		    }
+		    # Use new values of some variables if their old values were
+		    #	defaults.  This makes ./configure changes effective.
+		    if (mem["Configure_DCC_LIBEXEC"] == mem["DCC_LIBEXEC"]) {
+			defined["DCC_LIBEXEC"] = 0;
+		    }
+		    if (mem["Configure_DCC_RUNDIR"] == mem["DCC_RUNDIR"]) {
+			defined["DCC_RUNDIR"] = 0;
+		    }
+		    if (mem["Configure_DCCSUID"] == mem["DCCSUID"]) {
+			defined["DCCSUID"] = 0;
+		    }
+		    if (mem["Configure_DCC_LOGGER"] == mem["DCC_LOGGER"]) {
+			defined["DCC_LOGGER"] = 0;
+		    }
+		    # use new, configured values of some variables
+		    if (defined["DCC_CONF_VERSION"])
+			old_version = mem["DCC_CONF_VERSION"];
+		    defined["DCC_CONF_VERSION"] = 0;
+		    defined["Configure_DCC_LIBEXEC"] = 0;
+		    defined["Configure_DCC_RUNDIR"] = 0;
+		    defined["Configure_DCCSUID"] = 0;
+		    defined["Configure_DCC_LOGGER"] = 0;
+		}
+		if (defined[key]) {
+		    if (comments[key] && old_version > 3) {
+			print comments[key];
+		    }
+		    print key "=" mem[key];
+		} else {
+		    print line;
+		}
+	    }
+	}
+	!/^[ABCDEFGHIJKLMNOPQRSTUVWXYZ]/ {
+	    if (FILENAME != first_file) {
+		print $0;
+	    } else {
+		if ($0 ~ /^ *#/ && $1 != "#") {
+		    if (cur_comment) {
+			cur_comment = cur_comment "\n" $0;
+		    } else {
+			cur_comment = $0;
+		    }
+		}
+	    }
+	}' $CUR $PROTOTYPE >$OUT
+
+
+# test the result
+. $OUT
+if test -n "@DCCSUID@" -a "@DCCSUID@" != "$DCCUID"; then
+    echo "./configure --with-uid=@DCCSUID@ conflicts with DCCUID=$DCCUID in $CUR" 1>&2
+fi

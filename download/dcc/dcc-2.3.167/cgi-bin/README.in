@@ -1,0 +1,138 @@
+Sample CGI scripts for managing per-user dccm, dccifd, and dccproc whitelists
+and logs.
+    Each user with a white list directory can
+	- browse logged messages
+	- point-and-click to add checksums from logged messages to an
+	    individual white list
+	- choose to receive a daily notice about messages since the user's
+	    log was last checked, but no more than one notice per week
+	    when the log is not checked.
+
+...............................................................................
+
+    newwebuser		see misc/README
+			It is installed in the DCC libexec directory
+			instead of the cgi-bin directory so that the HTTP
+			server need not be tempted by distant users to
+			execute it.
+
+    webuser-notify	send a mail message notifying a user of new DCC log
+			files.  This file must be edited, copied to the DCC
+			libexec directory, and made executable so that the
+			DCC cron script can use it.
+
+    common.pm		utility functions
+
+    header		common HTML used near top of the web pages
+    footer		common HTML used near bottom of the web pages
+			The scripts look first for a copy of the file
+			in the per-user directory and then in the cgi-bin
+			directory.
+
+    list-log		list a user's log files
+
+    list-msg		list a single message among the log files
+
+    edit-whiteclnt	edit a user's white list file
+
+    chgpasswd		change a user's password.
+			BEWARE that this script users `htpasswd -b` which
+			momentarily exposes passwords to other users on the
+			system using the `ps` command.  On systems with user
+			shell accounts, this script should be turned off or
+			replaced with something like the HTTPD::UserAdmin
+			Perl module.  To get it to work at all, you may need
+			to adjust $PATH to reach htpasswd.
+
+    http2https		CGI script to redirect HTTP accesses to HTTPS.
+
+...............................................................................
+
+
+These scripts are intended to be portable and usable instead of fast or fancy.
+Large organizations should consider perl_mod, templates, and so forth.
+
+Instead of modifying them in place, copying them to a directory other
+    than @prefix@/cgi-bin will avoid difficulties when installing new
+    versions of the DCC.
+
+They are intended to be used with dccm and dccifd, but can be used with dccproc
+    if dccproc is told to follow the per-user logging and whitelist
+    conventions used by dccm or dccifd with
+	dccproc -E -l @prefix@/userdirs/local/$USER/log \
+		-w @prefix@/userdirs/local/$USER/whiteclnt
+    It might be good to use the "include" facility to add a global
+    whiteclnt file to those per-user files.  The @libexecdir@/newwebuser
+    script starts per-user whiteclnt files from a prototype file and creates
+    a log directory.
+    It is not necessary to include the global whiteclnt file in each per-user
+    file with dccm or dccifd.  The global whiteclnt file is consulted if a
+    per-user's file fails to yield a black or white answer.
+
+    These scripts base their decisions about which additional or
+    "subsititute" headers to show on the -S parameters in DCCM_ARGS in
+    @prefix@/dcc_conf.  If you are not use dccm or dccifd but are using dccproc,
+    you must still set DCCM_ARGS for any local substitute SMTP headers.
+    Less likely to be useful SMTP headers such as non-null Message-IDs are
+    not supported to avoid confusing end-users.
+
+The log directory and whitelist for a local user in .../userdirs/local/name
+    are mapped to the htpasswd username "name", while those for remote
+    users in such as .../userdirs/esmtp/xxx@example.com are mapped to
+    esmtp/name@example.com
+
+These scripts should be installed and protected with an equivalent to the
+following in httpd.conf with Apache:
+    ScriptAlias /DCC-cgi-bin/ @prefix@/cgi-bin/
+    <Directory @prefix@/cgi-bin/>
+	RedirectMatch permanent /dcc-cgi-bin/*$ /dcc-cgi-bin/edit-whiteclnt
+	Order deny,allow
+	allow from all
+	AuthType Basic
+	AuthName "DCC user"
+	SetEnv AuthName "DCC user"
+	AuthUserFile @prefix@/userdirs/webusers
+	require valid-user
+    #
+	SSLCipherSuite ALL:!ADH:RC4+RSA:+HIGH:+MEDIUM:+LOW:+SSLv2:+EXP
+	SSLRequireSSL
+    # install the http2http2 script in your main /cgi-bin/ directory and
+    #	    add something like the following line to redirect HTTP to HTTPS
+    #   ErrorDocument 403 /cgi-bin/http2https
+    </Directory>
+
+Httpd must be able to read and write the per-user files and directories,
+usually by sharing a GID with the DCC user and having the directories
+writable-by-group.  By default, the newwebuser script uses the group www.
+
+
+This scripts can be used with the main client DCC log directory and whitelist by
+
+    1. let httpd read the main DCC log files.
+	Make the @prefix@/log directory readable and searchable by 'group'
+	    but neither searchable nor readable by 'other'.
+	Give the log directory the group used by httpd.
+	On SVR4 and Solaris systems, also make the directory set-GID
+
+    2. use `@libexecdir@/newwebuser %postmaster`
+	to recreate a per-user directory for a local username that is
+	invalid and will not be hit by spammer dictionary attacks
+
+    3. replace the resulting userdirs/local/%postmaster/log directory with a
+	symbolic link to the main log directory:
+	    rmdir @prefix@/userdirs/local/%postmaster/log
+	    ln -s ../../../log @prefix@/userdirs/local/%postmaster/log
+
+    4. replace the resulting userdirs/%postmaster/whiteclnt file with a
+	symbolic link to the DCC client white list:
+	    rm @prefix@/userdirs/local/%postmaster/whiteclnt
+	    ln -f -s ../../../whiteclnt @prefix@/userdirs/local/%postmaster
+
+	ensure that the @prefix@/whiteclnt file can be read and written
+	    by the httpd group.  If you don't trust your httpd daemon,
+	    it might be best to forget this idea.
+
+    5. follow the hints above for installing the sample CGI scripts.
+
+
+	Rhyolite Software DCC 2.3.167-1.15 $Revision$

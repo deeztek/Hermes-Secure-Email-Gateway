@@ -1,0 +1,7 @@
+hosts = 127.0.0.1
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+table = recipients
+select_field = status
+where_field = recipient

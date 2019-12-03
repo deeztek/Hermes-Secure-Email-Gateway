@@ -1,0 +1,52 @@
+Sample sendmail configuration files and scripts
+
+    Note that several of these files do not exist until they have been
+    built with the `configure` script their .in prototypes.
+
+    start-dccm		start dccm
+			    Installed in libexec in the DCC home directory.
+
+    start-dccd		start dccd
+			    Installed in libexec in the DCC home directory.
+
+    rcDCC		rc.d script for starting all DCC daemons.  It can be
+			    linked into rc*.d directories on Solaris and Linux.
+			    It can be called by /etc/rc.local on older BSD
+			    systems and linked into /usr/local/etc/rc.d on
+			    newer BSD systems.
+
+    cron-dccd		run dbclean and delete log files daily
+			    Installed in libexec in the DCC home directory.
+
+    crontab		example cron entry
+
+    dcc.m4		DCC sendmail "FEATURE" file for cf/feature directory
+
+    dccdnsbl.m4		DCC sendmail "FEATURE" file to connect a DNS black-list
+			    to DCC
+
+    hackmc		modify sendmail.cf generated from .mc file to report
+			    spam detected by sendmail using the "access_db"
+			    and "blacklist_recipients" features and
+			    unauthorized relaying to the DCC.  Lines in the
+			    access_db database should be of the form
+				DCC: "DISCARD spammer cyberpromo.com"
+			    or
+				DCC: "spammer cyberpromo.com"
+			    to "discard" or "reject," respectively.
+
+    site.config.m4      build milter in sendmail
+
+    wlist.c		dump whitelist hash tables
+
+    man2html		slightly modified Perl script
+
+    newwebuser		create per-user directories and white list files,
+			optionally from a prototype.
+			The required argument should be the "dir" value
+			from a dccm log file.
+			BEWARE that this script does not participate in
+			the locking done by the chgpasswd CGI script.
+
+
+	Rhyolite Software DCC 2.3.167-1.15 $Revision$

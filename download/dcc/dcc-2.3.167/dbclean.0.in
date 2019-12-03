@@ -1,0 +1,204 @@
+dbclean(8)            Distributed Checksum Clearinghouse            dbclean(8)
+
+NNAAMMEE
+     ddbbcclleeaann -- Clean Distributed Checksum Clearinghouse Database
+
+SSYYNNOOPPSSIISS
+     ddbbcclleeaann [--ddffFFNNPPSSVVqquu] [--ii _i_d] [--aa [_s_e_r_v_e_r_-_a_d_d_r][_,_p_o_r_t]] [--hh _h_o_m_e_d_i_r]
+             [--HH _h_a_s_h_-_f_i_l_e_-_d_i_r] [--DD _d_b_-_f_i_l_e_-_d_i_r] [--GG _o_n] [--RR _m_o_d_e]
+             [--ss _h_a_s_h_-_s_i_z_e] [--ee _s_e_c_o_n_d_s] [--EE _s_p_a_m_s_e_c_s]
+             [--LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l]
+
+DDEESSCCRRIIPPTTIIOONN
+     DDbbcclleeaann creates empty, rebuilds corrupted, and deletes or expires old
+     reports of checksums from DCC databases.  It should be installed where it
+     will be found with the path given the DCC server daemon when the daemon
+     needs to expand the hash table.  See dccd(8).  It should also be run by
+     the daily cron(8) job, _/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_c_r_o_n_-_d_c_c_d.
+
+     The whitelist in _/_v_a_r_/_d_c_c_/_w_h_i_t_e_l_i_s_t or _/_v_a_r_/_d_c_c_/_g_r_e_y___w_h_i_t_e_l_i_s_t are built
+     into the DCC server's database.  Changes to the whitelist are not effec-
+     tive until dbclean is run.  White or blacklists can also be used by DCC
+     clients and work better.
+
+   OOPPTTIIOONNSS
+     The following options are available.  Most of them should set by changing
+     DBCLEAN_LOGDAYS and DBCLEAN_ARGS in the _/_v_a_r_/_d_c_c_/_d_c_c___c_o_n_f control file.
+
+     --dd   enables debugging output.  Additional --dd options increase the number
+          of messages.
+
+     --FF   uses write() instead of mmap() and msync() in some cases to modify
+          the DCC database.  This works better on some versions of Solaris
+          provided the entire DCC database fits in RAM and provided the file
+          system has not been tuned for the large, random accesses of a DCC
+          database.  It is the default on Solaris except when the database is
+          in a memory mapped file system or the entire database fits in RAM.
+          Do not use --FF with --ff, --HH, or --DD.
+
+     --ff   uses mmap() and msync() to modify the DCC database.  Do not use --ff
+          with --FF, --HH, or --DD.
+
+     --NN   creates a new, empty database.  There must not be an existing data-
+          base and the DCC server, dccd(8), must not be running.
+
+     --PP   expires old checksums from a database using the --ee --aanndd --EE values
+          from the preceding use of ddbbcclleeaann.  --PP cannot be used with --ee or --EE.
+          Using --PP differs from not using --ee or --EE, because in the absence of
+          all three, their default values are used.
+
+     --SS   says that the DCC server, dccd(8), is not running and so ddbbcclleeaann
+          should run stand-alone and not try to tell the DCC server about
+          changes to the database.  --ii is not needed with --SS.
+
+     --VV   displays the version of the DCC database cleaner.  Two or more --VV
+          options show the options with which it was built.
+
+     --qq   quiets the announcement to stderr of the final results and debugging
+          messages turned on with --dd.  Results are still sent to the system
+          log.
+
+     --uu   should be used when the file system containing the _d_c_c___d_b and
+          _d_c_c___d_b_._h_a_s_h files is "ultra-fast," such as a solid-state drive.
+          This setting postpones writing some data during normal operation
+          until the system is shutdown.  This reduces wear on the SSD at the
+          cost of writing GBytes of data when the system is shutdown.  Writing
+          GBytes to a rotating disk at system shutdown unacceptable, but not
+          noticeable to a non-rotating disk that operates 10 or 100 times
+          faster.
+
+     --ii _i_d
+          specifies the DCC ID recognized by the local DCC server as its own.
+          This ID allows the DCC server to recognize commands from ddbbcclleeaann to
+          stop using the database while it is being cleaned.
+
+     --aa [_s_e_r_v_e_r_-_a_d_d_r][_,_p_o_r_t]
+          is commonly used to specify a UDP port or IP address of the local
+          server other than the default.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.
+
+     --HH _h_a_s_h_-_f_i_l_e_-_d_i_r
+          puts the _d_c_c___d_b_._h_a_s_h hash table file in the _h_a_s_h_-_f_i_l_e_-_d_i_r directory
+          with a symbolic link.  Using --HH to put the hash table in a memory,
+          "tmpfs", or "swap" file system such as _/_d_e_v_/_s_h_m or _/_t_m_p signifi-
+          cantly speeds up the DCC server, dccd(8), on operating systems such
+          as Linux and Solaris that lack the _M_A_P___N_O_S_Y_N_C flag for the mmap(8)
+          system call.
+
+          The memory file system must have space for two copies of the
+          _d_c_c___d_b_._h_a_s_h file.  --HH is undesirable on FreeBSD and other systems
+          with _M_A_P___N_O_S_Y_N_C except when --DD is used.  The DCC database file,
+          _d_c_c___d_b, should usually be in file system that is not cleared by
+          operating system rebooting and _n_o_t in a memory file system.
+
+          Use or stop using --HH by adding it to or removing it from
+          DBCLEAN_ARGS in @prefix@/dcc_conf and manually running or waiting
+          for the nightly run of the @libexecdir@/cron-dccd cron job.
+
+          Do not use --HH with --FF or --ff.
+
+     --DD _d_b_-_f_i_l_e_-_d_i_r
+          puts the _/_v_a_r_/_d_c_c_/_d_c_c___d_b database and the _/_v_a_r_/_d_c_c_/_d_c_c___d_b_._h_a_s_h hash
+          table files in the _d_b_-_f_i_l_e_-_d_i_r directory with symbolic links.  Using
+          --DD to put the files in a memory, "tmpfs", or "swap" file system such
+          as _/_d_e_v_/_s_h_m or _/_t_m_p significantly speeds up the DCC server, dccd(8),
+          but causes several GBytes of database transfers before DCC is effec-
+          tive whenever the operating system is restarted.  --DD should _n_o_t be
+          used except at sites with more than one DCC server installation and
+          where at least one of the other local servers is not using --DD.  --DD
+          should only be used on systems that are rarely rebooted, because up
+          to one month is required for the database reach equilibrium.
+
+          The memory file system must have space for two copies of the _d_c_c___d_b
+          file.
+
+          Use or stop using --DD by adding it to or removing it from
+          DBCLEAN_ARGS in @prefix@/dcc_conf and manually running or waiting
+          for the nightly run of the @libexecdir@/cron-dccd cron job.
+
+          Do not use --DD with --FF or --ff.
+
+     --GG _o_n
+          cleans a greylist database in _/_v_a_r_/_d_c_c_/_g_r_e_y___d_b and
+          _/_v_a_r_/_d_c_c_/_g_r_e_y___d_b_._h_a_s_h instead of of a DCC server database.
+
+     --RR _m_o_d_e
+          repairs a database or does a quick cleaning.  _M_o_d_e must be one of
+          the following:
+          _b_a_d    to repair a broken database.
+          _q_u_i_c_k  for a quick, superficial cleaning during the day.
+          _h_a_s_h   to rebuild a hash not sent to disk before the system was
+                 rebooted.
+          _f_a_i_l_s_a_f_e
+                 to work around missing nightly cleaning by the cron(8) job,
+                 _/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_c_r_o_n_-_d_c_c_d
+          _d_e_l    to finish processing a delete command received by dccd(8).
+
+     --ss _h_a_s_h_-_s_i_z_e
+          specifies a size for the hash table in _/_v_a_r_/_d_c_c_/_d_c_c___d_b_._h_a_s_h.  By
+          default the hash table is rebuilt to be approximately 80% full based
+          on an estimate of the number of distinct checksums in the database
+          file.
+
+     --ee _s_e_c_o_n_d_s
+          specifies that reports older than _s_e_c_o_n_d_s and with totals below 10
+          targets should be deleted.  Reports older than _s_e_c_o_n_d_s of checksums
+          that have been reported more recently are summarized in the data-
+          base.  The default value is 1DAY or the value of --EE, whichever is
+          smaller.  The 1 day default is reduced if the system does not appear
+          to have enough RAM to hold the database.  The minimum is 1 hour.
+          _S_e_c_o_n_d_s can also be _N_E_V_E_R or a number of hours, days, or weeks fol-
+          lowed by _H_O_U_R_S, _H, _D_A_Y_S, _D, _W_E_E_K_S or _W.
+
+          DCC servers that are not very busy and are isolated or do not
+          receive "floods" of checksums from busy servers should use longer
+          values to increase their chances of recognizing bulk mail.
+
+     --EE _s_p_a_m_s_e_c_s
+          changes the expiration of checksums with more than 10 targets from
+          the default of 30DAYS or the explicit value of --ee, whichever is
+          larger.  The default is reduced if the system does not have enough
+          RAM to hold the database.  _S_p_a_m_s_e_c_s can also be _N_E_V_E_R or a number of
+          hours, days, or weeks followed by _H_O_U_R_S, _H, _D_A_Y_S, _D, _W_E_E_K_S or _W.
+
+     --LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l
+          specifies how messages should be logged.  _L_t_y_p_e must be _e_r_r_o_r, _i_n_f_o,
+          or _o_f_f to indicate which of the two types of messages are being con-
+          trolled or to turn off all syslog(3) messages from ddbbcclleeaann.  _L_e_v_e_l
+          must be a syslog(3) level among _E_M_E_R_G, _A_L_E_R_T, _C_R_I_T, _E_R_R, _W_A_R_N_I_N_G,
+          _N_O_T_I_C_E, _I_N_F_O, and _D_E_B_U_G.  _F_a_c_i_l_i_t_y must be among _A_U_T_H, _A_U_T_H_P_R_I_V,
+          _C_R_O_N, _D_A_E_M_O_N, _F_T_P, _K_E_R_N, _L_P_R, _M_A_I_L, _N_E_W_S, _U_S_E_R, _U_U_C_P, and _L_O_C_A_L_0
+          through _L_O_C_A_L_7.  The default is equivalent to
+                --LL _i_n_f_o_,_M_A_I_L_._N_O_T_I_C_E --LL _e_r_r_o_r_,_M_A_I_L_._E_R_R
+
+     ddbbcclleeaann exits 0 on success, and > 0 if an error occurs.
+
+FFIILLEESS
+     @prefix@      is the DCC home directory containing data and control
+                   files.
+     dcc_conf      is the DCC control file.
+     dcc_db        is the main file containing mail checksums.
+     dcc_db.hash   mail checksum database hash table.
+     grey_db       is the database of greylist checksums.
+     grey_db.hash  is the greylist database hash table.
+     dcc_db-new, dcc_db-new.hash, grey_db-new, grey_db-new.hash
+                   new database and hash files until they are renamed.
+     dcc_db-old, grey_db-old
+                   previous database files.
+     ids           list of IDs and passwords, as described in dccd(8).
+     whitelist     contains the DCC server whitelist in the format described
+                   in dcc(8).
+     grey_whitelist
+                   contains the greylist server whitelist.
+
+SSEEEE AALLSSOO
+     cdcc(8), cron(8), dcc(8), dccd(8), dblist(8), dccifd(8), dccm(8),
+     dccproc(8).
+
+HHIISSTTOORRYY
+     Implementation of ddbbcclleeaann was started at Rhyolite Software, in 2000.
+     This document describes version 2.3.167.
+
+                                 June 19, 2019

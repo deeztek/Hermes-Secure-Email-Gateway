@@ -1,0 +1,162 @@
+#! /bin/sh
+
+# get statistics from a DCC server
+#   [-x]	    debugging
+#   [-q]	    quiet
+#   [-S]	    read `cdcc stats` from stdin
+#   [-s stats-file] save raw `cdcc stats` output in stats-file
+#   [-i client-ID]  that DCC server will accept
+#   [-p password]   that DCC server will accept
+#   [-C cdcc-cmd]   optional cdcc command before "stats"
+#   host	    server to ask for numbers
+
+# A single line of 6 decimal numbers separated by colons is sent to stdout:
+#   For example,
+#	115492:71318:44694:2462909:155924:666
+#   means the DCC server has
+#	115492  received reports of checksums from DCC clients
+#	71318	received reports where the answer target count was >= 10
+#	44694	received reports where the answer target count was "many"
+#	2462909	entries in its hash table
+#	155924	received reports by flooding
+#	666	received reports about spam traps
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.29 $Revision$
+#	@configure_input@
+
+DEBUG=
+QUIET=
+STATSFILE=
+STATSFILE_NEW=/dev/null
+CLNT_ID=
+PASSWD=
+CCMDS="; "
+USAGE="`basename $0`: [-xqS] [-s sfile] [-i client-ID] [-p passwd] [-C cdcc-cmd]
+    [host]"
+while getopts "xqSs:i:p:C:" c; do
+    case $c in
+	x) set -x; DEBUG=-x;;
+	q) QUIET="-q";;
+	S) USE_STDIN=yes;;
+	s) if test -n "$OPTARG" -a $OPTARG != /dev/null; then
+		STATSFILE=$OPTARG
+		STATSFILE_NEW=$STATSFILE.$$.new
+		trap "/bin/rm -f $STATSFILE_NEW" 0 1 2 15
+	    fi
+	    ;;
+	i) CLNT_ID="$OPTARG";;
+	p) if test "$OPTARG" != ""; then
+		PASSWD="password $OPTARG;"
+	    fi
+	    ;;
+	C) CCMDS="$CCMDS$OPTARG; ";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 1; then
+    if test "$#" -ne 0 -o -z "$USE_STDIN"; then
+	echo "$USAGE" 1>&2
+	exit 1
+    fi
+fi
+
+HOST=$1
+
+if test -n "$USE_STDIN"; then
+    cat
+else
+    exec </dev/null
+
+    if test -z "$CLNT_ID"; then
+	CLNT_ID=1
+    fi
+
+    CMDS="id $CLNT_ID; $PASSWD host $HOST$CCMDS stats; info"
+    if test -n "$QUIET"; then
+	@bindir@/cdcc -B "$CMDS" 2>/dev/null
+    else
+	@bindir@/cdcc -B "$CMDS"
+    fi
+fi								\
+    | tee $STATSFILE_NEW					\
+    | awk '
+	/hash entries/{
+	    hashes = $4;
+	}
+	/query/{
+	    queries = $8;
+	    if (queries ~ /^-/) {
+		# negative numbers are 32-bit overflows
+		queries = 4294967296 + queries;
+	    }
+	}
+	/reports.*many/{
+	    reports = $1;
+	    if (reports ~ /^-/) {
+		reports = 4294967296 + reports;
+	    }
+	    trapped = $6
+	    if (trapped ~ /^-/) {
+		trapped = 4294967296 + trapped;
+	    }
+	}
+	/answers.*>10/{
+	    split($2,bulk,">");
+	    if (bulk[1] ~ /^-/) {
+		bulk[1] = 4294967296 + bulk[1];
+	    }
+	    spam=$5;
+	    if (spam ~ /^-/) {
+		spam = 4294967296 + spam;
+	    }
+	}
+	/accepted/{
+	    flooded=$1;
+	    if (flooded ~ /^-/) {
+		flooded = 4294967296 + flooded;
+	    }
+	}
+	/no rep/{
+	    norep=$1;
+	    split($4,rep1,">");
+	    split($5,rep10,">");
+	    split($6,rep20,">");
+	    split($7,rep30,">");
+	    split($8,rep60,">");
+	    if (NF < 10) {
+		hit = "U"
+	    } else {
+		hit = $10;
+	    }
+	}
+	END {
+	    printf "%s:%s:%s:%s:%s:%sR%s:%s:%s:%s:%s:%s:%s\n",
+		reports+queries, bulk[1], spam, trapped, hashes, flooded,
+		norep, rep1[1], rep10[1], rep20[1], rep30[1], rep60[1], hit;
+	}'
+
+if test `wc -l <$STATSFILE_NEW` -gt 2; then
+    rm -f $STATSFILE
+    mv $STATSFILE_NEW $STATSFILE
+fi

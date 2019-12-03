@@ -1,0 +1,32 @@
+# Sample DCC client information
+#   See cdcc(8) about loading this file into the memory mapped client file,
+#   @prefix@/map, with the "load" command.  When used for that purpose,
+#   it must not be publicly readable.
+
+#   This file is otherwise only documentation for the mapped client file.
+#   It is handy to regularly update it with a command like
+#	`cdcc -q info > map.txt` and archive it with RCS or SCCS.
+#   The cdcc command must be run as the dcc user or the passwords will not be
+#   captured.
+
+# public DCC servers
+#	REMOVE THESE LINES from any spam appliance or filter that you sell.
+#	It is wrong to take and sell the human system administration work
+#	of the operators of the public DCC servers.
+dcc1.dcc-servers.net	RTT+1000 ms	anon
+dcc2.dcc-servers.net	RTT+1000 ms	anon
+dcc3.dcc-servers.net	RTT+1000 ms	anon
+dcc4.dcc-servers.net	RTT+1000 ms	anon
+dcc5.dcc-servers.net	RTT+1000 ms	anon
+
+#   `make install` replaces "secret1" with a unique password.  Extreme
+#   security is not needed for these passwords.
+
+# local DCC server
+@   RTT-1000 ms    32768 secret1
+
+# local greylist server
+@   GREYLIST	   32768 secret1
+
+
+#	Rhyolite Software DCC 2.3.167-1.28 $Revision$  2019/05/23 02:35:22

@@ -1,0 +1,288 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.49 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt dblist 8 DCC
+.Os " "
+.Sh NAME
+.Nm dblist
+.Nd Database List Distributed Checksum Clearinghouse
+.Sh SYNOPSIS
+.Nm dblist
+.Op Fl vVHD
+.Op Fl G Ar on | off
+.Op Fl h Ar homedir
+.br
+.Op Fl C Ar 'type h1 h2 h3 h4'
+.Op Fl I Ar server-ID
+.Op Fl A Ar dbaddr
+.Op Fl L Ar pathlen
+.br
+.Op Fl P Ar pages
+.Op Fl T Ar timestamp
+.Op Ar file1 file2 ...
+.Sh DESCRIPTION
+.Nm Dblist
+lists the contents of a DCC database as it does some consistency
+checking.
+.Bl -tag -width 3n
+.It Fl v
+lists more of the database.
+Additional information is produced with additional
+.Fl v
+arguments.
+.It Fl V
+displays the version of the DCC database lister.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl H
+turns off the listing of the hash table as well as the analysis
+of the hash table.
+Determining the worst case and average lengths of chains in the
+hash table can take a long time for a large database on a small computer.
+.It Fl D
+turns off the listing of the data or checksum records.
+.It Fl G Ar on
+lists a greylist database.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+.It Fl C Ar 'type h1 h2 h3 h4'
+limits the listing to records containing that checksum or one of
+the other checksums specified with
+.Fl C .
+If the four hexadecimal values
+.Ar h1 h2 h3 h4
+are absent,
+records with the matching
+.Ar type
+will be listed.
+If
+.Ar type
+is absent, any checksum with the four hexadecimal values will be listed.
+If the hexadecimal values
+.Ar h1 h2 h3 h4
+are absent,
+all checksums of the specified type will be listed.
+.Pp
+The alternate form
+.Bk -words
+.Ar 'server-ID {simple|commercial|ignore|rogue} at ID'
+.Ek
+can be used to select
+.Ar server-ID
+records of some types.
+.Pp
+As many as 16 checksums can be specified.
+.It Fl I Ar server-ID
+limits the listing to records with that server-ID or one of the other
+server-IDs specified with
+.Fl I .
+As many as 16 server-IDs can be specified.
+.It Fl A Ar dbaddr
+excludes database records before
+.Ar dbaddr .
+.It Fl L Ar pathlen
+excludes records with path lengths shorter than
+.Ar pathlen .
+.It Fl P Ar pages
+ignores all but the last
+.Ar pages
+of the database.
+.It Fl T Ar timetamp
+excludes records with other timestamps.
+A timestamp with a missing microsecond value matches
+any record with that second.
+As many as 16
+timestamps can be specified.
+.It Ar file1 file2 ...
+are names of databases to be listed.
+The default is
+.Pa @prefix@/dcc_db
+and its companion,
+.Pa @prefix@/dcc_db.hash .
+When
+.Fl G Ar on
+is used, the
+default files are
+.Pa @prefix@/grey_db
+and
+.Pa @prefix@/grey_db.hash .
+.El
+.Pp
+By default, the sizes of the main file and the hash table as well
+as how much they contain and values related to the performance of
+the hash are displayed.
+.Pp
+With a single
+.Fl v ,
+most of the mail database file and the contents of memory
+mapped server flooding positions in the
+.Pa @prefix@/flod.map
+file  are listed.
+The listing starts with the serial number of the database file
+which is when old entries were last removed from it by
+.Xr dbclean 8
+That is followed by similar lines showing the oldest timestamp
+of checksums not expired by dbclean
+and of mail that is not "spam."
+.Pp
+The flooding positions from the
+.Pa @prefix@/flod.map
+file are record offsets or addresses in the main database file.
+.Pp
+A typical record in the main database file looks like:
+.Bd -literal -offset 2n
+02/07/02 20:25:12.497032    5	      1601		2fe5b94
+     path: 103<-101<-1601
+  Body	    6	    e2d3f96a c65aea01 3fece361 edff9ecf  2f21364 772d2
+  Fuz1	    many    6ff56fe8 ffc312d7 a5fe8f13 12a537ae  2f21364 200a9
+  Fuz2	    many    fac882b8 03eea34f bd792c40 2fe6fd54  2f21364 72816
+.Ed
+.Pp
+That example
+was received by a DCC server with server-ID
+.Em 1601
+at about 8:25 UTC on the evening of February 7, 2000.
+The report was about a mail message set to
+.Em 5
+addressees.
+The report was then sent or
+.Sq flooded
+to the server with server-ID
+.Em 101
+which in turn sent it to a server with server-ID
+.Em 103 .
+That server sent it to the local DCC server.
+The record is at the address
+.Em 0x2fe5b94
+in the database.
+The record contains 3 checksums.
+The simple checksum of the body of the message was
+.Em 0xe2d3f96a 0xc65aea01 0x3fece361 0xedff9ecf
+The total number of recipients of messages with this body checksum
+known in the database is
+.Em 6 ,
+which implies this checksum had been previously reported with a target
+count of 1.
+The previous report in the database of a message with this body checksum
+is at
+.Em 0x2f21364 .
+The hash table chain for this body checksum is computed to start at
+.Em 0x772d2 .
+This report included two fuzzy checksums.
+Both have been previously reported as having been sent to
+.Em many
+targets.
+.Pp
+An asterisk (*) before the type of the checksum
+indicates that this checksum is redundant.
+A report of
+.Em many
+addressees makes all preceding reports redundant.
+.Pp
+The flooding of some database records is delayed, as shown by the string
+.Em delayed
+after the server-ID.
+.Pp
+The string
+.Em trimmed
+after the server-ID
+marks older reports that have had uninteresting checksums removed.
+The string
+.Em compressed
+after the server-ID
+would indicate that this older report has been trimmed and compressed with
+older reports.
+.Pp
+With two
+.Fl v
+arguments,
+records added to the database by
+.Xr dbclean 8
+from the server whitelist are also displayed.
+.Pp
+Three
+.Fl v
+arguments cause the hash table to be displayed.
+Three typical hash table entries look like:
+.Bd -literal -offset 2n
+      19b8:   19ee   19b7
+      19b9:   19c0      0    90120 Fuz1
+      19ba:      0      0  1b72300 Fuz1
+.Ed
+.Pp
+The entry in slot number
+.Em 0x19b8
+is unused or free.
+Slot number
+.Em 0x19b9
+is the start of a chain of collisions or entries
+with the same hash value of 0x19b9.
+The next slot in this chain is at
+.Em 0x19c0 .
+The corresponding
+.Em Fuz1
+checksum is at
+.Em 0x9012
+in the database.
+The third slot at
+.Em 0x19ba
+is also that of a
+.Em Fuz1
+checksum,
+but it is not part of a hash chain and its database record
+is at
+.Em 0x1b72300 .
+.Sh FILES
+.Bl -tag -width dcc_db.hash -compact
+.It Pa @prefix@
+is the DCC home directory containing data and control files.
+.It Pa dcc_db
+main file of DCC checksums.
+.It Pa grey_dcc_db
+main file of checksums used for greylisting.
+.It Pa dcc_db.hash
+database hash table for
+.Pa @prefix@/dcc_db .
+.It Pa grey_dcc_db.hash
+database hash table for
+.Pa @prefix@/grey_dcc .
+.It Pa flod.map
+.It Pa grey_flod.map
+memory mapped flooding positions.
+.El
+.Sh SEE ALSO
+.Xr cdcc 8 ,
+.Xr dcc 8 ,
+.Xr dbclean 8 ,
+.Xr dccd 8 ,
+.Xr dccifd 8 ,
+.Xr dccm 8 ,
+.Xr dccproc 8 .
+.Sh HISTORY
+Implementation of
+.Nm
+was started at Rhyolite Software, in 2000.
+This document describes version 2.3.167.

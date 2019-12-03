@@ -1,0 +1,35 @@
+use strict;
+
+#
+# Place your configuration directives here.  They will override those in
+# earlier files.
+#
+# See /usr/share/doc/amavisd-new/ for documentation and examples of
+# the directives you can use in this file
+#
+$pax='pax';
+#$inet_socket_port = [10021, 10022];
+$inet_socket_port = 20021;
+$mydomain = 'mydirectmail.net';
+$myhostname = 'mail.mydirectmail.net';
+@local_domains_maps=read_hash("/etc/postfix/relay_domains");
+# when amavisd-new sends notifications, they appear to come from here:
+$mailfrom_notify_admin     = "postmaster\@$mydomain";
+$mailfrom_notify_recip     = "postmaster\@$mydomain";
+$mailfrom_notify_spamadmin = "postmaster\@$mydomain";
+$hdrfrom_notify_sender = "amavisd-new <postmaster\@$mydomain>";
+#@bypass_virus_checks_acl = qw(.);
+@whitelist_sender_maps=(read_hash("/etc/amavis/white.lst"));
+@blacklist_sender_maps=(read_hash("/etc/amavis/black.lst"));
+@local_domains_acl = qw(.);
+$sa_spam_modifies_subj = 2;
+$sa_spam_subject_tag = '[SPAM]';
+$sa_tag_level_deflt = undef;
+$sa_tag2_level_deflt = 5;
+$sa_kill_level_deflt = 9999;
+$final_virus_destiny = D_DISCARD;
+$final_banned_destiny = D_BOUNCE;
+$final_spam_destiny = D_DISCARD;
+$final_bad_header_destiny = D_PASS;
+#------------ Do not modify anything below this line -------------
+1;  # ensure a defined return

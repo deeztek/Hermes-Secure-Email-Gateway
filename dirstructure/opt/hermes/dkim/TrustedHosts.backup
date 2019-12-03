@@ -1,0 +1,9 @@
+#The TrustedHosts file tells OpenDKIM who to let use your keys. Because it.s referenced by the ExternalIgnoreList directive in your conf file, OpenDKIM will ignore this list of hosts when verifying incoming mail. And, because it's also referenced by the InternalHosts directive, this same list of hosts will be considered internal and OpenDKIM will sign their outgoing mail.
+
+#IMPORTANT: Make sure you list the IP address for localhost (127.0.0.1) in the TrustedHosts file or OpenDKIM won.t sign mail sent from this server. If you have multiple servers on the same network that relay mail through this server and you want to sign their mail as well, they must be listed in the TrustedHosts file.
+
+
+127.0.0.1
+#192.168.xxx.xxx
+#server1.domain.tld
+#domain.tld

@@ -1,0 +1,72 @@
+# make the Distributed Checksum Clearinghouse prototype home directory files
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.68 $Revision$
+# @configure_input@
+
+DEPTH	=..
+
+HINST	=$(INSTALL) -c $(SET_DCCOWN)
+HD	=@installroot@@prefix@
+MAP	=$(HD)/map@configsuffix@
+MAPTXT	=$(HD)/map.txt@configsuffix@
+IDS	=$(HD)/ids@configsuffix@
+CDCC	=$(DEPTH)/cdcc/cdcc
+
+# this should not be the ./configure name
+PFILE	=.updatedcc_pfile
+
+SIMPLE	=flod grey_flod whitelist grey_whitelist whiteclnt whitecommon
+GENFILES=ids map map.txt dcc_conf
+SSCRIPTS=fix-map
+
+DCC_BINDIR=@installroot@@libexecdir@
+@INCLUDE_INC@
+
+install:$(HD) $(HD)/log
+	for NM in $(SSCRIPTS); do $(BININSTALL) $$NM $(DCC_BINDIR)/$$NM;done
+	sh make-dcc_conf -F '@configsuffix@' -h $(HD)
+	for NM in $(SIMPLE); do\
+	    if test -n '@configsuffix@' -o ! -f $(HD)/$$NM; then\
+		$(HINST) -m 644 $$NM $(HD)/$${NM}@configsuffix@; fi; done
+	if test -s $(PFILE); then $(HINST) -m 600 $(PFILE) $(HD)/$(PFILE); fi
+	sh fix-map -n '@configsuffix@' -c $(CDCC) -h $(HD) -i $(IDS) -m $(MAP) -t $(MAPTXT)
+	for NM in $(SIMPLE) $(GENFILES); do\
+	    if test -n '@configsuffix@' -a ! -s $(HD)/$$NM; then\
+		cp -p $(HD)/$${NM}@configsuffix@ $(HD)/$${NM}; fi; done
+
+deinstall:
+	-if test -d $(DCC_BINDIR); then cd $(DCC_BINDIR); rm -f $(SSCRIPTS); fi
+	for NM in dcc_conf $(SIMPLE); do\
+	    if test -f $(HD)/$$NM && test `diff $$NM $(HD)/$$NM\
+		    | sed -e '/^---$$/d' -e '/^[^<>]/d'\
+			 -e '/^[<>][	]*#/d' -e '/^[<>][	]*$$/d'\
+		    | wc -l` -eq 0; then rm $(HD)/$$NM; fi; done;
+	rm -f $(HD)/dcc_conf-new || true
+	-if test -d $(HD); then\
+	    find $(HD) -name '*.dcc[xw]' | @DCC_XARGS@ rm -f;\
+	    rmdir $(HD)/log 2>/dev/null || true;\
+	    fi
+
+$(HD):
+	$(HINST) -m 755 -d $(HD)
+$(HD)/log:
+	$(HINST) -m 710 -d $(HD)/log

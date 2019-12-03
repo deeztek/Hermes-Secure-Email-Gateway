@@ -1,0 +1,33 @@
+<!-- common HTML footing used near the bottom of the web pages
+
+	This file can appear in the cgi directory or a per-user directory -->
+
+<P>
+<HR>
+<ADDRESS>
+<A HREF="//www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+
+<!-- common footing HTML -->

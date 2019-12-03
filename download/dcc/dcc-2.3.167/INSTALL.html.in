@@ -1,0 +1,1033 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <TITLE>DCC Installation</TITLE>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <META NAME="Keywords" CONTENT="spam, checksum clearinghouse, filter">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <STYLE type="text/css">
+	<!--
+	BODY {background-color:white; color:black}
+	TABLE.centered {margin-left: auto; margin-right: auto; }
+	TD {font-size:80%}
+	    TD.env {white-space:nowrap; font-family:monospace}
+	    TD.conf {white-space:nowrap; font-family:monospace}
+	DL.compat {margin-left:5%; margin-right:10%}
+	.small {font-size:smaller}
+	SUP {font-size:smallest}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+	-->
+    </STYLE>
+</HEAD>
+
+<BODY>
+<H1>Distributed Checksum Clearinghouse (DCC) Installation</H1>
+
+<P>
+<OL>
+<LI><H3>Fetch the Source and Read the License</H3>
+The DCC source is available at
+<A HREF="https://www.dcc-servers.net/dcc/">dcc-servers.net</A>
+and
+<A HREF="https://www.rhyolite.com/dcc/">Rhyolite Software</A>.
+<P>
+Please <EM>do not</EM> try to use the ancient, modified
+versions of DCC software distributed by some Linux packagers.
+Those versions do not detect bulk mail as well as more recent versions.
+Installations using those old versions also have problems using the
+public DCC servers that often make it necessary to add their IP addresses
+to the blacklist that protects the public DCC servers.
+Even worse, all known Linux redistributions of DCC software have been
+changed in ways that break things, including the
+<A HREF="misc/updatedcc">@libexecdir@/updatedcc</A> shell script that could
+otherwise be used to fetch, configure, compile, install, and restart
+a current version.
+<P>
+The license on the free source is in the source as well as
+<A HREF="https://www.dcc-servers.net/dcc/dcc-tree/LICENSE">dcc-servers.net</A>.
+The free license is intended to cover individuals and organizations
+including Internet service providers using DCC to filter their own mail.
+Organizations selling anti-spam appliances or managed mail services are
+not eligible for the free license.
+
+
+<P><LI><H3>Read the Documentation</H3>
+<P>
+The <A HREF="dcc.html#Installation-Considerations">DCC</A>
+and other man pages describe the features, operating modes,
+required data files, and other characteristics of the DCC.
+Also see the DCC <A HREF=FAQ.html>FAQ</A>
+or list of frequently answered questions.
+
+
+<P><LI><H3><A NAME="step-sendmail">Build Sendmail</A></H3>
+If the DCC-sendmail interface, <A HREF="dccm.html">dccm</A>, is not used,
+then <B>skip</B> to the <A HREF="#step-compile">next step</A>.
+<P>
+Sendmail must have the
+Mail Filter API or Milter enabled.
+Some systems such a FreeBSD 4.6 and newer are shipped with
+Milter enabled and the library installed by default.
+If your system comes with the Milter interface turn on,
+then <B>skip</B> to the <A HREF="#step-compile">next step</A>.
+Otherwise, the Milter interface must be explicitly enabled
+by adding lines like those in
+<A HREF="misc/site.config.m4">misc/site.config.m4</A>
+to your sendmail/devtools/Site/site.config.m4 file or equivalent.
+Then build sendmail as described in the INSTALL file distributed with sendmail.
+You must build <CODE>libmilter</CODE> separately by something like
+<PRE>
+	    cd libmilter
+	    sh ./Build
+</PRE>
+<P>
+After sendmail has been rebuilt if necessary it will need to be restarted.
+That should be done after <A HREF="#step-compile">the next step</A>
+after <A HREF="misc/dcc.m4">misc/dcc.m4</A> has been created by the
+<EM>./configure</EM> script.
+
+
+<P><LI><H3><A NAME="step-compile">Configure, Build, and
+Install the DCC Programs</A></H3>
+<P>
+See the installation considerations in the
+<A HREF="dcc.html#Installation-Considerations">DCC man page</A>.
+<P>
+Most DCC files are in a "home directory" such as @prefix@.
+DCC programs such as cdcc and dccproc are run by end
+users and should be installed in a directory such as /usr/local/bin.
+They must also be set-UID to the UID that can change the DCC
+data files.
+DCC programs that do not need to be run by end users
+are installed by default in the libexec subdirectory of the DCC home directory.
+See the <A HREF="#envtbl">table</A> of
+<EM>./configure</EM> script and makefile parameters.
+If necessary, set CFLAGS, LDFLAGS, LIBS or other environment variables
+listed in the <A HREF="#envtbl">table</A>.
+Omit any parameters you don't really need to change.
+<P>
+End users installing only <A HREF="dccproc.html">dccproc</A>
+can install it in their private
+<Q>~/bin</Q> directories and use private directories for their DCC
+home directories.
+In this case, the DCC programs that would otherwise need to be set-UID
+need not be.
+<P>
+To build <A HREF="dccproc.html">dccproc</A>
+<A NAME="individual-user">for an individual user</A>,
+use something like
+<PRE>
+	./configure <A HREF="#envtbl--disable-sys-inst">--disable-sys-inst</A> <A HREF="#envtbl--disable-dccm">--disable-dccm</A> <A HREF="#envtbl--homedir">--homedir=$HOME/dccdir</A>  <A HREF="#envtbl--bindir">--bindir=$HOME/bin</A>
+	make install
+</PRE>
+<P>
+If you do not intend to use the sendmail interface,
+<A HREF="dccm.html">dccm</A>, use something like
+<PRE>
+	./configure <A HREF="#envtbl--disable-dccm">--disable-dccm</A>
+	make install
+</PRE>
+If you will use dccm,
+it must be built with the sendmail source and object tree.
+By default, the makefiles look for
+native sendmail libraries (e.g. on FreeBSD), an installed "package"
+(e.g. on FreeBSD), or a directory named sendmail parallel to the DCC
+source and object tree.
+Those who regularly build new versions of sendmail may find it convenient
+to make a symbolic link there to their current sendmail.
+Otherwise configure the dccm makefile with
+<PRE>
+	./configure <A HREF="#envtbl--with-sendmail">--with-sendmail</A>=/some/where/sendmail
+	make install
+</PRE>
+If dccm does not build because it cannot find libmilter,
+check that libmilter was compiled with sendmail
+in the <A HREF="#step-sendmail">previous step</A>.
+<P>
+To connect the sendmail Milter interface to <A HREF="dccm.html">dccm</A>,
+copy or symbolically link <A HREF="misc/dcc.m4">misc/dcc.m4</A> to
+your sendmail/cf/feature directory and
+add <CODE>FEATURE(dcc)</CODE> lines to your sendmail.mc configuration file.
+It can be useful to modify sendmail.cf by using
+<A HREF="misc/hackmc">misc/hackmc</A>.
+Then rebuild and reinstall your sendmail.cf file, and restart sendmail.
+
+
+<P><LI><H3>Create Client Configuration Files</H3>
+All DCC configuration files are in the DCC  home directory, usually @prefix@.
+See the
+<A HREF="dcc.html#Client-Installation">dcc</A>,
+<A HREF="dccm.html#FILES">dccm</A>,
+<A HREF="dccifd.html#FILES">dccifd</A>,
+and <A HREF="dccproc.html#FILES">dccproc</A>
+man pages
+for the files each needs.
+Example files are in the <A HREF="homedir/">homedir</A> directory in the source.
+
+<UL>
+<LI>Unless run anonymously, DCC clients need client-ID numbers and passwords
+assigned by the operators of the chosen DCC servers in the @prefix@/map file.
+<LI><P>Even if run anonymously, the @prefix@/map file must contain the IP addresses
+of DCC servers.
+If your mail system handles fewer than 100,000 mail messages per day,
+the installation process generates a serviceable @prefix@/map file
+from the included <A HREF="homedir/map.txt">homedir/map.txt</A> file.
+That file points to the public DCC servers.
+
+<LI><P>If using remote DCC servers such as the public DCC servers,
+ensure that your firewalls allow outgoing packets to UDP port 6277
+on distant systems and incoming responses from UDP port 6277.
+There is a
+<A HREF="https://www.dcc-servers.net/dcc/firewall.html">description</A>
+one firewall's configuration.
+
+<LI><P>Your MX servers and mail submission clients should be listed in the main
+<A NAME=whitelist HREF="homedir/whiteclnt">whiteclnt</A> file with lines like:
+<PRE>
+    mx		ip  10.2.3.4
+    mx		ip  10.5.6.0/28
+    mxdcc       ip  10.5.6.0/28
+    ok		ip  10.7.8.9
+    submit      ip  192.168.1.0/24
+</PRE>
+If those other systems also run DCC clients, use <EM>MXDCC</EM> instead
+of <EM>MX</EM> so that messages will not be reported twice to the DCC network
+and so have higher target counts,
+and appear to be unsolicited bulk mail.
+<P>
+Use <EM>OK</EM> for mail systems that you trust to never send or
+forward unsolicited bulk mail.
+<P>
+Untrusted SMTP clients such as end users with browsers used as
+MUAs (mail user agents) should be listed in the
+<A HREF="homedir/whiteclnt">whiteclnt</A> file with <EM>submit</EM>.
+
+<LI><P>Sources of legitimate bulk mail must be recorded in whitelists.
+Example <A HREF="homedir/whiteclnt">whiteclnt</A>,
+<A HREF="homedir/whitelist">whitelist</A>, and
+<A HREF="homedir/whitecommon">common</A> whitelists are among
+the <A HREF="homedir/">sample configuration files</A> in the homedir directory.
+The format of DCC whitelists is described in the
+<A HREF="dcc.html#White-and-Blacklists">DCC</A> man page.
+
+<LI><P>Put suitable values in the DCC configuration file,
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> for dccm or dccifd.
+The default client values are usually good for a start and often only
+DCCM_REJECT_AT needs to be changed when it is time to reject spam.
+
+<LI><P>Optionally configure DNS blacklist (DNSBL) checks in
+<A HREF="dccm.html#OPTION-B">dccm</A>
+or
+<A HREF="dccifd.html#OPTION-B">dccifd</A>
+by setting DNSBL_ARGS in in the configuration file,
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A>, in the home directory.
+
+
+<LI><P>Optionally create per-user directories for logs and whitelists.
+See also the
+<A HREF="cgi-bin/README">CGI scripts</A> in @cgibin@
+that allow users to maintain their private whitelists
+and monitor their individual logs of rejected mail.
+
+<LI><P>Install a daily or more frequent cron job like
+<A HREF="misc/crontab">misc/crontab</A>
+and
+<A HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A>
+to prune <A HREF="dccm.html#FILE-logdir">dccm</A> or
+<A HREF="dccifd.html#FILE-logdir">dccifd</A>
+log files and the prune dccd database with
+<A HREF="dbclean.html">dbclean</A>.
+</UL>
+
+<LI><H3>Create Server Files and Start the Server</H3>
+<B><A HREF="#step-greylist">Skip</A></B> this and the next step
+if only remote DCC servers will be used.
+You should use your own, local DCC servers only if your mail system handles
+more than 100,000 mail messages per day.
+If your mail system handles fewer than 100,000 mail messages per day,
+you should use the public DCC servers.
+The DCC client programs are configuerd to use the public DCC servers
+by default.
+<P>
+It is best to use remote servers until the DCC client,
+dccm, dccifd, or dccproc, is stable.
+Then
+<UL>
+<LI>Put suitable values for dccd
+ in the configuration file,
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A>.
+Every DCC server requires a unique
+<A HREF="dcc.html#Client-and-Server-IDs">server-ID</A>.
+Obtain a server-ID by contacting Vernon Schryver at
+<A HREF="mailto:vjs@rhyolite.com">vjs@rhyolite.com</A> by email
+or via a
+<A HREF="https://www.rhyolite.com/cgi-bin/ct.cgi?sb=DCC+server-ID">web form</A>.
+<P>
+On Linux or Solaris, consider adding -H to DBCLEAN_ARGS in @prefix@/conf.
+See the <A HREF="dbclean.html#OPTION-H">dbclean man page</A>.
+
+<LI><P>Choose a secret password for your server-ID in your
+<A HREF="homedir/ids">@prefix@/ids</A> file.
+This password is used to control your server with the
+<A HREF="cdcc.html">cdcc</A> program.
+Your server-ID must be unique
+and can be obtained by contacting Vernon Schryver at
+<A HREF="mailto:vjs@rhyolite.com">vjs@rhyolite.com</A> by email
+or via a
+<A HREF="https://www.rhyolite.com/cgi-bin/ct.cgi?sb=DCC+server-ID">web
+form</A>.
+
+<LI><P>If you have more than one DCC server,
+ensure that there are common client-IDs with the same passwords in
+the <A HREF="homedir/ids">@prefix@/ids</A> files on all of your servers
+You should define a DNS name like dcc.example.com with A and AAAA records
+for all of your DCC servers.
+Then configure your DCC clients to spread their load among your DCC servers
+with a command like
+<PRE>
+	cdcc "dcc.example.com  RTT-1000 ms  32768 secret"
+</PRE>
+where 32768 and secret are the common client-ID and password
+found in @prefix@/ids on all of your DCC servers.
+
+<LI><P>Start the server with the system by installing
+<A HREF="misc/rcDCC">@libexecdir@/rcDCC</A> or an equivalent.
+If it is used unchanged, rcDCC is best installed with a symbolic link
+to automate installing updates.
+The server can be started manually with
+<PRE>
+	rcDCC start
+</PRE>
+
+<LI><P>The script
+<A NAME=cleaning HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A>
+<EM>must</EM> be used to run
+<A HREF="dbclean.html">dbclean</A> about once a day.
+An entry like <A HREF="misc/crontab">misc/crontab</A> can be put into
+the crontab file for the user that runs dccd.
+If you have more than one DCC server,
+stagger the times at which the cron job is run so
+that not all of your servers are simultaneously busy cleaning databases.
+
+<LI><P>Install the shutdown script
+<A HREF="misc/rcDCC">@libexecdir@/rcDCC</A>
+to shut down the DCC server as the operating system stops.
+If the DCC server fails to close the database cleanly,
+the database must be cleaned by the server with it starts.
+That takes time.
+
+</UL>
+
+
+
+<P><LI><H3><A NAME="step-flooding">Configure Flooding</A></H3>
+<A HREF="#step-greylist">Skip to the next step</A>
+if only remote DCC servers will be used.
+<P>
+Flooding requires that every server participating in a network of DCC
+servers have a unique server-ID.
+Server-IDs can be obtained by contacting Vernon Schryver at
+<A HREF="mailto:vjs@rhyolite.com">vjs@rhyolite.com</A> by email
+or via a
+<A HREF="https://www.rhyolite.com/cgi-bin/ct.cgi?sb=DCC+server-ID">web
+form</A>.
+<P>
+After you have an official server-ID,
+<UL>
+<LI>Obtain the <A HREF="dccd.html#FILE-flod">passwd-ID</A> and its password
+and add them to your <A HREF="homedir/ids">@prefix@/ids file</A>.
+<LI>If necessary adjust your firewalls to allow both incoming TCP connections
+to port 6277 on your DCC server and outgoing TCP connections to port 6277
+on your flooding peer.
+<LI>Add a line for each flooding peer to
+the <A HREF="dccd.html#FILE-flod">@prefix@/flod</A> file.
+<LI>Wait a few minutes for dccd to notice the change to the file
+and start flooding.
+The <A HREF="cdcc.html#OPERATION-stats">cdcc&nbsp;stats</A>,
+<A HREF="cdcc.html#OPERATION-flood-list">cdcc&nbsp;"id&nbsp;X;&nbsp;flood list"</A>
+and
+<A HREF="dblist.html#OPTION-H">@libexecdir@/dblist&nbsp;-Hv</A>
+commands can be used to monitor the floods of reports of checksums
+of bulk mail.
+</UL>
+<P>
+Flooded reports of bulk email contain timestamps that are used for several
+things including expiring old reports.
+To accurately detect stale incoming reports,
+a DCC server needs a clock that is not too inaccurate.
+For that reason it is good to run an NTP daemon on systems running DCC servers.
+
+<P><LI><H3><A NAME="step-greylist">Configure Greylisting</A></H3>
+<B>Skip</B> to the <A HREF="#step-start-dccm">next step</A>
+if greylisting will not be used.
+Greylist is very effective.
+See this
+<A HREF="https://www.dcc-servers.net/dcc/greylist.html">description</A>.
+<P>
+Larger sites can use more than one greylist server,
+with the greylist servers flooding data just like DCC servers.
+<P>
+To configure greylisting:
+<OL>
+<LI><H4>Assign greylist client-IDs and server-IDs</H4>
+<P>Client-IDs and matching passwords must be used by clients of
+greylist servers such as dccm and dccifd.
+The client-IDs must be in the @prefix@/map file on the client system.
+Greylist client-IDs and server-IDs must be in the
+<A HREF="homedir/ids">@prefix@/ids</A> file on the
+greylist server.
+When a system hosts both DCC and greylist servers, it is convenient
+for clients to use the same client-ID and password for both.
+It is also convenient for a greylist server and a DCC server on a system
+to share a common server-ID and password.
+<P>
+The vast majority of installations do not have local DCC servers and
+can use the greylist server-ID generated automatically in the
+<A HREF="homedir/ids">@prefix@/ids</A> file.
+
+<P><LI><H4>Add the greylist server to @prefix@/map</H4>
+<P>If the
+cdcc&nbsp;"<A HREF="cdcc.html#OPERATION-info">info</A>"
+command does not show the correct greylist server,
+add it with something like
+<PRE>
+	cdcc "<A HREF="cdcc.html#OPERATION-add">add localhost greylist 32768 secret"</A>
+</PRE>
+The DCC makefile files add a greylist server at localhost or 127.0.0.1
+to <A HREF="cdcc.html#FILES">@prefix@/map</A> file created for a new
+DCC installation.
+
+<P><LI><H4>Set @prefix@/dcc_conf</H4>
+In most installations, enable a local greylist server by
+installing the script <A HREF="misc/rcDCC">@libexecdir@/rcDCC</A>
+with a symbolic link,
+setting  <EM>GREY_ENABLE=on</EM> in @prefix@/dcc_conf
+and then running
+<PRE>
+	<A HREF="misc/rcDCC">@libexecdir@/rcDCC</A> start
+</PRE>
+
+<P>If absolutely necessary, override the greylist
+<A HREF="dccd.html#OPTION-G">embargo, wait, and white</A> values
+in GREY_DCCD_ARGS in @prefix@/dcc_conf.
+Usually simply set GREY_CLIENT_ARGS=on
+
+<P><LI><H4>Set @prefix@/grey_flod</H4>
+<P>
+Sites with more than one greylist server should arrange to flood
+data among them by adding lines to
+<A HREF="dccd.html#FILE-grey_flod">@prefix@/grey_flod</A> files
+in the same format as
+<A HREF="dccd.html#FILE-flod">@prefix@/flod</A> files.
+Flooding among greylist servers uses port 6276 by default, and so that
+port may need to be opened in firewalls.
+
+<P><LI><H4>Set cron job</H4>
+<P>
+Install a daily cron job like
+<A HREF="misc/crontab">misc/crontab</A>
+and
+<A HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A>
+to clean the database.
+<P>
+
+<P><LI><H4>Whitelist Mail Submission Clients</H4>
+<P>
+Greylisting of local mail systems must be turned off because common
+mail user agents (MUAs) cannot handle temporary rejections.
+One way to turn off greylisting of local client is with <EM>submit</EM> lines
+in the main <A HREF="homedir/whiteclnt">whiteclnt</A> file
+as described <A HREF="#whitelist">above</A>.
+<P>
+An alternative to whitelisting mail submission clients is available with
+<A HREF="dccm.html">dccm</A> and sendmail by using the
+<A HREF="misc/hackmc">misc/hackmc&nbsp;-T</A>
+script to modify sendmail.cf to trust SMTP clients authenticated with
+SMTP-TLS or SMTP-AUTH.
+
+</OL>
+
+
+
+<P><LI><H3><A NAME="step-start-dccm">Start dccm</A></H3>
+If the DCC-sendmail interface, dccm, is not used,
+<B>skip</B> to the <A HREF="#step-start-dccifd">next step</A>.
+<P>
+The DCC sendmail milter interface <A HREF="dccm.html">dccm</A>
+should be started before sendmail.
+That often requires changing an /etc/rc script or configuration file.
+The script <A HREF="misc/rcDCC">@libexecdir@/rcDCC</A>
+should be installed, best with a symbolic link.
+The milter daemon can be started manually with
+<PRE>
+	rcDCC start
+</PRE>
+
+
+
+<P><LI><H3><A NAME="step-start-dccifd">Start dccifd</A></H3>
+If the general MTA interface, dccifd, is not used,
+<B>skip</B> to the <A HREF="#configure-dccproc">next step</A>.
+If you are using SpamAssassin, then you almost certainly
+should be using dccifd.
+<P>
+The general MTA interface <A HREF="dccifd.html">dccifd</A>
+should usually be started before the mail transfer agent or MTA.
+It should be enabled by setting <EM>DCCIFD_ENABLE=on</EM>
+in <A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A>.
+It is also usually necessary to change an /etc/rc script or configuration file
+to start and stop the daemon with the system.
+The script <A HREF="misc/rcDCC">@libexecdir@/rcDCC</A>
+should be installed, best with a symbolic link.
+The daemon can be started manually with
+<PRE>
+	rcDCC start
+</PRE>
+<P>
+Dccifd can be used as a
+<A HREF="http://www.postfix.org/SMTPD_PROXY_README.html">Postfix Before-Queue
+Content filter</A>
+as described the
+<A HREF="dccifd.html#EXAMPLES">dccifd man page</A>.
+
+
+<P><LI><H3><A NAME="configure-dccproc">Configure Uses of dccproc</A></H3>
+If dccproc is used with procmail,
+add rules to procmailrc files as described in the
+<A HREF="dccproc.html#EXAMPLES">dccproc man page</A>.
+
+<P><LI><H3>Adjust Rejection Thresholds</H3>
+<P>It is best to only mark mail with X-DCC SMTP headers
+before changing procmail or dccm to reject mail.
+Configure dccm with DCCM_LOG_AT in
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A>
+to log bulk mail with somewhat lower counts.
+
+
+<P><LI><H3>Additional Considerations</H3>
+<P>Some additional mechanisms are available in the DCC client programs.
+They are often unnecessary when
+<A HREF="#step-greylist">greylisting</A> is used.
+<UL>
+<LI><A HREF="dccm.html#OPTION-B">DNS blacklists (DNSBL)</A>
+can reject messages containing "spamvertised" URLs.
+<LI><A HREF="dccm.html#OPTION-t">DCC reputations</A>
+are available in the commercial version of the DCC source.
+</UL>
+
+<P>
+When possible, it is almost always better to use dccifd than dccproc.
+This is certainly true with SpamAssassin.
+
+When using SpamAssassin, ensure that the SpamAssassin plugin
+DCC.pm is up to date.
+The DCC source includes a
+<A HREF="misc/DCC.pm">copy</A> in the misc directory.
+Please consider setting dcc_learn_score to report spam to other
+SpamAssassin with DCC users.
+
+
+
+<P><LI><H3>Update As Needed</H3>
+<P>New versions released at the
+<A HREF="https://www.dcc-servers.net/dcc/">usual place</A>
+can be installed by running the
+<A HREF="misc/updatedcc">@libexecdir@/updatedcc</A> script.
+That script is (re)built by the
+<EM>./configure</EM> script
+and runs <EM>./configure</EM> with parameters and
+environment variables from the previous installation.
+
+
+
+<P><LI><H3>Remove or Uninstall</H3>
+<P>Most of the DCC can be removed by running
+<A HREF="misc/uninstalldcc">@libexecdir@/uninstalldcc</A> script.
+Some logs and configuration files with locally chosen parameters in the home
+directory are not deleted.
+Manual changes such as links to
+<A HREF="misc/rcDCC">@libexecdir@/rcDCC</A>
+or the installation of the cron job,
+<A HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A>,
+are not reversed.
+
+
+</OL>
+
+
+
+<H2>Installation Parameters</H2>
+<P>There are several installation configuration parameters that can
+set to suit individual preferences and systems.
+
+<P>
+<TABLE class=centered border="1" cellpadding="2%"  frame=void rules=rows
+    summary="table of makefile and configure script controls">
+<CAPTION><A NAME="envtbl">
+    <B>Makefile and <EM>./configure</EM> Script Controls
+    <BR>Do NOT set these parameters unless absolutely necessary.</B></A>
+</CAPTION>
+<TR><TH><EM>./configure</EM> option
+    <TH>env name or <br>make variable
+    <TH>used by
+    <TH>default value
+    <TH>use
+<TR><TD class=env><A NAME="envtbl--homedir">--homedir=HOMEDIR</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>@prefix@/
+    <TD>DCC home directory with most DCC files
+<TR><TD class=env><A NAME="envtbl--bindir">--bindir</A>=DIR
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>/usr/local/bin
+    <TD>directory for DCC user commands including cdcc and dccproc<SUP>3</SUP>
+<TR><TD class=env><A NAME="envtbl--libexecdir">--libexecdir=DIR</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD><A HREF="#envtbl--homedir">--homedir</A>/libexec
+    <TD>directory containing most DCC programs
+<TR><TD class=env>--mandir=DIR
+    <TD>&nbsp
+    <TD><EM>./configure</EM>
+    <TD>/usr/local/man
+    <TD>directory for man pages<SUP>3</SUP>
+<TR><TD class=env>&nbsp;
+    <TD class=conf>NOMAN<SUP>1</SUP>
+    <TD>make
+    <TD>unset
+    <TD>do not install man pages when set<SUP>3</SUP>
+<TR><TD class=env><A NAME="envtbl--installroot">--with-installroot=DIR</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>unset
+    <TD>prefix all directory paths to build a binary tarball
+<TR><TD class=env><A NAME="envtbl--configsuffix">--with-configsuffix=str</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>unset
+    <TD>append <EM>str</EM> to generated configuration file names
+<TR><TD class=env><A NAME="envtbl--with-uid">--with-uid=UID</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>root
+    <TD>user name and set-UID for DCC programs and data
+<TR><TD class=env>&nbsp;
+    <TD class=conf><A NAME="envtbl-DCC_OWN">DCC_OWN</A><SUP>1</SUP>
+    <TD>make
+    <TD>bin, daemon on OS X, or current
+    <TD>owner or UID of most installed files<SUP>3</SUP>
+<TR><TD class=env>&nbsp;
+    <TD class=conf><A NAME="envtbl-DCC_GRP">DCC_GRP</A><SUP>1</SUP>
+    <TD>make
+    <TD>bin, daemon on OS X, or current
+    <TD>group of most installed files<SUP>3</SUP>
+<TR><TD class=env>&nbsp;
+    <TD class=conf>DCC_MODE<SUP>1</SUP>
+    <TD>make
+    <TD>555
+    <TD>mode of most installed programs
+<TR><TD class=env>&nbsp;
+    <TD class=conf>MANOWN<SUP>1</SUP>
+    <TD>make
+    <TD><A HREF="#envtbl-DCC_OWN">DCC_OWN</A>
+	or current
+    <TD>owner or UID of installed man pages<SUP>3</SUP>
+<TR><TD class=env>&nbsp;
+    <TD class=conf>MANGRP<SUP>1</SUP>
+    <TD>make
+    <TD><A HREF="#envtbl-DCC_GRP">DCC_GRP</A>
+	or current
+    <TD>group of installed man pages<SUP>3</SUP>
+<TR><TD class=env><A NAME="envtbl--disable-sys-inst">--disable-sys-inst</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>enabled
+    <TD>disable system installation or chmod, chgrp, and set-UID<SUP>3</SUP>
+<TR><TD class=env><A NAME="envtbl--disable-server">--disable-server</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>build but do not start
+    <TD>do not build server including dbclean and dccd
+<TR><TD class=env><A NAME="envtbl--disable-dccifd">--disable-dccifd</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>build but do not start
+    <TD>do not build program interface
+<TR><TD class=env><A NAME="envtbl--disable-dccm">--disable-dccm</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>build but do not start
+    <TD>do not build sendmail interface
+<TR><TD class=env><A NAME="envtbl--with-sendmail">--with-sendmail=DIR</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>../sendmail or /usr/ports/mail/...
+    <TD>directory containing sendmail milter header files
+<TR><TD class=env><A NAME="envtbl--cgi-bin">--with-cgi-bin</A>=DIR
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD><A HREF="#envtbl--homedir">--homedir</A>/cgi-bin
+    <TD>directory for DCC whitelist <A HREF="cgi-bin/">CGI scripts</A>
+<TR><TD class=env>--with-rundir=DIR
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>@dcc_rundir@
+    <TD>"run" directory for PIDs and sockets
+<TR><TD class=env>&nbsp;
+    <TD class=conf>CFLAGS<SUP>1</SUP>
+    <TD>make & <EM>./configure</EM>
+    <TD>&nbsp;
+    <TD>compiler options such as -g or -O2
+<TR><TD class=env>&nbsp;
+    <TD class=conf>PTHREAD_CFLAGS<SUP>2</SUP>
+    <TD><EM>./configure</EM>
+    <TD>depends on target
+    <TD>compiler options for compiling dccm and dccifd with pthreads
+<TR><TD class=env>&nbsp;
+    <TD class=conf>LDFLAGS<SUP>1</SUP>
+    <TD>make & <EM>./configure</EM>
+    <TD>&nbsp;
+    <TD>global linker options
+<TR><TD class=env>&nbsp;
+    <TD class=conf>PTHREAD_LDFLAGS<SUP>2</SUP>
+    <TD><EM>./configure</EM>
+    <TD>depends on target
+    <TD>linker options for dccm and dccifd
+<TR><TD class=env>&nbsp;
+    <TD class=conf><A NAME="envtbl-LIBS">LIBS</A><SUP>2</SUP>
+    <TD><EM>./configure</EM>
+    <TD>&nbsp;
+    <TD>additional libraries linked with all programs
+<TR><TD class=env>&nbsp;
+    <TD class=conf>PTHREAD_LIBS<SUP>2</SUP>
+    <TD><EM>./configure</EM>
+    <TD>depends on target
+    <TD>libraries for dccm and dccifd
+<TR><TD class=env>&nbsp;
+    <TD class=conf>CC
+    <TD>make & <EM>./configure</EM>
+    <TD>cc
+    <TD>C compiler such as "gcc" or "/opt/SUNWspro/SC6.1/bin/cc"
+<TR><TD class=env>&nbsp;
+    <TD class=conf>INSTALL<SUP>1</SUP>
+    <TD>make
+    <TD><A HREF="autoconf/install-sh">./autoconf/install-sh</A>
+    <TD>installation script
+<TR><TD class=env>&nbsp;
+    <TD class=conf>DCCD_MAX_FLOODS<SUP>1</SUP>
+    <TD>make
+    <TD>32
+    <TD>maximum DCC server flooding peers
+<TR><TD class=env><A NAME="envtbl--with-db-memory">--with-db-memory=MB</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>64
+    <TD>minimum server database buffer size between 32 MBytes and 49152 MBytes
+	<!-- DB_MIN_MBYTE -->
+<TR><TD class=env><A NAME="envtbl--with-max-db-mem">--with-max-db-mem=MB</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>1920 <!--DB_MAX_2G_MBYTE--> on 32-bit systems
+	    <BR>49152 <!--MAX_MAX_DB_MBYTE--> on 64-bit systems
+    <TD>maximum server database buffer size
+	<!-- DB_MAX_MBYTE -->
+<TR><TD class=env><A NAME="envtbl--with-max-log-size">--with-max-log-size=KB</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>32
+    <TD>maximum dccproc, dccifd, and dccm log file size in KBytes; 0=no limit
+<TR><TD class=env><A NAME="envtbl--disable-IPv6">--disable-IPv6</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>enabled; use IPV6 if available
+    <TD>turn off IPv6 support even if available
+<TR><TD class=env><A NAME="envtbl--with-socks">--with-socks[=lib]</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>none
+    <TD>location of <A HREF="#SOCKS">SOCKS</A> client library
+<TR><TD class=env><A NAME="envtbl--64bits">--enable-64-bits</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>depends on operating system and hardware
+    <TD>enable 64-bits on Solaris and Linux PowerPC
+<TR><TD class=env><A NAME="envtbl--with-make-cmd">--with-make-cmd=pgm</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>make or gmake
+    <TD>path to make command
+<TR><TD class=env><A NAME="envtbl--with-DCC-MD5">--with-DCC-MD5</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>local library if available
+    <TD>use MD5 code in DCC source instead of any local library
+<TR><TD class=env><A NAME="envtbl--with-kludge">--with-kludge=FILE</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>none
+    <TD>include header FILE, best with an absolute path
+<TR><TD class=env><A NAME="envtbl--fetch-cmd">--with-fetch-cmd=pgm</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>wget, fetch, curl, or ftp
+    <TD>program used by
+	<A HREF="misc/updatedcc">@libexecdir@/updatedcc</A>,
+	and other utilities to fetch files
+<TR><TD class=env><A NAME="envtbl--fetch-cmd-addr">--with-fetch-cmd-addr=ip</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>none
+    <TD>local IP address used by <A HREF="#envtbl--fetch-cmd">wget, fetch,
+	or curl</A> while fetching files
+<TR><TD class=env><A NAME="enable-lang-Dutch">--enable-lang-Dutch</A>
+    <TD>&nbsp;
+    <TD><EM>./configure</EM>
+    <TD>disabled
+    <TD>enable Dutch dictionary in checksums
+<TR><TD>&nbsp;
+</TABLE>
+
+<DL class=small>
+<DT>Note<SUP>1</SUP>
+<DD>These values are not built into the Makefiles by the
+<EM>./configure</EM> script but their current values in the environment
+are used by the script and the Makefiles.
+
+<DT>Note<SUP>2</SUP>
+<DD>These values are copied by the <EM>./configure</EM> script from the
+environment into the generated Makefiles.
+
+<DT>Note<SUP>3</SUP>
+<DD>When <A HREF="#envtbl--disable-sys-inst">--disable-sys-inst</A>
+is specified, the current UID and GID become the defaults,
+and the man pages are not installed.
+If the <EM>./configure</EM> script is not run as root,
+<A HREF="dccproc.html">dccproc</A>, <A HREF="cdcc.html">cdcc</A>,
+and <A HREF="dccsight.html">dccsight</A> are not installed set-UID.
+It is usually also necessary to set
+<A HREF="#envtbl--bindir">--bindir</A> to a private directory such
+as $HOME/bin.
+</DL>
+
+<H2><A NAME="Compatibility">Compatibility</A></H2>
+<P>DCC is thought to work on several systems including:
+<DL class=compat>
+<DT>BSDI BSD/OS
+<DD>DCC works starting with version 3.0 of BSD/OS.
+
+<DT>FreeBSD
+<DD>The works starting with at least version 4.0 of FreeBSD.
+
+<DT>NetBSD
+<DD>DCC works without change starting with at least NetBSD 4.0.
+
+<DT>OpenBSD
+<DD>DCC works starting with at least 2.9 despite
+the lame mmap() implementation.
+
+<DT>Linux
+<DD>Avoid the several years old, modified versions shipped by some
+Linux packagers.
+<P>
+On 64-bit PowerPC systems with more than 4 GBytes,
+use <EM>./configure --with-64-bits</EM> to build a DCC server that can
+benefit from a full sized database.
+A 64-bit sendmail milter library will be needed if
+<A HREF="dccm.html">dccm</A> is used
+
+<DT>AIX
+<DD>DCC on 4.1.PPC has been tried but not well tested.
+Rumor has it that the 4.1.PPC pthreads code does not work
+with the sendmail milter library and dccm, but the rest of
+DCC does work.
+
+<DT>Solaris
+<DD>DCC compiles on several versions of Solaris with gcc or
+native C compiler by setting the environment variable CC appropriately.
+<EM>You must install gmake</EM>.
+Do not use "CFLAGS=-fast" with the native compiler.
+<P>
+While building the sendmail milter library, consider using
+<EM>_FFR_USE_POLL</EM> to avoid problems with large file descriptors
+and select().
+<P>
+On 64-bit systems with more than 4 GBytes,
+use <EM>./configure --with-64-bits</EM> to build a DCC server that can
+benefit from a full sized database.
+A 64-bit sendmail milter library will be needed if
+<A HREF="dccm.html">dccm</A> is used
+
+<DT>HP-UX
+<DD>DCC compiles on versions of HP-UX starting with 11.00.
+It requires gmake.  Dccproc and dccm work.
+Dccifd does not work with UNIX domain sockets because select() and
+poll() do not notice the results of shutdown().
+Dccifd does work with TCP/IP connections to MTAs or spam filters.
+<BR>
+Dccproc should work on version 10.20, since it does not use pthreads.
+
+<DT>IRIX
+<DD>DCC compiles on IRIX 6.5.
+It requires gmake.
+
+<DT>OSF1
+<DD>DCC compiles on OSF1 V5.0 with gmake.
+
+<DT>OpenUNIX
+<DD>DCC compiles on OpenUNIX 8.0.1.
+
+<DT>Mac OS/X
+<DD>DCC compiles on at least some versions of Apple's OS/X.
+
+<DT>Windows
+<DD>The DCC client dccproc compiles and works on at least some versions of
+Microsoft Windows 98, XP, and Vista with Borland's free SDK
+and with Microsoft's SDK.
+See the <A HREF="win32.mak">main Makefile</A> for Windows.
+
+
+</DL>
+<P>
+<SMALL>Those system names include trademarks.  Please don't abuse them.</SMALL>
+
+<H2><A NAME="Troubleshooting">Troubleshooting</A></H2>
+<P>
+Much of the DCC <A HREF=FAQ.html>list of frequently asked questions</A>
+concerns troubleshooting DCC installations.
+Many of the messages in the archive of the
+<A HREF="https://www.rhyolite.com/pipermail/dcc/">DCC mailing list</A>
+are also troubleshooting questions and answers.
+
+<H2><A NAME="spam-traps"></A><A NAME="spamtraps">Spam Traps</A></H2>
+<P><A HREF="dccm.html">Dccm</A> and sendmail can be configured to
+report the checksums of unsolicited bulk mail so that other DCC clients
+can reject later copies of the same unsolicited bulk mail
+sent from other sources.
+Such mechanisms are commonly called <EM>spam traps</EM>.
+
+<P>Entries in a sendmail access_db can also be rejected or discarded
+while they are reported to the DCC server by dccm.
+The script
+<A HREF="misc/hackmc">misc/hackmc</A> modifies the output of
+sendmail .mc files to tell dccm about some undesirable mail.
+The script accepts one or more .mc files and generates the corresponding
+slightly modified .cf files.
+If the access_db entry starts with the string "DCC:",
+the message is reported by dccm to the DCC server as extremely bulky.
+Otherwise the message is rejected as usual.
+The remainder of the the access_db entry after "DCC:" consists of
+the optional string "DISCARD" followed by an optional SMTP status message.
+If the string "DISCARD" is present, the message is discarded instead of
+rejected.  This is important to keep senders of unsolicited bulk mail from
+discovering and removing "spam trap" addresses from their target lists.
+
+<P>For example, a line like the following in an access_db can
+discard all mail from example.com while reporting it to the DCC server
+as extremely bulky.
+ Note the quotes (").
+<PRE>
+    example.com     DCC: "DISCARD spam"
+</PRE>
+
+<P>Spam traps can be configured with
+<A HREF="dcc.html#White-and-Blacklists">option&nbsp;spam-trap-discard</A>
+and
+<A HREF="dcc.html#White-and-Blacklists">option&nbsp;spam-trap-accept</A>
+lines in
+<A NAME=whitelist HREF="homedir/whiteclnt">whiteclnt</A> files.
+
+<P>Mail from a spam trap address can be sent to
+dccproc as described in the
+<A HREF="dccproc.html#EXAMPLES">dccproc man page</A>
+
+
+<H2><A NAME="SOCKS">SOCKS</A></H2>
+<P>The DCC client and server programs can be built to use the SOCKS
+protocol.
+The
+<A HREF="#envtbl--with-socks">--with-socks</A>
+<EM>./configure</EM> parameter
+configures the DCC client library and the DCC server
+to use common SOCKS network library functions.
+If the SOCKS library is in a standard place,
+something like <A HREF="#envtbl--with-socks">--with-socks=socks</A>
+should be sufficient.
+Setting the environment variable
+<A HREF="#envtbl-DCC_LDFLAGS">DCC_LDFLAGS</A> to something
+like <Em>-L/usr/local/lib</Em> is sometimes helpful.
+Otherwise, using <A HREF="#envtbl--with-socks">--with-socks</A>
+without specifying the library name and setting <A HREF="#envtbl-LIBS">LIBS</A>
+to the full pathname of the library
+might work.
+<P>
+DCC client programs
+including dccproc and dccm that use the DCC client library
+must be told to use the SOCKS5 protocol with the
+<A HREF="cdcc.html#OPERATION-SOCKS">SOCKS&nbsp;on</A>
+operation of
+<A HREF="cdcc.html">cdcc</A>.
+SOCKS5 is required instead of SOCKS4
+because DCC clients communicate with DCC servers using UDP.
+
+<P>
+DCC servers can use SOCKS4 or SOCKS5 when exchanging
+floods of reports of checksums.
+Links between individual pairs of peers are configured with the
+<Em>passive</Em> and <Em>SOCKS</Em> flags in the flod file described
+in the <A HREF="dccd.html#FILE-flod">dccd</A> man page.
+In both cases, the SOCKS library code must be configured, often
+in the files /etc/socks.conf and /etc/socksd.conf.
+
+<P>
+When the DCC software is built with SOCKS,
+IPv6 name resolution is turned off.
+
+<P>
+The DCC server and client programs have been tested with the
+<A HREF="http://www.inet.no/dante/">DANTE</A> library and server.
+The DANTE SOCKS implementation is also one of the FreeBSD "ports"
+or packages.
+<P>
+Note that if a connection fails repeatedly, Dante will disable the rule
+that failed and will eventually try the underlying connect()
+call.
+This fails in almost every SOCKS environment because there is
+no available route for an ordinary connect().
+Dante by default won't re-enable the failing rule.
+To fix this, change BADROUTE_EXPIRE from the default of <EM>0*60</EM>
+to <EM>5</EM> in include/config.h in the Dante source and recompile.
+
+
+<P class=small>
+This document describes DCC version 2.3.167.
+<A HREF="//www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</BODY>
+</HTML>

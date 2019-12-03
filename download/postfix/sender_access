@@ -1,0 +1,6 @@
+#Example sender access map file
+#makeabuck@mlm.tld 550 No MLM thanks
+#allspam.tld 550 Spam is not accepted here
+#badguy.net REJECT
+#justaspamminfool@allspamallthetime.com REJECT
+#newsletter-favorite-lug.org OK

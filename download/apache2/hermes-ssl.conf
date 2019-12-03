@@ -1,0 +1,39 @@
+<IfModule mod_ssl.c>
+<VirtualHost _default_:9080>
+ProxyRequests Off
+
+SSLEngine on
+SSLCertificateFile    /etc/ssl/certs/ssl-cert-snakeoil.pem
+SSLCertificateKeyFile /etc/ssl/private/ssl-cert-snakeoil.key
+SSLProtocol -all +TLSv1.2
+
+SetEnvIf User-Agent ".*MSIE.*" nokeepalive ssl-unclean-shutdown
+<Proxy *>
+Order deny,allow
+Allow from all
+</Proxy>
+
+#RequestHeader set X-FORWARDED-PROTOCOL https
+#RequestHeader set X-Forwarded-Ssl on
+
+#HERMES SEG CONFIGURATION
+ProxyPass /admin ajp://localhost:8009/admin
+ProxyPassReverse /admin ajp://localhost:8009/admin
+ProxyPass /users ajp://localhost:8009/users
+ProxyPassReverse /users ajp://localhost:8009/users
+ProxyPass /main ajp://localhost:8009/main
+ProxyPassReverse /main ajp://localhost:8009/main
+
+#CIPHERMAIL CONFIGURATION
+ProxyPass /ciphermail ajp://localhost:8010/ciphermail
+ProxyPassReverse /ciphermail ajp://localhost:8010/ciphermail
+ProxyPass /web ajp://localhost:8010/web
+ProxyPassReverse /web ajp://localhost:8010/web
+
+ProxyTimeout 3600
+
+LogFormat "%h %l %u %t \"%r\" %>s %b \"%{Referer}i\" \"%{User-agent}i\"" combined
+CustomLog /var/log/apache2/hermes combined
+
+</VirtualHost>
+</IfModule>

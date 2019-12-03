@@ -1,0 +1,174 @@
+#! /bin/sh
+
+# send mail messages about new per-user DCC log files
+
+# This script can be run by the daily DCC cron job after it has been
+#	1. changed to contain the URL of the local DCC CGI scripts,
+#	2. changed to use a locally suitable command to send mail
+#	3. copied to the DCC libexec directory,
+#	4. and made executable.
+#   It is remotely possible that the default values in this script are
+#	suitable and that you could use this script directly by putting
+#	the following in the libexec directory:
+#	    #! /bin/sh
+#	    sh @prefix@/cgi-bin/webuser-notify -d $*
+#
+# This script expects to be called by the standard DCC cron job to read a
+#   series of user names on stdin, each of which has a new log file.
+#   Each user name must be prefixed with the appropriate subdirectory such
+#   as "local/".  The single argument to this script must be the
+#   DCCM_USERDIRS or DCCIFD_USERDIRS_directory made into an absolute path.
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.13 $Revision$
+
+
+# http or https; prefer https.
+HTTPS="https"
+
+# URL of the CGI scripts
+#   you will probably need to change this
+BASE=`hostname`
+BASE=`expr "$BASE" : '.*\.\([^.]*\.[^.]*$\)' \| "$BASE"`
+BASE="www.$BASE/DCC-cgi-bin"
+
+
+SWITCH='#webuser mail-notify'
+
+USAGE="`basename $0`: [-x] -d userdirs"
+USERDIRS=
+while getopts "xd:" c; do
+    case $c in
+	x) set -x;;
+	d) USERDIRS=$OPTARG;;
+	*) ;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0 -o "$USERDIRS" = ""; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+if test ! -d "$USERDIRS"; then
+    echo "userdir $1 is not a directory" 1>&2
+    exit 1
+fi
+
+
+while read NM; do
+    # ignore users that are not configured to use the machinery
+    if test ! -f "$USERDIRS/$NM/whiteclnt"; then
+	continue;
+    fi
+
+    DIR="$USERDIRS/$NM"
+
+    UNAME=`expr "$NM" : 'local/\(.*\)' \| "$NM"`
+    OK=no
+    BOX="$UNAME"
+    eval `sed -n -e '/^[^#]/q'						\
+	-e "s/^$SWITCH=on mailbox=$/OK=yes;/p"				\
+	-e "s/^$SWITCH=on mailbox=\(.*\)/BOX=\1;OK=yes;/p"		\
+	-e "s/^$SWITCH=off.*/OK=no;/p"	$USERDIRS/$NM/whiteclnt`
+    if test "$OK" != yes; then
+	# forget it if notifications are turned off for this user
+	continue
+    fi
+
+    # Don't send a notification of messages older than this file,
+    #	 because the user has already check them through the CGI scripts.
+    MARKER=notify.marker
+
+    # Postpone notifications until this file is current to avoid sending
+    #	daily notes that the user is ignoring.
+    BLOCK=notify.block
+
+    # Send a notification when this file is current
+    PENDING=notify.pending
+
+    FND="find $DIR -follow"
+
+    if test -f $DIR/$PENDING; then
+	# Because `find -mtime -0` sometimes means  `find -mtime -1`
+	# or vice versa, use this to see if $DIR/$PENDING is finally ready.
+	rm -f $DIR/$MARKER
+	touch $DIR/$MARKER
+	if test "`$FND -name $PENDING -newer $DIR/$MARKER`" != ""; then
+	    continue;
+	fi
+	rm $DIR/$PENDING
+
+    else
+	if test -f $DIR/$MARKER; then
+	    if test "`$FND -name 'msg.*' -newer $DIR/$MARKER		\
+			| head -1`" = ""; then
+		# there are no messages the user has not seen
+		continue
+	    fi
+	fi
+	# We have at least one new message.  If we are blocked by having
+	# sent a notification within the past week, make a pending message.
+	rm -f $DIR/$MARKER
+	touch $DIR/$MARKER
+	if test "`$FND -name $BLOCK -newer $DIR/$MARKER`" != ""; then
+	    mv $DIR/$BLOCK $DIR/$PENDING
+	    continue;
+	fi
+    fi
+
+    # browsers don't tolerate '/' or '@' in usernames and passwords in URLs
+    URL_UNAME="`expr "$UNAME@" : '\([^/@]*@$\)' || true`$BASE"
+
+
+
+    ####################################################################
+    # Modify the following message to taste.
+
+    MAIL_SUBJECT="bulk mail notification for $UNAME"
+    if test "`basename @NOTIFYMAILER@`" = sendmail; then
+	HEADERS="Subject: $MAIL_SUBJECT
+Precedence: bulk
+"
+	CMD="@NOTIFYMAILER@ $BOX"
+    else
+	HEADERS=
+	CMD="@NOTIFYMAILER@ -s '$MAIL_SUBJECT' $BOX"
+    fi 
+eval $CMD <<EOF
+$HEADERS
+Recently logged bulk messages for $UNAME can be viewed at
+$HTTPS://$URL_UNAME/list-log
+Edit your whitelist at
+$HTTPS://$URL_UNAME/edit-whiteclnt
+if any of those are solicited bulk messages instead of spam
+or to stop or redirect these messages.
+
+The user name for both web pages is $UNAME
+EOF
+
+    # no more of this mail for a week
+    NWEEK=`@PERL@ -e 'use POSIX; 
+	    print strftime("%y%m%d%H%M", localtime(time()+7*24*60*60))'`
+    rm -f $DIR/$BLOCK
+    touch -t "$NWEEK" $DIR/$BLOCK
+
+done

@@ -1,0 +1,78 @@
+#
+# Postfix master process configuration file.  For details on the format
+# of the file, see the master(5) manual page (command: "man 5 master").
+#
+# ==========================================================================
+# service type  private unpriv  chroot  wakeup  maxproc command + args
+#               (yes)   (yes)   (yes)   (never) (100)
+# ==========================================================================
+smtp      inet  n       -       -       -       -       smtpd
+            -o message_size_limit=${djigzo_before_filter_message_size_limit}
+pickup    fifo  n       -       -       60      1       pickup
+cleanup   unix  n       -       -       -       0       cleanup
+qmgr      fifo  n       -       n       300     1       qmgr
+tlsmgr    unix  -       -       -       1000?   1       tlsmgr
+rewrite   unix  -       -       -       -       -       trivial-rewrite
+bounce    unix  -       -       -       -       0       bounce
+defer     unix  -       -       -       -       0       bounce
+trace     unix  -       -       -       -       0       bounce
+verify    unix  -       -       -       -       1       verify
+flush     unix  n       -       -       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       -       -       -       smtp
+# When relaying mail as backup MX, disable fallback_relay to avoid MX loops
+relay     unix  -       -       -       -       -       smtp
+	-o smtp_fallback_relay=
+showq     unix  n       -       -       -       -       showq
+error     unix  -       -       -       -       -       error
+retry     unix  -       -       -       -       -       error
+discard   unix  -       -       -       -       -       discard
+#local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       -       -       -       lmtp
+anvil     unix  -       -       -       -       1       anvil
+scache    unix  -       -       -       -       1       scache
+
+#submission inet  n       -       -       -       -       smtpd
+#            -o message_size_limit=${djigzo_before_filter_message_size_limit}
+#            -o smtpd_tls_security_level=encrypt
+#            -o smtpd_sasl_auth_enable=yes
+#            -o smtpd_sasl_type=dovecot
+#            -o smtpd_sasl_path=private/auth
+#            -o smtpd_sasl_security_options=noanonymous
+#            -o smtpd_recipient_restrictions=reject_non_fqdn_recipient,permit_sasl_authenticated,reject
+
+djigzo unix -       -       n       -       4      smtp
+            -o smtp_send_xforward_command=yes
+            -o disable_dns_lookups=yes
+            -o smtp_generic_maps=
+
+# cleanup for reinject so we can set the hopcount_limit differently for the reinjection port
+cleanup_reinject unix  n       -       -       -       0       cleanup
+            -o hopcount_limit=100
+
+# injection port for mail handled by the back-end
+127.0.0.1:10026 inet  n       -       -       -       10      smtpd
+            -o content_filter= 
+            -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks,no_milters
+            -o smtpd_helo_restrictions=
+            -o smtpd_client_restrictions=
+            -o smtpd_sender_restrictions=
+            -o smtpd_recipient_restrictions=permit_mynetworks,reject
+            -o smtpd_tls_security_level=
+            -o mynetworks=127.0.0.0/8
+            -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+            -o smtpd_authorized_xclient_hosts=127.0.0.0/8
+            -o cleanup_service_name=cleanup_reinject
+
+# injection port for mail sent by web gui
+127.0.0.1:10027 inet  n       -       -       -       10      smtpd
+            -o smtpd_helo_restrictions=
+            -o smtpd_client_restrictions=
+            -o smtpd_sender_restrictions=
+            -o smtpd_recipient_restrictions=permit_mynetworks,reject
+            -o smtpd_tls_security_level=
+            -o mynetworks=127.0.0.0/8
+            -o syslog_name=postfix/10027
+            -o message_size_limit=${djigzo_before_filter_message_size_limit}

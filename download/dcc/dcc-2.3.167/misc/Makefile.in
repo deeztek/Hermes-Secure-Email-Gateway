@@ -1,0 +1,43 @@
+# install the Distributed Checksum Clearinghouse miscellaneous files
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+# Rhyolite Software DCC 2.3.167-1.44 $Revision$
+# @configure_input@
+
+DEPTH	=..
+PROG	=wlist
+SRCS	=$(PROG).c
+REP_SSCRIPTS=fetchids
+SSCRIPTS=cron-dccd dcc-nagios fetchblack fetch-testmsg-whitelist	\
+	hackmc list-clients logger newwebuser rcDCC start-dccd		\
+	start-grey start-dccifd start-dccm stop-dccd dcc-stats-collect	\
+	stats-get dcc-stats-graph dcc-stats-init dcc-stats-update	\
+	updatedcc uninstalldcc $(REP_SSCRIPTS)
+
+DCC_BINDIR=@installroot@@libexecdir@
+@INCLUDE_INC@
+
+install:
+	for NM in $(SSCRIPTS); do $(BININSTALL) $$NM $(DCC_BINDIR)/$$NM;done
+
+deinstall:
+	-if test -d $(DCC_BINDIR); then cd $(DCC_BINDIR); rm -f $(SSCRIPTS); fi

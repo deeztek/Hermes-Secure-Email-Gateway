@@ -1,0 +1,7 @@
+Makefile.in
+clnt_threaded.c
+cmn.c
+cmn_defs.h
+reply.c
+totals.c
+.manifest

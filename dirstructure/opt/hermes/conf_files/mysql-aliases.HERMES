@@ -1,0 +1,6 @@
+user        = HERMES-USERNAME
+password    = HERMES-PASSWORD
+hosts       = 127.0.0.1
+port        = 3306
+dbname      = hermes
+query       = SELECT alias, maps FROM aliases WHERE alias = '%s%'

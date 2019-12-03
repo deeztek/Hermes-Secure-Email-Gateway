@@ -1,0 +1,995 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.171 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt dccd 8 DCC
+.Os " "
+.Sh NAME
+.Nm dccd
+.Nd Distributed Checksum Clearinghouse Daemon
+.Sh SYNOPSIS
+.Bk -words
+.Nm dccd
+.Op Fl dVbfFQ
+.Fl i Ar server-ID
+.Op Fl n Ar brand
+.Op Fl h Ar homedir
+.Fl I Xo
+.Sm off
+.Op Ar host-ID
+.Op Ar ,user
+.Sm on
+.Xc
+.br
+.Oo
+.Fl a Xo
+.Sm off
+.Op Ar server-addr
+.Op Ar ,server-port
+.Xc
+.Sm on
+.Oc
+.Op Fl q Ar qsize
+.br
+.Oo
+.Fl G Xo
+.Sm off
+.Op Ar on,
+.Op Ar weak-body,
+.Op Ar weak-IP,
+.Op Ar embargo
+.Op Ar ,window
+.Op Ar ,white
+.Xc
+.Sm on
+.Oc
+.br
+.Oo
+.Fl W Xo
+.Sm off
+.Op Ar rate
+.Op Ar ,chg
+.Op Ar ,dbsize
+.Sm on
+.Xc
+.Oc
+.Oo
+.Fl K Xo
+.Sm off
+.Op Ar no-
+.Ar type
+.Sm on
+.Xc
+.Oc
+.Oo
+.Fl T Xo
+.Sm off
+.Op Ar no-
+.Ar tracemode
+.Sm on
+.Xc
+.Oc
+.Op Fl u Ar anon-delay Ns Op Ar ,inflate
+.Op Fl C Ar dbclean
+.Op Fl L Ar ltype,facility.level
+.br
+.Oo
+.Fl R Xo
+.Sm off
+.Op Ar RL_SUB ,
+.Op Ar RL_ANON ,
+.Op Ar RL_ALL_ANON ,
+.Op Ar RL_BUGS
+.Xc
+.Sm on
+.Oc
+.Ek
+.Sh DESCRIPTION
+.Nm Dccd
+receives reports of checksums related to mail received by DCC clients
+and queries about the total number of reports of particular checksums.
+A DCC server never receives
+mail, address, headers, or other information from clients, but only
+cryptographically secure checksums of such information.
+A DCC server cannot determine the text or other information that corresponds
+to the checksums it receives.
+It only acts as a clearinghouse of total counts of checksums
+computed by clients.
+.Pp
+Each DCC server is identified by a numeric
+.Ar server-ID .
+Each DCC client is identified by a
+.Ar client-ID ,
+either explicitly listed in the
+.Pa @prefix@/ids
+file or
+the special anonymous client-ID.
+Many computers are expected to share a single
+.Ar client-ID .
+A
+.Ar server-ID
+is between 100 and 32768 while a
+.Ar client-ID
+is between 32768 and 16777215.
+DCC server-IDs need be known only to DCC servers and the people running
+them.
+The passwords associated with DCC server-IDs should be protected,
+because DCC servers listen to commands authenticated with server-IDs
+and their associated passwords.
+Each client that does not use the anonymous ID must know the client-ID
+and password used by each of its servers.
+A single client computer can use different passwords with different
+server computers.
+See the
+.Pa @prefix@/ids
+file.
+.Pp
+A
+.Pa @prefix@/whitelist
+of known good (or bad) sources of email prevents
+legitimate mailing lists from being seen as unsolicited bulk email
+by DCC clients.
+The whitelist used by a DCC server is built into
+the database when old entries are removed by
+.Xr dbclean 8 .
+Each DCC client has its own, local whitelist, and in general,
+whitelists work better in DCC clients than servers.
+.Pp
+A
+.Nm
+.Pa @prefix@/whitelist
+file containing IP addresses that should be in client
+.Pa whiteclnt
+files is useful.
+When
+.Fl T Ar WLIST
+tracing is enabled (as it is by default),
+.Nm
+complains to the system log when an authenticated client reports mail from
+IP addresses listed as
+.Em OK ,
+.Em MX ,
+or
+.Em MXDCC .
+It is often useful to have a
+.Pa @prefix@/whitecommon
+file containing whitelisted IP addresses.
+.Pp
+The effectiveness of a Distributed Checksum Clearinghouse
+increases as the number of subscribers increases.
+Flooding reports of checksums among DCC servers increases
+the effective number of subscribers to each server.
+Each
+.Nm
+daemon tries to maintain TCP/IP connections to the other servers
+listed in the
+.Pa @prefix@/flod
+file, and send them reports containing checksums with total
+counts exceeding thresholds.
+Changes in the flod file are noticed automatically within minutes.
+.Pp
+Controls on report flooding are specified in the flod file.
+Each line specifies a hostname and port number to which reports
+should be flooded,
+a server-ID to identify and authenticate the output stream,
+a server-ID to identify and authenticate an input stream from the
+same server,
+and flags with each ID.
+The ability to delete reports of checksums is handy, but could
+be abused.
+If
+.Ar del
+is not present among the
+.Ar in-opts
+options for the incoming ID,
+incoming delete requests are logged and then ignored.
+Floods from DCC "brands" that count only mail to
+spam traps and whose servers use the
+.Fl Q
+option to count extremely bulk mail
+should be marked with
+.Ar traps .
+They can be seen as counting millions of targets, so the
+.Ar traps
+flag on their
+.Pa @prefix@/flod
+file entry changes their incoming flooded reports counts to
+.Em many.
+.Pp
+.Nm Dccd
+automatically checks its
+.Pa @prefix@/flod
+and
+.Pa @prefix@/ids
+files periodically.
+.Xr Cdcc 8
+has the commands
+.Ic new ids
+and
+.Ic flood check
+to tell
+.Nm
+to check those two files immediately.
+Both files are also checked for changes after the SIGHUP signal.
+.Ss OPTIONS
+The following options are available.
+Most of them should set by changing the
+.Pa @prefix@/dcc_conf
+control file.
+.Bl -tag -width 3n
+.It Fl d
+enables debugging output.
+Additional
+.Fl d
+options increase the number of messages.
+.It Fl V
+displays the version of the DCC server daemon.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl b
+causes the server to not detach itself from the controlling tty
+or put itself into the background.
+.It Fl F
+uses write() instead of mmap() and msync() in some cases to modify the
+DCC database.
+It is the default on Solaris except when the database is in a memory
+mapped file system.
+See
+.Fl f .
+.It Fl f
+uses mmap() and msync() to modify the DCC database.  See
+.Fl F .
+.It Fl Q
+causes the server to treat reports of checksums as queries
+except from DCC clients marked trusted in the
+.Pa @prefix@/ids
+file with
+.Ar rpt-ok .
+See
+.Fl u
+to turn off access by anonymous or unauthenticated clients.
+.It Fl i Ar server-ID
+specifies the ID of this DCC server.
+Each server identifies itself as responsible for checksums
+that it forwards to other servers.
+.It Fl n Ar brand
+is an arbitrary string of letters and numbers that
+identifies the organization running the DCC server.
+The brand is required, and appears in the SMTP
+.Em X-DCC
+headers generated by the DCC.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+.It Fl I Xo
+.Sm off
+.Op Ar host-ID
+.Op Ar ,user
+.Sm on
+.Xc
+sets the UID and GID of the process
+or the server's name for assertions of its
+.Fl i Ar server-ID
+flooded to peers.
+The default name is the first 16 characters of the host name.
+If present,
+.Ar user
+must be a valid user name.
+.It Fl a Xo
+.Sm off
+.Op Ar server-addr
+.Op Ar ,server-port
+.Sm on
+.Xc
+adds an hostname or IP address to the list of local IP addresses
+that the server answers.
+Multiple
+.Fl a
+options can be used to specify a subset of the available network
+interfaces or to use more than one port number.
+The default without any
+.Fl a
+options is to listen on all local IP addresses.
+It can be useful to list some of the IP addresses of
+multi-homed hosts to deal with firewalls.
+By default
+.Ar server-port
+is 6277 for DCC servers and 6276 for greylist servers.
+It is the UDP port at which DCC
+requests are received and the TCP port for incoming floods of reports.
+.Pp
+If
+.Ar server-addr
+is absent
+and if the
+.Xr getifaddrs 8
+function is supported,
+separate UDP sockets are bound to each configured network interface so
+that each DCC clients receives replies from the
+IP addresses to which corresponding request are sent.
+If
+.Nm
+is started before all network interfaces are turned on or
+there are interfaces that are turned on and off or change their addresses
+such as PPP interfaces,
+then the special string
+.Ar @
+should be used to tell
+.Nm
+to bind to an INADDR_ANY UDP socket.
+.Pp
+Outgoing TCP connections to flood checksum reports to other DCC servers
+used the IP address of a single
+.Fl a
+option,
+but only if there is single option that is not localhost.
+See also the
+.Pa @prefix@/flod
+file.
+.It Fl q Ar qsize
+specifies the maximum size of the queue of requests from anonymous or
+unauthenticated clients.
+The default value is the maximum DCC RTT in seconds times 200 or 1000.
+.It Fl G Xo
+.Sm off
+.Op Ar on,
+.Op Ar weak-body,
+.Op Ar weak-IP,
+.Op Ar embargo
+.Op Ar ,window
+.Op Ar ,white
+.Xc
+.Sm on
+changes
+.Nm
+to a greylist server for
+.Xr dccm 8
+or
+.Xr dccifd 8 .
+Greylisting consists of temporarily rejecting or embargoing mail from
+unfamiliar combinations of SMTP client IP address, SMTP envelope sender,
+and SMTP envelope recipient.
+If the SMTP client persists for
+.Ar embargo seconds
+and so is probably not an open proxy, worm-infected personal computer,
+or other transient source of spam, the triple of
+.Em (IP\ address,sender,recipient)
+is added to a database similar to the usual DCC database.
+If the SMTP client does not try again after
+.Ar embargo
+seconds and before
+.Ar window
+seconds after the first attempt,
+the triple is forgotten.
+If the SMTP client persists past the embargo,
+the triple is added to the database and becomes familiar
+and the message is accepted.
+Familiar triples are remembered for
+.Ar white
+seconds after the last accepted mail message.
+The triple is forgotten if it is ever associated with unsolicited bulk email.
+.Pp
+All three durations can be a number of minutes, hours, days, or
+weeks followed by
+.Ar MINUTES ,
+.Ar M ,
+.Ar HOURS ,
+.Ar H ,
+.Ar DAYS ,
+.Ar D ,
+.Ar WEEKS
+or
+.Ar W .
+The default is
+.Fl G Ar 270seconds,7days,63days .
+The first duration or the
+.Ar embargo
+should be longer than open proxies can linger retransmitting.
+The second
+.Ar window
+time should be as long as legitimate mail servers persist in retransmitting
+to recognize embargoed messages whose retransmissions were not
+received because of network or other problems.
+The
+.Ar white
+time should be long enough to recognize and not embargo messages from
+regular senders.
+.Pp
+Usually the DCC greylist system requires that an almost
+identical copy of the message be retransmitted during the
+.Ar embargo .
+If
+.Ar weak-body
+is present,
+any message with the same triple of sender IP address, sender mail
+address, and target mail address ends the embargo,
+even if the body of the message differs.
+.Pp
+If
+.Ar weak-IP
+is present,
+all mail from an SMTP client at an IP address is accept
+after any message from the same IP address has been accepted.
+.Pp
+Unlike DCC checksums, the contents of
+greylist databases are private and do not benefit from broad sharing.
+However, large installations can use more two or more greylist servers
+flooding triples among themselves.
+Flooding among greylist servers is controlled by the
+.Pa @prefix@/grey_flod
+file.
+.Pp
+All greylist cooperating or flooding greylist servers
+.Em must
+use the same
+.Fl G
+values.
+.Pp
+Clients of greylist servers cannot be anonymous and must have
+client-IDs and passwords assigned in the
+.Pa @prefix@/ids
+file.
+This implies that
+.Xr cdcc
+commands directed to greylist servers must specify the server-ID.
+.Pp
+White- and blacklists are honored by the DCC clients.
+whitelisted messages are embargoed or checked with a greylist server.
+The greylist triples of blacklisted messages, messages whose DCC counts make
+them spam, and other messages known to be spam are sent to a greylist
+server to be removed from the greylist database and cause an embargo
+on the next messages with those triples.
+.Pp
+Messages whose checksums match greylist server whitelists
+are not embargoed and the checksums of their triples are not
+added to the greylist database.
+.Pp
+The target counts of embargoed messages are reported to the DCC network
+to improve the detection of bulk mail.
+.It Fl W Xo
+.Sm off
+.Op Ar rate
+.Op Ar ,chg
+.Op Ar ,dbsize
+.Sm on
+.Xc
+controls quick database cleaning.
+If the database is larger than
+.Ar dbsize
+in MBytes,
+the database has not recently been cleand and is not about to be cleaned,
+and
+.Nm
+is receiving fewer than
+.Ar rate
+requests per second,
+or if telling DCC clients that the database is about to be cleaned
+reduces the requests/second by
+.Ar chg,
+then
+.Nm
+starts
+.Xr dbclean 8
+for a quick database cleaning.
+The cleaning is abandoned if it takes too long.
+.Pp
+The defaults are equivalent to
+.Bk -words
+.Fl W Ar 1.0,40.0,RSS
+.Ek
+where
+.Ar RSS
+is the maximum dccd resident set size
+displayed in the system log when the database is opened.
+A rate of
+.Fl W Ar 0.0
+disables quick cleanings.
+.It Fl K Xo
+.Sm off
+.Op Ar no-
+.Ar type
+.Sm on
+.Xc
+marks checksums of
+.Ar type
+(not) be kept
+or counted in the database (unless they appear in the
+.Pa @prefix@/whitelist
+file).
+Explicit settings add to or remove from the initial contents of the list,
+which is equivalent to
+.Fl K Ar Body
+.Fl K Ar Fuz1
+.Fl K Ar Fuz2 .
+.It Fl T Xo
+.Sm off
+.Op Ar no-
+.Ar tracemode
+.Sm on
+.Xc
+causes the server to trace or record some operations.
+.Ar tracemode
+must be one of the following:
+.Bl -tag -width FLOOD2 -offset 2n -compact
+.It Ar ADMN
+administrative requests from the control program,
+.Xr cdcc 8
+.It Ar ANON
+errors by anonymous clients
+.It Ar CLNT
+errors by authenticated clients
+.It Ar RLIM
+rate-limited messages
+.It Ar QUERY
+all queries and reports
+.It Ar RIDC
+some messages concerning the report-ID cache that is used
+to detect duplicate reports from clients
+.It Ar FLOOD1
+messages about inter-server flooding connections
+.It Ar FLOOD2
+messages about flooded reports
+.It Ar BL
+requests from clients in the
+.Pa @prefix@/blacklist
+file.
+.It Ar DB
+odd database events including long chains of duplicate checksums
+.It Ar WLIST
+reports of whitelisted checksums from authenticated, not anonymous DCC clients
+.El
+The default is
+.Ar ANON CLNT WLIST
+except for a greylist server which uses
+.Ar ANON CLNT WLIST IDS .
+.It Fl u Ar anon-delay Ns Op Ar ,inflate
+changes the number of milliseconds anonymous or unauthenticated clients
+must wait for answers to their queries and reports.
+The purpose of this delay is to discourage large anonymous clients.
+The
+.Ar anon-delay
+is multiplied by 1 plus the number of recent anonymous requests from
+IPv4 addresses in a /24 block or IPv6 addresses a /56 block divided by the
+.Ar inflate
+value.
+.Pp
+The string
+.Ar FOREVER
+turns off all anonymous or unauthenticated access not only
+for checksum queries and reports but also
+.Xr cdcc 8
+.Ic stats
+requests.
+A missing value for
+.Ar inflate
+turns off inflation.
+.Pp
+The default value is
+.Ar 50 ,
+except when
+.Fl G
+is used in which case
+.Ar FOREVER
+is assumed and required.
+.It Fl C Ar dbclean
+changes the default name or path of the program used to rebuild
+the hash table when it becomes too full.
+The default value is
+.Pa @libexecdir@/dbclean .
+The value can include arguments as in
+.Ar -C '@libexecdir@/dbclean -F' .
+.Pp
+Dbclean
+.Em should not
+be run by
+.Nm
+except in emergencies such as database corruption or hash table overflow.
+.Xr Dbclean 8
+should be run daily with the @libexecdir@/cron-dccd cron script
+.It Fl L Ar ltype,facility.level
+specifies how messages should be logged.
+.Ar Ltype
+must be
+.Ar error ,
+.Ar info ,
+or
+.Ar off
+to indicate which of the two types of messages are being controlled or
+to turn off all
+.Xr syslog 3
+messages from
+.Nm .
+.Ar Level
+must be a
+.Xr syslog 3
+level among
+.Ar EMERG ,
+.Ar ALERT ,
+.Ar CRIT , ERR ,
+.Ar WARNING ,
+.Ar NOTICE ,
+.Ar INFO ,
+and
+.Ar DEBUG .
+.Ar Facility
+must be among
+.Ar AUTH ,
+.Ar AUTHPRIV ,
+.Ar CRON ,
+.Ar DAEMON ,
+.Ar FTP ,
+.Ar KERN ,
+.Ar LPR ,
+.Ar MAIL ,
+.Ar NEWS ,
+.Ar USER ,
+.Ar UUCP ,
+and
+.Ar LOCAL0
+through
+.Ar LOCAL7 .
+The default is equivalent to
+.Dl Fl L Ar info,MAIL.NOTICE  Fl L Ar error,MAIL.ERR
+.It Fl R Xo
+.Sm off
+.Op Ar RL_SUB ,
+.Op Ar RL_ANON ,
+.Op Ar RL_ALL_ANON ,
+.Op Ar RL_BUGS
+.Xc
+.Sm on
+sets one or more of the four rate-limits.
+.Ar RL_SUB
+limits the number of DCC transactions per second from subscribers
+or DCC clients with known client-IDs and passwords.
+This limit applies to each IP address independently.
+.Pp
+.Ar RL_ANON
+limits the number of DCC transactions per second from anonymous DCC clients.
+This limit applies to each IP address independently.
+It is better to use
+.Fl u
+than to change this value to exclude anonymous clients.
+.Pp
+.Ar RL_ALL_ANON
+limits the number of DCC transactions per second from all anonymous DCC clients.
+This limit applies to all anonymous clients as a group, regardless of their
+IP addresses.
+.Pp
+.Ar RL_BUGS
+limits the number of complaints or error messages per second for all
+anonymous DCC clients as a group as well as for each DCC client by IP
+address.
+.Pp
+The default is equivalent to
+.Fl R Ar 400,50,2000,0.1
+.El
+.Sh FILES
+.Bl -hang -width @prefix@ -compact
+.It Pa @prefix@
+is the DCC home directory containing data and control files.
+.It Pa dcc_conf
+is the DCC control file.
+.It Pa dcc_db
+is the database of mail checksums.
+.It Pa dcc_db.hash
+is the mail checksum database hash table.
+.It Pa grey_db
+is the database of greylist checksums.
+.It Pa grey_db.hash
+is the greylist database hash table.
+.It Pa flod
+contains lines controlling DCC flooding of the form:
+.br
+.Bd -ragged -compact
+.Ar host Ns Xo
+.Sm off
+.Op Ar ,rport
+.Op Ar ;src Op Ar ,lport
+.Sm on
+.Xc
+.Ar rem-ID
+.Op Ar passwd-ID Op Ar o-opt Op Ar i-opt
+.Ed
+where absent optional values are signaled with "-" and
+.Bl -hang -offset 1n -width 2n -compact
+.It Ar host
+is the IP address or name of a DCC server and
+.Ar rport
+is the name or number of the TCP port used by the remote server.
+.It Ar src
+and
+.Ar lport
+are the source IP address or host name and TCP port
+from which the outgoing flooding connection should come.
+The string
+.Ar *
+specifies any source IP address.
+Incoming flooding connections must arrive at an address and port
+specified with
+.Fl a .
+.It Ar rem-id
+is the server-ID of the remote DCC server.
+.It Ar passwd-ID
+is a server-ID that is not assigned to a server,
+but whose first password is used to sign
+checksum reports sent to the remote system.
+Either of its passwords are required with incoming reports.
+If it is absent or "-", outgoing floods are signed with the first
+password of the local server in the
+.Pa ids
+file and incoming floods must be signed with either password of
+the remote server-ID.
+.It Ar i-opt Li and Ar o-opt
+are comma separated lists of
+.Bl -hang -offset 1n -width 2n -compact
+.It Ar off
+turns off flooding to the remote or local system.
+.It Ar no-del
+says checksum delete requests are refused by the remote or local server
+and so turns off sending or accepting delete requests, respectively.
+By default, delete requests are sent to remote servers and accepted
+in incoming floods if and only if the peers are exchanging DCC reputations.
+.It Ar del
+says delete requests are accepted by the remote or local server.
+.It Ar no-log-del
+turns off logging of incoming requests to delete checksums.
+.It Ar passive
+is used to tell a server outside a firewall to expect a peer
+inside to create both of the pair
+of input and output TCP connections used for flooding.
+The peer inside the firewall should use
+.Ar SOCKS
+or
+.Ar NAT
+on its
+.Pa flod
+file entry for this system.
+.It Ar SOCKS
+is used to tell a server inside a firewall that it should create both
+of the TCP connections used for flooding and that SOCKS protocol should
+be used.
+The peer outside the firewall should use
+.Ar passive
+on its
+.Pa flod
+file entry for this system.
+.It Ar NAT
+differs from
+.Ar SOCKS
+only by not using the SOCKS protocol.
+.It Ar IDS->result
+converts server-IDs in flooded reports.
+.Ar IDS
+may be the string
+.Sq self
+to specify the server's own ID.
+.Ar IDS
+can instead be the string
+.Sq all
+to specify all server-IDs
+or a pair of server-IDs separated by a dash to specify an inclusive range.
+.Ar result
+can be the string
+.Sq self
+to translate to the server's own ID.
+.Sq ok
+sends or receives reports without translation.
+The string
+.Sq reject
+to not send outgoing or refuse incoming reports.
+Only the first matching conversion is applied.
+For example, when
+.Sq self->ok,all->reject
+is applied to a locally generated report,
+the first conversion is made and the second is ignored.
+.It Ar leaf=path-len
+does not send reports with paths longer than
+.Ar path-len
+server-IDs.
+A
+.Ar path-len
+of 0 blocks reports from this server.
+.It Ar IPv4
+requires only IPv4 addresses to connect to this flooding peer.
+.It Ar IPv6
+requires only IPv6 addresses to connect to this flooding peer.
+.It Ar vers
+specifies the version of the DCC flooding protocol used by the remote
+DCC server with a string such as
+.Sq version2 .
+.It Ar trace1
+sends information about a single peer like the
+.Xr cdcc 8
+command
+.Ic trace FLOOD1 on
+does for all peers.
+.It Ar trace2
+sends information about individual flooded reports like the
+.Xr cdcc 8
+command
+.Ic trace FLOOD2 on
+does for all peers.
+.El
+.El
+.It Pa grey_flod
+is the equivalent of the
+.Pa @prefix@/flod
+file used by
+.Nm
+when it is a greylist server.
+.It Pa flod.map
+is an automatically generated file in which
+.Nm
+records its progress sending or flooding reports to DCC peers.
+.It Pa grey_flod.map
+is the equivalent of the
+.Pa @prefix@/flod.map
+file used by
+.Nm
+when it is a greylist server.
+.It Pa ids
+contains the IDs and passwords known by the DCC server.
+An
+.Pa ids
+file that can be read by others cannot be used.
+It contains blank lines, comments starting
+with "#" and lines of the form:
+.Bd -ragged -compact -offset indent
+.Sm off
+.Ar id
+.Op Ar ,rpt-ok
+.Op Ar ,no-reps
+.Op Ar ,trace
+.Op Ar ,delay=ms  Ns Op Ar *inflate
+.Sm on
+.Ar pass1 Op Ar pass2
+.Ed
+where
+.Bl -hang -offset 1n -width 2n -compact
+.It Ar id
+is a DCC
+.Ar client-ID
+or
+.Ar server-ID .
+.It Ar trace
+logs activity from clients and flooding peers using the ID.
+.It Ar rpt-ok
+overrides
+.Fl Q
+by saying that this client is trusted
+to report only checksums for unsolicited bulk mail.
+.It Ar no-reps
+disables DCC Reputation reports from and responses to clients using this ID.
+.It Ar delay=ms  Ns Op Ar *inflate
+delays answers to systems using the client
+.Ar id .
+The
+.Ar delay
+in milliseconds is multiplied by 1 plus the number of recent requests from
+an IP address using
+.Ar id
+divided by the
+.Ar inflate
+value.
+See
+.Fl u .
+.It Ar pass1
+is the password currently used by clients with identifier
+.Ar id .
+It is a 1 to 32 character string that does not contain
+blank, tab, newline or carriage return characters.
+.It Ar pass2
+is the optional next password that those clients will use.
+A DCC server accepts either password if both are present in the file.
+.El
+Both passwords can be absent if the entry not used except to tell
+.Nm
+that server-IDs in the flooded reports are valid.
+The string
+.Em unknown
+is equivalent to the null string.
+.It Pa whitelist
+contains the DCC server whitelist.
+It is not used directly but is loaded into the database when
+.Xr dbclean 8
+is run.
+.It Pa grey_whitelist
+contains the greylist server whitelist.
+It is not used directly but is loaded into the database when
+.Xr dbclean 8
+is run with
+.Fl G .
+.It Pa blacklist
+if present, contains a list of IP addresses and blocks of IP addresses
+of DCC clients and flooding peers that are ignored.
+Each line in the file should be blank, a comment starting with '#',
+or an IP address or block of IP addresses in the form
+.Bd -ragged -compact -offset indent
+.Xo
+.Sm off
+.Op Ar trace,
+.Op Ar ok,
+.Op Ar bad,
+.Op Ar no-anon
+.Op Ar flood-ok
+.Sm on
+.Xc
+.Ar address
+.Ed
+Addresses are single IPv4 or IPv6
+addresses, CIDR blocks in the usual form,
+or a pair of addresses separated by a hyphen (-)
+specifying an inclusive range.
+The last line in the file that cover an address applies.
+Changes to the file are automatically noticed within a few minutes.
+An IP address is assigned all of the flags from all of lines that apply to it.
+Addresses or blocks of addresses can be preceded with
+.Em ok
+to "punch holes"
+in blacklisted blocks or specify tracing without blacklisting.
+.Em Trace
+logs activity.
+.Em No-anon
+blacklists clients only when they use the anonymous client-ID.
+.Em flood-ok
+says that DCC flood peering is allowed.
+.Em Bad
+is assumed when only an address is present.
+This mechanism is intended for no more than a few dozen blocks of addresses.
+.It Pa dccd_clients
+contains client IP addresses and activity counts.
+.It Pa grey_clients
+contains greylist client IP addresses and activity counts.
+.El
+.Sh EXAMPLES
+.Nm
+is usually started with other system daemons with something like the
+script
+.Pa @libexecdir@/rcDCC .
+That scripts uses values in @prefix@/dcc_conf to start the server.
+With the argument
+.Em stop ,
+.Pa @libexecdir@/rcDCC
+can be used to stop the daemon.
+.Pp
+The database grows too large unless old reports are removed.
+.Xr dbclean 8
+should be run daily with the @libexecdir@/cron-dccd
+.Xr cron 8
+script
+.Sh SEE ALSO
+.Xr cdcc 8 ,
+.Xr dcc 8 ,
+.Xr dbclean 8 ,
+.Xr dblist 8 ,
+.Xr dccifd 8 ,
+.Xr dccm 8 ,
+.Xr dccproc 8 .
+.Xr dccsight 8 ,
+.Sh HISTORY
+.Nm
+is based on an idea from Paul Vixie.
+It was designed and written at Rhyolite Software, starting in 2000.
+This document describes version 2.3.167.

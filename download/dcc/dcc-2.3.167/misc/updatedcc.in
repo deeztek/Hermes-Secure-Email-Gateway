@@ -1,0 +1,677 @@
+#! /bin/sh
+
+# Fetch, build, install, and start a new version of the DCC just
+#   as it was configured last time.
+
+# This script should only be used after the DCC has been correctly configured.
+
+# If this script fails in its efforts to use wget, curl, fetch, or ftp
+#   to download a new tarball, then manually download a tarball to
+#   build subdirectory in the DCC home directory, probably @prefix@/build.
+#   This script unpacks the newest DCC tarball it finds in that directory,
+#   which will probably be the manually download file.
+
+
+# This script should usually not be used if large configuration changes are
+#   needed.  Instead use `./configure ...; make install` as usual.  That will
+#   create a new version of this script with the ./configure settings captured.
+#   However, -eENV=VAL and -cCONF=VAL can be used to tweak an installation,
+#	as in `updatedcc -c--with-uid=dcc` `updatedcc -c--without-uid`
+#	or `updatedcc -e "CFLAGS=-g -O2"`
+
+#   -e ENV=VAL	    set environment variable ENV before running ./configure
+
+#   -c CONF[=VAL]   add CONF or CONF=VAL to the end of the settings
+#			given ./configure
+
+#   -s base-URL	    fetch the tarball using base-URL instead of the default.
+#			The name of the tarball is appended to base-URL.
+
+#   -V x.y.z	    try to fetch version x.y.z of the tarball instead of the
+#			the most recent verison
+
+#   -C pfile	    fetch the DCC source using parameters in pfile
+
+#   -T tgt	    target instead of "install" for `make`
+#			'-T all' will compile but not install
+
+#   -U		    only fetch, unpack, and configure the tarball.
+#			Do not compile or install the software.
+
+#   -K		    cron mode; configure, compile, and install only
+#			if the fetched version differs, and be silent when
+#			nothing is done
+
+#   -k		    not cron mode even if there is no controling tty
+
+#   -x		    debug
+#   -v		    verbose
+
+
+# This script should be run as root, but can be run as the non-root
+# user that runs dccm and dccd.  If not run as root, it cannot install
+# man pages or user commands including cdcc and dccproc.
+
+# The following environment variables are set by this script to their values
+#   when ./configure or this script was last run:
+#   Unsetting variables that are not set often yields a non-zero command status
+#   so do this before watching for errors from mkdir and so forth
+export @UPDATEDCC_ENV@
+unset @UPDATEDCC_ENV@
+ENV_SET="@UPDATEDCC_ENV_SET@"
+@UPDATEDCC_ENV_SET@
+ENV_EXPORT="@UPDATEDCC_ENV_EXPORT@"
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.147 $Revision$
+#	@configure_input@
+
+# English messages so grep can suppress them;
+#   simple collating sequence for sort
+#   sane gcc error messages
+LC_ALL=C; export LC_ALL
+
+
+RELEASE=2.3.167
+HTTP_REFERER=DCC-$RELEASE-script; export HTTP_REFERER
+
+DCC_HOMEDIR=@prefix@
+DCC_LIBEXEC=@libexecdir@	    # in case dcc_conf has disappeared
+DCCUID=
+if test -s $DCC_HOMEDIR/dcc_conf; then
+    # override DCC_LIBEXEC and DCCUID from dcc_conf
+    . $DCC_HOMEDIR/dcc_conf
+fi
+
+BURLS=
+VERSION=
+
+ME=`basename $0`
+USAGE="$ME: [-xvUKk] [-e ENV=VAL] [-c CONF=VAL] [-s base-URL] [-V x.y.z]\\
+	[-C pfile] [-T make-tgt]"
+VERBOSE=
+DEBUG=
+UNPACK=
+CRON=
+CONFS=
+PFILE="@UPDATEDCC_PFILE@"
+MAKE_TGT=install
+while getopts "xvUKke:c:s:V:p:C:T:" c; do
+    case $c in
+    x) set -x; DEBUG=-x VERBOSE=yes;;
+    v) VERBOSE=yes;;
+    U) UNPACK=yes;;
+    K) CRON=yes;;
+    k) CRON=no;;
+    e) NM=`expr "$OPTARG" : '\([^=]*\)=.*'`
+	if test -z "$NM"; then
+	    echo "-e requires ENV=VAL setting" 1>&2; exit 1
+	fi
+	VAL=`expr "$OPTARG" : '.*=\([^=]*\)'`
+	# quote any odd characters
+	VAL=`echo "$VAL" | sed -e 's/\([^-_/:=+,.a-zA-Z0-9]\)/\\\\\1/g'`
+	test -z "$ENV_SET" || ENV_SET="$ENV_SET; "
+	if test -z "$VAL"; then
+	    ENV_SET="${ENV_SET}unset $NM"
+	else
+	    ENV_SET="${ENV_SET}$NM=$VAL"
+	fi
+	ENV_EXPORT="$ENV_EXPORT $NM"
+	;;
+    c) CONFS="$CONFS $OPTARG"
+	NM=`expr "X$OPTARG" : 'X--homedir=\(..*\)'`
+	if test -n "$NM"; then
+	    DCC_HOMEDIR="$NM"
+	fi
+	NM=`expr "X$OPTARG" : 'X--libexecdir=\(..*\)'`
+	if test -n "$NM"; then
+	    DCC_LIBEXEC="$NM"
+	fi
+	;;
+    s) BURL=`expr "$OPTARG" : '\(.*\)/dcc.tar.Z$' \| "$OPTARG"`
+	BURLS="$BURL $OPTARG"
+	;;
+    V) VERSION=`expr "X$OPTARG" : 'X\([1-9]\.[1-9][0-9]*\.[1-9][0-9]*\)'`
+	if test "$VERSION" != "$OPTARG"; then
+	    echo "invalid -V $OPTARG" 1>&2; exit 1
+	fi
+	;;
+    C) PFILE="$OPTARG";;
+    T) MAKE_TGT="$OPTARG";;
+    p) echo "All 3 DCC tarballs are now the same";;
+    *) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2; exit 1
+fi
+
+BDIR="$DCC_HOMEDIR/build"
+DCCDIR="$BDIR/dcc"
+OK_MARK="$BDIR/.updatedcc_ok"
+
+if test -z "$VERBOSE"; then
+    WGETQUIET='-nv'
+    CURLQUIET=
+    CONFQUIET='--quiet'
+    MQUIET=
+else
+    WGETQUIET=
+    CURLQUIET=
+    CONFQUIET=
+    MQUIET='#'
+fi
+
+# assume cron mode if stdin is not a tty
+if test -z "$CRON" && test -n "`tty 2>&1 | grep 'not a tty'`"; then
+    echo "assume -K because stdin is not a tty"
+    CRON=assumed
+fi
+if test "$CRON" = no; then
+    CRON=
+fi
+exec </dev/null
+if test -n "$CRON"; then
+    # be quite in cron mode unless told otherwise
+    if test -z "$VERBOSE" -a "$CRON" != assumed; then
+	WGETQUIET='-q'
+	CURLQUIET='-s'
+	exec >/dev/null
+    fi
+    exec 3>&1			# preserve stdout in case cron mode does work
+
+    if test -n "$UNPACK"; then
+	echo "-u (unpack only) and -K (cron mode) are incompatible" 1>&2
+	exit 1
+    fi
+    if test -n "$VERSION"; then
+	echo "-V$VERSION and -K (cron mode) are incompatible" 1>&2
+	exit 1
+    fi
+    # Do nothing if we have run recently.
+    #	Pick a somewhat random number of days to reduce the crowds that
+    #	otherwise happen on anniversaries of releases.
+    #	Some versions of cksum yield 10 digit numbers that some versions of
+    #	expr think are negative.
+    DAYS=`ls -lia $DCC_HOMEDIR | cksum					\
+	| sed -e 's/[	 ]\{1,\}/ + /g' -e 's/\([0-9]\{6\}\)\([0-9]\)/\1 + \2/g'`
+    DAYS=`expr '(' '(' $DAYS ')' % 3 ')' + 6`
+    if test -d $DCCDIR							\
+	    && test -n "`find $OK_MARK -mtime -$DAYS 2>/dev/null`"; then
+	echo "fewer than $DAYS days since the last updatedcc -K; stop"
+	exit 0
+    fi
+fi
+
+
+# see if we have permission
+set -e
+if test ! -d $BDIR; then
+    rm -f $BDIR || true
+    mkdir $BDIR
+fi
+cd $BDIR
+if test ! -d $DCCDIR; then
+    rm -f $DCCDIR || true
+    mkdir $DCCDIR
+fi
+set +e
+for NM in "$DCC_HOMEDIR" "$DCC_LIBEXEC"; do
+    if test -z "$NM"; then
+	continue
+    fi
+    if test ! -d "$NM"; then
+	NM=`dirname "$NM"`
+    fi
+    if test ! -w "$NM"; then
+	echo "cannot write $NM; must $ME be run as root?" 1>&2
+	exit 1
+    fi
+done
+find $DCCDIR -type d | while read SUBDIR; do
+	if test ! -w $SUBDIR; then
+	    echo "cannot write $SUBDIR; must $ME be run as root?" 1>&2
+	    # but maybe this is ok
+	    break
+	fi
+    done
+
+if test -z "$PFILE"; then
+    if test -n "@UPDATEDCC_PFILE@"; then
+	CONFS="--without-updatedcc-pfile $CONFS"
+    fi
+    # quietly use $DCC_HOMEDIR/.updatedcc_pfile if it exists
+    if test -s "$DCC_HOMEDIR/.updatedcc_pfile"; then
+	PFILE="$DCC_HOMEDIR/.updatedcc_pfile"
+    fi
+else
+    PFILE=`echo $PFILE | sed "s@^[^/]@$DCC_HOMEDIR/&@"`
+    # add it to the configuration if it is not the default
+    if test "$PFILE" != "$DCC_HOMEDIR/.updatedcc_pfile"; then
+	CONFS="--with-updatedcc-pfile=$PFILE $CONFS"
+    fi
+fi
+if test -f "$PFILE" -a ! -r "$PFILE"; then
+    echo "cannot read $PFILE; must $ME be run as root?" 1>&2
+fi
+if test -n "$PFILE"; then
+    . $PFILE
+fi
+
+if test -z "$BURLS"; then
+    # $SERVER is set manually or from $DCC_HOMEDIR/.updatedcc_pfile
+    if test -n "$SERVER"; then
+	BURLS="$SERVER"
+    else
+	BURLS="https://www.dcc-servers.net/dcc/source ftp://ftp.dcc-servers.net/src/dcc"
+    fi
+fi
+
+# figure out what we are fetching
+if test -z "$VERSION"; then
+    DLTBALL="dcc.tar.Z"
+    TBALL=
+    TBALL_PATH="$DLTBALL"
+else
+    DLTBALL="dcc-$VERSION.tar.Z"
+    TBALL="$DLTBALL"
+    TBALL_PATH="old/$DLTBALL"
+fi
+# move an old copy of the tarball aside
+if test -f $DLTBALL; then
+    OLD_DLTBALL=$DLTBALL.$$
+    mv $DLTBALL $OLD_DLTBALL
+fi
+
+# don't blab the password needlessly
+print_url () {
+    PURL=`echo "$2" | sed -e 's%^\([fhtps]*://\)[^/@:]\{1,\}:[^/@:]\{1,\}@%\1%'`
+    echo "using $1 to get $PURL"
+}
+
+
+TRAPS="0 1 2 15"
+stop_dccd () {
+    if test "$DCC_UPDATEDCC_FAST" = yes; then
+	return
+    fi
+    DCC_UPDATEDCC_FAST= export DCC_UPDATEDCC_FAST
+
+    # trapped signals on some systems must start by turning themselves off,
+    #	especially #0
+    trap stop_update_early $TRAPS
+
+    # start stopping dccd now in the hope that it will have released the
+    #	sockets and database files by the time we need to restart it.
+    $DCC_LIBEXEC/stop-dccd $DEBUG
+    # switch to a working server
+    @bindir@/cdcc -q rtt >/dev/null 2>&1 || true
+}
+
+stop_update_early() {
+    @TRAP_OFF@ $TRAPS
+    echo 'stopping update; please wait'
+    $DCC_RESTART
+    exit 1
+}
+
+stop_update_late() {
+    @TRAP_OFF@ $TRAPS
+    echo "stopping; emptying $DCCDIR"
+    @DCCMAKE@ cleandir >/dev/null
+    $DCC_RESTART $TRAPS
+    exit 1
+}
+
+if test -n "$UNPACK"; then
+    DCC_RESTART=
+else
+    DCC_RESTART="$DCC_LIBEXEC/rcDCC $DEBUG start"
+    if test -z "$CRON"; then
+	# in cron mode let FTP be slow instead of stopping the server
+	stop_dccd
+    fi
+fi
+
+
+# use fetch, wget, curl, or ftp that understands URLs
+#	notice '-c --with-fetch_cmd=X' and '-c --without-fetch_cmd'
+PGM=
+eval `echo "X $CONFS" | tr ' ' '\n'					\
+	| sed -n -e 's/^--with-fetch[-_]cmd=\(.*\)$/PGM=\1/p'		\
+		-e 's/^--without-fetch[-_]cmd$/PGM=""/p'`
+if test -z "$PGM"; then
+    PGM=@FETCH_CMD@
+fi
+PGM_B=`basename $PGM`
+SUCCESS=
+oldTZ=$TZ; TZ=UTC; export TZ		# Solaris FTP is confused by dates
+rm -f $DLTBALL
+if test "$PGM_B" = wget; then
+    for BURL in $BURLS; do
+	URL="$BURL/$TBALL_PATH"
+	print_url "$PGM" "$URL"
+	# Do not use --mirror because -r results in a 0 exit status
+	#   even on failure.
+	# Do not use --no-remove-listing, -nr, or --dont-remove-listing
+	#   because none of them are supported by all versions of wget.
+	# At least some versions of wget exit with 0 after having done
+	#   nothing but emitting a usage message.
+	if $PGM $WGETQUIET -nd --no-host-directories -N \
+		--retr-symlinks --passive-ftp @FETCH_WGET_OPTS@ "$URL"; then
+	    if test -s $DLTBALL; then
+		# notice if we get an HTTP error document with or without
+		# HTTP headers
+		if test -z "`sed -n -e 2q				\
+				-e 's/.*DOCTYPE.*/HTML/p'		\
+				-e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p' \
+			$DLTBALL`"; then
+		    SUCCESS="yes"
+		    break
+		fi
+		# do not leave a broken file
+		rm -f $DLTBALL
+	    fi
+	else
+	    # do not leave a broken file
+	    rm -f $DLTBALL
+	fi
+	echo
+    done
+    PGM_B=
+fi
+
+if test "$PGM_B" = fetch; then
+    for BURL in $BURLS; do
+	URL="$BURL/$TBALL_PATH"
+	print_url "$PGM" "$URL"
+	FETCH_BIND_ADDRESS=@FETCH_CMD_ADDR@ export FETCH_BIND_ADDRESS
+	if $PGM -p -q -m "$URL"; then
+	    if test -s $DLTBALL; then
+		SUCCESS="yes"
+		break
+	    fi
+	fi
+	echo
+    done
+    PGM_B=
+fi
+
+if test "$PGM_B" = curl; then
+    for BURL in $BURLS; do
+	URL="$BURL/$TBALL_PATH"
+	print_url "$PGM" "$URL"
+	if $PGM @FETCH_CURL_OPTS@ -L -R --connect-timeout 30 --max-time 600 \
+		    $CURLQUIET "$URL" -o $DLTBALL; then
+	    # --fail does not work on at least some versions of curl
+	    if test -s $DLTBALL; then
+		# notice if we get an HTTP error document with or without
+		# HTTP headers
+		if test -z "`sed -n -e 2q				\
+				-e 's/.*DOCTYPE.*/HTML/p'		\
+				-e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p' \
+			$DLTBALL`"; then
+		    SUCCESS="yes"
+		    break
+		fi
+		# do not leave a broken file
+		rm -f $DLTBALL
+	    fi
+	else
+	    rm -f $DLTBALL
+	fi
+	echo
+    done
+    PGM_B=
+fi
+
+# try FTP if it is the right choice or the right choice has not worked
+#   Some ftp programs understand HTTP URLs
+if test "$PGM_B" = ftp -o ! -s $DLTBALL; then
+    if test "$PGM_B" != ftp ; then
+	PGM_B=ftp
+	PGM=ftp
+    fi
+    for BURL in $BURLS; do
+	URL="$BURL/$TBALL_PATH"
+	print_url "$PGM" "$URL"
+	$PGM "$URL" || true
+	if test -s $DLTBALL; then
+	    SUCCESS="yes"
+	    break
+	fi
+	echo
+    done
+    # if that did not work, try ancient anonymous FTP
+    if test ! -s $DLTBALL; then
+	for URL in $BURLS; do
+	    HOST=`expr "$URL" : "ftp://\([^/]*\)/"`
+	    SRC=`expr "$URL" : "ftp://[^/]*/\(.*\)"`
+	    if test -z "$HOST" -o -z "$SRC"; then
+		continue
+	    fi
+	    USR=`expr "$HOST" : "\([^/:]*\):"`
+	    if test -z "$USR"; then
+		USR=anonymous
+		PASSWD=`hostname`
+	    else
+		PASSWD=`expr "$HOST" : "$USR:\(.*\)@.*"`
+		HOST=`expr "$HOST" : ".*@\(.*\)"`
+	    fi
+	    echo "try old anonymous FTP with $HOST and $SRC"
+	    (echo "user $USR $PASSWD ";				\
+			echo "binary";				\
+			echo "get $SRC/$DLTBALL $DLTBALL")	\
+		| ftp -n $HOST
+	    if test -s $DLTBALL; then
+		SUCCESS="yes"
+		break
+	    fi
+	    # some versions of ftp like to leave empty files
+	    rm -f $DLTBALL
+	done
+    fi
+    PGM_B=
+fi
+
+if test -n "$PGM_B"; then
+    echo "unrecognized fetch program $PGM" 1>&2
+    if test -n "$OLD_DLTBALL"; then
+	mv $OLD_DLTBALL $DLTBALL
+    fi
+    exit 1
+fi
+if test -z "$oldTZ"; then
+    unset TZ
+else
+    TZ=$oldTZ
+fi
+if test -z "$SUCCESS" -o ! -s $DLTBALL; then
+    echo
+    echo "failed to fetch a new copy of $DLTBALL" 1>&2
+    if test -n "$PFILE"; then
+	echo "is $PFILE correct?" 1>&2
+    fi
+    # try to install an existing tar ball if not in cron mode
+    if test -n "$CRON"; then
+	if test -n "$OLD_DLTBALL"; then
+	    mv $OLD_DLTBALL $DLTBALL
+	fi
+	exit 1
+    fi
+    echo
+fi
+set -e
+
+# pick the newest tarball, possibly one fetched manually and already present
+#   instead of the official tarball fetched by this script.
+if test -z "$TBALL"; then
+    TBALL=`ls -Lt dcc*.tar.Z | head -1`
+fi
+if test ! -s "$TBALL"; then
+    echo "failed to fetch tarball; nothing to install" 1>&2
+    if test -n "$OLD_DLTBALL"; then
+	mv $OLD_DLTBALL $DLTBALL
+    fi
+    exit 1
+fi
+if test -n "$OLD_DLTBALL"; then
+    rm $OLD_DLTBALL
+fi
+
+NEW_DCC=`zcat "$TBALL" | tar -tf -					\
+	    | sed -n -e '2,$d' -e 's@\(dcc-[0-9.]*\)/.*@\1@p'`
+if test -z "$NEW_DCC"; then
+    echo "failed to find the version of $TBALL" 1>&2
+    exit 1
+fi
+
+if test -n "$CRON"; then
+    exec 1>&3				# restore stdout
+    if test "$NEW_DCC" = "dcc-$RELEASE"	\
+	&& test -z "`find $TBALL -follow -newer $DCCDIR`"; then
+	# This is the same release.
+	# We are finished since we should only install new versions for cron
+	echo "new $TBALL is the same version $RELEASE; stop"
+	touch $OK_MARK
+	exit 0
+    fi
+    stop_dccd
+fi
+
+# Move the unpacked tarball into the build directory named dcc
+#	while preserving any foreign files.
+#   Empty the target build directory of old DCC source and generated files.
+MNM=.manifest
+if test -d $DCCDIR; then
+    if test ! -f $DCCDIR/$MNM; then
+	if test `find $DCCDIR -type f -print | wc -l` -gt 50; then
+	    # deal with old versions without .manifest files
+	    echo delete $DCCDIR
+	    rm -rf $DCCDIR
+	fi
+    else
+	cd $DCCDIR
+	set +e
+	@DCCMAKE@ purge >/dev/null 2>&1
+	cd $BDIR
+	rmdir $DCCDIR 2>/dev/null
+	set -e
+	if test -d $DCCDIR; then
+	    find $DCCDIR -type f -print		\
+		| sed -e '1s/./preserving &/' -e '2,$s/./	&/'
+	    cd $BDIR
+	fi
+    fi
+fi
+
+echo "unpack $TBALL into $DCCDIR"
+rm -rf $NEW_DCC
+zcat $TBALL | tar -xf - 2>&1 | head
+
+if test -n "$UNPACK"; then
+    echo "will configure but *NOT* build or install $NEW_DCC"
+else
+    echo "will configure and 'make $MAKE_TGT' $NEW_DCC"
+fi
+if test ! -d $DCCDIR; then
+    rm -rf $DCCDIR
+    mv $NEW_DCC $DCCDIR
+else
+    # install top directories for preserved files first
+    find $NEW_DCC -name $MNM -print | sort | while read NM; do
+	DIR=`expr $NM : "$NEW_DCC/\(.*\)/$MNM" || true`
+	if test -z "$DIR"; then
+	    DIR=.
+	fi
+	if test ! -d $NEW_DCC/$DIR; then
+	    # we already moved this directory
+	    continue
+	fi
+	# if we can, move the entire directory from the directory in the
+	#	unpacked tarball to the corresponding build directory
+	if test ! -d $DCCDIR/$DIR; then
+	    # first remove a possible stray file with the target name
+	    rm -f $DCCDIR/$DIR || true
+	    mv $NEW_DCC/$DIR $DCCDIR/$DIR
+	    continue
+	fi
+	# otherwise move individual files from the unpacked tarball directory
+	cd $NEW_DCC/$DIR
+	mv `cat $MNM` $DCCDIR/$DIR
+	cd $BDIR
+	done
+    rm -rf $NEW_DCC
+fi
+
+cd $DCCDIR
+
+# compute default --with-uid from dcc_conf to quiet complaints from fix-map
+if test -n "$DCCUID" \
+	-a -z "`echo @UPDATEDCC_PARMS@ $CONFS | grep with-uid=`"; then
+    DEF_WITH_UID="--with-uid=$DCCUID"
+    echo "infer $DEF_WITH_UID from DCCUID=$DCCUID in $DCC_HOMEDIR/dcc_conf"
+else
+    DEF_WITH_UID=""
+fi
+
+if test -n "$ENV_SET"; then
+    echo "+ $ENV_SET; export$ENV_EXPORT"
+    eval "$ENV_SET; export$ENV_EXPORT"
+fi
+echo "+ ./configure $DEF_WITH_UID @UPDATEDCC_PARMS@ $CONFQUIET $CONFS"
+./configure $DEF_WITH_UID @UPDATEDCC_PARMS@ $CONFQUIET $CONFS
+
+if test -n "$UNPACK"; then
+    exit
+fi
+trap stop_update_late $TRAPS
+
+@DCCMAKE@ $MAKE_TGT 2>&1						\
+    | sed -e "$MQUIET/^[a-z0-9_]*.c: In function .*/d"			\
+	-e "$MQUIET/ warning: .%.. yields only last 2 digits of year/d"	\
+	-e "$MQUIET/^make.*is up to date/d"				\
+	-e "$MQUIET/^make.*Nothing to be done for/d"			\
+	-e "$MQUIET/^[a-z\/]*cc/s/-W[-a-z]* *//g"			\
+	-e "$MQUIET/^[a-z\/]*cc/s@-m[0-9a-z=]* *@@g"			\
+	-e "$MQUIET/^[a-z\/]*cc/s@-D_FILE_OFFSET_BITS=64 *@@g"		\
+	-e "$MQUIET/^[a-z\/]*cc/s@-D_LARGEFILE_SOURCE *@@g"		\
+	-e "$MQUIET/^[a-z\/]*cc/s@-D_REENTRANT *@@g"			\
+	-e "$MQUIET/^[a-z\/]*cc/s@-D_GNU_SOURCE *@@g"			\
+	-e "$MQUIET/^[a-z\/]*cc/s@-Qunused-arguments *@@g"		\
+	-e "$MQUIET/^[a-z\/]*cc/s@-I[-a-zA-Z0-9/.]* *@@g"		\
+	-e "$MQUIET/^[a-z\/]*cc/s@-fno-strict-aliasing *@@g"		\
+	-e "$MQUIET/^[a-z\/]*cc/s@-pipe *@@g"				\
+	-e "$MQUIET/^[a-z\/]*cc/s@-std=gnu99 *@@g"			\
+	-e "$MQUIET/^[a-z\/]*cc/s@-fstack-protector *@@g"		\
+	-e "$MQUIET/^building static .* library/d"			\
+	-e "$MQUIET/^rm -f \.depend/d"					\
+	-e "$MQUIET/^echo .* \.depend/d"				\
+	-e "${MQUIET}s@^[-_a-zA-Z0-9/]*\(g*cc\)  *@\1 @g"
+
+touch $OK_MARK
+
+# finally start the new version and switch back to the local server
+@TRAP_OFF@ $TRAPS
+$DCC_RESTART
+@bindir@/cdcc -q rtt >/dev/null 2>&1

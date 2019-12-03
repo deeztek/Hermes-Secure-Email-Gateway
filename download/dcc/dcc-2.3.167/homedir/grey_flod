@@ -1,0 +1,12 @@
+# Sample Greylist server peers
+#   This file contains peers to which the local greylist server should flood
+#   reports of checksums of familiar correspondents and embargoed messages.
+#   See dccd(8).
+
+# In this example the two servers  See the sample ids file.
+#   hostname,port	    rem-id [passwd-id] [out-opts] [in-opts]
+#grey1.domain.com    32702
+#grey2.domain.com    32703
+
+
+#	Rhyolite Software DCC 2.3.167-1.2 $Revision$

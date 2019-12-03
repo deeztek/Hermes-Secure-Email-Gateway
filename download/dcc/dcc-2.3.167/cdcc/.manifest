@@ -1,0 +1,4 @@
+Makefile.in
+cdcc.c
+win32.mak
+.manifest

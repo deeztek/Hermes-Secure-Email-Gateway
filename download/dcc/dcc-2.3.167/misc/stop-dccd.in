@@ -1,0 +1,142 @@
+#! /bin/sh
+
+# stop dccd
+
+# This script assumes that it is being run by root or the DCC user, probably
+# while the system is stopping.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.30 $Revision$
+#	@configure_input@
+
+exec 1>&2 </dev/null
+
+LOGGER_TAG=stop-dccd
+DCC_LOGGER="@DCC_LOGGER@"
+DCC_HOMEDIR=@prefix@
+CDCC_QUIET='>/dev/null 2>&1'
+VERBOSE=
+DEBUG=
+GREY=
+SYSSTOP=stop
+DB_NM=dcc_db
+# check the args once to get the home directory
+while getopts ":xvGSCh:u:i:n:" c; do
+    case $c in
+	x) set -x; DEBUG=-x; VERBOSE=-v; CDCC_QUIET=;;
+	v) VERBOSE=-v;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+. $DCC_HOMEDIR/dcc_conf
+
+USAGE="`basename $0`: [-xvGSC] [-h homedir] [-u UID] [-i id]"
+OPTIND=1
+while getopts "xvGSCh:u:i:n:" c; do
+    case $c in
+	x) ;;
+	v) ;;
+	G) GREY="GREY_" DB_NM=grey_db;;
+	S) SYSSTOP="system stop";;
+	C) SYSSTOP="clean stop";;
+	h) ;;
+	u) DCCUID="$OPTARG";;
+	i) SRVR_ID="$OPTARG"; GREY_SRVR_ID="$OPTARG";;
+	n) ;;						# obsolete
+	*) eval $DCC_LOGGER \"$USAGE\"; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    eval $DCC_LOGGER \"$USAGE\"
+    exit 1
+fi
+
+if test "$DCC_HOMEDIR" != @prefix@; then
+    CDCC_ARGS="-h $DCC_HOMEDIR"
+fi
+
+if test -n "$GREY"; then
+    if test -z "$GREY_SRVR_ID" \
+	    && grep '^# auto local greylist server-ID' $DCC_HOMEDIR/ids >/dev/null 2>&1 \
+	    && grep '^32702[	 ]' $DCC_HOMEDIR/ids >/dev/null 2>&1; then
+	GREY_SRVR_ID=32702
+    fi
+    SRVR_ID="$GREY_SRVR_ID"
+    DCCD_ARGS="$GREY_DCCD_ARGS"
+    CDCC_ARGS=" $CDCC_ARGS 'grey on'"
+fi
+
+if test -z "$SRVR_ID"; then
+    if test X"$DEBUG" = "X-x"; then
+	echo "${GREY}SRVR_ID not set in $DCC_HOMEDIR/dcc_conf"
+    fi
+    exit
+fi
+
+# talk where the current server should be listening
+SRVR_ADDR=`expr X"$DCCD_ARGS" : '.*-a[	 ]*\([^	, ]*\)'`
+SRVR_PORT=`expr X"$DCCD_ARGS" : '.*-a[	 ]*[^	, ]*,\([^	, ]*\)'`
+if test -n "$SRVR_ADDR"; then
+    CDCC_ARGS="$CDCC_ARGS 'server $SRVR_ADDR'"
+fi
+if test -n "$SRVR_PORT"; then
+    CDCC_ARGS="$CDCC_ARGS 'port $SRVR_PORT'"
+fi
+
+CDCC0="@bindir@/cdcc $CDCC_ARGS 'id $SRVR_ID'"
+CDCC="$CDCC0 $CDCC_QUIET"
+
+# stop a current dbclean
+if test -s $DCC_HOMEDIR/$DB_NM.lock; then
+    kill `cat $DCC_HOMEDIR/$DB_NM.lock` >/dev/null 2>&1
+fi
+
+# stop the current daemon, including giving it time to shut down gracefully
+#   After telling the daemon to stop, keep telling the daemon to politely
+#   stop flooding until it stops answering or we run out of patience.
+#   Then tell it to pull the plug.
+if eval "$CDCC '$SYSSTOP' 'sleep 0.5'"; then
+    LCNT=0
+    while eval "$CDCC 'flood list' 'sleep 0.5'" ; do
+	LCNT=`expr $LCNT + 1`
+	# Pull the plug on the floods after 5 seconds
+	if test "$LCNT" -ge 10; then
+	    if test "$VERBOSE" = "-v"; then
+		if test "$LCNT" -eq 10; then
+		    eval "$CDCC0 'flood list'"
+		fi
+	    fi
+	    eval "$CDCC 'flood halt' 'sleep 0.5'"
+	fi
+	# give up after another second to let the daemon close the file
+	if test "$LCNT" -gt 12; then
+	    break;
+	fi
+    done
+fi
+
+set +x
+if test X"$DEBUG" = "X-x"; then
+    echo "The final cdcc command should have failed, since that is how"
+    echo "this script knows that dccd has stopped."
+fi

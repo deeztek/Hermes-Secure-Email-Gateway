@@ -1,0 +1,1 @@
+mail._domainkey.THE-DOMAIN THE-DOMAIN:mail:/opt/hermes/dkim/keys/THE-DOMAIN.dkim.private

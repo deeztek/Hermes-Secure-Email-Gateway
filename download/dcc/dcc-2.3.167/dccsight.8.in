@@ -1,0 +1,240 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.31 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt dccsight 8 DCC
+.Os " "
+.Sh NAME
+.Nm dccsight
+.Nd Distributed Checksum Clearinghouse raw checksum interface
+.Sh SYNOPSIS
+.Nm dccsight
+.Bk -words
+.Op Fl VdPQC
+.Op Fl h Ar homedir
+.Op Fl m Ar map
+.Op Fl w Ar whiteclnt
+.Op Fl t Ar targets
+.Op Fl i Ar infile
+.Op Fl L Ar ltype,facility.level
+.Ek
+.Sh DESCRIPTION
+.Nm Dccsight
+reads one or more lines containing DCC checksums,
+reports them to a DCC server,
+and writes a X-DCC header line.
+It can be used to report checksums obtained from
+.Xr dccproc 8
+using
+.Fl C .
+.Ss OPTIONS
+The following options are available:
+.Bl -tag -width 3n
+.It Fl V
+displays the version of the DCC raw checksum interface.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl d
+enables debugging output from the DCC client software.
+Additional
+.Fl d
+options increase the number of messages.
+.It Fl P
+The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP header
+fields, but historically has looked for counts of "many".
+However, there are situations when
+.Nm
+knows that a mail message is extremely bulky and probably spam.
+For example, mail from a sender that is blacklisted in
+.Pa whiteclnt
+gets an X-DCC header that includes
+.Em bulk .
+To acommodate that bug in SpamAssassin, by default whenever
+.Nm
+generates an X-DCC header containing "bulk",
+it also forces the
+.Em Body
+count to "many".
+.Fl P
+turns off that kludge and the
+.Em Body
+contains the count from the DCC server.
+.It Fl Q
+only queries the DCC server about the checksums of messages
+instead of reporting.
+This is useful when
+.Nm
+is used to filter mail that has already been reported to a DCC
+server by another DCC client.
+No single mail message should be reported to a DCC
+server more than once per recipient,
+because each report will increase the apparent "bulkness" of the message.
+.Pp
+It is better to use
+.Em MXDCC
+lines in the global
+.Pa @prefix@/whiteclnt
+file for your MX mail servers that use DCC than to use
+.Fl Q
+with
+.Nm .
+.Pp
+Do not use
+.Fl Q
+except on mail that you know has been reported to a DCC server.
+DCC depends on reports of all except known private mail and
+works only because almost no DCC installations use
+.Fl Q .
+.It Fl C
+outputs the checksums for the message as well as the X-DCC header.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+.It Fl m Ar map
+specifies a name or path of the memory mapped parameter file instead
+of the default
+.Pa @prefix@/map
+in the DCC home directory.
+It should be created with the
+.Xr cdcc 8
+command.
+.It Fl w Ar whiteclnt
+specifies an optional file containing SMTP client IP addresses and
+SMTP headers
+of mail that do not need X-DCC headers and whose checksums should not
+be reported to the DCC server.
+It can also contain checksums of spam.
+If the pathname is not absolute, it is relative to the DCC home directory.
+Thus, individual users with private whitelists usually specify them
+with absolute paths.
+It is useful to
+.Ar include
+a common or system-wide whitelist in private lists.
+.Pp
+The format of the
+.Nm
+whiteclnt file is the same as the
+.Pa @prefix@/whitelist
+file required by
+.Xr dbclean 8
+and
+.Xr dccsight 8 .
+Because this list is used frequently, a companion file is used.
+It has the same pathname but with an added suffix of
+.Ar .dccw .
+After being created empty,
+it will contain an automatic memory mapped hash table of the main file.
+.It Fl t Ar targets
+specifies the number of addressees of the message if other than 1.
+The string
+.Ar many
+instead of a number asserts that there were too many addressees
+and that the message is unsolicited bulk email.
+.It Fl i Ar infile
+specifies an input file
+instead of standard input.
+If not absolute, the pathname is interpreted relative to the
+directory in which
+.Nm
+was started.
+.It Fl L Ar ltype,facility.level
+specifies how messages should be logged.
+.Ar Ltype
+must be
+.Ar error ,
+.Ar info ,
+or
+.Ar off
+to indicate which of the two types of messages are being controlled or
+to turn off all
+.Xr syslog 3
+messages from
+.Nm .
+.Ar Level
+must be a
+.Xr syslog 3
+level among
+.Ar EMERG ,
+.Ar ALERT ,
+.Ar CRIT , ERR ,
+.Ar WARNING ,
+.Ar NOTICE ,
+.Ar INFO ,
+and
+.Ar DEBUG .
+.Ar Facility
+must be among
+.Ar AUTH ,
+.Ar AUTHPRIV ,
+.Ar CRON ,
+.Ar DAEMON ,
+.Ar FTP ,
+.Ar KERN ,
+.Ar LPR ,
+.Ar MAIL ,
+.Ar NEWS ,
+.Ar USER ,
+.Ar UUCP ,
+and
+.Ar LOCAL0
+through
+.Ar LOCAL7 .
+The default is equivalent to
+.Dl Fl L Ar info,MAIL.NOTICE  Fl L Ar error,MAIL.ERR
+.El
+.Pp
+.Nm
+exits 0 on success, and >0 if an error occurs.
+.Sh FILES
+.Bl -tag -width whiteclnt -compact
+.It Pa @prefix@
+DCC home directory.
+.It Pa map
+memory mapped file in the DCC home directory
+of information concerning DCC servers.
+.It Pa whiteclnt
+contains the client whitelist in
+the format described in
+.Xr dcc 8 .
+.It Pa whiteclnt.dccw
+memory mapped hash table of the
+.Pa @prefix@/whiteclnt
+file.
+.El
+.Sh SEE ALSO
+.Xr cdcc 8 ,
+.Xr dcc 8 ,
+.Xr dbclean 8 ,
+.Xr dccd 8 ,
+.Xr dblist 8 ,
+.Xr dccproc 8 ,
+.Xr dccm 8 ,
+.Xr dccifd 8 ,
+.Xr mail 1 ,
+.Xr procmail 1 .
+.Sh HISTORY
+Implementation of
+.Nm
+was started at Rhyolite Software in 2000.
+This document describes version 2.3.167.

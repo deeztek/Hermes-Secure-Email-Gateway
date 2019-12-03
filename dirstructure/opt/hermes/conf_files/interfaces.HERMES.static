@@ -1,0 +1,18 @@
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto THE-INTERFACE
+iface THE-INTERFACE inet static
+	address SERVER-ADDRESS
+	netmask SERVER-SUBNET
+	gateway SERVER-GATEWAY
+        dns-nameservers SERVER-DNS
+        dns-search SERVER-DOMAIN
+
+#auto THE-INTERFACE
+#iface THE-INTERFACE inet dhcp

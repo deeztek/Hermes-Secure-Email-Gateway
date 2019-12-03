@@ -1,0 +1,447 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.66 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt dbclean 8 DCC
+.Os " "
+.Sh NAME
+.Nm dbclean
+.Nd Clean Distributed Checksum Clearinghouse Database
+.Sh SYNOPSIS
+.Bk -words
+.Nm dbclean
+.Op Fl dfFNPSVqu
+.Op Fl i Ar id
+.Oo
+.Fl a Xo
+.Sm off
+.Op Ar server-addr
+.Op Ar ,port
+.Xc
+.Sm on
+.Oc
+.Op Fl h Ar homedir
+.br
+.Op Fl H Ar hash-file-dir
+.Op Fl D Ar db-file-dir
+.Op Fl G Ar on
+.Op Fl R Ar mode
+.br
+.Op Fl s Ar hash-size
+.Op Fl e Ar seconds
+.Op Fl E Ar spamsecs
+.br
+.Op Fl L Ar ltype,facility.level
+.Ek
+.Sh DESCRIPTION
+.Nm Dbclean
+creates empty, rebuilds corrupted, and deletes or expires old reports
+of checksums from DCC databases.
+It should be installed where it will be found with the path
+given the DCC server daemon when the daemon needs to expand the hash table.
+See
+.Xr dccd 8 .
+It should also be run by the daily
+.Xr cron 8
+job,
+.Pa @libexecdir@/cron-dccd .
+.Pp
+The whitelist in
+.Pa @prefix@/whitelist
+or
+.Pa @prefix@/grey_whitelist
+are built into the DCC server's database.
+Changes to the whitelist are not effective until dbclean is run.
+White or blacklists can also be used by DCC clients and work better.
+.Ss OPTIONS
+The following options are available.
+Most of them should set by changing DBCLEAN_LOGDAYS
+and DBCLEAN_ARGS in the
+.Pa @prefix@/dcc_conf
+control file.
+.Bl -tag -width xxx
+.It Fl d
+enables debugging output.
+Additional
+.Fl d
+options increase the number of messages.
+.It Fl F
+uses write() instead of mmap() and msync() in some cases to modify the DCC
+database.
+This works better on some versions of Solaris provided the entire DCC
+database fits in RAM and provided the file system has not been tuned
+for the large, random accesses of a DCC database.
+It is the default on Solaris except when the database is in a memory
+mapped file system or the entire database fits in RAM.
+Do not use
+.Fl F
+with
+.Fl f ,
+.Fl H ,
+or
+.Fl D .
+.It Fl f
+uses mmap() and msync() to modify the DCC database.
+Do not use
+.Fl f
+with
+.Fl F ,
+.Fl H ,
+or
+.Fl D .
+.It Fl N
+creates a new, empty database.
+There must not be an existing database and the DCC server,
+.Xr dccd 8 ,
+must not be running.
+.It Fl P
+expires old checksums from a database using the
+.Fl e and
+.Fl E
+values from the preceding use of
+.Nm dbclean .
+.Fl P
+cannot be used with
+.Fl e
+or
+.Fl E .
+Using
+.Fl P
+differs from not using
+.Fl e
+or
+.Fl E ,
+because in the absence of all three, their default values are used.
+.It Fl S
+says that
+the DCC server,
+.Xr dccd 8 ,
+is not running and so
+.Nm
+should run stand-alone and not try to tell the DCC server about
+changes to the database.
+.Fl i
+is not needed with
+.Fl S .
+.It Fl V
+displays the version of the DCC database cleaner.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl q
+quiets the announcement to stderr of the final results and debugging
+messages turned on with
+.Fl d .
+Results are still sent to the system log.
+.It Fl u
+should be used when the file system containing the
+.Pa dcc_db
+and
+.Pa dcc_db.hash
+files is "ultra-fast," such as a solid-state drive.
+This setting postpones writing some data during normal operation until the
+system is shutdown.
+This reduces wear on the SSD at the cost of writing GBytes of
+data when the system is shutdown.
+Writing GBytes to a rotating disk at system shutdown unacceptable,
+but not noticeable to a non-rotating disk that operates 10 or 100 times
+faster.
+.It Fl i Ar id
+specifies the DCC ID recognized by the local DCC server as its own.
+This ID allows the DCC server to recognize commands from
+.Nm
+to stop using the database while it is being cleaned.
+.It Fl a Xo
+.Sm off
+.Op Ar server-addr
+.Op Ar ,port
+.Xc
+.Sm on
+is commonly used to specify a UDP port or IP address of the local
+server other than the default.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+.It Fl H Ar hash-file-dir
+puts the
+.Pa dcc_db.hash
+hash table file in the
+.Ar hash-file-dir
+directory with a symbolic link.
+Using
+.Fl H
+to put the hash table in a memory, "tmpfs", or "swap" file system such as
+.Pa /dev/shm
+or
+.Pa /tmp
+significantly speeds up the DCC server,
+.Xr dccd 8 ,
+on operating systems such as Linux and Solaris that lack the
+.Em MAP_NOSYNC
+flag for the
+.Xr mmap 8
+system call.
+.Pp
+The memory file system must have space for two copies of the
+.Pa dcc_db.hash
+file.
+.Fl H
+is undesirable on FreeBSD and other systems with
+.Em MAP_NOSYNC
+except when
+.Fl D
+is used.
+The DCC database file,
+.Pa dcc_db ,
+should usually be in file system that is not cleared by operating system
+rebooting and
+.Em not
+in a memory file system.
+.Pp
+Use or stop using
+.Fl H
+by adding it to or removing it from DBCLEAN_ARGS in @prefix@/dcc_conf
+and manually running or waiting for the nightly run of the
+@libexecdir@/cron-dccd cron job.
+.Pp
+Do not use
+.Fl H
+with
+.Fl F
+or
+.Fl f .
+.It Fl D Ar db-file-dir
+puts the
+.Pa @prefix@/dcc_db
+database
+and the
+.Pa @prefix@/dcc_db.hash
+hash table files in the
+.Ar db-file-dir
+directory with symbolic links.
+Using
+.Fl D
+to put the files in a memory, "tmpfs", or "swap" file system such as
+.Pa /dev/shm
+or
+.Pa /tmp
+significantly speeds up the DCC server,
+.Xr dccd 8 ,
+but causes several GBytes of database transfers before DCC is effective
+whenever the operating system is restarted.
+.Fl D
+should
+.Em not
+be used except at sites with more than one DCC server installation
+and where at least one of the other local servers is not using
+.Fl D .
+.Fl D
+should only be used on systems that are rarely rebooted, because
+up to one month is required for the database reach equilibrium.
+.Pp
+The memory file system must have space for two copies of the
+.Pa dcc_db
+file.
+.Pp
+Use or stop using
+.Fl D
+by adding it to or removing it from DBCLEAN_ARGS in @prefix@/dcc_conf
+and manually running or waiting for the nightly run of the
+@libexecdir@/cron-dccd cron job.
+.Pp
+Do not use
+.Fl D
+with
+.Fl F
+or
+.Fl f .
+.It Fl G Ar on
+cleans a greylist database in
+.Pa @prefix@/grey_db
+and
+.Pa @prefix@/grey_db.hash
+instead of of a DCC server database.
+.It Fl R Ar mode
+repairs a database or does a quick cleaning.
+.Ar Mode
+must be one of the following:
+.Bl -tag -width quick -compact
+.It Em bad
+to repair a broken database.
+.It Em quick
+for a quick, superficial cleaning during the day.
+.It Em hash
+to rebuild a hash not sent to disk before the system was rebooted.
+.It Em failsafe
+to work around missing nightly cleaning by the
+.Xr cron 8
+job,
+.Pa @libexecdir@/cron-dccd
+.It Em del
+to finish processing a delete command received by
+.Xr dccd 8 .
+.El
+.It Fl s Ar hash-size
+specifies a size for the hash table in
+.Pa @prefix@/dcc_db.hash .
+By default the hash table is rebuilt to be approximately 80% full based
+on an estimate of the number of distinct checksums in the database file.
+.It Fl e Ar seconds
+specifies that reports older than
+.Ar seconds
+and with totals below 10 targets should be deleted.
+Reports older than
+.Ar seconds
+of checksums that have been reported more recently
+are summarized in the database.
+The default value is 1DAY or the value of
+.Fl E ,
+whichever is smaller.
+The 1 day default is reduced if the system does not appear to have
+enough RAM to hold the database.
+The minimum is 1 hour.
+.Ar Seconds
+can also be
+.Ar NEVER
+or a number of hours, days, or weeks followed by
+.Ar HOURS ,
+.Ar H ,
+.Ar DAYS ,
+.Ar D ,
+.Ar WEEKS
+or
+.Ar W .
+.Pp
+DCC servers that are not very busy and are
+isolated or do not receive "floods" of checksums
+from busy servers should use longer values
+to increase their chances of recognizing bulk mail.
+.It Fl E Ar spamsecs
+changes the expiration of checksums with more than 10 targets
+from the default of 30DAYS or the explicit value of
+.Fl e ,
+whichever is larger.
+The default is reduced if the system does not have enough RAM
+to hold the database.
+.Ar Spamsecs
+can also be
+.Ar NEVER
+or a number of hours, days, or weeks followed by
+.Ar HOURS ,
+.Ar H ,
+.Ar DAYS ,
+.Ar D ,
+.Ar WEEKS
+or
+.Ar W .
+.It Fl L Ar ltype,facility.level
+specifies how messages should be logged.
+.Ar Ltype
+must be
+.Ar error ,
+.Ar info ,
+or
+.Ar off
+to indicate which of the two types of messages are being controlled or
+to turn off all
+.Xr syslog 3
+messages from
+.Nm .
+.Ar Level
+must be a
+.Xr syslog 3
+level among
+.Ar EMERG ,
+.Ar ALERT ,
+.Ar CRIT , ERR ,
+.Ar WARNING ,
+.Ar NOTICE ,
+.Ar INFO ,
+and
+.Ar DEBUG .
+.Ar Facility
+must be among
+.Ar AUTH ,
+.Ar AUTHPRIV ,
+.Ar CRON ,
+.Ar DAEMON ,
+.Ar FTP ,
+.Ar KERN ,
+.Ar LPR ,
+.Ar MAIL ,
+.Ar NEWS ,
+.Ar USER ,
+.Ar UUCP ,
+and
+.Ar LOCAL0
+through
+.Ar LOCAL7 .
+The default is equivalent to
+.Dl Fl L Ar info,MAIL.NOTICE  Fl L Ar error,MAIL.ERR
+.El
+.Pp
+.Nm
+exits 0 on success,
+and > 0 if an error occurs.
+.Sh FILES
+.Bl -tag -width grey_db.hash -compact
+.It Pa @prefix@
+is the DCC home directory containing data and control files.
+.It Pa dcc_conf
+is the DCC control file.
+.It Pa dcc_db
+is the main file containing mail checksums.
+.It Pa dcc_db.hash
+mail checksum database hash table.
+.It Pa grey_db
+is the database of greylist checksums.
+.It Pa grey_db.hash
+is the greylist database hash table.
+.It Pa dcc_db-new , dcc_db-new.hash , grey_db-new , grey_db-new.hash
+new database and hash files until they are renamed.
+.It Pa dcc_db-old , grey_db-old
+previous database files.
+.It Pa ids
+list of IDs and passwords, as described in
+.Xr dccd 8 .
+.It Pa whitelist
+contains the DCC server whitelist in
+the format described in
+.Xr dcc 8 .
+.It Pa grey_whitelist
+contains the greylist server whitelist.
+.El
+.Sh SEE ALSO
+.Xr cdcc 8 ,
+.Xr cron 8 ,
+.Xr dcc 8 ,
+.Xr dccd 8 ,
+.Xr dblist 8 ,
+.Xr dccifd 8 ,
+.Xr dccm 8 ,
+.Xr dccproc 8 .
+.Sh HISTORY
+Implementation of
+.Nm
+was started at Rhyolite Software, in 2000.
+This document describes version 2.3.167.

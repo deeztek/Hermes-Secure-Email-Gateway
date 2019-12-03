@@ -1,0 +1,891 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.128 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt dccproc 8 DCC
+.Os " "
+.Sh NAME
+.Nm dccproc
+.Nd Distributed Checksum Clearinghouse Procmail Interface
+.Sh SYNOPSIS
+.Nm dccproc
+.Bk -words
+.Op Fl VdAQCHEPR
+.Op Fl h Ar homedir
+.Op Fl m Ar map
+.Op Fl w Ar whiteclnt
+.Op Fl T Ar tmpdir
+.Op Fl a Ar IP-address
+.Op Fl f Ar env_from
+.Op Fl t Ar targets
+.Op Fl x Ar exitcode
+.br
+.Oo
+.Fl c Xo
+.Sm off
+.Ar type,
+.Op Ar log-thold,
+.Ar rej-thold
+.Sm on
+.Xc
+.Oc
+.Oo
+.Fl g Xo
+.Sm off
+.Op Ar not-
+.Ar type
+.Sm on
+.Xc
+.Oc
+.Op Fl S Ar header
+.br
+.Op Fl i Ar infile
+.Op Fl o Ar outfile
+.Op Fl l Ar logdir
+.Op Fl B Ar dnsbl-option
+.Op Fl L Ar ltype,facility.level
+.Ek
+.Sh DESCRIPTION
+.Nm Dccproc
+is a low performance DCC client for checking single mail messages
+for mail filters such as
+.Xr procmail 1
+.Pp
+.Nm Dccproc
+copies a complete SMTP message from standard input or a file
+to standard output or another file.
+As it copies the message,
+it computes the DCC checksums for the message,
+reports them to a DCC server, and adds
+a header line to the message.
+Another program such as
+.Xr procmail 1
+can use the added header line to filter mail
+or the exit
+.Nm
+exit status.
+.Pp
+Error messages are sent to stderr as well as the system log.
+Connect stderr and stdout to the same file to see errors in context,
+but direct stderr to /dev/null to keep DCC error messages out of the mail.
+The
+.Fl o
+option can also be used to separate the error messages.
+.Pp
+.Nm Dccproc
+sends reports of checksums related to mail received by DCC clients
+and queries about the total number of reports of particular checksums.
+A DCC server receives no
+mail, address, headers, or other information,
+but only cryptographically secure checksums of such information.
+A DCC server cannot determine the text or other information that corresponds
+to the checksums it receives.
+It only acts as a clearinghouse of counts of checksums computed by clients.
+.Pp
+The checksums of private mail, the internal mail,and other
+mail that is known to not be unsolicited bulk can be listed in a whitelist
+specified with
+.fl w .
+.Pp
+When
+.Xr sendmail 8
+is used,
+.Xr dccm 8
+is a better DCC interface.
+.Xr Dccifd 8
+is more efficient than
+.Nm
+because it is a daemon, but that has costs in complexity.
+See
+.Xr dccsight 8
+for a way to use previously computed checksums.
+.Ss OPTIONS
+The following options are available:
+.Bl -tag -width 3n
+.It Fl V
+displays the program's version.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl d
+enables debugging output from the DCC client software.
+Additional
+.Fl d
+options increase the number of messages.
+One causes error messages to be sent to STDERR as well as the system log.
+.It Fl A
+adds to existing X-DCC headers in the message
+instead of replacing existing headers
+of the brand of the current server.
+.It Fl P
+The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP header
+fields, but historically has looked for counts of "many".
+However, there are situations when
+.Nm
+knows that a mail message is extremely bulky and probably spam.
+For example, mail from a sender that is blacklisted in
+.Pa whiteclnt
+gets an X-DCC header that includes
+.Em bulk .
+To acommodate that bug in SpamAssassin, by default whenever
+.Nm
+generates an X-DCC header containing "bulk",
+it also forces the
+.Em Body
+count to "many".
+.Fl P
+turns off that kludge and the
+.Em Body
+contains the count from the DCC server.
+.It Fl Q
+only queries the DCC server about the checksums of messages
+instead of reporting.
+This is useful when
+.Nm
+is used to filter mail that has already been reported to a DCC
+server by another DCC client.
+No single mail message should be reported to a DCC
+server more than once per recipient,
+because each report will increase the apparent "bulkness" of the message.
+.Pp
+It is better to use
+.Em MXDCC
+lines in the global
+.Pa @prefix@/whiteclnt
+file for your MX mail servers that use DCC than to use
+.Fl Q
+with
+.Nm .
+.Pp
+Do not use
+.Fl Q
+except on mail that you know has been reported to a DCC server.
+DCC depends on reports of all except known private mail and
+works only because almost no DCC installations use
+.Fl Q .
+.It Fl C
+outputs only the X-DCC header
+and the checksums for the message.
+.It Fl H
+outputs only the X-DCC header.
+.It Fl E
+adds lines to the start of the log file turned on with
+.Fl l
+and
+.Fl c
+describing what might have been the envelope of the message.
+The information for the inferred envelope comes from arguments including
+.Fl a
+and headers in the message when
+.Fl R
+is used.
+No lines are generated for which no information is available,
+such as the envelope recipient.
+.It Fl P
+The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP header
+fields, but historically has looked for counts of "many".
+However, there are situations when
+.Nm
+knows that a mail message is extremely bulky and probably spam.
+For example, mail from a sender that is blacklisted in
+.Pa whiteclnt
+gets an X-DCC header that includes
+.Em bulk .
+To acommodate that bug in SpamAssassin, by default whenever
+.Nm
+generates an X-DCC header containing "bulk",
+it also forces the
+.Em Body
+count to "many".
+.Fl P
+turns off that kludge and the
+.Em Body
+contains the count from the DCC server.
+.It Fl R
+says the first Received lines have the standard
+"helo\ (name\ [address])..."
+format and the address is that of the SMTP client
+that would otherwise be provided with
+.Fl a .
+The
+.Fl a
+option should be used
+if the local SMTP server adds a Received line with some other format
+or does not add a Received line.
+Received headers specifying IP addresses marked
+.Em MX
+or
+.Em MXDCC
+in the
+.Fl w Ar whiteclnt
+file are skipped.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+.It Fl m Ar map
+specifies a name or path of the memory mapped parameter file instead
+of the default
+.Pa @prefix@/map .
+It should be created with the
+.Ic new map
+operation of the
+.Xr cdcc 8
+command.
+.It Fl w Ar whiteclnt
+specifies an optional file containing SMTP client IP addresses and
+SMTP headers
+of mail that do not need X-DCC headers and whose checksums should not
+be reported to the DCC server.
+It can also contain checksums of spam.
+If the pathname is not absolute, it is relative to the DCC home directory.
+Thus, individual users with private whitelists usually specify them
+with absolute paths.
+Common whitelists shared by users must be in the DCC home directory or
+one of its subdirectories and owned by the set-UID user of
+.Nm dccproc .
+It is useful to
+.Ar include
+a common or system-wide whitelist in private lists.
+.Pp
+Because the contents of the
+.Ar whiteclnt
+file are used frequently, a companion file is automatically
+created and maintained.
+It has the same pathname but with an added suffix of
+.Ar .dccw .
+It contains a memory mapped hash table of the main file.
+.Pp
+.Ar Option
+lines can be used to modify many aspects of
+.Nm
+filtering,
+as described in the main
+.Xr dcc 8
+man page.
+For example, an
+.Ar option spam-trap-discards
+line turns off DCC filtering and reports the message as spam.
+.It Fl T Ar tmpdir
+changes the default directory for temporary files from the system default.
+The system default is often
+.Pa /tmp .
+.It Fl a Ar IP-address
+specifies the IP address (not the host name) of
+the immediately previous SMTP client.
+It is often not available.
+.Fl a Ar 0.0.0.0
+is ignored.
+.Fl a .
+The
+.Fl a
+option should be used
+instead of
+.Fl R
+if the local SMTP server adds a Received line with some other format
+or does not add a Received line.
+.It Fl f Ar env_from
+specifies the RFC\ 821 envelope "Mail\ From" value with which the
+message arrived.
+It is often not available.
+If
+.Fl f
+is not present, the contents of the first Return-Path: or UNIX style
+From_ header is used.
+The
+.Ar env_from
+string is often but need not be bracketed with "<>".
+.It Fl t Ar targets
+specifies the number of addressees of the message if other than 1.
+The string
+.Ar many
+instead of a number asserts that there were too many addressees
+and that the message is unsolicited bulk email.
+.It Fl x Ar exitcode
+specifies the code or status with which
+.Nm
+exits if the
+.Fl c
+thresholds are reached or the
+.Fl w Ar whiteclnt
+file blacklists the message.
+.Pp
+The default value is EX_NOUSER.
+EX_NOUSER is 67 on many systems.
+Use 0 to always exit successfully.
+.It Fl c Xo
+.Sm off
+.Ar type,
+.Op Ar log-thold,
+.Ar rej-thold
+.Sm on
+.Xc
+sets logging and "spam" thresholds for checksum
+.Ar type .
+The checksum types are
+.Ar IP ,
+.Ar env_From ,
+.Ar From ,
+.Ar Message-ID ,
+.Ar substitute ,
+.Ar Received ,
+.Ar Body ,
+.Ar Fuz1 ,
+.Ar Fuz2 ,
+.Ar rep-total ,
+and
+.Ar rep .
+The first six,
+.Ar IP
+through
+.Ar substitute ,
+have no effect except when a local DCC server configured with
+.Fl K
+is used.
+The
+.Ar substitute
+thresholds apply to the first substitute heading encountered in the mail
+message.
+The string
+.Ar ALL
+sets thresholds for all types, but is unlikely to be useful except for
+setting logging thresholds.
+The string
+.Ar CMN
+specifies the commonly used checksums
+.Ar Body ,
+.Ar Fuz1 ,
+and
+.Ar Fuz2 .
+.Ar Rej-thold
+and
+.Ar log-thold
+must be numbers, the string
+.Ar NEVER ,
+or the string
+.Ar MANY
+indicating millions of targets.
+Counts from the DCC server as large as the threshold for any single type
+are taken as sufficient evidence
+that the message should be logged or rejected.
+.Pp
+.Ar Log-thold
+is the threshold at which messages are logged.
+It can be handy to log messages at a lower threshold to find
+solicited bulk mail sources such as mailing lists.
+If no logging threshold is set,
+only rejected mail and messages with complicated combinations of white
+and blacklisting are logged.
+Messages that reach at least one of their rejection thresholds are
+logged regardless of logging thresholds.
+.Pp
+.Ar Rej-thold
+is the threshold at which messages are considered "bulk,"
+and so should be rejected or discarded if not whitelisted.
+.Pp
+DCC Reputation thresholds in the commercial version
+of DCC are controlled by thresholds on checksum types
+.Ar rep
+and
+.Ar rep-total .
+The DCC Reputations of IP addresses that the DCC database says have sent
+more than
+.Ar rep-total,log-thold
+are computed and messages from those addresses are logged.
+Messages from IP addresses with DCC Reputations of at least the
+.Ar rep,rej-thold
+rejection threshold can be rejected.
+The DCC Reputation of an IP address is the percentage of its messages
+known to have been sent to at least 10 recipients.
+The defaults are equivalent to
+.Ar rep,never
+and
+.Ar rep-total,never,20 .
+.Pp
+Bulk DCC Reputations do not reject mail unless enabled by an
+.Ar option\ DCC-rep-on
+line a
+.Pa whiteclnt
+file.
+.Pp
+The checksums of locally whitelisted messages are not checked with
+the DCC server and so only the number of targets of the current copy of
+a whitelisted message are compared against the thresholds.
+.Pp
+The default is
+.Ar ALL,NEVER ,
+so that nothing is discarded, rejected, or logged.
+A common choice is
+.Ar CMN,25,50
+to reject or discard
+mail with common bodies except as overridden by
+the whitelist of the DCC server, the sendmail
+.Em ${dcc_isspam}
+and
+.Em ${dcc_notspam}
+macros, and
+.Fl g ,
+and
+.Fl w .
+.It Fl g Xo
+.Sm off
+.Op Ar not-
+.Ar type
+.Sm on
+.Xc
+indicates that whitelisted,
+.Ar OK
+or
+.Ar OK2 ,
+counts from the DCC server for a type of checksum are to be believed.
+They should be ignored if prefixed with
+.Ar not- .
+.Ar Type
+is one of the same set of strings as for
+.Fl c .
+Only
+.Ar IP ,
+.Ar env_From ,
+and
+.Ar From
+are likely choices.
+By default all three are honored,
+and hence the need for
+.Ar not- .
+.It Fl S Ar hdr
+adds to the list of substitute or locally chosen headers that
+are checked with the
+.Fl w Ar whiteclnt
+file and sent to the DCC server.
+The checksum of the last header of type
+.Ar hdr
+found in the message is checked.
+.Ar Hdr
+can be
+.Em HELO
+to specify the SMTP envelope HELO value.
+.Ar Hdr
+can also be
+.Em mail_host
+to specify the host name from
+the Mail_from value in the SMTP envelope.
+As many as 8 different substitute headers can be specified, but only
+the checksum of the first will be sent to the DCC server.
+.It Fl i Ar infile
+specifies an input file for the entire message
+instead of standard input.
+If not absolute, the pathname is interpreted relative to the
+directory in which
+.Nm
+was started.
+.It Fl o Ar outfile
+specifies an output file for the entire message including headers
+instead of standard output.
+If not absolute, the pathname is interpreted relative to the
+directory in which
+.Nm
+was started.
+.It Fl l Ar logdir
+specifies a directory for copies of messages whose
+checksum target counts exceed
+.Fl c
+thresholds.
+The format of each file is affected by
+.Fl E .
+.Pp
+See the FILES section below concerning the contents of the files.
+See also the
+.Ar option log-subdirectory-{day,hour,minute}
+lines in
+.Pa whiteclnt
+files described in
+.Xr dcc 8 .
+.Pp
+The directory is relative to the DCC home directory if it is not absolute
+.It Fl B Ar dnsbl-option
+enables DNS white- and blacklist checks of the SMTP client IP address,
+SMTP envelope Mail_From sender domain name, and of host names in
+URLs in the message body.
+Body URL blacklisting has too many false positives to use on
+abuse mailboxes.
+It is less effective than greylisting with
+.Xr dccm 8
+or
+.Xr dccifd 8
+but can be useful in situations where
+greylisting cannot be used.
+It can be combined with greylisting.
+.Pp
+.Ar Dnsbl-option
+is either one of the
+.Fl B Ar set:option
+forms or
+.Bd -literal -compact -offset 4n
+.Fl B Xo
+.Sm off
+.Ar domain Oo any Op Ar ,bltype Oc
+.Sm on
+.Xc
+.Fl B Xo
+.Sm off
+.Ar domain Oo Ar ,IPaddr
+.Op Ar /xx  Oo Ar &IPmask Oc Op Ar ,bltype Oc
+.Sm on
+.Xc
+.Fl B Xo
+.Sm off
+.Ar domain Oo Ar ,IPaddrLO
+.Op Ar -IPaddrHI Oo Ar &IPmask Oc Op Ar ,bltype Oc
+.Sm on
+.Xc
+.Ed
+.Ar Domain
+is a DNS blacklist domain such as
+.Em example.com
+that will be searched.
+The strings
+.Ar any ,
+.Ar IPaddr ,
+.Ar IPaddr/xx ,
+or
+.Ar IPaddrLO-IPaddrHI ,
+specifies which IP addresses found in the DNS blacklist
+after applying the optional IP address mask
+.Ar IPmask
+say that mail messages should be rejected or accepted with
+.Fl B Ar set:white .
+"127.0.0.2" is assumed if no address(es) are specified.
+IPv6 addresses can be specified with the usual colon (:) notation.
+Host names can be used instead of numeric addresses.
+The type of DNS blacklist
+is specified by
+.Ar bltype
+as
+.Ar name ,
+.Ar all-names ,
+.Ar IPv4 ,
+or
+.Ar IPv6 .
+Given an envelope sender domain name or a domain name in a URL of
+spam.domain.org
+and a blacklist of type
+.Ar name ,
+spam.domain.org.example.com will be looked up.
+The names
+spam.domain.org.example.com,
+domain.org.example.com, and
+org.example.com
+will be looked up in blacklists of type
+.Ar all-names .
+Use
+.Ar name
+with DNS blacklists that use wildcards for speed
+but
+.Ar all-names
+for other DNS name blacklists.
+Blacklist types of
+.Ar IPv4
+and
+.Ar IPv6
+require that the domain name in a URL sender address
+be resolved into an IPv4 or IPv6
+address.
+The resolved address from the mail message
+is then written as a reversed string of decimal
+octets to check the DNS blacklist, as in
+.Em 2.0.0.127.example.com .
+.Pp
+A
+.Ar domain
+of "."
+and type of
+.Ar name
+can be used to blacklist domain names with specified addresses.
+This can be useful to detect URLs with domain names listed in
+a Response Policy Zone (RPZ).
+For example, the following can be used to reject mail
+containing URLs listed by a response policy zone that maps
+evil domain names to 224.0.0.0 with an informative status
+message:
+.Bd -literal
+  '-Bset:rej-msg=5.7.1 550 %ID %BTYPE \\
+	https://example.com/query/dbl?domain=%BTGT'
+  -B.,224.0.0.0,name
+.Ed
+.Pp
+More than one blacklist can be specified and blacklists can be grouped with
+.Fl B Ar set:group=X .
+All searching within a group of blacklists
+is stopped at the first positive result.
+.Pp
+Unlike
+.Xr dccm 8
+and
+.Xr dccifd 8 ,
+no
+.Ar option\ DNSBL-on
+line is required in the
+.Pa whiteclnt
+file.
+A
+.Fl B
+argument is sufficient to show that DNSBL filtering is wanted by the
+.Nm
+user.
+.Bl -tag -width 3n
+.It Fl B Ar set:no-client
+implies that SMTP client IP addresses and reverse DNS domain names should
+not be checked in the following blacklists.
+.br
+.Fl B Ar set:client
+restores the default for the following blacklists.
+.It Fl B Ar set:no-mail_host
+implies that SMTP envelope Mail_From sender domain names should
+not be checked in the following blacklists.
+.Fl B Ar set:mail_host
+restores the default.
+.It Fl B Ar set:no-URL
+says that URLs in the message body should not be checked in the
+in the following blacklists.
+.Fl B Ar set:URL
+restores the default.
+.It Fl B Ar set:no-MX
+says MX servers of sender Mail_From domain names and host names in URLs
+should not be checked in the following blacklists.
+.br
+.Fl B Ar set:MX
+restores the default.
+.It Fl B Ar set:no-NS
+says DNS servers of sender Mail_From domain names and host names in URLs
+should not be checked in the following blacklists.
+.Fl B Ar set:NS
+restores the default.
+.It Fl B Ar set:white
+says the DNS list is a whitelist of names or IP addresses.
+.Bk
+.Fl B Ar set:black
+.Ek
+restores the default.
+DNS whitelist usually also need
+.Bk
+.Fl B Ar set:no-mail_host ,
+.Fl B Ar set:no-URL ,
+.Fl B Ar set:no-MX ,
+.Fl B Ar set:no-NS ,
+and
+.Fl B Ar set:no-mail_host .
+.Ek
+.It Fl B Ar set:defaults
+is equivalent to all of
+.Bk
+.Fl B Ar set:black
+.Fl B Ar set:client
+.Fl B Ar set:mail_host
+.Fl B Ar set:URL
+.Fl B Ar set:MX
+and
+.Fl B Ar set:NS
+.Ek
+.It Fl B Ar set:group=X
+adds following DNS blacklists specified with
+.Bk
+.Fl B Xo
+.Sm off
+.Ar domain Op Ar ...
+.Sm on
+.Xc
+.Ek
+to group 1, 2, 3, or 4.
+.It Fl B Ar set:debug=X
+sets the DNS blacklist logging level
+.It Fl B Ar set:msg-secs=S
+limits
+.Nm
+to
+.Ar S
+seconds total for checking all DNS blacklists.
+The default is 25.
+.It Fl B Ar set:URL-secs=S
+limits
+.Nm
+to at most
+.Ar S
+seconds resolving and checking any single URL or IP address.
+The default is 11.
+Some spam contains dozens of URLs and
+some "spamvertised" URLs contain host names that need minutes to
+resolve.
+Busy mail systems cannot afford to spend minutes checking each incoming
+mail message.
+.El
+.It Fl L Ar ltype,facility.level
+specifies how messages should be logged.
+.Ar Ltype
+must be
+.Ar error ,
+.Ar info ,
+or
+.Ar off
+to indicate which of the two types of messages are being controlled or
+to turn off all
+.Xr syslog 3
+messages from
+.Nm .
+.Ar Level
+must be a
+.Xr syslog 3
+level among
+.Ar EMERG ,
+.Ar ALERT ,
+.Ar CRIT , ERR ,
+.Ar WARNING ,
+.Ar NOTICE ,
+.Ar INFO ,
+and
+.Ar DEBUG .
+.Ar Facility
+must be among
+.Ar AUTH ,
+.Ar AUTHPRIV ,
+.Ar CRON ,
+.Ar DAEMON ,
+.Ar FTP ,
+.Ar KERN ,
+.Ar LPR ,
+.Ar MAIL ,
+.Ar NEWS ,
+.Ar USER ,
+.Ar UUCP ,
+and
+.Ar LOCAL0
+through
+.Ar LOCAL7 .
+The default is equivalent to
+.Dl Fl L Ar info,MAIL.NOTICE  Fl L Ar error,MAIL.ERR
+.El
+.Pp
+.Nm
+exits with 0 on success and with the
+.Fl x
+value if the
+.Fl c
+thresholds are reached or the
+.Fl w Ar whiteclnt
+file blacklists the message.
+If at all possible,
+the input mail message is output to standard output or the
+.Fl o Ar outfile
+despite errors.
+If possible, error messages are put into the system log instead of
+being mixed with the output mail message.
+The exit status is zero for errors so that the mail message
+will not be rejected.
+.Pp
+If
+.Nm
+is run more than 500 times in fewer than 5000 seconds,
+.Nm
+tries to start
+.Xr Dccifd 8 .
+The attempt is made at most once per hour.
+Dccifd is significantly more efficient than
+.Nm .
+With luck, mechanisms such as SpamAssassin will notice when dccifd is
+running and switch to dccifd.
+.Sh FILES
+.Bl -tag -width whiteclnt -compact
+.It Pa @prefix@
+DCC home directory.
+.It Pa map
+memory mapped file in the DCC home directory
+of information concerning DCC servers.
+.It Pa whiteclnt
+contains the client whitelist in
+the format described in
+.Xr dcc 8 .
+.It Pa whiteclnt.dccw
+is a memory mapped hash table corresponding to the
+.Pa whiteclnt
+file.
+.It Pa tmpdir
+contains temporary files created and deleted as
+.Nm
+processes the message.
+.It Pa logdir
+is an optional directory specified with
+.Fl l
+and containing marked mail.
+Each file in the directory contains one message, at least one of whose
+checksums reached one of its
+.Fl c
+thresholds.
+The entire body of the SMTP message including its header
+is followed by the checksums for the message.
+.El
+.Sh EXAMPLES
+The following
+.Xr procmailrc 5
+rule adds an X-DCC header to passing mail
+.Bd -literal -offset 4n
+:0 f
+| /usr/local/bin/dccproc -ERw whiteclnt
+.Ed
+.Pp
+This
+.Xr procmailrc 5
+recipe rejects mail with total counts of 10 or larger for
+the commonly used checksums:
+.Bd -literal -offset 4n
+:0 fW
+| /usr/local/bin/dccproc -ERw whiteclnt -ccmn,10
+:0 e
+{
+    EXITCODE=67
+    :0
+    /dev/null
+}
+.Ed
+.Sh SEE ALSO
+.Xr cdcc 8 ,
+.Xr dcc 8 ,
+.Xr dbclean 8 ,
+.Xr dccd 8 ,
+.Xr dblist 8 ,
+.Xr dccifd 8 ,
+.Xr dccm 8 ,
+.Xr dccsight 8 ,
+.Xr mail 1 ,
+.Xr procmail 1 .
+.Sh HISTORY
+Distributed Checksum Clearinghouses are based on an idea of Paul Vixie.
+Implementation of
+.Nm
+was started at Rhyolite Software in 2000.
+This document describes version 2.3.167.
+.Sh BUGS
+.Nm
+uses
+.Fl c
+where
+.Xr dccm 8
+uses
+.Fl t .

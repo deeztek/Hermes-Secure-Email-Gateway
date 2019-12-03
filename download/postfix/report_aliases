@@ -1,0 +1,2 @@
+spam: "|/etc/sal-wrapper-0.2.1/sal-wrapper.pl --spam"
+ham:  "|/etc/sal-wrapper-0.2.1/sal-wrapper.pl --ham"

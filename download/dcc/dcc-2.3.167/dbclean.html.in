@@ -1,0 +1,268 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <TITLE>dbclean.8</TITLE>
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <STYLE type="text/css">
+	BODY {background-color:white; color:black}
+	ADDRESS {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+    </STYLE>
+</HEAD>
+<BODY>
+<PRE>
+<!-- Manpage converted by man2html 3.0.1 -->
+<B>dbclean(8)</B>            Distributed Checksum Clearinghouse            <B>dbclean(8)</B>
+
+
+</PRE>
+<H2 ID="NAME">NAME</H2><PRE>
+     <B>dbclean</B> -- Clean Distributed Checksum Clearinghouse Database
+
+
+</PRE>
+<H2 ID="SYNOPSIS">SYNOPSIS</H2><PRE>
+     <B>dbclean</B> [<B>-dfFNPSVqu</B>] [<B>-i</B> <I>id</I>] [<B>-a</B> [<I>server-addr</I>][<I>,port</I>]] [<B>-h</B> <I>homedir</I>]
+             [<B>-H</B> <I>hash-file-dir</I>] [<B>-D</B> <I>db-file-dir</I>] [<B>-G</B> <I>on</I>] [<B>-R</B> <I>mode</I>]
+             [<B>-s</B> <I>hash-size</I>] [<B>-e</B> <I>seconds</I>] [<B>-E</B> <I>spamsecs</I>]
+             [<B>-L</B> <I>ltype,facility.level</I>]
+
+
+</PRE>
+<H2 ID="DESCRIPTION">DESCRIPTION</H2><PRE>
+     <B>Dbclean</B> creates empty, rebuilds corrupted, and deletes or expires old
+     reports of checksums from DCC databases.  It should be installed where it
+     will be found with the path given the DCC server daemon when the daemon
+     needs to expand the hash table.  See <B><A HREF="dccd.html">dccd(8)</A></B>.  It should also be run by
+     the daily <B>cron(8)</B> job, <I>@libexecdir@/cron-dccd</I>.
+
+     The whitelist in <I>@prefix@/whitelist</I> or <I>@prefix@/grey</I><B>_</B><I>whitelist</I> are built
+     into the DCC server's database.  Changes to the whitelist are not effec-
+     tive until dbclean is run.  White or blacklists can also be used by DCC
+     clients and work better.
+
+   <B ID="OPTIONS">OPTIONS</B>
+     The following options are available.  Most of them should set by changing
+     DBCLEAN_LOGDAYS and DBCLEAN_ARGS in the <I>@prefix@/dcc</I><B>_</B><I>conf</I> control file.
+
+     <B ID="OPTION-d">-d</B>   enables debugging output.  Additional <B>-d</B> options increase the number
+          of messages.
+
+     <B ID="OPTION-F">-F</B>   uses write() instead of mmap() and msync() in some cases to modify
+          the DCC database.  This works better on some versions of Solaris
+          provided the entire DCC database fits in RAM and provided the file
+          system has not been tuned for the large, random accesses of a DCC
+          database.  It is the default on Solaris except when the database is
+          in a memory mapped file system or the entire database fits in RAM.
+          Do not use <B>-F</B> with <B>-f</B>, <B>-H</B>, or <B>-D</B>.
+
+     <B ID="OPTION-f">-f</B>   uses mmap() and msync() to modify the DCC database.  Do not use <B>-f</B>
+          with <B>-F</B>, <B>-H</B>, or <B>-D</B>.
+
+     <B ID="OPTION-N">-N</B>   creates a new, empty database.  There must not be an existing data-
+          base and the DCC server, <B><A HREF="dccd.html">dccd(8)</A></B>, must not be running.
+
+     <B ID="OPTION-P">-P</B>   expires old checksums from a database using the <B>-e -and -E</B> values
+          from the preceding use of <B>dbclean</B>.  <B>-P</B> cannot be used with <B>-e</B> or <B>-E</B>.
+          Using <B>-P</B> differs from not using <B>-e</B> or <B>-E</B>, because in the absence of
+          all three, their default values are used.
+
+     <B ID="OPTION-S">-S</B>   says that the DCC server, <B><A HREF="dccd.html">dccd(8)</A></B>, is not running and so <B>dbclean</B>
+          should run stand-alone and not try to tell the DCC server about
+          changes to the database.  <B>-i</B> is not needed with <B>-S</B>.
+
+     <B ID="OPTION-V">-V</B>   displays the version of the DCC database cleaner.  Two or more <B>-V</B>
+          options show the options with which it was built.
+
+     <B ID="OPTION-q">-q</B>   quiets the announcement to stderr of the final results and debugging
+          messages turned on with <B>-d</B>.  Results are still sent to the system
+          log.
+
+     <B ID="OPTION-u">-u</B>   should be used when the file system containing the <I>dcc</I><B>_</B><I>db</I> and
+          <I>dcc</I><B>_</B><I>db.hash</I> files is "ultra-fast," such as a solid-state drive.
+          This setting postpones writing some data during normal operation
+          until the system is shutdown.  This reduces wear on the SSD at the
+          cost of writing GBytes of data when the system is shutdown.  Writing
+          GBytes to a rotating disk at system shutdown unacceptable, but not
+          noticeable to a non-rotating disk that operates 10 or 100 times
+          faster.
+
+     <B ID="OPTION-i">-i</B> <I>id</I>
+          specifies the DCC ID recognized by the local DCC server as its own.
+          This ID allows the DCC server to recognize commands from <B>dbclean</B> to
+          stop using the database while it is being cleaned.
+
+     <B ID="OPTION-a">-a</B> [<I>server-addr</I>][<I>,port</I>]
+          is commonly used to specify a UDP port or IP address of the local
+          server other than the default.
+
+     <B ID="OPTION-h">-h</B> <I>homedir</I>
+          overrides the default DCC home directory, <I>@prefix@</I>.
+
+     <B ID="OPTION-H">-H</B> <I>hash-file-dir</I>
+          puts the <I>dcc</I><B>_</B><I>db.hash</I> hash table file in the <I>hash-file-dir</I> directory
+          with a symbolic link.  Using <B>-H</B> to put the hash table in a memory,
+          "tmpfs", or "swap" file system such as <I>/dev/shm</I> or <I>/tmp</I> signifi-
+          cantly speeds up the DCC server, <B><A HREF="dccd.html">dccd(8)</A></B>, on operating systems such
+          as Linux and Solaris that lack the <I>MAP</I><B>_</B><I>NOSYNC</I> flag for the <B>mmap(8)</B>
+          system call.
+
+          The memory file system must have space for two copies of the
+          <I>dcc</I><B>_</B><I>db.hash</I> file.  <B>-H</B> is undesirable on FreeBSD and other systems
+          with <I>MAP</I><B>_</B><I>NOSYNC</I> except when <B>-D</B> is used.  The DCC database file,
+          <I>dcc</I><B>_</B><I>db</I>, should usually be in file system that is not cleared by
+          operating system rebooting and <I>not</I> in a memory file system.
+
+          Use or stop using <B>-H</B> by adding it to or removing it from
+          DBCLEAN_ARGS in @prefix@/dcc_conf and manually running or waiting
+          for the nightly run of the @libexecdir@/cron-dccd cron job.
+
+          Do not use <B>-H</B> with <B>-F</B> or <B>-f</B>.
+
+     <B ID="OPTION-D">-D</B> <I>db-file-dir</I>
+          puts the <I>@prefix@/dcc</I><B>_</B><I>db</I> database and the <I>@prefix@/dcc</I><B>_</B><I>db.hash</I> hash
+          table files in the <I>db-file-dir</I> directory with symbolic links.  Using
+          <B>-D</B> to put the files in a memory, "tmpfs", or "swap" file system such
+          as <I>/dev/shm</I> or <I>/tmp</I> significantly speeds up the DCC server, <B><A HREF="dccd.html">dccd(8)</A></B>,
+          but causes several GBytes of database transfers before DCC is effec-
+          tive whenever the operating system is restarted.  <B>-D</B> should <I>not</I> be
+          used except at sites with more than one DCC server installation and
+          where at least one of the other local servers is not using <B>-D</B>.  <B>-D</B>
+          should only be used on systems that are rarely rebooted, because up
+          to one month is required for the database reach equilibrium.
+
+          The memory file system must have space for two copies of the <I>dcc</I><B>_</B><I>db</I>
+          file.
+
+          Use or stop using <B>-D</B> by adding it to or removing it from
+          DBCLEAN_ARGS in @prefix@/dcc_conf and manually running or waiting
+          for the nightly run of the @libexecdir@/cron-dccd cron job.
+
+          Do not use <B>-D</B> with <B>-F</B> or <B>-f</B>.
+
+     <B ID="OPTION-G">-G</B> <I>on</I>
+          cleans a greylist database in <I>@prefix@/grey</I><B>_</B><I>db</I> and
+          <I>@prefix@/grey</I><B>_</B><I>db.hash</I> instead of of a DCC server database.
+
+     <B ID="OPTION-R">-R</B> <I>mode</I>
+          repairs a database or does a quick cleaning.  <I>Mode</I> must be one of
+          the following:
+          <I>bad</I>    to repair a broken database.
+          <I>quick</I>  for a quick, superficial cleaning during the day.
+          <I>hash</I>   to rebuild a hash not sent to disk before the system was
+                 rebooted.
+          <I>failsafe</I>
+                 to work around missing nightly cleaning by the <B>cron(8)</B> job,
+                 <I>@libexecdir@/cron-dccd</I>
+          <I>del</I>    to finish processing a delete command received by <B><A HREF="dccd.html">dccd(8)</A></B>.
+
+     <B ID="OPTION-s">-s</B> <I>hash-size</I>
+          specifies a size for the hash table in <I>@prefix@/dcc</I><B>_</B><I>db.hash</I>.  By
+          default the hash table is rebuilt to be approximately 80% full based
+          on an estimate of the number of distinct checksums in the database
+          file.
+
+     <B ID="OPTION-e">-e</B> <I>seconds</I>
+          specifies that reports older than <I>seconds</I> and with totals below 10
+          targets should be deleted.  Reports older than <I>seconds</I> of checksums
+          that have been reported more recently are summarized in the data-
+          base.  The default value is 1DAY or the value of <B>-E</B>, whichever is
+          smaller.  The 1 day default is reduced if the system does not appear
+          to have enough RAM to hold the database.  The minimum is 1 hour.
+          <I>Seconds</I> can also be <I>NEVER</I> or a number of hours, days, or weeks fol-
+          lowed by <I>HOURS</I>, <I>H</I>, <I>DAYS</I>, <I>D</I>, <I>WEEKS</I> or <I>W</I>.
+
+          DCC servers that are not very busy and are isolated or do not
+          receive "floods" of checksums from busy servers should use longer
+          values to increase their chances of recognizing bulk mail.
+
+     <B ID="OPTION-E">-E</B> <I>spamsecs</I>
+          changes the expiration of checksums with more than 10 targets from
+          the default of 30DAYS or the explicit value of <B>-e</B>, whichever is
+          larger.  The default is reduced if the system does not have enough
+          RAM to hold the database.  <I>Spamsecs</I> can also be <I>NEVER</I> or a number of
+          hours, days, or weeks followed by <I>HOURS</I>, <I>H</I>, <I>DAYS</I>, <I>D</I>, <I>WEEKS</I> or <I>W</I>.
+
+     <B ID="OPTION-L">-L</B> <I>ltype,facility.level</I>
+          specifies how messages should be logged.  <I>Ltype</I> must be <I>error</I>, <I>info</I>,
+          or <I>off</I> to indicate which of the two types of messages are being con-
+          trolled or to turn off all <B>syslog(3)</B> messages from <B>dbclean</B>.  <I>Level</I>
+          must be a <B>syslog(3)</B> level among <I>EMERG</I>, <I>ALERT</I>, <I>CRIT</I>, <I>ERR</I>, <I>WARNING</I>,
+          <I>NOTICE</I>, <I>INFO</I>, and <I>DEBUG</I>.  <I>Facility</I> must be among <I>AUTH</I>, <I>AUTHPRIV</I>,
+          <I>CRON</I>, <I>DAEMON</I>, <I>FTP</I>, <I>KERN</I>, <I>LPR</I>, <I>MAIL</I>, <I>NEWS</I>, <I>USER</I>, <I>UUCP</I>, and <I>LOCAL0</I>
+          through <I>LOCAL7</I>.  The default is equivalent to
+                <B>-L</B> <I>info,MAIL.NOTICE</I> <B>-L</B> <I>error,MAIL.ERR</I>
+
+     <B>dbclean</B> exits 0 on success, and &gt; 0 if an error occurs.
+
+
+</PRE>
+<H2 ID="FILES">FILES</H2><PRE>
+     <SPAN="FILE-@prefix@">@prefix@</SPAN>      is the DCC home directory containing data and control
+                   files.
+     <SPAN="FILE-dcc_conf">dcc_conf</SPAN>      is the DCC control file.
+     <SPAN="FILE-dcc_db">dcc_db</SPAN>        is the main file containing mail checksums.
+     <SPAN="FILE-dcc_db.hash">dcc_db.hash</SPAN>   mail checksum database hash table.
+     <SPAN="FILE-grey_db">grey_db</SPAN>       is the database of greylist checksums.
+     <SPAN="FILE-grey_db.hash">grey_db.hash</SPAN>  is the greylist database hash table.
+     <SPAN="FILE-dcc_db-new">dcc_db-new</SPAN>, dcc_db-new.hash, grey_db-new, grey_db-new.hash
+                   new database and hash files until they are renamed.
+     <SPAN="FILE-dcc_db-old">dcc_db-old</SPAN>, grey_db-old
+                   previous database files.
+     <SPAN="FILE-ids">ids</SPAN>           list of IDs and passwords, as described in <B><A HREF="dccd.html">dccd(8)</A></B>.
+     <SPAN="FILE-whitelist">whitelist</SPAN>     contains the DCC server whitelist in the format described
+                   in <B><A HREF="dcc.html">dcc(8)</A></B>.
+     <SPAN="FILE-grey_whitelist">grey_whitelist</SPAN>
+                   contains the greylist server whitelist.
+
+
+</PRE>
+<H2 ID="SEE-ALSO">SEE ALSO</H2><PRE>
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>, <B>cron(8)</B>, <B><A HREF="dcc.html">dcc(8)</A></B>, <B><A HREF="dccd.html">dccd(8)</A></B>, <B><A HREF="dblist.html">dblist(8)</A></B>, <B><A HREF="dccifd.html">dccifd(8)</A></B>, <B><A HREF="dccm.html">dccm(8)</A></B>,
+     <B><A HREF="dccproc.html">dccproc(8)</A></B>.
+
+
+</PRE>
+<H2 ID="HISTORY">HISTORY</H2><PRE>
+     <SPAN="FILE-Implementation">Implementation</SPAN> of <B>dbclean</B> was started at <A HREF="https://www.rhyolite.com/">Rhyolite Software</A>, in 2000.
+     <SPAN="FILE-This">This</SPAN> document describes version 2.3.167.
+
+                                 June 19, 2019
+</PRE>
+<HR>
+<ADDRESS>
+Man(1) output converted with man2html modified for DCC
+$Date 2001/04/29 03:22:18 $
+<BR>
+<A HREF="https://www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+</BODY>
+</HTML>

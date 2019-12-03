@@ -1,0 +1,15 @@
+/* Distributed Checksum Clearinghouse
+ *
+ * local definitions included via `./configure --with-kludge=FILE`
+ *
+ * Rhyolite Software DCC 2.3.167-1.2 $Revision$
+ * @configure_input@
+ */
+
+#if !defined(KLUDGE_H) && defined(HAVE_KLUDGE_H)
+#define KLUDGE_H
+
+#include "@kludge_h@"
+
+#endif
+

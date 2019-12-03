@@ -1,0 +1,114 @@
+dccsight(8)           Distributed Checksum Clearinghouse           dccsight(8)
+
+NNAAMMEE
+     ddccccssiigghhtt -- Distributed Checksum Clearinghouse raw checksum interface
+
+SSYYNNOOPPSSIISS
+     ddccccssiigghhtt [--VVddPPQQCC] [--hh _h_o_m_e_d_i_r] [--mm _m_a_p] [--ww _w_h_i_t_e_c_l_n_t] [--tt _t_a_r_g_e_t_s]
+              [--ii _i_n_f_i_l_e] [--LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l]
+
+DDEESSCCRRIIPPTTIIOONN
+     DDccccssiigghhtt reads one or more lines containing DCC checksums, reports them
+     to a DCC server, and writes a X-DCC header line.  It can be used to
+     report checksums obtained from dccproc(8) using --CC.
+
+   OOPPTTIIOONNSS
+     The following options are available:
+
+     --VV   displays the version of the DCC raw checksum interface.  Two or more
+          --VV options show the options with which it was built.
+
+     --dd   enables debugging output from the DCC client software.  Additional
+          --dd options increase the number of messages.
+
+     --PP   The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP
+          header fields, but historically has looked for counts of "many".
+          However, there are situations when ddccccssiigghhtt knows that a mail mes-
+          sage is extremely bulky and probably spam.  For example, mail from a
+          sender that is blacklisted in _w_h_i_t_e_c_l_n_t gets an X-DCC header that
+          includes _b_u_l_k.  To acommodate that bug in SpamAssassin, by default
+          whenever ddccccssiigghhtt generates an X-DCC header containing "bulk", it
+          also forces the _B_o_d_y count to "many".  --PP turns off that kludge and
+          the _B_o_d_y contains the count from the DCC server.
+
+     --QQ   only queries the DCC server about the checksums of messages instead
+          of reporting.  This is useful when ddccccssiigghhtt is used to filter mail
+          that has already been reported to a DCC server by another DCC
+          client.  No single mail message should be reported to a DCC server
+          more than once per recipient, because each report will increase the
+          apparent "bulkness" of the message.
+
+          It is better to use _M_X_D_C_C lines in the global _/_v_a_r_/_d_c_c_/_w_h_i_t_e_c_l_n_t
+          file for your MX mail servers that use DCC than to use --QQ with
+          ddccccssiigghhtt.
+
+          Do not use --QQ except on mail that you know has been reported to a
+          DCC server.  DCC depends on reports of all except known private mail
+          and works only because almost no DCC installations use --QQ.
+
+     --CC   outputs the checksums for the message as well as the X-DCC header.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.
+
+     --mm _m_a_p
+          specifies a name or path of the memory mapped parameter file instead
+          of the default _/_v_a_r_/_d_c_c_/_m_a_p in the DCC home directory.  It should be
+          created with the cdcc(8) command.
+
+     --ww _w_h_i_t_e_c_l_n_t
+          specifies an optional file containing SMTP client IP addresses and
+          SMTP headers of mail that do not need X-DCC headers and whose check-
+          sums should not be reported to the DCC server.  It can also contain
+          checksums of spam.  If the pathname is not absolute, it is relative
+          to the DCC home directory.  Thus, individual users with private
+          whitelists usually specify them with absolute paths.  It is useful
+          to _i_n_c_l_u_d_e a common or system-wide whitelist in private lists.
+
+          The format of the ddccccssiigghhtt whiteclnt file is the same as the
+          _/_v_a_r_/_d_c_c_/_w_h_i_t_e_l_i_s_t file required by dbclean(8) and dccsight(8).
+          Because this list is used frequently, a companion file is used.  It
+          has the same pathname but with an added suffix of _._d_c_c_w.  After
+          being created empty, it will contain an automatic memory mapped hash
+          table of the main file.
+
+     --tt _t_a_r_g_e_t_s
+          specifies the number of addressees of the message if other than 1.
+          The string _m_a_n_y instead of a number asserts that there were too many
+          addressees and that the message is unsolicited bulk email.
+
+     --ii _i_n_f_i_l_e
+          specifies an input file instead of standard input.  If not absolute,
+          the pathname is interpreted relative to the directory in which
+          ddccccssiigghhtt was started.
+
+     --LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l
+          specifies how messages should be logged.  _L_t_y_p_e must be _e_r_r_o_r, _i_n_f_o,
+          or _o_f_f to indicate which of the two types of messages are being con-
+          trolled or to turn off all syslog(3) messages from ddccccssiigghhtt.  _L_e_v_e_l
+          must be a syslog(3) level among _E_M_E_R_G, _A_L_E_R_T, _C_R_I_T, _E_R_R, _W_A_R_N_I_N_G,
+          _N_O_T_I_C_E, _I_N_F_O, and _D_E_B_U_G.  _F_a_c_i_l_i_t_y must be among _A_U_T_H, _A_U_T_H_P_R_I_V,
+          _C_R_O_N, _D_A_E_M_O_N, _F_T_P, _K_E_R_N, _L_P_R, _M_A_I_L, _N_E_W_S, _U_S_E_R, _U_U_C_P, and _L_O_C_A_L_0
+          through _L_O_C_A_L_7.  The default is equivalent to
+                --LL _i_n_f_o_,_M_A_I_L_._N_O_T_I_C_E --LL _e_r_r_o_r_,_M_A_I_L_._E_R_R
+
+     ddccccssiigghhtt exits 0 on success, and >0 if an error occurs.
+
+FFIILLEESS
+     @prefix@   DCC home directory.
+     map        memory mapped file in the DCC home directory of information
+                concerning DCC servers.
+     whiteclnt  contains the client whitelist in the format described in
+                dcc(8).
+     whiteclnt.dccw
+                memory mapped hash table of the _/_v_a_r_/_d_c_c_/_w_h_i_t_e_c_l_n_t file.
+
+SSEEEE AALLSSOO
+     cdcc(8), dcc(8), dbclean(8), dccd(8), dblist(8), dccproc(8), dccm(8),
+     dccifd(8), mail(1), procmail(1).
+
+HHIISSTTOORRYY
+     Implementation of ddccccssiigghhtt was started at Rhyolite Software in 2000.
+     This document describes version 2.3.167.
+
+                                 June 19, 2019

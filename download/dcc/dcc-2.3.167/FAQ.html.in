@@ -1,0 +1,1512 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <TITLE>DCC FAQ</TITLE>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <META NAME="Keywords" CONTENT="spam, checksum clearinghouse, filter">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <STYLE type="text/css">
+	<!--
+	BODY {background-color:white; color:black}
+	UL.FAQlist {margin-left:10%; margin-right:10%}
+	DL.FAQbody {margin-left:5%}
+	DT {font-weight:bolder}
+	.small {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+	-->
+    </STYLE>
+</HEAD>
+
+<BODY>
+<H1 style='text-align:center'>Distributed Checksum Clearinghouse (DCC)
+Frequently Answered Questions</H1>
+
+<P>
+<A HREF="https://www.rhyolite.com/dcc/FAQ.html">Current versions</A>
+of this list can be found among the
+<A HREF="https://www.rhyolite.com/dcc/">https://www.rhyolite.com/dcc/</A>
+web pages and their <A HREF="https://www.dcc-servers.net/dcc/FAQ.html">mirror</A>
+at
+<A HREF="https://www.dcc-servers.net/dcc/">https://www.dcc-servers.net/dcc/</A>.
+
+
+<UL class="FAQlist">
+
+<LI><A HREF="#what-is-it">
+What is the Distributed Checksum Clearinghouse or DCC?</A>
+<LI><A HREF="#license">
+Is the DCC source free?</A>
+<LI><A HREF="#source">
+Where can I get DCC source?</A>
+<LI><A HREF="#binary">
+Where can I get DCC RPMs, packages or other binary forms?</A>
+<LI><A HREF="#fuzzy-personalize">
+Do the fuzzy checksums ignore <Q lang="en-us">personalizations</Q>?</A>
+<LI><A HREF="#system-load">
+How much bandwidth, RAM, disk space, and computing does the DCC require?</A>
+<LI><A HREF="#need-server">
+Do I need to run a DCC server?</A>
+<LI><A HREF="#load-balance">
+Can I use cluster or other load balancing mechanisms with my DCC servers?</A>
+<LI><A HREF="#crash">
+What happens to my mail if DCC breaks?</A>
+<LI><a HREF="#mark-only">
+How do I mark spam without rejecting it?</A>
+<LI><A HREF="#bad-man">
+Why doesn't the man command find the man pages?</A>
+<LI><A HREF="#sendmail-only">
+Must sendmail be used with DCC?</A>
+<LI><A HREF="#postfix">
+Can Postfix be used with DCC?</A>
+<LI><A HREF="#smtpd">
+Can the DCC be used with smtpd?</A>
+<LI><A HREF="#exim">
+Can the DCC be used with Exim?</A>
+<LI><A HREF="#other-MUAs">
+How can the DCC be used with mail user agents?</A>
+<LI><A HREF="#spamass">
+Can the DCC be used with SpamAssassin or other spam filters?</A>
+<LI><A HREF="#dcc-delay">
+How long must SpamAssassin or an MTA wait for DCC results?</A>
+<LI><A HREF="#root-needed">
+Must I have the root password to use DCC?</A>
+<LI><A HREF="#firewall-ports2">
+Why don't the public DCC servers work?  Do I need a client-ID?</A>
+<LI><A HREF="#firewall-ports">
+Which ports do I need to open in my firewall?</A>
+<LI><A HREF="#cleaning1">
+Why does the dccd database grow without bound?</A>
+<LI><A HREF="#cleaning2">
+The dccd database is corrupt.  What should I do?</A>
+<LI><A HREF="#cleaning3">
+How can I stop the log directories from overflowing?</A>
+<LI><A HREF="#bad-locks">
+Why do my DCC clients including cdcc and dccproc
+complain about <Q lang="en-us">Resource temporarily unavailable</Q>?</A>
+<LI><A HREF="#maxprocs">
+Why does dccifd or dccm complain about
+<Q lang="en-us">thread_create() failed: 11, try again</Q>? or
+<Q lang="en-us">pthread_create(): Cannot allocate memory</Q>?</A>
+<LI><A HREF="#max-work">
+Why does dccm or dccifd complain about
+<Q lang="en-us">too many simultaneous mail messages</Q>?</A>
+<LI><A HREF="#server-pick">
+Why doesn't my DCC client pick my local DCC server?</A>
+<LI><A HREF="#IDs1">
+If I have a server-ID, do I need a DCC client-ID, or vice versa?</A>
+<LI><A HREF="#IDs2">Why does my DCC server complain about
+ "rejected server-IDs" among flooded checksum reports?</A>
+<LI><A HREF="#server-rate-limits">
+Why does my DCC server refuse to accept more than 50 operations per second?</A>
+<LI><A HREF="#private-server">
+How do I keep strangers from using my DCC server?</A>
+<LI><A HREF="#dccm-log1">
+How can I determine why dccm reported
+a message as spam or with a recipient count of "MANY"?</A>
+<LI><A HREF="#dblist1">
+How can I see what checksums my server has heard from its clients?</A>
+<LI><A HREF="#whitelist13">
+How do I stop DCC false positives?</A>
+<LI><A HREF="#whitelist1">
+Why is mail from my favorite mailing list marked with an
+<I>X-DCC</I> header line that says it is spam?</A>
+<LI><A HREF="#whitelist11">
+Why are acknowledgments of spam reports mistakenly
+marked as spam by DCC?</A>
+<LI><A HREF="#x-dcc-header1">
+Why are some checksums missing from my <I>X-DCC</I> header lines?</A>
+<LI><A HREF="#whitelist9">
+How do I maintain client whitelists?</A>
+<LI><A HREF="#whitelist2">
+Do I need both server and client whitelists?</A>
+<LI><A HREF="#whitelist3">
+When the whitelist file used by dccd, dccm or dccifd is changed,
+what must be done to tell the software about the change?</A>
+<LI><A HREF="#whitelist14">
+How do I test a whiteclnt file?</A>
+<LI><A HREF="#reg-exps1">
+Can I use wild cards or regular expressions in DCC whitelists?</A>
+<LI><A HREF="#whitelist10">
+How do I whitelist mail from a legitimate
+bulk mailer using its name or SMTP headers such as Mailing-List or the
+Habeas SWE headers?</A>
+<LI><A HREF="#incompat-whitelists">
+Why does dccm or dccifd complain about "incompatible whitelists"?</A>
+<LI><A HREF="#whitelist4">
+Why do legitimate mail messages have
+<I>X-DCC</I> header lines that say they are "bulk", "many", or spam?</A>
+<LI><A HREF="#whitelist5">
+Are IP address blocks in whitelists used by dccproc?</A>
+<LI><A HREF="#whitelist6">
+Why is dccproc is ignoring <I>env_from</I> whitelist entries?</A>
+<LI><A HREF="#delck">
+What if I make a mistake with
+dccproc&nbsp;-t&nbsp;many and report legitimate mail as spam?</A>
+<LI><A HREF="#whitelist8">
+Can the sendmail "spamfriend" mechanism tell
+dccm to not check mail sent to some addresses?</A>
+<LI><A HREF="#whitelist12">
+How do I tell dccm and sendmail to not check mail for an entire domain?</A>
+<LI><A HREF="#false-positives">
+How can I avoid polluting the databases of DCC servers with
+checksums of my mail that is not spam?</A>
+<LI><A HREF="#spamtrap">
+Can DCC be fed with <Q lang="en-us">spam traps</Q>?</A>
+<LI><A HREF="#flood3">
+How many flooding peers does my DCC server need?</A>
+<LI><A HREF="#flood1">
+Do I need to tell the operators of other DCC servers
+the password for controlling my server to turn on flooding?</A>
+<LI><A HREF="#flood2">
+How can I figure out why flooding is not working?</A>
+<LI><A HREF="#nagios">
+How do I monitor my DCC clients and servers?  Is there a nagios plugin?</A>
+<LI><A HREF="#rtt">
+Why didn't the RTT reported by
+the cdcc&nbsp;info
+operation change when my network topology changed?</A>
+<LI><A HREF="#socks1">
+When my clients are configured to use SOCKS, they do not
+realize immediately when a server is down.</A>
+</UL>
+
+<P>
+<HR>
+
+<DL class="FAQbody">
+
+<DT><A NAME="what-is-it">
+What is the Distributed Checksum Clearinghouse or DCC?</A>
+<DD>
+The DCC or Distributed Checksum Clearinghouse is an anti-spam content filter
+that runs on a variety of
+<A HREF="INSTALL.html#Compatibility">operating systems</A>.
+The idea of the DCC is that if mail recipients could compare
+the mail they receive, they could recognize unsolicited bulk mail.
+A DCC server totals reports of "fuzzy" checksums of
+messages from clients and answers queries about the total counts
+for checksums of mail messages.
+<P>
+See the main <A HREF="dcc.html">DCC man page</A> as well as the
+<A HREF="https://www.rhyolite.com/dcc/#overview">DCC web page</A>
+and its <A HREF="https://www.dcc-servers.net/dcc/#overview">mirror</A>.
+
+
+<P><DT><A NAME="license">
+Is the DCC source free</A>
+<DD>
+The non-commercial Distributed Checksum Clearinghouse source carries a
+<A HREF="LICENSE">license</A>
+that is free only to organizations that do not sell filtering devices or
+services except to their own users and that participate in the global
+DCC network.
+ISPs that use DCC to filter mail for their
+own users are intended to be covered by the free license.
+You can redistribute unchanged copies of the free source, but you <B>may not</B>
+redistribute modified, "fixed," or "improved" versions of the source
+or binaries.
+You also can't call it your own or blame anyone for the results of using it.
+<P>
+Organizations that do not qualify for the free license are welcome to
+inquire about  licenses for the commercial version by email to
+<A HREF="mailto:sales@rhyolite.com">sales@rhyolite.com</A>
+or via the
+<A HREF="https://www.rhyolite.com/cgi-bin/ct.cgi?sb=Commercial+DCC+License">form</A>.
+The commercial version supports
+<A HREF="https://www.rhyolite.com/dcc/reputations.html">DCC Reputations</A>.
+<P>
+Please note that organizations that do not qualify for the free DCC license
+have never been allowed to use the public DCC servers.
+
+
+<P><DT><A NAME="source">
+Where can I get DCC source?</A>
+<DD>
+The official DCC source repositories are at
+<A HREF="https://www.rhyolite.com/dcc/source/dcc.tar.Z">www.rhyolite.com/dcc/</A>
+and
+<A HREF="https://www.dcc-servers.net/dcc/source/dcc.tar.Z">https://www.dcc-servers.net/dcc/</A>.
+<P>
+Please do not try to use ancient versions of DCC software dating from early
+2005 and redistributed by third parties including some Linux packagers.
+Those versions do not detect bulk mail as well as more recent versions.
+Installations using those old versions also have problems using the
+public DCC servers that often make it necessary to add their IP addresses
+to the blacklist that protects the public DCC servers.
+Even worse, all known Linux redistributions of DCC software have been
+changed in ways that break things, including the
+<A HREF="misc/updatedcc">@libexecdir@/updatedcc</A>
+shell script that could
+otherwise be used to fetch, configure, compile, install, and restart
+a current version.
+<P>
+When installing DCC software, please consider the installation instructions
+in the
+<A HREF="INSTALL.html">INSTALL.html</A> file included with
+the source or in the
+<A HREF="https://www.dcc-servers.net/dcc/INSTALL.html">on line source trees</A>.
+
+
+<P><DT><A NAME="binary">
+Where can I get DCC RPMs, packages or other binary forms?</A>
+<DD>
+There are no official distributions of DCC binaries,
+whether simple a.out files, RPM Package Manager (RPM) packages,
+or BSD style ports or packages (pkg).
+There are many unofficial sources of DCC binaries, including
+Linux RPMs and BSD style packages.
+<P>
+The FreeBSD packages are not too far out of date and
+include a working version of the
+<A HREF="misc/updatedcc">@libexecdir@/updatedcc</A> shell script that
+fetches, configures, compiles, installs, and restarts
+a current version.
+<P>
+As far as known in 2009, all DCC RPMs offered by Linux distributors
+are based on DCC software from 2005 and <STRONG>should not</STRONG> be used.
+They cause problems for the public DCC servers.
+
+
+<P><DT><A NAME="fuzzy-personalize">
+Do the fuzzy checksums ignore <Q lang="en-us">personalizations</Q>?</A>
+<DD>
+Yes, they ignore many <Q lang="en-us">personalizations</Q> and
+<Q lang="en-us">hash busters</Q>.
+
+
+<P><DT><A NAME="system-load">
+How much bandwidth, RAM, disk space, and computing does the DCC require?</A>
+<DD>
+The UDP packets used by a DCC client to obtain the checksum totals
+from a DCC server for a mail message generally use less bandwidth than
+the DNS queries required to receive the same message.
+A DCC client needs very little disk space.
+<P>
+Bulk messages are usually logged by DCC clients.
+On systems receiving a lot of mail, the mechanisms for automatically
+creating new log directories every minute, day, or hour
+can keep any single log directory from becoming too large.
+See the <A HREF="dccm.html#OPTION-l">dccm</A>
+and
+<A HREF="dccproc.html#OPTION-l">dccproc</A>
+man pages.
+<P>
+About 1.4 GBytes/day are exchanged between each pair of DCC servers.
+Each server has 3 or 4 peers.
+The resulting database is about 3 GBytes with the default expiration
+parameters..
+However, while <A HREF="dbclean.html">dbclean</A> is deleting old checksums,
+there are three copies of the database.
+The DCC clients and server do not need many CPU cycles,
+but the daily executions of <A HREF="dbclean.html">dbclean</A>
+on a system with a DCC server
+require a computer with at least 2 or 3 GBytes of RAM.
+In 2006,
+a DCC server prefers more than 4 GBytes of RAM and can use 6 GBytes.
+12 to 18 GBytes of disk space are also needed.
+<P>
+The memory found by <A HREF="dccd.html">dccd</A> or
+<A HREF="dbclean.html">dbclean</A>
+and how can be seen by starting them with -d in DCCD_ARGS or DBCLEAN_ARGS
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file in the DCC home directory.
+They try to use half of physical memory if there is less than 2 GBytes,
+all except 512 MByte between 2 GBytes and 4 GBytes,
+and all but 1 GByte if there are more than 4 GBytes.
+<P>
+DCC servers used by clients handling 100,000 or more messages per day
+need to be larger.
+Each additional 100,000 messages/day need about 100 MBytes of disk space
+and system memory, given the default expiration used by
+<A HREF="dbclean.html#OPTION-e">dbclean</A>.
+
+
+<P><DT><A NAME="need-server">Do I need to run a DCC server?</A>
+<DD>
+A mail system that processes fewer than 100,000 mail messages per day
+uses less of its own bandwidth and the bandwidth of other DCC servers
+by using the <A HREF="https://www.dcc-servers.net/dcc/#public-servers">public
+DCC servers</A>.
+Each mail message needs a DCC transaction that requires
+about 100 bytes, and so 100,000 mail messages/day imply about 10
+MBytes/day of DCC client-server traffic.  Each DCC server needs to
+exchange "floods" or streams of checksms with 4 other servers.  Each
+flood is currently about 1.4 GBytes/day for a current total of about
+3 GBytes/day.
+<P>
+When normally installed by the included Makefiles, DCC clients are
+configured to use the
+<A HREF="https://www.dcc-servers.net/dcc/#public-servers">public DCC servers</A>
+without any additional configuration except opening firewalls to port UDP 6277.
+<P>
+Mail systems that process more than 100,000 mail messages per day
+need local DCC servers connected to the global network of DCC servers.
+The public DCC servers include denial of service defenses which
+ignore requests in excess of about 240,000 per day per client.
+<P>
+It is wrong to resell the CPU cycles, network bandwidth,
+disk space, and, most important, human system administration work of the
+public DCC servers.
+Vendors of "anti-spam appliances" or similar
+that do not steal from the operators
+of the public DCC servers have always run their own DCC servers.
+
+
+<P><DT><A NAME="load-balance">
+Can I use cluster or other load balancing mechanisms with my DCC servers?</A>
+<DD>
+No, <B>do not</B> try outside load balancing mechanisms with a DCC server.
+Each DCC client must know the DCC server it is using for each DCC
+request by fixed IP address.
+Instead let the load balancing mechanisms in each DCC client work.
+Each DCC client monitors the round trip time (RTT) including queue
+delays to all of the DCC servers it knows.
+The client uses the fastest available server.
+
+<P><DT><A NAME="crash">
+What happens to my mail if DCC breaks?</A>
+<DD>
+When in doubt or trouble, the DCC clients including
+<A HREF="dccproc.html">dccproc</A> and <A HREF="dccm.html">dccm</A>
+deliver mail.  They wait only a little while for a DCC server
+to answer before giving up.  They then avoid asking a server for a while
+to avoid slowing down mail.
+<P>
+If the DCC sendmail interface or milter program, dccm, crashes,
+the default parameters in <A HREF="misc/dcc.m4">misc/dcc.m4</A>
+for the sendmail.cf Xdcc line
+tell sendmail to wait only about 30 seconds before
+giving up and delivering the mail.
+<P>
+The DCC client code keeps track of the speeds of the
+servers it knows about, and uses the fastest or closest.
+Every hour or so it re-resolves A records
+and checks the speeds of the servers it
+is not using.  When the current server stops working or gets significantly
+slower, the client code switches to a better server.
+
+
+<P><DT><A NAME="mark-only">
+How do I mark spam without rejecting it?</A>
+<DD>
+Unless given thresholds at which to reject mail,
+<A HREF="dccm.html#OPTION-t">dccm</A>
+and
+<A HREF="dccproc.html#OPTION-c">dccproc</A> do not reject mail.
+When dccm is given a threshold by setting DCCM_REJECT_AT in
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> in the DCC home directory,
+DCCM_ARGS can also be set to <A HREF="dccm.html#OPTION-a">"-a&nbsp;IGNORE</A>
+so that spam is marked but not rejected.
+
+
+<P><DT><A NAME="bad-man">
+Why doesn't the man command find the man pages?</A>
+<DD>
+The nroff source, formated nroff output, and HTML versions of the
+man pages are in the top-level source directory.
+Formatted or nroff source is installed by default somewhere in /usr/local/man
+depending on the target system.
+It may be necessary to add /usr/local/man to the MANPATH environment variable.
+Even with that, SunOS 5.7 sometimes has trouble finding them unless
+<B>man&nbsp;-F</B> is used.
+
+
+<P><DT><A NAME="sendmail-only">
+Must sendmail be used with DCC?</A>
+<DD>
+While the sendmail milter interface, <A HREF="dccm.html">dccm</A>
+and the DCC program interface or <A HREF="dccifd.html">dccifd</A>
+are the most efficient ways to report and check DCC checksums,
+<A HREF="dccproc.html">dccproc</A> is also commonly used.
+
+
+<P><DT><A NAME="postfix">
+Can Postfix be used with DCC?</A>
+<DD>
+The best way to use DCC with <A rel=nofollow HREF="http://www.postfix.org/">Postfix</A>
+is with <A HREF="dccifd.html#EXAMPLES">dccifd</A> as a
+<A rel=nofollow HREF="http://www.postfix.org/SMTPD_PROXY_README.html">Before-Queue Content
+Filter</A>.
+<P>
+In tests thesevalues for
+<A HREF="dccifd.html#OPTION-p">-p</A> and <A HREF="dccifd.html#OPTION-o">-o</A>
+in the <A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file:
+<PRE>
+    DCCIFD_ENABLE=on
+    DCCIFD_ARGS="-p 127.0.0.1,10025,127.0.0.1/32 -o 127.0.0.1,10026   ..."
+</PRE>
+worked with these lines in /etc/postfix/master.cf
+<PRE>
+    smtp      inet  n       -       n       -       -       smtpd
+        -o smtpd_proxy_filter=127.0.0.1:10025
+    127.0.0.1:10026 inet n  -       n       -	-	smtpd
+        -o smtpd_authorized_xforward_hosts=127.0.0.0/8
+        -o smtpd_client_restrictions=
+        -o smtpd_helo_restrictions=
+        -o smtpd_sender_restrictions=
+        -o smtpd_recipient_restrictions=permit_mynetworks,reject
+        -o smtpd_data_restrictions=
+        -o mynetworks=127.0.0.0/8
+        -o receive_override_options=no_unknown_recipient_checks
+</PRE>
+<P>
+I think the warnings in the Postfix documentation about the costs of
+Before-Queue filters apply more to computationally expensive filters
+such as <A rel=nofollow HREF="https://spamassassin.apache.org/">SpamAssassin</A>
+than dccifd.
+
+
+<P><DT><A NAME="smtpd">
+Can the DCC be used with smtpd?</A>
+<DD>
+Yes, <A HREF="dccproc.html">dccproc</A> can be used with Obtuse's smtpd.
+Dave Lugo has contributed a shell script to the
+<A HREF="http://sd.inodes.org/">smtpd-sd project</A>
+which can be used to do DCC checking prior to the end of the SMTP
+DATA command.
+
+
+<P><DT><A NAME="exim">
+Can the DCC be used with Exim?</A>
+<DD>
+There are comments about using <A HREF="dccproc.html">Dccproc</A> with
+<A HREF="http://www.exim.org/">Exim</A>
+in the
+<A HREF="https://www.rhyolite.com/pipermail/dcc/">DCC mailing list archives</A>
+including these messages:
+<UL>
+<LI><A HREF="https://www.rhyolite.com/pipermail/dcc/2002/000203.html">
+2002/000203</A>
+<LI><A HREF="https://www.rhyolite.com/pipermail/dcc/2002/000254.html">
+2002/000254</A>
+</UL>
+<P>
+<STRONG>However</STRONG>, those mailing list messages talked about using
+<A HREF="dccproc.html">dccproc</A> before
+<A HREF="dccifd.html">dccifd</A> was available.
+Dccproc is suitable only for low mail volumes.
+
+
+<P><DT><A NAME="spamass">
+Can the DCC be used with SpamAssassin or other spam filters?</A>
+<DD>
+The DCC can be used with
+<A rel=nofollow HREF="https://spamassassin.apache.org/">SpamAssassin</A> as
+well as other spam and virus filters.
+Note that it is more efficient to arrange to use a DCC client daemon,
+<A HREF="dccm.html">dccm</A> or <A HREF="dccifd.html">dccifd</A>,
+to mark passing mail and check
+<I>X-DCC</I> header lines in the filter than connect to
+dccifd on each message.
+It is even less desirable to start and run
+<A HREF="dccproc.html">dccproc</A> on each message.
+<P>
+If the <A HREF="dccifd.html">dccifd</A> socket is present,
+SpamAssassin prefers to talk to dccifd instead of running dccproc.
+<P>
+Some commercial virus and spam filters include DCC clients that
+query public DCC servers or DCC servers operated by the filter vendor
+and that "flood" or exchange bulk mail checksums with public servers.
+Reputable manufacturers of such devices operate their own DCC servers
+connected to global network of DCC servers instead of stealing and then
+selling the CPU cycles, network bandwidth, disk space, and, most important,
+human system administration efforts of the public DCC servers.
+
+<P><DT><A NAME="dcc-delay">
+How long must SpamAssassin or an MTA wait for DCC results?</A>
+<DD>
+DCC clients including dccproc, dccifd, and dccm can wait as long as
+about 16 seconds for an answer from a DCC server.
+Except when an anonymous client triggers the progressive delays that are
+among the defenses against denial of service attacks in the public DCC servers,
+delays are almost always less than 10 seconds.
+Delays for DNS blacklists
+(see <A HREF="dccifd.html#OPTION-B">dccifd&nbsp;-B</A>)
+are additional.
+
+
+<P><DT><A NAME="other-MUAs">
+How can the DCC be used with mail user agents?</A>
+<DD><A HREF="dccproc.html">Dccproc</A> can be used with any mail user
+agent that can check mail headers.
+For example, WD Baseley sent a
+<A HREF="https://www.rhyolite.com/pipermail/dcc/2002/000212.html">note</A>
+to the <A HREF="https://www.rhyolite.com/mailman/listinfo/dcc">DCC
+mailing list</A>
+on how to configure <A HREF="http://www.eudora.com/">Eudora</A> to
+act on X-DCC header lines.
+<P>
+Bharat Mediratta has developed DeepSix for people using mail user agents
+on UNIX boxes connected remote servers such as corporate Exchange servers.
+See his
+project on <A HREF="http://sourceforge.net/projects/deepsix">Sourceforge</A>
+as well as his
+<A HREF="https://www.rhyolite.com/pipermail/dcc/2001/000042.html">announcement</A>
+in the DCC mailing list.
+
+
+<P><DT><A NAME="root-needed">
+Must I have the root password to use DCC?</A>
+<DD>
+No, the procmail or sendmail .forward DCC user program,
+<A HREF="dccproc.html">dccproc</A>
+can be installed in an individual ~/bin directory.
+Then <A HREF="cdcc.html">cdcc</A>
+can create a private map file used with
+<A HREF="dccproc.html#OPTION-h">dccproc&nbsp;-h&nbsp;dir</A>
+or
+<A HREF="dccproc.html#OPTION-m">dccproc&nbsp;-m&nbsp;dir/map</A>.
+<P>
+Also see the <A HREF="INSTALL.html#individual-user">DCC installation
+instructions</A>.
+
+
+<P><DT><A NAME="firewall-ports2">
+Why don't the public DCC servers work?  Do I need a client-ID?</A>
+<DD>
+The public DCC servers accept requests from clients using the
+anonymous client-ID.
+Incorrectly configured firewalls often cause problems.
+Traceroute can be used to send UDP packets to test for interfering firewalls.
+See the answer to the <A HREF="#firewall-ports">firewall question</A>.
+<P>
+After firewalls, the most common cause of problems while trying to
+use the public DCC servers is sending too many requests.
+The DCC server daemon, <A HREF="dccd.html">dccd</A>, includes
+defenses against denial of service or DoS attacks.
+Those defenses include progressively delaying responses
+and eventually ignoring requests.
+The ancient version of the DCC client software included in some
+Linux redistributions tries so hard to reach the fastest server
+that it can trigger those DoS defenses.
+
+
+<P><DT><A NAME="firewall-ports">
+Which ports do I need to open in my firewall?</A>
+<DD>
+DCC traffic is like DNS traffic.  You should treat port 6277
+like port 53.
+Allow outgoing packets to distant UDP port 6277 and incoming packets
+from distant UDP port 6277.
+<P>
+If the command `cdcc info` says no DCC servers are answering,
+you may need to adjust your firewall.
+Also consider the other reasons why the
+<A HREF="#firewall-ports2">public DCC servers can ignore requests</A>.
+<P>
+If you run a DCC server, open incoming connections to local TCP port 6277
+from your flooding peers,
+and outgoing connections to TCP port 6277 on your flooding peers.
+Also open UDP port 6277 to your DCC clients
+(systems using <A HREF="dccproc.html">dccproc</A>,
+<A HREF="dccifd.html">dccifd</A>,
+or
+<A HREF="dccm.html">dccm</A> to filter mail) and to
+dcc-status.rhyolite.com for the DCC server status web page.
+<P>
+See also the discussion of Cisco ACLs at
+<A HREF="https://www.dcc-servers.net/dcc/firewall.html">https://www.dcc-servers.net/dcc/firewall.html</A>.
+<P>
+TCP and UDP port 6276 is by the
+<A HREF="https://www.dcc-servers.net/dcc/greylist.html">greylisting</A>
+mechanism in dccifd and dccm very much like port 6277.
+TCP 6276 is used for flooding greylist data among your greylist database
+servers, if you have more than one.
+UDP port is used by dccm and dccifd for database operations similar
+to DCC operations.
+
+
+
+<P><DT><A NAME="cleaning1">
+Why does the</A> <A HREF="dccd.html#FILE-dcc_db">dccd database</A>
+grow without bound?
+<DD><A HREF="dbclean.html">Dbclean</A> should be run every night when the
+system is least busy
+with the <A HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A>
+script.
+An entry like <A HREF="misc/crontab">misc/crontab</A> should be put into
+the crontab file for the user that runs <A HREF="dccd.html">dccd</A>.
+
+
+<P><DT><A NAME="cleaning2">
+The dccd database is corrupt.  What should I do?</A>
+<DD><A HREF="dbclean.html#OPTION-R">Dbclean&nbsp;-R</A>
+will usually repair a broken
+DCC server database.
+However,
+if your server is "flooding" or exchanging checksums with other servers,
+it is often quicker to stop the DCC server,
+delete the
+<A HREF="dccd.html#FILE-dcc_db">@prefix@/dcc_db</A> and
+<A HREF="dccd.html#FILE-dcc_db.hash">@prefix@/dcc_db.hash</A> files
+and restart <A HREF="dccd.html">dccd</A> with the
+<A HREF="misc/start-dccd">@libexecdir@/start-dccd</A> script.
+When dccd starts, it will notice that the database has been purged
+and ask its flooding peers to rewind and retransmit their checksums of
+bulk mail.
+
+
+<P><DT><A NAME="cleaning3">
+How can I stop the log directories from overflowing?</A>
+<DD>
+Global <A HREF="dccm.html#OPTION-l">dccm</A>
+or <A HREF="dccifd.html#OPTION-l">dccifd</A>
+logging can be entirely
+disabled by setting DCCM_LOGDIR="" or DCCIFD_LOGDIR="" in the
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file in the DCC home directory.
+Logging for individual users can be disabled by not creating or deleting
+thir log directories.
+However, this not only disables logging of rejected mail, but also logging
+of mail that suffered system failures.
+<P>
+To delete old log files, run the
+<A HREF="misc/cron-dccd">@libexecdir@/cron-dccd</A> script
+daily with an entry like <A HREF="misc/crontab">misc/crontab</A>
+in the crontab file for the user that runs <A HREF="dccd.html">dccd</A>
+or <A HREF="dccd.html">dccd</A>.
+The DBCLEAN_LOGDAYS parameter in the
+<A HREF="homedir/dcc_conf">@libexecdir@/dcc_conf</A> file in the
+DCC home directory specifies the age of old log files.
+
+
+<P><DT><A NAME="bad-locks">
+Why do my DCC clients including</A>
+<A HREF="cdcc.html">cdcc</A> and <A HREF="dccproc.html">dccproc</A>
+complain about "Resource temporarily unavailable"?
+<DD>
+Perhaps your operating system has bugs in its implementation of
+<CODE>fcntl</CODE> file locking, particularly for the
+DCC client <A HREF="cdcc.html#FILE-map">map</A> file when it is on
+an NFS file system.
+<P>
+Another common case is using an editor such as some versions of <EM>vi</EM>
+that locks files on the main or a per-user
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file,
+
+
+<P><DT><A NAME="maxprocs">
+Why does dccifd or dccm complain about
+<Q lang="en-us">thread_create() failed: 11, try again</Q>?
+or <Q lang="en-us">pthread_create(): Cannot allocate memory</Q>?</A>
+<DD>
+The most common cause of
+<Q lang="en-us">thread_create() failed: 11, try again</Q>
+or <Q lang="en-us">pthread_create(): Cannot allocate memory</Q>
+error messages from <A HREF="dccm.html">dccm</A>
+and <A HREF="dccifd.html">dccifd</A>
+is a too small limit on the maximum number of processes allowed
+the UID running the dccm or dccifd process.
+The "maxproc" limit seen with the `limit` or `limits` shell command
+should be a dozen or so larger than the sum of
+the queue sizes of dccm or dccifd (or both if both are running).
+<P>
+See also the common question and answer about
+<A HREF="#max-work">too many simultaneous mail messages</A>.
+
+
+<P><DT><A NAME="max-work">
+Why does dccm or dccifd complain about
+<Q lang="en-us">too many simultaneous mail messages</Q>?</A>
+<DD>
+Dccm or dccifd can fail to create a thread to deal with an incoming
+mail message if there are no available file descriptors or
+other resources.
+Adding <EM>-d</EM> to DCCD_ARGS or DCCIFD_ARGS in
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> in the DCC home directory
+sends a message to the system log that includes the limit on simultaneous mail
+messages and its source, such as a process resource limit on the
+number of file descriptors.
+<P>
+Another common limit is the maximum number of file descriptors
+allowed by the <EM>select</EM> system call.
+This limit can be escaped by building the sendmail milter library to
+use the <EM>poll</EM> system call.
+
+
+
+
+<P><DT><A NAME="server-pick">
+Why doesn't my DCC client pick my local DCC server?</A>
+<DD>
+The DCC clients including <A HREF="dccm.html">dccm</A>
+and <A HREF="dccproc.html">dccproc</A> pick the nearest and fastest
+server in the list kept in the <A HREF="cdcc.html#FILE-map">@prefix@/map</A>
+file.
+DCC servers not in that list will not be used.
+That list can be viewed with the
+<A HREF="cdcc.html#OPERATION-info">cdcc&nbsp;info</A>
+or
+<A HREF="cdcc.html#OPERATION-RTT">cdcc&nbsp;RTT</A> operations.
+Add to the list with
+<A HREF="cdcc.html#OPERATION-add">cdcc&nbsp;add</A>
+or <A HREF="cdcc.html#OPERATION-load">cdcc&nbsp;load</A>.
+<P>
+A nearby server that seems slower than a more distant server will
+not be chosen.
+The anonymous user delay set with <A HREF="dccd.html#OPTION-u">dccd&nbsp;-u</A>
+is intended to make a server appear slow to "freeloaders."
+The "RTT +/-" value that can be used with
+the <A HREF="cdcc.html#OPERATION-add">cdcc&nbsp;add</A>
+and <A HREF="cdcc.html#OPERATION-load">cdcc&nbsp;load</A>
+operations can be used to force DCC clients to prefer or avoid servers
+except when absolutely necessary.
+
+
+
+<P><DT><A NAME="IDs1">
+If I have a server-ID, do I need a DCC client-ID, or vice versa?</A>
+<DD>
+DCC <A HREF="dcc.html#Client-and-Server-IDs">server and client-IDs</A>
+serve distinct purposes.
+Servers require server-IDs to identify each other in the floods of checksums
+they exchange and to recognize authorized users of powerful
+cdcc operations such as <A HREF="cdcc.html#OPERATION-stop">stop</A>.
+DCC servers require client-IDs to identify paying clients that should
+be given quicker service that anonymous clients, to refuse reports from
+anonymous clients, or to refuse even to answer queries from anonymous
+clients.
+
+
+<P><DT><A NAME="IDs2">
+Why does my DCC server complain about
+"rejected server-IDs" among flooded checksum reports?</A>
+<DD>
+You have turned on IDS tracing, but do not have a
+<A HREF="dccd.html#FILE-ids">@prefix@/ids</A> file that is complete.
+You don't need and probably will not have a complete file unless you
+are assigning DCC server-IDs.
+<P>Redundant paths among DCC servers exchanging
+or flooding reports of checksums would cause duplicate entries in
+each server's database without the mechanism that depends on every DCC server 
+having a unique server-ID.
+With IDS tracing enabled, <A HREF="dccd.html#OPTION-T">dccd</A> complains
+about server-IDs that are not listed in the local
+<A HREF="dccd.html#FILE-ids">@prefix@/ids</A> file.
+
+<P><DT><A NAME="server-rate-limits">
+Why does my DCC server refuse to accept more than
+50 operations per second?</A>
+<DD>
+A common cause of such problems is one of the DCC server's
+defenses against denial of service attacks.
+A DCC server cannot know anything about anonymous clients,
+or clients using client-ID 1 or without a client-ID and matching password
+from the <A HREF="dccd.html#FILE-ids">@prefix@/ids</A> file.
+As far as your server can know, an anonymous client sending many
+operations is run by an unhappy sender of unsolicited bulk mail trying
+to flood your server with a denial of service attack.
+It is easy to tell your client its ID with the
+<A HREF="cdcc.html#OPERATION-add">cdcc add</A>
+or <A HREF="cdcc.html#OPERATION-load">load</A> operations.
+<P>
+The default limits can changed by
+adding an <A HREF="dccd.html#OPTION-R">dccd&nbsp;-R</A> argument
+can be added to DCCD_ARGS in the
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file in the DCC home directory,
+
+
+<P><DT><A NAME="private-server">
+How do I keep strangers from using my DCC server?</A>
+<DD>
+See the <A HREF="dccd.html#OPTION-u">dccd&nbsp;-u</A> option.
+
+
+<P><DT><A NAME="dccm-log1">
+How can I determine why</A> <A HREF="dccm.html">dccm</A> reported
+a message as spam or with a recipient count of "MANY"?
+<DD>
+Dccm is usually configured to log mail with recipient counts greater
+than the <A HREF="dccm.html#OPTION-t">-t&nbsp;,log-thold,</A>
+as well as mail with some conflicts among
+<A HREF="dcc.html#White-and-Blacklists">whitelist</A> entries.
+Each log file contains a single message, its checksums, its disposition,
+and other information as described in the
+<A HREF="dccm.html#FILE-logdir">dccm man page</A>.
+<P>
+See also the <A HREF="dblist.html#OPTION-C">dblist&nbsp;-C</A> command.
+
+
+<P><DT><A NAME="dblist1">
+How can I see what checksums my server has heard from its clients?</A>
+<DD>
+The <A HREF="dblist.html#OPTION-v">dblist&nbsp;-Hv</A>
+command displays the contents of the database.
+Look for records with your
+<A HREF="dcc.html#Client-and-Server-IDs">server-ID</A>
+with <A HREF="dblist.html#OPTION-I">dblist&nbsp;-I</A>.
+
+
+<P><DT><A NAME="whitelist13">
+How do I stop DCC false positives?</A>
+<DD>
+You are probably not seeing false positives.
+The Distributed Checksum Clearing Houses detect both solicited
+and unsolicited bulk mail, while spam is only unsolicited bulk email.
+For your DCC client, <A HREF="dccm.html">dccm</A>,
+<A HREF="dccifd.html">dccifd</A>, or
+<A HREF="dccproc.html">dccproc</A>, to know to ignore bulk mail messages
+that are solicited, it must be told by entries the main or a per-user
+<A HREF="homedir/whiteclnt">whiteclnt</A> whitelist file.
+<P>
+The DCC source includes
+<A HREF="cgi-bin/">proof-of-concept cgi scripts</A>
+for web pages supporting point-and-click white- and blacklisting.
+See the <A HREF="cgi-bin/README">@cgibin@/README</A> file.
+There is also a
+<A HREF="https://www.rhyolite.com/dcc/#cgi-demo">demonstration</A>
+of the cgi scripts.
+
+
+<P><DT><A NAME="whitelist1">
+Why is mail from my favorite mailing list marked with an
+<I>X-DCC</I> header line that says it is spam?</A>
+<DD>
+Sources of solicited bulk mail including mailing lists to which
+you have subscribed should usually be in your DCC client
+<A HREF="dcc.html#White-and-Blacklists">whitelist</A>
+so that they receive no <I>X-DCC</I> header lines.
+
+
+<P><DT><A NAME="whitelist11">
+Why are acknowledgments of spam reports mistakenly marked as spam by DCC?</A>
+<DD>
+There is probably no mistake.
+DCC detect bulk mail and not only unsolicited bulk mail.
+Whether a bulk message is spam depends on whether you solicited or asked for it.
+Some INTERNET service providers have sent literally millions of
+acknowledgments of spam reports, which makes them bulk mail.
+Bulk mail you want to receive should be
+<A HREF="dcc.html#White-and-Blacklists">whitelisted</A>
+in your master
+<A HREF="homedir/whiteclnt">whiteclnt</A> file or a per-user whiteclnt file.
+
+
+<P><DT><A NAME="x-dcc-header1">
+Why are some checksums missing from my <I>X-DCC</I> header lines?</A>
+<DD>
+If the DCC client was not able to compute a checksum for a message,
+it will not ask the server about that checksum and the checksum will
+not appear in the <I>X-DCC</I> header.
+For example, if <A HREF="dccproc.html">dccproc</A> is not told and
+cannot figure out the IP address of the source of the message,
+that checksum will be missing.
+The <I>Fuz1</I> and <I>Fuz2</I> checksums cannot be computed for
+messages that are too small, and so will be missing for them.
+A checksum will also be missing if the DCC server is configured to not count
+it.
+
+
+<P><DT>Do I need both server and client
+<A NAME="whitelist2" HREF="dcc.html#White-and-Blacklists">
+whitelists</A>?
+<DD>
+The server <A HREF="homedir/whitelist">@prefix@/whitelist</A> file
+used explicitly by <A HREF="dbclean.html#FILE-whitelist">dbclean</A>
+and implicitly by <A HREF="dccd.html#FILE-whitelist">dccd</A>
+is not very useful.
+<P>
+The <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> client whitelist file
+used by
+<A HREF="dccproc.html#FILE-whiteclnt">dccproc</A>,
+<A HREF="dccm.html#FILE-whiteclnt">dccm</A>,
+and
+<A HREF="dccifd.html#FILE-whiteclnt">dccifd</A>
+are generally required.
+Client whitelists apply only to the stream of mail handled by the
+DCC client,
+while server whitelists apply to reports of mail from all DCC clients
+of the DCC server.
+<P>
+<A HREF="dccproc.html">Dccproc</A> is intended for use by individual users
+with programs such as
+<A HREF="http://www.procmail.org/">procmail</A>.
+Because the global whiteclnt file usually found in the DCC home directory
+is as likely to be used as a private file,
+the file name must be explicitly specified with
+<A HREF="dccproc.html#OPTION-w">dccproc&nbsp;-w&nbsp;whiteclnt</A>.
+A perhaps inconvenient implication is programs such as
+<A rel=nofollow HREF="https://spamassassin.apache.org/">SpamAssassin</A> that
+switch unpredictably between dccproc and <A HREF=dccifd.html>dccifd</A>
+might get inconsistent results unless they invoke dccproc with the global
+whiteclnt file.
+
+
+<P><DT><A NAME="whitelist9"></A>
+How do I maintain client
+<A HREF="dcc.html#White-and-Blacklists">whitelists</A>?
+<DD>
+Start by monitoring bulk mail in the
+global log directories specified with
+<A HREF="dccproc.html#OPTION-l">dccproc&nbsp;-l</A>
+and with DCCM_LOGDIR and DCCM_USERDIRS in the
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file
+for <A HREF="dccm.html#OPTION-l">dccm</A>,
+and
+<A HREF="dccifd.html#OPTION-U">dccifd</A>.
+Then add entries to whitelist files.
+<P>
+The global
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file
+and the whitelists specified with
+<A HREF="dccproc.html#OPTION-w">dccproc&nbsp;-w</A> are maintained
+with ordinary text editors.
+<P>
+Per-user whitelists in whiteclnt files
+specified with DCCM_USERDIRS in the
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A> file
+are easily maintained with ordinary text editors by the system administrator.
+However, it is often better to let individual users deal with their
+own whitelists.
+The DCC source includes sample CGI scripts
+in the <A HREF="cgi-bin/">@cgibin@</A> directory
+to let individual end-users monitor their private logs of bulk mail
+and their individual whitelists.
+See the <A HREF="cgi-bin/README">@cgibin@/README</A> file.
+There is also a
+<A HREF="https://www.rhyolite.com/dcc/#cgi-demo">demonstration</A>
+of the cgi scripts.
+
+
+<P><DT><A NAME="whitelist3"></A>
+When the <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> whitelist file
+used by <A HREF="dccm.html#FILE-whiteclnt">dccm</A>,
+<A HREF="dccd.html#FILE-whitelist">dccd</A>,
+or <A HREF="dccifd.html#FILE-whiteclnt">dccifd</A>
+is changed,
+what must be done to tell the software about the change?
+<DD>
+The DCC clients notice when their whiteclnt files
+as well as included files change and automatically rebuild the corresponding
+<A HREF="dccm.html#FILE-whiteclnt.dccw">.dccw hash table</A> files.
+<P>
+Changes to the DCC server or dccd
+<A HREF="dccd.html#FILE-whitelist">whitelist</A>
+are not effective until after <A HREF="dbclean.html">dbclean</A> is run.
+<P>
+Some text editors including versions of <EM>vi</EM> lock their files.
+<A HREF="dccm.html#FILE-whiteclnt">Dccm</A>,
+<A HREF="dccproc.html#FILE-whiteclnt">dccproc</A>,
+and <A HREF="dccifd.html#FILE-whiteclnt">dccifd</A>
+are unable to read whitelist files while they are locked.
+
+
+<P><DT><A NAME="whitelist14">
+How do I test a whiteclnt file?</A>
+<DD>
+An easy way to test a DCC client whitelist or
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file
+is to feed dccproc with a test message.
+For example, the following shell script would test whether the IP address
+127.0.0.1
+and the SMPT envelope Mail_From value postmaster@example.com are in the
+<EM>whiteclnt</EM> file in the DCC home directory:
+<PRE>
+	#!/bin/sh
+	/usr/local/bin/dccproc -QCw whiteclnt \
+		-a 127.0.0.1 -f postmaster@example.com &lt;&lt;EOF
+	Message-ID: <1234@example.com>
+
+	text
+	EOF
+</PRE>
+If the script produces something like
+<PRE>
+	X-DCC--Metrics: calcite.rhyolite.com; whitelist
+			    reported: 0		      checksum	       wlist
+		       IP: e475b896 492c60fc efecb432 6e29e3c5		  ok
+		 env_From: bef98dc1 cc6ea4d7 b8daf07c a2bfbc9e
+	       Message-ID: 26573398 2ab927cd 681a89fa e502496d
+</PRE>
+then you know that SMTP client IP (mail sender) IP address 127.0.0.1
+is whitelisted, but the SMTP envelope Mail_From value is not.
+
+
+<P><DT>
+Can I use wild cards or regular expressions in DCC
+<A NAME="reg-exps1" HREF="dcc.html#White-and-Blacklists">
+whitelists</A>?
+<DD>
+No, regular expressions cannot be used,
+because DCC client and server whitelists are converted to lists of checksums.
+The same basic idea is used for DCC client whitelists
+as for the DCC protocol.
+A DCC client computes the checksums for a message, and then looks
+for those checksums in the local whitelist.
+Depending on the values associated with those checksums,
+the DCC client asks a DCC server about them.
+<P>
+To use regular expressions with the DCC, consider procmail.
+Procmail is included with many UNIX-like systems.
+See also the
+<A HREF="http://www.procmail.org/">Procmail Homepage</A>.
+<P>
+DCC clients can be configured to white- or blacklist
+using called "substitute" headers.
+See <A HREF="dccproc.html#OPTION-S">dccproc&nbsp;-S</A> or
+<A HREF="dccm.html#OPTION-S">dccm&nbsp;-S</A>.
+<P>
+It is also possible to use a sendmail access_db file entries to
+white- or blacklist based on portions of SMTP envelope and
+client IP addresses.
+For example, an access_db file line of "From:example.com OK"
+can be used to tell dccm to whitelist all mail from SMTP clients
+in the example.com domain.
+See the -O argument to the
+<A HREF="misc/hackmc">@libexecdir@/hackmc</A> script.
+<P>
+It is generally better to use white- and blacklisting lines in
+the global <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file
+or a per-user whiteclnt file.
+See the <A HREF="dcc.html#White-and-Blacklists">main DCC man page</A>
+
+
+<P><DT>
+<A NAME="whitelist10">How do I whitelist mail from a legitimate
+bulk mailer using its name or SMTP headers such as Mailing-List
+headers?</A>
+<DD>
+Start by determining an envelope value or SMTP header that distinguishes
+the bulk mail from a sample message or DCC log file.
+The name of the sending computer is the <EM>mail_host</EM> value in
+<A HREF="dccm.html#FILE-logdir">dccm log files</A>.
+If the distinguishing header or envelope value is not among the main
+<A HREF="dcc.html#White-and-Blacklists">DCC whitelist values</A>,
+then a "substitute" value must be used.
+An "ok substitute ..." line must be added to the whitelist file
+and the DCC client program must be told with
+<A HREF="dccproc.html#OPTION-S">dccproc&nbsp;-S</A> or
+<A HREF="dccm.html#OPTION-S">dccm&nbsp;-S</A>.
+There are example whitelist entries in the sample
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file.
+<P>
+
+<P><DT><A NAME="incompat-whitelists">
+Why does dccm or dccifd complain about "incompatible whitelists"?</A>
+<DD>
+There are several points during an SMTP transaction when an SMTP server
+can reject a mail message.
+Early points are when the SMTP client specifies the recipients of the
+mail message.
+The last point is after the entire message has been received by the SMTP
+server.
+Spam filters that check mail message bodies must wait until that last point.
+The SMTP protocol does not allow an SMTP server to reject the
+mail message for only some recipients.
+The SMTP server must tell the SMTP client that the message has been
+accepted for all or rejected for recipients.
+This is a problem when the recipients of a single mail message have
+differing
+<A HREF="dcc.html#White-and-Blacklists">DCC thresholds or other parameters</A>
+in their individual whitelist files
+that require that the mail message be delivered to some mailboxes but
+rejected for other mailboxes.
+<P>
+The DCC client programs solve this conflict in one of two ways.
+One is telling the SMTP client
+that the mail message has been accepted for all recipients and then
+discarding instead of delivering the message for mailboxes with parameters
+that make it spam.
+This solution has the disadvantage of not informing senders of the
+refusal to deliver the message.
+The other solution is to temporarily reject recipients with possibly
+incompatible parameters early in the SMTP transaction with the same
+SMTP error status number as too many recipients for a single SMTP transaction.
+This second solution has the advantage of ensuring that senders know
+when their mail is rejected but the disadvantage of sometimes
+requiring as many SMTP transactions as there are recipients for a mail message.
+<P>
+Which solution is used is determined by the
+<A HREF="dcc.html#White-and-Blacklists">forced-discard-ok</A>
+and <A HREF="dcc.html#White-and-Blacklists">forced-discard-nok</A>
+settings in the global and per-user
+<A HREF="dccm.html#FILE-whiteclnt">whiteclnt</A> files.
+Unless all recipients for a mail message agree on the first solution,
+perhaps by <EM>forced-discard-ok</EM> in the main
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file,
+the second solution is used.
+
+
+<P><DT><A NAME="whitelist4">
+Why do legitimate mail messages have
+<I>X-DCC</I> header lines that say they are "bulk", "many", or spam?</A>
+<DD>
+There are several possible causes of such problems.
+The first and most obvious is that the mail is solicited bulk mail
+and that the source needs to be added to your
+<A HREF="dcc.html#White-and-Blacklists">whitelist</A>.
+
+<P>Another possible reason is that your individual legitimate mail messages
+have not been marked as spam because their <I>Body</I> or <I>Fuz1</I>
+checksum counts are small, but that the IP address or other checksum
+counts are large.
+The IP address checksum count, for example, is the total of all reports
+of addressees for that checksum.
+That total is independent of the other checksums, and so counts
+all reports for all messages with that source IP address.
+A source of legitimate mail that has sent a message that was reported
+as spam by one of its recipients will often have the totals
+for the checksums of its IP address, From header, and
+other values be <I>MANY</I>.
+This is why it usually does not make sense to reject mail based on what the
+DCC server reports for the IP address, From header, and other values that
+are not unique to the message.
+Only the last Received header line, the Message-ID line, and body checksums
+can be expected to be unique and sometimes not the Message-ID
+and Received header lines.
+
+<P><DT><A NAME="qmail2">
+Why is legitimate mail from someone using <I>qmail</I>
+marked as spam?</A>
+<DD>
+A common cause for that and similar complaints involves
+null or missing Message-ID header lines.
+Spam often lacks Message-ID lines or has a null or "&lt&gt" ID,
+so rejecting mail with null or missing Message-IDs can be an
+effective filter.
+DCC clients treat missing Message-ID lines as if they were present but null.
+The sample <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A>
+<A HREF="dcc.html#White-and-Blacklists">whitelist</A> file in the DCC source
+includes the line:
+<PRE>
+	many    message-id &lt;&gt;
+</PRE>
+Some Mail Transfer Agents violate section 3.6.4 of RFC 2822 and
+do not include Message-ID header lines in mail they send,
+including some combinations of qmail and
+"<B>sendmail&nbsp;-bs</B>" acting as the originating MTA,
+and qmail by itself when it is generates a non-delivery message or "bounce."
+Solutions to this problem include removing that line from your
+<A HREF="dcc.html#White-and-Blacklists">whitelists</A>
+or adding lines specifying the From or envelope
+from values of senders of legitimate mail lacking Message-ID header lines.
+
+
+<P><DT><A NAME="whitelist5"></A>
+Are <A HREF="dcc.html#White-and-Blacklists">IP address blocks</A>
+in <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> whitelists used by
+<A HREF="dccproc.html">dccproc</A>?
+<DD>
+Yes, <A HREF="dccproc.html">dccproc</A> can whitelist mail
+by the IP address of the immediately
+preceding SMTP client,
+but only if it knows that IP address.
+Unless the <A HREF="dccproc.html#OPTION-a">dccproc&nbsp;-a</A>
+or <A HREF="dccproc.html#OPTION-R">dccproc&nbsp;-R</A>
+options are used, dccproc does not know the IP address.
+
+
+<P><DT><A NAME="whitelist6">
+Why is</A> <A HREF="dccproc.html">dccproc</A> is ignoring
+<A HREF="dcc.html#White-and-Blacklists"><I>env_from</I> whitelist</A>
+entries?
+<DD>
+DCC checksums are of the entire header line or envelope value.
+An entry in the whitelist file for <I>jsmith@example.com</I>
+will have no effect on mail with an envelope value of
+<I>"J.Smith"&nbsp;jsmith@example.com</I>.
+The file must contain <I>"J.Smith"&nbsp;jsmith@example.com</I>.
+<P>
+Another common cause for this problem is implied by the fact that
+for an <I>env_from</I> whitelist entry
+to have any effect, dccproc must be able to find the envelope value
+in the message in a <I>Return-Path</I> header,
+an old UNIX-style <I>From_</I> header, or an <B>-f</B> argument.
+If your mail delivery agent does not add a <I>Return-Path</I> header
+and you do not use
+<A HREF="dccproc.html#OPTION-f">dccproc&nbsp;-f</A>,
+then dccproc cannot know about
+white or blacklist entries for envelope return addresses.
+<P>
+Note also that dccproc has no whitelist by default and
+that <A HREF="dccproc.html#OPTION-w">dccproc&nbsp;-w</A>
+must be used.
+
+
+<P><DT><A NAME="delck">
+What if I make a mistake with</A>
+<A HREF="dccproc.html#OPTION-t">dccproc&nbsp;-t&nbsp;many</A>
+and report legitimate mail as spam?
+<DD>
+It is possible to delete checksums from the distributed DCC
+database with the <A HREF="cdcc.html#OPERATION-delck-type-hex1-hex2-hex3-hex4">
+cdcc&nbsp;delck</A>
+operation.
+However, it is not worth the trouble.
+Unless the same (as far as the fuzzy checksums are concerned) message
+is sent again, no one is likely to notice the mistake before the
+report of the message's checksums expire from the DCC servers'
+databases for lack of repetition.
+
+
+<P><DT><A NAME="whitelist8">
+Can the sendmail "spamfriend" mechanism tell</A>
+<A HREF="dccm.html">dccm</A> to not check mail sent to some addresses?
+<DD>
+Sendmail decisions to accept, reject, or discard mail are largely
+independent of the decisions made by dccm.
+The DCC equivalent is to add
+<A HREF="dcc.html#White-and-Blacklists">env_to</A> entries to the
+<A HREF="dccm.html#FILE-whiteclnt">dccm whitelist</A>.
+See the sample <A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file in the
+DCC source
+<P>
+However, if your sendmail.cf file sets the
+<I>dcc_notspam</I> macro while processing the
+envelope, then the message will by whitelisted.
+This is related to the <I>dcc_isspam</I> macro
+used by sendmail.cf modified by
+<A HREF="misc/hackmc">@libexecdir@/hackmc&nbsp;-R</A>
+to tell dccm to report blacklisted messages as spam to the DCC server.
+
+
+<P><DT><A NAME="whitelist12">
+How do I tell</A> <A HREF="dccm.html">dccm</A> and sendmail
+to not check mail for an entire domain?
+<DD>
+To whitelist all mail addressed to mailboxes in a local domain name,
+first modify sendmail.cf with the
+<A HREF="misc/hackmc">@libexecdir@/hackmc&nbsp;-O</A> script.
+Then add the following line to the sendmail access_DB file and rebuild
+the database with the sendmail tool, <I>makemap</I>:
+<PRE>
+	To:domain.com       DCC:OK
+</PRE>
+<P>
+You can apply finer control by adding
+a third argument to the FEATURE(dcc) macro in your sendmail.mc file
+as described in
+<A HREF="misc/dcc.m4">misc/dcc.m4</A>.
+All mail for the domain can use a single "per-user"
+<A HREF="homedir/whiteclnt">whiteclnt</A> file,
+often in the @prefix@/userdirs/esmtp/example.com, where @prefix@/userdirs
+is the default value for <EM>DCCM_USERDIRS</EM> in the DCC configuration file
+<A HREF="homedir/dcc_conf">@prefix@/dcc_conf</A>.
+Making @prefix@/userdirs/esmtp a symbolic link to @prefix@/userdir/local
+can be useful.
+<P>
+To whitelist all mail sent <I>from</I> a domain,
+add a line like the following to the global
+<A HREF="homedir/whiteclnt">@prefix@/whiteclnt</A> file
+or a per-user whiteclnt file:
+<PRE>
+OK      substitute mail_host   example.com
+</PRE>
+<P>
+See the <A HREF="dcc.html#White-and-Blacklists">DCC man page</A>.
+
+
+
+<P><DT><A NAME="false-positives">
+How can I avoid polluting databases of DCC servers with
+checksums of my mail that is not spam?</A>
+<DD>
+Reports of checksums with
+<A HREF="dcc.html#White-and-Blacklists">whitelist</A>
+entries in your server's database are not flooded to its peers.
+The checksums of messages whitelisted with entries in local
+<A HREF="dccm.html">dccm</A> or <A HREF="dccproc.html">dccproc</A>
+whitelists are not reported to DCC servers.
+It is good to add entries to DCC server and client
+<A HREF="dcc.html#White-and-Blacklists">whitelists</A>
+for localhost, your IP address blocks, and your domains if
+you know that none of your users will ever send spam.
+<P>
+However, in the common mode in which the DCC is used, no
+checksums of mail are pollution.
+Checksums of genuinely private mail will have target counts of
+1 or a small number, and so will not be flooded by your server to
+other servers.
+Strangers will not see your private mail and so will not be able
+to ask any DCC server about the checksums of your private mail.
+On the other hand, the DCC functions best by collecting reports
+of the receipt of bulk mail as soon as possible.
+That implies that it is generally desirable
+to send reports of all mail to a DCC server.
+The DCC flooding protocol does not send checksums with counts
+below 10 <!--fix if BULK_THRESHOLD changes-->
+to other servers.
+
+
+<P><DT><A NAME="spamtrap">
+Can DCC be fed with <Q lang="en-us">spam traps</Q>?</A>
+<DD>
+A spam trap is a mail address that should practically
+never receive legitimate mail,
+and that treats any mail that it does receive as spam.
+A spam trap might be a common name such as
+<Q lang="en-us">user1</Q> that has never been valid
+and is discovered by unsolicited bulk email
+advertisers by <Q lang="en-us">dictionary attacks</Q> or guessing.
+It might instead be an address hidden in a web page
+or a mailbox of an account that has been disabled for many months.
+<P>
+Any spam trap might receive legitimate mail.
+For example, a spam trap that differs from an ordinary mailbox by a
+single character might receive mail intended for the ordinary mailbox.
+It might be best for a system to reject mail sent to such a trap so
+that legitimate mail senders know that their messages have gone astray.
+A mailbox that is a long string of arbitrary letters and digits is much
+less likely to receive legitimate messages and so might best accept
+all messages without complaint.
+<P>
+There are several ways to connect
+<Q lang="en-us">spam trap</Q> mailboxes to DCC:
+<DL>
+<DT><A HREF="dccproc.html">dccproc</A>
+<DD>
+For example,
+<PRE>dccproc -R -tMANY -cCMN,MANY -o/dev/null</PRE>
+will accept a message on STDIN,
+look for the IP address of the sender among
+<Q lang="en-us">Received:</Q> SMTP fields,
+reports the message to the DCC server as spam and the IP address as the sender,
+and exit with the default value of
+<A HREF="dccproc.html#OPTION-x">dccproc&nbsp;-x</A>.
+<P>
+<DT><A HREF="dccifd/dccif-test/dccif-test.c">dccif-test</A>
+<DD>
+dccif-test was written to test the interface to the DCC interface daemon,
+<A HREF="dccifd.html">dccifd</A>.
+When wired to a spam trap, it is more efficient than dccproc.
+For example,
+<PRE>dccif-test -cclnt-IP-addr -oSPAM -O/dev/null</PRE>
+will do much the same as the dccproc example above.
+<P>
+<DT><A HREF="dcc.html#White-and-Blacklists">whiteclnt file</A> option line
+<DD>
+The best way to build a spam trap is with a
+per-user <A HREF="dccm.html#OPTION-w">whiteclnt file</A>
+with an
+<EM>option spam-trap-accept</EM> or <EM>option spam-trap-reject</EM>
+line.
+<P>
+With sendmail, virtual user mapping can be used to send mail to invalid
+mailboxes to a single mailbox whose corresponding DCC per-user
+whiteclnt file contains an
+<EM>option spam-trap-accept</EM> or <EM>option spam-trap-reject</EM>
+line.
+</DL>
+
+
+<P><DT><A NAME="flood3">
+How many flooding peers does my DCC server need?</A>
+<DD>
+A single flooding peer delivers all reports of checksums of bulk
+mail seen by any DCC server.  Additional peers provided reports
+sooner and so help the clients of a peer detect spews of spam sooner.
+However, more peers will cause more reports to be duplicates.
+<P>
+A DCC server in a network of many servers should have at least three
+flooding peers to ensure that the failure of a single server or network
+link cannot partition the network.
+Limiting the number the number of peers of any server to four or perhaps
+a few more ensures that no single server is critical to the network.
+To minimize the distances in the network, four peers
+per server seem necessary.
+<P>
+An organization with more than one server can be viewed as a single
+server by other organizations, with its servers flooding each other
+and external peers spread among its servers.
+This protects the network should the organization suffer large scale problems
+while protecting the organization from single points of failure.
+
+
+<P><DT><A NAME="flood1">
+Do I need to tell the operators of other DCC servers
+the password for controlling my server to turn on flooding?</A>
+<DD>
+No, you do not need to and generally should not tell other DCC server
+operators the passwords for controlling your server with
+the <A HREF="cdcc.html">cdcc</A> command.
+Every Inter-server flood of checksums is authorized by lines in
+each server's <A HREF="dccd.html#FILE-flod">@prefix@/flod</A> file
+and authenticated by the password associated with the
+<A HREF="dccd.html#FILE-flod">passwd-ID</A> in those lines.
+The passwd-ID is a <A HREF="dcc.html#Client-and-Server-IDs">server-ID</A>
+defined in the <A HREF="dccd.html#FILE-ids">@prefix@/ids</A> file
+that should generally be used only to authenticate floods of checksums.
+
+
+<P><DT><A NAME="flood2">
+How can I figure out why flooding is not working?</A>
+<DD>
+Many DCC server problems can be diagnosed by turning
+on one or more of the tracing modes in the server with the
+<A HREF="cdcc.html#OPERATION-trace">cdcc&nbsp;trace</A> operation
+or by restarting the server with
+<A HREF="dccd.html#OPTION-T">dccd&nbsp;-T</A>.
+<P>
+The <A HREF="cdcc.html#OPERATION-flood-list">cdcc flood list</A>
+operation displays the current flooding peers of a DCC server.
+Counts of checksum reports sent and received to and from
+a single peer can be displayed with
+<A HREF="cdcc.html#OPERATION-flood-stats">cdcc&nbsp;"flood stats ID"</A>
+<P>
+The positions in the local database of outgoing streams of checksums
+are displayed by the start of <A HREF="dblist.html">dblist&nbsp;-Hv</A>.
+
+
+<P><DT><A NAME="nagios">
+How do I monitor my DCC clients and servers?  Is there a nagios plugin?</A>
+<DD>
+The DCC source includes a shell script
+<A HREF="misc/dcc-nagios">@libexecdir@/dcc-nagios</A>
+that can be used as
+a <A HREF="http://www.nagios.org/">nagios</A> plugin.
+
+
+<P><DT><A NAME="rtt">
+Why didn't the RTT reported by the</A>
+<A HREF="cdcc.html#OPERATION-info">cdcc&nbsp;info</A> operation
+change when my network topology changed?
+<DD>
+The RTT or round trip time is an average value.
+Changes in network topology, server load, and so forth are not
+immediately reflected in the RTT to avoid switching DCC servers
+too frequently.
+
+
+<P><DT><A NAME="socks1">
+When my clients are configured to use SOCKS, they do not
+realize immediately when a server is down.</A>
+<DD>
+When configured to use SOCKS, DCC clients cannot "connect"
+to a server and so do not receive ICMP errors and must wait for
+timeouts to know the server is not answering.
+
+
+</DL>
+
+<P>
+<HR>
+<P class=small>
+This document describes DCC version 2.3.167.
+<A HREF="//www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</BODY>
+</HTML>
