@@ -1,0 +1,156 @@
+dblist(8)             Distributed Checksum Clearinghouse             dblist(8)
+
+NNAAMMEE
+     ddbblliisstt -- Database List Distributed Checksum Clearinghouse
+
+SSYYNNOOPPSSIISS
+     ddbblliisstt [--vvVVHHDD] [--GG _o_n | _o_f_f] [--hh _h_o_m_e_d_i_r]
+            [--CC _'_t_y_p_e _h_1 _h_2 _h_3 _h_4_'] [--II _s_e_r_v_e_r_-_I_D] [--AA _d_b_a_d_d_r] [--LL _p_a_t_h_l_e_n]
+            [--PP _p_a_g_e_s] [--TT _t_i_m_e_s_t_a_m_p] [_f_i_l_e_1 _f_i_l_e_2 _._._.]
+
+DDEESSCCRRIIPPTTIIOONN
+     DDbblliisstt lists the contents of a DCC database as it does some consistency
+     checking.
+
+     --vv   lists more of the database.  Additional information is produced with
+          additional --vv arguments.
+
+     --VV   displays the version of the DCC database lister.  Two or more --VV
+          options show the options with which it was built.
+
+     --HH   turns off the listing of the hash table as well as the analysis of
+          the hash table.  Determining the worst case and average lengths of
+          chains in the hash table can take a long time for a large database
+          on a small computer.
+
+     --DD   turns off the listing of the data or checksum records.
+
+     --GG _o_n
+          lists a greylist database.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.
+
+     --CC _'_t_y_p_e _h_1 _h_2 _h_3 _h_4_'
+          limits the listing to records containing that checksum or one of the
+          other checksums specified with --CC.  If the four hexadecimal values
+          _h_1 _h_2 _h_3 _h_4 are absent, records with the matching _t_y_p_e will be
+          listed.  If _t_y_p_e is absent, any checksum with the four hexadecimal
+          values will be listed.  If the hexadecimal values _h_1 _h_2 _h_3 _h_4 are
+          absent, all checksums of the specified type will be listed.
+
+          The alternate form
+          _'_s_e_r_v_e_r_-_I_D _{_s_i_m_p_l_e_|_c_o_m_m_e_r_c_i_a_l_|_i_g_n_o_r_e_|_r_o_g_u_e_} _a_t _I_D_' can be used to
+          select _s_e_r_v_e_r_-_I_D records of some types.
+
+          As many as 16 checksums can be specified.
+
+     --II _s_e_r_v_e_r_-_I_D
+          limits the listing to records with that server-ID or one of the
+          other server-IDs specified with --II.  As many as 16 server-IDs can be
+          specified.
+
+     --AA _d_b_a_d_d_r
+          excludes database records before _d_b_a_d_d_r.
+
+     --LL _p_a_t_h_l_e_n
+          excludes records with path lengths shorter than _p_a_t_h_l_e_n.
+
+     --PP _p_a_g_e_s
+          ignores all but the last _p_a_g_e_s of the database.
+
+     --TT _t_i_m_e_t_a_m_p
+          excludes records with other timestamps.  A timestamp with a missing
+          microsecond value matches any record with that second.  As many as
+          16 timestamps can be specified.
+
+     _f_i_l_e_1 _f_i_l_e_2 _._._.
+          are names of databases to be listed.  The default is _/_v_a_r_/_d_c_c_/_d_c_c___d_b
+          and its companion, _/_v_a_r_/_d_c_c_/_d_c_c___d_b_._h_a_s_h.  When --GG _o_n is used, the
+          default files are _/_v_a_r_/_d_c_c_/_g_r_e_y___d_b and _/_v_a_r_/_d_c_c_/_g_r_e_y___d_b_._h_a_s_h.
+
+     By default, the sizes of the main file and the hash table as well as how
+     much they contain and values related to the performance of the hash are
+     displayed.
+
+     With a single --vv, most of the mail database file and the contents of mem-
+     ory mapped server flooding positions in the _/_v_a_r_/_d_c_c_/_f_l_o_d_._m_a_p file  are
+     listed.  The listing starts with the serial number of the database file
+     which is when old entries were last removed from it by dbclean(8) That is
+     followed by similar lines showing the oldest timestamp of checksums not
+     expired by dbclean and of mail that is not "spam."
+
+     The flooding positions from the _/_v_a_r_/_d_c_c_/_f_l_o_d_._m_a_p file are record offsets
+     or addresses in the main database file.
+
+     A typical record in the main database file looks like:
+
+       02/07/02 20:25:12.497032    5         1601              2fe5b94
+            path: 103<-101<-1601
+         Body      6       e2d3f96a c65aea01 3fece361 edff9ecf  2f21364 772d2
+         Fuz1      many    6ff56fe8 ffc312d7 a5fe8f13 12a537ae  2f21364 200a9
+         Fuz2      many    fac882b8 03eea34f bd792c40 2fe6fd54  2f21364 72816
+
+     That example was received by a DCC server with server-ID _1_6_0_1 at about
+     8:25 UTC on the evening of February 7, 2000.  The report was about a mail
+     message set to _5 addressees.  The report was then sent or `flooded' to
+     the server with server-ID _1_0_1 which in turn sent it to a server with
+     server-ID _1_0_3.  That server sent it to the local DCC server.  The record
+     is at the address _0_x_2_f_e_5_b_9_4 in the database.  The record contains 3
+     checksums.  The simple checksum of the body of the message was _0_x_e_2_d_3_f_9_6_a
+     _0_x_c_6_5_a_e_a_0_1 _0_x_3_f_e_c_e_3_6_1 _0_x_e_d_f_f_9_e_c_f The total number of recipients of mes-
+     sages with this body checksum known in the database is _6, which implies
+     this checksum had been previously reported with a target count of 1.  The
+     previous report in the database of a message with this body checksum is
+     at _0_x_2_f_2_1_3_6_4.  The hash table chain for this body checksum is computed to
+     start at _0_x_7_7_2_d_2.  This report included two fuzzy checksums.  Both have
+     been previously reported as having been sent to _m_a_n_y targets.
+
+     An asterisk (*) before the type of the checksum indicates that this
+     checksum is redundant.  A report of _m_a_n_y addressees makes all preceding
+     reports redundant.
+
+     The flooding of some database records is delayed, as shown by the string
+     _d_e_l_a_y_e_d after the server-ID.
+
+     The string _t_r_i_m_m_e_d after the server-ID marks older reports that have had
+     uninteresting checksums removed.  The string _c_o_m_p_r_e_s_s_e_d after the server-
+     ID would indicate that this older report has been trimmed and compressed
+     with older reports.
+
+     With two --vv arguments, records added to the database by dbclean(8) from
+     the server whitelist are also displayed.
+
+     Three --vv arguments cause the hash table to be displayed.  Three typical
+     hash table entries look like:
+
+             19b8:   19ee   19b7
+             19b9:   19c0      0    90120 Fuz1
+             19ba:      0      0  1b72300 Fuz1
+
+     The entry in slot number _0_x_1_9_b_8 is unused or free.  Slot number _0_x_1_9_b_9 is
+     the start of a chain of collisions or entries with the same hash value of
+     0x19b9.  The next slot in this chain is at _0_x_1_9_c_0.  The corresponding
+     _F_u_z_1 checksum is at _0_x_9_0_1_2 in the database.  The third slot at _0_x_1_9_b_a is
+     also that of a _F_u_z_1 checksum, but it is not part of a hash chain and its
+     database record is at _0_x_1_b_7_2_3_0_0.
+
+FFIILLEESS
+     @prefix@     is the DCC home directory containing data and control files.
+     dcc_db       main file of DCC checksums.
+     grey_dcc_db  main file of checksums used for greylisting.
+     dcc_db.hash  database hash table for _/_v_a_r_/_d_c_c_/_d_c_c___d_b.
+     grey_dcc_db.hash
+                  database hash table for _/_v_a_r_/_d_c_c_/_g_r_e_y___d_c_c.
+     flod.map
+     grey_flod.map
+                  memory mapped flooding positions.
+
+SSEEEE AALLSSOO
+     cdcc(8), dcc(8), dbclean(8), dccd(8), dccifd(8), dccm(8), dccproc(8).
+
+HHIISSTTOORRYY
+     Implementation of ddbblliisstt was started at Rhyolite Software, in 2000.  This
+     document describes version 2.3.167.
+
+                                 June 19, 2019

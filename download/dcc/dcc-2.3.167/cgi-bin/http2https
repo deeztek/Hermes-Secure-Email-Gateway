@@ -1,0 +1,99 @@
+#! /bin/sh
+
+# Redirect HTTP URLs to equivalent HTTPs when that seems to be the problem.
+#   Turn on this kludge with
+#	ErrorDocument 403 /cgi-bin/http2https
+#   after installing this script in your CGI-bin directory.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.9 $Revision$
+
+
+# This script is only intended for 403 errors
+if test "$REDIRECT_STATUS" != "403"; then
+    cat <<EOF
+Status: 500 Internal Server Error
+Content-type: text/html
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<HTML>
+<HEAD>
+<TITLE>500 Internal Server Error</TITLE>
+</HEAD>
+<BODY style="background-color:white;color:black">
+<H1>500 Internal Server Error</H1>
+Invalid use of http2https for $REDIRECT_STATUS.
+<P><HR>
+<ADDRESS>$SERVER_SIGNATURE</ADDRESS>
+</BODY>
+</HTML>
+EOF
+    exit
+fi
+
+
+# if things seem to be happening with SSL, pretend we're not here
+if test "$HTTPS" = "on" -o "$REDIRECT_HTTPS" = "on"; then
+    if test "$REDIRECT_ERROR_NOTES" = ""; then
+	REDIRECT_ERROR_NOTES="You don't have permission to access $REQUEST_URI on this server."
+    fi
+    cat <<EOF
+Status: 403 Forbidden
+Content-type: text/html
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<HTML>
+<HEAD>
+<TITLE>403 Forbidden</TITLE>
+</HEAD>
+<BODY style="background-color:white;color:black">
+<H1>Forbidden</H1>
+$REDIRECT_ERROR_NOTES
+<P><HR>
+<ADDRESS>$SERVER_SIGNATURE</ADDRESS>
+</BODY>
+</HTML>
+EOF
+    exit
+fi
+
+
+cat <<EOF
+Status: 301 Moved Permanently
+Location: https://$SERVER_NAME$REQUEST_URI
+Content-type: text/html
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<HTML>
+<HEAD>
+<TITLE>HTTPS Required</TITLE>
+</HEAD>
+<BODY style="background-color:white;color:black">
+<H1>HTTPS Required</H1>
+You must use HTTPS to access $REQUEST_URI on this server.
+<P><HR>
+<ADDRESS>$SERVER_SIGNATURE</ADDRESS>
+</BODY>
+</HTML>
+EOF

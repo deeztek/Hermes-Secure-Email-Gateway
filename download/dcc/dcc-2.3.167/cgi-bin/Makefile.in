@@ -1,0 +1,75 @@
+# install the Distributed Checksum Clearinghouse sample white list CGI files
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.23 $Revision$
+# @configure_input@
+
+# Install only the CGI scripts in the cgi-bin directory to minimize
+#   the risks of letting Apache execute files in it.  Install the other
+#   scripts in the usual DCC libexec directory.
+
+DEPTH	=..
+PROG	=check_ip_range
+SRCS	=$(PROG).c
+CSCRIPTS=chgpasswd edit-whiteclnt list-log list-msg http2https webuser-notify
+OFILES	=README common.pm common
+LOCFILES=header footer
+
+CGI_BIN=@installroot@@cgibin@
+
+DCC_BINDIR=@installroot@@libexecdir@
+@INCLUDE_INC@
+
+install:$(CGI_BIN)
+	for NM in $(CSCRIPTS); do $(INSTALL) $(SET_BINOWN)\
+		-m $(BINMODE) -c $$NM $(CGI_BIN)/$$NM; done
+	for NM in $(OFILES); do $(INSTALL) $(SET_BINOWN)\
+		-m 444 -c $$NM $(CGI_BIN)/$$NM; done
+	for NM in $(LOCFILES); do NM=$(CGI_BIN)/$$NM;\
+	    if test ! -f $$NM; then continue; fi;\
+	    CKSUM=`sed -e 's/.*Rhyolite Software.*Revision.*//' $$NM\
+			| cksum 2>&1`;\
+	    for S in '1705768782 56' '231510888 124' '2404527987 132'\
+		    '366383114 239' '1124978657 253' '1233624433 272'\
+		    '559239208 333' '2112089299 350'; do\
+		if test "$$CKSUM" = "$$S"; then rm -f $$NM; fi; done; done
+	for NM in $(LOCFILES); do\
+	    if test ! -f $(CGI_BIN)/$$NM\
+		    || cmp -s $(CGI_BIN)/$$NM $(CGI_BIN)/$$NM-dist; then\
+		$(INSTALL) $(SET_BINOWN) -m 644 -c $$NM $(CGI_BIN)/$$NM;\
+	    else\
+		$(INSTALL) $(SET_BINOWN) -m 644 -c $$NM $(CGI_BIN)/$$NM-new;\
+	    fi;\
+	    $(INSTALL) $(SET_BINOWN) -m 644 -c $$NM $(CGI_BIN)/$$NM-dist;\
+	done
+
+$(CGI_BIN):
+	$(INSTALL) -d $(SET_BINOWN) -m 755 $(CGI_BIN)
+
+deinstall:
+	-for NM in $(OFILES) $(CSCRIPTS); do rm -f $(CGI_BIN)/$$NM; done
+	for NM in $(LOCFILES); do\
+	    if cmp -s $(CGI_BIN)/$$NM $$NM\
+		    || cmp -s $(CGI_BIN)/$$NM $(CGI_BIN)/$$NM-dist; then\
+		rm -f $(CGI_BIN)/$$NM; fi;\
+	    rm -f $(CGI_BIN)/$$NM-new $(CGI_BIN)/$$NM-dist;\
+	done
+	rmdir $(CGI_BIN) 2>/dev/null || true

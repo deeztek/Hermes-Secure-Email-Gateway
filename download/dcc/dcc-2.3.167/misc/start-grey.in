@@ -1,0 +1,135 @@
+#! /bin/sh
+
+# start dccd for greylisting
+# This script assumes that it is being run by root or the DCC user, probably
+# while the system is starting.  If start-dccm or start-dccifd,
+# This script should be run before both of them to # avoid complaints.
+# See the misc/rcDCC script.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.22 $Revision$
+#	@configure_input@
+
+exec 1>&2 </dev/null
+
+LOGGER_TAG=start-grey-dccd
+DCC_LOGGER="@DCC_LOGGER@"
+DCC_HOMEDIR=@prefix@
+VERBOSE=
+DEBUG=
+# check the args once to get the home directory
+while getopts ":xvh:u:a:i:" c; do
+    case $c in
+	x) set -x; DEBUG=-x; VERBOSE=-v;;
+	v) VERBOSE=-v;;
+	h) CWD=`pwd`
+	    DCC_HOMEDIR=`echo "$OPTARG" | sed -e "s@^[^/]@$CWD/&@"`;;
+	*) ;;
+    esac
+done
+if test ! -s $DCC_HOMEDIR/dcc_conf; then
+    eval $DCC_LOGGER \"cannot find $DCC_HOMEDIR/dcc_conf\"
+fi
+. $DCC_HOMEDIR/dcc_conf
+# deal with bash reserved $UID
+if test -z "$DCCUID" -a -n "$UID"; then
+    DCCUID="$UID"
+fi
+if test "$BRAND" != ""; then
+    BRAND="-n $BRAND"
+fi
+GREY_DCCD_ARGS="$GREY_DCCD_ARGS $BRAND $DCC_LOG_ARGS"
+
+STOP_ARGS=
+USAGE="`basename $0`: [-xv] [-h homedir] [-u UID] [-a args] [-i id]"
+OPTIND=1
+while getopts "xvh:u:a:i:" c; do
+    case $c in
+	x) ;;
+	v) ;;
+	h) ;;
+	u) DCCUID="$OPTARG";;
+	a) GREY_DCCD_ARGS="$GREY_DCCD_ARGS $OPTARG";;
+	i) $GREY_SRVR_ID="$OPTARG"; STOP_ARGS="$STOP_ARGS -i $GREY_SRVR_ID";;
+	*) eval $DCC_LOGGER \"$USAGE\"; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    eval $DCC_LOGGER \"$USAGE\"
+    exit 1
+fi
+
+if test "$DCC_HOMEDIR" != @prefix@; then
+    GREY_DCCD_ARGS="-h $DCC_HOMEDIR $GREY_DCCD_ARGS"
+    STOP_ARGS="-h $DCC_HOMEDIR $STOP_ARGS"
+fi
+
+
+# stop the current daemon, including giving it time to shut down gracefully
+$DCC_LIBEXEC/stop-dccd -G $DEBUG $VERBOSE $STOP_ARGS
+
+case X"$GREY_ENABLE" in
+    X[oO][nN])
+	# start the greylist server
+	;;
+    X)
+	# if $GREY_CLIENT_ARGS contains "-G" and $GREY_ENABLE is not set
+	#   then start the greylist server
+	if test -z "$GREY_CLIENT_ARGS"; then
+	    exit 0
+	fi
+	;;
+    *) exit 0;;
+esac
+
+# tell dccd where to find dbclean if it is not where dccd was built to look.
+if test "$DCC_LIBEXEC" != @libexecdir@; then
+    GREY_DCCD_ARGS="-C $DCC_LIBEXEC/dbclean $GREY_DCCD_ARGS"
+fi
+
+if test ! -x $DCC_LIBEXEC/dccd; then
+    eval $DCC_LOGGER \"cannot start greylist dcccd because dccd has not been installed\"
+    exit 1
+fi
+
+if test -z "$GREY_SRVR_ID"; then
+    if grep '# auto local greylist server-ID' $DCC_HOMEDIR/ids >/dev/null 2>&1 \
+	    && grep '^32702[	 ]' $DCC_HOMEDIR/ids >/dev/null 2>&1; then
+	GREY_SRVR_ID=32702
+    else
+	eval $DCC_LOGGER \"'cannot start greylist dccd; GREY_SRVR_ID not set in $DCC_HOMEDIR/dcc_conf'\"
+	exit 1
+    fi
+fi
+GREY_DCCD_ARGS="-i $GREY_SRVR_ID $GREY_DCCD_ARGS"
+
+# first try to use `su -` to set limits
+#   fall back to -I for systems where su requires a valid shell in
+#	/etc/passwd but the dcc user does not have one
+if test -n "$DCCUID" -a X"$DCCUID" != X"$USER"; then
+    if @DCC_SU@ $DCCUID -c date >/dev/null 2>&1; then
+	@DCC_SU@ $DCCUID -c "$DCC_LIBEXEC/dccd -Gon $GREY_DCCD_ARGS"
+	exit
+    fi
+    GREY_DCCD_ARGS="-I,$DCCUID $GREY_DCCD_ARGS"
+fi
+eval $DCC_LIBEXEC/dccd -Gon $GREY_DCCD_ARGS

@@ -1,0 +1,271 @@
+# common Makefile lines for the Distributed Checksum Clearinghouse
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.78 $Revision$
+# @configure_input@
+
+GMAKE_QUIET=@GMAKE_QUIET@
+
+@ifdef@ SUBDIR
+###########################################################################
+all install depend:
+	@for D in $(SUBDIR); do \
+	    echo "==> $$D"; (cd $$D; $(MAKE) $(GMAKE_QUIET) $@); done
+clean cleandir:
+	@for D in $(SUBDIR) $(SUBDIR_OTHER); do \
+	    echo "==> $$D"; (cd $$D; $(MAKE) $(GMAKE_QUIET) $@); done
+###########################################################################
+@else@
+###########################################################################
+# do not let clean be the default target
+# and silence gmake "nothing to be done" noise
+all:
+	@:
+###########################################################################
+@endif@
+
+
+# common to DCC clients
+@ifndef@ CLNTLIBS
+CLNTLIBS    =$(DEPTH)/clntlib/libclnt.a $(DEPTH)/dcclib/libdcc.a
+@endif@
+
+# common to threaded DCC clients
+THRINC	    =-I$(DEPTH)/thrlib @PTHREAD_CFLAGS@
+THR_LDADD   =$(DEPTH)/thrlib/libthr.a @PTHREAD_LIBS@
+THR_DPADD   =$(DEPTH)/thrlib/libthr.a
+
+SRVRINC	    =-I$(DEPTH)/srvrlib
+SRVRLIBS    =$(DEPTH)/srvrlib/libsrvr.a
+
+@DCC_CC@
+
+LDADD	    +=$(CLNTLIBS) @LIBS@
+DPADD	    +=$(CLNTLIBS)
+
+#DBGFLAGS   +=-g
+#DBGFLAGS   +=-DDCC_DEBUG_HEAP -DDCC_DEBUG_CKSUM -DDCC_DEBUG_LOCKS
+# --with-c-warnings
+@CWRN1@	    +=-W -Wextra -Wall -Wunused -Wbad-function-cast
+@CWRN1@	    +=-Wnested-externs -Wpointer-arith -Wshadow -Wwrite-strings
+@CWRN1@	    +=-Wuninitialized -Wno-unknown-pragmas -Wmissing-declarations
+@CWRN1@	    +=-Wmissing-prototypes -Wsign-compare -Wchar-subscripts
+@CWRN1@	    +=-Wformat-security
+# --with-c-warnings=2
+@CWRN2@	    +=-Wdeclaration-after-statement -Wswitch-enum
+@CWRN2@	    +=-Wmissing-noreturn -Wmissing-prototypes -Wstrict-prototypes
+#  --with-c-warnings=3   often wrong
+@CWRN3@	    +=-Wformat-nonliteral -Wunreachable-code -Wcast-align
+CFLAGS	    +=@DCC_CFLAGS@ $(DBGFLAGS) $(CWARN) -I$(DEPTH)/include $(PROFILE)
+LDFLAGS	    +=@DCC_LDFLAGS@ $(DBGFLAGS) $(PROFILE)
+
+@PKG_MAKE@
+@NO_SYS_INST@
+@NO_SUID@
+
+@ifdef@ DCC_BINDIR
+BINDIR	    =$(DCC_BINDIR)
+@else@
+BINDIR	    =@installroot@@bindir@
+@endif@
+
+# use the environment variable DCC_OWN if it is set
+#   otherwise, if SUID is allowed, use DCCSUID value from --with-used
+#   otherwise use the value set in ./ configure from $TARGET_SYS
+@ifndef@ DCC_OWN
+@ifndef@ NO_SUID
+DCC_OWN	    =@DCCSUID@
+@else@
+DCC_OWN	    =@DCC_OWN@
+@endif@
+@endif@
+
+BINOWN      =$(DCC_OWN)
+@ifndef@ NO_SUID
+@ifdef@ SUID_PGM
+BINOWN      =@DCCSUID@
+@endif@
+@endif@
+
+@ifndef@ DCC_GRP
+DCC_GRP	    =@DCC_GRP@
+@endif@
+BINGRP	    =$(DCC_GRP)
+
+@ifndef@ DCC_MODE
+DCC_MODE    =555
+@endif@
+
+BINMODE	    =$(DCC_MODE)
+@ifndef@ NO_SUID
+@ifdef@ SUID_PGM
+@ifndef@ PKG_MAKE
+BINMODE	    =4$(DCC_MODE)
+@endif@
+@endif@
+@endif@
+
+MANDIR	    =@installroot@@mandir@
+@ifndef@ MANGRP
+MANGRP	    =$(DCC_GRP)
+@endif@
+@ifndef@ MANOWN
+MANOWN	    =$(DCC_OWN)
+@endif@
+MANMODE	    =444
+
+@ifdef@ NO_SYS_INST
+# turn off man pages if not installing on the system
+NOMAN	=no
+@endif@
+
+SET_BINOWN=
+SET_MANOWN=
+SET_DCCOWN=
+@ifndef@ NO_SYS_INST
+@ifndef@ PKG_MAKE
+SET_BINOWN=-o $(BINOWN) -g $(BINGRP)
+SET_MANOWN=-o $(MANOWN) -g $(MANGRP)
+SET_DCCOWN=-o @DCCSUID@ -g $(BINGRP)
+@endif@
+@endif@
+
+
+OBJS	=$(SRCS:.c=.o)
+
+
+###########################################################################
+@ifdef@ LIB
+all:	lib$(LIB).a
+
+lib$(LIB).a:$(OBJS)
+	@rm -f lib${LIB}.a
+	$(AR) qcs lib$(LIB).a $(OBJS)
+	@RANLIB@ lib$(LIB).a
+
+CLEANFILES+=lib$(LIB).a
+@endif@
+###########################################################################
+
+
+###########################################################################
+@ifdef@ PROG
+all:   $(PROG)
+
+$(PROG):$(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) ${LDADD} -o $@
+
+$(PROG):$(DPADD)
+
+MAN8	=$(PROG).0
+# turn off man pages in the command directories and build them in the top level
+NOMAN	=no
+
+CLEANFILES+=$(PROG)
+@endif@
+###########################################################################
+
+
+CLEANFILES+=$(OBJS) $(SRCS:.c=.d) .depend
+
+clean cleandir:locclean
+locclean:
+	@rm -f $(CLEANFILES)
+
+install:beforeinstall locinstall
+locinstall:maninstall proginstall
+
+proginstall:beforeinstall
+@ifdef@ PROG
+	$(BININSTALL) $(PROG) $(BINDIR)
+@endif@
+
+@ifndef@ INSTALL
+INSTALL	=@DCCINSTALL@
+@endif@
+@ifdef@ PKG_MAKE
+BININSTALL=$(INSTALL)
+@else@
+BININSTALL=$(INSTALL) -c $(SET_BINOWN) -m $(BINMODE)
+@endif@
+
+# create the DCC home directory before trying to install files
+beforeinstall:$(BINDIR) $(MANDIR)8 all
+$(BINDIR):
+	$(INSTALL) -d $(SET_BINOWN) -m 755 $(BINDIR)
+
+maninstall:
+@ifndef@ NOMAN
+@ifdef@ MANX
+	for NM in $(MANX); do\
+	  $(INSTALL) -c $(SET_MANOWN) -m $(MANMODE) $$NM $(MANDIR)8@MANXFILE@;\
+	  done
+@endif@
+@endif@
+	@:
+
+$(MANDIR)8:
+@ifndef@ NOMAN
+@ifdef@ MANX
+	$(INSTALL) -d $(SET_MANOWN) -m 755 $(MANDIR)8
+@endif@
+@endif@
+	@:
+
+
+uninstall delete:deinstall
+deinstall:beforedelete
+
+progdelete:
+@ifdef@ PROG
+	rm -f $(BINDIR)/$(PROG)
+@endif@
+	@:
+
+beforedelete:progdelete
+@ifdef@ SUBDIR
+	for DIR in $(SUBDIR); do\
+	    (cd $$DIR; $(MAKE) $(GMAKE_QUIET) deinstall); done
+@endif@
+@ifndef@ NOMAN
+@ifdef@ MANX
+	for NM in $(MANX); do rm -f $(MANDIR)8@MANXFILE@/$$NM; done
+@endif@
+@endif@
+
+
+# generate dependencies
+CLEANFILES+=.depend
+depend:.depend
+.depend:$(SRCS:.c=.d)
+	@cat $(SRCS:.c=.d) /dev/null >$@
+
+.SUFFIXES:.d
+.c.d:
+	@$(CC) -MM $(CFLAGS) $< \
+	    | sed "s!^\([^ :]\{1,\}\)[ :]\{1,\}!\1 $@: !g" >$@
+
+@INCLUDE_DEPS@
+
+# rebuild things when the main parameter files change even without dependencies
+@ifdef@ SRCS
+$(SRCS:.c=.o):$(DEPTH)/include/dcc_config.h
+@endif@

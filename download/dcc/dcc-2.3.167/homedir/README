@@ -1,0 +1,23 @@
+These sample files can be modified and installed in the DCC home directory
+
+The following are used by DCC clients:
+    whiteclnt
+    map.txt		must be loaded into the map file with
+				`cdcc "load map.ascii"`
+			    That is done by `make install`
+
+The following are used by DCC servers:
+    whitelist		must be added to a new database with `dbclean -NS`
+    flod
+    ids
+
+Among the other files
+    whitecommon		is used by both the sample whiteclnt and whitelist files
+    dcc_conf		prototype configuration file for libexec/rcDCC and
+			    libexec/cron-dccd
+			    dcc_conf does not exist until it has been built
+			    with the `configure` script from the dcc_conf.in
+			    prototype.
+
+
+	Rhyolite Software DCC 2.3.167-1.9 $Revision$

@@ -1,0 +1,180 @@
+#! /bin/sh -e
+
+# correct map file when switching between DCC and DCC Reputation code.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.26 $Revision$
+# @configure_input@
+
+
+set -e
+
+@NO_SUID@
+@PKG_MAKE@
+
+DCC_HOMEDIR=@prefix@
+CDCC=@bindir@/cdcc
+NEW=			# always create new files with this suffix if not null
+IDS=			# look for or put ids file here
+P_IDS=ids		# prototype ids file
+MAP=			# look for or put map file here
+MAPTXT=			# look for or put map.txt file here
+P_MAPTXT=map.txt	# prototype map.txt
+NEW_MAPTXT=		# yes=need to generate a new map.txt
+
+USAGE="$0: [-x] [-n new] [-c cdcc] [-h homedir] -i ids [-I prototype-ids] \
+    -m map -t map.txt [-T prototype-map.txt]"
+while getopts "xn:c:h:i:I:m:t:T:p:" c; do
+    case $c in
+	x) set -x;;
+	n) NEW="$OPTARG";;
+	c) CDCC="$OPTARG";;
+	h) DCC_HOMEDIR="$OPTARG";;
+	i) IDS="$OPTARG";;
+	I) P_IDS="$OPTARG";;
+	m) MAP="$OPTARG";;
+	t) MAPTXT="$OPTARG";;
+	T) P_MAPTXT="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+if test ! -d "$DCC_HOMEDIR"; then
+    echo "$0: bad DCC home directory" 1>&2; echo "$USAGE" 1>&2; exit 1
+fi
+if test -z "$IDS"; then
+    echo "$0: -i ids not used" 1>&2
+    echo "-$USAGE" 1>&2
+    exit 1
+fi
+if test -z "$MAP"; then
+    echo "$0: -m map not used" 1>&2
+    echo "-$USAGE" 1>&2
+    exit 1
+fi
+if test -z "$MAPTXT"; then
+    echo "$0: -t map.txt not used" 1>&2
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+
+if test ! -x "$CDCC"; then
+    echo "$0: cdcc does not seem to have been built in $CDCC" 1>&2
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+CDCC_CMD="$CDCC -qh$DCC_HOMEDIR file=$MAP"
+$CDCC_CMD >/dev/null </dev/null			# see that cdcc works
+
+# create new ids and map files or check old files
+if test -n "$NEW" || test ! -s "$IDS" -a ! -s "$MAP"; then
+    if test ! -s "$P_IDS"; then
+	echo "$0: cannot create $IDS if prototype $P_IDS does not exist" 1>&2
+	exit 1
+    fi
+    if test ! -s "$P_MAPTXT"; then
+	echo "$0: cannot create $MAP if prototype $P_MAPTXT does not exist" 1>&2
+	exit 1
+    fi
+
+    # /dev/random is overkill for the security needed here,
+    #	but use it if it exists.  Use /dev/urandom to avoid blocking
+    PASSWD1=`(ps; date; dd if=/dev/urandom count=1 2>&1 || true)	\
+	| cksum | tr '	 ' xy`
+    PASSWD2=`(echo "$PASSWD1";						\
+	ps; date; dd if=/dev/urandom count=1 2>&1 || true)		\
+	| cksum | tr '	 ' xy`
+
+    rm -f "$IDS" "$MAP" "$MAPTXT" || true
+
+    sed -e "/^[^#]/s/secret1[0-9a-z]*/secret1$PASSWD1/"		\
+	    -e "/^[^#]/s/secret2[0-9a-z]*/secret2$PASSWD2/" "$P_IDS" >"$IDS"
+
+    sed -e "/^[^#]/s/secret1[0-9a-z]*/secret1$PASSWD1/" "$P_MAPTXT"	\
+	| $CDCC_CMD "new map $MAP; load -; info" >$MAPTXT
+else
+    if test ! -s "$MAP" -a -s "$MAPTXT"; then
+	$CDCC_CMD "new map; load $MAPTXT"
+    fi
+    if test ! -s "$MAP"; then
+	echo "$0: cannot re-create $MAP if $IDS exists" 1>&2
+    fi
+    if test ! -s "$IDS"; then
+	echo "$0: cannot re-create $IDS if $MAP exists" 1>&2
+	IDS=
+    fi
+fi
+
+if test ! -w "$MAP" -o ! -r "$MAP"; then
+    echo "$0: $MAP not readable and writable" 1>&2
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+if test -r $DCC_HOMEDIR/.updatedcc_pfile				\
+	    -a -s $DCC_HOMEDIR/.updatedcc_pfile; then
+    . $DCC_HOMEDIR/.updatedcc_pfile
+fi
+if test -r .updatedcc_pfile -a -s .updatedcc_pfile; then
+    . ./.updatedcc_pfile
+fi
+
+# Replace references to the old common DCC Reputation servers.
+#   When we remove the common DCC Reputation servers, add the public servers
+#   as low priority backups to avoid leaving things broken.
+USING_RHYOLITE=`$CDCC_CMD info						\
+    | sed -n -e 's/^\(com-dcc\.rhyolite\.com\),-.*/\1/p'`
+if test -n "$USING_RHYOLITE"; then
+    for s in $USING_RHYOLITE; do
+	$CDCC_CMD "delete $s"
+    done
+    $CDCC_CMD "add dcc1.dcc-servers.net RTT+1000 ms"			\
+	"add dcc2.dcc-servers.net RTT+1000 ms"				\
+	"add dcc3.dcc-servers.net RTT+1000 ms"				\
+	"add dcc4.dcc-servers.net RTT+1000 ms"				\
+	"add dcc5.dcc-servers.net RTT+1000 ms"
+    NEW_MAPTXT=yes
+fi
+
+# create map.txt
+if test -n "$NEW_MAPTXT" -o ! -s "$MAPTXT"; then
+    rm -f $MAPTXT
+    echo '# map.txt is merely the output of `cdcc -q info`' >$MAPTXT
+    $CDCC_CMD info >>$MAPTXT
+fi
+
+# make the files private
+chmod 0600 $MAPTXT $MAP $IDS
+
+if test -n "@DCCSUID@" -a -z "$NO_SUID$PKG_MAKE"			\
+				&& id "@DCCSUID@" >/dev/null 2>&1; then
+    chown "@DCCSUID@" $MAPTXT $MAP $IDS $DCC_HOMEDIR $DCC_HOMEDIR/log
+    for F in $DCC_HOMEDIR/whiteclnt $DCC_HOMEDIR/dcc_db $DCC_HOMEDIR/grey_db; do
+	if test -f $F; then
+	    chown @DCCSUID@ $F
+	fi
+    done
+fi

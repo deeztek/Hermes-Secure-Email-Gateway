@@ -1,0 +1,170 @@
+use strict;
+
+#
+# Place your configuration directives here.  They will override those in
+# earlier files.
+#
+# See /usr/share/doc/amavisd-new/ for documentation and examples of
+# the directives you can use in this file
+#
+$pax='pax';
+$inet_socket_port = [10021, 10030];
+#$inet_socket_port = 10021;
+$mydomain = 'SERVER-DOMAIN';
+$myhostname = 'SERVER-NAME.SERVER-DOMAIN';
+@local_domains_maps=(read_hash("/etc/postfix/relay_domains"));
+# when amavisd-new sends notifications, they appear to come from here:
+$mailfrom_notify_admin     = "postmaster\@$mydomain";
+$mailfrom_notify_recip     = "postmaster\@$mydomain";
+$mailfrom_notify_spamadmin = "postmaster\@$mydomain";
+$hdrfrom_notify_sender = "amavisd-new <postmaster\@$mydomain>";
+#@bypass_virus_checks_acl = qw(.);
+#$log_level = 5;
+#@local_domains_acl = qw(.);
+$sa_spam_modifies_subj = 1;
+$sa_spam_subject_tag = 'sa-spam-subject-tag';
+$sa_tag_level_deflt = undef;
+$sa_tag2_level_deflt = 2;
+$sa_kill_level_deflt = 5;
+$sa_local_tests_only = 0;
+$final_virus_destiny = final-virus-destiny;
+$final_banned_destiny = final-banned-destiny;
+$final_spam_destiny = final-spam-destiny;
+$final_bad_header_destiny = final-bad-header-destiny;
+#@mynetworks = qw(MY-NETWORKS);
+$QUARANTINEDIR = "/mnt/data/amavis";
+#$virus_quarantine_method = 'sql:';
+$virus_quarantine_method = 'local:virus/%m';
+#$spam_quarantine_method = 'sql:';
+$spam_quarantine_method = 'local:spam/%m';
+#$banned_files_quarantine_method = 'sql:';
+$banned_files_quarantine_method = 'local:banned/%m';
+#$bad_header_quarantine_method = 'sql:';
+$bad_header_quarantine_method = 'local:bad_header/%m';
+#$clean_quarantine_method = 'sql:';
+$clean_quarantine_method = 'local:clean/%m';
+$timestamp_fmt_mysql = 1;
+@mynetworks_maps = (read_array('/etc/amavis/mynetworks'), \@mynetworks);
+
+$policy_bank{'MYNETS'} = {  # mail originating from @mynetworks
+   originating => [1],  # is true in MYNETS by deflt, but let's make it explicit
+   terminate_dsn_on_notify_success => [0],
+   spam_kill_level_maps => [6.9],
+   spam_subject_tag2_maps => ["***SPAM ORIGINATED FROM LOCAL NETWORK*** "],
+   virus_admin_maps => ["postmaster\@$mydomain"], # alert of internal viruses
+   spam_admin_maps  => ["postmaster\@$mydomain"],  # alert of internal spam
+   warnbadhsender => [1],  # warn local senders about their broken MUA
+   spam_quarantine_cutoff_level_maps => [15],
+};
+
+#DKIM CUSTOMIZATIONS
+$enable_dkim_verification = 1;
+$enable_dkim_signing = 1;
+dkim_key('domain.tld', 'domain.tld', '/etc/mail/domain.tld.key.pem');
+dkim_key('domain2.tld', 'domain2.tld', '/etc/mail/domain2.tld.key.pem');
+@dkim_signature_options_bysender_maps = (
+    { '.' => { ttl => 21*24*3600, c => 'relaxed/simple' } } );
+
+#END DKIM CUSTOMIZATIONS
+
+# This policy will bypass ALL checks.
+read_hash(\%whitelist_sender, '/etc/amavis/white.lst');
+@whitelist_sender_maps = (\%whitelist_sender);
+
+$interface_policy{'10030'} = 'BYPASSALLCHECKS';
+$policy_bank{'BYPASSALLCHECKS'} = { # mail from the pickup daemon
+    log_level => 5,
+    bypass_spam_checks_maps   => ['@whitelist_sender_maps'],  # don't spam-check this mail
+    bypass_banned_checks_maps => ['@whitelist_sender_maps'],  # don't banned-check this mail
+    bypass_header_checks_maps => ['@whitelist_sender_maps'],  # don't header-check this mail
+    bypass_virus_checks_maps  => ['@whitelist_sender_maps'],  # don't virus-check this mail
+};
+
+# Blacklist Senders
+@blacklist_sender_maps=(read_hash(\%blacklist_sender, '/etc/amavis/black.lst'));
+
+@storage_sql_dsn = (
+    ['DBI:mysql:database=hermes;host=localhost;port=3306', 'HERMES-USERNAME', 'HERMES-PASSWORD'],
+);
+$sql_allow_8bit_address = 1;
+@lookup_sql_dsn = (
+    ['DBI:mysql:database=hermes;host=localhost;port=3306',
+     'HERMES-USERNAME',
+     'HERMES-PASSWORD']);
+
+#$sql_select_policy = 'SELECT users.id, users.policy_id, users.email FROM users,policy'.
+#' WHERE (users.policy_id=policy.id) AND (users.email IN (%k))';
+
+$sql_select_policy = 'SELECT *, users.id FROM users,policy'.
+' WHERE (users.policy_id=policy.id) AND (users.email IN (%k))';
+' ORDER BY users.priority DESC';
+
+#$sql_select_white_black_list = 'SELECT wb FROM wblist,mailaddr'.
+#' WHERE (wblist.rid=?) AND (wblist.sid=mailaddr.id) AND (mailaddr.email IN (%k))'; 
+#'ORDER BY mailaddr.priority DESC';
+#$sql_select_white_black_list = 'SELECT wb FROM wblist LEFT JOIN mailaddr ON wblist.sid=mailaddr.id WHERE (wblist.rid=?) AND (mailaddr.email IN (%k)) ORDER BY mailaddr.priority ASC';
+
+$sql_select_white_black_list =
+  'SELECT wb FROM wblist,mailaddr,users'
+  . ' WHERE (users.id=?)'
+  . ' AND (wblist.rid=users.id)'
+  . ' AND (wblist.sid=mailaddr.id)'
+  . ' AND (mailaddr.email IN (%k))';
+#  . ' ORDER BY mailaddr.priority DESC';
+
+#$sql_select_policy = 'SELECT domain FROM domains WHERE CONCAT("@",domain) IN (%k)';
+#=== CLAMAV-UNOFFICIAL-SIGS CONFIGURATION ===
+@keep_decoded_original_maps = (new_RE(
+qr'^MAIL$', # retain full original message for virus checking
+qr'^MAIL-UNDECIPHERABLE$', # recheck full mail if it contains undecipherables
+qr'^(ASCII(?! cpio)|text|uuencoded|xxencoded|binhex)'i,
+));
+
+#=== BANNED FILE CONFIGURATION BELOW ===
+$banned_filename_re = new_RE(
+# qr'^UNDECIPHERABLE$',  # is or contains any undecipherable components
+
+  # block certain double extensions anywhere in the base name
+  qr'\.[^./]*\.(exe|vbs|pif|scr|bat|cmd|com|cpl|dll|rtf)\.?$'i,
+
+  qr'\{[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}\}?$'i, # Windows Class ID CLSID, strict
+
+  qr'^application/x-msdownload$'i,                  # block these MIME types
+  qr'^application/x-msdos-program$'i,
+  qr'^application/hta$'i,
+
+# qr'^application/x-msmetafile$'i,      # Windows Metafile MIME type
+# qr'^\.wmf$',                          # Windows Metafile file(1) type
+
+# qr'^message/partial$'i, qr'^message/external-body$'i, # rfc2046 MIME types
+
+# [ qr'^\.(Z|gz|bz2)$'           => 0 ],  # allow any in Unix-compressed
+# [ qr'^\.(rpm|cpio|tar)$'       => 0 ],  # allow any in Unix-type archives
+# [ qr'^\.(zip|rar|arc|arj|zoo)$'=> 0 ],  # allow any within such archives
+# [ qr'^application/x-zip-compressed$'i => 0],  # allow any within such archives
+
+  qr'.\.(exe|vbs|pif|scr|bat|cmd|com|cpl|rtf)$'i, # banned extension - basic
+# qr'.\.(ade|adp|app|bas|bat|chm|cmd|com|cpl|crt|emf|exe|fxp|grp|hlp|hta|
+#        inf|ins|isp|js|jse|lnk|mda|mdb|mde|mdw|mdt|mdz|msc|msi|msp|mst|
+#        ops|pcd|pif|prg|reg|scr|sct|shb|shs|vb|vbe|vbs|
+#        wmf|wsc|wsf|wsh)$'ix,  # banned ext - long
+
+# qr'.\.(mim|b64|bhx|hqx|xxe|uu|uue)$'i,  # banned extension - WinZip vulnerab.
+
+  qr'^\.(exe-ms)$',                       # banned file(1) types
+# qr'^\.(exe|lha|tnef|cab|dll)$',         # banned file(1) types
+);
+
+
+# BANNED RULES CONFIGURATION BELOW ===
+%banned_rules = (
+  FILE-RULES-GO-HERE
+  'DEFAULT2' => $banned_filename_re,
+);
+
+# BANNED RULES CONFIGURATION ABOVE ===
+
+#------------ Do not modify anything below this line -------------
+1;  # ensure a defined return
+
+

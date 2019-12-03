@@ -1,0 +1,217 @@
+#! /bin/sh
+
+# generate periodic list of a DCC server's clients
+
+# This script should be run at midnight UTC, which is rarely midnight local
+#   time.
+# It prefers to generates a new HTML file based on an existing file, but
+#   will start from scratch if the output file does not already exist.
+
+#   -A		    all, not just anonymous clients
+#   -S		    do not sort; omit -s in `cdcc "clients -s"`
+#   -T		    do not tell dccd to clear its counters
+#   -I		    do not wrap the result with <HTML></HTML> etc. so that
+#			it can be server-side included into a web page
+#   -Z timezone	    in case dccd is far away
+#   -O cdcc-op	    something else to tell cdcc to do
+#   -d ndays	    keep this many days of snapshots instead of 7
+#   -n clients	    number of clients in each snapshot
+#   -s server	    host running dccd instead of localhost
+#   -i server-ID    DCC server-ID of the server
+#   -o ofile	    output file
+
+# Rhyolite Software DCC 2.3.167-1.37 $Revision$
+# @configure_input@
+
+DCC_HOMEDIR=@prefix@
+DEBUG=
+ARGS="xATSIh:Z:O:d:n:s:p:i:o:"
+# check the args once to get the home directory to get server name and ID
+while getopts ":$ARGS" c; do
+    case $c in
+	x) set -x;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+if test -s $DCC_HOMEDIR/dcc_conf; then
+    . $DCC_HOMEDIR/dcc_conf
+fi
+
+CDCC=@bindir@/cdcc
+ALL=A
+SORT=s
+CLEAR=clear
+INCLUDE=no
+OPS=
+NDAYS=7
+NCLIENTS=100
+TZ=UTC
+SERVER=localhost
+TITLE=`hostname`
+ID=$SRVR_ID
+PASSWD=
+OUT=
+USAGE="`basename $0`: [-xASTI] [-Z timezone] [-O cdcc-op] [-d ndays] [-n nclients]
+    [-s server] [-p password] -i server-ID -o ofile"
+OPTIND=1
+while getopts "$ARGS" c; do
+    case $c in
+	x) ;;
+	A) ALL=;;
+	S) SORT=;;
+	T) CLEAR=;;
+	I) INCLUDE=yes;;
+	h) ;;
+	Z) TZ=$OPTARG;;
+	O) OPS="$OPS$OPTARG; ";;
+	d) NDAYS="$OPTARG";;
+	n) NCLIENTS="$OPTARG";;
+	s) SERVER="$OPTARG"; TITLE="$OPTARG";;
+	p) PASSWD="; password $OPTARG";;
+	i) ID="$OPTARG";;
+	o) OUT="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+# check that the ID is not 1
+if expr "$ID" - 1 >/dev/null 2>&1; then :
+else
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+# we need an output file
+if test "$OUT" = ""; then
+    echo "use '-o ofile' to specify an output file" 1>&2
+    exit 1
+fi
+
+AUTH="${OPS}server $SERVER; id $ID$PASSWD"
+
+NCLIENTS25=`expr $NCLIENTS + 25`
+NCLIENTS5=`expr $NCLIENTS + 5`
+
+export TZ
+
+set -e
+
+
+# prefer the target directory for temporary files
+OUTDIR=`dirname $OUT`
+if test -z "$OUTDIR" -o -w "$OUTDIR"; then
+    NEW=$OUT.new$$
+    TMP=$OUT.tmp$$
+else
+    NEW=/tmp/list-clients-new$$
+    TMP=/tmp/list-clients-tmp$$
+fi
+trap "set +e; /bin/rm -f $NEW $TMP; exit" 0 1 2 15
+
+
+# create or add to the HTML file
+makeout () {
+    if test -s $OUT; then
+	# start the new file with the head of the old file
+	sed -e '/<!--clients sample-->/,$d'			\
+	    -e '/<\/BODY>/,$d' -e '/<\/body>,$/d'		\
+	    -e '/<\/HTML>/,$d' -e '/<\/html>/,$d' $OUT >$NEW
+    else
+	# create a new ouptut file
+	if test "$INCLUDE" != yes; then
+	    cat >>$NEW <<EOF
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <TITLE>$TITLE Clients</TITLE>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+</HEAD>
+
+<BODY>
+
+<H1>Recent $TITLE Clients</H1>
+<P>
+EOF
+	fi
+    fi
+
+    if test -z "$HEADING"; then
+	HEADING=`date`
+    fi
+
+    cat >>$NEW <<EOF
+<!--clients sample-->
+<H3>$HEADING</H3>
+<P>
+<PRE>
+EOF
+    if test -s $TMP; then
+	sed -e '1,/^  *server-ID/d' -e '/^$/d' -e '/^version/,$d'	\
+		-e '/^[	 ]*blacklisted$/d'				\
+		-e 's/[a-f0-9.]\{63\}\.ip6\.arpa$//'			\
+	    $TMP >>$NEW
+    else
+	echo "$*" >>$NEW
+    fi
+
+    cat >>$NEW <<EOF
+</PRE>
+
+EOF
+
+    # save a limited number samples from the old file
+    if test -s $OUT; then
+	IGNORECASE=1 awk '/<!--clients sample-->/{ ++nsample; }
+/<!--end clients samples-->/{ nsample = 1; }
+/<\/body>/{ nsample = 1; }
+/<\/html>/{ nsample = 1; }
+{ if (nsample < '$NDAYS' && nsample > 0) print $0;
+}' $OUT >>$NEW
+    else
+	echo '<!--end clients samples-->' >>$NEW
+    fi
+
+    if test "$INCLUDE" != yes; then
+	if grep -i '</body>' $NEW >/dev/null; then :
+	else
+	    echo '</BODY>' >>$NEW
+	fi
+	if grep -i '</html>' $NEW >/dev/null; then :
+	else
+	    echo '</HTML>' >>$NEW
+	fi
+    fi
+
+    cp -f $NEW $OUT
+
+    if test ! -s $TMP; then
+	echo "$*" 2>&1
+	exit 1
+    fi
+}
+
+
+
+
+
+# Prime reverse DNS resolution with a dummy run and then do it for real
+$CDCC "$AUTH; clients "-V$ALL$SORT" $NCLIENTS25" >/dev/null
+$CDCC "$AUTH; clients "-V$ALL$SORT" $NCLIENTS5" >$TMP
+
+if test ! -s $TMP; then
+    makeout "obtained no data from $SERVER"
+fi
+
+HEADING=`$CDCC "$AUTH; stats $CLEAR"					\
+    | sed -n								\
+	-e 's/.* delay .* \([0-9]\{1,\}\) clients .*/\1 Clients/'	\
+	-e 's/.*reports added between/between /p'`
+
+makeout "missing $TMP"

@@ -1,0 +1,135 @@
+# sample whitelist for DCC clients
+#   $REVISION$
+
+# Changes in this file and the files it includes are noticed automatically
+#   within a few minutes.
+
+# See the dcc man page for the format of DCC whitelists.
+#   Each line must be in one of the forms:
+#count [hex] type value
+#      [hex] type value
+
+# Hexadecimal checksum values can be obtained from dccm, dccifd, and
+#   dccproc log files.
+
+#option log-all
+#option	log-normal
+#option	option log-subdirectory-day
+#option	option log-subdirectory-hour
+#option	option log-subdirectory-minute
+#option	dcc-on
+#option	dcc-off
+#option	greylist-on
+#option	greylist-off
+#option	greylist-log-on
+#option greylist-ignore-spam-on
+#option greylist-ignore-spam-off
+#option	greylist-log-off
+#option	DCC-reps-off
+#option	DCC-reps-on
+#option	DNSBL1-off
+#option	DNSBL1-on
+#option	DNSBL2-off
+#option	DNSBL2-on
+#option	DNSBL3-off
+#option	DNSBL3-on
+#option	DNSBL4-off
+#option	DNSBL4-on
+#option	MTA-first
+#option	MTA-last
+#option	forced-discard-ok
+#option	no-forced-discard
+#option	threshold cksum_type,targets
+#option spam-trap-discard
+#option spam-trap-reject
+
+
+#   Rhyolite Software DCC 2.3.167-1.46 $Revision$
+################
+
+
+# whitelist values common to the server and client
+include whitecommon
+
+# The following IP address entries usually should also be in @prefix@whitelist,
+#   probably by putting them in @prefix@whitecommon and including that file
+#   here and in @prefix@whitelist.
+#
+#   Do not tell the DCC servers about purely local mail.
+#   Add lines listing all of the host names of this system.
+#   These lines are best in the whitecommon file included in this file
+#ok	ip	127.0.0.1
+#ok	ip	::1
+#
+# List statically allocated IP addresses that you trust to never send
+#   or forward unsolicited bulk email
+#ok	ip	10.1.2.0/24
+#
+# List secondary MX relays or any MX relays that might forward spam to this
+#	system.
+#mx	ip	10.3.4.5
+#mx	ip	10.6.7.0/28
+#   Use mxdcc instead of mx if the relay does DCC checks
+#mxdcc	ip	10.8.9.10
+#
+# List SMTP submission clients such as web browsers that cannot tolerate
+#   4yz temporary rejections but that cannot be trusted to never send spam
+#submit	ip	10.4.5.0/24
+
+
+
+# Do not filter postmaster to avoid rejecting reports of spam.
+#   As with all header checksums, all valid forms of the address must
+#   be listed.
+#ok	env_to	postmaster
+#ok	env_to	postmaster@example.com
+#ok	env_to	postmaster@host.example.com
+
+# See http://www.iecc.com/dcc-testmsg-whitelist.txt for list of checksums
+#   of practically blank messages.  Such checksums can be usefully whitelisted.
+#   See @libexecdir@/fetch-testmsg-whitelist for a cron script to
+#   fetch them.
+#include testmsg-whitelist
+
+# If dccm or dccifd is run with "-S mail_host" by adding that to DCCM_ARGS
+#   or DCCIFD_ARGS in @prefix@/dcc_conf, then uncommenting the following
+#   line would white-list all mail from the SMTP client at example.com.
+#ok	substitute mail_host example.com
+
+# If dccm, dccifd, or dccproc is run with "-S Mailing-list", then this line
+#   would white-list all mail with either of two Mailing-List header
+#   values:
+#ok	hex substitute Mailing-List e78e0f7f b0d5212c 8a1a433a 769ad0fd
+#ok	substitute Mailing-List host.example.com
+
+# A lot of bulk mail lacks message-ID header lines.
+#   If you receive much mail from lame mailing lists (often involving
+#	qmail) or solicited bulk mail you probably do not want to use
+#	this blacklist entry.
+# many	message-id <>
+
+# Mail with SMTP HELO values commonly used seen in spam can be rejected
+#   and reported to the DCC server as spam by running dccproc, dccifd, or dccm
+#   with "-S HELO" and uncommenting the following lines:
+#many	substitute helo localhost
+#many	substitute helo EmailSender
+#many	substitute helo Super
+#many	substitute helo Testsmtp
+#many	substitute helo laptop
+#many	substitute helo localhost.com
+#many	substitute helo localhost.localdomain
+#many	substitute helo newsserver
+#many	substitute helo oemcomputer
+#many	substitute helo proxy
+#many	substitute helo server
+#many	substitute helo smtp.localhost.localdomain
+#many	substitute helo test.com
+#many	substitute helo unknown
+#many	substitute helo webhome
+#many	substitute helo webserver
+#many	substitute helo whatever-your-domain-name-might-be.com
+#many	substitute helo www
+#many	substitute helo yourwebsite.com
+#
+#many	substitute helo 10.0.0.1
+#many	substitute helo IP-addresses-of-your-DNS-HTTP-and-SMTP-servers

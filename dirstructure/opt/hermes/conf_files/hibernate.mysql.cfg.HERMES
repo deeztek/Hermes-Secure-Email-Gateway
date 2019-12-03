@@ -1,0 +1,85 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!DOCTYPE hibernate-configuration PUBLIC
+        "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+        "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+<!--
+    Copyright (c) 2008-2015, DJIGZO.
+    
+    This file is part of Djigzo email encryption.
+    
+    Djigzo is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License 
+    version 3, 19 November 2007 as published by the Free Software 
+    Foundation.
+    
+    Djigzo is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+    
+    You should have received a copy of the GNU Affero General Public 
+    License along with Djigzo. If not, see <http://www.gnu.org/licenses/>
+    
+    Additional permission under GNU AGPL version 3 section 7
+    
+    If you modify this Program, or any covered work, by linking or 
+    combining it with aspectjrt.jar, aspectjweaver.jar, tyrex-1.0.3.jar, 
+    freemarker.jar, dom4j.jar, mx4j-jmx.jar, mx4j-tools.jar, 
+    spice-classman-1.0.jar, spice-loggerstore-0.5.jar, spice-salt-0.8.jar, 
+    spice-xmlpolicy-1.0.jar, saaj-api-1.3.jar, saaj-impl-1.3.jar, 
+    wsdl4j-1.6.1.jar (or modified versions of these libraries), 
+    containing parts covered by the terms of Eclipse Public License, 
+    tyrex license, freemarker license, dom4j license, mx4j license,
+    Spice Software License, Common Development and Distribution License
+    (CDDL), Common Public License (CPL) the licensors of this Program grant 
+    you additional permission to convey the resulting work.
+-->
+<hibernate-configuration>
+    <session-factory>
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQLDialect</property>
+        <!-- For MySQL JDBC driver, use com.mysql.jdbc.Driver -->
+        <property name="hibernate.connection.driver_class">org.mariadb.jdbc.Driver</property>
+        <property name="hibernate.connection.url">jdbc:mysql://127.0.0.1:3306/djigzo</property>
+        <property name="hibernate.connection.username">djigzo</property>
+        <property name="hibernate.connection.password">DwRV08foKDrZCeYIvfIm</property>
+
+		<property name="hibernate.connection.pool_size">1</property>
+		<property name="hibernate.connection.autocommit">false</property>
+		<property name="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+		
+		<property name="hibernate.c3p0.min_size">5</property>
+		<property name="hibernate.c3p0.max_size">50</property>
+		<property name="hibernate.c3p0.timeout">1800</property>
+		<property name="hibernate.c3p0.max_statements">50</property>
+					
+		<property name="hibernate.jdbc.fetch_size">10</property>
+		<property name="hibernate.jdbc.batch_size">10</property>
+
+<!-- Because Hibernate generates DDL not directly supported by MySQL, we need to disable validate
+ 
+		<property name="hibernate.hbm2ddl.auto">validate</property>
+ -->		
+		<property name="hibernate.show_sql">false</property>
+		<property name="hibernate.format_sql">true</property>		
+		<property name="hibernate.current_session_context_class">thread</property>
+
+         <!-- The standard database entities. Additional entities may be read from classpath or from xml.d -->
+		<mapping class="mitm.application.djigzo.admin.hibernate.AdminEntity"/>
+		<mapping class="mitm.application.djigzo.admin.hibernate.AuthorityEntity"/>
+		<mapping class="mitm.application.djigzo.impl.hibernate.UserPreferencesEntity"/>
+		<mapping class="mitm.application.djigzo.impl.hibernate.UserEntity"/>
+        <mapping class="mitm.common.properties.hibernate.PropertyEntity"/>
+        <mapping class="mitm.common.properties.hibernate.BlobEntity"/>
+
+        <mapping class="mitm.common.properties.hibernate.NamedBlobEntity"/>
+		<mapping class="mitm.common.security.certstore.hibernate.X509CertStoreEntryHibernate"/>
+		<mapping class="mitm.common.security.crlstore.hibernate.X509CRLStoreEntryHibernate"/>
+		<mapping class="mitm.common.security.keystore.hibernate.KeyStoreEntryHibernate"/>
+		<mapping class="mitm.common.sms.impl.SMSGatewayEntity"/>
+        <mapping class="mitm.common.security.ctl.CTLEntryEntity"/>
+        <mapping class="mitm.common.security.ca.hibernate.CertificateRequestEntity"/>
+        <mapping class="mitm.common.mail.repository.hibernate.MailRepositoryItemEntity"/>
+        <mapping class="mitm.common.security.openpgp.PGPKeyRingEntity"/>
+        <mapping class="mitm.common.security.openpgp.trustlist.PGPTrustListEntity"/>
+    </session-factory>
+</hibernate-configuration>

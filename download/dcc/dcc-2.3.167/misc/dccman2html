@@ -1,0 +1,99 @@
+#! /bin/sh -e
+
+# elaborate man2html and do not depend on whether perl is in /usr/bin or
+#   /usr/local/bin
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#   Rhyolite Software DCC 2.3.167-1.25 $Revision$
+
+MAN2HTML=misc/man2html
+IFILE=
+OFILE=
+CHAPTER=8
+
+USAGE="`basename $0`: [-x] [-c x] -i ifile [-o ofile]"
+while getopts "xc:i:o:" c; do
+    case $c in
+	x) set -x; DEBUG=-x;;
+	c) CHAPTER="$OPTARG";;
+	i) IFILE="$OPTARG";;
+	o) OFILE="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+if test ! -s "$IFILE"; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+if test -z "$OFILE"; then
+    OFILE=`expr "$IFILE" : '\(.*\)\.[0-9]$'`.html
+fi
+
+Title=`basename "$IFILE" | sed -e "s/\.[0-9]$/.$CHAPTER/"`
+
+SELF=`expr "$Title" : '\(.*\)..$'`
+PGPAT=`echo '(%|dcc|cdcc|dbclean|dblist|dccd|dccm|dccproc|dccifd|dccsight|%)' \
+    | sed -e "s/|$SELF|/|/"`
+
+BURL=https://www.rhyolite.com/
+
+perl $MAN2HTML -botm 0 -topm 0 -Title "$Title"				\
+	-cgiurlexp '(($TITLE = ${title}) =~ tr/A-Z/a-z/, $TITLE).".html"' \
+	    <"$IFILE"							\
+    | sed -E								\
+	-e '# remove stray page header not deleted by man2html'		\
+	-e '/^FreeBSD [1-9]/d'						\
+	-e '# remove HTTP references to non-DCC man pages'		\
+	-e "s@<(A HREF=\"$PGPAT.html\")@<Z\1@g"				\
+	-e 's@<A HREF="[^>]*>([^<]*)</A>@\1@g'				\
+	-e 's@<ZA HREF=@<A HREF=@g'					\
+	-e '# remove useless tags'					\
+	-e 's@</B> <B>@ @g'						\
+	-e '# add IDs to sections'					\
+	-e 's@^(   )<B>([^<]*)</B>$@\1<B ID="\2">\2</B>@'		\
+	-e 's@^(<H[0-9])>([^<]*)@\1 ID="\2">\2@'			\
+	-e '# add IDs to option definitions'				\
+	-e '/ID="DESCRIPTION"/,/ID="FILES""/s@^     <B>-([-_a-zA-Z0-9])</B>@     <B ID="OPTION-\1">-\1</B>@' \
+	-e '# add IDs to file descriptions'				\
+	-e '/ID="FILES"/,/^<H2>/s@^     ([-a-zA-Z0-9_/.]+)@     <SPAN="FILE-\1">\1</SPAN>@' \
+	-e 's@(<SPAN ID="FILE-)[^"]*/([^/"]+")@\1\2@'			\
+	-e '# add anchor names to cdcc operations'			\
+	-e '/ID="OPERATIONS"/,/ID="FILES"/s@^     <B>([-_a-zA-Z0-9 ]*)</B>@     <B ID="OPERATION-\1">\1</B>@' \
+	-e '# convert blanks in IDs to dashes'				\
+	-e 's/( ID="[^"]*) /\1-/g'					\
+	-e 's/( ID="[^"]*) /\1-/g'					\
+	-e 's/( ID="[^"]*) /\1-/g'					\
+	-e 's/( ID="[^"]*) /\1-/g'					\
+	-e 's/( ID="[^"]*) /\1-/g'					\
+	-e '# make URLs into links'					\
+	-e 's@([^=">])(https*://www[-a-z./]+)@\1<A HREF="\2">\2</A>@g'   \
+	-e '# replace references to Rhyolite Software with links'	\
+	-e 's@Rhyolite Software(, LLC)?@<A HREF="'$BURL'">&</A>@'	\
+	-e 's@'$BURL'(">[^<]*</A>)[, ]*('$BURL'[^ ]*)@\2\1@'		\
+	-e '# make references to HTML documents into links'		\
+	-e 's@INSTALL.html@<A HREF="&">&</A>@'				\
+    >"$OFILE"

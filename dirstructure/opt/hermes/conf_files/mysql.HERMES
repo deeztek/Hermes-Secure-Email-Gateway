@@ -1,0 +1,5 @@
+### Configuration file for rsyslog-mysql
+### Changes are preserved
+
+$ModLoad ommysql
+mail.* :ommysql:localhost,Syslog,SYSLOG-USERNAME,SYSLOG-PASSWORD

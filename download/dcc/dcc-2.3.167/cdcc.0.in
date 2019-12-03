@@ -1,0 +1,403 @@
+cdcc(8)               Distributed Checksum Clearinghouse               cdcc(8)
+
+NNAAMMEE
+     ccddcccc -- Control Distributed Checksum Clearinghouse
+
+SSYYNNOOPPSSIISS
+     ccddcccc [--VVBBddqq] [--hh _h_o_m_e_d_i_r] [--cc _i_d_s] [_o_p_1 _o_p_2 _._._. [_-]]
+
+DDEESSCCRRIIPPTTIIOONN
+     CCddcccc is used to clear, control, and query the control file used by Dis-
+     tributed Checksum Clearinghouse clients such as dccm(8).  The host names,
+     UDP port numbers, IDs, and passwords local clients use to talk to servers
+     as well as IP addresses, round trip times, and other information are con-
+     tained in the _m_a_p file.  While ccddcccc is set-UID, it uses the real UID only
+     when accessing the _m_a_p file.  It refuses to display sensitive information
+     such as passwords unless the real UID is the same as the effective UID.
+     Note that ccddcccc needs to be set to a UID that can read and write the _m_a_p
+     file, but that UID need not be 0.
+
+     CCddcccc is also used to send commands to DCC servers to tell them to stop,
+     reload their lists of DCC IDs, turn on tracing, and so forth.
+
+     Many commands sent to DCC servers require a numeric DCC ID and a password
+     recognized by the server.  A DCC password is a 1-32 character string that
+     does not contain blank, tab, newline or carriage return characters.  The
+     ID is specified with the iidd operation.  If ccddcccc is run with a real UID
+     that can read the _i_d_s file and a password is not specified (see the
+     ppaasssswwoorrdd operation), then the current password for the specified ID in
+     the _i_d_s file will be used.  If no _i_d_s file is available and a password
+     and DCC ID are not specified, ccddcccc uses the anonymous DCC client-ID.  DCC
+     servers do not expect a password from clients using the anonymous client-
+     ID, but they also won't honor control requests.
+
+     Operations that modify the _m_a_p file can only be performed when the real
+     UID is sufficient to modify the file directly.  Trying to perform an
+     operation that requires a password without specifying a server-ID or
+     without using a UID that can access the _i_d_s file produces an error mes-
+     sage complaining about a "privileged operation."
+
+     Commands and operations are read from the command line or from stdin.  A
+     series of _o_p_1 _o_p_2 _._._. operations followed a _- (a dash) causes operations
+     to be read from stdin after the command line operations are processed.
+     Semi-colons or newlines separate commands in UNIX command-line "words,"
+     as well as when commands are read from stdin.  Since each command line
+     operation must be a shell "word," quotes are often required as in
+
+           % cdcc "load map.txt"
+     or
+
+           % cdcc "host localhost;info" stats
+
+   OOPPTTIIOONNSS
+     The following options are available:
+
+     --VV   displays the version of the DCC controller.  Two or more --VV options
+          show the options with which it was built.
+
+     --BB   sends error messages from the DCC server to both stderr and stdout
+          instead of only stderr.
+
+     --dd   enables debugging output from the DCC client software.  Additional
+          --dd options increase the number of messages.  See the ddeebbuugg command.
+
+     --qq   quiets initial complaints about the map file and some messages about
+          successful commands.  See the qquuiieett command.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.  See the hhoommeeddiirr
+          operation.
+
+     --cc _i_d_s
+          specifies the file containing DCC IDs and passwords known by local
+          DCC servers.  An _i_d_s file that can be read by others cannot be used.
+          The format of the _i_d_s file is described in dccd(8).
+
+     _o_p_1 _o_p_2 _._._.
+          are operations or commands such as "id 100; stop".  Commands or
+          operations specified on the command line are performed before the
+          first interactive request.  The last command can be _- to specify
+          that additional commands should be read from stdin.
+
+   OOPPEERRAATTIIOONNSS
+     Local operations include the following:
+
+     hheellpp [_c_o_m_m_a_n_d]
+           lists information about one or all available commands and opera-
+           tions.
+
+     eexxiitt  stops ccddcccc
+
+     ggrreeyy [_o_n | _o_f_f]
+           switches between DCC and greylist servers.
+
+     hhoommeeddiirr [_p_a_t_h]
+           displays or specifies the DCC home directory, _/_v_a_r_/_d_c_c.
+
+     ffiillee [_m_a_p]
+           displays or specifies the name or path of the map file.  The string
+           "-" specifies the default file _/_v_a_r_/_d_c_c_/_m_a_p.
+
+     nneeww mmaapp [_m_a_p]
+           creates a new, empty file for DCC server host names, port numbers,
+           passwords, and so forth.  There must not already be a file of the
+           same name.  The default is _m_a_p in the DCC home directory.
+
+     ddeelleettee _h_o_s_t[,_p_o_r_t]
+           deletes the entry in the _m_a_p file for _h_o_s_t and UDP _p_o_r_t_. If
+           greylist mode has been set with the ggrreeyy oonn command, the entry for
+           the grelist server at _h_o_s_t is deleted.
+
+     aadddd _h_o_s_t[,_p_o_r_t] [_R_T_T_+_a_d_j|_R_T_T_-_a_d_j] [_G_r_e_y_l_i_s_t] [_c_l_i_e_n_t_-_I_D [password]]
+           adds an entry to the _m_a_p file.  The _p_o_r_t can be "-" to specify the
+           default DCC server port number.
+
+           An adjustment to the round trip time is between -2000 and +2000 and
+           follows the string _R_T_T.  The adjustment is added to the average
+           measured round trip time when the DCC client software picks the
+           "nearest" DCC server, or the server with the smallest RTT.  If an
+           IP address is mentioned more than once in the list of servers, for
+           example because it is among the addresses for more than one server
+           name, conflicts among RTT adjustments are resolved by picking the
+           adjustment with the largest absolute value.
+
+           _G_r_e_y_l_i_s_t marks an entry for a greylist servers.  _G_r_e_y_l_i_s_t is
+           assumed if greylist mode has been set with the ggrreeyy oonn command, See
+           dccd(8).
+
+           If both the client-ID and the password are absent, the anonymous
+           client-ID, 1, is used.  The string _a_n_o_n is equivalent to the anony-
+           mous client-ID.  A null password string is assumed if the password
+           is missing and the client-ID is 1 or also missing.
+
+     llooaadd _i_n_f_o_-_f_i_l_e
+           loads the current parameter file with the host names, port numbers,
+           IDs, and passwords in _i_n_f_o_-_f_i_l_e.  Standard input is understood if
+           _i_n_f_o_-_f_i_l_e is "-".
+
+           A suitable file can be created with the iinnffoo operation.  It con-
+           sists of ignored blank or comment lines starting with '#' and other
+           lines in the same format as the arguments to the aadddd operation.
+           Note that output of the iinnffoo command will lack passwords unless it
+           is run by a privileged user.
+
+     hhoosstt [_h_o_s_t_n_a_m_e]
+           specifies the host name of the DCC server to which commands should
+           be sent.  If _h_o_s_t_n_a_m_e is "-", the current default DCC server is
+           chosen.
+
+     ppoorrtt [_p_o_r_t]
+           specifies the UDP port number of the DCC server to which commands
+           should be sent.  The default is 6277 or 6276 depending on the set-
+           ting of the greylist mode controlled with the ggrreeyy command.
+
+     ppaasssswwoorrdd _s_e_c_r_e_t
+           specifies the password with which to sign commands sent to the DCC
+           server specified with the sseerrvveerr and ppoorrtt operations.
+
+     iidd [_I_D]
+           specifies or displays the numeric DCC ID for commands sent to the
+           DCC server specified with the sseerrvveerr and ppoorrtt operations.  If no
+           password is specified with the ppaasssswwoorrdd command, the password is
+           sought in the local _i_d_s.
+
+     iinnffoo [--NN]
+           displays information about the connections to DCC servers.  It
+           starts with the current date and name of the current _m_a_p file or
+           says that ccddcccc is using the implicit file created with the sseerrvveerr
+           and ppoorrtt operations.  It then says when host names will next be
+           resolved into IP addresses, the smallest round trip time to the IP
+           addresses of known DCC servers.  The host name, UDP port number (or
+           dash if it is the default), DCC client-ID, and password (if ccddcccc is
+           used by a privileged user) are shown in one line per configured DCC
+           server.
+
+           The currently preferred IP address is indicated by an asterisk.
+           The "brand" of the server, its DCC ID, and its IP address are dis-
+           played in one line per IP address.  The performance of the server
+           at each IP address in the most recent 32 operations is displayed in
+           a second line.  The second line ends with the measured delay
+           imposed by the server on requests with this client's ID.
+
+           --NN displays the reverse DNS name of each server.
+
+     RRTTTT [--NN]
+           measures the round trip time to the DCC servers.  It does this by
+           discarding accumulated information and forcing a probe of all
+           listed server IP addresses.
+
+           _B_e_w_a_r_e that when run with sufficient privilege, the RRTTTT operation
+           is like the iinnffoo and llooaadd operations and displays cleartext pass-
+           words.
+
+           --NN displays the reverse DNS name of each server.
+
+     ddeebbuugg Op Ar on | off | TTL=x
+           increases or decreases debugging information from the DCC client
+           software or sets the IP TTL on queries to the server.  See --dd.
+
+           Some operating systems do not include the functions required to
+           change the IP TTL.  Others include the required functions but have
+           no apparent effect.
+
+     qquuiieett [_o_n | _o_f_f]
+           makes commands more quiet or more verbose.
+
+     IIPPvv66 [_o_n | _o_f_f | _o_n_l_y]
+           clients to try to use IPv6 and IPv4, IPv4 only, or IPv6 only.
+
+     SSOOCCKKSS [_o_n | _o_f_f]
+           tell DCC to use the SOCKS5 protocol if they have been built with a
+           SOCKS library.  The socks library linked with the DCC client must
+           be configured appropriately, often including knowing which DCC
+           servers must be connected via the SOCKS proxy and which can be
+           reached directly.  DCC clients use SOCKS functions such as
+           Rsendto() with all or no servers depending on the setting of this
+           switch.
+
+     ssrrcc [_- |] _I_P_a_d_d_r_e_s_s[_,_I_P_v_6_a_d_d_r_e_s_s]
+           displays or configures the source address of DCC client requests.
+           _- removes the explicit configuration of the source, while _I_P_a_d_d_r_e_s_s
+           or _I_P_a_d_d_r_e_s_s_,_I_P_v_6_a_d_d_r_e_s_s sets it.  This makes sense only on multi-
+           homed hosts.  It can be useful for passing firewalls.
+
+   DDCCCC SSEERRVVEERR CCOOMMMMAANNDDSS
+     Commands that can be sent to a DCC server include the following.  Most of
+     the commands must be used with the server's _I_D specified with the iidd com-
+     mand.  The specified ID is included in the commands sent to the server
+     The command itself is digitally signed with the first password associated
+     with the ID in the _i_d_s file.  The server requires that the signature
+     match one of the passwords associated with the ID in its _i_d_s file.
+
+     ddeellcckk ttyyppee hheexx11 hheexx22 hheexx33 hheexx44
+          asks the server to delete the _t_y_p_e checksum with value _h_e_x_1 _h_e_x_2
+          _h_e_x_3 _h_e_x_4.  The type and checksum values can be found in dccproc(8)
+          and dccm(8) log files or computed with _d_c_c_p_r_o_c --QQCC.
+
+          There are very few situations where it makes sense to bother to
+          delete checksums.  For example, mail that was accidentally reported
+          with a target count of "MANY" is either private and so will not be
+          seen by other people and so will not be affected, or it is bulk and
+          its source so must have already been whitelisted by recipients.
+
+     ssttaattss [_a_l_l | _c_l_e_a_r]
+          displays current status and statistics from the current DCC server
+          or for _a_l_l known DCC servers.  The server's counters will be cleared
+          after they are displayed when the server's ID has been specified
+          with the iidd _I_D operation.
+
+     cclliieennttss [--nnssiiaaVVAAKK] [--II _i_d] [_m_a_x [_t_h_o_l_d]] [_a_d_d_r[_/_p_r_e_f_i_x]]
+          display some of the clients recently seen by the server.
+          --nn     display only the IP addresses and not the names of clients.
+          --ss     sort the clients by the number of requests they have made.
+          --ii     count clients with the same client-ID as single entities.
+          --II _i_d  display information only about clients using client-ID _i_d.
+          --aa     produce 24 hour average numbers of requests.
+          --AA     display only anonymous clients.
+          --KK     display only clients using client-IDs other than the anony-
+                 mous ID of 1.
+          --VV     include the DCC protocol versions used by clients.
+          _m_a_x    display only the _m_a_x most recent clients.
+          _m_a_x _t_h_o_l_d display the most recent _m_a_x clients that have made at
+                 least _t_h_o_l_d requests.
+          _a_d_d_r[_/_p_r_e_f_i_x] restricts the results to the DCC client with that IP
+                 address or clients with addresses in that block of addresses.
+                 Individual clients in a blacklisted block of addresses in the
+                 server's _/_v_a_r_/_d_c_c_/_b_l_a_c_k_l_i_s_t file are not displayed unless
+                 explicitly requested by address or address block.
+
+          Clients with IDs marked with an asterisk (*) used the wrong password
+          for that client-ID.
+
+          The mechanism that implements this command involves asking the DCC
+          server for the first approximately 100 clients, then the second
+          about 100, and so on, If entries change position in the complete
+          list maintained by the server between requests, the displayed list
+          will have duplicate or missing entries.  Only clients since the last
+          use of ssttaattss cclleeaarr are displayed.
+
+     ssttoopp
+          tells the DCC server to exit.
+
+     ssyysstteemm ssttoopp
+          tells the DCC server to exit so that the operating system can be
+          shut down.  This tells the DCC server on some systems to delete the
+          dcc_db.hash file to speed system shut down.  The file will be
+          rebuilt automatically by ddbbcclleeaann when the DCC server is restarted.
+
+     cclleeaann ssttoopp
+          tells the DCC server to exit after applying fsync() to the database.
+
+     rreellooaadd IIDDss
+          tells the local DCC server to reload its DCC _i_d_s file immediately.
+          This command is not strictly needed.  Every several minutes, the DCC
+          server notices if the file has been changed and automatically reads
+          it.
+
+     fflloooodd cchheecckk
+          tells the DCC server to check for changes in the _f_l_o_d file and try
+          to restart any of the streams to peers that are broken.
+
+     fflloooodd sshhuuttddoowwnn
+          tells the DCC server to cleanly stop flooding checksums to and from
+          peers.  The server will wait for sending and receiving peers to
+          agree to stop.  Each fflloooodd sshhuuttddoowwnn or fflloooodd hhaalltt request increases
+          a count of reasons why the server should not flood checksums.
+
+     fflloooodd hhaalltt
+          tells the DCC server to abruptly stop flooding checksums to and from
+          peers.
+
+     fflloooodd rreewwiinndd _s_e_r_v_e_r_-_I_D
+          tells the DCC server to ask its peer with _s_e_r_v_e_r_-_I_D to rewind and
+          resend its stream of checksums.
+
+     fflloooodd ffffwwdd iinn _s_e_r_v_e_r_-_I_D
+          tells the DCC server to ask its peer to "fast forward" or skip to
+          the end of the incoming flood.
+
+     fflloooodd ffffwwdd oouutt _s_e_r_v_e_r_-_I_D
+          tells the DCC server to "fast forward" or skip to the current end of
+          the flood to its peer.
+
+     fflloooodd rreessuummee
+          tells the DCC server to reduce the number of reasons to not flood
+          checksums increased by fflloooodd sshhuuttddoowwnn and fflloooodd hhaalltt.. When the num-
+          ber of reasons reaches zero, the server tries to resume flooding.
+
+     fflloooodd lliisstt
+          displays the list of current incoming and outgoing floods.  Each
+          line contains the server-ID of the peer, the IP address and port
+          used for the outgoing flood, the address for the incoming flood if
+          different, and the host name.  Only the server-IDs of flooding peers
+          are disclosed with the server's ID.
+
+     fflloooodd ssttaattss [cclleeaarr] { _s_e_r_v_e_r_-_I_D | _a_l_l }
+          displays counts of checksum reports sent and received by the current
+          flooding connections to and from _s_e_r_v_e_r_-_I_D or _a_l_l flooding connec-
+          tions and then optionally clears the counts.
+
+     DDBB cclleeaann
+          is used by ddbbcclleeaann to tell the server that the database expiration
+          has begun.
+
+     DDBB nneeww
+          is used by ddbbcclleeaann to tell the server that the database cleaning is
+          complete.
+
+     fflluusshh ccaacchhee
+          tells the server to flush its cache and to keep it clean.
+
+     ccaacchhee ookk
+          tells the server to resume normal operations after fflluusshh ccaacchhee.
+
+     cclloocckk cchheecckk
+          asks the DCC server to say how much its clock differs from the local
+          clock.
+
+     cclloocckk kklluuddggee ++//--sseeccoonnddss
+          adjusts the timestamps in server commands to make it possible to
+          control servers with inaccurate clocks.
+
+     ttrraaccee _d_e_f_a_u_l_t
+          turns on _A_N_O_N and _C_L_N_T tracing and turns off all others.
+
+     ttrraaccee _m_o_d_e _{_o_n_|_o_f_f_}
+          turns the server's tracing _m_o_d_e on or off.  _M_o_d_e must be one of:
+            _A_D_M_N    administrative requests from ccddcccc
+            _A_N_O_N    errors by anonymous clients
+            _C_L_N_T    errors by authenticated clients
+            _R_L_I_M    rate-limited messages
+            _Q_U_E_R_Y   all queries and reports
+            _R_I_D_C    messages concerning the report-ID cache that is used to
+                    detect duplicate reports from clients
+            _F_L_O_O_D_1  messages about inter-server flooding connections
+            _F_L_O_O_D_2  messages about flooded reports
+            _I_D_S     unknown server-IDs in flooded reports
+            _B_L      blacklisted clients
+            _D_B      odd database events
+            _W_L_I_S_T   reports of whitelisted checksums from authenticated, not
+                    anonymous DCC clients
+
+     ccddcccc exits with 0 on success, and >0 if an error occurs in operations
+     specified on the command line.
+
+FFIILLEESS
+     @prefix@  default DCC home directory unless changed by the _h_o_m_e_d_i_r opera-
+               tion.
+     map       memory mapped file in the home DCC home directory of server
+               host names, port numbers, passwords, measured round trip times
+               (RTT), and so forth.
+     ids       list of IDs and passwords, as described in dccd(8).  It is only
+               required by systems running the DCC server, but is used by ccddcccc
+               if available.
+
+SSEEEE AALLSSOO
+     dbclean(8), dcc(8), dccd(8), dblist(8), dccifd(8), dccm(8), dccproc(8),
+     dccsight(8).
+
+HHIISSTTOORRYY
+     Implementation of ccddcccc was started at Rhyolite Software in 2000.  This
+     document describes version 2.3.167.
+
+                                 June 19, 2019

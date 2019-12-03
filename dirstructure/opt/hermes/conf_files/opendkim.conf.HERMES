@@ -1,0 +1,31 @@
+LogWhy                  Yes
+SyslogFacility          mail
+
+Syslog                  Yes
+SyslogSuccess           Yes
+TemporaryDirectory      /var/tmp
+UMask                   022
+
+X-Header                Yes
+ReportAddress           someone@domain.tld
+OversignHeaders         From
+Quarantine              Yes
+KeyTable                refile:/opt/hermes/dkim/KeyTable
+SigningTable            refile:/opt/hermes/dkim/SigningTable
+ExternalIgnoreList      refile:/opt/hermes/dkim/TrustedHosts
+InternalHosts           refile:/opt/hermes/dkim/TrustedHosts
+
+RequireSafeKeys         False
+
+#Hermes Configuration Below
+
+Canonicalization        HEADER-CANONICALIZATION/BODY-CANONICALIZATION
+On-Default              DEFAULT-ACTION
+On-BadSignature         BADSIGNATURE-ACTION
+On-DNSError             DNSERROR-ACTION
+On-InternalError        INTERNALERROR-ACTION
+On-NoSignature          NOSIGNATURE-ACTION
+On-Security             SECURITY-ACTION
+SignatureAlgorithm      SIGNATURE-ALGORITHM
+
+#Hermes Configuration Above

@@ -1,0 +1,25 @@
+# whitelist file required by DCC server
+#   Unless you are running a DCC server, this file will not be used.  Even
+#   if you are running a DCC server, it is almost always better to put entries
+#   in the client whiteclnt files.
+
+#   See the dcc man page for the format of DCC white and blacklists.
+#   Each line must be in one of the forms
+#count [hex] type value
+#      [hex] type value
+#include pathname
+
+# Whitelists for DCC servers are usually not a good idea except for local
+#   IP addresses that are trusted to never send spam.  It is usually
+#   better to use whitelists only with DCC clients such as dccproc, dccifd,
+#   and dccm.
+
+# Changes to this file or the files it includes have no effect until dbclean
+#   is run, perhaps by the required daily cron job, @libexecdir@/cron-dccd
+
+
+#   Rhyolite Software DCC 2.3.167-1.16 $Revision$
+################
+
+
+include whitecommon

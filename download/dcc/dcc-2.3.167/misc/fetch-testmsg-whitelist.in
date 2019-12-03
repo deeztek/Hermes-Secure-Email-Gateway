@@ -1,0 +1,163 @@
+#! /bin/sh
+
+# Fetch a list of "empty" mail messages for whitelisting.  Many free mail
+#   service providers add HTML or other text to mail.  That causes empty
+#   and nearly empty mail messages to have valid DCC checksums and not be
+#   ignored by DCC clients.
+
+# The fetched file can be included in whiteclnt files.  For example, the
+#   following line in @prefix@whiteclnt would whitelist many common
+#   empty messages
+#   include @prefix@/testmsg-whitelist
+
+# By default the script fetches http://www.iecc.com/dcc-testmsg-whitelist.txt
+#   to @prefix@/testmsg-whitelist
+
+# The script should be run at most once a day.
+
+
+
+# Rhyolite Software DCC 2.3.167-1.37 $Revision$
+# @configure_input@
+
+exec </dev/null
+
+HTTP_REFERER=DCC-2.3.167-script; export HTTP_REFERER
+
+DCC_HOMEDIR=@prefix@
+URL=http://www.iecc.com/dcc-testmsg-whitelist.txt
+TGT=testmsg-whitelist
+LOG=$TGT.log
+PGM=@FETCH_CMD@
+FORCE=
+
+USAGE="`basename $0`: [-xf] [-h homedir] [-p fetch-pgm] [-s src-URL]"
+while getopts "xfh:p:s:" c; do
+    case $c in
+	x) set -x;;
+	f) FORCE=yes;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	p) PGM="$OPTARG";;
+	s) URL="$OPTARG";;
+	*) echo 1>&2 "$USAGE"; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo 1>&2 "$USAGE"
+    exit 1
+fi
+
+
+FNAME=`expr "$URL" : '.*/\([^/][^/]*\)'`
+if test -z "$FNAME"; then
+    FNAME="$URL"
+    if test -z "$FNAME"; then
+	echo 1>&2 "source file not specified"
+	exit 1
+    fi
+fi
+
+cd "$DCC_HOMEDIR"
+
+# don't bother if the file exists and is no more than 2 weeks old
+if test -f "$TGT" -a -z "$FORCE"; then
+    if test "`find $TGT -mtime -7 -type f`"; then
+	date "+%n%x %X: $TGT is too recent to fetch again" >>$LOG
+	exit 0
+    fi
+fi
+
+# Delay for an arbitrary, somewhat random number of seconds to try to spread
+#   the load on the HTTP server for the list.
+#   Some versions of cksum yield 10 digit numbers that some versions of expr
+#   think are negative.
+RND=`ls -lia $DCC_HOMEDIR | cksum					\
+    | sed -e 's/[	 ]\{1,\}/ + /g' -e 's/\([0-9]\{6\}\)\([0-9]\)/\1 + \2/g'`
+RND=`expr \( $RND \) % 123`
+if test -z "$RND"; then
+    RND=0
+fi
+sleep $RND
+
+# use fetch, wget, curl, or ftp that understands URLs
+rm -f $FNAME
+PGM_B=`basename $PGM`
+if test "$PGM_B" = wget; then
+    PGM_B=
+    # Do not use wget --mirror because -r results in a 0 exit status
+    #   even on failure.
+    # Do not use --no-remove-listing, -nr, or --dont-remove-listing
+    #   because none of them are supported by all versions of wget.
+    # At least some versions of wget exit with 0 after having done
+    #   nothing but emitting a usage message.
+    if $PGM -nd --retr-symlinks -N --no-host-directories		\
+	    --passive-ftp @FETCH_WGET_OPTS@ $URL >$LOG 2>&1; then
+	if test -s $FNAME; then
+	    if test -n "`sed -n -e 2q					\
+		    -e 's/.*DOCTYPE.*/HTML/p'				\
+		    -e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p' $FNAME`"; then
+		rm $FNAME
+	    fi
+	fi
+    else
+	rm -f $FNAME
+    fi
+fi
+
+if test "$PGM_B" = fetch; then
+    PGM_B=
+    FETCH_BIND_ADDRESS=@FETCH_CMD_ADDR@ export FETCH_BIND_ADDRESS
+    $PGM -p -q -m $URL >$LOG 2>&1 || true
+fi
+
+if test "$PGM_B" = curl; then
+    PGM_B=
+    $PGM -s -S --connect-timeout 30 --max-time 600 \
+	@FETCH_CURL_OPTS@ $URL -o $FNAME >$LOG 2>&1 || true
+    # curl --fail does not work on at least some versions
+    if test -s $FNAME; then
+	if test -n "`sed -n -e 2q					\
+		    -e 's/.*DOCTYPE.*/HTML/p'				\
+		    -e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p' $FNAME`"; then
+	    rm $FNAME
+	fi
+    fi
+fi
+
+if test "$PGM_B" = ftp; then
+    PGM_B=
+    $PGM -p $URL >$LOG 2>&1 || true
+    # if that did not work, try ancient anonymous FTP
+    if test ! -s $FNAME; then
+	HOST=`expr "$URL" : "ftp://\([^/]*\)/"`
+	RFILE=`expr "$URL" : "ftp://[^/]*/\(.*\)"`
+	echo "try old anonymous FTP"
+	(echo "user anonymous `hostname`"; echo "get $RFILE $FNAME")	\
+	    | ftp -n $HOST
+    fi
+    # some versions of ftp like to leave empty files
+    if test ! -s $FNAME; then
+	rm -f $FNAME
+    fi
+fi
+# if some other program was specified, use it and hope it is simple enough
+if test -n "$PGM_B"; then
+    $PGM $URL || true
+fi
+
+if test ! -s "$FNAME"; then
+    echo 1>&2 "failed to fetch $FNAME with $PGM"
+    exit 1
+fi
+
+# work around wget timestamping
+#   We use the mtime of the file to reduce fetching of the file.
+#   We use `wget -N` to prevent .1 files
+touch $FNAME
+
+if test "$FNAME" != "$TGT"; then
+    mv -f "$FNAME" "$TGT"
+fi
+
+date "+%n%x %X: fetched $TGT" >>$LOG

@@ -1,0 +1,462 @@
+dccd(8)               Distributed Checksum Clearinghouse               dccd(8)
+
+NNAAMMEE
+     ddccccdd -- Distributed Checksum Clearinghouse Daemon
+
+SSYYNNOOPPSSIISS
+     ddccccdd [--ddVVbbffFFQQ] --ii _s_e_r_v_e_r_-_I_D [--nn _b_r_a_n_d] [--hh _h_o_m_e_d_i_r] --II [_h_o_s_t_-_I_D][_,_u_s_e_r]
+          [--aa [_s_e_r_v_e_r_-_a_d_d_r][_,_s_e_r_v_e_r_-_p_o_r_t]] [--qq _q_s_i_z_e]
+          [--GG [_o_n_,][_w_e_a_k_-_b_o_d_y_,][_w_e_a_k_-_I_P_,][_e_m_b_a_r_g_o][_,_w_i_n_d_o_w][_,_w_h_i_t_e]]
+          [--WW [_r_a_t_e][_,_c_h_g][_,_d_b_s_i_z_e]] [--KK [_n_o_-]_t_y_p_e] [--TT [_n_o_-]_t_r_a_c_e_m_o_d_e]
+          [--uu _a_n_o_n_-_d_e_l_a_y[_,_i_n_f_l_a_t_e]] [--CC _d_b_c_l_e_a_n] [--LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l]
+          [--RR [_R_L___S_U_B],[_R_L___A_N_O_N],[_R_L___A_L_L___A_N_O_N],[_R_L___B_U_G_S]]
+
+DDEESSCCRRIIPPTTIIOONN
+     DDccccdd receives reports of checksums related to mail received by DCC
+     clients and queries about the total number of reports of particular
+     checksums.  A DCC server never receives mail, address, headers, or other
+     information from clients, but only cryptographically secure checksums of
+     such information.  A DCC server cannot determine the text or other infor-
+     mation that corresponds to the checksums it receives.  It only acts as a
+     clearinghouse of total counts of checksums computed by clients.
+
+     Each DCC server is identified by a numeric _s_e_r_v_e_r_-_I_D.  Each DCC client is
+     identified by a _c_l_i_e_n_t_-_I_D, either explicitly listed in the _/_v_a_r_/_d_c_c_/_i_d_s
+     file or the special anonymous client-ID.  Many computers are expected to
+     share a single _c_l_i_e_n_t_-_I_D.  A _s_e_r_v_e_r_-_I_D is between 100 and 32768 while a
+     _c_l_i_e_n_t_-_I_D is between 32768 and 16777215.  DCC server-IDs need be known
+     only to DCC servers and the people running them.  The passwords associ-
+     ated with DCC server-IDs should be protected, because DCC servers listen
+     to commands authenticated with server-IDs and their associated passwords.
+     Each client that does not use the anonymous ID must know the client-ID
+     and password used by each of its servers.  A single client computer can
+     use different passwords with different server computers.  See the
+     _/_v_a_r_/_d_c_c_/_i_d_s file.
+
+     A _/_v_a_r_/_d_c_c_/_w_h_i_t_e_l_i_s_t of known good (or bad) sources of email prevents
+     legitimate mailing lists from being seen as unsolicited bulk email by DCC
+     clients.  The whitelist used by a DCC server is built into the database
+     when old entries are removed by dbclean(8).  Each DCC client has its own,
+     local whitelist, and in general, whitelists work better in DCC clients
+     than servers.
+
+     A ddccccdd _/_v_a_r_/_d_c_c_/_w_h_i_t_e_l_i_s_t file containing IP addresses that should be in
+     client _w_h_i_t_e_c_l_n_t files is useful.  When --TT _W_L_I_S_T tracing is enabled (as
+     it is by default), ddccccdd complains to the system log when an authenticated
+     client reports mail from IP addresses listed as _O_K, _M_X, or _M_X_D_C_C.  It is
+     often useful to have a _/_v_a_r_/_d_c_c_/_w_h_i_t_e_c_o_m_m_o_n file containing whitelisted
+     IP addresses.
+
+     The effectiveness of a Distributed Checksum Clearinghouse increases as
+     the number of subscribers increases.  Flooding reports of checksums among
+     DCC servers increases the effective number of subscribers to each server.
+     Each ddccccdd daemon tries to maintain TCP/IP connections to the other
+     servers listed in the _/_v_a_r_/_d_c_c_/_f_l_o_d file, and send them reports contain-
+     ing checksums with total counts exceeding thresholds.  Changes in the
+     flod file are noticed automatically within minutes.
+
+     Controls on report flooding are specified in the flod file.  Each line
+     specifies a hostname and port number to which reports should be flooded,
+     a server-ID to identify and authenticate the output stream, a server-ID
+     to identify and authenticate an input stream from the same server, and
+     flags with each ID.  The ability to delete reports of checksums is handy,
+     but could be abused.  If _d_e_l is not present among the _i_n_-_o_p_t_s options for
+     the incoming ID, incoming delete requests are logged and then ignored.
+     Floods from DCC "brands" that count only mail to spam traps and whose
+     servers use the --QQ option to count extremely bulk mail should be marked
+     with _t_r_a_p_s.  They can be seen as counting millions of targets, so the
+     _t_r_a_p_s flag on their _/_v_a_r_/_d_c_c_/_f_l_o_d file entry changes their incoming
+     flooded reports counts to _m_a_n_y_.
+
+     DDccccdd automatically checks its _/_v_a_r_/_d_c_c_/_f_l_o_d and _/_v_a_r_/_d_c_c_/_i_d_s files peri-
+     odically.  Cdcc(8) has the commands nneeww iiddss and fflloooodd cchheecckk to tell ddccccdd
+     to check those two files immediately.  Both files are also checked for
+     changes after the SIGHUP signal.
+
+   OOPPTTIIOONNSS
+     The following options are available.  Most of them should set by changing
+     the _/_v_a_r_/_d_c_c_/_d_c_c___c_o_n_f control file.
+
+     --dd   enables debugging output.  Additional --dd options increase the number
+          of messages.
+
+     --VV   displays the version of the DCC server daemon.  Two or more --VV
+          options show the options with which it was built.
+
+     --bb   causes the server to not detach itself from the controlling tty or
+          put itself into the background.
+
+     --FF   uses write() instead of mmap() and msync() in some cases to modify
+          the DCC database.  It is the default on Solaris except when the
+          database is in a memory mapped file system.  See --ff.
+
+     --ff   uses mmap() and msync() to modify the DCC database.  See --FF.
+
+     --QQ   causes the server to treat reports of checksums as queries except
+          from DCC clients marked trusted in the _/_v_a_r_/_d_c_c_/_i_d_s file with
+          _r_p_t_-_o_k.  See --uu to turn off access by anonymous or unauthenticated
+          clients.
+
+     --ii _s_e_r_v_e_r_-_I_D
+          specifies the ID of this DCC server.  Each server identifies itself
+          as responsible for checksums that it forwards to other servers.
+
+     --nn _b_r_a_n_d
+          is an arbitrary string of letters and numbers that identifies the
+          organization running the DCC server.  The brand is required, and
+          appears in the SMTP _X_-_D_C_C headers generated by the DCC.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.
+
+     --II [_h_o_s_t_-_I_D][_,_u_s_e_r]
+          sets the UID and GID of the process or the server's name for asser-
+          tions of its --ii _s_e_r_v_e_r_-_I_D flooded to peers.  The default name is the
+          first 16 characters of the host name.  If present, _u_s_e_r must be a
+          valid user name.
+
+     --aa [_s_e_r_v_e_r_-_a_d_d_r][_,_s_e_r_v_e_r_-_p_o_r_t]
+          adds an hostname or IP address to the list of local IP addresses
+          that the server answers.  Multiple --aa options can be used to specify
+          a subset of the available network interfaces or to use more than one
+          port number.  The default without any --aa options is to listen on all
+          local IP addresses.  It can be useful to list some of the IP
+          addresses of multi-homed hosts to deal with firewalls.  By default
+          _s_e_r_v_e_r_-_p_o_r_t is 6277 for DCC servers and 6276 for greylist servers.
+          It is the UDP port at which DCC requests are received and the TCP
+          port for incoming floods of reports.
+
+          If _s_e_r_v_e_r_-_a_d_d_r is absent and if the getifaddrs(8) function is sup-
+          ported, separate UDP sockets are bound to each configured network
+          interface so that each DCC clients receives replies from the IP
+          addresses to which corresponding request are sent.  If ddccccdd is
+          started before all network interfaces are turned on or there are
+          interfaces that are turned on and off or change their addresses such
+          as PPP interfaces, then the special string _@ should be used to tell
+          ddccccdd to bind to an INADDR_ANY UDP socket.
+
+          Outgoing TCP connections to flood checksum reports to other DCC
+          servers used the IP address of a single --aa option, but only if there
+          is single option that is not localhost.  See also the _/_v_a_r_/_d_c_c_/_f_l_o_d
+          file.
+
+     --qq _q_s_i_z_e
+          specifies the maximum size of the queue of requests from anonymous
+          or unauthenticated clients.  The default value is the maximum DCC
+          RTT in seconds times 200 or 1000.
+
+     --GG [_o_n_,][_w_e_a_k_-_b_o_d_y_,][_w_e_a_k_-_I_P_,][_e_m_b_a_r_g_o][_,_w_i_n_d_o_w][_,_w_h_i_t_e]
+          changes ddccccdd to a greylist server for dccm(8) or dccifd(8).
+          Greylisting consists of temporarily rejecting or embargoing mail
+          from unfamiliar combinations of SMTP client IP address, SMTP enve-
+          lope sender, and SMTP envelope recipient.  If the SMTP client per-
+          sists for _e_m_b_a_r_g_o _s_e_c_o_n_d_s and so is probably not an open proxy,
+          worm-infected personal computer, or other transient source of spam,
+          the triple of _(_I_P _a_d_d_r_e_s_s_,_s_e_n_d_e_r_,_r_e_c_i_p_i_e_n_t_) is added to a database
+          similar to the usual DCC database.  If the SMTP client does not try
+          again after _e_m_b_a_r_g_o seconds and before _w_i_n_d_o_w seconds after the
+          first attempt, the triple is forgotten.  If the SMTP client persists
+          past the embargo, the triple is added to the database and becomes
+          familiar and the message is accepted.  Familiar triples are remem-
+          bered for _w_h_i_t_e seconds after the last accepted mail message.  The
+          triple is forgotten if it is ever associated with unsolicited bulk
+          email.
+
+          All three durations can be a number of minutes, hours, days, or
+          weeks followed by _M_I_N_U_T_E_S, _M, _H_O_U_R_S, _H, _D_A_Y_S, _D, _W_E_E_K_S or _W.  The
+          default is --GG _2_7_0_s_e_c_o_n_d_s_,_7_d_a_y_s_,_6_3_d_a_y_s.  The first duration or the
+          _e_m_b_a_r_g_o should be longer than open proxies can linger retransmit-
+          ting.  The second _w_i_n_d_o_w time should be as long as legitimate mail
+          servers persist in retransmitting to recognize embargoed messages
+          whose retransmissions were not received because of network or other
+          problems.  The _w_h_i_t_e time should be long enough to recognize and not
+          embargo messages from regular senders.
+
+          Usually the DCC greylist system requires that an almost identical
+          copy of the message be retransmitted during the _e_m_b_a_r_g_o.  If
+          _w_e_a_k_-_b_o_d_y is present, any message with the same triple of sender IP
+          address, sender mail address, and target mail address ends the
+          embargo, even if the body of the message differs.
+
+          If _w_e_a_k_-_I_P is present, all mail from an SMTP client at an IP address
+          is accept after any message from the same IP address has been
+          accepted.
+
+          Unlike DCC checksums, the contents of greylist databases are private
+          and do not benefit from broad sharing.  However, large installations
+          can use more two or more greylist servers flooding triples among
+          themselves.  Flooding among greylist servers is controlled by the
+          _/_v_a_r_/_d_c_c_/_g_r_e_y___f_l_o_d file.
+
+          All greylist cooperating or flooding greylist servers _m_u_s_t use the
+          same --GG values.
+
+          Clients of greylist servers cannot be anonymous and must have
+          client-IDs and passwords assigned in the _/_v_a_r_/_d_c_c_/_i_d_s file.  This
+          implies that cdcc commands directed to greylist servers must specify
+          the server-ID.
+
+          White- and blacklists are honored by the DCC clients.  whitelisted
+          messages are embargoed or checked with a greylist server.  The
+          greylist triples of blacklisted messages, messages whose DCC counts
+          make them spam, and other messages known to be spam are sent to a
+          greylist server to be removed from the greylist database and cause
+          an embargo on the next messages with those triples.
+
+          Messages whose checksums match greylist server whitelists are not
+          embargoed and the checksums of their triples are not added to the
+          greylist database.
+
+          The target counts of embargoed messages are reported to the DCC net-
+          work to improve the detection of bulk mail.
+
+     --WW [_r_a_t_e][_,_c_h_g][_,_d_b_s_i_z_e]
+          controls quick database cleaning.  If the database is larger than
+          _d_b_s_i_z_e in MBytes, the database has not recently been cleand and is
+          not about to be cleaned, and ddccccdd is receiving fewer than _r_a_t_e
+          requests per second, or if telling DCC clients that the database is
+          about to be cleaned reduces the requests/second by _c_h_g_, then ddccccdd
+          starts dbclean(8) for a quick database cleaning.  The cleaning is
+          abandoned if it takes too long.
+
+          The defaults are equivalent to --WW _1_._0_,_4_0_._0_,_R_S_S where _R_S_S is the max-
+          imum dccd resident set size displayed in the system log when the
+          database is opened.  A rate of --WW _0_._0 disables quick cleanings.
+
+     --KK [_n_o_-]_t_y_p_e
+          marks checksums of _t_y_p_e (not) be kept or counted in the database
+          (unless they appear in the _/_v_a_r_/_d_c_c_/_w_h_i_t_e_l_i_s_t file).  Explicit set-
+          tings add to or remove from the initial contents of the list, which
+          is equivalent to --KK _B_o_d_y --KK _F_u_z_1 --KK _F_u_z_2.
+
+     --TT [_n_o_-]_t_r_a_c_e_m_o_d_e
+          causes the server to trace or record some operations.  _t_r_a_c_e_m_o_d_e
+          must be one of the following:
+            _A_D_M_N    administrative requests from the control program, cdcc(8)
+            _A_N_O_N    errors by anonymous clients
+            _C_L_N_T    errors by authenticated clients
+            _R_L_I_M    rate-limited messages
+            _Q_U_E_R_Y   all queries and reports
+            _R_I_D_C    some messages concerning the report-ID cache that is used
+                    to detect duplicate reports from clients
+            _F_L_O_O_D_1  messages about inter-server flooding connections
+            _F_L_O_O_D_2  messages about flooded reports
+            _B_L      requests from clients in the _/_v_a_r_/_d_c_c_/_b_l_a_c_k_l_i_s_t file.
+            _D_B      odd database events including long chains of duplicate
+                    checksums
+            _W_L_I_S_T   reports of whitelisted checksums from authenticated, not
+                    anonymous DCC clients
+          The default is _A_N_O_N _C_L_N_T _W_L_I_S_T except for a greylist server which
+          uses _A_N_O_N _C_L_N_T _W_L_I_S_T _I_D_S.
+
+     --uu _a_n_o_n_-_d_e_l_a_y[_,_i_n_f_l_a_t_e]
+          changes the number of milliseconds anonymous or unauthenticated
+          clients must wait for answers to their queries and reports.  The
+          purpose of this delay is to discourage large anonymous clients.  The
+          _a_n_o_n_-_d_e_l_a_y is multiplied by 1 plus the number of recent anonymous
+          requests from IPv4 addresses in a /24 block or IPv6 addresses a /56
+          block divided by the _i_n_f_l_a_t_e value.
+
+          The string _F_O_R_E_V_E_R turns off all anonymous or unauthenticated access
+          not only for checksum queries and reports but also cdcc(8) ssttaattss
+          requests.  A missing value for _i_n_f_l_a_t_e turns off inflation.
+
+          The default value is _5_0, except when --GG is used in which case
+          _F_O_R_E_V_E_R is assumed and required.
+
+     --CC _d_b_c_l_e_a_n
+          changes the default name or path of the program used to rebuild the
+          hash table when it becomes too full.  The default value is
+          _/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_d_b_c_l_e_a_n.  The value can include arguments as in _-_C
+          _'_/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_d_b_c_l_e_a_n _-_F_'.
+
+          Dbclean _s_h_o_u_l_d _n_o_t be run by ddccccdd except in emergencies such as
+          database corruption or hash table overflow.  Dbclean(8) should be
+          run daily with the @libexecdir@/cron-dccd cron script
+
+     --LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l
+          specifies how messages should be logged.  _L_t_y_p_e must be _e_r_r_o_r, _i_n_f_o,
+          or _o_f_f to indicate which of the two types of messages are being con-
+          trolled or to turn off all syslog(3) messages from ddccccdd.  _L_e_v_e_l must
+          be a syslog(3) level among _E_M_E_R_G, _A_L_E_R_T, _C_R_I_T, _E_R_R, _W_A_R_N_I_N_G, _N_O_T_I_C_E,
+          _I_N_F_O, and _D_E_B_U_G.  _F_a_c_i_l_i_t_y must be among _A_U_T_H, _A_U_T_H_P_R_I_V, _C_R_O_N,
+          _D_A_E_M_O_N, _F_T_P, _K_E_R_N, _L_P_R, _M_A_I_L, _N_E_W_S, _U_S_E_R, _U_U_C_P, and _L_O_C_A_L_0 through
+          _L_O_C_A_L_7.  The default is equivalent to
+                --LL _i_n_f_o_,_M_A_I_L_._N_O_T_I_C_E --LL _e_r_r_o_r_,_M_A_I_L_._E_R_R
+
+     --RR [_R_L___S_U_B],[_R_L___A_N_O_N],[_R_L___A_L_L___A_N_O_N],[_R_L___B_U_G_S]
+          sets one or more of the four rate-limits.  _R_L___S_U_B limits the number
+          of DCC transactions per second from subscribers or DCC clients with
+          known client-IDs and passwords.  This limit applies to each IP
+          address independently.
+
+          _R_L___A_N_O_N limits the number of DCC transactions per second from anony-
+          mous DCC clients.  This limit applies to each IP address indepen-
+          dently.  It is better to use --uu than to change this value to exclude
+          anonymous clients.
+
+          _R_L___A_L_L___A_N_O_N limits the number of DCC transactions per second from
+          all anonymous DCC clients.  This limit applies to all anonymous
+          clients as a group, regardless of their IP addresses.
+
+          _R_L___B_U_G_S limits the number of complaints or error messages per second
+          for all anonymous DCC clients as a group as well as for each DCC
+          client by IP address.
+
+          The default is equivalent to --RR _4_0_0_,_5_0_,_2_0_0_0_,_0_._1
+
+FFIILLEESS
+     @prefix@  is the DCC home directory containing data and control files.
+     dcc_conf  is the DCC control file.
+     dcc_db    is the database of mail checksums.
+     dcc_db.hash is the mail checksum database hash table.
+     grey_db   is the database of greylist checksums.
+     grey_db.hash is the greylist database hash table.
+     flod      contains lines controlling DCC flooding of the form:
+               _h_o_s_t[_,_r_p_o_r_t][_;_s_r_c[_,_l_p_o_r_t]] _r_e_m_-_I_D [_p_a_s_s_w_d_-_I_D [_o_-_o_p_t [_i_-_o_p_t]]]
+               where absent optional values are signaled with "-" and
+                _h_o_s_t is the IP address or name of a DCC server and _r_p_o_r_t is
+                    the name or number of the TCP port used by the remote
+                    server.
+                _s_r_c and _l_p_o_r_t are the source IP address or host name and TCP
+                    port from which the outgoing flooding connection should
+                    come.  The string _* specifies any source IP address.
+                    Incoming flooding connections must arrive at an address
+                    and port specified with --aa.
+                _r_e_m_-_i_d is the server-ID of the remote DCC server.
+                _p_a_s_s_w_d_-_I_D is a server-ID that is not assigned to a server, but
+                    whose first password is used to sign checksum reports sent
+                    to the remote system.  Either of its passwords are
+                    required with incoming reports.  If it is absent or "-",
+                    outgoing floods are signed with the first password of the
+                    local server in the _i_d_s file and incoming floods must be
+                    signed with either password of the remote server-ID.
+                _i_-_o_p_t and _o_-_o_p_t are comma separated lists of
+                     _o_f_f turns off flooding to the remote or local system.
+                     _n_o_-_d_e_l says checksum delete requests are refused by the
+                         remote or local server and so turns off sending or
+                         accepting delete requests, respectively.  By default,
+                         delete requests are sent to remote servers and
+                         accepted in incoming floods if and only if the peers
+                         are exchanging DCC reputations.
+                     _d_e_l says delete requests are accepted by the remote or
+                         local server.
+                     _n_o_-_l_o_g_-_d_e_l turns off logging of incoming requests to
+                         delete checksums.
+                     _p_a_s_s_i_v_e is used to tell a server outside a firewall to
+                         expect a peer inside to create both of the pair of
+                         input and output TCP connections used for flooding.
+                         The peer inside the firewall should use _S_O_C_K_S or _N_A_T
+                         on its _f_l_o_d file entry for this system.
+                     _S_O_C_K_S is used to tell a server inside a firewall that it
+                         should create both of the TCP connections used for
+                         flooding and that SOCKS protocol should be used.  The
+                         peer outside the firewall should use _p_a_s_s_i_v_e on its
+                         _f_l_o_d file entry for this system.
+                     _N_A_T differs from _S_O_C_K_S only by not using the SOCKS proto-
+                         col.
+                     _I_D_S_-_>_r_e_s_u_l_t converts server-IDs in flooded reports.  _I_D_S
+                         may be the string `self' to specify the server's own
+                         ID.  _I_D_S can instead be the string `all' to specify
+                         all server-IDs or a pair of server-IDs separated by a
+                         dash to specify an inclusive range.  _r_e_s_u_l_t can be
+                         the string `self' to translate to the server's own
+                         ID.  `ok' sends or receives reports without transla-
+                         tion.  The string `reject' to not send outgoing or
+                         refuse incoming reports.  Only the first matching
+                         conversion is applied.  For example, when
+                         `self->ok,all->reject' is applied to a locally gener-
+                         ated report, the first conversion is made and the
+                         second is ignored.
+                     _l_e_a_f_=_p_a_t_h_-_l_e_n does not send reports with paths longer
+                         than _p_a_t_h_-_l_e_n server-IDs.  A _p_a_t_h_-_l_e_n of 0 blocks
+                         reports from this server.
+                     _I_P_v_4 requires only IPv4 addresses to connect to this
+                         flooding peer.
+                     _I_P_v_6 requires only IPv6 addresses to connect to this
+                         flooding peer.
+                     _v_e_r_s specifies the version of the DCC flooding protocol
+                         used by the remote DCC server with a string such as
+                         `version2'.
+                     _t_r_a_c_e_1 sends information about a single peer like the
+                         cdcc(8) command ttrraaccee FFLLOOOODD11 oonn does for all peers.
+                     _t_r_a_c_e_2 sends information about individual flooded reports
+                         like the cdcc(8) command ttrraaccee FFLLOOOODD22 oonn does for all
+                         peers.
+     grey_flod is the equivalent of the _/_v_a_r_/_d_c_c_/_f_l_o_d file used by ddccccdd when
+               it is a greylist server.
+     flod.map  is an automatically generated file in which ddccccdd records its
+               progress sending or flooding reports to DCC peers.
+     grey_flod.map is the equivalent of the _/_v_a_r_/_d_c_c_/_f_l_o_d_._m_a_p file used by
+               ddccccdd when it is a greylist server.
+     ids       contains the IDs and passwords known by the DCC server.  An _i_d_s
+               file that can be read by others cannot be used.  It contains
+               blank lines, comments starting with "#" and lines of the form:
+                     _i_d[_,_r_p_t_-_o_k][_,_n_o_-_r_e_p_s][_,_t_r_a_c_e][_,_d_e_l_a_y_=_m_s[_*_i_n_f_l_a_t_e]] _p_a_s_s_1
+                     [_p_a_s_s_2]
+               where
+                _i_d  is a DCC _c_l_i_e_n_t_-_I_D or _s_e_r_v_e_r_-_I_D.
+                _t_r_a_c_e logs activity from clients and flooding peers using the
+                    ID.
+                _r_p_t_-_o_k overrides --QQ by saying that this client is trusted to
+                    report only checksums for unsolicited bulk mail.
+                _n_o_-_r_e_p_s disables DCC Reputation reports from and responses to
+                    clients using this ID.
+                _d_e_l_a_y_=_m_s[_*_i_n_f_l_a_t_e] delays answers to systems using the client
+                    _i_d.  The _d_e_l_a_y in milliseconds is multiplied by 1 plus the
+                    number of recent requests from an IP address using _i_d
+                    divided by the _i_n_f_l_a_t_e value.  See --uu.
+                _p_a_s_s_1 is the password currently used by clients with identi-
+                    fier _i_d.  It is a 1 to 32 character string that does not
+                    contain blank, tab, newline or carriage return characters.
+                _p_a_s_s_2 is the optional next password that those clients will
+                    use.  A DCC server accepts either password if both are
+                    present in the file.
+               Both passwords can be absent if the entry not used except to
+               tell ddccccdd that server-IDs in the flooded reports are valid.
+               The string _u_n_k_n_o_w_n is equivalent to the null string.
+     whitelist contains the DCC server whitelist.  It is not used directly but
+               is loaded into the database when dbclean(8) is run.
+     grey_whitelist contains the greylist server whitelist.  It is not used
+               directly but is loaded into the database when dbclean(8) is run
+               with --GG.
+     blacklist if present, contains a list of IP addresses and blocks of IP
+               addresses of DCC clients and flooding peers that are ignored.
+               Each line in the file should be blank, a comment starting with
+               '#', or an IP address or block of IP addresses in the form
+                     [_t_r_a_c_e_,][_o_k_,][_b_a_d_,][_n_o_-_a_n_o_n][_f_l_o_o_d_-_o_k] _a_d_d_r_e_s_s
+               Addresses are single IPv4 or IPv6 addresses, CIDR blocks in the
+               usual form, or a pair of addresses separated by a hyphen (-)
+               specifying an inclusive range.  The last line in the file that
+               cover an address applies.  Changes to the file are automati-
+               cally noticed within a few minutes.  An IP address is assigned
+               all of the flags from all of lines that apply to it.  Addresses
+               or blocks of addresses can be preceded with _o_k to "punch holes"
+               in blacklisted blocks or specify tracing without blacklisting.
+               _T_r_a_c_e logs activity.  _N_o_-_a_n_o_n blacklists clients only when they
+               use the anonymous client-ID.  _f_l_o_o_d_-_o_k says that DCC flood
+               peering is allowed.  _B_a_d is assumed when only an address is
+               present.  This mechanism is intended for no more than a few
+               dozen blocks of addresses.
+     dccd_clients contains client IP addresses and activity counts.
+     grey_clients contains greylist client IP addresses and activity counts.
+
+EEXXAAMMPPLLEESS
+     ddccccdd is usually started with other system daemons with something like the
+     script _/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_r_c_D_C_C.  That scripts uses values in
+     @prefix@/dcc_conf to start the server.  With the argument _s_t_o_p,
+     _/_v_a_r_/_d_c_c_/_l_i_b_e_x_e_c_/_r_c_D_C_C can be used to stop the daemon.
+
+     The database grows too large unless old reports are removed.  dbclean(8)
+     should be run daily with the @libexecdir@/cron-dccd cron(8) script
+
+SSEEEE AALLSSOO
+     cdcc(8), dcc(8), dbclean(8), dblist(8), dccifd(8), dccm(8), dccproc(8).
+     dccsight(8),
+
+HHIISSTTOORRYY
+     ddccccdd is based on an idea from Paul Vixie.  It was designed and written at
+     Rhyolite Software, starting in 2000.  This document describes version
+     2.3.167.
+
+                                 June 19, 2019

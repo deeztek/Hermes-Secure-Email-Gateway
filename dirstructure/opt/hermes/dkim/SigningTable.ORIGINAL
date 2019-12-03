@@ -1,0 +1,15 @@
+#This table is used to select one or more signatures to apply to a message based on the address found in the From: header field. Keys in this table vary depending on the type of table used; values in this data set should include one field that contains a name found in the KeyTable that identifies which key should be used in generating the signature, and an optional second field naming the signer of the message that will be included in the .i=. tag in the generated signature.
+
+#If the first field contains only a .%. character, it will be replaced by the domain found in the From: header field. Similarly, within the optional second field, any .%. character will be replaced by the domain found in the From: header field.
+
+#If this table specifies a regular expression file (.refile.), then the keys are wildcard patterns that are matched against the address found in the From: header field. Entries are checked in the order in which they appear in the file.
+
+#For all other database types, the full user@host is checked first, then simply host, then user@.domain (with all superdomains checked in sequence, so .foo.example.com. would first check .user@foo.example.com., then .user@.example.com., then .user@.com.), then .domain, then user@*, and finally *.
+
+#In any case, only the first match is applied, unless MultipleSignatures is enabled in which case all matches are applied.
+
+#A working signingTable will look like this:
+
+#*@domain.tld default._domainkey.domain.tld
+#*@joseairosa.com mail._domainkey.example1.com
+#*@porvocacao.com mail._domainkey.example2.com

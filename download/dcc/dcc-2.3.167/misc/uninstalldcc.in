@@ -1,0 +1,87 @@
+#! /bin/sh
+
+# Delete most DCC files.
+#   Some logs configuration files with locally chosen parameters in @prefix@
+#   are not deleted.
+#   Manual changes such as links to @libexecdir@/rcDCC or the
+#   installation of the cron job, @libexecdir@/cron-dccd, are not reversed.
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+
+# Rhyolite Software DCC 2.3.167-1.4 $Revision$
+# @configure_input@
+
+DCC_HOMEDIR=@prefix@
+DCC_LIBEXEC=@libexecdir@	    # in case dcc_conf has disappeared
+. $DCC_HOMEDIR/dcc_conf
+BDIR=$DCC_HOMEDIR/build
+DCCBDIR=$BDIR/dcc
+
+USAGE=`basename $0`': [-x]'
+while getopts "x" c; do
+    case $c in
+    x) set -x; DEBUG=-x;;
+    *) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2; exit 1
+fi
+
+
+echo "This script will delete most of a DCC client and server installed"
+echo "with the official DCC Makefiles in $DCCBDIR."
+echo "Are you sure you want to proceed?  " | tr -d '\012'
+read OK
+case $OK in
+    [yY][eE][sS]) ;;
+    *) echo "ok, nothing deleted"; exit;;
+esac
+
+if test ! -f $DCCBDIR/Makefile; then
+    $DCC_LIBEXEC/updatedcc -U
+    if test ! -f $DCCBDIR/Makefile; then
+	echo "This script can only be run after $DCC_LIBEXEC/updatedcc has"
+	echo "installed the offical Makefiles in $DCCBDIR"
+	exit 1
+    fi
+fi
+
+$DCC_LIBEXEC/rcDCC $DEBUG stop
+cd $DCCBDIR
+@DCCMAKE@ uninstall purge
+rm -f $BDIR/dcc.tar.Z \
+    $DCC_HOMEDIR/flod.map $DCC_HOMEDIR/grey_flod.map			    \
+    $DCC_HOMEDIR/dcc_db $DCC_HOMEDIR/dcc_db.hash $DCC_HOMEDIR/dcc_db-old    \
+    $DCC_HOMEDIR/grey_db $DCC_HOMEDIR/grey_db.hash $DCC_HOMEDIR/grey_db-old \
+    $DCC_HOMEDIR/testmsg-whitelist $DCC_HOMEDIR/testmsg-whitelist.log	    \
+    $DCC_HOMEDIR/*.dccw $DCC_HOMEDIR/*.dccx
+for DIR in `find $DCC_HOMEDIR -depth -type d` $DCC_LIBEXEC $DCC_RUNDIR; do
+    if test -d $DIR; then
+	find $DIR -depth -type d | @DCC_XARGS@ rmdir || true
+    fi
+done
+
+echo
+echo "Some of your configuration and log files remain in $DCC_HOMEDIR"
+

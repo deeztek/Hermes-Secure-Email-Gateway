@@ -1,0 +1,146 @@
+#! /bin/sh -e
+
+# create a per-user whitelist target directory, password, and so forth.
+
+# This script creates the directories needed for per-addressee white
+#   lists and log directories.  It also runs htpasswd to create an entry
+#   in the Apache password file for the userdirs directory.
+
+# The files and directories must be writable by both the httpd and dccm
+#   processes.  That is assumed to be arranged by having the processes share
+#   a group such as "www" and using a umask of 007.
+#   The dccm log directories and files should not be globally readable
+#   to protect the privacy of mail.
+#   If dccm is run by a "user" such as "dcc", you might be able to
+#   use suEXEC.  You might need to make a symbolic link of ~dcc/public_html"
+#   to ~dcc/userdirs.
+
+# The web "usernames" are related the per-user whitelist directory names
+#   seen in env_To lines in DCC log files.  The whitelist and log directory in
+#   "userdirs/local/xxx" is accessed with the user name "xxx".
+#   "userdirs/esmtp/xxx@example.com" uses the user name "esmtp/xxx@example.com
+
+# An additional directory named @prefix@/userdirs/tmp is created for the
+#   CGI scripts that manage the per-user whitelists and logs.
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.15 $Revision$
+#	@configure_input@
+
+
+exec 1>&2 </dev/null
+
+@NO_SUID@
+
+# Since the CGI scripts cannot accept args and so must rely on the
+#   DCC parameter file in the built-in homedir, do the same here.
+DCC_HOMEDIR=@prefix@
+. $DCC_HOMEDIR/dcc_conf
+
+USAGE="`basename $0`: [-x] [-p htpasswd-pgm] [-g group] [-P whiteclnt-prototype] username"
+HTPASSWD=@HTPASSWD@
+GROUP=www
+PROTO=
+while getopts "xp:g:P:" c; do
+    case $c in
+	x) set -x;;
+	p) HTPASSWD=$OPTARG;;
+	g) GROUP="$OPTARG";;	    #GID shared with httpd
+	P) PROTO="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 1 -o -z "$1"; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+USER=$1
+
+if test -z "$DCCM_USERDIRS"; then
+    cat <<EOF 1>&2
+Per-user whitelists require DCCM_USERDIRS defined in $DCC_HOMEDIR/dcc_conf.
+Please consider installing a new version of dcc_conf.
+EOF
+    exit 1
+fi
+
+if test ! -r $DCC_HOMEDIR/ids; then
+    if test -n "$DCCUID"; then
+	echo "`basename $0: must be run by root or $DCCUID" 1>&2
+    else
+	echo "`basename $0: must be run by root" 1>&2
+    fi
+    exit 1
+fi
+
+
+USERDIRS=$DCC_HOMEDIR/$DCCM_USERDIRS
+WEBUSERS=$USERDIRS/webusers
+TMP_DIR=$USERDIRS/tmp
+USER=`expr "$USER" : "$DCCM_USERDIRS/\(.*\)" \| "$USER"`
+LOCAL_DIR=`expr "$USER" : '\(..*\)/..*' || true`
+if test -z "$LOCAL_DIR"; then
+    LOCAL_DIR="$USERDIRS/local"
+    PER_USER="$USERDIRS/local/$USER"
+else
+    USER=`expr "$USER" : 'local/\(.*\)' \| "$USER"`
+    LOCAL_DIR="$USERDIRS/$LOCAL_DIR"
+    PER_USER="$USERDIRS/$USER"
+fi
+
+# create the directories
+#   (some systems don't have `mkdir -p`)
+for nm in "$USERDIRS" "$TMP_DIR" "$LOCAL_DIR" "$PER_USER" "$PER_USER/log"; do
+    if test ! -d "$nm"; then
+	mkdir "$nm"
+    fi
+done
+
+# create the initial whiteclnt file
+#   copy the prototype
+if test ! -s $PER_USER/whiteclnt; then
+    date "+# whitelist for $USER%n#%n#%n#webuser created %x %X %Z%n" \
+	> "$PER_USER/whiteclnt"
+    if test "$PROTO" != ""; then
+	cat "$PROTO" >> "$PER_USER/whiteclnt"
+    fi
+fi
+
+# Add the username and password to the htpasswd file
+#   Create the htpasswd file for the first user.
+if test ! -f $WEBUSERS; then
+    $HTPASSWD -c $WEBUSERS "$USER"
+else
+    $HTPASSWD $WEBUSERS "$USER"
+fi
+
+# set permissions of existing files and directories in case they're wrong
+chgrp $GROUP "$USERDIRS" "$TMP_DIR" "$PER_USER" "$PER_USER/log"
+chgrp $GROUP "$PER_USER/whiteclnt" $WEBUSERS
+if test -n "$DCCUID" -a -z "$NO_SUID"; then
+    chown $DCCUID $WEBUSERS "$USERDIRS" "$TMP_DIR" "$LOCAL_DIR"
+    chown $DCCUID "$PER_USER" "$PER_USER/log" "$PER_USER/whiteclnt"
+fi
+chmod g=rwx "$USERDIRS" "$TMP_DIR" "$PER_USER" "$PER_USER/log"
+chmod g=rw "$PER_USER/whiteclnt" $WEBUSERS
+chmod o= "$PER_USER/log" $WEBUSERS

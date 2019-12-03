@@ -1,0 +1,119 @@
+#! /bin/sh
+
+# start dccd
+# This script assumes that it is being run by root or the DCC user, probably
+# while the system is starting.  If start-dccm or start-dccifd,
+# This script should be run before both of them to # avoid complaints.
+# See the misc/rcDCC script.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.57 $Revision$
+#	@configure_input@
+
+exec 1>&2 </dev/null
+
+LOGGER_TAG=start-dccd
+DCC_LOGGER="@DCC_LOGGER@"
+DCC_HOMEDIR=@prefix@
+VERBOSE=
+DEBUG=
+STOP_ARGS=
+# check the args once to get the home directory
+while getopts ":xvh:u:a:i:n:" c; do
+    case $c in
+	x) set -x; DEBUG=-x; VERBOSE=-v;;
+	v) VERBOSE=-v;;
+	h) CWD=`pwd`
+	    DCC_HOMEDIR=`echo "$OPTARG" | sed -e "s@^[^/]@$CWD/&@"`;;
+	*) ;;
+    esac
+done
+if test ! -s $DCC_HOMEDIR/dcc_conf; then
+    eval $DCC_LOGGER \"cannot find $DCC_HOMEDIR/dcc_conf\"
+fi
+. $DCC_HOMEDIR/dcc_conf
+# deal with bash reserved $UID and old versions of dcc_conf
+if test 0"$DCC_CONF_VERSION" -lt 2 -a -z "$DCCUID" -a -n "$UID"; then
+    DCCUID="$UID"
+fi
+DCCD_ARGS="$DCC_LOG_ARGS $DCCD_ARGS"
+
+USAGE="`basename $0`: [-xv] [-h homedir] [-u UID] [-a args] [-i id] [-n brand]"
+OPTIND=1
+while getopts "xvh:u:a:i:n:" c; do
+    case $c in
+	x) ;;
+	v) ;;
+	h) ;;
+	u) DCCUID="$OPTARG";;
+	a) DCCD_ARGS="$DCCD_ARGS $OPTARG";;
+	i) SRVR_ID="$OPTARG"; STOP_ARGS="$STOP_ARGS -i $SRVR_ID";;
+	n) BRAND="$OPTARG";;
+	*) eval $DCC_LOGGER \"$USAGE\"; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    eval $DCC_LOGGER \"$USAGE\"
+    exit 1
+fi
+
+if test "$DCC_HOMEDIR" != @prefix@; then
+    DCCD_ARGS="-h$DCC_HOMEDIR $DCCD_ARGS"
+    STOP_ARGS="-h$DCC_HOMEDIR $STOP_ARGS"
+fi
+if test "$BRAND" != ""; then
+    BRAND="-n $BRAND"
+fi
+DCCD_ARGS="-i$SRVR_ID $BRAND $DCCD_ARGS"
+
+# stop the current daemon, including giving it time to shut down gracefully
+$DCC_LIBEXEC/stop-dccd $DEBUG $VERBOSE $STOP_ARGS
+
+# tell dccd where to find dbclean if it is not where dccd was built to look.
+if test "$DCC_LIBEXEC" != @libexecdir@; then
+    DCCD_ARGS="-C $DCC_LIBEXEC/dbclean $DCCD_ARGS"
+fi
+
+# assume unset DCCD_ENABLE is "on" for upward compatibility
+case "$DCCD_ENABLE" in
+    [oO][fF][fF]) exit 0;;
+esac
+if test ! -x $DCC_LIBEXEC/dccd; then
+    eval $DCC_LOGGER \"cannot start dcccd because dccd has not been installed\"
+    exit 1
+fi
+if test -z "$SRVR_ID"; then
+    eval $DCC_LOGGER \"'cannot start dccd; SRVR_ID not set in $DCC_HOMEDIR/dcc_conf'\"
+    exit 1
+fi
+
+# first try to use `su -` to set limits
+#   fall back to -I for systems where su requires a valid shell in
+#	/etc/passwd but the dcc user does not have one
+if test -n "$DCCUID" -a X"$DCCUID" != X"$USER"; then
+    if @DCC_SU@ $DCCUID -c date >/dev/null 2>&1; then
+	@DCC_SU@ $DCCUID -c "$DCC_LIBEXEC/dccd $DCCD_ARGS"
+	exit
+    fi
+    DCCD_ARGS="-I,$DCCUID $DCCD_ARGS"
+fi
+eval $DCC_LIBEXEC/dccd $DCCD_ARGS

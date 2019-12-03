@@ -1,0 +1,178 @@
+#! /bin/sh
+
+# chkconfig: 2345 40 80
+# description: rcDCC is a startup script for DCC  https://www.rhyolite.com/dcc/
+# processname: dccd
+# processname: dccm
+# processname: dccifd
+
+### BEGIN INIT INFO
+# Provides:	    dccd dccm dccifd
+# Required-Start:   $network $named $syslog $time
+# Should-Start:	    ypbind sendmail
+# Required-Stop:
+# Should-Stop:
+# Default-Start:    2 3 4 5
+# Default-Stop:	    0 1 6
+# Short-Description: DCC daemons providing mail filtering
+# Description:       Start dccm, dccifd, and/or dccd to support DCC mail
+#	filtering via sendmail, postfix, or SpamAssassin
+### END INIT INFO
+
+
+
+# start or stop dccd, dccifd, and dccm for Solaris, System V, IRIX,
+#   Redhat Linux, or FreeBSD
+
+# dccm must be started before sendmail and stopped after sendmail to avoid
+#   complaints from sendmail
+# dccd must be should before the first mail message arrives
+# Thus on some Solaris systems, this script can be installed as
+#   rc0.d/K37DCC  rc1.d/K37DCC  rc2.d/S88DCC  rcS.d/K37DCC
+# On some Linux systems it can be installed as rc.d/init.d/DCC and linked
+#   to rc.d/rc0.d/K31DCC rc.d/rc1.d/K31DCC rc.d/rc2.d/S80DCC rc.d/rc3.d/S80DCC
+#   rc.d/rc4.d/S80DCC rc.d/rc5.d/S80DCC and rc.d/rc6.d/K31DCC
+# On other Linux systems such as SUSE, link this script to /etc/init.d/DCC and
+#   run `insserv DCC`
+# On FreeBSD 5.* and 6.* systems, link this file to
+#	/usr/local/etc/rc.d/rcDCC.sh
+# PROVIDE: dcc
+# REQUIRE: NETWORKING
+# BEFORE: mail
+# KEYWORD: shutdown
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.43 $Revision$
+#	@configure_input@
+
+
+DCC_HOMEDIR=@prefix@
+DCC_LIBEXEC=@libexecdir@	    # in case dcc_conf has disappeared
+. $DCC_HOMEDIR/dcc_conf
+if test -z "$DCC_RUNDIR" -a -n "$DCCM_RUNDIR"; then
+    # deal with old dcc_conf files
+    DCC_RUNDIR="$DCCM_RUNDIR"
+fi
+
+USAGE="`basename $0`: [-x] [-m dccd|dccifd|dccm|grey] start|stop"
+
+DEBUG=
+DAEMON=
+while getopts "xm:" c; do
+    case $c in
+	x) set -x; DEBUG=-x;;
+	m) if test "$OPTARG" = dccd -o "$OPTARG" = dccifd		\
+			-o "$OPTARG" = dccm -o "$OPTARG" = grey; then
+		DAEMON=$OPTARG
+	    else
+		echo "unrecognized daemon $OPTARG" 1>&2
+		DAEMON=
+	    fi
+	    ;;
+	*) echo "$USAGE" 1>&2;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+
+
+MODULE=
+if test `uname` = Linux; then
+    # Convince the Redhat shutdown mechanism to invoke us at shutdown
+    # by including this string:
+    # . /etc/rc.d/init.d/functions
+
+    # Some Linux systems need a module name in /var/lock/subsys that matches
+    # the name to which this script is linked to /etc/rc.d/rc?.d for the
+    # shutdown or Kxx script.
+    MODULE=`basename $0 | sed -n -e 's/^[SK][0-9][0-9]\(.*\)/\1/p'`
+    # If @libexecdir@/updatedcc runs @libexecdir@/rcDCC,
+    #	then the running name of this program will not be the
+    #	needed module name
+    if test -z "$MODULE" -a -d /etc/rc.d; then
+	for NM in `find /etc/rc.d -follow -name 'K[0-9][0-9]*dcc*'	\
+				-o -name 'K[0-9][0-9]*DCC*'`; do
+	  # The random string ddb7d6d95cbf42fd4fdb is extremely unlikely to
+	  # appear in any file other than this file.
+	  if grep ddb7d6d95cbf42fd4fdb $NM >/dev/null 2>&1; then
+	      MODULE=`basename $NM | sed -e 's/^K[0-9][0-9]//'`
+	      break
+	  fi
+	done
+    fi
+fi
+
+
+case "$1" in
+start|faststart|restart|reload)
+	if test -z "$DAEMON" -o "$DAEMON" = dccd; then
+	    $DCC_LIBEXEC/start-dccd $DEBUG
+	fi
+	if test -z "$DAEMON" -o "$DAEMON" = grey; then
+	    $DCC_LIBEXEC/start-grey $DEBUG
+	fi
+	if test -z "$DAEMON" -o "$DAEMON" = dccm; then
+	    $DCC_LIBEXEC/start-dccm $DEBUG
+	fi
+	if test -z "$DAEMON" -o "$DAEMON" = dccifd; then
+	    $DCC_LIBEXEC/start-dccifd $DEBUG
+	fi
+	if test -n "$MODULE" -a -d /var/lock/subsys; then
+	    touch /var/lock/subsys/$MODULE
+	fi
+	;;
+
+stop)
+	# stop dccm and dccifd
+	PIDS=
+	if test -z "$DAEMON" -o "$DAEMON" = dccm; then
+	    PIDS="$PIDS `cat $DCC_RUNDIR/dccm.pid 2>/dev/null`"
+	    PIDS="$PIDS `cat $DCC_HOMEDIR/dccm.pid 2>/dev/null`"
+	fi
+	if test -z "$DAEMON" -o "$DAEMON" = dccifd 2>/dev/null; then
+	    PIDS="$PIDS `cat $DCC_RUNDIR/dccifd.pid 2>/dev/null`"
+	    PIDS="$PIDS `cat $DCC_HOMEDIR/dccifd.pid 2>/dev/null`"
+	fi
+	if expr "$PIDS" : '.*[0-9]' >/dev/null; then
+	    # signal the process group because on Linux systems signaling the
+	    # main process for a threaded application does not work.
+	      kill -15 $PIDS
+	fi
+	# Tell dccd about operating system shutdown, including deleting
+	# dcc_db.hash, which will be rebuilt by dbclean when dccd is restarted.
+	if test -z "$DAEMON" -o "$DAEMON" = grey; then
+	    $DCC_LIBEXEC/stop-dccd -G -S $DEBUG
+	fi
+	if test -z "$DAEMON" -o "$DAEMON" = dccd; then
+	    $DCC_LIBEXEC/stop-dccd -S $DEBUG
+	fi
+	if test -n "$MODULE" -a -f /var/lock/subsys/$MODULE; then
+	    rm /var/lock/subsys/$MODULE
+	fi
+	;;
+
+*)
+	echo "$USAGE" 1>&2
+	exit 1
+	;;
+
+esac
+exit 0

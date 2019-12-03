@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <TITLE>dccsight.8</TITLE>
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <STYLE type="text/css">
+	BODY {background-color:white; color:black}
+	ADDRESS {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+    </STYLE>
+</HEAD>
+<BODY>
+<PRE>
+<!-- Manpage converted by man2html 3.0.1 -->
+<B>dccsight(8)</B>           Distributed Checksum Clearinghouse           <B>dccsight(8)</B>
+
+
+</PRE>
+<H2 ID="NAME">NAME</H2><PRE>
+     <B>dccsight</B> -- Distributed Checksum Clearinghouse raw checksum interface
+
+
+</PRE>
+<H2 ID="SYNOPSIS">SYNOPSIS</H2><PRE>
+     <B>dccsight</B> [<B>-VdPQC</B>] [<B>-h</B> <I>homedir</I>] [<B>-m</B> <I>map</I>] [<B>-w</B> <I>whiteclnt</I>] [<B>-t</B> <I>targets</I>]
+              [<B>-i</B> <I>infile</I>] [<B>-L</B> <I>ltype,facility.level</I>]
+
+
+</PRE>
+<H2 ID="DESCRIPTION">DESCRIPTION</H2><PRE>
+     <B>Dccsight</B> reads one or more lines containing DCC checksums, reports them
+     to a DCC server, and writes a X-DCC header line.  It can be used to
+     report checksums obtained from <B><A HREF="dccproc.html">dccproc(8)</A></B> using <B>-C</B>.
+
+   <B ID="OPTIONS">OPTIONS</B>
+     The following options are available:
+
+     <B ID="OPTION-V">-V</B>   displays the version of the DCC raw checksum interface.  Two or more
+          <B>-V</B> options show the options with which it was built.
+
+     <B ID="OPTION-d">-d</B>   enables debugging output from the DCC client software.  Additional
+          <B>-d</B> options increase the number of messages.
+
+     <B ID="OPTION-P">-P</B>   The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP
+          header fields, but historically has looked for counts of "many".
+          However, there are situations when <B>dccsight</B> knows that a mail mes-
+          sage is extremely bulky and probably spam.  For example, mail from a
+          sender that is blacklisted in <I>whiteclnt</I> gets an X-DCC header that
+          includes <I>bulk</I>.  To acommodate that bug in SpamAssassin, by default
+          whenever <B>dccsight</B> generates an X-DCC header containing "bulk", it
+          also forces the <I>Body</I> count to "many".  <B>-P</B> turns off that kludge and
+          the <I>Body</I> contains the count from the DCC server.
+
+     <B ID="OPTION-Q">-Q</B>   only queries the DCC server about the checksums of messages instead
+          of reporting.  This is useful when <B>dccsight</B> is used to filter mail
+          that has already been reported to a DCC server by another DCC
+          client.  No single mail message should be reported to a DCC server
+          more than once per recipient, because each report will increase the
+          apparent "bulkness" of the message.
+
+          It is better to use <I>MXDCC</I> lines in the global <I>@prefix@/whiteclnt</I>
+          file for your MX mail servers that use DCC than to use <B>-Q</B> with
+          <B>dccsight</B>.
+
+          Do not use <B>-Q</B> except on mail that you know has been reported to a
+          DCC server.  DCC depends on reports of all except known private mail
+          and works only because almost no DCC installations use <B>-Q</B>.
+
+     <B ID="OPTION-C">-C</B>   outputs the checksums for the message as well as the X-DCC header.
+
+     <B ID="OPTION-h">-h</B> <I>homedir</I>
+          overrides the default DCC home directory, <I>@prefix@</I>.
+
+     <B ID="OPTION-m">-m</B> <I>map</I>
+          specifies a name or path of the memory mapped parameter file instead
+          of the default <I>@prefix@/map</I> in the DCC home directory.  It should be
+          created with the <B><A HREF="cdcc.html">cdcc(8)</A></B> command.
+
+     <B ID="OPTION-w">-w</B> <I>whiteclnt</I>
+          specifies an optional file containing SMTP client IP addresses and
+          SMTP headers of mail that do not need X-DCC headers and whose check-
+          sums should not be reported to the DCC server.  It can also contain
+          checksums of spam.  If the pathname is not absolute, it is relative
+          to the DCC home directory.  Thus, individual users with private
+          whitelists usually specify them with absolute paths.  It is useful
+          to <I>include</I> a common or system-wide whitelist in private lists.
+
+          The format of the <B>dccsight</B> whiteclnt file is the same as the
+          <I>@prefix@/whitelist</I> file required by <B><A HREF="dbclean.html">dbclean(8)</A></B> and <B>dccsight(8)</B>.
+          Because this list is used frequently, a companion file is used.  It
+          has the same pathname but with an added suffix of <I>.dccw</I>.  After
+          being created empty, it will contain an automatic memory mapped hash
+          table of the main file.
+
+     <B ID="OPTION-t">-t</B> <I>targets</I>
+          specifies the number of addressees of the message if other than 1.
+          The string <I>many</I> instead of a number asserts that there were too many
+          addressees and that the message is unsolicited bulk email.
+
+     <B ID="OPTION-i">-i</B> <I>infile</I>
+          specifies an input file instead of standard input.  If not absolute,
+          the pathname is interpreted relative to the directory in which
+          <B>dccsight</B> was started.
+
+     <B ID="OPTION-L">-L</B> <I>ltype,facility.level</I>
+          specifies how messages should be logged.  <I>Ltype</I> must be <I>error</I>, <I>info</I>,
+          or <I>off</I> to indicate which of the two types of messages are being con-
+          trolled or to turn off all <B>syslog(3)</B> messages from <B>dccsight</B>.  <I>Level</I>
+          must be a <B>syslog(3)</B> level among <I>EMERG</I>, <I>ALERT</I>, <I>CRIT</I>, <I>ERR</I>, <I>WARNING</I>,
+          <I>NOTICE</I>, <I>INFO</I>, and <I>DEBUG</I>.  <I>Facility</I> must be among <I>AUTH</I>, <I>AUTHPRIV</I>,
+          <I>CRON</I>, <I>DAEMON</I>, <I>FTP</I>, <I>KERN</I>, <I>LPR</I>, <I>MAIL</I>, <I>NEWS</I>, <I>USER</I>, <I>UUCP</I>, and <I>LOCAL0</I>
+          through <I>LOCAL7</I>.  The default is equivalent to
+                <B>-L</B> <I>info,MAIL.NOTICE</I> <B>-L</B> <I>error,MAIL.ERR</I>
+
+     <B>dccsight</B> exits 0 on success, and &gt;0 if an error occurs.
+
+
+</PRE>
+<H2 ID="FILES">FILES</H2><PRE>
+     <SPAN="FILE-@prefix@">@prefix@</SPAN>   DCC home directory.
+     <SPAN="FILE-map">map</SPAN>        memory mapped file in the DCC home directory of information
+                concerning DCC servers.
+     <SPAN="FILE-whiteclnt">whiteclnt</SPAN>  contains the client whitelist in the format described in
+                <B><A HREF="dcc.html">dcc(8)</A></B>.
+     <SPAN="FILE-whiteclnt.dccw">whiteclnt.dccw</SPAN>
+                memory mapped hash table of the <I>@prefix@/whiteclnt</I> file.
+
+
+</PRE>
+<H2 ID="SEE-ALSO">SEE ALSO</H2><PRE>
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>, <B><A HREF="dcc.html">dcc(8)</A></B>, <B><A HREF="dbclean.html">dbclean(8)</A></B>, <B><A HREF="dccd.html">dccd(8)</A></B>, <B><A HREF="dblist.html">dblist(8)</A></B>, <B><A HREF="dccproc.html">dccproc(8)</A></B>, <B><A HREF="dccm.html">dccm(8)</A></B>,
+     <B><A HREF="dccifd.html">dccifd(8)</A></B>, <B>mail(1)</B>, <B>procmail(1)</B>.
+
+
+</PRE>
+<H2 ID="HISTORY">HISTORY</H2><PRE>
+     <SPAN="FILE-Implementation">Implementation</SPAN> of <B>dccsight</B> was started at <A HREF="https://www.rhyolite.com/">Rhyolite Software</A> in 2000.
+     <SPAN="FILE-This">This</SPAN> document describes version 2.3.167.
+
+                                 June 19, 2019
+</PRE>
+<HR>
+<ADDRESS>
+Man(1) output converted with man2html modified for DCC
+$Date 2001/04/29 03:22:18 $
+<BR>
+<A HREF="https://www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+</BODY>
+</HTML>

@@ -1,0 +1,2644 @@
+Changes to the Distributed Checksum Clearinghouse source.
+
+    2019/06/18 22:59:28 Rhyolite Software DCC 2.3.167-1.357 $Revision$
+
+2.3.167
+    Do not count a refusal to respond about reputations as no reputations.
+    Fix `cdcc clients` display of counts larger than 4294967295.
+
+2.3.166
+    Add "no-reps" flag to lines in /var/dcc/ids to disable DCC Reputations
+	for clients using that ID.  The format of lines in /var/dcc/ids
+	is described in the dccd man page.
+
+2.3.165
+    Allow anonymous clients to ask about but not report DCC Reputations.
+
+2.3.164
+    With the expiration of U.S.Patent 6460050, replace the free version of the
+	DCC software with former commercial version that includes
+	DCC Reputations.
+
+1.3.163
+    Fix a recent bug on systems lacking both sysctl(boottime) and /proc/uptime.
+	The symptom of the bug is that dccd complains that "dcc_db.hash was
+	not synchronized" and refuses to start.
+
+1.3.162
+    Fix rare crash while adding a delayed record.
+
+1.3.161
+    Fix assertion botch introduced in 1.3.160 and reported by Stephan Schulz.
+    Fix hash table corruption with dbclean -F or the new -u on Linux
+	introduced in 1.3.160
+
+1.3.160
+    Add `dbclean -u` to cater to SSDs by delaying some file system writing
+	until the system is shut down.  "-u" can be added to DBCLEAN_ARGS
+	in /var/dcc/dcc_conf.
+    Speed up processing of flooded reports.
+    Fix dccifd crash reported by Grant Keller at Sonic.
+
+1.3.159
+    Stop using /usr/share/mk Makefiles on BSD systems in order to allow
+	building on FreeBSD 11.
+    Add ./configure --with-install-cmd=X --enable-pkg-make to facilitate
+	as FreeBSD port without patches.
+    Use /proc/uptime to compute boottime on Linux.
+    Ignore host names defined as 0.0.0.0.
+    Don't let the Received: header parsing for the sender IP address in
+	dccifd and dccproc be fooled by HELO values like "[127.0.0.1]"
+    Change URLs to use https
+
+1.3.158
+    Do not flood any reports to peers with "leaf=0"
+    Fix crash in dccm, dccifd, and dccproc when time jumps backwards by
+	more than than 1 millisecond.
+    Adjust Makefiles for recent NetBSD.
+
+1.3.155
+    Fix `cdcc "help flood"`
+    Try `cc -E -w` in ./configure to avoid fatal gcc warning about
+	CPPFLAGS=-D_FORTIFY_SOURCE=2 that currently breaks DCC packaging
+	on archlinux and will affect other systems.
+
+1.3.154
+    Fix editline build problem in cdcc reported by Robert Pelletier.
+
+1.3.153
+    Resolve confusion between dccifd ASCII protocol options "no-grey"
+	and "grey-off" pointed out by Mark Thomas.
+
+1.3.152
+    In `cdcc clients` output, suppress individual client addresses covered
+	by an address block in the server /var/dcc/blacklist file except when
+	explicitly requested as in `cdcc "clients 10.2.3.0/24"`.
+
+1.3.151
+    Compress bad client addresses for `cdcc clients`.
+
+1.3.148
+    Answer clients with bad client-IDs and passwords as if they were
+	using the anonymous client-ID.
+    Improve counting by dccd of clients in address blocks.
+
+1.3.147
+    Fix missing clients in `cdcc clients`.
+    Fix NetBSD threads problem 1.3.146 reported by Petar Bogdanovic.
+
+1.3.146
+    Add -I to `cdcc clients`
+    Reduce dccifd thread stack size to 512 KBytes for busy 32-bit systems
+    Fix some problems in the Windows version of dccproc.
+
+1.3.145
+    Suppress some error messages about broken DCC clients from dccd.
+    Fix default start and stop Linux run levels in rcDCC as suggested by
+	Herve Eychenne.
+    Change start-dccifd to use `kill` instead of `/bin/kill` to accommodate
+	Linux systems where /bin/kill does not understand `/bin/kill -9 -$PID`
+	as the way to kill a process group.
+    `cdcc src` now accepts a pair of IPv4,IPv6 addresses.
+    Requests from anonymous DCC clients to the public DCC servers are grouped
+	by IPv4 /24 or IPv6 /56 address blocks for inflating the delay.
+
+1.3.144
+    Fix a rare crash of dccd, the server daemon.
+    Allow "." in -B for dccifd, dccm, and dccproc as the base domain
+	name of DNSBL to support detecting and rejecting mail containing
+	URLs listed in a response policy zone (RPZ).
+
+1.3.143
+    Fix `dccifd -V` broken in 1.3.142 reported by Chris Burton.
+    Fix "incompatible whitelist" SMTP bug in dccifd introduced in 1.3.139.
+    Deal with default -mstructure-size-boundary=8 in FreeBSD on ARM as
+	suggested by Ronald Klop.  However, intermittent failures of
+	`cdcc "id 1; stats"` on FreeBSD 9.0-STABLE on a system with a
+	"Feroceon 88FR131 rev 1 (Marvell core)" seem to be caused by broken
+	consistency between write() and mmap().  That suggests that while
+	the DCC client software should generally work, the DCC server will
+	occassionally fail mysteriously.
+    Fix dccm parsing of Received headers for MX and MXDCC whiteclnt lines
+	that broke in verseion 1.3.139.
+
+1.3.142
+    Improve physical page locality of the DCC server's use of the database
+	hash table and so improve server performance.
+    The nagios script in var/dcc/libexec/dcc-nagios now compares the clock
+	on the DCC server with the local clock.
+    `cdcc -VV` and other commands produce the ./configure parameters used to
+	build them.
+    Build cdcc with editline.
+    Add -P to dccproc, dccifd, dccm, and dccsight.
+
+1.3.141
+    Fix "MTA-last" in dcc man page as suggested by Bram Grietens.
+    Fix no_forced-discard typo reported by Bram Grietens.
+    Fix dccm to honor `hackmc -R` and discard relay attacks.
+    misc/DCC.pm, which is generated from misc/DCC.pm.in, is now very
+	similar to what will probably be in SpamAssassin 3.4.
+    Fix problems finding native milter library for dccm pointed out by
+	Kevin A. McGrail.
+    Improve documentation or help output from the nagios plugin,
+	/var/dcc/libexec/dcc-nagios
+    Fix bug in misc/DCC.pm in dealing with mail that already has an
+	X-DCC header found and diagnosed by Herbert J. Skuhra.
+
+1.3.140
+    tweak some HTML in the whiteclnt proof-of-concept pages
+    Fix bug in `wlist` display of address blocks reported by Rob McMahon.
+    Fix missing IP address in log files for mail from (as opposed to
+	relayed by) MX relays.
+
+1.3.139
+    Give temporary rejections by dccm and dccifd for conflicting per-user
+	thresholds a separate message.
+    Add FreeBSD "faststart" to rcDCC.
+
+1.3.138
+    Fix bad URL decoding reported by Kostik.
+
+1.3.137
+    Fix some innocuous compilers warnings on Solaris and Ubuntu.
+
+1.3.136
+    Fix dccd and cdcc for `cdcc clients` for large operation counts.
+    Deal with trailing '.' and other punctuation URLs in dccm, dccifd, and
+	dccproc as pointed out by Kostik.  This changes the FUZ1 and FUZ2
+	checksums in some cases.
+    Fix a free(0).
+
+1.3.135
+    /var/dcc/map on 32 and 64 bit versions of a system are now the same.
+    Dccproc, dccm, and dccifd decode HTML &#xxx character references in URLs.
+    Dccproc, dccm, and dccifd convert UTF-8 domain names to Punycode
+	before checking DNS blacklists.
+    Deal with Linux `logger` bug that does the wrong thing with something like
+	`logger message with -S dash S` as suggested by Leandro Santi.
+
+1.3.134
+    Fix compile bug reported by Rob.McMahon involving old compilers
+	without "inline"
+
+1.3.133
+    Fix DNSBL bugs in parsing http://example.com?parameter and
+	http://example.com:80 reported by Kostik
+    Increase number of distinct kinds of local or "substitute" headers that
+	can be locally white- or blacklisted to 8
+
+1.3.132
+    Fix fstatfs() wrapper on Ubuntu and speed up dccd and dbclean when
+	a memory file system is used with -H.
+
+1.3.131
+    Fix minor bug in updatedcc and fetch-testmsg-whitelist as suggested by
+	Taso N. Devetzis.
+    Find in_port_t in sys/types.h as reported by Josh Allen.
+
+1.3.130
+    Fix serious bug reported by Bart Dumon in DNS whitelists on systems
+	without strlcpy().
+
+1.3.129
+    Adjust dnswl.org in the sample dcc_conf file.
+
+1.3.128
+    Support DNS whitelists.  An example using dnswl.org is in the sample
+	homedir/dcc_conf file.
+    Fix dccproc, dccifd, and dccm crash in parsing Received: fields with
+	IPv6 addresses.
+    Parse IPv6 address literals lacking the "IPv6:" tag in Received: headers.
+
+1.3.127
+    Fix problem with `dbclean -H` after a system reboot reported by Gary Mills.
+    Fix "duplicate symbol" problem on MacOS X or Darwin 10.3.0
+	reported by Robert Pelletier by removing the use of `ranlib -c`.
+	I hope this does not break things on older versions of MacOS X
+	or future DCC releases.
+    Fix printf compiler warnings on MacOS X.
+
+1.3.126
+    Fix another problem in flooding server-ID types past server-ID mappings.
+
+1.3.125
+    Fix stack corruption in version *.3.124.
+
+1.3.124
+    Fix reporting of rogue server-IDs.
+    Remove vestiges of obsolete server-ID tracing.
+    Flood server-ID types past flod file mappings.
+
+1.3.123
+    Another ./configure adjustment for NetBSD.
+    Release /var/dcc/libexec/ck2ip
+    Fix bug that broke DCC Reputation server count statistics.
+    Put "reps=0%" into X-DCC header when that is the answer.
+    Add "cksums" to the MTA-to-dccifd ASCII protocol for SpamAssassin
+	auto-learn. See /var/dcc/build/dcc/misc/DCC.pm or
+	http://www.dcc-servers.net/dcc/dcc-tree/misc/DCC.pm
+    Fix `dccm -aIGNORE` bug reported by Chris Aseltine.
+    Add "option greylist-log-on" and "option greylist-log-off" for
+	whiteclnt files.  greylist-log-on makes spam wait until after
+	a greylist embargo before it is rejected and spam does not reset
+	the embargo for a greylist triple.
+
+1.3.122
+    Adjust `./configure --with-make-cmd=path` for NetBSD as suggested by
+	Petar Bogdanovic.
+
+1.3.121
+    Fix `hackmc -T` to work with sendmail.mc FEATURE(`delay_checks')
+    Add `hackmc -U` to whitelist authenticated SMTP clients like -T but
+	unlike -T not whitelist SMTP clients with verified STARTTLS
+	certificates.  Too many sources of spam have good TLS certs.
+    Fix `hackmc -M` to change sendmail.cf to terat Feature(badmx) and
+	Feature(block_bad_helo) like Feature(dnsbl) and Feature(enhdnslb)
+	and report bad mail to DCC before rejecting it.
+    Dccm with `hackmc -R` should reject mail for unauthorized relaying despite
+	whitelisting in whiteclnt files and "option MTA-first".
+    Add <META HTTP-EQUIV="x-dns-prefetch-control" CONTENT="off"> to
+	the proof-of-concept whitelist CGI scripts.
+    Add ./configure --with-make-cmd=x to ease the use of bmake
+    /var/dcc/libexec/dcc-nagios notices forced-passive and auto-NAT signs
+	of DCC flooding problems.
+    Turn off RES_DEFNAMES and RES_DNSRCH for name DNS blacklists to stop
+	extra queries reported by Bart Dumon.
+    Fix inversion of dccd -f/-F in 1.3.120 reported by Tomasz Potega.
+
+
+1.3.120
+    Add `dbclean -H` to optionally put the /var/dcc/dcc_db.hash file in
+	a RAM file system such as /dev/shm or /tmp on Linux or Solaris
+	systems that lack mmap(MAP_NOSYNC).  This significantly speeds up
+	dccd.  Use (or stop using) it by adding (or removing) something like
+	-H/dev/shm to DBCLEAN_ARGS in /var/dcc/dcc_conf and manually running
+	or waiting for the nightly run of the /var/dcc/libexec/cron-dccd
+	cron job.
+	DO NOT put the dcc_db file in a transient or RAM file system.
+	`dbclean -H` is bad for DCC servers on systems such as FreeBSD that
+	have mmap(MAP_NOSYNC).
+	The memory file system must have space for two copies of dcc_db.hash.
+    Fix bug in updatedcc related to "-c --with-fetch_cmd=X" reported by
+	Eddy Beliveau
+    Make `dccd -T WLIST` the default.  WLIST tracing causes dccd to
+	send messages like this to the system log:
+	  REPORT whitelisted ... from ID 32768 at 10.2.3.4,61250
+	when an authenticed DCC client reports a mail message that is
+	whitelisted by /var/dcc/whitelist or the /var/dcc/whitecommon which
+	is often included in /var/dcc/whitelist.  The system log messages
+	help find DCC clients with missing or broken /var/dcc/whiteclnt files.
+	DCC server operators should whitelist 127.0.0.1, ::1, and their
+	local networks.  They can be turned off by adding -TNO-WLIST to
+	/var/dcc/dcc_conf.  See the sample files at
+	    http://www.dcc-servers.net/dcc/dcc-tree/homedir/whitecommon
+	    http://www.dcc-servers.net/dcc/dcc-tree/homedir/whitelist
+	    http://www.dcc-servers.net/dcc/dcc-tree/homedir/whiteclnt
+    Fix significant performance problems in dccd on systems with sufficient
+	RAM.
+
+1.3.117
+    Fix URL encoding of + in proof-of-concept CGI scripts
+    Repair replacement for getifaddrs() for systems that lack it including
+	Solaris.  This is important for the DCC server's detection of 
+	network interfaces that come and go.
+
+1.3.116
+    Fix broken `dccifd -Q` reported by Mark Thomas.
+    Fix dccifd and dccproc parsing of Return-Path:<> reported
+	by Wolfgang Breyha.
+    Significantly improve compression on server-to-server flooding.
+
+1.3.115
+    Fix dccd crash in 1.3.114 reported by John Levine.
+
+1.3.114
+    Make `/var/dcc/libexec/dcc-nagios -s server` monitor the number of
+	working floods.
+    Fix the high RTT bug reported by Petar Bogdanovic and Mike Cappella.
+    Speed up dbclean.
+
+1.3.113
+    Work around broken updatedcc in version 1.3.109
+
+1.3.112
+    Fix dccproc, dccm, and dccifd -B...,any, bug reported by Bart Dumon.
+    Add dccproc, dccm, and dccifd -Bdomain,IPaddr,all-names as suggested by
+	Bart Dumon.
+    Delete ill conceived dccm, dccproc, dccifd -Bset:temp-fail
+    Add /var/dcc/libexec/dcc-nagios
+
+1.3.111
+    fix "trap -" hiccup in updatedcc on Solaris
+
+1.3.109
+    Add Dutch to FUZ2 checksums with `./configure --enable-lang-Dutch`
+    Change handling of send() and sendto() failures in the DCC client code
+	to deal with strangeness in FreeBSD jails.
+    Fix bug with IPv6 disabled on Linux.
+
+1.3.108
+    Change homedir/fix-map so that the FreeBSD package can use it to generate
+	passwords.
+    Tweak the response of the DCC client code to ostensibly impossible EINVAL
+	from connect() in the hope of helping dccifd in FreeBSD jails.
+
+1.3.107
+    Fix problem with FreeBSD dcc-dccd package.
+
+1.3.106
+    Reduce the number of system calls used by dccproc to decide whether
+	IPv6 is available.
+    Fix bugs in ./configure --with-configsuffix=x and --with-installroot
+	as proposed by Craig Green.  This will fix updatedcc in the
+	FreeBSD port and package.
+    Fix dccifd core dump on NetBSD reported by Petar Bogdanovic and
+	Mike Cappella.
+
+1.3.105
+    Fix NetBSD client problem reported by Petar Bogdanovic by fixing
+	select() usage and changing the ./configure script so that
+	NetBSD uses poll() instead of select.
+
+1.3.104
+    Fix bogus 0 second retries for DNSBL lookups in dccm, dccifd, and dccproc.
+    Accept blocks of addresses in whitelists and elsewhere as starting
+	and ending pairs like 10.2.3.4-10.5.6.7 as well as CIDR blocks.
+    Reduce name space pollution for sites using dccif() in dcclib.a.
+    Fix IPv6 ifindex bug reported by Joe Breu.
+    Change IPv6 support to use separate sockets instead of sharing IPv4
+	sockets.  This is necessary on FreeBSD systems with IPv4 mapped
+	addresses in IPv6 sockets turned off.
+    Ignore and replace settings of "IPv6 on" and "IPv6 off" in existing
+	/var/dcc/map files with new values name "IPv6 on", "IPv6 off", and
+	"IPv6 only".  The new default of "IPv6 on" combined with distinct
+	socket change described above should make DCC client programs including
+	dccproc, dccifd, and dccm seamlessly use avaliable IPv6 and IPv4 DCC
+	servers.  "IPv6 only" and "IPv6 off" should not be needed but are
+	available just in case.
+    Ignore `dccd -6` and `dccd -4` instead of enabling IPv6.  The server code
+	now opens IPv6 and IPv4 sockets to receive requests from clients
+	corresponding to IPv6 and IPv4 addresses on network interfaces.
+	I think the right things happen if the DCC server has no IPv6 support
+	and if the server has only link-local or site-local addresses.
+
+1.3.103
+    Quiet RedHat versus Debian error message from rcDCC reported by Ken Rea.
+    Deal with corrupt /var/dcc/map reported by Steve Martin instead of
+	calling abort().
+    Fix error in libexec/fetch-testmsg-whitelist reported by Horst Scheuermann
+	and William Taylor.
+    Tweak ./configure and makefiles to try to avoid the mysterious,
+	unreproducable linking problem reported by John Levine.
+    Fix bug with `./configure --with-max-log-size=0` reported by
+	Valentin Schmid.
+    `./configure --with-max-log-size=KB` now also applies to dccproc log files.
+    Generate man pages with /var/dcc and other directories replaced by
+	local ./configure choices.  This is intended to help the FreeBSD
+	package	and similar redistributions.
+
+1.3.102
+    Fix build error reported by Steve Martin in dnsbl.c on MacOS X and other
+	systems without a resolver library found by ./configure.
+
+1.3.101
+    Fix inconsistent declaration of grey_on in dccd/dump-clients/dump-clients.c
+	reported by Bobby Rose.
+
+1.3.100
+    Support groups of DNS blacklists that can be independently enabled
+	in per-user whiteclnt files.
+    Follow Petar Bogdanovic's suggestion to make ./configure assume that 
+	`su -` and the default file ownership on NetBSD should be like FreeBSD
+    Another tweak to reduce spurious DCC Reputations for 127.0.0.1.
+    Dccifd in query mode assumes one recipient and so always generates an
+	X-DCC header.
+    Tweak proof of concept per-user whitelist cgi scripts in cgi-bin.
+    Improve long term client request rate computation to improve how public
+	DCC servers handle too active clients.
+    Count anonymous clients ignored by `dccd -uFOREVER` among `cdcc stats`
+	"bad IDs" to more easily detect local clients that lack client-IDs
+	and passwords.
+    `misc/hackmc -M` now reports mail rejected with the sendmail
+	FEATURE(`badmx') to the DCC with counts of "MANY"
+
+1.3.99
+    Fix typo in Makefile.inc for NetBSD and OSF1 reported by Petar Bogdanovic.
+
+1.3.98
+    Change the DCC server to not sign responses to anonymous clients with
+	the client's sequence numbers in protocol version 9.
+    Add `dccd -T wlist` and `cdcc "trace wlist on"` to help find failures
+	by clients to whitelist IP addresses and other checksums
+	in /var/dcc/whitelist.
+    Let whitelisting by the MTA, DCC server, or other whiteclnt lines override
+	"option spam-trap-accept" and "option spam-trap-reject" whiteclnt
+	lines as suggested by Horst Scheuermann.
+    Finally document in the man pages parameters including %CIP that can be
+	used in dccifd and dccm rejection messages.
+
+1.3.97
+     Fix "pthread_mutex_lock(cwf): Invalid argument; fatal error" reported
+	by Steve Martin.
+
+1.3.96
+    Add `cdcc "clock check" to help detect broken clocks at DCC servers.
+    Fix intermittent complaints about whiteclnt.dccw reported by Gary Mills.
+    `cdcc clients` now indicates clients that have pegged a server's
+	anti-DoS delays.
+
+1.3.95
+    Stop rare "fcntl(F_SETLKW F_WRLCK info  -1): Bad file descriptor" complaints
+	when dccm and dccifd start.
+
+1.3.94
+    Fix core new dump in version 1.3.93 of dccm with aborted mail messages.
+
+1.3.93
+    Make the default value for the `dccm -j` and `dccifd -j` job limit
+	as large as possible.  This makes -j settings unnecessary.
+    Dccproc and cdcc time out after about 1 minute when the /var/dcc/map
+	file is not unlocked.
+    Add "option spam-trap-accept" and "option spam-trap-reject" to
+	whiteclnt files.  I think these are the best way to build
+	DCC spam traps.
+
+1.3.92
+    Improve the hash function used in the DCC server database.
+    Replace -Bno-envelope for dccm, dccproc, and dccifd with
+	-Bno-client and -Bno-mail_host for Tony Del Porto.  It seems that
+	Spamhaus' PBL should generally not be applied to SMTP envelope
+	Mail_From domain names to avoid rejecting mail received through an
+	ISP smart-host but with sender domain name hosted on a dynamically
+	assigned IP address.  The now undocumented -Bno-envelope implies
+	-Bno-client and -Bno-mail_host.
+    Fix the @configsuffix@ mechanism in homedir/Makefile.in as suggested
+	by Craig Green.
+    Switch to -lpthread threads on FreeBSD starting with 6.2 because of
+	recent problems with libc_r threads.
+    Dccproc should not require a "option DNSBL-on" line in /var/dcc/whiteclnt
+	to pay attention to DNSBL hits.  The -B settings on the dccproc
+	command line are sufficient to show that the user wants DNSBL checking.
+    Fix bug in compression of DCC Reputation reports.
+
+1.3.91
+    Fix mechanism that should prevent dccd from starting dbclean for a quick
+	cleaning about the time the cron job runs.
+    Let DNSBL target addresses be CIDR blocks to improve the use of Spamhaus' 
+	lists.
+    Fix DNSBL bug that caused false positives reported by Ray Gardener.
+    Tweak homedire/Makefile.in for the gento folks.
+    Fix recent compiling bug with Borland on WIN32 reported by Tommy Barberis.
+
+1.3.90
+    Fix updatedcc problem reported by Chris Magnuson.
+	Updatedcc failed after shutting down the localhost DCC server and
+	finding no working server and when the environment variable
+	DCC_UPDATEDCC_FAST is not set to "yes".  The easiest work-around
+	is to add the public DCC servers to the local /var/dcc/map file
+	with `cdcc "add dcc1.dcc-servers.net RTT+1000 ms"`  Besides working
+	around the updatedcc problem, that uses the public DCC servers
+	as backups for the local server.
+
+1.3.89
+    Repair compile problem on Solaris
+
+1.3.88
+    Repair rate limiting on dccd syslog complaints.
+    Relax dccd load sharing enough to prevent spurious timeouts by
+	keepalive timers and some troubles with flood connections.
+
+1.3.87
+    Add `./configure --enable-64-bits` to compile 64-bit DCC server code
+	for Solaris or Linux PowerPC.  If you are using dccm, you will
+	need to build a 64-bit sendmail milter library.
+    Fix complaint from `cdcc "new map"` about the new file being empty.
+    Fix bug in `./configure --with-installroot=DIR` and `make install`
+	reported by Pavel Urban.
+    Fix at least some causes of "continue not asking Greylist" complaints
+	from dccm and dccifd.
+    Make dbclean on Linux systems with lots of RAM even closer to -F.
+
+1.3.86
+    Disable automatic 64-bit compilation for Solaris again
+
+1.3.85
+    Fix Redhat Enterprise 5.1 build bugs in 1.3.84 reported by Mark Thomas.
+    Fix old glitch in building for 64-bit Solaris systems.
+
+1.3.84
+    Allow very large DCC database hash tables, including that used
+	for greylisting.
+    Add `./configure --with-configsuffix=.str` to improve FreeBSD port.
+    Add `rcDCC -m {dccd|dccm|...}` to improve FreeBSD port.
+    Add magic comments to rcDCC to make it work with SUSE insserv.
+
+1.3.83
+    Deal with build problem on FreeBSD 7.0 reported by Craig Green.
+    Keep client IP addresses as old as 7 days in /var/dcc/dccd_clients
+	and /var/dcc/grey_clients
+
+1.3.82
+    Fix automagic upgrade of old /var/dcc/map files reported by James Carlson
+	and Earl Killian.  The bug was new with 1.3.81.
+
+1.3.81
+    improve SMTP status messages from dccm and dccifd
+    improve dbclean handling of less frequent spam
+    do something like `dbclean -F` on systems that lack mmap(MAP_NOSYNC).
+	This should help recent versions of Linux that thrash themselves
+	much as Solaris always has.
+    perhaps fix the "Deadlock situation detected/avoided" messages long
+	but infrequently seen on Solaris.
+    fix a bug reported by Edward Toton in the mechanism that works around a
+	missing cron-dccd cron job.
+    fix problem in cron-dccd reported by Dean Maluski when a greylist server
+	is running but no DCC server.
+
+1.3.80
+    fix bug with `dccm -t` log thresholds reported by Bart Dumon
+
+1.3.79
+    remove -t arg. for dbclean
+    change lines in log files for DNSBL hits to include IP address from
+	the DNSBL
+    probe a DNSBL only once for several -B results with distinct SMTP
+	4yz or 5yz rejection messages
+    reduce dccifd memory on some Linux systems by 4 MByte
+    do not use set-UID privileges outside the ./configure --homedir=DIR
+	directory
+    fix bug in 1.3.78 in sizing the window for large (>100 MByte) greylist
+	databases found by Tomasz Potega
+
+1.3.78
+    Fix failure to reduce default dbclean expirations when working around
+	a missing cron-dccd cron job.
+
+1.3.77
+    Improve dccd load limiting, including while catching up on flooding.
+
+1.3.76
+    Add yet more system log tracing with `dccd -d` for the determination of
+	memory limits.
+    Tweak duplicate flooded report detection.
+
+1.3.75
+    Fix false duplicate detection of flooded checksums introduced in
+	version 1.3.74.
+    Make the rep-total default threshold be 20, matching the documentation.
+
+1.3.74
+    Repair rate limiting of dccd system log messages.
+    Another fix for detecting duplicate bulk mail reports.
+
+1.3.73
+    Correct count of reputation hits.
+
+1.3.72
+    Fix holes in the detection of duplicate flooded reports.
+    Fix quick database cleaning to not run dbclean 2 hours or less before
+	the usual cron cleaning.
+    Fix bug in counting DCC operations by the free DCC servers.
+
+1.3.71
+    Fix confusion in daily log messages between incoming and outgoing
+	flood error messages.
+
+1.3.70
+    /var/dcc/libexec/dcc-stats-graph no longer combines RRD files to
+	generate a graph. Instead the new /var/dcc/rrd-combine should be used
+	to generate a combined file that is then graphed.
+    Fix dccproc to report mail to the DCC server that DCC Reputations has
+	marked as spam.
+    Remove SOCKS flooding input bug that I added in 1.3.67.
+    Fix a failure by DCC Reputation servers to fail to detect flooded
+	duplicate reports.
+
+1.3.69
+    Fix embarrassing build bug in 1.3.68 reported by Chris Pollock.
+
+1.3.68
+    Enhance /var/dcc/libexec/list-clients
+    Increase flooding listen() queue to try to deal with connection timeouts.
+    dccifd should pay attention to thresholds in /var/dcc/whiteclnt
+    Fix new fix for reputation report counting.
+
+1.3.67
+    Occassionally run a quick dbclean on the server database when the database
+	gets too big.
+    Report "connection refused" flooding problems in `cdcc "flood stats ..."`
+    `cdcc stats` on DCC Reputation servers report the number of client
+	reputation hits.
+    updatedcc -K does not try to download more than once per week.
+	-K is assumed if stdin is not a tty.  Some installations seem to
+	have cron jobs that run updatedcc several times per day.
+    SOCKS flooding only doubles instead of quadruples the backoff or delay
+	before retrying connections.
+    Add more tracing of flood state changes to try to find the stickiness
+	with Solaris.
+
+1.3.66
+    Fix SOCKS flood crash introduced in 1.3.65 and reported by Tomasz Potega.
+
+1.3.65
+    Another tweak to the negotiation of DCC Reputations.
+    Restore recently lost logging of flooding error messages.
+    Fix missing reset of keepalive timer.
+    Include flooding position in `cdcc "flood stats ..."`
+    Fix rm and rmdir complaints from cron-dccd on Solaris reported
+	by Mark Thomas.
+    SUBMIT whiteclnt entries now also turn off DCC Reputation checking.
+	There are better ways to turn off mail from a local SMTP client
+	DCC Reputations.
+    Fix looping whitelisted flooded report bug reported by John L.
+	This bug might be related to crashes complaining
+	"ifp->ibuf_len=-111; fatal error"
+
+1.3.64
+    Make ./configure and so updatedcc complaints about bad memory sizes
+	warnings instead of fatal errors.
+
+1.3.63
+    Correct error in `cdcc "flood list"` announced negotiation of DCC
+	Reputations.
+
+1.3.62
+    Let "option threshold type,val" lines in whiteclnt file accept "all"
+	and "cmn" for "type" as with `dccproc -c` and `dccm -t` and `dccifd -t`.
+    Use yet another scheme in updatedcc to detect download failures that
+	won't force unneeded downloads.
+    Fix dccifd man page about the location of the socket as suggested by
+	Carl Byington.
+    Fix several rare or potential bugs related to broken TCP connections with
+	DCC flooding including one that has caused a core dump.
+
+1.3.61
+    Fix problems with Sun Studio 12 compilers reported by Rob McMahon.
+    `updatedcc -K` or cron mode is silent when things go ok,
+	 or at least less chatty.
+
+1.3.60
+    Fix confusion in flooding connection accounting.
+    Work around new Fedore Core 6 gcc Fortify buffer over-non-flow bug
+	reported by Joseph Breu by reducing the size of server-to-server
+	messages by 1 byte.
+    Reduce the number of socket() and bind() system calls in dccm and dccifd.
+    Close unused sockets in dccm and dccifd after bursts of mail such
+	as dictionary attacks.
+    Prevent complaints during flooding from between commercial and free
+	versions about bad protocol versions.
+
+1.3.59
+    Fix crashing in dccifd reported by John M. Crawford.
+    Fix problem in flooding server-ID assertions.
+
+1.3.58
+    Fix bug in recent versions of `/var/dcc/libexec/dcc-stats-graph -d`
+	reported by Kevin W. Gagel.
+    Deal with multiple A RR answers from DNSBLs such as Spamhaus' ZEN
+	for dccifd, dccproc, and dccm -B.
+    Turn off a "close(socket): Connection reset by peer" message from
+	dccifd in proxy mode when postfix gets anxious and closes early.
+
+1.3.57
+    Fix bug in libexec/fetchblack adding a local blacklist file
+	reported by Krzysztof Snopek.
+    Make the system host name be the default value of `dccifd -D`
+	so that local user name for per-user logs and whiteclnt files
+	is "user" given SMTP recipient address "user@host.example.com"
+	on the system named user.host.example.
+    Support wildcards so that `dccifd '-D*example.com'` will take
+	"user" as the local name for per-user logs and whiteclnt files
+	vien SMTP recipient address user@host.exaple.com.
+    Fix bug in version 1.3.56 of dbclean in computing the hash table size
+	when upgrading from 1.3.42 reported by Domenico Diacono.
+
+1,3,56
+    Dccd continues parsing /var/dcc/blacklist after a bad line instead
+	of stopping.
+    Change dcc-stats-graph to not use --alt-y-mrtg with rrdtool version 1.2.
+    Do not save dccd client list when running with -Gon.
+    Dccd continues to inflate queue wait for 5 minutes after flooding
+	resumes so that the database will be good for clients.
+    Add -K to updatedcc for "cron mode" to not install code, restart daemons,
+	or otherwise disturb things by installing the same version.
+    Improve server queue delay measurement when the system is too slow
+	to keep up with incoming floods.
+    Do not use MAXHOSTNAMELEN for domain name lengths because on Linux
+	it is only 64 bytes.  This implies a new version of the /var/dcc/map
+	file.  Old versions of the file are automatically upgraded, but that
+	implies problems if you install old versions of the DCC client
+	programs.
+    Dccm, dccifd, and dccproc delete all old X-DCC headers instead of only
+	those with the same brand name as the current DCC server to fix
+	problem reported by Frank Tegtmeyer.
+    Fix unrecognized data /var/dcc/dccd_clients message.
+    Improve DCC server hash table size estimation to help servers with
+	1 GByte or less or more than 3 GByte of RAM.
+    Fix "flooding not stopped before ADMN DB UNLOCK" problem reported by
+	Tomasz Potega.
+    dcc-stats-graph no longer labels "Spam Ratio" graphs with '%' because
+	recent versions of rrdtool graph no longer understand "--units %%"
+
+1.3.55
+    Dccd falls back on foreground DNS resolution of flooding peer names
+	when fork() fails, perhaps because of a lack of swap space.
+    Fix structure alignment bug introduced in 1.3.51/2.3.51 and seen in
+	Solaris on SPARC CPUs using `gcc -O` reported by Stephan Schulz.
+
+1.3.54
+    Fix bug in proof-of-concept CGI script "LogOut/In" button introduced in
+	1.3.48 on Apache without mod_unique_id.
+    Fix new bug in proof-of-concept list-log CGI script reported by
+	Krzysztof Snopek.  It seems that in Solaris`ls -f` does not work on
+	a list of files.
+    Make `dccd -F` the default on Solaris to speed up the DCC server there.
+
+1.3.53
+    More speed for dbclean on FreeBSD.
+    Fix recent damage to `dccproc -a` and dccproc -f`.
+    Fix -B "name too long" problem reported by Daniel Gehriger and
+	Giulio Cervera.
+    Fix bogus mail rejection by dccifd in proxy mode reported by
+	Daniel Gehriger.
+    Reduce BIND timeout for each lookup to whatever remains of the
+	-Bset:url-secs=X limit.
+
+1.3.52
+    Fix bug in updatedcc found and diagnosed by Asgeir.
+    Speed up dbclean on FreeBSD.
+
+1.3.51
+    Fix recently added bug with greylisting in dccifd reported by
+	Daniel Gehriger.
+    Fix database corruption bug in `dccd -F` added in version 1.3.49.
+    Fix bugs in queue delay reported by DCC servers to anonymous clients.
+	This change is important for the public DCC servers.
+    What the nightly cron job, /var/dcc/libexec/cron-dccd, to try to
+	restart dccd if it is not running but is turned on.
+    Include anonymous client queue delay in `cdcc stats` queue delay report.
+    Close hole that allowed deleting or adding hosts in /var/dcc/maps.
+    Reduce minimum default reduced dbclean expiriation durations to
+	1 hour and 1 day from 2 hours and 2 days to help systems with
+	1 GByte or less RAM.
+    Change cgi-bin/webuser-notify to use sendmail and include a
+	"Precedence: bulk" header so that the vacation program won't
+	respond to the CGI cron script's mail messages.
+    Change cgi-bin/webuser-notify to handle per-user log subdirectories
+	generated by "option log-subdirectory-*" in whiteclnt files.
+
+1.3.50
+    Fix client random selection of public DCC servers.
+    /var/dcc/blacklist also affects flooding peers.
+
+1.3.49
+    Change dbclean to use a dccd optimization and be faster on FreeBSD
+	systems that have less that 4 GByte of RAM.
+    Set the GID of dccifd, dccm, and dccproc log files and subdirectory
+	to be the same as the parent directory if running as root and
+	if necessary.
+    Possibly fix pthread_mutex_lock(user_log) bug on MaxOS X reported by
+	Steve Martin.
+
+1.3.48
+    Turn off automatic generation of 64-bit DCC servers.
+
+1.3.47
+    Remove support for external filters as part of the fix for the
+	thundering herd problem in `dccm -B` reported by Gary Mills.
+    Check NS IP addresses in DNS blacklists (DNSBLs) before MX IP addresses
+	for dccproc, dccifd, and dccm -B.
+    Fix `dccm -tsubstitute...` problem reported by Ludger Bolmerg-Berliner
+    Try to compile for 64-bit pointers on Solaris to use more than 2 GBytes
+	if available.
+    Significantly improve speed on large FreeBSD DCC servers.
+    Make dbclean automatic -e/-E adjustments much more stable to
+	significantly help DCC servers on Mondays and Tuesdays.
+    Fix bad Body and missing Fuz1 and Fuz2 checksums for dccifd and dccm
+	when previous messages had bad MIME encapsulation reported by
+	Gary Mills and Harel Tassa.
+
+1.3.46
+    Do not greylist mail from SMTP submission clients marked by
+	"submit IP" lines in /var/dcc/whiteclnt.
+    Stop race with idle DNSBL helper processes.
+    More adjustments to help deal with large databases.
+    Deal with ./configure problem with BIND resolver on some versions
+	of Linux reported by Daniel Gehriger.
+    Change header checksums to ignore all instead of only some occurrences
+	characters matching [<>'"]
+    Dccm uses SMFIP_RCPT_REJ in sendmail 8.14 to detect dictionary attacks
+	and adjust the DCC Reputation of attackers.
+    Fix a very rare infinite loop in the MIME decoding code in DCC clients.
+    Add "option log-subdirectory-{day,hour,minute}" to whiteclnt files
+	to create per-user log files in subdirectories like the subdirectories
+	used for /var/dcc/log with dccm, dccifd, and dccproc -l.
+    Detect too-small file size resource limits in dccd and dbclean.
+    Compile with -D_FILE_OFFSET_BITS=64 on Linux as suggested by
+	Dmitry Konovalov.
+    Compile with -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64 as advised by
+	James Carlson.
+    Add dccm and dccifd -Bset:maxjobs=X
+    Suppress ENOENT errors from recvmsg() on Tru64-UNIX observed by
+	Alberto D'Ambrosio.
+    Fix printf(null) crash in dccifd acting as a proxy for CommuniGate
+	reported by Charles Chappell.
+
+1.3.45
+    Fix memory leak in dccm and dccifd when DNSBLs (-B) are used.
+    Improve performance on current UNIX-like systems that have madvise()
+	with large DCC server databases.
+    Mention the "incompatible whitelists" message in the FAQ.
+
+1.3.44
+    Remove some quoting in homedir/Makefile to try to work around Linux
+	"improvements."
+
+1.3.43
+    Make "option forced-discard-nok" in /var/dcc/whiteclnt the default for
+	dccm as well as dccifd in proxy mode.
+    Add whiteclnt type of IP address entry "submit".
+	It is intended to be applied to the IP addresses of SMTP submission
+	clients such as web browsers that cannot tolerate 4yz temporary
+	rejections of mail, but that cannot be trusted to not send spam.
+    Let body and reputation checksum thresholds be set in the global and
+	per-user whiteclnt files.  "Never" is a valid threshold and turns
+	off rejections for a checksum.
+    Overhaul proof of concept per-user whiteclnt CGI scripts to handle
+	per-user checksum thresholds.
+    Rationalize /var/dcc/libexec/dcc-stats-graph -tTITLE
+    Fix bugs with -eNEVER and -Enever in dbclean.
+    Add "submit" to "mx" and "mxdcc" values for IP addresses whiteclnt files
+	to mark SMTP clients that are submitting new messages and that
+	do not understand 4yz rejections for individual recipients.
+    Fix dccifd crash on bogus long recipient names diagnosed by Tomasz Potega.
+    /var/dcc/libexec/fetchblack is not as noisy when the sources of the
+	public DCC server blacklist are down for long periods.
+    Limit the database window to less than 2 GBytes on all 32-bit systems
+	including Solaris.  Previous versions assumed that Solaris would
+	do the right thing if it allowed large files.
+    Fix bugs in the "skipping asking DCC server" mechanism that made it
+	too forgiving.
+    Remove the `dccd -t` thresholds in favor of simple constants.
+    Dccm, dccifd, and dccproc now emit X-DCC headers for locally white-
+	and blacklisted messages even when no DCC server responds.
+    Automatically compensate for incompatibility in newer versions of
+	rrdtool.
+    Prefer poll() to select() on Linux.
+    Increase the computed limit on `dccm -j` by not dedicating two FDs
+	to each thread for per-user log files but instead doing some locking.
+
+1.3.42
+    Correct wrong count of `cdcc "clients -i 10.11.12.13"`
+    Change rcDCC.in back to allow the use of /var/run for PID files.
+
+1.3.41
+    Finally fix ancient missing quote in start-dccm.
+
+1.3.40
+    Make bad password-IDs in /var/dcc/flod a serious error that is reported
+	even when tracing is off.
+    Fix missing ';;' in libexec/logger as suggested by James Carlson.
+    Restore `start-dccm -c` that was removed from version 1.3.39 with the
+	mistaken idea that -c was not in use.
+    Fix bug counting clients of public DCC servers introduced in 1.3.39.
+    Adding -d to DCCD_ARGS or GREY_DCCD_ARGS causes dccd to say how it
+	determines the size of available memory.
+    Deal with sysctl(HW_PHYSMEM) on amd64 FreeBSD 6.* need for an 8-byte value
+	without breaking sysctl(HW_PHYSMEM) on FreeBSD 5.* that demands a
+	4-byte value.
+    Allow databases larger than 3 GBytes on 64-bit systems.
+
+1.3.39
+    Fix bug that caused `cdcc "clients -V"` to sometimes report version
+	numbers of '?'.
+    Change dccd to prefer recycling an old, almost idle client rate-limiting
+	block instead of the oldest block.
+    Modify /var/dcc/libexec/list-clients based on a suggestion from Chris Myers.
+
+1.3.38
+    Add `cdcc "clients x.y.z.w/p"`
+
+1.3.37
+    Fix problems in /var/dcc/libexec/list-clients and with `cdcc clients`
+	with IPv6 addresses reported by Vincent Schonau.
+
+1.3.36
+    Fix bad ./configure check to see if `xargs` needs and can use -r
+	reported by Mark Thomas.
+
+1.3.35
+    Fix dccm crash reported by John Doherty.
+
+1.3.34
+    Fix bug in `make install` on Solaris introduced in 1.3.33.
+
+1.3.33
+    Work around change to `sort` collating sequence in Fedore Cort 5 reported
+	by Jakob Hirsch.
+
+1.3.32
+    Fix dccd crash as suggested by Wolfgang Breyha.
+    Do not try to stat() missing whiteclnt files more often than once every
+	5 seconds.  This should significantly reduce the number of stat()
+	system calls on busy systems using dccifd and SpamAssassin.
+    Fix some problems with determining the mail sender through MX forwarders
+	for second and subsequent mail messages in an SMTP session.
+    Recognize some more qmail variations of Received headers for obtaining
+	IP addresses.
+    Add `cdcc "clients -V"`.
+    Optionally in dccm and by default in dccifd in proxy mode temporarily
+	reject SMTP recipients that might be forced to have spam discarded
+	instead of rejected because it must be delivered to other
+	recipients.
+
+1.3.31
+    Mention /var/dcc/libexec/uninstalldcc in the installation instructions.
+    Change dccm and dccifd per-user log message for mail that is now being
+	accepted after being temporarily rejected for some other recipient
+	to "accept after greylist embargo" from "accept", as requested by
+	Spike Ilacqua.
+    Fix failure to reset "continue not asking" counter problem reported
+	by Breno Moiana.
+    Reduce default value of `dbclean -e` from 2 days to 1.
+    Modify error messages to try to find some clues about the Solaris
+	"deadlock avoided" problem.
+
+1.3.30
+    Fix leak in dccd blacklist.
+    Change client-server protocol so that `cdcc clients` gets more than
+	16 bits of NOP counts.
+    updatedcc and fetchblack try two FTP and HTTP servers.
+    do not use stdio to parse whiteclnt files to deal with Solaris'
+	255 limit on stdio file descriptors.
+    add /var/dcc/libexec/uninstalldcc
+
+1.3.29
+    Fix dblist.c compiling problem in 1.3.28 on some versions of
+	Linux reported by Thomas Schwanhaeuser and Nigel Horne.
+
+1.3.28
+    Turn off use of futimes() on Linux to resolve bug diagnosed by
+	Wolfgang Breyha.
+    Fix two locking problems dccm and dccifd that might cause the crashes
+	reported by Gary Mills.
+    Reduce dccifd and dccm thread stack size.
+    Fix bug that kept some DCC Reputations from being compressed in
+	the database.
+    Change the default DCC Reputation rejection message to the equivalent of
+	-r '%s bad reputation; see http://commercial-dcc.rhyolite.com/cgi-bin/reps.cgi?tgt=%s'
+
+1.3.27
+    Fix an odd case where flooding connections between DCC servers were
+	not being shut down.  I think it only happened when a firewall
+	or something else systematically filtered TCP FINs.
+    Use setresgid() for setegid() on HP-UX to fix problem reported by
+	Giacomo Fazio.
+
+1.3.26
+    Compression reputation reports from the same week instead of from
+	the same half day.  This significantly reduces the size of the
+	database on systems using DCC Reputations.
+    Restore the flood rate limiting based on TCP windows, but now just
+	ignore the bogus EAGAIN complaints from some versions of Solaris.
+    Fix server whitelists broken in 1.3.21.
+
+1.3.25
+    Fix dccproc crash when given a bogus env_From value diagnosed by
+	Jeff Mincy.
+    Fix greylist triple checksum in dccm and dccifd log files.
+    Fix the default expiration of DCC Reputation checksums at 30 days and
+	2 days unaffected by the system's amount of RAM.
+    Expire FUZ1 checksums in reports that also have FUZ2 checksums.  This
+	significantly reduces the size of the DCC server database.
+    Remove new flood output rate limit using SO_SNDBUF because it causes some
+	versions of Solaris to generate persistent EAGAIN errors for send().
+    Fix at least some of the dccifd memory leak reported by Chris Mikkelson.
+	It may be the same as the leak reported by Gunther Richter.
+    Limit worst case DCC client delays exclusive of delays caused by waiting
+	for DNS blacklists or external filters are limited to about 16 seconds.
+
+1.3.24
+    Dccproc starts dccifd after 500 uses at least as fast as 0.1/second.
+	With luck SpamAssassin will notice and switch to dccifd.
+    Look for libsmutil.a in /usr/lib on Linx for old RedHat
+	as suggested by Jason Balicki.
+    Fix X-DCC header misplaced by dccproc reported by James McNutt.
+
+1.3.23
+    Fix bug in dccm, dccproc, and dccifd that tripled effective DCC target
+	counts on messages being retransmitted after greylisting.  I
+	introduced this bug in version 1.3.21, which was released 3 days ago.
+
+1.3.22
+    Fix "POSSIBLE ATTACK" complaint from sendmail about trailing '\n'
+	on headers added by dccm reported by Paul Ganci.
+
+1.3.21
+    Add a crude cache or database to the proof-of-concept scripts in
+	cgi-bin/common to speed them up on large log directories.
+	The goal is to handle log directories with 40,000 files within a
+	second or two.  The caches files are built incrementally.
+    Invert the sort order of list-log in cgi scripts.
+	This change to cgi-bin/common should be upward compatible because
+	it is controlled by additional parameters to the Perl functions.
+    Complain about contradictory or ignored entries in whitelists, including
+	"from" checksums that are normally ignored in server whitelists.
+    Fix dccd craziness with gre (or any) interfaces with the same IP addresses
+	as other interfaces observed Craig Green.
+    Fix infinite loop in dccproc triggered by a To: header of more than
+	20480 bytes and with a '\n' character in byte #20478 observed by
+	James McNutt.
+    Ignore a few failures by select() apparently caused by SOCKS libraries.
+    Increase default DNSBL timeouts to -Bset:msg-secs=40 and -BURL-secs=11
+
+1.3.20
+    Fix dbclean expiration of reputation checksums
+
+1.3.19
+    Changed the midnight dccm and dccifd system log message to disclose
+	spam passed from whiteclnt-listed MX servers.
+    MX servers should now be listed in /var/dcc/whiteclnt with lines like:
+		mx	ip	10.2.3.4
+		mx	ip	10.5.6.0/28
+		mxdcc	ip	10.7.8.9
+	"MX" marks the IP address of one of your mail systems that should
+	be ignored in initial Received: headers and when reported by
+	sendmail to dccm.  "MXDCC" marks IP addresss of your mail systems
+	that run DCC clients and that will have already reported mail
+	to the DCC.  Continue using "OK" whitelist entries for mail systems
+	that you trust to never send or forward unsolicited bulk email.
+    Allow custom DNS blacklist SMTP rejection messages.  See
+	-Bset:rej-msg=X in the dccifd and dccm man pages.
+
+1.3.18
+    Fix `dccm -aIGNORE` crash reported by Juergen Georgi.
+    Fix detection of duplicates reputation reports.
+    Initial support for "mx ip" entries in whiteclnt files.
+    Fix compression by dccd of delayed reputation reports.
+
+1.3.17
+    People have broken wget by changing the old "--non-verbose" to
+	"--no-verbose". That would have ok, except they do not understand
+	what they were doing enough to support the old form.  Reportedly
+	"-nv" works on both versions.
+    `cdcc stats` on DCC Reputation servers includes an additional line
+	about reputation results.
+    Adjust logged reason when spam is ignored after greylist as suggested
+	by Spike Ilacqua.
+    Replace `dccproc -R` with `dccproc -r N`  (Of course, `dccproc -R`
+	is still recognized.)
+    Fix problems with flooding and expiring bad reputations with modest
+	evidence.
+
+1.3.16
+    Fix bug introduced in 1.3.15 that caused greylist retransmissions
+	to be counted by the DCC server as separate messages contributing
+	to the "bulkness" of a message.
+    If /var/dcc/log is neither readable nor searchable by 'other', then
+	create log files with the same 'group' permissions as the directory
+	instead of the old default of 600.  This allows the application of
+	cgi scripts to the main whiteclnt and log files.
+    `dccd -T ALL` no longer works.  It never made much sense and continues
+	to cause confusion.
+    Dccifd in proxy mode no longer requires blanks after colons in SMTP
+	commands.  Problem reported by Martin Pala.
+    Fix dccifd proxy mode crash on mail messages without bodies reported
+	by Martin Pala.
+    Complain about bad host name and other errors in whiteclnt files
+	every 30 minutes instead of every 5 minutes.
+    Allow whiteclnt files to be read-only with a new locking scheme.
+    Use Milter.macros.eom in sendmail 8.13 so that the ${dcc_isspam}, and
+	${dcc_notspam}, ${dcc_userdir} macros can be set by sendmail.cf
+	rules that examin headers.  This might also allow some hack_mc
+	settings to be used with delay_checks.
+    As suggested with discussions with Martin Pala, the thresholds for
+	quick flooding among servers are now non-linear.
+
+1.3.15
+    When "option MTA-first" in a dccm and dccifd whiteclnt file, determinations
+	of (not) spam by the MTA are consulted first and so can be overidden
+	by the whiteclnt files.  This allows individual	users to override a
+	sendmail access.db file.
+    Correct the SMTP rejection message in per-user log files for dccm and
+	dccifd, especially when dccifd is acting as a proxy.
+    Fix bug reported by James Carlson that kept./configure from turning
+	on SOCKS.
+    Make "option dcc-reps-on/off" and "option dcc-on/off" independent.
+	A mailbox can now use neither, either, or both of DCC Reputations
+	and standard DCC filtering.
+    Use distinct timestamps on reputation reports so they won't be seen
+	as duplicates by flooding peers.
+
+1.3.14
+    Keep dccd flooding threshold at or above 10.
+    Fix dccd core dump involving reputation counts in 1.3.13.
+
+1.3.13
+    Make default maximum server memory size 2000 MByte on all except IRIX
+	and Solaris.
+    Fix bug in 1.3.12 that causes dccd flooding thresholds to be 0 if
+	dccd is started by hand or without a dccm rejection threshold.
+
+1.3.12
+    Fix packaging error in 1.3.11.
+
+1.3.11
+    Dccproc should complain if the -w whiteclnt file is bad.
+    misc/dcc.m4 can add a sendmail.cf rule that assigns a single
+	whiteclnt file and log directory to mail forwarded to another system.
+	With that the cgi-bin scripts can be used to control dccm for
+	mail forwarded to another system with a single web user.
+
+1.3.10
+    Delete "message" checksum in greylist database when spam causes
+	an embargo to be restored.  This fixes some counts after a
+	greylist whitelisting has been revoked.
+    Make the default owner and group for files be root:wheel on FreeBSD
+	As always, use the DCC_OWN and DCC_GRP environment variables with
+	`make install` or updatedcc -e to override those defaults.
+
+1.3.9
+    Dccifd and dccproc treat the bogus SMTP client IP address of 0.0.0.0
+	from SpamAssassin as if it were absent, which allows it to look in
+	in Received headers.
+    Add "rcvd-nxt" option to the dccifd MTA protocol to parse later
+	Received: headers.
+
+1.3.8
+    Repair greylisting broken in 1.3.7.
+
+1.3.7
+    Fix "bulk rep" string in X-DCC header.
+    Many other reputation related changes.
+    Log files now say "Restore #x" instead of "Embargo #x" when a greylist
+	embargo is restored because the message is spam.
+    Don't use -a with `fetch` in updatedcc, fetchblack, and
+	fetch testmsg-whitelist because it does not know when to stop trying
+	to reach a dead FTP server.
+    Add "any" to dccm, dccifd, and dccproc -B DNSBL result address as
+	suggested by Giulio Cervera.
+
+1.3.6
+    Compute reputations of IP addresses.
+    Try to deal with UNIX kernel problems cause bogus failures of mmap().
+    Fix bug related to --disable-dccifd reported by Krzysztof Snopek.
+    Stop relying on `su - -c` to start daemons as requested by Dean Hollister.
+    Fix server-ID mapping in /var/dcc/flod to use the first relevant mapping
+	as the documentation says instead of the last one.
+    Fix recent bug in cron-dccd that stopped emptying client per-user log
+	directories.
+
+1.3.5
+    Untangle `dccd -a` as well as local host name and IPv4 vs. IPv6 options
+	in /var/dcc/flod
+    Fix automatic /var/tmp/map file upgrading for Windows.
+	Actually c:\\program files\dcc\map
+    Improve dccd work-around for missing /var/dcc/libexec/cron-dccd cron job
+	on memory-short DCC servers.  This still not a substitute for the
+	cron job.  *USE THE CRON JOB*.
+    Repair dccifd and dccm midnight log entry bug reported
+	by Christopher Bodenstein.
+    Fix recent bug in cron-dccd that stopped emptying /var/dcc/log.
+
+1.3.4
+    Fix another dccm, dccifd, and dccproc bug related to bogus long
+	URLs from a core dump on Spike Ilacqua's system.
+    Fix installroot homedir/Makefile as suggested by Pavel Urban and Paul Ganci.
+    Add `cdcc "src x.y.z.w" to help DCC clients navigate firewalls.
+	This change requires a change in the format of the /var/dcc/map file.
+	However, the DCC clients should all automatically and invisibly
+	upgrade old files.
+    Fix `dccd -a` bug reported by John Levine.`
+
+1.3.3
+    Work around bogus use of "::" in line 184 of /usr/share/mk/bsd.lib.mk"
+	in ancient FreeBSD as reported by Lento Yip.
+
+1.3.2
+    Improve logging of failures by external filters.
+    Fix new use of pstat_getstatic() on HP-UX to obtain physical memory size.
+
+1.3.1
+    Allow dccproc, dccm, and dccifd to use an external filter.  See the
+	./configure --with-xfltr=FILE --with-xfltr-cflags=opt and
+	--with-xfltr-ldflags=opt, the discussion of -X in the man pages,
+	and the toy filter in thrlib/xfltr_sample.c.
+	See also /var/dcc/dcc_conf-new
+    Automatically decrease the number of DNS blacklist helper processes for
+	dccm and dccifd when fewer are needed.
+    Use pstat_getstatic() on HP-UX to determine the size of physical memory.
+    Dccifd refuses to run on HP-UX 11.00 to keep SpamAssassin from stalling
+	while dccifd cannot hear.
+
+1.3.0
+    New license.
+    cron-dccd tells dbclean -6 if needed.
+    Treat EHOSTUNREACH or "No route to host" like ECONNREFUSED in DCC
+	clients and do not complain about every instance.
+    Deal better with DCC servers with floppy multi-homing such as behind
+	some NAT boxes.
+    Deal more gracefully with Linux systems without IPv6 support but
+	with `cdcc "IPv6 on"`.
+    Fix crash in dccm, dccifd, and dccproc while computing FUZ2 checksum on
+	URLs with very long host names in HTML mail messages.
+    Fix dccifd missing SMTP reply code in dccifd rejections in proxy mode.
+    `dccifd -ddd` logs SMTP transactions in proxy mode.
+    Dccifd man page has example -o configuration for use as a Postfix
+	before-queue filter.
+    Restart dccm and dccifd after core dumps.
+
+1.2.74
+    Make clients prefer real IPv6 address to embedded or mapped IPv4
+	addresses.
+
+1.2.73
+    Fix crash in dccsight as suggested by Vincent Schonau.
+    Fix handling of log files for senders without reverse DNS in
+	cgi-bin/common as suggested by Vincent Schonau.
+    Add IPv4 and IPv6 o-opts to /var/dcc/flod lines to deal with the change
+	in the default from "YES" to "NO" in the FreeBSD ipv6_ipv4mapping
+
+1.2.72
+    Do not make DNS blacklist checks if the MTA already knows the message
+	is or is not spam.
+    Add -lresolv to $LIBS for Mac OS X Darwin as suggested by Joel Brogniart.
+    Change DNS blacklist checking to check MX servers as well.
+    Add -B settings to control which DNS blacklists are used for the envelope
+	or body, and whether MX servers should be checked.
+    SIGUSR1 causes dccm and dccifd to send their statistics to the system log.
+    Use getaddrinfo() and getnameinfo() when getipnodebyname() and
+	getipnodebyaddr() are not available.  This might make IPv6 work
+	on Linux systems.
+    Note that to make dccd listen to IPv6, -6 must be added to DCCD_ARGS
+	and GREY_DCCD_ARGS in /var/dcc/dcc_conf.  This requirement has long
+	been present to defend against systems that only pretend to
+	understand IPv6.  Perhaps it is time to remove it.
+    Add `dccifd -o` to use a subset of ESMTP so that dccifd can be used
+	as a "before-queue" filter or SMTP proxy by Postifx.
+    Probably fix a rare dccm and dccifd crash.
+
+1.2.71
+    Fix stray greylist queries reported by Vincent Schonau.
+    Fix conflict between checking DCC and greylist servers on Linux
+	reported by Vincent Schonau.
+
+1.2.70
+    Turn on IP TOS bits for DCC server-to-server flooding.
+    Add -B to dccproc, dccm, and dccifd to consult DNS blacklists.
+	This feature and greylisting are valuable supplements
+	to DCC target counting.  However, greylisting is generally
+	significantly better where greylisting can be used.  Most
+	dccproc and many dccifd installations cannot use greylisting.
+
+1.2.69
+    Add `misc/hackmc -r` like -R but to reject instead of discard bad
+	relay attempts.
+    Fix bogus X-DCC header added after a fatal problem with the DCC server
+	as suggested by Harald Daeubler.
+    Release a single tarball equivalent to the old dcc-dccd-*.tar.Z that
+	contained the DCC server and all clients.
+
+1.2.68
+    Fix counting of blacklisted DCC clients by dccd.
+
+1.2.67
+    Remove bonehead optimization in dccd of /var/dcc/blacklist in 1.2.66.
+    Deal with stdargs in gcc 3.4 on AMD 64-bit systems that do not allow
+	a va_list arg to be passed to two different subfunctions, but
+	without breaking things on the many systems that lack va_copy().
+
+1.2.66
+    Overhaul dccd rate-limiting.  Instead of imposing a penalty time
+	on overactive clients, simply rate-limit them.
+    Reduce limit on dccd error messages about clients from 2/second to
+	0.1/second.
+
+1.2.65
+    Fix accounting of NOPs from blacklisted clients.
+    Fix race that caused "??" server-IDs in X-DCC headers.
+    Do not count requests from blacklisted clients against the rate limits
+	as suggested by Sven Willenberger.
+
+1.2.64
+    Correct ">XXXX clients" from `cdcc stats`
+    Removed redundant declarations of mapfile_nm and rl_anon as
+	suggested by Andreas Jochens.
+
+1.2.63
+    Possibly fix dccm crash reported by Ludger Bolmerg.
+
+1.2.62
+    Fix bug in `dccd -a10.2.3.4` diagnosed by John Levine.
+
+1.2.61
+    Fix file descriptor leak in getifaddrs() replacement.
+
+1.2.60
+    Fix bug reported by John Levine on systems such as BSD/OS 4.3
+	without getifaddrs() introduced in 1.2.59 with tracking changes
+	in network interfaces.
+
+1.2.59
+    Fix broken `dccd -G0` reported and diagnosed by Chris Mikkelson.
+    Track changes in network interfaces on most modern flavors of UNIX
+	as suggested by James Carlson.
+    Fix two MIME decoding bugs as suggested by George Schlossnagle.
+    Treat '>' as a blank instead of punctuation for FUZ2 checksums.
+    Don't re-use va_list in stdargs functions to work around a characteristic
+	of gcc for AMD 64 bit systems.  gcc 64-bit stdargs
+	reportedly passes va_list by reference instead of by value.
+    Fix date labels in graphs generated by dcc-stats-graph as suggested by
+	Kevin Gagel.
+
+1.2.58
+    Work around new bug in FreeBSD 4.10 mechanism to disconnect UDP
+    sockets reported by Daniel V Klein.  The symptom of the bug is
+    that DCC servers appear down to clients running on FreeBSD 4.10
+
+1.2.57
+    Invoke WSACleanup() after using WSAStartup() on Windows systems
+    as suggested by Carl Stehle.
+
+1.2.56
+    Fix /var/dcc/ids delay= extension.
+
+1.2.55
+    Add `./configure --with-max-db-mem=X` to limit the size of the
+	database window.
+    Extend /var/dcc/ids format to allow authenticated clients to be delayed
+	as `dccd -U` delays anonymous clients.
+    Add `./configure --with-kludge=FILE`.
+
+1.2.54
+    Fix problem with flooding among greylist servers using `dccd -Gweak-IP`
+	reported by Valentin Chopov.
+
+1.2.53
+    Restore `dccsight -G grey-cksum` because the proof-of-concept CGI
+	scripts use it.
+    On OS X, use owner and group of daemon:daemon for programs and use
+	dccmaninstall in `make install` as suggested by Jason Schwarz.
+
+1.2.52
+    Fix problem in start-dccm and start-dccifd with Solaris /bin/sh
+	reported by Gary Mills
+    Work around bug in OpenBSD HTONL() and NTOHL() reported by Jeff Drinkert.
+    Change wlist to rebuild the .dccw hash table unless given -Q.
+
+1.2.51
+    Fix cause of "packet length 44 too small" complaints by DCC servers.
+	With an empty mail body and no useful headers, DCC clients were
+	sending empty requests to DCC servers.
+    Add `cdcc "debug TTL=x"` to help find firewalls that filter DCC requests.
+    Use shared libmilter.so in dccm as suggested by James Carlson.
+    Fix Body checksum when MIME boundary crosses buffer boundary from
+	Richard Lyons.
+    Stop crash in dccm reported by Krzysztof Snopek.
+    Deprecate misc/dccdnsbl.m4 and change misc/hackmc to work with
+	FEATURE(dnsbl) and FEATURE(endnsbl) in modern sendmail.
+    Make it compile on Mac OS X and DragonFly FreeBSD.
+    Reduce the size of greylisting databases.
+    Separate DCC query mode for dccm and dccifd from greylist query mode.
+    Add `dccd -G weak-IP` to whitelist not only a {sender,target,IP address}
+	after passing the greylist embargo, but anything from the IP address.
+	Use this facility with caution; it might be a bad idea.
+
+    The last change requires that all greylist clients and servers
+	be upgraded simultaneously.
+
+1.2.50
+    Fix `dccifd lhost,lport,rhost/bits` on systems that have IPv6.
+    Change homedir/make-dcc_conf to track changes in
+	`./configure --with-rundir=x --libexecdir=y`
+	as suggested by Josef T. Burger.  This change will not be effective
+	until upgrading from 1.2.50 to later versions.
+    Deal with tiny FD_SETSIZE reported by Christian Becker.
+    Fix dccifd, dccm, and dccproc core-dump caused by missing whiteclnt file
+	reported by Henrik Edlund.
+
+1.2.49
+    Fix infinite loop in computing DCC clients computing checksums of
+	large, deeply nested MIME messages reported by Clive Cleland.
+
+1.2.48
+    Add "option dcc-off" and "option dcc-on" to per-user whitelist files
+	as suggested by Spike Ilacqua.
+    Make /var/dcc/libexec/fetch-testmsg-whitelist deal with cron processes
+	that set $PATH without /usr/local/bin
+
+1.2.46
+    Fix infinite packet flood from DCC clients including dccproc observed
+	by Benji Spencer, Clive Cleland, and Andrew Kent.  I introduced
+	this serious bug with the WIN32 changes in 1.2.33.
+    Fix "option greylist-off" bug introduced in 1.2.39 and reported by
+	Spike Ilacqua.
+    Defend dccd against too many clients.
+
+1.2.45
+    Fix dccd database "window" size computation bug that chose 3 GBytes
+	on systems with less than 512 MByte.
+    Fix `cdcc "stats all"` to use the right host name from Leandro Santi.
+    Increase `dccd -R` default rate limits for all anonymous clients
+	and for individual authenticated clients..
+    updatedcc understands -V x.y.z unless no old version x.y.z is available.
+
+1.2.44
+    Fix bug in dbclean -e and -E default reductions that made them 50% less
+	instead of more conservative compared to 1.2.39.
+    Speed up dbclean on systems with mmap(MAP_ANON).
+    Clean some uninitialize variable complaints from purify reported by
+	Praveen Nimmagadda.
+    Minor adjustments to deal with Solaris's VM system.    
+
+1.2.43
+    Fix typo in -e and -E default reductions.
+
+1.2.42
+    More adjustments to deal with Solaris's VM system.
+    Use all except 384 MByte of physical memory on systems with more than
+	768 MByte.  On systems with 768 MByte or less, use half.
+    Tweak WIN32 makefiles.
+
+1.2.41
+    Restore TZ in update/misc after setting it to GMT to keep the
+	Solaris FTP from going crazy.
+
+1.2.40
+    Include win32.makin2 that was missing from 1.2.39.
+    Do not respond to clients when the database is broken to ensure that
+	they switch to another server.
+    Add missing "option greylist-on" support to cgi-bin/edit-whiteclnt
+    Remove DCC_PROTO_HOMEDIR support for building RPM or other packages
+	and add `./configure --installroot=DIR`
+    Adjust threshold for `dbclean -F` to keep Solaris systems from spending
+	hours in dbclean.
+    Add `dbclean -f` to turn off default `dbclean -F` on Solaris for
+	installations where the file system has been tuned for the
+	large, randomly accessed file that is a DCC database.
+
+1.2.39
+    Suppress syslog messages from cdcc noted by Krzysztof Snopek.
+    Suppress complaints about madvise(MADV_WILLNEED).
+    Tweak WIN32 porting aids.
+
+1.2.38
+    Turn off the use of madvise(MADV_WILLNEED) on systems such as BSD/OS
+	that claim to have it but don't.
+    -Gweak did not in 1.2.37 work as reported by Valentin Chopov.
+
+1.2.37
+    Tweak WIN32 #ifdefs.
+    Change -G for dccm and dccifd to require -Gon.   Add kludges in
+	start-dccm and start-dccifd to convert the old -G to -Gon.
+    Add "-G noIP" and '-G IPmask/xx' to ignore all or part of the SMTP
+	client IP address in the greylist triple.
+    `dblist -G` no longer works.  Use `dbclist -Gon`
+    Fix bug where dbclean increased the number of reasons to stop flooding
+	by 1 and then decreased it by 2 reported by Bernard Gardner.
+    Use madvise(WILLNEED) for database buffers on systems with plenty
+	of RAM as suggested by Robert Milkowski.
+    Adjust scripts including /var/dcc/libexec/start-dccd to deal with
+	POSIX compliance of `expr` in FreeBSD 5.1.
+    Change FUZ2 checksum to know about Polish.
+
+1.2.36
+    Fix updatedcc for systems that have only make in $PATH but where
+	it is really gmake.
+
+1.2.35
+    Turn off the use of poll() instead of select() on Linux systems.
+
+1.2.34
+    Fix bugs in the  ./configure mechanisms to use poll() instead of
+	select() on FreeBSD reported by Valentin Chopov.
+
+1.2.33
+    Adjust default dbclean expirations based on available RAM and
+	the size of the database.
+    Make dcclib, cdcc, and dccproc build for WIN32 with Borland C++ 5.02
+	or FreeCommandLineTools.exe.  The former can use the dcc.ide file
+	and the latter can use win32.mak.
+    Fix use of SO_LINGER on Solaris.
+    More changes to ease compiling cdcc for WIN32.
+    Possibly fix dccd amnesia about flooding peers.
+    Use poll() instead of select() on FreeBSD.
+    Fix updatedcc to use gmake if ./configure insisted.
+    Entirely remove "--prefix" from ./configure to stop people from
+	mistakenly assuming that ./configure is what the Free Software
+	Foundation dictates it should be.
+    Change /var/dcc/libexec/start-dccd to stop dbclean when dccd starts
+	and so prevent a deadlock between dbclean and dccd.
+    Fix problem with updatedcc on systems with only gmake reported by
+	James Carlson.
+    Fix problem with large greylist whitelist files reported by John Levine.
+    Reduce number of write() system calls per operation in dccifd.
+
+1.2.32
+    Fix corruption of `dccm -U` directory introduced in 1.2.31 and
+	reported by Spike Ilacqua.
+
+1.2.31
+    Make all dccd databases "big."  If you have not previously used
+	`./configure --enable-big-db` then when version 1.2.31 of
+	dccd is started, it will run dbclean to rebuild the database.
+	This will make the hash table about 9% bigger and so 9% slower.
+    Make the "ms" units optional for RTT adjustments in `cdcc add` or
+	`cdcc load` as suggested by Hernan A. Perez Masci.
+    Add ${dcc_userdir} sendmail.cf macro as suggested by Valentin Chopov.
+	This lets you use the full power of sendmail.cf rewrite rules
+	to control per-user whitelist and log directories.  See the
+	dccm man page.
+    Make `dbclean -F` the default on Solaris systems with plenty of RAM
+	and automatically turn it off when there is not enough RAM to hold
+	the entire database.
+
+1.2.30
+    Let `dccd -C` take arguments for dbclean, so that the following line
+	in dcc_conf works:
+		DCCD_ARGS="'-C$DCC_LIBEXEC/dbclean -F'"
+    Make pthread_detach() failures in dccifd non-fatal.
+    Add mechanism to cgi-bin/list-msg to whitelist-for-greylisting
+	(sender,IP-address,recipient) checksums.  This mechanism
+	requires that the 1.2.30 versions of dccd and dccsight be
+	installed.
+    Change dccifd to record the message headers in the log file even when
+	the MTA fails to provide the message body.
+
+1.2.29
+    FUZ2 checksums character entity references in URLs in HTML.
+    Insert checksums of greylist triples of whitelisted messages
+	into the greylist database.
+    If greylisting is turned on, then include greylist checksums in dccm and
+	dccifd log files even for whitelisted and blacklist messages.
+    Dccm and dccifd log some messages that are whitelisted for greylisting
+	or otherwise not currently embargoed but were in the past.
+    Change whiteclnt "log all-grey" and "log no-grey" options to
+	"option greylist-log-off" and "option greylist-log-on".
+	(Of course the old strings continue to work.)
+    Add whiteclnt option "option greylist-off" and "option greylist-on"
+	to control greylisting for greylistig for an individual user.
+	Note mail in SMTP transactions that involve other users for which
+	greylisting has not been turned off can still temporarily rejected.
+    Add "option log-all" log everything for an individual user.
+    The proof-of-concept CGI scripts handle the new whiteclnt options.
+    Fix false "many" from dccproc when switching DCC servers reported by
+	Rutger ter Borg.
+    Remove 1.2.28 change in the dccd "xx MByte window" message that
+	displayed the minimum of the physical file size and the mmap() window
+	size.  The message now contains the mmap() window size..
+    Fix `dccd -FG,` core dump reported by Aleksander Dzierzanowski.
+    Make "skip asking" in `cdcc info` output a comment as suggested by
+	Gunther Heintzen.
+    Speed up flooding among greylist servers.
+
+1.2.28
+    Reduce the number of msync() system calls, significantly speeding up
+	dbclean and dccd on FreeBSD.
+    Fix "window" size computation for dccd and dbclean on systems with
+	more than 4 GByte of RAM.
+    Adjust flooding threshold for greylist dccd.
+    Changed the dccifd man page to say that dccifd looks at the first
+	Received: header for the sender's IP address if was not provided
+	by the dccifd client.
+    Remove the recommendation for whitelisting the Habeas Mark from the
+	sample dcc_conf file.
+    Detect bogus -G args reported by Aleksander Dzierzanowski.
+
+1.2.27
+    Use fsync() and msync() on /var/dcc/flod.map in dccd to try to
+	get Linux to send the file to the disk.
+    Use setsockopt(SO_LINGER) to speed shutdown on FreeBSD.
+
+1.2.26
+    Fix `dccd -F`.  Adding -F to DBCLEAN_ARGS in /var/dcc/dcc_conf on
+	Solaris systems with enough RAM to hold most of the database
+	can make dbclean twice as fast and reduces its effects on other
+	processes.  Addcing -F to DCCD_ARGS might have similar effects.
+    The use of MAP_NOSYNC on systems that support it including FreeBSD
+	reduces the effects of dccd on other processes.
+
+1.2.25
+    Fiddle with /var/dcc/libexec/dcc-stats-graph.
+    Add `dccd -F` like `dbclean -F`
+
+1.2.24
+    Generate /var/dcc/dcc_conf-new whether it is needed or not.
+    Add `dbclean -F` to work around Solaris performance bugs with large
+	files and mmap().
+    Add `dccd -Gweak` to not require a retransmission of the same message
+	to end a greylist embargo.
+    Add option "no-reject" to the dccifd-MTA protocol to be similar to
+	`dccm -aIGNORE` for greylisting while ignoring DCC results.
+
+1.2.22
+    Fix stray hostnames reported in dccifd log file headers observed by
+	Chris Mikkelson.
+    Fix empty dccm syslog complaints seen on Solaris.
+    Fix core-dump with bogus hostname in whiteclnt file observed by
+	Joe Ilacqua.
+    Updatedcc starts to shut down dccd early to avoid problems restarting
+	it on slow systems at the end.
+
+1.2.21
+    Fix dbclean every 20 seconds possibly observed by Kelsey Cummings.
+    Stop frequent running of dbclean from dccd to clean up greylisting records.
+
+1.2.20
+    Fix cdcc core dump with non-existent /var/dcc/map files.
+    Change updatedcc to not use "set -e" because some versions of
+	bash have tantrums if you unset a variable that is not set.
+
+1.2.19
+    Fix "too many CIDR blocks" problem reported by John Doherty.
+
+1.2.18
+    Fix infinite loop in dccm reported by Gary Mills.  This error might
+	also have caused dccm to crash.  It should affect dccd as well
+	as the DCC client programs.  I introduced it in version 1.2.15.
+
+1.2.17
+    Fix IP whitelist entries in DCC server databases broken in 1.2.15 and
+	1.2.16.
+
+1.2.16
+    Fix bug in libexec/updatedcc with blanks in CFLAGS reported by
+	Aaron Paetznick.  This only fix uses of updatedcc after
+	1.2.16 has been installed.
+
+1.2.15
+    Ensure the mtime of /var/dcc/whiteclnt.dccw files changes to stop
+	endless reparsing on some Linux systems.
+    Resolve inconsistency in dccproc whitelist vs. -t many noted by
+	Dawn Endico by making whitelisting always produce an exit code of 0.
+    Put absolute path on cdcc in misc/stats-get as pointed out by
+	Kevin Gagel.
+    Make dccm and dccifd log file size configurable as suggested by
+	Furlan Campos.
+    Fix bug reported by Jim Carroll that kept mail from being rejected
+	when first sent to a spam.
+    Allow large CIDR blocks to be white- or blacklisted in whiteclnt files.
+    Fix dccifd -p bug reported by Christopher Bodenstein.
+    Fix "continue not asking greylist" log message that should be
+	"continue not asking DCC" reported by Jorg Bielak.
+    Fix ./configure script in dccproc tarball that was creating a bogus
+	RUNDIR value for dccifd.
+    Add `./configure --with-max-log-size=KB` as requested by Furlan Campos.
+    The proof of concept CGI scripts now
+	deal with per-user logs for user that receive enough spam that their
+	    log directories have 20,000 entries.
+	support the per-user greylist log options for whiteclnt files
+	    described in the dcc man page near the description of "include"
+	support locking of per-user whiteclnt files with a line of
+	    "#webuser locked"
+    Fix output file data corruption bug reported by Chris Mikkelson.
+    Change default dccm greylist SMTP status code as suggested by Gary Mills.
+
+1.2.14
+    Adjust homedir/make-dcc_conf for Solaris as suggested by Gary Mills.
+
+1.2.13
+    Tweak libexec/updatedcc for Solaris.
+
+1.2.12
+    Report checksums in greylist embargoed mail to a DCC server while
+	waiting for the embargo to expire.
+    Recognize more than 1 GByte of RAM on Solaris systems.
+    Fix bug in stats-get not counting queries pointed out by Yury Razbegin.
+    Change the default greylist -G "white" value from 30 to 63 days.
+    dccm and dccifd now include the greylist triple checksum in per-user
+	log files.
+    Fix bugs in dccifd C interface routine pointed out by Stephen Misel.
+    Fix dccd whitelist bug observed by Gary Mills.
+    Fix bug in 1.2.8 through 1.2.11 that stops flooding of brand new
+	reports of bulk mail that is not spam.
+    Automatically generate /var/dcc/dcc_conf-new from existing dcc_conf
+	to aid installation of greylisting.
+
+1.2.11
+    Resume looking for native sendmail milter libraries on more than
+	FreeBSD.
+
+1.2.10
+    Fix some compiler warnings on Solaris.
+    Fix "only 256 open files allowed" message from dccid on Solaris
+	reported by Turgut Kalfaoglu.
+    Use poll() instead of select() in dccifd if possible.
+    Fix error in libexec/start-dccd reported by Valentin Chopov.
+    Look for native sendmail milter and install man pages on
+	recent versions of NetBSD as suggested by Josef T. Burger.
+
+1.2.9
+    Turn off database hash debugging accidentally turned on in 1.2.8.
+
+1.2.8
+    Fix serious bug in resolving DCC server host names by dccm and dccifd.
+    Add "temporary" to default greylist rejection messages.
+    Fix greylisting of null messages.
+    Add misc/fetch-testmsg-whitelist
+    Improve compression/suppression of flooded checksums to reduce the
+	database size and bandwidth requirements 10-50% for DCC servers that
+	see fewer than 20K DCC ops/day.  Tests have produced conflicting
+	results.  The full effects are not seen unless flooding peers
+	install this version.
+
+1.2.7
+    Fix greylist flooding problem reported by Valentin Chopov.
+    Add whitelists to greylist servers as requested by Bobby Rose.
+    Change `dccm -r` to also set the greylist rejection message and to
+	optionally interpolate the queue-ID and SMTP client IP address
+	as requested by Gary Mills.
+    Fix 1.2.x bug that treated all flooded checksums to a new database
+	as stale until a local checksum has been added and dbclean run.
+
+1.2.6
+    Complete the fix for "badly signed NOP response" in the DCC server.
+	To be effective, the public DCC servers will need to use
+	version 1.2.6.
+
+1.2.5
+    Fix "badly signed NOP response" bug diagnosed by Philipp Buehler and
+	Thorsten Janssen.
+    Turn off connect() on DCC client UDP sockets for Linux 5.2.
+    Use sysconf() on Solaris and Linux and sysctl() on BSD systems to
+	estimate the size of physical memory.  This may reduce the need
+	for `./configure --with-db-memory=X`
+    Add `./configure --with-DCC-MD5` to use the MD5 code in the DCC source
+	instead of any local library.
+    Fix dblcean "repairing" the database because "was [it] not closed cleanly."
+
+1.2.4
+    Fix core dump in creating X-DCC header as suggested by James Carlson.
+    Fix dccif.c for `./configure --disable-IPv6` and stats-get for
+	deleting /dev/null when interrupted as suggested by Yury Razbegin.
+
+1.2.3
+    Fix leak in greylist server.
+    Improve some obscure error messages from dccd.
+    Address IPv6 problem on RedHat 5.2 reported by Darren Nickerson.
+    Check /proc/meminfo on Linux for hints on real memory size to
+	work around the Linux mmap() bugs and resulting dccd performance
+	problems as suggested by Dave Lugo.
+
+1.2.2
+    Avoid `chown` in start-dccm and start-dccd.
+    Fix stop-dccd as noted by Michael Ghens.
+    Add greylist installation instructions to INSTALL.html and INSTALL.txt.
+
+1.2.1
+    Fix typo in default map.txt noted by Michael Ghens.
+    Fix undetected hash table size overflow noted by Leandro Santi.
+    Fix "BRAND" error in start-dccd.
+    Fix inflation of target counts on greylisted messages.
+    Dccd is off in the default dcc_conf.
+    Reduce default greylist embargo to 4.5 minutes.
+
+1.2.0
+    Many changes to support a form of Greylisting.
+	See http://projects.puremagic.com/greylisting/
+	and the dccd and dccm man pages.  Greylisting is probably not
+	ready for prime time in 1.2.0.
+    Change flod.map file format to allow `cdcc "flood stats 123"` to say
+	"not connected since" as suggested by by James Carlson.
+    Fix bogus "overwriting existing entry" error message noted by
+	Dallas Engelken.
+    As suggested by Leandro Santi, prevent false alarms about bogus packets
+	received by DCC clients.
+    Improve 24-hour averaging of client operations by dccd.
+    Fixes to dccd/rl.c from Leandro Santi.
+
+1.1.45
+    Fix error in sample homedir/map.txt file.
+    Fix problem in starting flooding.
+    Fix error in misc/dcc-stats-init.
+
+1.1.44
+    Fix core dump observed by Stephen Misel.
+    Suppress error message from rcDCC and start-dccm when dccm is not
+	installed as noted by Kevin Gagel.
+
+1.1.43
+    Fix core dump reported by James Carlson.
+
+1.1.42
+    Fix dbclean progress reporting bug noted by Vladimir Samoilov.
+    Improve misc/na-spam to catch another kind of quote leader.
+    Drop anonymous requests that would be delayed by more than the maximum
+	possible RTT.
+    Add application layer keepalives to flooding.
+
+1.1.41
+    Sort IP addresses in `cdcc rtt`.
+    Improve response of the client code to broken servers.
+
+1.1.40
+    Adjust client failure "fail_more()" backoff mechanism.
+    Add commas to misc/dcc.m4 as suggesed by Spike Ilacqua.
+
+1.1.39
+    Fix missing changes to dcc.m4.
+
+1.1.38
+    Fix `make install` file ownership as noted by Gary Mills.
+
+1.1.37
+    Deal with certain obfuscating URLs.  This change includes some
+	URLs in Fuz2 checksums and removes parts of some URLs from Fuz1
+	checksums.  This should reduce much of the need for the dubious
+	    many hex FUZ2: 00000000 00000000 00000000 00000000
+	whiteclnt entry.
+    Decode RFC 822 and MIME entity headers to control quoted-printable
+	and base64 decoding instead of the previous adaptive algorithm.
+	This also involves decoding nested MIME multipart messages.
+	A side effect of this is to change the checksums computed for
+	some mail.
+    Use poll() on Solaris to avoid failures from select() on large FDs.
+    Smuggle the Mail_From value to dccm with a ${dcc_mail_host} macro
+	so the mail_host checksum is valid despite sendmail smart relays.
+	This requires rebuilding sendmail.cf with the new dcc.m4.
+    Move part of the server-failing timer into /var/dcc/map so that
+	dccproc processes can share it.
+    Fix dccifd bug in handling detecting the end of headers reported
+	by Tim Clymo.
+    Fix `dccd -u` which was almost entirely broken.  Extend `dccd -u`
+	to inflate the delay for busy anonymous clients.
+    Make server selection more stable despite network problems.
+    Fix some cases of false alarms of database corruption by dbclean.
+	This fix is important where dbclean complains about `repairing` the
+	database.
+    Clear dccd queue delay when the server is idle.  This should help
+	dccd on BSD/OS after dbclean runs.
+    Avoid `chown` and `chgrp` with `configure --disable-sys-inst`.
+    Add `dccproc -x exitcode` as suggested by Paul Wright.
+    `cdcc clients` displays counts of NOPs to catch misconfigured firewalls
+	at clients.
+
+1.1.36
+    Add optional DCCM_ENABLE and DCCD_ENABLE to /var/dcc/dcc_conf
+    Look for libmilter.a where it is in some versions of Linux.
+    Add "eval" to start-dccd, start-dccm, and start-dccifd when
+	not using a separate UID to allow quoted blanks in
+	`dccm -r "rejection messages"`.
+
+1.1.35
+    Deal with name space pollution in Solaris as suggested by Isaac Saldana.
+
+1.1.34
+    Fix libexec/dcc-stats-collect and libexec/stats-get as noted
+	by Valentin Chopov.
+    Adjust FUZ2 length thresholds to catch more HTML obfuscated spam.
+    Reduce some stalling of dccd on BSD/OS when dbclean starts.
+    Resolve conflict between start-dccifd and dccifd by making the default
+	location for the dccifd PID file the same as for the dccm file
+    Fix dccifd to remove stray X-DCC headers.
+    Fix start-dccifd to pay attention to DCCIFD_ARGS in dcc-conf.
+
+1.1.33
+    Fix rare core-dump in dccd that more frequently corrupts the database.
+    Do not loop forever as the result of some database corruption.
+    Turn off by default dccd blacklist event tracing.
+    Increase the limit on the size of white-listed CIDR blocks from /24 to
+	/20 or 1024 IP addresses.  Every IP address whether specified
+	separately or with a CIDR block requires a separate entry in a
+	client DCC whitelist hash table.  The hash table is limited to
+	about 80K entries.
+    Add '-T' to misc/hackmc to trust or white-list mail authenticated
+	by SMTP AUTH or START TLS.
+    Server blacklisting suppresses "bad client or server-ID" error messages.
+    add /var/dcc/libexec/stats-get produce server statistics as noted by
+	Daniel Klein.
+
+1.1.32
+    Do not count MIME content-type image bytes when deciding whether
+	to generate FUZ2 checksums.
+    Unlink dccm and dccifd PID files before trying to (re)create them.
+    Dccm watches milter "contexts" more closely for corruption.
+    Add an optional count to `cdcc clients`.
+    Dbclean tries harder to restore dccd flooding.
+    Initialize wtgts in dccproc as noted by Leandro Santi.
+
+1.1.31
+    Fix core dump in ckfuz1.c noted by Gary Mills.
+
+1.1.30
+    Allow blanks in MIME boundaries.
+    Possibly fix compiler "initialization type mismatch" warnings noted by
+	Gary Mills.
+
+1.1.29
+    Fix dccm core dump in ckfuz1.c noted by Sven Willenberger.
+
+1.1.28
+    Fix dccm core dump in dcc_ck_body0() noted by Valentin Chopov.
+
+1.1.27
+    Add to HTML character references known by the Fuz2 checksums.
+
+1.1.25
+    Notice "Content-Type: text/html" headers to pay attention to HTML
+	even in mail without <html> tags.
+    Tweak the Fuz2 checksum to ignore some Microsoft delivery notifications.
+    Adjust Fuz1 checksum to be more consistent on URLs.
+    Fix date bug reported by Krzysztof Snopek in `cdcc clients`.
+    Include an indication that the client was blacklisted in `cdcc clients`.
+    Change MIME decoding somewhat as suggested by Leandro Santi.
+    Fix bug in dccd client blacklist.
+    Add `dccm -g not-all`.
+
+1.1.24
+    Add `cdcc "clients -s"` to sort by the number of requests.
+    Add /var/dcc/blacklist of blocks of IP addresses refused by dccd.
+    Remove -lpthread from $(DPADD) in dccm and dccifd Makefiles for Solaris
+	with gmake to try to deal with problem observed by Krzysztof Snopek.
+
+1.1.23
+    Fix handling of &amp; in the middle of words in HTML.
+    Change dccifd to respond with DCCIF_RESULT_REJECT or 'R' when
+	queried about spam.
+    Fix typo in detection of non-compiler on SunOS.
+    Add `./configure --disable-dccifd` as suggested by Krzysztof Snopek.
+
+1.1.22
+    Fix inconsistencies in fuzzy checksums computed by dccm and dccproc.
+    More ./configure script changes to try to deal with problems on
+	a Solaris system with GCC and some undetermined oddities.
+
+1.1.21
+    Suppress repeated messages about unauthorized server IDs of peers.
+    Install cdcc, dccproc, and so forth in $HOME/bin by default
+	if /usr/local/bin is not writable and $HOME/bin exists.
+    Fix infinite loop in decoding invalid HTML character references.
+
+1.1.20
+    Fuzzy checksums ignore all text before initial MIME boundary and
+	after terminal MIME boundary.
+    Add support for Spanish thanks to Leandro Santi.
+    Shuffle hostname resolving code to try to fix what may be a race
+	in the Linux pthread_create() as discovered by Karl Grindley.
+    Reduce default value of `dbclean -e` from 7 to 2 days.  Mail that does
+	not reach the local bulk threshold within 2 days is probably not
+	spam and if it is, it will almost certainly reach a bulk threshold
+	at some other server in the network.
+
+1.1.19
+    fix missing env_From handling in dccifd/dccif.pl observed
+	by Nathan Neulinger
+    set mode of dccifd socket to 0666 as suggested by Nathan Neulinger
+
+1.1.18
+    fix `dccproc -c` logging bug noted by Brad Volz.
+    fix ./configure to pick UID and GUID out of `id` with --disable-sys-inst
+    multiply the `dccd -u` delay by 4 when flooding is off or broken to
+	steer clients away from DCC servers without working links.
+    radically reduce the number of wsync() calls to speed systems with
+	lame mmap() support including BSD/OS 4.2.
+    fix setting of file descriptor limit in dccm and dccifd as noted
+	by Gary Mills
+    change configure script to deal with change in gmake version string
+	discovered by Aaron Paetznick
+
+1.1.17
+    add DCC interface daemon, dccifd, similar to dccm for SpamAssassin and
+	Perl filters and MTAs other than sendmail.  This is only an initial
+	release soliciting comments about its interface.  Its interface
+	may change in 1.1.18.  The new lines of homdir/dcc_conf must be
+	added to /var/dcc/dcc_conf to turn it on.
+    `dccm -a IGNORE` says "would have rejected" in the log messages
+	for Sven Willenberger
+    generate sample client-ID password for localhost server in /var/dcc/ids
+	and /var/dcc/map
+    dccd only complains about unknown server-IDs when "IDS" tracing is
+	turned on.
+    DCC clients check for new server DNS records every other hour
+	instead of every hour
+    compute the same Base64 result for 32-character lines with or without '\r'
+    close unlikely, theoretical per-user log file FD leak in dccm.
+    dccproc passes header lines (including continuations) longer than
+	20 KBytes
+    fix bugs in misc/newwebuser as noted by Furlan Campos.
+    dccm deletes all X-DCC headers of the right brand name to foil
+	tricky spammers.
+    dccproc defaults the -T tmpdir to the -l logdir
+
+1.1.16
+    fix long HELO values in dccm from Leandro Santi.
+    fix /var/dcc ownership installation bugs noted by John Reames.
+    let count of clients seen within 24 hours be more than 1000.
+    change misc/na-spam, the news.admin.net-abuse.sightings gateway script
+	to use dccproc log files instead of generating its own.
+    don't allow ':' in DCC server "brandnames".
+    recover misplaced change to misc/dcc.m4 to fix need to use
+	FEATURE(`delay_checks')
+    fix apparently harmless quoting error in dcc.m4
+    fix `cdcc "flood stats all"` when the server's peers are not ordered
+	by their IDs.
+    decode Base64 with invalidly long lines.
+
+1.1.15
+    change graph generating shell scripts, including making the
+	database size RRA use "MIN" instead of "MAX".  A shell script
+	that can convert existing RRDs is available.
+    make `misc/hackmc -O` apply to all uses of the sendmail access DB
+	instead of only the envelope Mail_From value.
+
+1.1.14
+    tweak graph generating shell scripts.
+    add `cdcc "flood stats all"` and `cdcc "flood stats clear all"`
+
+1.1.13
+    tweak graph generating shell scripts including fixes from Jack Bates.
+    adjust autoconf mechanism to try to deal with systems with inet_ntop()
+	but without IPv6.
+
+1.1.12
+    move dccd statistics to the flod.map so they're preserved despite
+	restarting dccd.
+    add shell scripts to generate RRD graphs.
+    make rate-limits run-time parameters for `dccd -R`.
+
+1.1.11
+    fix dccm bugs with handling a non-responsive server.
+    change misc/hackmc to modify sendmail.cf to reject unauthorized relay
+	attempts with a temporary failure when they are supposed to be sent
+	to the DCC but dccm is not running.  This prevents leaking relay
+	relay spam.  You must use the new hackmc script to install this
+	change in sendmail.cf.
+    remove "# whitelisted" from `cdcc stats` output to give more room
+	for totals.
+    prevent empty dccproc log files as noted by Krzysztof Snopek.
+    even fatal errors should cause dccproc to exit with 0 to avoid
+	rejecting mail, as noted by Krzysztof Snopek.
+    When server hostnames have common IP addresses, prefer the server
+	with the non-anonymous client-ID, noted by Krzysztof Snopek.
+
+1.1.10
+    try to deal with truncated per-user dccm logs on Solaris.
+    reduce threshold at which Fuz2 checksums are computed to capture
+	more spam.
+    force the use of gcc on Solaris.
+    try not to wait for the syslog console messages to resolve a dccm
+	crash on Solaris.
+
+1.1.9
+    make `cdcc "flood list"` unpriviledged, but disclose only server-IDs
+	to strangers.
+
+1.1.8
+    fix "invalid database address" problems on SPARC systems with
+	./configure ----enable-big-db
+    %-encode quotes in URLs generated by the CGI scripts.
+    fix `cdcc "id=X"` for X>65535.
+    increase path length limit to 24.
+    add `dblist -I server-ID`.
+
+1.1.7
+    fix man page installation on AIX.
+    work around connect() bugs on AIX41 and OpenUNIX.
+
+1.1.6
+    fix encoding of quote characters in the CGI scripts
+    look for sendmail 8.12.1 libsm.a that is required by that version of
+	the Milter code.
+    make the configure script again find the FreeBSD MD5 library.
+
+1.1.5
+    fix bugs in white-list links in the CGI scripts.
+    increase 8-hop flooding path limit to 16.
+    changes from Mark Moraes to compile dccproc under Cygwin on Windows 2000
+    the DCC source compiles on OpenUNIX 8.0.1 thanks to Larry Rosenman.
+    reduce the chances of duplicate or missing entries in the list
+	from `cdcc clients` as suggested by Dave Lugo.
+    add `dblist -C` to limit the listing to reports with specified checksums
+	as suggested by Sam Leffler.
+    `dccm -r "4xx ..." now produces a proper SMTP "temporary failure".
+    deal with /usr/include/md5.h that seems to be RedHat 7.3 but that does
+	not compile by itself.
+
+1.1.4
+    fix dccproc and dccm tarballs broken in 1.1.3.
+
+1.1.3
+    add a "VERSION:" string to the start of dccm and dccproc log files.
+    fix memory leak in dccm observed by Gary Mills.
+    fix core-dump in dccd with unreadable /var/dcc/flod noted by Sam Leffler.
+    add prototype CGI scripts for per-user white lists.
+    rate limit and improve log messages about read-only whiteclnt files.
+    allow null passwords for server-IDs in /var/dcc/ids that are used only
+	as markers so that no DCC server is accidentally started with the
+	password "unknown"
+    install initial /var/dcc/map file using dcc.dcc-servers.net
+    install empty server database as suggested by Andrew Macpherson.
+    create /var/dcc/log during installation.
+    adjust the `dccd -u` default to minimize rejecting DCC queries from
+	nearby anonymous clients.
+    convert upper to lower case in dccm per-user white list directories as
+	suggested by Andrew Macpherson.
+    allow null passwords as place-keepers in /var/dcc/ids.
+    rebuild gmake .d depend files when include/dcc_config.h changes so
+	that bad things don't happen when a header file disappears and
+	the configuration changes to match.
+    fix "log-del" option in /var/dcc/flod to log checksum delete requests.
+    add "del" and "no-log-del" options to /var/dcc/flod lines.
+    change the defaults for flooding delete requests to log them ("log-del"),
+	not send them ("no-del" among o-opts) and
+	reject them ("no-del" among i-opts).
+    change misc/hackmc to be usable in typical Makefiles that generate
+	.mc files.  It now feeds a single set of .mc files to m4
+	to produce a single .cf file on stdout instead of a set of .mc files.
+	It also no longer includes ../m4/cf.m4
+    use native sendmail milter libraries on FreeBSD 4.6
+    IDs in /var/dcc/ids can be placeholders without passwords
+
+1.1.2
+    fix `dccm -W`.
+    the recipient mailbox resolved by sendmail can be used as an white list
+	value by dccm.  This simplifies white-listing when the system
+	has more than one name.
+
+1.1.1.
+    add -follow to cron-dccd in case user log directories are beyond
+	symbolic links.
+    fix "resource temporarily unavailable" message from dccproc
+	reported by Henrik Lewander.
+    fix `dccm -W` problem in 1.1.0 reported by Mark Motley.
+
+1.1.0
+    "substitute" whitelist header entries must start with the name of
+	the header.  This is incompatible with previous versions.
+    remove `dccm -a REJECT_ONLY`
+    add per-user whitelists and logs to dccm.  See `dccm -U`. Use the
+	DCCM_USERDIRS variable in the new homedir/dcc_conf file to turn on.
+	To generate per-user log files without leaking informatio about
+	Bcc addresses, the format of all log files has changed slightly.
+	Look for "bulk" in the X-DCC line instead of the final "targets" line.
+    add `dccproc -E` to add dccm log file style envelope lines to log files.
+    fix cleaning of hourly DCC log files as suggested by Gary Mills.
+    X-DCC header lines contain the string "bulk" when the message is bulky.
+    add the "mail_host" as a possible "subsitute header" for dccm.
+    several of the mailing lists in the sample white list now require that
+	dccproc or dccm use `-S sender`	or dccm use `-S mail_host`.
+	This removes hostnames from the sample whitelist, because they
+	can take a long time to resolve or fail to resolve.
+    change env_To: lines in dccm log files to include the sendmail "mailer"
+	and address.  Also add the resolved "mail_addr" and "mail_host"
+	to dccm log files.
+    allow common dccproc white list files owned by the DCC user to be in
+	subdirectories of the DCC home directory instead of only the
+	DCC home directory.
+    use Rgethostbyname() in clients only when `cdcc SOCKS on` is sent
+	and in the server only for flooding peers that are flagged with
+	"SOCKS" in /var/dcc/flod.
+    use gethostid() and hash the local host name instead of gethostbyname()
+	to generate the DCC client host ID
+    consider an entire report of checksums obsolete if the fuzziest checksum
+	is obsolete for dbclean or flooding.  This reduces the database
+	size and flooding bandwidth by another factor of 2.
+    fix `./configure --mandir=/tmp/foo` to put the man pages into
+	/tmp/foo/man8/dccm.8 and similar places on other systems instead
+	of /tmp/foo8/dccm.8 as suggested by Michael Grant.
+    add `configure --disable-sys-install` to simplify and make a non-system
+	installation (e.g. by a user with a shell account) safer (no suid).
+    stop frequent complaints about bad flooding passwords in most cases.
+
+1.0.53
+    fix bug in fuzzy checksums that was not handling long Base64 lines.
+    increase the thresholds for computing the Body and Fuz2 checksums
+	and decrease the threshold for the Fuz1 checksum.
+    limit work-around for broken Linux threads that need signals delivered
+	to the process group to Linux systems to avoid breaking dccm
+	on Solaris 2.6 systems.
+    add `cdccc "flood stats ID".  Part of this involves a change
+	to format of the flod.map file.  It will be automatically rebuilt.
+    fix `cdcc clients` and `cdcc stats` operations to do better with more
+	than 64 active clients.
+    fix core-dump in dccd found by James Carlson.
+    use Rgethostbyname() when SOCKS is configured.
+    fix private (not owned by the dcc user) whitelist files for dccproc.
+    notice and report missing incoming flood connections.
+    detect and complain about duplicate definitions in /var/dcc/ids
+
+1.0.52
+    fix bug in dbclean that was inflating instead of compressing some
+	reports.
+    fix spurious emergency execution of dbclean by dccd.
+    deal with missing h_nerr and h_errlist[] in Solaris 2.6 as
+	suggested by Gary Mills.
+    fix use of old $DCCM_RUNDIR in rcDCC as suggested by Gary Mills.
+    fix extra blank in dcc.m4 as suggested by Gary Mills.
+    generate dcc.m4 with the local choice for /var/dcc/run with configure.
+    use dcc_inet_ntop() on systems that do not understand IPv6 to fix
+	a problem on Solaris 2.6 discovered by Gary Mills.
+
+1.0.51
+    fix man pages on FreeBSD.
+    fix file descriptor leak in dccd when using SOCKS.
+    `cdcc "flood check"` forces dccd to re-resolve hostnames for flooding
+	peers that are failing.
+
+1.0.50
+    Improve automatic dbclean-ing by dccd.
+
+1.0.49
+    Check the log directory for dccproc and dccm after changing to the
+	home directory.
+
+1.0.48
+    Split old records in the database so they compress better.
+    Reduce bandwidth required for flooding by summarizing checksum counts.
+    Fix configure in the partial packages, dcc-dccm-*.tar.Z and
+	dcc-dccproc-*.tar.Z
+    Fix `dccd -K no-IP`.
+    Fix error messages for `dccproc -c type,thold` and add "never" as in
+	`dccproc -c all,never`
+    Fix yet another bug in dcc_mkstemp().
+    Add "NEVER" to -c for dccproc and -t for dccm.
+    Enhance `dccm -l logdir` and `dccproc -l logdir` to scatter log files
+	among directories for systems dealing with more than 500,000
+	mail messages per day.
+    Dccm log files are now named "tmp.XXXXXX" until it is known that they
+	are needed and they are renamed to msg.XXXXXX or they are deleted.
+
+1.0.47
+    Make "-n brand" optional for dccd.
+    decode Base64 before computing checksums.
+    remove `cdcc pck` and `cdcc delck body` operations.
+    add configure parameter --with-bad-locks to deal with Solaris mmap()
+	vs. fcntl() locking problems.
+    Dccm and dccproc shold keep only the last of several locally specified
+	header checksums.
+    Because people have been confused by env_To checksums being ignored
+	in server whitelists, they are now reported as errors.
+
+1.0.46
+    Fix garbage in dccm log file names.
+    When run as root, dbclean avoids changing the owner of the database files.
+    Add logging to dccproc in the style of dccm.
+    Accept hex checksums to allow whitelisting message bodies, and especially
+	"empty" bodies contianing more than 1 KBytes generated by
+	Outlook Express.
+    Improve compression of old entries in the database.
+    Add checking of "substitute" headers.  See -S in the dccm and dccproc
+	man pages.
+
+1.0.45
+    Repair incoming flood duplicate detection broken in 1.0.44.
+
+1.0.44
+    Dccd now tries to fix the database when it starts
+	dccd also marks the database potentially inconsistent while it
+	is running and until it stops cleanly.  Graceless shutdowns
+	are now detected and the database is automatically checked with
+	`dbclean -R` before dccd resumes operation.
+    Add Fuz2 checksums to the default lists along with Fuz1 and Body
+    By default, dccd does not keep non-body checksums in the database.
+	The previous behavior can be restored with -Kall.
+    Double the maximum size of the database's hash table
+    Teach dccd to run dbclean to expire checksums so things work even
+	if the cron job doesn't
+    Misc/hackmc -D adds a local rule to reject mail from SMPT clients
+	without reverse DNS to the DCC
+    Suppress messages from dccd for EINVAL the second connect().
+	This is lame, but both FreeBSD and Linux answer the second connect()
+	on a non-blocking socket after an ICMP Unreachable or timeout
+	with EINVAL.
+    Speed up dbclean for large databases
+	It is only about 2.5 times faster on linux 2.2.14-5.0
+	Large systems handling more than 200,000 messages/day should
+	use --with-db-memory=500000000 or whatever is the appropriate number.
+	This change combined with the -K changes mentioned above produce
+	an overall speed-up of about 10 times for busy, not large systems.
+    Add configure parameter --enable-big-db to support server databases
+	with up to 2 billion instead of 16 million entries in the hash table
+    Fix problem with env_To white-listing reported by Mark Motley
+    Add -H to dccproc to emit only the header
+    Fix dccd to pass -L parameters to dbclean so that log messages from
+	automatic invocations of dbclean are not lost
+
+
+1.0.43
+    add prototype Fuz2 fuzzy body checksum and remove the subject checksum
+	See INSTALL.{html,txt} about DCC_RPT_SUBJECT if you want to
+	restore Subject checksums in in you DCC clients.
+    fix SOCKS connection and re-connection of flood stream.
+    add -c thresholds to dccproc and make its exit code indicate whether
+	they are exceeded.  This should eliminate common needs to parse
+	the output of dccproc.
+    fix dccd iflod_send_pos() core-dump seen during very high network losses
+	to flooding peer.
+    deal with Linux bug in not allowing connect() after a previous
+	connect() to 127.1.
+    fix dccm core-dump on some platforms when whitelist hostnames fail to
+	resolve.
+    deal with Linux `bash` vs. `su`
+    handle duplicate local interfaces on Linux
+    make `cdcd "flood rewind"` require a remote server-ID
+
+1.0.42
+    fix dccm crash while dealing with white list.
+
+1.0.41
+    fix bug introduced in 1.0.37 that broke `cdcc add`
+    include truncated getifaddrs() for systems that do not have it to improve
+	the default behavior of dccd with multihoming.
+    fixes for syntax errors in misc/{rcDCC,stop-dccd} from Michael Ghens
+    make `dccm -W` less confusing.
+    change hackmc to report mail with bogus DNS senders to the DCC
+
+1.0.40
+    fix for syntax error in /var/dcc/libexec/cron-dccd from Dave Lugo
+    deal with slow dccd response to dbclean
+
+1.0.39
+    keep dccd from going crazy with a crazy value for -q
+
+1.0.38
+    fix dccd core dump with Dave Lugo's help.
+    improve dccd host name resolving helper process.
+    improve misc/na-spam.
+    `cdcc 'stats clear'` now also clears the list of clients seen by dccd.
+    add a path of server-IDs to flooded checksum reports.
+    increase the number of checksums recognized by the server.
+    fix pthread error on SunOS and possibly AIX.
+    use absolute path for `cdcc` in /var/dcc/libexec/stop-dccd as suggested
+	by Sam Leffler.
+    improve fuzzy ignoring of MIME multipart boundaries.
+
+
+1.0.37
+    deal with lack of -s in SunOS `logger`.
+    dccd now has a helper process to wait for slow DNS servers to resolve
+	the names of flooding peers.
+    Deleting and restarting the DCC server's database now causes dccd to
+	ask peers to re-flood their checksums.  This new feature required
+	changing the flooding protocol.  DCC servers using the new protocol
+	talk to servers using the old protocol after the old servers start
+	their streams or with an explicit tag in the /var/dcc/flod file.
+    `sendmail -bs` is used by some mail user agents such as pine.  In such
+	cases the sendmail milter interface gives filters such as dccm a null
+	pointer to what should be an IP address and a pointer to the
+	string "localhost".  Dccm now acts as if such mail arrived from
+	IP address 127.1.  This makes the common white list entry
+	"ok IP localhost" effective for such mail.  Note that dccm deletes
+	X-DCC header lines with its own brand from white listed messages,
+	because they would otherwise be wrong and a potential vulnerability
+	to bad guys.
+    Fix `dccproc -o ofile` to include the X-DCC header in ofile.  If this fix
+	is a problem, see `dccproc -C`
+    add /var/dcc/libexec/na-spam and ng-spam to gather spam from
+	news.admin.net-abuse.sightings
+    fix start-dccd, start-dccm, and cron-dccd to support multiple dccd
+	daemons in separate home directories.
+
+1.0.36
+    support for OSF1.
+    handle msync() with only two parameters in old BSD/OS.
+    try to fix rare core-dump in dccm whitelist parsing.
+    fix error in misc/dccdnsbl.m4 noted by Michael Ghens.
+    fix autoconf errors for SunOS noted by Sam Leffler
+    add "log-del" option to /var/dcc/flod file
+    fix recent damage to DCC{D,M}_ARGS in start_dcc{d,m}
+
+1.0.35
+    add DCC_LOG_FACILITY to dcc_conf as suggested by Sam Leffler.
+	You must install the new homedir/dcc_conf with your parameters
+	to use it.
+    fix recently introduced bug that kept dccd from automatically
+	running dbclean to expand the database.
+    document the output of the dblist program in its man page.
+    `configure --with-rundir` can be used to override the use of /var/run/dcc
+	for the PIDs of DCC daemons, sockets, and so forth.
+    `configure --with-uid=dcc` creates Makefiles and scripts to install
+	and start DCC programs as the user "dcc"
+
+
+1.0.34
+    support for IRIX
+    fix bug in setting libexecdir for configure
+    change `cdcc stats` to show cumulative report counts
+    increase maximum number of flooding peers from 16 to 32
+	and make it a compile-time parameter
+    change $UID in misc/start-dcc{d,m} to the avoid reserved variable in
+	RedHat 6.2 as suggested by Michael Ghens
+    fix bug in cron-dccd found by Michael Ghens and Dave Lugo
+    remove mechanism for configuring the DCC home directory by setting
+	an environment variable before invoking `make`
+    change the default value of the -u anon-delay parameter for dccd to 0.
+    add "flood list" operation to `cdcc`
+    look for sendmail for dccm in a FreeBSD "ports" package
+
+1.0.33
+    support for HPUX thanks to Richard Rauenzahn.
+    check against "$USER" instead of "root" in start-dccm and start-dccd
+	as suggested by Luke Crawford.
+    make the server rate limits configurable at compile-time.
+
+1.0.32
+    fix bug in local white lists that ignored changes in the count field
+    by default, start-dccm no longer tells dccm to reject based on
+	message-ID checksums
+    fix recently introduced bug that kept flooding off after the
+	hash table needs to be expanded.
+
+1.0.31
+    add SOCKS support.
+    dccproc only logs errors unless given -d.  This should fix problems
+	in some mail systems using dccproc caused by network problems.
+    fix permissions bugs related to using private map files
+    the dcc_notspam sendmail macro used by dccm with -o must be non-empty
+	to be considered "set".
+
+1.0.30
+    fix man page installation on OpenBSD.
+    fix bug in starting incoming floods on systems with IPv6 interfaces
+	but without what DCC recognizes as IPv6 support such as OpenBSD.
+    deal with systems such as OpenBSD with lame mmap() support.
+    speed up recognition of changes in the /var/dcc/flod file.
+    use DCCM_REJECT_AT in /var/dcc/dcc_conf to also set the default
+	flooding threshold used by dccd when it is started by
+	/var/dcc/libexec/start-dccd
+    add configure switches to not build dccm and the server
+    `dccd -u` turns off `cdcc stats` from anonymous systems to avoid telling
+	strangers how many mail messages a small DCC server has seen.
+
+1.0.29
+    fix start-dccd to deal better with non-standard DCC home directories.
+    dccproc is now like dccm and treats a missing Message-ID header.
+	as if it were present and with a null value.
+    do the right thing for DCC servers running on platforms where
+	gethostname() fails completely on a short buffer instead of
+	giving a prefix of the hostname.
+    detect and quit on null hostname from gethostname().
+
+1.0.28
+    improve the handling of an already running daemon in by misc/start-dccd
+    support mapping of ranges of server IDs when flooding reports
+    yet more changes to deal with quoted-printable.  These changes
+	generally cause the fuz1 checksum to differ.
+    remove need for FEATURE(delay_checks) when reporting sendmail access_db
+	hits to DCC server
+    change body checksum to ignore '>' in "\n>From" because the '>' is
+	often added for old UNIX MUAs.
+    improve response of dccproc to 20KByte or larger To: headers.
+    make `cdcc "file map2; load map2.txt"` act the same as
+	`printf "file map2\nload map2.txt" | cdcc`
+    dccm now treats a missing Message-ID header as if it existed but with
+	a null value.
+
+1.0.27
+    change example scripts to deal with `expr` exiting with 1 and stopping
+	them on Solaris
+    fix client IDs larger than 65535
+    detect and complain server IDs offered to `cdcc` as client IDs
+
+1.0.26
+    if dccm is already installed, try to build it even if the sendmail
+	milter library is not available to prevent silent failures to
+	install new versions of dccm.
+
+1.0.25
+    fix confusion if a quoted-printable sequence overlaps a buffer boundary.
+    do not give up on remote servers if a local server responds with
+	an ICMP unreachable error.
+
+1.0.24
+    minimize interpreting '=' in a URL as quoted-printable to make dccproc
+	and dccm compute the same fuzzy checksums more often.
+
+1.0.23
+    fix confusion in dccproc about whether an initial line of a message
+	that starts with blanks is a continuation of the last header line
+
+1.0.22
+    fix infinite loop and packet spew from dccproc when the clock jumps
+    backward or jumps forward more than 1000 seconds.
+    fix syslog process name on Solaris and AIX
+    `dccproc -R` picks IP address out of standard Received: lines
+    fix bugs in decoding quoted printable with broken soft ends of lines
+
+1.0.21
+    repair DCC server whitelist broken in 1.0.20
+
+1.0.20
+    support for Solaris
+    describe ways to connect spam traps to the DCC in INSTALL.html
+    move parameters from start-dccd, start-dccm, and cron-dccd to a common file
+    add misc/rcDCC start-up script for Solaris and Linux
+    fix byte-order bug in flood header server ID which requires changing
+	the flood protocol.  To flood to version 1.0.19 or older versions
+	of dccd, specifiy version 4 in the flod file line.
+    removed locking file /var/dcc/map.lock
+    change handling of spam sent simultaneously to white-listed and unlisted
+	targets.  See the discussion of the new "REJECT_ONLY" action in the
+	dccm man page.
+
+1.0.19
+    improve `cdcc stats` flood formatting
+    fix `cdcc "host domain.com; stats all"`
+    change dccproc to use the value of the Return-Path: header for the
+	envelope-From checksum if the header is present and -f is not used.
+    fix `dbclean -S -N` when the whitelist is empty
+    add rough support for NetBSD.
+    mention dccd in the INSTALL file.
+    fix for parsing "-L error,LOCAL1.ERR" from Vincent Schonau
+
+1.0.18
+    add "clients -n" to cdcc
+    add -C to dccproc
+
+1.0.17
+    add dccsight
+
+1.0.16
+    try again to deal with getifaddrs() without freeifaddrs().
+    fix bug introduced in 1.0.15 that causes dccproc to require
+	a white-list
+    fix corruption of /var/dcc/map when dccproc is run with stderr not
+	open and when the DCC server first fails to answer.
+
+1.0.15
+    make the sendmail {dcc_isspam} and {dcc_notspam} macros consistently
+	override what dccm and the DCC server determine
+
+1.0.14
+    deal with systems that have getifaddrs() but not freeifaddrs().
+    fix bogus response from server when a duplicate request from an
+	anonymous client arrives before the original request has been
+	scheduled to be answered.
+    fix obscure double-trip bug in threaded client library.
+    accept "rpt-ok" as well as "rpt_ok" in the ids file.
+    fix /var/dcc/flod option scanning bug by dccd.
+    'dccd -u 999999' turns off access by anonymous or unauthenticated clients.
+    add -W to dccm to cause only explicitly listed targets to be protected
+	by the DCC
+    add a "reject" server-ID translation target in the flods file to
+	not send or receive the reports of some servers.
+
+1.0.13
+    add RTT adjustment to cdcc load and add operations to allow a client
+	to prefer servers despite worse RTT's
+
+1.0.12
+    in dccm count two intead of one open file for each active job against
+	the system imposed limit on open files for automatically setting
+	the value of -j for dccm and for automatically changing the soft
+	resource limit.
+    use the GNU autoconfig install script instead of `install -d` to create
+	$(HOMEDIR)/libexec because GNU autoconfig does not detect install
+	programs that do not understand -d
+    rate limit complaints by dccd about unrecognized server IDs
+
+1.0.11
+    dccm tolerates null sender IP addres and hostname from `sendmail -bs`
+	from sendmail 8.11.3 but perhaps not from 8.12.
+    change -p for dccd and dbclean to -a to allow specification of entire
+	server addresses.
+    by default, dccd listens on separate UDP sockets so that clients receive
+	responses from the same IP address to which they send requests.
+
+1.0.10
+    fix "bogus oflod complaint length 0" nonsense from server
+    `cdcc stats` counts the clients seen in the last 24 hours, but
+       `cdcc clients` displays all that fit in the cdcc buffer even if
+	older than 24 hours
+    the `configure` script looks at `make -v` to guess whether to generate
+	gmake or make makefiles
+    include list of common "dictionary attack" user names among the sample
+	homedir files
+
+1.0.9
+    body checksums ignore effects of quoted-printable encoding
+    deal with versions of gmake that do not understand ?=
+    improve "clients" request of cdcc
+
+1.0.8
+    fix rate limiting bugs in the server
+    fix local env-To whitelist
+
+1.0.7
+    fix locking bug when client whitelist file cannot be opened
+    use `install -c` to not delete misc scripts
+    fix server flood stalls when there are many stale or whitelisted
+	reports
+
+1.0.6
+    fix bug in alternate dccm argv[0] in start-dccm
+    fix bug in noticing changes to included white lists
+
+1.0.5
+    install cron-dccd, start-dccd, and start-dccm in $(HOMEDIR)/libexec
+
+1.0.4
+    fix server core-dump for repeated invalid admin. opcodes while
+	tracing is enabled.
+    add "clients" request to `cdcc`
+    add "stats all" request to `cdc
+    add homedir/start-dccm.sh
+    /var/run/dccm.pid and /var/run/dccm depend on argv[0]
+    white-lists can use "include pathname"
+    dccm -o overrides -s
+    dccm -o and -s have default values
+    move /var/run/dccm and /var/run/dccm.pid to the directory /var/run/dcc
+	and change the sendmail "feature" file misc/dcc.m4 to match
+
+1.0.3
+    improve flood ID mapping
+    remove need to explicitly build before `make install`

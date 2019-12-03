@@ -1,0 +1,14 @@
+Makefile.in
+README.in
+check_ip_range.c
+chgpasswd.in
+common.in
+common.pm.in
+edit-whiteclnt.in
+footer
+header
+http2https
+list-log.in
+list-msg.in
+webuser-notify.in
+.manifest

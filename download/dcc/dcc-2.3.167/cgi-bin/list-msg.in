@@ -1,0 +1,264 @@
+#! @PERL@ -wT -I@cgibin@
+
+# Display a message in a user's log directory
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.41 $Revision$
+# @configure_input@
+
+# This file must protected with an equivalent to httpd.conf lines
+#   in the README file.
+
+
+use strict 'subs';
+use common;
+
+
+# display the message literally if asked
+if ($query{literal}) {
+    my($buf, $msg, $path);
+
+    # punt to directory listing if no message specified
+    punt2("no message specified for listing", $list_log_url)
+	if (!$query{msg});
+    punt2("bad message $query{msg} specified for listing", $list_log_url)
+	if ($query{msg} !~ /^([a-zA-Z\d][a-zA-Z\d]{5}[a-zA-Z\d.]{0,4})$/);
+    $msg = $1;
+
+    $path = msg2path($msg);
+    if (!open(MSG, $path)) {
+	html_head("Message $msg for $user");
+	print "<P class=warn>Cannot open $path: $!\n";
+	html_footer();
+	print "</BODY>\n</HTML>";
+	exit;
+    }
+    print "Content-type: text/plain\n";
+    print "Cache-Control: max-age=0, must-revalidate\n\n";
+    print $buf while (read(MSG, $buf, 4*1024));
+    exit;
+}
+
+
+# find the previous and next messages
+get_log_msgs($query{msg}, 0);
+$query{msg} = $msgs_num[$#msgs_num] if (!$query{msg} && $#msgs_num >= 0);
+my $msg = $query{msg} || '';
+my $path = msg2path($msg, '');
+
+if (!$msg || !$msgs_cache{$msg}) {
+    punt2("message $msg has disappeared", $list_log_url)
+} else {
+    my($msg_num, $older_msg, $oldest_msg, $newer_msg, $newest_msg);
+
+    if ($#msgs_num < 0) {
+	$newest_msg = "";
+	$oldest_msg = "";
+    } else {
+	$newest_msg = "$msgs_num[$#msgs_num]";
+	$oldest_msg = $msgs_num[0];
+    }
+    if (!defined($msg_first) || $msgs_num[$msg_first] ne $msg) {
+	$msg_num = "";
+	$newer_msg = $newest_msg;
+	$older_msg = $oldest_msg;
+    } else {
+	$msg_num = "#" . ($msg_first+1);
+	if ($msg_first < $#msgs_num) {
+	    $newer_msg = $msgs_num[$msg_first+1]
+	} else {
+	    $newer_msg = $newest_msg;
+	}
+	if ($msg_first > 0) {
+	    $older_msg = $msgs_num[$msg_first-1];
+	} else {
+	    $older_msg = $oldest_msg;
+	}
+    }
+
+    $oldest_link = "$list_msg_link${url_ques}msg=$oldest_msg\">Oldest</A>";
+    $older_link = "$list_msg_link${url_ques}msg=$older_msg\">Older</A>";
+    $newer_link = "$list_msg_link${url_ques}msg=$newer_msg\">Newer</A>";
+    $newest_link = "$list_msg_link\">Newest</A>";
+    html_head("Message $msg_num of " . ($#msgs_num+1) . " for $user");
+    common_buttons();
+    print <<EOF;
+<TR><TD>$newest_link
+    <TD>$newer_link
+    <TD>$older_link
+    <TD>$oldest_link
+</TABLE>
+<P>
+$list_msg_link${url_ques}msg=$msg&amp;literal=yes"
+    TARGET="DCC literal log file">Literal log file</A> $path
+contents for reporting or analysis.
+EOF
+}
+
+# pass a greylist triple
+if ($query{greywhite}) {
+    my($cksum, $sight);
+
+    html_whine("bogus greywhite checksum \"$query{greywhite}\"")
+	if ($query{greywhite} !~ /^([a-z0-9 ]+)$/);
+    $cksum = $1;
+    $sight = `@libexecdir@/dccsight -G '$cksum' 2>&1`;
+    if ($sight =~ /^(Pass|Embargo Ended)\s*$/i){
+	print "\n<P>\ngreylist embargo ended";
+    } else {
+	print "\n<P class=warn>\n@libexecdir@/dccsight -G '$cksum': $sight";
+    }
+}
+
+
+
+@error = parse_log_msg($msg);
+if (defined $error[0]) {
+    print "<P class=warn><STRONG>$error[0]:</STRONG> $error[1]\n";
+    html_footer();
+    print "</BODY>\n</HTML>\n";
+    exit;
+}
+
+
+print <<EOF;
+<P>
+<HR>
+<H4>Envelope</H4>
+<TABLE border=0 cellspacing=0 cellpadding=0>
+EOF
+
+print "<TR><TD>&nbsp;\n    <TD>$msg_date\n";
+print_envelope_link(1, "IP address", "IP", $msg_client_name, $msg_ip);
+print_envelope_link(scalar "helo" =~ /^($sub_hdrs)$/i,
+		    "HELO", "substitute HELO", "", $msg_helo);
+print_envelope_link(1, "env_From", "env_From", "", $msg_env_from);
+print_envelope_link(scalar "mail_host" =~ /^($sub_hdrs)$/i,
+		    "mail_host", "substitute mail_host", "", $msg_mail_host);
+map print_envelope_link(1, "env_To", "env_To", "", html_str_encode($_)),
+	@msg_env_to;
+
+
+# make links for whitelisting the body checksusm
+$msg_cksums =~ s/(Body|Fuz1|Fuz2):\s+(\S{8}\s\S{8}\s\S{8}\s\S{8}\s)/make_hex_link($1,$2)/eig;
+
+# make whitelisting links for greylist checksums with active embargos
+while ($msg_cksums =~ /^\s+([a-z0-9]{8}(?: [a-z0-9]{8}){3}) Embargo[\s#0-9]*$/mi) {
+    my($sum, $sight, $link, $text);
+
+    $sum = $1;
+    $sight = `@libexecdir@/dccsight -QG "$sum" 2>&1`;
+    if ($sight =~ /Embargo.*/) {
+	$link = make_greywhite_link($sum);
+	$text = "    <STRONG>select checksum to end greylist embargo of sender</STRONG>\n";
+    } else {
+	$link = "$sum<!--inactive-->";
+	$text = "    current value: " . html_str_encode($sight);
+    }
+    $msg_cksums =~ s/(^\s+)$sum(.*$)\n/$1$link$2\n$1$text/m;
+}
+
+print <<EOF;
+</TABLE>
+<P>
+<HR>
+<H4>Headers</H4>
+<PRE>
+$msg_hdrs
+</PRE>
+
+<HR>
+<H4>Body</H4>
+<P>
+$msg_body
+
+<HR>
+<H4>Checksums</H4>
+<PRE>$msg_cksums</PRE>
+
+EOF
+html_footer();
+print "</BODY>\n</HTML>\n";
+
+exit;
+
+#############################################################################
+
+
+sub print_envelope_link {
+    my($enable, $label, $type, $text, $value) = @_;
+
+    # skip the row if the value is absent
+    return if (! $value);
+
+    print "<TR><TD>";
+    print html_str_encode($label) if ($label);
+    print ":&nbsp;&nbsp;\n    <TD>";
+    if (! $enable) {
+	print html_str_encode($text . $value);
+	print "\n";
+	return;
+    }
+
+    if ($text) {
+	    print $text;
+	    print "&nbsp;";
+    }
+    print $edit_link;
+    print "${url_ques}type=";
+    print url_encode($type);
+    print "&amp;val=";
+    print url_encode($value);
+    print "&amp;msg=$query{msg}" if ($query{msg});
+    print "&amp;auto=1#cur_key\">";
+    print html_str_encode($value);
+    print "</A>\n";
+}
+
+
+
+sub make_hex_link {
+    my($type, $sum) = @_;
+    my($str);
+
+    # cannot whitelist missing fuz2 place keepers
+    return "$type: $sum" if ($sum =~ /^[ 0]+$/);
+
+    $str = "$edit_link${url_ques}type=";
+    $str .= url_encode("hex $type");
+    $str .= "&amp;val=";
+    $str .= url_encode($sum);
+    $str .= "&amp;msg=$msg&amp;auto=1#cur_key\">$type: $sum</A>";
+
+    return $str;
+}
+
+
+sub make_greywhite_link {
+    my($sum) = @_;
+    my($str);
+
+    $str = "$list_msg_link${url_ques}msg=$msg&amp;greywhite=";
+    $str .= url_encode($sum);
+    $str .= "\">$sum</A>";
+
+    return $str;
+}

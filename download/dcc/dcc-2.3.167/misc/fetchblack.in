@@ -1,0 +1,220 @@
+#! /bin/sh -e
+
+# fetch a blacklist dcc.dcc-servers.net DCC servers
+
+# This script should be run about twice an hour at an arbitrary time
+#	instead of 0,30 to minimize pile-ups on the FTP server.
+
+# -h homedir	set DCC home directory
+#
+# -o blklist	file of local blacklist entries
+#
+# -p pgm	fetch, wget, curl, or ftp
+#
+# -s srvr-host	host name of source of the common blacklist
+#
+# -m file	mirror a copy of the server's file there
+
+
+# Rhyolite Software DCC 2.3.167-1.57 $Revision$
+# @configure_input@
+
+
+# other, probably local blacklist files
+OTHER_BLS=
+
+exec </dev/null
+
+HTTP_REFERER=DCC-2.3.167-script; export HTTP_REFERER
+
+DCC_HOMEDIR=@prefix@
+SRVR_BL=dcc-servers-blacklist
+SRVRS=
+PGM=@FETCH_CMD@
+FORCE=
+MIRROR=
+
+USAGE="`basename $0`: [-xf] [-h homedir] [-o blklist] [-p pgm] [-s srvr-host]"
+while getopts "xfh:o:p:s:m:" c; do
+    case $c in
+	x) set -x;;
+	f) FORCE=yes;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	o) OTHER_BLS="$OTHER_BLS $OPTARG";;
+	p) PGM=$OPTARG;;
+	s) SRVRS="$SRVRS $OPTARG";;
+	m) MIRROR=$OPTARG;;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2; exit 1
+fi
+if test -z "$SRVRS"; then
+    SRVRS="https://www.dcc-servers.net/dcc https://www.rhyolite.com/dcc ftp://ftp.dcc-servers.net ftp://ftp.rhyolite.com"
+fi
+URLS=
+for SRVR in $SRVRS; do
+    if expr "$SRVR" : '.[hft]*tps*://' >/dev/null; then
+	if expr "$SRVR" : ".*/$SRVR_BL"'$' >/dev/null; then
+	    URLS="$URLS $SRVR"
+	else
+	    URLS="$URLS $SRVR/$SRVR_BL"
+	fi
+    else
+	URLS="$URLS ftp://$SRVR/$SRVR_BL"
+    fi
+done
+
+# dccd expects this target
+TGT_BL=$DCC_HOMEDIR/blacklist
+NEW_BL=new-blacklist
+MARKER=fetchblack-failed
+BDIR=$DCC_HOMEDIR/$SRVR_BL
+FLOG=$BDIR/fetch-log
+
+if test ! -d $BDIR; then
+    mkdir $BDIR
+fi
+cd $BDIR
+
+# use fetch, wget, curl, or ftp that understands URLs
+if test ! -s $SRVR_BL; then
+    echo "# initial place keeper" >$SRVR_BL
+fi
+mv $SRVR_BL $SRVR_BL.old
+rm -f $FLOG
+BASE_PGM=`basename "$PGM"`
+if test "$BASE_PGM" = wget; then
+    BASE_PGM=
+    for URL in $URLS; do
+	echo "$URL:" >>$FLOG
+	# Do not use wget --mirror because -r results in a 0 exit status
+	#   even on failure.
+	# Do not use --no-remove-listing, -nr, or --dont-remove-listing
+	#   because none of them are supported by all versions of wget.
+	# At least some versions of wget exit with 0 after having done
+	#   nothing but emitting a usage message.
+	if $PGM -nd --retr-symlinks -N --no-host-directories		\
+		--passive-ftp @FETCH_WGET_OPTS@ $URL >>$FLOG 2>&1; then
+	    if test -s $SRVR_BL; then
+		if test -z "`sed -n -e 2q				\
+			    -e 's/.*DOCTYPE.*/HTML/p'			\
+			    -e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p'	\
+		    $SRVR_BL`"; then
+		    break;
+		fi
+		# do not leave a broken file
+		rm $SRVR_BL
+	    fi
+	else
+	    rm -f $FNAME
+	fi
+	echo >>$FLOG
+    done
+fi
+
+if test "$BASE_PGM" = fetch; then
+    BASE_PGM=
+    for URL in $URLS; do
+	echo "$URL:" >>$FLOG
+	FETCH_BIND_ADDRESS=@FETCH_CMD_ADDR@ export FETCH_BIND_ADDRESS
+	$PGM -p -m $URL >>$FLOG 2>&1 || true
+	if test -s $SRVR_BL; then
+	    break;
+	fi
+	echo >>$FLOG
+    done
+fi
+
+if test "$BASE_PGM" = curl; then
+    BASE_PGM=
+    for URL in $URLS; do
+	echo "$URL:" >>$FLOG
+	$PGM @FETCH_CURL_OPTS@ -L --connect-timeout 30 --max-time 600\
+	    $URL -o $SRVR_BL >>$FLOG 2>&1 || true
+	# curl --fail does not work on at least some versions
+	if test -s $SRVR_BL; then
+		if test -z "`sed -n -e 2q				\
+			    -e 's/.*DOCTYPE.*/HTML/p'			\
+			    -e 's/<HEAD>/HTML/p' -e 's/<head>/HTML/p'	\
+			$SRVR_BL`"; then
+		break;
+	    fi
+	    # do not leave a broken file
+	    rm $SRVR_BL
+	fi
+	echo >>$FLOG
+    done
+fi
+
+if test "$BASE_PGM" = ftp; then
+    BASE_PGM=
+    for URL in $URLS; do
+	echo "$URL:" >>$FLOG
+	$PGM -p $URL >>$FLOG 2>&1
+	if test -s $SRVR_BL; then
+	    break;
+	fi
+	echo >>$FLOG
+    done
+    # if that did not work, try ancient FTP
+    if test ! -s $SRVR_BL; then
+	for URL in $URLS; do
+	    HOST=`expr "$URL" : "ftp://\([^/]*\)/"`
+	    RFILE=`expr "$URL" : "ftp://[^/]*/\(.*\)"`
+	    if test -z "$RFILE" -o -z "$HOST"; then
+		continue
+	    fi
+	    echo "$URL:" >>$FLOG
+	    (echo "user anonymous `hostname`"; echo "get $RFILE $SRVR_BL")    \
+		| ftp -n $HOST >>$FLOG 2>&1
+	    if test -s $SRVR_BL; then
+		break;
+	    fi
+	    # some versions of ftp like to leave empty files
+	    rm -f $SRVR_BL
+	    echo >>$FLOG
+	done
+    fi
+fi
+
+if test -s $SRVR_BL; then
+    rm -f $MARKER $SRVR_BL.old
+    if test -n "$MIRROR"; then
+	cp $SRVR_BL $MIRROR
+    fi
+else
+    # complain only when the list is more than a day old,
+    #	and then only once per day starting the second day.
+    OLD_MARKER="`find $MARKER -follow -mtime -1 2>/dev/null`"
+    if test -z "$OLD_MARKER"; then
+	if test -s $MARKER; then
+	    echo "Unable to fetch blacklist; see $FLOG"
+	fi
+	echo "Unable to fetch blacklist; see $FLOG" >$MARKER
+	date >>$MARKER
+    fi
+    # continue so that we include new versions of local blacklists
+    mv $SRVR_BL.old $SRVR_BL
+fi
+
+# add the local lists last so that they can override
+rm -f $NEW_BL
+cat  $SRVR_BL >$NEW_BL
+for NM in $OTHER_BLS; do
+    if test -s "$NM"; then
+	echo >>$NEW_BL
+	echo >>$NEW_BL
+	echo >>$NEW_BL
+	echo "# local file $NM" >>$NEW_BL
+	cat $NM >>$NEW_BL
+    fi
+done
+if test -z "$FORCE" && cmp $NEW_BL ../blacklist 1>/dev/null 2>&1; then :
+else
+    # copy it in case the target is a symbolic link
+    cp $NEW_BL $TGT_BL
+fi
+rm $NEW_BL

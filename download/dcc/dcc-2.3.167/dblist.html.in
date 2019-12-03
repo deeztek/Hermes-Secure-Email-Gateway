@@ -1,0 +1,220 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <TITLE>dblist.8</TITLE>
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <STYLE type="text/css">
+	BODY {background-color:white; color:black}
+	ADDRESS {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+    </STYLE>
+</HEAD>
+<BODY>
+<PRE>
+<!-- Manpage converted by man2html 3.0.1 -->
+<B>dblist(8)</B>             Distributed Checksum Clearinghouse             <B>dblist(8)</B>
+
+
+</PRE>
+<H2 ID="NAME">NAME</H2><PRE>
+     <B>dblist</B> -- Database List Distributed Checksum Clearinghouse
+
+
+</PRE>
+<H2 ID="SYNOPSIS">SYNOPSIS</H2><PRE>
+     <B>dblist</B> [<B>-vVHD</B>] [<B>-G</B> <I>on</I> | <I>off</I>] [<B>-h</B> <I>homedir</I>]
+            [<B>-C</B> <I>'type</I> <I>h1</I> <I>h2</I> <I>h3</I> <I>h4'</I>] [<B>-I</B> <I>server-ID</I>] [<B>-A</B> <I>dbaddr</I>] [<B>-L</B> <I>pathlen</I>]
+            [<B>-P</B> <I>pages</I>] [<B>-T</B> <I>timestamp</I>] [<I>file1</I> <I>file2</I> <I>...</I>]
+
+
+</PRE>
+<H2 ID="DESCRIPTION">DESCRIPTION</H2><PRE>
+     <B>Dblist</B> lists the contents of a DCC database as it does some consistency
+     checking.
+
+     <B ID="OPTION-v">-v</B>   lists more of the database.  Additional information is produced with
+          additional <B>-v</B> arguments.
+
+     <B ID="OPTION-V">-V</B>   displays the version of the DCC database lister.  Two or more <B>-V</B>
+          options show the options with which it was built.
+
+     <B ID="OPTION-H">-H</B>   turns off the listing of the hash table as well as the analysis of
+          the hash table.  Determining the worst case and average lengths of
+          chains in the hash table can take a long time for a large database
+          on a small computer.
+
+     <B ID="OPTION-D">-D</B>   turns off the listing of the data or checksum records.
+
+     <B ID="OPTION-G">-G</B> <I>on</I>
+          lists a greylist database.
+
+     <B ID="OPTION-h">-h</B> <I>homedir</I>
+          overrides the default DCC home directory, <I>@prefix@</I>.
+
+     <B ID="OPTION-C">-C</B> <I>'type</I> <I>h1</I> <I>h2</I> <I>h3</I> <I>h4'</I>
+          limits the listing to records containing that checksum or one of the
+          other checksums specified with <B>-C</B>.  If the four hexadecimal values
+          <I>h1</I> <I>h2</I> <I>h3</I> <I>h4</I> are absent, records with the matching <I>type</I> will be
+          listed.  If <I>type</I> is absent, any checksum with the four hexadecimal
+          values will be listed.  If the hexadecimal values <I>h1</I> <I>h2</I> <I>h3</I> <I>h4</I> are
+          absent, all checksums of the specified type will be listed.
+
+          The alternate form
+          <I>'server-ID</I> <I>{simple|commercial|ignore|rogue}</I> <I>at</I> <I>ID'</I> can be used to
+          select <I>server-ID</I> records of some types.
+
+          As many as 16 checksums can be specified.
+
+     <B ID="OPTION-I">-I</B> <I>server-ID</I>
+          limits the listing to records with that server-ID or one of the
+          other server-IDs specified with <B>-I</B>.  As many as 16 server-IDs can be
+          specified.
+
+     <B ID="OPTION-A">-A</B> <I>dbaddr</I>
+          excludes database records before <I>dbaddr</I>.
+
+     <B ID="OPTION-L">-L</B> <I>pathlen</I>
+          excludes records with path lengths shorter than <I>pathlen</I>.
+
+     <B ID="OPTION-P">-P</B> <I>pages</I>
+          ignores all but the last <I>pages</I> of the database.
+
+     <B ID="OPTION-T">-T</B> <I>timetamp</I>
+          excludes records with other timestamps.  A timestamp with a missing
+          microsecond value matches any record with that second.  As many as
+          16 timestamps can be specified.
+
+     <I>file1</I> <I>file2</I> <I>...</I>
+          are names of databases to be listed.  The default is <I>@prefix@/dcc</I><B>_</B><I>db</I>
+          and its companion, <I>@prefix@/dcc</I><B>_</B><I>db.hash</I>.  When <B>-G</B> <I>on</I> is used, the
+          default files are <I>@prefix@/grey</I><B>_</B><I>db</I> and <I>@prefix@/grey</I><B>_</B><I>db.hash</I>.
+
+     By default, the sizes of the main file and the hash table as well as how
+     much they contain and values related to the performance of the hash are
+     displayed.
+
+     With a single <B>-v</B>, most of the mail database file and the contents of mem-
+     ory mapped server flooding positions in the <I>@prefix@/flod.map</I> file  are
+     listed.  The listing starts with the serial number of the database file
+     which is when old entries were last removed from it by <B><A HREF="dbclean.html">dbclean(8)</A></B> That is
+     followed by similar lines showing the oldest timestamp of checksums not
+     expired by dbclean and of mail that is not "spam."
+
+     The flooding positions from the <I>@prefix@/flod.map</I> file are record offsets
+     or addresses in the main database file.
+
+     A typical record in the main database file looks like:
+
+       02/07/02 20:25:12.497032    5         1601              2fe5b94
+            path: 103&lt;-101&lt;-1601
+         Body      6       e2d3f96a c65aea01 3fece361 edff9ecf  2f21364 772d2
+         Fuz1      many    6ff56fe8 ffc312d7 a5fe8f13 12a537ae  2f21364 200a9
+         Fuz2      many    fac882b8 03eea34f bd792c40 2fe6fd54  2f21364 72816
+
+     That example was received by a DCC server with server-ID <I>1601</I> at about
+     8:25 UTC on the evening of February 7, 2000.  The report was about a mail
+     message set to <I>5</I> addressees.  The report was then sent or `flooded' to
+     the server with server-ID <I>101</I> which in turn sent it to a server with
+     server-ID <I>103</I>.  That server sent it to the local DCC server.  The record
+     is at the address <I>0x2fe5b94</I> in the database.  The record contains 3
+     checksums.  The simple checksum of the body of the message was <I>0xe2d3f96a</I>
+     <I>0xc65aea01</I> <I>0x3fece361</I> <I>0xedff9ecf</I> The total number of recipients of mes-
+     sages with this body checksum known in the database is <I>6</I>, which implies
+     this checksum had been previously reported with a target count of 1.  The
+     previous report in the database of a message with this body checksum is
+     at <I>0x2f21364</I>.  The hash table chain for this body checksum is computed to
+     start at <I>0x772d2</I>.  This report included two fuzzy checksums.  Both have
+     been previously reported as having been sent to <I>many</I> targets.
+
+     An asterisk (*) before the type of the checksum indicates that this
+     checksum is redundant.  A report of <I>many</I> addressees makes all preceding
+     reports redundant.
+
+     The flooding of some database records is delayed, as shown by the string
+     <I>delayed</I> after the server-ID.
+
+     The string <I>trimmed</I> after the server-ID marks older reports that have had
+     uninteresting checksums removed.  The string <I>compressed</I> after the server-
+     ID would indicate that this older report has been trimmed and compressed
+     with older reports.
+
+     With two <B>-v</B> arguments, records added to the database by <B><A HREF="dbclean.html">dbclean(8)</A></B> from
+     the server whitelist are also displayed.
+
+     Three <B>-v</B> arguments cause the hash table to be displayed.  Three typical
+     hash table entries look like:
+
+             19b8:   19ee   19b7
+             19b9:   19c0      0    90120 Fuz1
+             19ba:      0      0  1b72300 Fuz1
+
+     The entry in slot number <I>0x19b8</I> is unused or free.  Slot number <I>0x19b9</I> is
+     the start of a chain of collisions or entries with the same hash value of
+     0x19b9.  The next slot in this chain is at <I>0x19c0</I>.  The corresponding
+     <I>Fuz1</I> checksum is at <I>0x9012</I> in the database.  The third slot at <I>0x19ba</I> is
+     also that of a <I>Fuz1</I> checksum, but it is not part of a hash chain and its
+     database record is at <I>0x1b72300</I>.
+
+
+</PRE>
+<H2 ID="FILES">FILES</H2><PRE>
+     <SPAN="FILE-@prefix@">@prefix@</SPAN>     is the DCC home directory containing data and control files.
+     <SPAN="FILE-dcc_db">dcc_db</SPAN>       main file of DCC checksums.
+     <SPAN="FILE-grey_dcc_db">grey_dcc_db</SPAN>  main file of checksums used for greylisting.
+     <SPAN="FILE-dcc_db.hash">dcc_db.hash</SPAN>  database hash table for <I>@prefix@/dcc</I><B>_</B><I>db</I>.
+     <SPAN="FILE-grey_dcc_db.hash">grey_dcc_db.hash</SPAN>
+                  database hash table for <I>@prefix@/grey</I><B>_</B><I>dcc</I>.
+     <SPAN="FILE-flod.map">flod.map</SPAN>
+     <SPAN="FILE-grey_flod.map">grey_flod.map</SPAN>
+                  memory mapped flooding positions.
+
+
+</PRE>
+<H2 ID="SEE-ALSO">SEE ALSO</H2><PRE>
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>, <B><A HREF="dcc.html">dcc(8)</A></B>, <B><A HREF="dbclean.html">dbclean(8)</A></B>, <B><A HREF="dccd.html">dccd(8)</A></B>, <B><A HREF="dccifd.html">dccifd(8)</A></B>, <B><A HREF="dccm.html">dccm(8)</A></B>, <B><A HREF="dccproc.html">dccproc(8)</A></B>.
+
+
+</PRE>
+<H2 ID="HISTORY">HISTORY</H2><PRE>
+     <SPAN="FILE-Implementation">Implementation</SPAN> of <B>dblist</B> was started at <A HREF="https://www.rhyolite.com/">Rhyolite Software</A>, in 2000.  This
+     <SPAN="FILE-document">document</SPAN> describes version 2.3.167.
+
+                                 June 19, 2019
+</PRE>
+<HR>
+<ADDRESS>
+Man(1) output converted with man2html modified for DCC
+$Date 2001/04/29 03:22:18 $
+<BR>
+<A HREF="https://www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+</BODY>
+</HTML>

@@ -1,0 +1,225 @@
+#! /bin/sh
+
+# update an old RRD file to the current format for
+#	@libexecdir@/dcc-stats-collect
+#   [-x]	    debugging
+#   [-D data-dir]   where to find the rrdtool files
+#   [-h dcc_homedir]
+#   [-T @RRDTOOL@]  see the FreeBSD package or elsewhere
+#   file1, ...
+
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.4 $Revision$
+#	@configure_input@
+
+DCC_HOMEDIR=@prefix@
+DEBUG=
+# check the args once to get the home directory
+while getopts "xh:D:T:" c; do
+    case $c in
+	x) set -x; DEBUG=-x;;
+	h) DCC_HOMEDIR="$OPTARG";;
+	*) ;;
+    esac
+done
+. $DCC_HOMEDIR/dcc_conf
+
+DATADIR=$DCC_HOMEDIR/stats
+RRDTOOL=@RRDTOOL@
+USAGE="`basename $0`: [-x] [-h homedir] [-D data-dir] [-T rrdtool] file1 ..."
+OPTIND=1
+while getopts "xh:D:T:" c; do
+    case $c in
+	x) ;;
+	h) ;;
+	D) DATADIR="$OPTARG";;
+	T) RRDTOOL="$OPTARG";;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -eq 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+set -e
+cd $DATADIR
+
+for FILE in $*; do
+    FILE="`basename $FILE .rrd`.rrd"
+
+    # guage the age of the database
+    NO_MAX=no
+    HAS_FLOODED=
+    NO_TRAPPED=no
+    HAS_BULK=
+    eval `$RRDTOOL info $FILE						\
+	    | sed -n -e 's/^rra.*cf = .MAX.*/NO_MAX=/p'			\
+		-e 's/ds.flooded.*DERIVE.*/HAS_FLOODED=yes/p'		\
+		-e 's/ds.trapped.*DERIVE.*/NO_TRAPPED=/p'		\
+		-e 's/ds.bulk.*DERIVE.*/HAS_BULK=yes/p'`
+
+    if test -z "$HAS_BULK"; then
+	echo "$FILE is not a DCC rrd file" 1>&2
+	continue
+    fi
+
+    if test -z "$NO_MAX$HAS_FLOODED$NO_TRAPPED"; then
+       continue
+    fi
+
+    if test -s "$FILE.old"; then
+	echo "$FILE.old already exists" 1>&2
+	exit 1
+    fi
+
+    $RRDTOOL dump "$FILE" >"$FILE.xml"
+
+    # delete "flooded" counts
+    if test -n "$HAS_FLOODED"; then
+	awk 'BEGIN { in_header = 1; }
+	    in_header == 1 {
+		saved = saved $0 "\n";
+		if ($2 == "flooded") { in_flooded = 1; }
+		if ($1 == "</ds>") {
+		    if (! in_flooded) { printf "%s", saved; }
+		    saved = "";
+		    in_flooded = 0;
+		    next;
+		}
+		if ($0 ~ /.*<rra>/) {
+		    printf "%s", saved;
+		    saved = "";
+		    in_header = 0;
+		    in_prep = 0;
+		    next;
+		}
+		next;
+	    }
+	    $1 == "<cdp_prep>" {
+		in_prep = 1;
+		ds_num = 0;
+	    }
+	    in_prep == 1 {
+		saved = saved $0 "\n";
+		if ($1 == "<ds>") { ds_num = ds_num + 1; }
+		if ($1 == "</ds>") {
+		    if (ds_num != 5) { printf "%s", saved; }
+		    saved = "";
+		    next;
+		}
+		if ($1 == "</cdp_prep>") {
+		    in_prep = 0;
+		    printf "%s", saved;
+		    saved = "";
+		    next;
+		}
+		next;
+	    }
+	    /<row>/ {
+		sub(/<v>[^<]+<\/v><\/row>/, "</row>");
+		print $0;
+		next;
+	    }
+	    { print; }
+	    ' "$FILE.xml" >"$FILE.xml2"
+	rm -f "$FILE.xml"
+	mv "$FILE.xml2" "$FILE.xml"
+    fi
+
+    # add maximums
+    if test -n "$NO_MAX"; then
+	# get all but the final "</rrd>" line of the xml
+	sed -e '$d' "$FILE.xml" >"$FILE.xml2"
+	# add a "MAX" database from a copy of the last "MIN" database
+	sed -e 's@<cf> MIN </cf>@<rra><cf> MAX </cf>@p'		\
+	    -e '1,/<cf> MAX <.cf>/d'				\
+	    -e 's@<v>[-+.e0-9 ]*</v>@<v> NaN </v>@g'		\
+		"$FILE.xml" >>"$FILE.xml2"
+	rm -f "$FILE.xml"
+	mv "$FILE.xml2" "$FILE.xml"
+    fi
+
+    # add trapped counts
+    if test -n "$NO_TRAPPED"; then
+	awk 'BEGIN { in_header = 1; }
+	    in_header == 1 {
+		saved = saved $0 "\n";
+		if ($2 == "spam") { in_spam = 1; }
+		if ($1 == "</ds>") {
+		    printf "%s", saved;
+		    if (in_spam) {
+			sub(/spam/, "trapped", saved);
+			printf "%s", saved;
+		    }
+		    saved = "";
+		    in_spam = 0;
+		    next;
+		}
+		if ($0 ~ /.*<rra>/) {
+		    printf "%s", saved;
+		    saved = "";
+		    in_header = 0;
+		    in_prep = 0;
+		    next;
+		}
+		next;
+	    }
+	    $1 == "<cdp_prep>" {
+		in_prep = 1;
+		ds_num = 0;
+	    }
+	    in_prep == 1 {
+		saved = saved $0 "\n";
+		if ($1 == "<ds>") { ds_num = ds_num + 1; }
+		if ($1 == "</ds>") {
+		    if (ds_num == 3) { printf "%s", saved; }
+		    printf "%s", saved;
+		    saved = "";
+		    next;
+		}
+		if ($1 == "</cdp_prep>") {
+		    in_prep = 0;
+		    printf "%s", saved;
+		    saved = "";
+		    next;
+		}
+		next;
+	    }
+	    /<row>/ {
+		sub(/<row><v>[^<]+<\/v><v>[^<]+<\/v><v>[^<]+<\/v>/,
+		    "&<v> 0 </v>");
+		print $0;
+		next;
+	    }
+	    { print; }
+	    ' "$FILE.xml" >"$FILE.xml2"
+	rm -f "$FILE.xml"
+	mv "$FILE.xml2" "$FILE.xml"
+    fi
+
+    mv "$FILE" "$FILE.old"
+    $RRDTOOL restore "$FILE.xml" "$FILE"
+    rm -f "$FILE.xml" "$FILE.xml2"
+
+done

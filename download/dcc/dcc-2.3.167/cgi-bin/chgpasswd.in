@@ -1,0 +1,147 @@
+#! @PERL@ -wT -I@cgibin@
+
+# Change a DCC end-user's password
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.22 $Revision$
+# @configure_input@
+
+# This file must protected with equivalents to the httpd.conf lines
+#   in the README file.
+
+use strict 'subs';
+use 5.004;
+use Fcntl qw(:DEFAULT :flock);
+
+use common;
+
+
+sub emsg {
+    my($msg) = html_str_encode(@_);
+
+    $msg =~ s/^\s+//;
+    $msg =~ s/\s+$//;
+    $msg =~ s/\n/<BR>\n/g;
+
+    return "<P class=warn>$msg";
+}
+
+
+my($preq, $passwd1, $passwd2, @file, %dict,
+   $locked, $result_msg, $restart_url);
+
+
+read_whiteclnt(\@file, \%dict);
+
+
+$webusers="$DCCM_USERDIRS/webusers";
+$webusers = "@prefix@/$webusers" if ($webusers !~ /^\//);
+$webusers_lock="$webusers.lock";
+
+$passwd1 = $query{passwd1} ? $query{passwd1} : "";
+$passwd2 = $query{passwd2} ? $query{passwd2} : "";
+if ($hostname eq "www.rhyolite.com"
+    && $ENV{AuthName} && $ENV{AuthName} eq "DCC-demo-cgi"
+    && $user eq "cgi-demo"
+    && $passwd1 && $passwd2 && $passwd1 eq $passwd2) {
+    $passwd1 = "cgi-demo";
+    $passwd2 = "cgi-demo";
+}
+
+$preq="The password must be 4 or more characters.";
+$locked = ($whiteclnt_lock =~ /\blocked/) ? " disabled" : "";
+if ($locked) {
+    $result_msg = emsg("$whiteclnt locked; password not changed");
+} elsif (!$passwd1) {
+    if ($locked) {
+	$result_msg = emsg("$whiteclnt locked");
+    } else {
+	$result_msg = html_str_encode($preq);
+    }
+} elsif (length($passwd1) < 4) {
+    $result_msg = emsg("$preq");
+
+} elsif ($passwd1 ne $passwd2) {
+    $result_msg = emsg("The two copies of the password differ.");
+} elsif ($passwd1 !~ /^([^'"`]+)$/) {
+    $result_msg = emsg("Quotes are not allowed in passwords.");
+} else {
+    $passwd1 = $1;			# quite Perl taint warnings
+
+    # use a separate lock file in case htpasswd does some locking of its own
+    if (!sysopen(LOCKFH, "$webusers_lock", O_WRONLY | O_CREAT)) {
+	$result_msg = emsg("open($webusers_lock): $!");
+    } elsif (!flock(LOCKFH, LOCK_EX | LOCK_NB)) {
+	$result_msg = emsg("$webusers_lock busy: $!\nTry again");
+	close(LOCKFH);
+    } else {
+	$locked = " disabled";
+	open(CMD, "@HTPASSWD@ -b $webusers '$user' '$passwd1' 2>&1 |");
+	if (!read(CMD, $result_msg, 1000)) {
+	    $result_msg = emsg("read(htpasswd): $!");
+	    # put the error message into the Apache error log
+	    print STDERR "DCC cgi chgpasswd $result_msg\n";
+	    $result_msg = emsg($result_msg);
+	    close(CMD);
+	    close(LOCKFH);
+	} else {
+	    close(LOCKFH);
+	    if (!close(CMD)) {
+		$result_msg = ($! ? "$result_msg\nclose(htpasswd): $!"
+			       : "$result_msg\nhtpasswd exit status $?");
+		# put the error message into the Apache error log
+		print STDERR "DCC cgi chgpasswd $result_msg\n";
+		$result_msg = emsg($result_msg);
+	    } else {
+		$restart_url = ($query{goback} && $query{goback} ne $passwd_url
+				? "$query{goback}$url_suffix"
+				: $edit_url);
+		$restart_url .= $url_ques;
+	    }
+	}
+    }
+}
+
+html_head("Change DCC Password for $user", $restart_url);
+
+print "<H3>Change DCC Password for <EM>$user</EM></H3>\n<P>\n";
+
+common_buttons();
+print <<EOF;
+</TABLE>
+
+<P>
+<FORM action="$ENV{SCRIPT_NAME}" name=form method=POST>
+<TABLE border=0 cellspacing=1 cellpadding=1>
+<TR><TD align=right><LABEL for=passwd1>Password</LABEL>
+    <TD><INPUT$locked id=passwd1 type=password name=passwd1 maxlength=12 value="$passwd1">
+<TR><TD align=right><LABEL for=passwd2>Confirm</LABEL>
+    <TD><INPUT$locked id=passwd2 type=password name=passwd2 maxlength=12 value="$passwd2">
+<TR><TD><INPUT type=submit $locked value="Change">$form_hidden
+</TABLE>
+</FORM>
+
+<P>
+$result_msg
+
+EOF
+html_footer();
+print "</BODY>\n</HTML>\n";

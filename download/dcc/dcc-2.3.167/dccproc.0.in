@@ -1,0 +1,437 @@
+dccproc(8)            Distributed Checksum Clearinghouse            dccproc(8)
+
+NNAAMMEE
+     ddccccpprroocc -- Distributed Checksum Clearinghouse Procmail Interface
+
+SSYYNNOOPPSSIISS
+     ddccccpprroocc [--VVddAAQQCCHHEEPPRR] [--hh _h_o_m_e_d_i_r] [--mm _m_a_p] [--ww _w_h_i_t_e_c_l_n_t] [--TT _t_m_p_d_i_r]
+             [--aa _I_P_-_a_d_d_r_e_s_s] [--ff _e_n_v___f_r_o_m] [--tt _t_a_r_g_e_t_s] [--xx _e_x_i_t_c_o_d_e]
+             [--cc _t_y_p_e_,[_l_o_g_-_t_h_o_l_d_,]_r_e_j_-_t_h_o_l_d] [--gg [_n_o_t_-]_t_y_p_e] [--SS _h_e_a_d_e_r]
+             [--ii _i_n_f_i_l_e] [--oo _o_u_t_f_i_l_e] [--ll _l_o_g_d_i_r] [--BB _d_n_s_b_l_-_o_p_t_i_o_n]
+             [--LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l]
+
+DDEESSCCRRIIPPTTIIOONN
+     DDccccpprroocc is a low performance DCC client for checking single mail messages
+     for mail filters such as procmail(1)
+
+     DDccccpprroocc copies a complete SMTP message from standard input or a file to
+     standard output or another file.  As it copies the message, it computes
+     the DCC checksums for the message, reports them to a DCC server, and adds
+     a header line to the message.  Another program such as procmail(1) can
+     use the added header line to filter mail or the exit ddccccpprroocc exit status.
+
+     Error messages are sent to stderr as well as the system log.  Connect
+     stderr and stdout to the same file to see errors in context, but direct
+     stderr to /dev/null to keep DCC error messages out of the mail.  The --oo
+     option can also be used to separate the error messages.
+
+     DDccccpprroocc sends reports of checksums related to mail received by DCC
+     clients and queries about the total number of reports of particular
+     checksums.  A DCC server receives no mail, address, headers, or other
+     information, but only cryptographically secure checksums of such informa-
+     tion.  A DCC server cannot determine the text or other information that
+     corresponds to the checksums it receives.  It only acts as a clearing-
+     house of counts of checksums computed by clients.
+
+     The checksums of private mail, the internal mail,and other mail that is
+     known to not be unsolicited bulk can be listed in a whitelist specified
+     with
+
+     When sendmail(8) is used, dccm(8) is a better DCC interface.  Dccifd(8)
+     is more efficient than ddccccpprroocc because it is a daemon, but that has costs
+     in complexity.  See dccsight(8) for a way to use previously computed
+     checksums.
+
+   OOPPTTIIOONNSS
+     The following options are available:
+
+     --VV   displays the program's version.  Two or more --VV options show the
+          options with which it was built.
+
+     --dd   enables debugging output from the DCC client software.  Additional
+          --dd options increase the number of messages.  One causes error mes-
+          sages to be sent to STDERR as well as the system log.
+
+     --AA   adds to existing X-DCC headers in the message instead of replacing
+          existing headers of the brand of the current server.
+
+     --PP   The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP
+          header fields, but historically has looked for counts of "many".
+          However, there are situations when ddccccpprroocc knows that a mail message
+          is extremely bulky and probably spam.  For example, mail from a
+          sender that is blacklisted in _w_h_i_t_e_c_l_n_t gets an X-DCC header that
+          includes _b_u_l_k.  To acommodate that bug in SpamAssassin, by default
+          whenever ddccccpprroocc generates an X-DCC header containing "bulk", it
+          also forces the _B_o_d_y count to "many".  --PP turns off that kludge and
+          the _B_o_d_y contains the count from the DCC server.
+
+     --QQ   only queries the DCC server about the checksums of messages instead
+          of reporting.  This is useful when ddccccpprroocc is used to filter mail
+          that has already been reported to a DCC server by another DCC
+          client.  No single mail message should be reported to a DCC server
+          more than once per recipient, because each report will increase the
+          apparent "bulkness" of the message.
+
+          It is better to use _M_X_D_C_C lines in the global _/_v_a_r_/_d_c_c_/_w_h_i_t_e_c_l_n_t
+          file for your MX mail servers that use DCC than to use --QQ with
+          ddccccpprroocc.
+
+          Do not use --QQ except on mail that you know has been reported to a
+          DCC server.  DCC depends on reports of all except known private mail
+          and works only because almost no DCC installations use --QQ.
+
+     --CC   outputs only the X-DCC header and the checksums for the message.
+
+     --HH   outputs only the X-DCC header.
+
+     --EE   adds lines to the start of the log file turned on with --ll and --cc
+          describing what might have been the envelope of the message.  The
+          information for the inferred envelope comes from arguments including
+          --aa and headers in the message when --RR is used.  No lines are gener-
+          ated for which no information is available, such as the envelope
+          recipient.
+
+     --PP   The SpamAsassin DCC.pm plugin should watch for "bulk" in X-DCC SMTP
+          header fields, but historically has looked for counts of "many".
+          However, there are situations when ddccccpprroocc knows that a mail message
+          is extremely bulky and probably spam.  For example, mail from a
+          sender that is blacklisted in _w_h_i_t_e_c_l_n_t gets an X-DCC header that
+          includes _b_u_l_k.  To acommodate that bug in SpamAssassin, by default
+          whenever ddccccpprroocc generates an X-DCC header containing "bulk", it
+          also forces the _B_o_d_y count to "many".  --PP turns off that kludge and
+          the _B_o_d_y contains the count from the DCC server.
+
+     --RR   says the first Received lines have the standard
+          "helo (name [address])..."  format and the address is that of the
+          SMTP client that would otherwise be provided with --aa.  The --aa option
+          should be used if the local SMTP server adds a Received line with
+          some other format or does not add a Received line.  Received headers
+          specifying IP addresses marked _M_X or _M_X_D_C_C in the --ww _w_h_i_t_e_c_l_n_t file
+          are skipped.
+
+     --hh _h_o_m_e_d_i_r
+          overrides the default DCC home directory, _/_v_a_r_/_d_c_c.
+
+     --mm _m_a_p
+          specifies a name or path of the memory mapped parameter file instead
+          of the default _/_v_a_r_/_d_c_c_/_m_a_p.  It should be created with the nneeww mmaapp
+          operation of the cdcc(8) command.
+
+     --ww _w_h_i_t_e_c_l_n_t
+          specifies an optional file containing SMTP client IP addresses and
+          SMTP headers of mail that do not need X-DCC headers and whose check-
+          sums should not be reported to the DCC server.  It can also contain
+          checksums of spam.  If the pathname is not absolute, it is relative
+          to the DCC home directory.  Thus, individual users with private
+          whitelists usually specify them with absolute paths.  Common
+          whitelists shared by users must be in the DCC home directory or one
+          of its subdirectories and owned by the set-UID user of ddccccpprroocc.  It
+          is useful to _i_n_c_l_u_d_e a common or system-wide whitelist in private
+          lists.
+
+          Because the contents of the _w_h_i_t_e_c_l_n_t file are used frequently, a
+          companion file is automatically created and maintained.  It has the
+          same pathname but with an added suffix of _._d_c_c_w.  It contains a mem-
+          ory mapped hash table of the main file.
+
+          _O_p_t_i_o_n lines can be used to modify many aspects of ddccccpprroocc filter-
+          ing, as described in the main dcc(8) man page.  For example, an
+          _o_p_t_i_o_n _s_p_a_m_-_t_r_a_p_-_d_i_s_c_a_r_d_s line turns off DCC filtering and reports
+          the message as spam.
+
+     --TT _t_m_p_d_i_r
+          changes the default directory for temporary files from the system
+          default.  The system default is often _/_t_m_p.
+
+     --aa _I_P_-_a_d_d_r_e_s_s
+          specifies the IP address (not the host name) of the immediately pre-
+          vious SMTP client.  It is often not available.  --aa _0_._0_._0_._0 is
+          ignored.  --aa.  The --aa option should be used instead of --RR if the
+          local SMTP server adds a Received line with some other format or
+          does not add a Received line.
+
+     --ff _e_n_v___f_r_o_m
+          specifies the RFC 821 envelope "Mail From" value with which the mes-
+          sage arrived.  It is often not available.  If --ff is not present, the
+          contents of the first Return-Path: or UNIX style From_ header is
+          used.  The _e_n_v___f_r_o_m string is often but need not be bracketed with
+          "<>".
+
+     --tt _t_a_r_g_e_t_s
+          specifies the number of addressees of the message if other than 1.
+          The string _m_a_n_y instead of a number asserts that there were too many
+          addressees and that the message is unsolicited bulk email.
+
+     --xx _e_x_i_t_c_o_d_e
+          specifies the code or status with which ddccccpprroocc exits if the --cc
+          thresholds are reached or the --ww _w_h_i_t_e_c_l_n_t file blacklists the mes-
+          sage.
+
+          The default value is EX_NOUSER.  EX_NOUSER is 67 on many systems.
+          Use 0 to always exit successfully.
+
+     --cc _t_y_p_e_,[_l_o_g_-_t_h_o_l_d_,]_r_e_j_-_t_h_o_l_d
+          sets logging and "spam" thresholds for checksum _t_y_p_e.  The checksum
+          types are _I_P, _e_n_v___F_r_o_m, _F_r_o_m, _M_e_s_s_a_g_e_-_I_D, _s_u_b_s_t_i_t_u_t_e, _R_e_c_e_i_v_e_d,
+          _B_o_d_y, _F_u_z_1, _F_u_z_2, _r_e_p_-_t_o_t_a_l, and _r_e_p.  The first six, _I_P through
+          _s_u_b_s_t_i_t_u_t_e, have no effect except when a local DCC server configured
+          with --KK is used.  The _s_u_b_s_t_i_t_u_t_e thresholds apply to the first sub-
+          stitute heading encountered in the mail message.  The string _A_L_L
+          sets thresholds for all types, but is unlikely to be useful except
+          for setting logging thresholds.  The string _C_M_N specifies the com-
+          monly used checksums _B_o_d_y, _F_u_z_1, and _F_u_z_2.  _R_e_j_-_t_h_o_l_d and _l_o_g_-_t_h_o_l_d
+          must be numbers, the string _N_E_V_E_R, or the string _M_A_N_Y indicating
+          millions of targets.  Counts from the DCC server as large as the
+          threshold for any single type are taken as sufficient evidence that
+          the message should be logged or rejected.
+
+          _L_o_g_-_t_h_o_l_d is the threshold at which messages are logged.  It can be
+          handy to log messages at a lower threshold to find solicited bulk
+          mail sources such as mailing lists.  If no logging threshold is set,
+          only rejected mail and messages with complicated combinations of
+          white and blacklisting are logged.  Messages that reach at least one
+          of their rejection thresholds are logged regardless of logging
+          thresholds.
+
+          _R_e_j_-_t_h_o_l_d is the threshold at which messages are considered "bulk,"
+          and so should be rejected or discarded if not whitelisted.
+
+          DCC Reputation thresholds in the commercial version of DCC are con-
+          trolled by thresholds on checksum types _r_e_p and _r_e_p_-_t_o_t_a_l.  The DCC
+          Reputations of IP addresses that the DCC database says have sent
+          more than _r_e_p_-_t_o_t_a_l_,_l_o_g_-_t_h_o_l_d are computed and messages from those
+          addresses are logged.  Messages from IP addresses with DCC Reputa-
+          tions of at least the _r_e_p_,_r_e_j_-_t_h_o_l_d rejection threshold can be
+          rejected.  The DCC Reputation of an IP address is the percentage of
+          its messages known to have been sent to at least 10 recipients.  The
+          defaults are equivalent to _r_e_p_,_n_e_v_e_r and _r_e_p_-_t_o_t_a_l_,_n_e_v_e_r_,_2_0.
+
+          Bulk DCC Reputations do not reject mail unless enabled by an
+          _o_p_t_i_o_n _D_C_C_-_r_e_p_-_o_n line a _w_h_i_t_e_c_l_n_t file.
+
+          The checksums of locally whitelisted messages are not checked with
+          the DCC server and so only the number of targets of the current copy
+          of a whitelisted message are compared against the thresholds.
+
+          The default is _A_L_L_,_N_E_V_E_R, so that nothing is discarded, rejected, or
+          logged.  A common choice is _C_M_N_,_2_5_,_5_0 to reject or discard mail with
+          common bodies except as overridden by the whitelist of the DCC
+          server, the sendmail _$_{_d_c_c___i_s_s_p_a_m_} and _$_{_d_c_c___n_o_t_s_p_a_m_} macros, and
+          --gg, and --ww.
+
+     --gg [_n_o_t_-]_t_y_p_e
+          indicates that whitelisted, _O_K or _O_K_2, counts from the DCC server
+          for a type of checksum are to be believed.  They should be ignored
+          if prefixed with _n_o_t_-.  _T_y_p_e is one of the same set of strings as
+          for --cc.  Only _I_P, _e_n_v___F_r_o_m, and _F_r_o_m are likely choices.  By default
+          all three are honored, and hence the need for _n_o_t_-.
+
+     --SS _h_d_r
+          adds to the list of substitute or locally chosen headers that are
+          checked with the --ww _w_h_i_t_e_c_l_n_t file and sent to the DCC server.  The
+          checksum of the last header of type _h_d_r found in the message is
+          checked.  _H_d_r can be _H_E_L_O to specify the SMTP envelope HELO value.
+          _H_d_r can also be _m_a_i_l___h_o_s_t to specify the host name from the
+          Mail_from value in the SMTP envelope.  As many as 8 different sub-
+          stitute headers can be specified, but only the checksum of the first
+          will be sent to the DCC server.
+
+     --ii _i_n_f_i_l_e
+          specifies an input file for the entire message instead of standard
+          input.  If not absolute, the pathname is interpreted relative to the
+          directory in which ddccccpprroocc was started.
+
+     --oo _o_u_t_f_i_l_e
+          specifies an output file for the entire message including headers
+          instead of standard output.  If not absolute, the pathname is inter-
+          preted relative to the directory in which ddccccpprroocc was started.
+
+     --ll _l_o_g_d_i_r
+          specifies a directory for copies of messages whose checksum target
+          counts exceed --cc thresholds.  The format of each file is affected by
+          --EE.
+
+          See the FILES section below concerning the contents of the files.
+          See also the _o_p_t_i_o_n _l_o_g_-_s_u_b_d_i_r_e_c_t_o_r_y_-_{_d_a_y_,_h_o_u_r_,_m_i_n_u_t_e_} lines in
+          _w_h_i_t_e_c_l_n_t files described in dcc(8).
+
+          The directory is relative to the DCC home directory if it is not
+          absolute
+
+     --BB _d_n_s_b_l_-_o_p_t_i_o_n
+          enables DNS white- and blacklist checks of the SMTP client IP
+          address, SMTP envelope Mail_From sender domain name, and of host
+          names in URLs in the message body.  Body URL blacklisting has too
+          many false positives to use on abuse mailboxes.  It is less effec-
+          tive than greylisting with dccm(8) or dccifd(8) but can be useful in
+          situations where greylisting cannot be used.  It can be combined
+          with greylisting.
+
+          _D_n_s_b_l_-_o_p_t_i_o_n is either one of the --BB _s_e_t_:_o_p_t_i_o_n forms or
+              --BB _d_o_m_a_i_n[any[_,_b_l_t_y_p_e]]
+              --BB _d_o_m_a_i_n[_,_I_P_a_d_d_r[_/_x_x[_&_I_P_m_a_s_k][_,_b_l_t_y_p_e]]]
+              --BB _d_o_m_a_i_n[_,_I_P_a_d_d_r_L_O[_-_I_P_a_d_d_r_H_I[_&_I_P_m_a_s_k][_,_b_l_t_y_p_e]]]
+          _D_o_m_a_i_n is a DNS blacklist domain such as _e_x_a_m_p_l_e_._c_o_m that will be
+          searched.  The strings _a_n_y, _I_P_a_d_d_r, _I_P_a_d_d_r_/_x_x, or _I_P_a_d_d_r_L_O_-_I_P_a_d_d_r_H_I,
+          specifies which IP addresses found in the DNS blacklist after apply-
+          ing the optional IP address mask _I_P_m_a_s_k say that mail messages
+          should be rejected or accepted with --BB _s_e_t_:_w_h_i_t_e.  "127.0.0.2" is
+          assumed if no address(es) are specified.  IPv6 addresses can be
+          specified with the usual colon (:) notation.  Host names can be used
+          instead of numeric addresses.  The type of DNS blacklist is speci-
+          fied by _b_l_t_y_p_e as _n_a_m_e, _a_l_l_-_n_a_m_e_s, _I_P_v_4, or _I_P_v_6.  Given an envelope
+          sender domain name or a domain name in a URL of spam.domain.org and
+          a blacklist of type _n_a_m_e, spam.domain.org.example.com will be looked
+          up.  The names spam.domain.org.example.com, domain.org.example.com,
+          and org.example.com will be looked up in blacklists of type
+          _a_l_l_-_n_a_m_e_s.  Use _n_a_m_e with DNS blacklists that use wildcards for
+          speed but _a_l_l_-_n_a_m_e_s for other DNS name blacklists.  Blacklist types
+          of _I_P_v_4 and _I_P_v_6 require that the domain name in a URL sender
+          address be resolved into an IPv4 or IPv6 address.  The resolved
+          address from the mail message is then written as a reversed string
+          of decimal octets to check the DNS blacklist, as in
+          _2_._0_._0_._1_2_7_._e_x_a_m_p_l_e_._c_o_m.
+
+          A _d_o_m_a_i_n of "."  and type of _n_a_m_e can be used to blacklist domain
+          names with specified addresses.  This can be useful to detect URLs
+          with domain names listed in a Response Policy Zone (RPZ).  For exam-
+          ple, the following can be used to reject mail containing URLs listed
+          by a response policy zone that maps evil domain names to 224.0.0.0
+          with an informative status message:
+
+            '-Bset:rej-msg=5.7.1 550 %ID %BTYPE \
+                  https://example.com/query/dbl?domain=%BTGT'
+            -B.,224.0.0.0,name
+
+          More than one blacklist can be specified and blacklists can be
+          grouped with --BB _s_e_t_:_g_r_o_u_p_=_X.  All searching within a group of black-
+          lists is stopped at the first positive result.
+
+          Unlike dccm(8) and dccifd(8), no _o_p_t_i_o_n _D_N_S_B_L_-_o_n line is required in
+          the _w_h_i_t_e_c_l_n_t file.  A --BB argument is sufficient to show that DNSBL
+          filtering is wanted by the ddccccpprroocc user.
+
+          --BB _s_e_t_:_n_o_-_c_l_i_e_n_t
+               implies that SMTP client IP addresses and reverse DNS domain
+               names should not be checked in the following blacklists.
+               --BB _s_e_t_:_c_l_i_e_n_t restores the default for the following black-
+               lists.
+
+          --BB _s_e_t_:_n_o_-_m_a_i_l___h_o_s_t
+               implies that SMTP envelope Mail_From sender domain names should
+               not be checked in the following blacklists.  --BB _s_e_t_:_m_a_i_l___h_o_s_t
+               restores the default.
+
+          --BB _s_e_t_:_n_o_-_U_R_L
+               says that URLs in the message body should not be checked in the
+               in the following blacklists.  --BB _s_e_t_:_U_R_L restores the default.
+
+          --BB _s_e_t_:_n_o_-_M_X
+               says MX servers of sender Mail_From domain names and host names
+               in URLs should not be checked in the following blacklists.
+               --BB _s_e_t_:_M_X restores the default.
+
+          --BB _s_e_t_:_n_o_-_N_S
+               says DNS servers of sender Mail_From domain names and host
+               names in URLs should not be checked in the following black-
+               lists.  --BB _s_e_t_:_N_S restores the default.
+
+          --BB _s_e_t_:_w_h_i_t_e
+               says the DNS list is a whitelist of names or IP addresses.
+               --BB _s_e_t_:_b_l_a_c_k restores the default.  DNS whitelist usually also
+               need --BB _s_e_t_:_n_o_-_m_a_i_l___h_o_s_t, --BB _s_e_t_:_n_o_-_U_R_L, --BB _s_e_t_:_n_o_-_M_X,
+               --BB _s_e_t_:_n_o_-_N_S, and --BB _s_e_t_:_n_o_-_m_a_i_l___h_o_s_t.
+
+          --BB _s_e_t_:_d_e_f_a_u_l_t_s
+               is equivalent to all of --BB _s_e_t_:_b_l_a_c_k --BB _s_e_t_:_c_l_i_e_n_t
+               --BB _s_e_t_:_m_a_i_l___h_o_s_t --BB _s_e_t_:_U_R_L --BB _s_e_t_:_M_X and --BB _s_e_t_:_N_S
+
+          --BB _s_e_t_:_g_r_o_u_p_=_X
+               adds following DNS blacklists specified with --BB _d_o_m_a_i_n[_._._.] to
+               group 1, 2, 3, or 4.
+
+          --BB _s_e_t_:_d_e_b_u_g_=_X
+               sets the DNS blacklist logging level
+
+          --BB _s_e_t_:_m_s_g_-_s_e_c_s_=_S
+               limits ddccccpprroocc to _S seconds total for checking all DNS black-
+               lists.  The default is 25.
+
+          --BB _s_e_t_:_U_R_L_-_s_e_c_s_=_S
+               limits ddccccpprroocc to at most _S seconds resolving and checking any
+               single URL or IP address.  The default is 11.  Some spam con-
+               tains dozens of URLs and some "spamvertised" URLs contain host
+               names that need minutes to resolve.  Busy mail systems cannot
+               afford to spend minutes checking each incoming mail message.
+
+     --LL _l_t_y_p_e_,_f_a_c_i_l_i_t_y_._l_e_v_e_l
+          specifies how messages should be logged.  _L_t_y_p_e must be _e_r_r_o_r, _i_n_f_o,
+          or _o_f_f to indicate which of the two types of messages are being con-
+          trolled or to turn off all syslog(3) messages from ddccccpprroocc.  _L_e_v_e_l
+          must be a syslog(3) level among _E_M_E_R_G, _A_L_E_R_T, _C_R_I_T, _E_R_R, _W_A_R_N_I_N_G,
+          _N_O_T_I_C_E, _I_N_F_O, and _D_E_B_U_G.  _F_a_c_i_l_i_t_y must be among _A_U_T_H, _A_U_T_H_P_R_I_V,
+          _C_R_O_N, _D_A_E_M_O_N, _F_T_P, _K_E_R_N, _L_P_R, _M_A_I_L, _N_E_W_S, _U_S_E_R, _U_U_C_P, and _L_O_C_A_L_0
+          through _L_O_C_A_L_7.  The default is equivalent to
+                --LL _i_n_f_o_,_M_A_I_L_._N_O_T_I_C_E --LL _e_r_r_o_r_,_M_A_I_L_._E_R_R
+
+     ddccccpprroocc exits with 0 on success and with the --xx value if the --cc thresh-
+     olds are reached or the --ww _w_h_i_t_e_c_l_n_t file blacklists the message.  If at
+     all possible, the input mail message is output to standard output or the
+     --oo _o_u_t_f_i_l_e despite errors.  If possible, error messages are put into the
+     system log instead of being mixed with the output mail message.  The exit
+     status is zero for errors so that the mail message will not be rejected.
+
+     If ddccccpprroocc is run more than 500 times in fewer than 5000 seconds, ddccccpprroocc
+     tries to start Dccifd(8).  The attempt is made at most once per hour.
+     Dccifd is significantly more efficient than ddccccpprroocc.  With luck, mecha-
+     nisms such as SpamAssassin will notice when dccifd is running and switch
+     to dccifd.
+
+FFIILLEESS
+     @prefix@   DCC home directory.
+     map        memory mapped file in the DCC home directory of information
+                concerning DCC servers.
+     whiteclnt  contains the client whitelist in the format described in
+                dcc(8).
+     whiteclnt.dccw
+                is a memory mapped hash table corresponding to the _w_h_i_t_e_c_l_n_t
+                file.
+     tmpdir     contains temporary files created and deleted as ddccccpprroocc pro-
+                cesses the message.
+     logdir     is an optional directory specified with --ll and containing
+                marked mail.  Each file in the directory contains one message,
+                at least one of whose checksums reached one of its --cc thresh-
+                olds.  The entire body of the SMTP message including its
+                header is followed by the checksums for the message.
+
+EEXXAAMMPPLLEESS
+     The following procmailrc(5) rule adds an X-DCC header to passing mail
+
+         :0 f
+         | /usr/local/bin/dccproc -ERw whiteclnt
+
+     This procmailrc(5) recipe rejects mail with total counts of 10 or larger
+     for the commonly used checksums:
+
+         :0 fW
+         | /usr/local/bin/dccproc -ERw whiteclnt -ccmn,10
+         :0 e
+         {
+             EXITCODE=67
+             :0
+             /dev/null
+         }
+
+SSEEEE AALLSSOO
+     cdcc(8), dcc(8), dbclean(8), dccd(8), dblist(8), dccifd(8), dccm(8),
+     dccsight(8), mail(1), procmail(1).
+
+HHIISSTTOORRYY
+     Distributed Checksum Clearinghouses are based on an idea of Paul Vixie.
+     Implementation of ddccccpprroocc was started at Rhyolite Software in 2000.  This
+     document describes version 2.3.167.
+
+BBUUGGSS
+     ddccccpprroocc uses --cc where dccm(8) uses --tt.
+
+                                 June 19, 2019

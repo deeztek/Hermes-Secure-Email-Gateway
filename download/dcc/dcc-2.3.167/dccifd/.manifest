@@ -1,0 +1,4 @@
+Makefile.in
+dccif.pl.in
+dccifd.c
+.manifest

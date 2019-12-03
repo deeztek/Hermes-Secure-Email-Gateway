@@ -1,0 +1,654 @@
+.\" Copyright (c) 2019 by Rhyolite Software, LLC
+.\"
+.\" Permission to use, copy, modify, and distribute this software without
+.\" changes for any purpose with or without fee is hereby granted, provided
+.\" that the above copyright notice and this permission notice appear in all
+.\" copies and any distributed versions or copies are either unchanged
+.\" or not called anything similar to "DCC" or "Distributed Checksum
+.\" Clearinghouse".
+.\"
+.\" __________________________________________________
+.\"
+.\" THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+.\" WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+.\" OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+.\" BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+.\" OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+.\" WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+.\" ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+.\"
+.\"
+.\" Rhyolite Software DCC 2.3.167-1.110 $Revision$
+.\"
+.Dd June 19, 2019
+.ds volume-ds-DCC Distributed Checksum Clearinghouse
+.Dt cdcc 8 DCC
+.Os " "
+.Sh NAME
+.Nm cdcc
+.Nd Control Distributed Checksum Clearinghouse
+.Sh SYNOPSIS
+.Nm cdcc
+.Op Fl VBdq
+.Op Fl h Ar homedir
+.Op Fl c Ar ids
+.Op Ar op1 op2 ... Op Ar -
+.Sh DESCRIPTION
+.Nm Cdcc
+is used to clear, control, and query the control file used
+by Distributed Checksum Clearinghouse
+clients such as
+.Xr dccm 8 .
+The host names, UDP port numbers, IDs, and passwords local clients use
+to talk to servers as well as IP addresses, round trip times, and other
+information are contained in the
+.Pa map
+file.
+While
+.Nm
+is set-UID, it uses the real UID only when accessing the
+.Pa map
+file.
+It refuses to display sensitive information such as passwords
+unless the real UID is the same as the effective UID.
+Note that
+.Nm
+needs to be set to a UID that can read and write the
+.Pa map
+file, but that UID need not be 0.
+.Pp
+.Nm Cdcc
+is also used to send commands to DCC servers to tell them
+to stop, reload their lists of DCC IDs, turn on tracing, and so forth.
+.Pp
+Many commands sent to DCC servers require a numeric DCC ID
+and a password recognized by the server.
+A DCC password is a 1-32 character string that does not contain
+blank, tab, newline or carriage return characters.
+The ID is specified with the
+.Ic id
+operation.
+If
+.Nm cdcc
+is run with a real UID that can read the
+.Pa ids
+file and a password is not specified
+(see the
+.Ic password
+operation),
+then the current password for the specified ID in the
+.Pa ids
+file will be used.
+If no
+.Pa ids
+file is available and a password and DCC ID are not specified,
+.Nm
+uses the anonymous DCC client-ID.
+DCC servers do not expect a password from clients using the
+anonymous client-ID,
+but they also won't honor control requests.
+.Pp
+Operations that modify the
+.Pa map
+file can only be performed when
+the real UID is sufficient to modify the file directly.
+Trying to perform an operation that requires a password without
+specifying a server-ID or without using a UID that can access the
+.Pa ids
+file produces an error message complaining
+about a "privileged operation."
+.Pp
+Commands and operations are read from the command line or from stdin.
+A series of
+.Ar op1 op2 ...
+operations followed a
+.Ar -
+(a dash) causes operations to be read from stdin after the command line
+operations are processed.
+Semi-colons or newlines separate commands in UNIX command-line "words,"
+as well as when commands are read from stdin.
+Since each command line operation must be a shell "word," quotes are
+often required as in
+.Bd -ragged -offset indent
+% cdcc
+.Qq load map.txt
+.Ed
+or
+.Bd -ragged -offset indent
+% cdcc
+.Qq host localhost;info
+stats
+.Ed
+.Ss OPTIONS
+The following options are available:
+.Bl -tag -width 3n
+.It Fl V
+displays the version of the DCC controller.
+Two or more
+.Fl V
+options show the options with which it was built.
+.It Fl B
+sends error messages from the DCC server to both stderr and stdout instead
+of only stderr.
+.It Fl d
+enables debugging output from the DCC client software.
+Additional
+.Fl d
+options increase the number of messages.
+See the
+.Ic debug
+command.
+.It Fl q
+quiets initial complaints about the map file
+and some messages about successful commands.
+See the
+.Ic quiet
+command.
+.It Fl h Ar homedir
+overrides the default DCC home directory,
+.Pa @prefix@ .
+See the
+.Ic homedir
+operation.
+.It Fl c Ar ids
+specifies the file containing DCC IDs and passwords known by
+local DCC servers.
+An
+.Pa ids
+file that can be read by others cannot be used.
+The format of the
+.Pa ids
+file is described in
+.Xr dccd 8 .
+.It Ar op1 op2 ...
+are operations or commands such as "id\ 100;\ stop".
+Commands or operations specified on the command line are performed
+before the first interactive request.
+The last command can be
+.Ar "-"
+to specify that additional commands should be read from stdin.
+.El
+.Ss OPERATIONS
+Local operations include the following:
+.Bl -tag -width info
+.It Ic help Op Ar command
+lists information about one or all available commands and operations.
+.It Ic exit
+stops
+.Nm
+.It Ic grey Op Ar on | off
+switches between DCC and greylist servers.
+.It Ic homedir Op Ar path
+displays or specifies the DCC home directory,
+.Pa @prefix@ .
+.It Ic file Op Ar map
+displays or specifies the name or path of the map file.
+The string "-" specifies the default file
+.Pa @prefix@/map .
+.It Ic new map Op Ar map
+creates a new, empty file for DCC server host names,
+port numbers, passwords, and so forth.
+There must not already be a file of the same name.
+The default is
+.Pa map
+in the DCC home directory.
+.It Ic delete Ar host Ns Xo
+.Ns Op , Ns Ar port
+.Xc
+deletes the entry in the
+.Pa map
+file for
+.Ar host
+and UDP
+.Ar port.
+If greylist mode has been set with the
+.Ic grey\ on
+command,
+the entry for the grelist server at
+.Ar host
+is deleted.
+.It Ic add Ar host Ns Xo
+.Ns Op , Ns Ar port
+.Op Ar RTT+adj Ns | Ns Ar RTT-adj
+.Op Ar Greylist
+.Op Ar client-ID Op password
+.Xc
+adds an entry to the
+.Pa map
+file.
+The
+.Ar port
+can be "-" to specify the default DCC server port number.
+.Pp
+An adjustment to the round trip time is
+between -2000 and +2000 and follows the string
+.Ar RTT .
+The adjustment is added to the average measured round trip time when
+the DCC client software picks the "nearest" DCC server, or the server
+with the smallest RTT.
+If an IP address is mentioned more than once in the list of servers,
+for example because it is among the addresses for more than one server name,
+conflicts among RTT adjustments are resolved by picking
+the adjustment with the largest absolute value.
+.Pp
+.Ar Greylist
+marks an entry for a greylist servers.
+.Ar Greylist
+is assumed if greylist mode has been set with
+the
+.Ic grey\ on
+command,
+See
+.Xr dccd 8 .
+.Pp
+If both the client-ID and the password are absent,
+the anonymous client-ID, 1, is used.
+The string
+.Ar anon
+is equivalent to the anonymous client-ID.
+A null password string is assumed if the password is missing
+and the client-ID is 1 or also missing.
+.It Ic load Ar info-file
+loads the current parameter file with the host names, port numbers, IDs, and
+passwords in
+.Ar info-file .
+Standard input is understood if
+.Ar info-file
+is "-".
+.Pp
+A suitable file can be created with the
+.Ic info
+operation.
+It consists of ignored blank or comment lines starting with '#' and
+other lines in the same format as the arguments to the
+.Ic add
+operation.
+Note that output of the
+.Ic info
+command will lack passwords unless it is run by a privileged user.
+.It Ic host Op Ar hostname
+specifies the host name of the DCC server to which commands should be sent.
+If
+.Ar hostname
+is "-", the current default DCC server is chosen.
+.It Ic port Op Ar port
+specifies the UDP port number of the DCC server to which commands should
+be sent.
+The default is 6277 or 6276 depending on the setting of the greylist
+mode controlled with the
+.Ic grey
+command.
+.It Ic password Ar secret
+specifies the password with which to sign commands sent to the DCC
+server specified with the
+.Ic server
+and
+.Ic port
+operations.
+.It Ic id Op Ar ID
+specifies or displays the numeric DCC ID for commands sent to the DCC
+server specified with the
+.Ic server
+and
+.Ic port
+operations.
+If no password is specified with the
+.Ic password
+command,
+the password is sought in the local
+.Pa ids .
+.It Ic info Op Fl N
+displays information about the connections to DCC servers.
+It starts with the current date and name of the current
+.Ar map
+file or
+says that
+.Nm
+is using the implicit file created with the
+.Ic server
+and
+.Ic port
+operations.
+It then says when host names will next be resolved into IP addresses,
+the smallest round trip time to the IP addresses of known DCC servers.
+The host name, UDP port number (or dash if it is the default),
+DCC client-ID, and password (if
+.Nm
+is used by a privileged user)
+are shown in one line per configured DCC server.
+.Pp
+The currently preferred IP address is indicated by an asterisk.
+The "brand" of the server, its DCC ID, and its IP address
+are displayed in one line per IP address.
+The performance of the server at each IP address in the most recent
+32 operations is displayed in a second line.
+The second line ends with the measured delay imposed by the server on requests
+with this client's ID.
+.Pp
+.Fl N
+displays the reverse DNS name of each server.
+.It Ic RTT Op Fl N
+measures the round trip time to the DCC servers.
+It does this by discarding accumulated information and forcing
+a probe of all listed server IP addresses.
+.Pp
+.Em Beware
+that when run with sufficient privilege, the
+.Ic RTT
+operation is like the
+.Ic info
+and
+.Ic load
+operations and displays cleartext passwords.
+.Pp
+.Fl N
+displays the reverse DNS name of each server.
+.It Ic debug Xo
+Op Ar on | off | TTL=x
+.Xc
+increases or decreases debugging information from the DCC client software
+or sets the IP TTL on queries to the server.
+See
+.Fl d .
+.Pp
+Some operating systems do not include the functions required to change the
+IP TTL.
+Others include the required functions
+but have no apparent effect.
+.It Ic quiet Op Ar on | off
+makes commands more quiet or more verbose.
+.It Ic IPv6 Op Ar on | off | only
+clients to try to use IPv6 and IPv4, IPv4 only, or IPv6 only.
+.It Ic SOCKS Op Ar on | off
+tell DCC to use the SOCKS5 protocol
+if they have been built with a SOCKS library.
+The socks library linked with the DCC client must be configured appropriately,
+often including knowing which DCC servers must be connected via the
+SOCKS proxy and which can be reached directly.
+DCC clients use SOCKS functions such as Rsendto() with all or no servers
+depending on the setting of this switch.
+.It Ic src Op Ar - |  Xo
+.Sm off
+.Ar IPaddress
+.Op Ar ,IPv6address
+.Sm on
+.Xc
+displays or configures the source address of DCC client requests.
+.Ar -
+removes the explicit configuration of the source, while
+.Ar IPaddress
+or
+.Ar IPaddress,IPv6address
+sets it.
+This makes sense only on multi-homed hosts.
+It can be useful for passing firewalls.
+.El
+.Pp
+.Ss DCC SERVER COMMANDS
+Commands that can be sent to a DCC server include the following.
+Most of the commands must be used with the server's
+.Ar ID
+specified with the
+.Ic id
+command.
+The specified ID is included in the commands sent to the server
+The command itself is digitally signed with the first password associated
+with the ID in the
+.Pa ids
+file.
+The server requires that the signature match one of the passwords associated
+with the ID in its
+.Pa ids
+file.
+.Bl -tag -width xxx
+.It Ic delck type hex1 hex2 hex3 hex4
+asks the server to delete the
+.Ar type
+checksum with value
+.Ar hex1 hex2 hex3 hex4 .
+The type and checksum values can be found in
+.Xr dccproc 8
+and
+.Xr dccm 8
+log files
+or computed with
+.Em dccproc Fl QC .
+.Pp
+There are very few situations where it makes sense to bother to delete
+checksums.
+For example, mail that was accidentally reported with a target
+count of "MANY" is either private and so will not be seen by other
+people and so will not be affected, or it is bulk and its source
+so must have already been whitelisted by recipients.
+.It Ic stats Op Ar all | clear
+displays current status and statistics from the current DCC server
+or for
+.Ar all
+known DCC servers.
+The server's counters will be cleared after they are displayed
+when the server's ID has been specified with the
+.Ic id Ar ID
+operation.
+.It Ic clients Xo
+.Op Fl nsiaVAK
+.Op Fl I Ar id
+.Op Ar max Op Ar thold
+.Op Ar addr Ns Op Ar /prefix
+.Xc
+display some of the clients recently seen by the server.
+.Bl -hang -compact -width xxxxx
+.It Fl n
+display only the IP addresses and not the names of clients.
+.It Fl s
+sort the clients by the number of requests they have made.
+.It Fl i
+count clients with the same client-ID as single entities.
+.It Fl I Ar id
+display information only about clients using client-ID
+.Ar id .
+.It Fl a
+produce 24 hour average numbers of requests.
+.It Fl A
+display only anonymous clients.
+.It Fl K
+display only clients using client-IDs other than the anonymous ID of 1.
+.It Fl V
+include the DCC protocol versions used by clients.
+.It Ar max
+display only the
+.Ar max
+most recent clients.
+.It Ar max Ar thold
+display the most recent
+.Ar max
+clients that have made at least
+.Ar thold
+requests.
+.It Ar addr Ns Op Ar /prefix
+restricts the results to the DCC client with that IP address or
+clients with addresses in that block of addresses.
+Individual clients in a blacklisted block of addresses
+in the server's
+.Pa @prefix@/blacklist
+file are not displayed unless explicitly requested by address or address block.
+.El
+.Pp
+Clients with IDs marked with an asterisk (*) used the wrong password for
+that client-ID.
+.Pp
+The mechanism that implements this command involves
+asking the DCC server for the first approximately 100 clients, then
+the second about 100, and so on,
+If entries change position in the complete list maintained by the server
+between requests,
+the displayed list will have duplicate or missing entries.
+Only clients since the last use of
+.Ic stats clear
+are displayed.
+.It Ic stop
+tells the DCC server to exit.
+.It Ic system stop
+tells the DCC server to exit so that the operating system can be shut down.
+This tells the DCC server on some systems to delete the dcc_db.hash file
+to speed system shut down.
+The file will be rebuilt automatically by
+.Nm dbclean
+when the DCC server is restarted.
+.It Ic clean stop
+tells the DCC server to exit after applying fsync() to the database.
+.It Ic reload IDs
+tells the local DCC server to reload its DCC
+.Pa ids
+file immediately.
+This command is not strictly needed.
+Every several minutes, the DCC server notices if the file has been changed
+and automatically reads it.
+.It Ic flood check
+tells the DCC server to check for changes in the
+.Pa flod
+file and try to restart any of the streams to peers that are broken.
+.It Ic flood shutdown
+tells the DCC server to cleanly stop flooding checksums to and from peers.
+The server will wait for sending and receiving peers to agree to stop.
+Each
+.Ic flood shutdown
+or
+.Ic flood halt
+request increases a count of reasons why the server should not
+flood checksums.
+.It Ic flood halt
+tells the DCC server to abruptly stop flooding checksums to and from peers.
+.It Ic flood rewind Ar server-ID
+tells the DCC server to ask its peer with
+.Ar server-ID
+to rewind and resend its stream of checksums.
+.It Ic flood ffwd in Ar server-ID
+tells the DCC server to ask its peer to "fast forward" or skip to
+the end of the incoming flood.
+.It Ic flood ffwd out Ar server-ID
+tells the DCC server to "fast forward" or skip to the current end
+of the flood to its peer.
+.It Ic flood resume
+tells the DCC server to reduce the number of reasons to
+not flood checksums increased by
+.Ic flood shutdown
+and
+.Ic flood halt.
+When the number of reasons reaches zero,
+the server tries to resume flooding.
+.It Ic flood list
+displays the list of current incoming and outgoing floods.
+Each line contains the server-ID of the peer,
+the IP address and port used for the outgoing flood,
+the address for the incoming flood if different,
+and the host name.
+Only the server-IDs of flooding peers are disclosed with the server's ID.
+.It Ic flood stats Xo
+.Op Ic clear
+.No {
+.Ar server-ID | all
+.No }
+.Xc
+displays counts of checksum reports sent and received by the current
+flooding connections to and from
+.Ar server-ID
+or
+.Ar all
+flooding connections
+and then optionally clears the counts.
+.It Ic DB clean
+is used by
+.Nm dbclean
+to tell the server that the database expiration has begun.
+.It Ic DB new
+is used by
+.Nm dbclean
+to tell the server that the database cleaning is complete.
+.It Ic flush cache
+tells the server to flush its cache and to keep it clean.
+.It Ic cache ok
+tells the server to resume normal operations after
+.Ic flush cache .
+.It Ic clock check
+asks the DCC server to say how much its clock differs from the local clock.
+.It Ic clock kludge +/-seconds
+adjusts the timestamps in server commands to make it possible to
+control servers with inaccurate clocks.
+.It Ic trace Ar default
+turns on
+.Ar ANON
+and
+.Ar CLNT
+tracing
+and turns off all others.
+.It Ic trace Ar mode {on|off}
+turns the server's tracing
+.Ar mode
+on or off.
+.Ar Mode
+must be one of:
+.Bl -tag -width FLOOD2 -offset 2n -compact
+.It Ar ADMN
+administrative requests from
+.Nm
+.It Ar ANON
+errors by anonymous clients
+.It Ar CLNT
+errors by authenticated clients
+.It Ar RLIM
+rate-limited messages
+.It Ar QUERY
+all queries and reports
+.It Ar RIDC
+messages concerning the report-ID cache that is used
+to detect duplicate reports from clients
+.It Ar FLOOD1
+messages about inter-server flooding connections
+.It Ar FLOOD2
+messages about flooded reports
+.It Ar IDS
+unknown server-IDs in flooded reports
+.It Ar BL
+blacklisted clients
+.It Ar DB
+odd database events
+.It Ar WLIST
+reports of whitelisted checksums from authenticated, not anonymous DCC clients
+.El
+.El
+.Pp
+.Nm
+exits with 0 on success,
+and >0 if an error occurs in operations specified on the command line.
+.Sh FILES
+.Bl -tag -width @prefix@ -compact
+.It Pa @prefix@
+default DCC home directory unless changed by the
+.Ar homedir
+operation.
+.It Pa map
+memory mapped file in the home DCC home directory of server host names,
+port numbers,
+passwords, measured round trip times (RTT), and so forth.
+.It Pa ids
+list of IDs and passwords, as described in
+.Xr dccd 8 .
+It is only required by systems running the DCC server,
+but is used by
+.Nm
+if available.
+.El
+.Sh SEE ALSO
+.Xr dbclean 8 ,
+.Xr dcc 8 ,
+.Xr dccd 8 ,
+.Xr dblist 8 ,
+.Xr dccifd 8 ,
+.Xr dccm 8 ,
+.Xr dccproc 8 ,
+.Xr dccsight 8 .
+.Sh HISTORY
+Implementation of
+.Nm
+was started at Rhyolite Software in 2000.
+This document describes version 2.3.167.

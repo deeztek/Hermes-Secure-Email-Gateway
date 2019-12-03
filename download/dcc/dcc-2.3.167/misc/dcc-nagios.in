@@ -1,0 +1,324 @@
+#! /bin/sh
+
+# This is a simple Nagios plug-in to monitor a DCC client or server.
+#   See `dcc-nagios -h` for some documentation.
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+#	Rhyolite Software DCC 2.3.167-1.5 $Revision$
+#	@configure_input@
+
+
+help () {
+cat <<EOF
+    $USAGE
+
+    This is a simple Nagios plug-in to monitor a DCC client or server.
+
+    Use "$ME" to check whether a DCC client can reach a DCC server
+    by parsing the output of "cdcc info".  In this mode $ME must
+    run on the DCC client being monitored, because "cdcc info" shows
+    information about known DCC servers in the local @prefix@/map file.
+    NRPE can be useful if system running Nagios is not the DCC client to
+    be monitored.
+
+    Use "$ME -s server" to check the health of a DCC server.
+    In this mode $ME uses cdcc commands including "cdcc stats"
+    to send UDP packets asking the DCC server how it feels.  NRPE can be
+    useful if the DCC software is not installed on the Nagios system.
+
+    The health of a DCC client is determined by the average delay a client
+    has seen to the current fastest server.  The health of a single server
+    is also determined the speed of its answers.
+
+    -t msec can be used to change the default healthy delay threshold.
+    A DCC server has no working DCC flooding peers delays its answers
+    by an extra 400 milliseconds.  A DCC client that should be using
+    a local DCC server might see delays increase from less than 100 ms.
+    to several 100 ms.
+
+    -x		debug script
+    -h		this message
+    -v		increase verbosity
+    -s srvr	name or IP address of of DCC server
+    -T /tmp	directory to keep file for this script
+    -t msec	tolerable DCC server queing delay in milliseconds
+    -C cdcc	alternative to @bindir@/cdcc
+    -m map	alternative to @prefix@/map
+    -i ID	client- or server-ID
+    -p passwd	password for client- or server-ID
+    -G on	check greylist server
+EOF
+}
+
+ME=`basename $0`
+USAGE="$ME: [-xhv] [-s server[,port]] [-T /tmp] [-t msec] [-C cdcc]
+	[-m map-file] [-i ID] [-p passwd] [-G on|off]"
+
+usage () {
+    if test "$MODE" = help; then
+	help 1>&2
+    else
+	echo "$USAGE" 1>&2
+    fi
+}
+
+EXIT_OK=0
+EXIT_WARN=1
+EXIT_CRIT=2
+EXIT_UNK=3
+
+CDCC=@bindir@/cdcc
+VERBOSE=0
+SRVR_PARMS=
+CLNT_PARMS=
+MODE=client
+TMPDIR=/tmp
+MAP=
+GREY=
+SRVR=
+OK_DELAY=400
+while getopts "xhvs:T:t:C:m:i:p:G:" c; do
+    case $c in
+	x) set -x;;
+	h) MODE=help;;
+	v) VERBOSE=`expr $VERBOSE + 1`;;
+	s) MODE=srvr; SRVR="$OPTARG";;
+	T) if test -d "$OPTARG" -a -w "$OPTARG"; then
+		TMPDIR=$OPTARG
+	    else
+		echo "invalid temporary directory \"$OPTARG\"" 1>&2
+	    fi
+	    ;;
+	t) if expr "$OPTARG" : '[0-9][0-9]*$' >/dev/null; then
+		OK_DELAY=$OPTARG
+	    else
+		echo "invalid delay in -t $OPTARG" 1>&2
+	    fi
+	    ;;
+	C) CDCC="$OPTARG";;
+	m) MAP="$OPTARG";;
+	i) SRVR_PARMS="$SRVR_PARMS id $OPTARG;";;
+	p) SRVR_PARMS="$SRVR_PARMS password $OPTARG;";;
+	G) case "$OPTARG" in
+	    [oO][nN]) GREY='1,/^#.* greylist /d';;
+	    [oO][fF][fF]) GREY= ;;
+	    *) usage;;
+	    esac
+	    ;;
+	*) usage; exit $EXIT_UNK;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    usage; exit $EXIT_UNK
+fi
+
+if test $VERBOSE -ge 3; then
+    set -x
+    VERBOSE=0
+fi
+
+
+# sed pattern to find server delay from `cdcc info` output
+DELAY_PAT='/^# \*/,/requests ok/s/.*ok  *\([0-9]\{1,\}\)[-+.0-9]* ms.*/\1/p'
+
+
+case $MODE in
+help)
+    help
+    exit $EXIT_OK
+    ;;
+
+
+
+client)
+    # Things are OK for a DCC client if there is at least one working server
+    # and its average delay is less than the 400 ms that results from
+    # having no work flood peers.
+    # Things are critical if there is no working server.
+    # Only warn if the best working server has long delays.
+
+    if test -z "$GREY"; then
+	GREY='/^# [0-9/]* [0-9:]* .* greylist /,$d'
+	GREYLABEL="servers"
+    else
+	GREY='1,/^# [0-9/]* [0-9:]* .* greylist /d'
+	GREYLABEL="greylist servers"
+	CLNT_PARMS="$CLNT_PARMS grey on;"
+    fi
+    if test $VERBOSE -gt 0 -a -n "$SRVR_PARMS"; then
+	echo "$ME: client mode does not use -i or -p"
+    fi
+    INFO=`$CDCC -q "$CLNT_PARMS quiet off; file ${MAP:=map}; info" 2>&1`
+    SRVRS=`echo "$INFO"							\
+	| sed -n -e "$GREY"						\
+	    -e 's/.* total, \([0-9][0-9]*\) working servers.*$/\1/p'`
+    if test -z "$SRVRS"; then
+	echo "$ME: 'cdcc$CLNT_PARMS info' failed"
+	if test $VERBOSE -ge 1; then
+	    echo "$INFO"
+	fi
+	exit $EXIT_UNK
+    fi
+    if test $VERBOSE -ge 2; then
+	echo "$INFO"
+    fi
+    if test "$SRVRS" -eq 0; then
+	echo "DCC client CRITICAL: $SRVRS working $GREYLABEL"
+	exit $EXIT_CRIT
+    fi
+    DELAY=`echo "$INFO" | sed -n -e "$GREY" -e "$DELAY_PAT"`
+    if test -z "$DELAY"; then
+	echo "$ME: failed to compute delay"
+	exit $EXIT_UNK
+    fi
+    if test $DELAY -ge $OK_DELAY; then
+	echo "DCC client WARNING: $SRVRS working $GREYLABEL; $DELAY ms delay"
+	exit $EXIT_WARN
+    fi
+    echo "DCC client OK: $SRVRS working $GREYLABEL; $DELAY ms delay"
+    exit $EXIT_OK
+    ;;
+
+
+
+srvr)
+    # A DCC server is OK if it answers and its announced delay is less than
+    # the 400 ms that results from having no working flood peers.
+    # Warn about its status if it answers but with long delays.
+    # Its status is critical if it does not answer.
+
+    FFILE="$TMPDIR/.dcc-nagios-$SRVR-flood"
+
+    if test $VERBOSE -gt 0 -a -n "$MAP$CLNT_PARMS"; then
+	echo "$ME: -s or server mode does not use -m"
+    fi
+    if test -z "$GREY"; then
+	GREYLABEL="DCC server $SRVR"
+    else
+	GREYLABEL="DCC greylist server $SRVR"
+	SRVR_PARMS="grey on; $SRVR_PARMS"
+    fi
+
+    # see what the server says
+    SOUT=`$CDCC -q "$SRVR_PARMS quiet off; host $SRVR; stats; info; flood list; clock check" 2>&1`
+    if test $VERBOSE -ge 2; then
+	echo "$SOUT"
+    fi
+    DELAY=`echo "$SOUT" | sed -n -e "$DELAY_PAT"`
+
+    # critical problem if the server did not answer
+    if test -z "$DELAY"; then
+	/bin/rm -f "$FFILE"
+	echo "$GREYLABEL CRITICAL: not answering"
+	exit $EXIT_CRIT
+    fi
+
+    STATE="$DELAY ms delay"
+    WARN=
+    if test $DELAY -ge $OK_DELAY; then
+	# possible problem if the server is slow
+	WARN=yes
+    fi
+
+    # check flooding
+    FLINE=`echo "$SOUT" | sed -n -e '/^ *flood/p'`
+    FTOTAL=`expr "$FLINE" : '.* \([0-9][0-9]*\) streams .*'`
+    FOUT=`expr "$FLINE" : '.* \([0-9][0-9]*\) out .*'`
+    FIN=`expr "$FLINE" : '.* \([0-9][0-9]*\) in .*'`
+    if test "$FIN" -le "$FOUT"; then
+	F="$FIN"
+    else
+	F="$FOUT"
+    fi
+    FPASSIVE=`echo "$SOUT" | sed -n -e '/forced passive/p' | wc -l | tr -d ' '`
+    ANAT=`echo "$SOUT" | sed -n -e '/auto-NAT/p' | wc -l | tr -d ' '`
+    if test "$F" -ge "$FTOTAL" -a "$FPASSIVE$ANAT" -eq 0; then
+	# do not mention missing peers of an isolated greylist server
+	if test "$FTOTAL" -ne 0 -o -z "$GREY"; then
+	    STATE="$STATE@1@$FTOTAL working flood peers"
+	fi
+	/bin/rm -f "$FFILE"
+    else
+	if test "$F" -eq 0; then
+	    FMSG="flooding not working"
+	else
+	    if test "$F" -lt "$FTOTAL"; then
+		FMSG="only $F of $FTOTAL flood peers working"
+	    else
+		if test "$FPASSIVE" -ne 0; then
+		    if test "$FPASSIVE" -ne 1; then
+			PLURAL=s
+		    else
+			PLURAL=
+		    fi
+		    FMSG="$FPASSIVE peer$PLURAL forcing passive flooding"
+		else
+		    if test "$ANAT" -ne 1; then
+			PLURAL=s
+		    else
+			PLURAL=
+		    fi
+		    FMSG="using auto-NAT flooding with $ANAT peer$PLURAL"
+		fi
+	    fi
+	fi
+	if test ! -s "$FFILE"; then
+	    echo "$FMSG" >"$FFILE"
+	fi
+	STATE="$STATE@1@$FMSG"
+    fi
+
+    # problem if flooding has been broken for at least 2 hours,
+    OLDFILE=`find $FFILE -mtime +2h 2>/dev/null`
+    if test -z "$OLDFILE"; then
+	# deal with old version of `find` by waiting a day or perhaps 2
+	OLDFILE=`find $FFILE -mtime +1 2>/dev/null`
+    fi
+    if test -n "$OLDFILE"; then
+	WARN=yes
+    fi
+
+    # check the clock, while ignoring "invalid ADMN UNKNOWN" from old servers
+    CLOCK_DELTA=`echo "$SOUT"						\
+		| sed -n -e 's/.*clocks differ by about -*\([0-9]*\) .*/\1/p'`
+    if test "$CLOCK_DELTA" -lt 5; then
+	STATE=`echo "$STATE" | sed -e 's/@1@/ and /'`
+    else
+	STATE=`echo "$STATE" | sed -e 's/@1@/, /'`
+	STATE="$STATE, and server clock differs by about $CLOCK_DELTA seconds"
+	CLOCK_BAD=`echo "$SOUT"						\
+		    | sed -n -e 's/.*which is more than .* allowed.*/yes/p'`
+	if test -n "$CLOCK_BAD"; then
+	    WARN=yes
+	fi
+    fi
+
+    # announce a problem
+    if test -n "$WARN"; then
+	echo "$GREYLABEL WARNING: $STATE"
+	exit $EXIT_WARN
+    fi
+
+    echo "$GREYLABEL OK: $STATE"
+    exit $EXIT_OK
+    ;;
+esac

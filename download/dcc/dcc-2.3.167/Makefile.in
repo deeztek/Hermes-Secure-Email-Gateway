@@ -1,0 +1,66 @@
+# make all of the Distributed Checksum Clearinghouse
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.64 $Revision$
+# @configure_input@
+
+DEPTH	=.
+SUBDIR_PROGS=cdcc ck2ip @SUBDIR_DCCD@ @SUBDIR_DCCM@ @SUBDIR_DCCIFD@	\
+	dccproc dccsight homedir misc cgi-bin
+SUBDIR_OPT  =rrd-combine
+SUBDIR_MAN  =cdcc dbclean dccd dblist dccm dccifd dccproc dccsight
+SUBDIR	    =dcclib clntlib @SUBDIR_SRVRLIB@ @SUBDIR_THRLIB@ $(SUBDIR_PROGS)
+SUBDIR_OTHER=@SUBDIR_DISABLED@ $(SUBDIR_OPT)
+
+MAN8	=dcc.8 $(SUBDIR_MAN:=.8)
+MAN0	=$(MAN8:.8=.0)
+MANGZ	=$(MAN8:.8=.8.gz)
+MAN_HTML=$(MAN8:.8=.html)
+MANX	=@MANX@
+
+all:	$(MANX)
+
+@INCLUDE_INC@
+
+# delete all known files in build tree
+purge:cleandir
+	find * -depth -name .manifest -print | while read NM; do\
+	    (cd `expr $$NM : '\(.*\)/[^/]*'`; rm -f `cat .manifest`)\
+	    done
+	-rm -rf `cat .config .manifest`
+	-find * -depth -type d -print | @DCC_XARGS@ rmdir
+
+# uninstall things we won't install
+install:noinstall
+noinstall:
+	for DIR in @SUBDIR_DISABLED@ -; do if test "$$DIR" != -; then\
+		(cd $$DIR; $(MAKE) deinstall); fi; done
+
+deinstall:
+	rmdir @libexecdir@ @prefix@ 2>/dev/null || true
+
+CLEANFILES+=$(MANGZ)
+
+.SUFFIXES:.8 .8.gz
+
+.8.8.gz:
+	gzip <$< >$@
+

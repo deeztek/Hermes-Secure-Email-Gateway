@@ -1,0 +1,529 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"
+	"http://www.w3.org/TR/html4/strict.dtd">
+<HTML>
+<HEAD>
+    <META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+    <TITLE>dccd.8</TITLE>
+    <META HTTP-EQUIV="Content-Style-Type" content="text/css">
+    <META NAME="viewport" content="width=device-width, initial-scale=1">
+    <STYLE type="text/css">
+	BODY {background-color:white; color:black}
+	ADDRESS {font-size:smaller}
+	IMG.logo{width:45px;vertical-align:middle;border:0}
+	@media screen and (max-width: 480px) {
+	    IMG.mhide{display:none;visibility:hidden}
+	}
+    </STYLE>
+</HEAD>
+<BODY>
+<PRE>
+<!-- Manpage converted by man2html 3.0.1 -->
+<B>dccd(8)</B>               Distributed Checksum Clearinghouse               <B>dccd(8)</B>
+
+
+</PRE>
+<H2 ID="NAME">NAME</H2><PRE>
+     <B>dccd</B> -- Distributed Checksum Clearinghouse Daemon
+
+
+</PRE>
+<H2 ID="SYNOPSIS">SYNOPSIS</H2><PRE>
+     <B>dccd</B> [<B>-dVbfFQ</B>] <B>-i</B> <I>server-ID</I> [<B>-n</B> <I>brand</I>] [<B>-h</B> <I>homedir</I>] <B>-I</B> [<I>host-ID</I>][<I>,user</I>]
+          [<B>-a</B> [<I>server-addr</I>][<I>,server-port</I>]] [<B>-q</B> <I>qsize</I>]
+          [<B>-G</B> [<I>on,</I>][<I>weak-body,</I>][<I>weak-IP,</I>][<I>embargo</I>][<I>,window</I>][<I>,white</I>]]
+          [<B>-W</B> [<I>rate</I>][<I>,chg</I>][<I>,dbsize</I>]] [<B>-K</B> [<I>no-</I>]<I>type</I>] [<B>-T</B> [<I>no-</I>]<I>tracemode</I>]
+          [<B>-u</B> <I>anon-delay</I>[<I>,inflate</I>]] [<B>-C</B> <I>dbclean</I>] [<B>-L</B> <I>ltype,facility.level</I>]
+          [<B>-R</B> [<I>RL</I><B>_</B><I>SUB</I>],[<I>RL</I><B>_</B><I>ANON</I>],[<I>RL</I><B>_</B><I>ALL</I><B>_</B><I>ANON</I>],[<I>RL</I><B>_</B><I>BUGS</I>]]
+
+
+</PRE>
+<H2 ID="DESCRIPTION">DESCRIPTION</H2><PRE>
+     <B>Dccd</B> receives reports of checksums related to mail received by DCC
+     clients and queries about the total number of reports of particular
+     checksums.  A DCC server never receives mail, address, headers, or other
+     information from clients, but only cryptographically secure checksums of
+     such information.  A DCC server cannot determine the text or other infor-
+     mation that corresponds to the checksums it receives.  It only acts as a
+     clearinghouse of total counts of checksums computed by clients.
+
+     Each DCC server is identified by a numeric <I>server-ID</I>.  Each DCC client is
+     identified by a <I>client-ID</I>, either explicitly listed in the <I>@prefix@/ids</I>
+     file or the special anonymous client-ID.  Many computers are expected to
+     share a single <I>client-ID</I>.  A <I>server-ID</I> is between 100 and 32768 while a
+     <I>client-ID</I> is between 32768 and 16777215.  DCC server-IDs need be known
+     only to DCC servers and the people running them.  The passwords associ-
+     ated with DCC server-IDs should be protected, because DCC servers listen
+     to commands authenticated with server-IDs and their associated passwords.
+     Each client that does not use the anonymous ID must know the client-ID
+     and password used by each of its servers.  A single client computer can
+     use different passwords with different server computers.  See the
+     <I>@prefix@/ids</I> file.
+
+     A <I>@prefix@/whitelist</I> of known good (or bad) sources of email prevents
+     legitimate mailing lists from being seen as unsolicited bulk email by DCC
+     clients.  The whitelist used by a DCC server is built into the database
+     when old entries are removed by <B><A HREF="dbclean.html">dbclean(8)</A></B>.  Each DCC client has its own,
+     local whitelist, and in general, whitelists work better in DCC clients
+     than servers.
+
+     A <B>dccd</B> <I>@prefix@/whitelist</I> file containing IP addresses that should be in
+     client <I>whiteclnt</I> files is useful.  When <B>-T</B> <I>WLIST</I> tracing is enabled (as
+     it is by default), <B>dccd</B> complains to the system log when an authenticated
+     client reports mail from IP addresses listed as <I>OK</I>, <I>MX</I>, or <I>MXDCC</I>.  It is
+     often useful to have a <I>@prefix@/whitecommon</I> file containing whitelisted
+     IP addresses.
+
+     The effectiveness of a Distributed Checksum Clearinghouse increases as
+     the number of subscribers increases.  Flooding reports of checksums among
+     DCC servers increases the effective number of subscribers to each server.
+     Each <B>dccd</B> daemon tries to maintain TCP/IP connections to the other
+     servers listed in the <I>@prefix@/flod</I> file, and send them reports contain-
+     ing checksums with total counts exceeding thresholds.  Changes in the
+     flod file are noticed automatically within minutes.
+
+     Controls on report flooding are specified in the flod file.  Each line
+     specifies a hostname and port number to which reports should be flooded,
+     a server-ID to identify and authenticate the output stream, a server-ID
+     to identify and authenticate an input stream from the same server, and
+     flags with each ID.  The ability to delete reports of checksums is handy,
+     but could be abused.  If <I>del</I> is not present among the <I>in-opts</I> options for
+     the incoming ID, incoming delete requests are logged and then ignored.
+     Floods from DCC "brands" that count only mail to spam traps and whose
+     servers use the <B>-Q</B> option to count extremely bulk mail should be marked
+     with <I>traps</I>.  They can be seen as counting millions of targets, so the
+     <I>traps</I> flag on their <I>@prefix@/flod</I> file entry changes their incoming
+     flooded reports counts to <I>many.</I>
+
+     <B>Dccd</B> automatically checks its <I>@prefix@/flod</I> and <I>@prefix@/ids</I> files peri-
+     odically.  <B><A HREF="cdcc.html">Cdcc(8)</A></B> has the commands <B>new ids</B> and <B>flood check</B> to tell <B>dccd</B>
+     to check those two files immediately.  Both files are also checked for
+     changes after the SIGHUP signal.
+
+   <B ID="OPTIONS">OPTIONS</B>
+     The following options are available.  Most of them should set by changing
+     the <I>@prefix@/dcc</I><B>_</B><I>conf</I> control file.
+
+     <B ID="OPTION-d">-d</B>   enables debugging output.  Additional <B>-d</B> options increase the number
+          of messages.
+
+     <B ID="OPTION-V">-V</B>   displays the version of the DCC server daemon.  Two or more <B>-V</B>
+          options show the options with which it was built.
+
+     <B ID="OPTION-b">-b</B>   causes the server to not detach itself from the controlling tty or
+          put itself into the background.
+
+     <B ID="OPTION-F">-F</B>   uses write() instead of mmap() and msync() in some cases to modify
+          the DCC database.  It is the default on Solaris except when the
+          database is in a memory mapped file system.  See <B>-f</B>.
+
+     <B ID="OPTION-f">-f</B>   uses mmap() and msync() to modify the DCC database.  See <B>-F</B>.
+
+     <B ID="OPTION-Q">-Q</B>   causes the server to treat reports of checksums as queries except
+          from DCC clients marked trusted in the <I>@prefix@/ids</I> file with
+          <I>rpt-ok</I>.  See <B>-u</B> to turn off access by anonymous or unauthenticated
+          clients.
+
+     <B ID="OPTION-i">-i</B> <I>server-ID</I>
+          specifies the ID of this DCC server.  Each server identifies itself
+          as responsible for checksums that it forwards to other servers.
+
+     <B ID="OPTION-n">-n</B> <I>brand</I>
+          is an arbitrary string of letters and numbers that identifies the
+          organization running the DCC server.  The brand is required, and
+          appears in the SMTP <I>X-DCC</I> headers generated by the DCC.
+
+     <B ID="OPTION-h">-h</B> <I>homedir</I>
+          overrides the default DCC home directory, <I>@prefix@</I>.
+
+     <B ID="OPTION-I">-I</B> [<I>host-ID</I>][<I>,user</I>]
+          sets the UID and GID of the process or the server's name for asser-
+          tions of its <B>-i</B> <I>server-ID</I> flooded to peers.  The default name is the
+          first 16 characters of the host name.  If present, <I>user</I> must be a
+          valid user name.
+
+     <B ID="OPTION-a">-a</B> [<I>server-addr</I>][<I>,server-port</I>]
+          adds an hostname or IP address to the list of local IP addresses
+          that the server answers.  Multiple <B>-a</B> options can be used to specify
+          a subset of the available network interfaces or to use more than one
+          port number.  The default without any <B>-a</B> options is to listen on all
+          local IP addresses.  It can be useful to list some of the IP
+          addresses of multi-homed hosts to deal with firewalls.  By default
+          <I>server-port</I> is 6277 for DCC servers and 6276 for greylist servers.
+          It is the UDP port at which DCC requests are received and the TCP
+          port for incoming floods of reports.
+
+          If <I>server-addr</I> is absent and if the <B>getifaddrs(8)</B> function is sup-
+          ported, separate UDP sockets are bound to each configured network
+          interface so that each DCC clients receives replies from the IP
+          addresses to which corresponding request are sent.  If <B>dccd</B> is
+          started before all network interfaces are turned on or there are
+          interfaces that are turned on and off or change their addresses such
+          as PPP interfaces, then the special string <I>@</I> should be used to tell
+          <B>dccd</B> to bind to an INADDR_ANY UDP socket.
+
+          Outgoing TCP connections to flood checksum reports to other DCC
+          servers used the IP address of a single <B>-a</B> option, but only if there
+          is single option that is not localhost.  See also the <I>@prefix@/flod</I>
+          file.
+
+     <B ID="OPTION-q">-q</B> <I>qsize</I>
+          specifies the maximum size of the queue of requests from anonymous
+          or unauthenticated clients.  The default value is the maximum DCC
+          RTT in seconds times 200 or 1000.
+
+     <B ID="OPTION-G">-G</B> [<I>on,</I>][<I>weak-body,</I>][<I>weak-IP,</I>][<I>embargo</I>][<I>,window</I>][<I>,white</I>]
+          changes <B>dccd</B> to a greylist server for <B><A HREF="dccm.html">dccm(8)</A></B> or <B><A HREF="dccifd.html">dccifd(8)</A></B>.
+          Greylisting consists of temporarily rejecting or embargoing mail
+          from unfamiliar combinations of SMTP client IP address, SMTP enve-
+          lope sender, and SMTP envelope recipient.  If the SMTP client per-
+          sists for <I>embargo</I> <I>seconds</I> and so is probably not an open proxy,
+          worm-infected personal computer, or other transient source of spam,
+          the triple of <I>(IP</I> <I>address,sender,recipient)</I> is added to a database
+          similar to the usual DCC database.  If the SMTP client does not try
+          again after <I>embargo</I> seconds and before <I>window</I> seconds after the
+          first attempt, the triple is forgotten.  If the SMTP client persists
+          past the embargo, the triple is added to the database and becomes
+          familiar and the message is accepted.  Familiar triples are remem-
+          bered for <I>white</I> seconds after the last accepted mail message.  The
+          triple is forgotten if it is ever associated with unsolicited bulk
+          email.
+
+          All three durations can be a number of minutes, hours, days, or
+          weeks followed by <I>MINUTES</I>, <I>M</I>, <I>HOURS</I>, <I>H</I>, <I>DAYS</I>, <I>D</I>, <I>WEEKS</I> or <I>W</I>.  The
+          default is <B>-G</B> <I>270seconds,7days,63days</I>.  The first duration or the
+          <I>embargo</I> should be longer than open proxies can linger retransmit-
+          ting.  The second <I>window</I> time should be as long as legitimate mail
+          servers persist in retransmitting to recognize embargoed messages
+          whose retransmissions were not received because of network or other
+          problems.  The <I>white</I> time should be long enough to recognize and not
+          embargo messages from regular senders.
+
+          Usually the DCC greylist system requires that an almost identical
+          copy of the message be retransmitted during the <I>embargo</I>.  If
+          <I>weak-body</I> is present, any message with the same triple of sender IP
+          address, sender mail address, and target mail address ends the
+          embargo, even if the body of the message differs.
+
+          If <I>weak-IP</I> is present, all mail from an SMTP client at an IP address
+          is accept after any message from the same IP address has been
+          accepted.
+
+          Unlike DCC checksums, the contents of greylist databases are private
+          and do not benefit from broad sharing.  However, large installations
+          can use more two or more greylist servers flooding triples among
+          themselves.  Flooding among greylist servers is controlled by the
+          <I>@prefix@/grey</I><B>_</B><I>flod</I> file.
+
+          All greylist cooperating or flooding greylist servers <I>must</I> use the
+          same <B>-G</B> values.
+
+          Clients of greylist servers cannot be anonymous and must have
+          client-IDs and passwords assigned in the <I>@prefix@/ids</I> file.  This
+          implies that cdcc commands directed to greylist servers must specify
+          the server-ID.
+
+          White- and blacklists are honored by the DCC clients.  whitelisted
+          messages are embargoed or checked with a greylist server.  The
+          greylist triples of blacklisted messages, messages whose DCC counts
+          make them spam, and other messages known to be spam are sent to a
+          greylist server to be removed from the greylist database and cause
+          an embargo on the next messages with those triples.
+
+          Messages whose checksums match greylist server whitelists are not
+          embargoed and the checksums of their triples are not added to the
+          greylist database.
+
+          The target counts of embargoed messages are reported to the DCC net-
+          work to improve the detection of bulk mail.
+
+     <B ID="OPTION-W">-W</B> [<I>rate</I>][<I>,chg</I>][<I>,dbsize</I>]
+          controls quick database cleaning.  If the database is larger than
+          <I>dbsize</I> in MBytes, the database has not recently been cleand and is
+          not about to be cleaned, and <B>dccd</B> is receiving fewer than <I>rate</I>
+          requests per second, or if telling DCC clients that the database is
+          about to be cleaned reduces the requests/second by <I>chg,</I> then <B>dccd</B>
+          starts <B><A HREF="dbclean.html">dbclean(8)</A></B> for a quick database cleaning.  The cleaning is
+          abandoned if it takes too long.
+
+          The defaults are equivalent to <B>-W</B> <I>1.0,40.0,RSS</I> where <I>RSS</I> is the max-
+          imum dccd resident set size displayed in the system log when the
+          database is opened.  A rate of <B>-W</B> <I>0.0</I> disables quick cleanings.
+
+     <B ID="OPTION-K">-K</B> [<I>no-</I>]<I>type</I>
+          marks checksums of <I>type</I> (not) be kept or counted in the database
+          (unless they appear in the <I>@prefix@/whitelist</I> file).  Explicit set-
+          tings add to or remove from the initial contents of the list, which
+          is equivalent to <B>-K</B> <I>Body</I> <B>-K</B> <I>Fuz1</I> <B>-K</B> <I>Fuz2</I>.
+
+     <B ID="OPTION-T">-T</B> [<I>no-</I>]<I>tracemode</I>
+          causes the server to trace or record some operations.  <I>tracemode</I>
+          must be one of the following:
+            <I>ADMN</I>    administrative requests from the control program, <B><A HREF="cdcc.html">cdcc(8)</A></B>
+            <I>ANON</I>    errors by anonymous clients
+            <I>CLNT</I>    errors by authenticated clients
+            <I>RLIM</I>    rate-limited messages
+            <I>QUERY</I>   all queries and reports
+            <I>RIDC</I>    some messages concerning the report-ID cache that is used
+                    to detect duplicate reports from clients
+            <I>FLOOD1</I>  messages about inter-server flooding connections
+            <I>FLOOD2</I>  messages about flooded reports
+            <I>BL</I>      requests from clients in the <I>@prefix@/blacklist</I> file.
+            <I>DB</I>      odd database events including long chains of duplicate
+                    checksums
+            <I>WLIST</I>   reports of whitelisted checksums from authenticated, not
+                    anonymous DCC clients
+          The default is <I>ANON</I> <I>CLNT</I> <I>WLIST</I> except for a greylist server which
+          uses <I>ANON</I> <I>CLNT</I> <I>WLIST</I> <I>IDS</I>.
+
+     <B ID="OPTION-u">-u</B> <I>anon-delay</I>[<I>,inflate</I>]
+          changes the number of milliseconds anonymous or unauthenticated
+          clients must wait for answers to their queries and reports.  The
+          purpose of this delay is to discourage large anonymous clients.  The
+          <I>anon-delay</I> is multiplied by 1 plus the number of recent anonymous
+          requests from IPv4 addresses in a /24 block or IPv6 addresses a /56
+          block divided by the <I>inflate</I> value.
+
+          The string <I>FOREVER</I> turns off all anonymous or unauthenticated access
+          not only for checksum queries and reports but also <B><A HREF="cdcc.html">cdcc(8)</A> stats</B>
+          requests.  A missing value for <I>inflate</I> turns off inflation.
+
+          The default value is <I>50</I>, except when <B>-G</B> is used in which case
+          <I>FOREVER</I> is assumed and required.
+
+     <B ID="OPTION-C">-C</B> <I>dbclean</I>
+          changes the default name or path of the program used to rebuild the
+          hash table when it becomes too full.  The default value is
+          <I>@libexecdir@/dbclean</I>.  The value can include arguments as in <I>-C</I>
+          <I>'@libexecdir@/dbclean</I> <I>-F'</I>.
+
+          Dbclean <I>should</I> <I>not</I> be run by <B>dccd</B> except in emergencies such as
+          database corruption or hash table overflow.  <B><A HREF="dbclean.html">Dbclean(8)</A></B> should be
+          run daily with the @libexecdir@/cron-dccd cron script
+
+     <B ID="OPTION-L">-L</B> <I>ltype,facility.level</I>
+          specifies how messages should be logged.  <I>Ltype</I> must be <I>error</I>, <I>info</I>,
+          or <I>off</I> to indicate which of the two types of messages are being con-
+          trolled or to turn off all <B>syslog(3)</B> messages from <B>dccd</B>.  <I>Level</I> must
+          be a <B>syslog(3)</B> level among <I>EMERG</I>, <I>ALERT</I>, <I>CRIT</I>, <I>ERR</I>, <I>WARNING</I>, <I>NOTICE</I>,
+          <I>INFO</I>, and <I>DEBUG</I>.  <I>Facility</I> must be among <I>AUTH</I>, <I>AUTHPRIV</I>, <I>CRON</I>,
+          <I>DAEMON</I>, <I>FTP</I>, <I>KERN</I>, <I>LPR</I>, <I>MAIL</I>, <I>NEWS</I>, <I>USER</I>, <I>UUCP</I>, and <I>LOCAL0</I> through
+          <I>LOCAL7</I>.  The default is equivalent to
+                <B>-L</B> <I>info,MAIL.NOTICE</I> <B>-L</B> <I>error,MAIL.ERR</I>
+
+     <B ID="OPTION-R">-R</B> [<I>RL</I><B>_</B><I>SUB</I>],[<I>RL</I><B>_</B><I>ANON</I>],[<I>RL</I><B>_</B><I>ALL</I><B>_</B><I>ANON</I>],[<I>RL</I><B>_</B><I>BUGS</I>]
+          sets one or more of the four rate-limits.  <I>RL</I><B>_</B><I>SUB</I> limits the number
+          of DCC transactions per second from subscribers or DCC clients with
+          known client-IDs and passwords.  This limit applies to each IP
+          address independently.
+
+          <I>RL</I><B>_</B><I>ANON</I> limits the number of DCC transactions per second from anony-
+          mous DCC clients.  This limit applies to each IP address indepen-
+          dently.  It is better to use <B>-u</B> than to change this value to exclude
+          anonymous clients.
+
+          <I>RL</I><B>_</B><I>ALL</I><B>_</B><I>ANON</I> limits the number of DCC transactions per second from
+          all anonymous DCC clients.  This limit applies to all anonymous
+          clients as a group, regardless of their IP addresses.
+
+          <I>RL</I><B>_</B><I>BUGS</I> limits the number of complaints or error messages per second
+          for all anonymous DCC clients as a group as well as for each DCC
+          client by IP address.
+
+          The default is equivalent to <B>-R</B> <I>400,50,2000,0.1</I>
+
+
+</PRE>
+<H2 ID="FILES">FILES</H2><PRE>
+     <SPAN="FILE-@prefix@">@prefix@</SPAN>  is the DCC home directory containing data and control files.
+     <SPAN="FILE-dcc_conf">dcc_conf</SPAN>  is the DCC control file.
+     <SPAN="FILE-dcc_db">dcc_db</SPAN>    is the database of mail checksums.
+     <SPAN="FILE-dcc_db.hash">dcc_db.hash</SPAN> is the mail checksum database hash table.
+     <SPAN="FILE-grey_db">grey_db</SPAN>   is the database of greylist checksums.
+     <SPAN="FILE-grey_db.hash">grey_db.hash</SPAN> is the greylist database hash table.
+     <SPAN="FILE-flod">flod</SPAN>      contains lines controlling DCC flooding of the form:
+               <I>host</I>[<I>,rport</I>][<I>;src</I>[<I>,lport</I>]] <I>rem-ID</I> [<I>passwd-ID</I> [<I>o-opt</I> [<I>i-opt</I>]]]
+               where absent optional values are signaled with "-" and
+                <I>host</I> is the IP address or name of a DCC server and <I>rport</I> is
+                    the name or number of the TCP port used by the remote
+                    server.
+                <I>src</I> and <I>lport</I> are the source IP address or host name and TCP
+                    port from which the outgoing flooding connection should
+                    come.  The string <I>*</I> specifies any source IP address.
+                    Incoming flooding connections must arrive at an address
+                    and port specified with <B>-a</B>.
+                <I>rem-id</I> is the server-ID of the remote DCC server.
+                <I>passwd-ID</I> is a server-ID that is not assigned to a server, but
+                    whose first password is used to sign checksum reports sent
+                    to the remote system.  Either of its passwords are
+                    required with incoming reports.  If it is absent or "-",
+                    outgoing floods are signed with the first password of the
+                    local server in the <I>ids</I> file and incoming floods must be
+                    signed with either password of the remote server-ID.
+                <I>i-opt</I> and <I>o-opt</I> are comma separated lists of
+                     <I>off</I> turns off flooding to the remote or local system.
+                     <I>no-del</I> says checksum delete requests are refused by the
+                         remote or local server and so turns off sending or
+                         accepting delete requests, respectively.  By default,
+                         delete requests are sent to remote servers and
+                         accepted in incoming floods if and only if the peers
+                         are exchanging DCC reputations.
+                     <I>del</I> says delete requests are accepted by the remote or
+                         local server.
+                     <I>no-log-del</I> turns off logging of incoming requests to
+                         delete checksums.
+                     <I>passive</I> is used to tell a server outside a firewall to
+                         expect a peer inside to create both of the pair of
+                         input and output TCP connections used for flooding.
+                         The peer inside the firewall should use <I>SOCKS</I> or <I>NAT</I>
+                         on its <I>flod</I> file entry for this system.
+                     <I>SOCKS</I> is used to tell a server inside a firewall that it
+                         should create both of the TCP connections used for
+                         flooding and that SOCKS protocol should be used.  The
+                         peer outside the firewall should use <I>passive</I> on its
+                         <I>flod</I> file entry for this system.
+                     <I>NAT</I> differs from <I>SOCKS</I> only by not using the SOCKS proto-
+                         col.
+                     <I>IDS-&gt;result</I> converts server-IDs in flooded reports.  <I>IDS</I>
+                         may be the string `self' to specify the server's own
+                         ID.  <I>IDS</I> can instead be the string `all' to specify
+                         all server-IDs or a pair of server-IDs separated by a
+                         dash to specify an inclusive range.  <I>result</I> can be
+                         the string `self' to translate to the server's own
+                         ID.  `ok' sends or receives reports without transla-
+                         tion.  The string `reject' to not send outgoing or
+                         refuse incoming reports.  Only the first matching
+                         conversion is applied.  For example, when
+                         `self-&gt;ok,all-&gt;reject' is applied to a locally gener-
+                         ated report, the first conversion is made and the
+                         second is ignored.
+                     <I>leaf=path-len</I> does not send reports with paths longer
+                         than <I>path-len</I> server-IDs.  A <I>path-len</I> of 0 blocks
+                         reports from this server.
+                     <I>IPv4</I> requires only IPv4 addresses to connect to this
+                         flooding peer.
+                     <I>IPv6</I> requires only IPv6 addresses to connect to this
+                         flooding peer.
+                     <I>vers</I> specifies the version of the DCC flooding protocol
+                         used by the remote DCC server with a string such as
+                         `version2'.
+                     <I>trace1</I> sends information about a single peer like the
+                         <B><A HREF="cdcc.html">cdcc(8)</A></B> command <B>trace FLOOD1 on</B> does for all peers.
+                     <I>trace2</I> sends information about individual flooded reports
+                         like the <B><A HREF="cdcc.html">cdcc(8)</A></B> command <B>trace FLOOD2 on</B> does for all
+                         peers.
+     <SPAN="FILE-grey_flod">grey_flod</SPAN> is the equivalent of the <I>@prefix@/flod</I> file used by <B>dccd</B> when
+               it is a greylist server.
+     <SPAN="FILE-flod.map">flod.map</SPAN>  is an automatically generated file in which <B>dccd</B> records its
+               progress sending or flooding reports to DCC peers.
+     <SPAN="FILE-grey_flod.map">grey_flod.map</SPAN> is the equivalent of the <I>@prefix@/flod.map</I> file used by
+               <B>dccd</B> when it is a greylist server.
+     <SPAN="FILE-ids">ids</SPAN>       contains the IDs and passwords known by the DCC server.  An <I>ids</I>
+               file that can be read by others cannot be used.  It contains
+               blank lines, comments starting with "#" and lines of the form:
+                     <I>id</I>[<I>,rpt-ok</I>][<I>,no-reps</I>][<I>,trace</I>][<I>,delay=ms</I>[<I>*inflate</I>]] <I>pass1</I>
+                     [<I>pass2</I>]
+
+               where
+                <I>id</I>  is a DCC <I>client-ID</I> or <I>server-ID</I>.
+                <I>trace</I> logs activity from clients and flooding peers using the
+                    ID.
+                <I>rpt-ok</I> overrides <B>-Q</B> by saying that this client is trusted to
+                    report only checksums for unsolicited bulk mail.
+                <I>no-reps</I> disables DCC Reputation reports from and responses to
+                    clients using this ID.
+                <I>delay=ms</I>[<I>*inflate</I>] delays answers to systems using the client
+                    <I>id</I>.  The <I>delay</I> in milliseconds is multiplied by 1 plus the
+                    number of recent requests from an IP address using <I>id</I>
+                    divided by the <I>inflate</I> value.  See <B>-u</B>.
+                <I>pass1</I> is the password currently used by clients with identi-
+                    fier <I>id</I>.  It is a 1 to 32 character string that does not
+                    contain blank, tab, newline or carriage return characters.
+                <I>pass2</I> is the optional next password that those clients will
+                    use.  A DCC server accepts either password if both are
+                    present in the file.
+               Both passwords can be absent if the entry not used except to
+               tell <B>dccd</B> that server-IDs in the flooded reports are valid.
+               The string <I>unknown</I> is equivalent to the null string.
+     <SPAN="FILE-whitelist">whitelist</SPAN> contains the DCC server whitelist.  It is not used directly but
+               is loaded into the database when <B><A HREF="dbclean.html">dbclean(8)</A></B> is run.
+     <SPAN="FILE-grey_whitelist">grey_whitelist</SPAN> contains the greylist server whitelist.  It is not used
+               directly but is loaded into the database when <B><A HREF="dbclean.html">dbclean(8)</A></B> is run
+               with <B>-G</B>.
+     <SPAN="FILE-blacklist">blacklist</SPAN> if present, contains a list of IP addresses and blocks of IP
+               addresses of DCC clients and flooding peers that are ignored.
+               Each line in the file should be blank, a comment starting with
+               '#', or an IP address or block of IP addresses in the form
+                     [<I>trace,</I>][<I>ok,</I>][<I>bad,</I>][<I>no-anon</I>][<I>flood-ok</I>] <I>address</I>
+               Addresses are single IPv4 or IPv6 addresses, CIDR blocks in the
+               usual form, or a pair of addresses separated by a hyphen (-)
+               specifying an inclusive range.  The last line in the file that
+               cover an address applies.  Changes to the file are automati-
+               cally noticed within a few minutes.  An IP address is assigned
+               all of the flags from all of lines that apply to it.  Addresses
+               or blocks of addresses can be preceded with <I>ok</I> to "punch holes"
+               in blacklisted blocks or specify tracing without blacklisting.
+               <I>Trace</I> logs activity.  <I>No-anon</I> blacklists clients only when they
+               use the anonymous client-ID.  <I>flood-ok</I> says that DCC flood
+               peering is allowed.  <I>Bad</I> is assumed when only an address is
+               present.  This mechanism is intended for no more than a few
+               dozen blocks of addresses.
+     <SPAN="FILE-dccd_clients">dccd_clients</SPAN> contains client IP addresses and activity counts.
+     <SPAN="FILE-grey_clients">grey_clients</SPAN> contains greylist client IP addresses and activity counts.
+
+
+</PRE>
+<H2 ID="EXAMPLES">EXAMPLES</H2><PRE>
+     <B>dccd</B> is usually started with other system daemons with something like the
+     <SPAN="FILE-script">script</SPAN> <I>@libexecdir@/rcDCC</I>.  That scripts uses values in
+     <SPAN="FILE-@prefix@/dcc_conf">@prefix@/dcc_conf</SPAN> to start the server.  With the argument <I>stop</I>,
+     <I>@libexecdir@/rcDCC</I> can be used to stop the daemon.
+
+     <SPAN="FILE-The">The</SPAN> database grows too large unless old reports are removed.  <B><A HREF="dbclean.html">dbclean(8)</A></B>
+     <SPAN="FILE-should">should</SPAN> be run daily with the @libexecdir@/cron-dccd <B>cron(8)</B> script
+
+
+</PRE>
+<H2 ID="SEE-ALSO">SEE ALSO</H2><PRE>
+     <B><A HREF="cdcc.html">cdcc(8)</A></B>, <B><A HREF="dcc.html">dcc(8)</A></B>, <B><A HREF="dbclean.html">dbclean(8)</A></B>, <B><A HREF="dblist.html">dblist(8)</A></B>, <B><A HREF="dccifd.html">dccifd(8)</A></B>, <B><A HREF="dccm.html">dccm(8)</A></B>, <B><A HREF="dccproc.html">dccproc(8)</A></B>.
+     <B><A HREF="dccsight.html">dccsight(8)</A></B>,
+
+
+</PRE>
+<H2 ID="HISTORY">HISTORY</H2><PRE>
+     <B>dccd</B> is based on an idea from Paul Vixie.  It was designed and written at
+     <SPAN="FILE-Rhyolite">Rhyolite</SPAN> Software, starting in 2000.  This document describes version
+     <SPAN="FILE-2.3.167.">2.3.167.</SPAN>
+
+                                 June 19, 2019
+</PRE>
+<HR>
+<ADDRESS>
+Man(1) output converted with man2html modified for DCC
+$Date 2001/04/29 03:22:18 $
+<BR>
+<A HREF="https://www.dcc-servers.net/dcc/">
+  <IMG class="logo mhide" ALT="DCC logo"
+    SRC="data:image/jpg;base64,
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDABsSFBcUERsXFhceHBsgKEIrKCUlKFE6
+PTBCYFVlZF9VXVtqeJmBanGQc1tdhbWGkJ6jq62rZ4C8ybqmx5moq6T/2wBDARwe
+HigjKE4rK06kbl1upKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSkpKSk
+pKSkpKSkpKSkpKSkpKT/wAARCAAnAGADASIAAhEBAxEB/8QAGgABAAIDAQAAAAAA
+AAAAAAAAAAIEAQMFBv/EACwQAAEEAQMBBgYDAAAAAAAAAAEAAgMRBBIhMSIFE0FR
+kaEUMkJhgbFScdH/xAAYAQEBAQEBAAAAAAAAAAAAAAAAAgEDBP/EAB0RAQACAQUB
+AAAAAAAAAAAAAAABEQIDEhMhMVH/2gAMAwEAAhEDEQA/APTIi85mukbPmzNlka6K
+RobTtt7/AMXTTw3zTJmno0XCMeVm5WU6Kd7ZIizQNVNAN2sd3l5eZlGKdwlhe0N6
+qaBvf6V8X2WbneREXBQiLRLE6V5DnkR+TTVoE+ZDBs91u/i3cqlNnZEkWuGPQwmr
+5KuR4kcbiWir5WTjtNAOc0DwaatBz/j8lsDu8jNca+CF0MacSwMebBIrfzVHtWHQ
+xpbWk7Hfe1Lst+thiLrAIIB8KQdNebziL7SFizIyh6r0ioPxezn5DpXxgyXZJJ3P
+HHB5C66WcYz2nKLVMXKixMnPklJq2bDk8qOLmRYmVnyyXpMjQAOfqXTlwMWabvpI
+Wuf5+f8Afmoy4eE7JbJJE0yncc78DjjxCvkwn2PWVK2iw1wc0OabBFgjxUe9YX6A
+erjjx8l51pooPlYxzWudRdx+lNAREQVs3G+JYACLHAPCzj4rYBtvtyVtEjDppw6r
+A+9I2Vj3FrXWRftygmqjsLU5x7z5ibBFiiQdt9uERBE4VvADiGU6623JOn01H2Uv
+gt2nW0UbpraHLTsL2+X3RFtyMRYAjdG7U0920AdJHH5U5MUve8iTQHgg6QRdit96
+PoiJcjWez2ncubd2OjYdQOwvjb3R2Bbi4S0SXfTY3uvQkn8oiXJTIwG6A0uFhrmg
+6eLN2N1tx4XQ2wadHIq+fHklESxFuNI3RUregkjo87+/3WyGJ0Q06gWC6Gnf1tES
+x//Z
+"></A>
+</ADDRESS>
+</BODY>
+</HTML>

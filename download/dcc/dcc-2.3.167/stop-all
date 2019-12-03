@@ -1,0 +1,25 @@
+#! /bin/sh
+
+if test ! -w $DCC_HOMEDIR; then
+    echo "not root" 2>&1
+    exit 1
+fi
+
+USAGE="`basename $0`: [-x]"
+while getopts "x" c; do
+    case $c in
+	x) set -x;;
+	*) echo "$USAGE" 1>&2; exit 1;;
+    esac
+done
+shift `expr $OPTIND - 1 || true`
+if test "$#" -ne 0; then
+    echo "$USAGE" 1>&2
+    exit 1
+fi
+
+cdcc "id 101; clean stop; grey on; clean stop"
+
+cdcc "id 106; port 6275; clean stop"
+
+cdcc "id 107; port 6273; clean stop"

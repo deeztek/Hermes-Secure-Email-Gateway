@@ -1,0 +1,11 @@
+# daily DCC server cleanup
+#   Rhyolite Software DCC 2.3.167-1.6 $Revision$
+# @configure_input@
+
+# if you use more than one DCC server, different start times are best
+#   so that your servers are not all busy cleaning their databases at once.
+15	2	*	*	*	@libexecdir@/cron-dccd
+
+# optionally fetch list of empty messags
+#   Please choose a random day of the week, hour, and minute
+#minute	hour	*	*	day	@libexecdir@/fetch-testmsg-whitelist

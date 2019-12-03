@@ -1,0 +1,1057 @@
+#! @PERL@ -wT -I@cgibin@
+
+# display and edit a DCC whitelist file
+
+# Copyright (c) 2019 by Rhyolite Software, LLC
+#
+# Permission to use, copy, modify, and distribute this software without
+# changes for any purpose with or without fee is hereby granted, provided
+# that the above copyright notice and this permission notice appear in all
+# copies and any distributed versions or copies are either unchanged
+# or not called anything similar to "DCC" or "Distributed Checksum
+# Clearinghouse".
+#
+# __________________________________________________
+#
+# THE SOFTWARE IS PROVIDED "AS IS" AND RHYOLITE SOFTWARE, LLC DISCLAIMS ALL
+# WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+# OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL RHYOLITE SOFTWARE, LLC
+# BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES
+# OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS,
+# WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION,
+# ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+#
+# Rhyolite Software DCC 2.3.167-1.74 $Revision$
+# @configure_input@
+
+# This file must protected with an equivalent to httpd.conf lines
+#   in the README file.
+
+use strict 'subs';
+use POSIX qw(strftime);
+
+use common;
+
+my($main_whiteclnt);		# path to the main whiteclnt file
+
+my(@file);			# list representation of the file
+my(%dict);			# dictionary of checksums and options
+my(%def_options);		# option settings from main whiteclnt file
+
+my($have_entry_form, $form_marked,
+   $cur_pos, $cur_key, $cur_entry, $cur_index);
+
+my $form_num = 0;
+
+
+
+# display the file literally
+if ($query{literal}) {
+    my($buf);
+
+    open(WHITECLNT, "< $whiteclnt") or html_whine("open($whiteclnt): $!");
+
+    print "Content-type: text/plain\n";
+    print "Cache-Control: max-age=0, must-revalidate\n\n";
+
+    print $buf
+	while (read(WHITECLNT, $buf, 4*1024));
+    print "\n";
+
+    close(WHITECLNT);
+    exit;
+}
+
+# lock, read and parse the whiteclnt file
+read_whiteclnt(\@file, \%dict);
+
+# get option defaults from the main whiteclnt file
+read_whitedefs(\%def_options);
+
+
+# get current position for the entry editing form
+$cur_pos = $query{pos};
+
+# find a whitecnt file entry to edit
+if ($query{key}) {
+    $cur_key = $query{key};
+} elsif ($query{auto} && $query{type} && $query{val}) {
+    my @new_entry = ck_new_white_entry("", "ok", $query{type}, $query{val});
+    $cur_key = $new_entry[0] if (defined($new_entry[1]));
+}
+$cur_entry = $dict{$cur_key} if ($cur_key);
+
+
+html_head("DCC Whitelist for $user at $hostname");
+common_buttons();
+print "<TR><TD colspan=10>return to $list_msg_link${url_ques}msg=$query{msg}\">logged message $query{msg}</A>\n"
+    if ($query{msg});
+print <<EOF;
+<TR><TD colspan=10>$edit_link${url_ques}literal=yes"
+	     TARGET="DCC literal whiteclnt">Literal contents of whitelist</A>.
+</TABLE>
+
+EOF
+
+
+# add new entry
+if ($query{Add}) {
+    my(@new_entry, $msg, $prev, $cur, $add_pos);
+
+    @new_entry = ck_new_white_entry($query{comment}, $query{count},
+				    $query{type}, $query{val});
+    give_up($new_entry[0]) if (!defined($new_entry[1]));
+
+    # insert into the file instead of appending to the end if we have
+    #	    a valid position
+    if (defined($cur_pos)) {
+	$add_pos = next_index($cur_pos);
+    } elsif ($cur_key) {
+	($prev, $cur, $add_pos) = neighbors($cur_key);
+    }
+
+    $cur_key = $new_entry[0];
+    $cur_entry = \@new_entry;
+    give_up("entry already present") if ($dict{$cur_key});
+
+    # send the new entry to the disk with the rest of the file
+    $whiteclnt_cur_key = $cur_key;
+    $msg = chg_white_entry(\@file, \%dict, $cur_key, \@new_entry, $add_pos);
+    give_up($msg) if ($msg);
+
+    # re-prime the form with cleaned comment
+    $cur_key = $new_entry[0];
+    $cur_entry = $dict{$cur_key};
+
+    give_up("new entry did not reach file") if (!$cur_entry);
+
+    finish("whitelist entry added");
+}
+
+
+
+# change current whitelist entry
+if ($query{Change}) {
+    my(@new_entry, $msg);
+
+    give_up("no entry selected to change") if (!$cur_key);
+    give_up("entry '$cur_key' has disappeared")
+	if (!$cur_entry || !$$cur_entry[0]);
+
+    @new_entry = ck_new_white_entry($query{comment}, $query{count},
+				    $query{type}, $query{val});
+    give_up($new_entry[0]) if (!defined($new_entry[1]));
+
+    give_up("no changes requested")
+	if ($$cur_entry[1] eq $new_entry[1]
+	    && $$cur_entry[2] eq $new_entry[2]);
+
+    # send the change to the disk with the rest of the file
+    $whiteclnt_cur_key = $cur_key;
+    $msg = chg_white_entry(\@file, \%dict, $cur_key, \@new_entry);
+    give_up($msg) if ($msg);
+
+    # re-prime the form with cleaned comment
+    $cur_key = $new_entry[0];
+    $cur_entry = $dict{$cur_key};
+    give_up("changed entry did not reach file") if (!$cur_entry);
+
+    finish("whitelist entry changed");
+}
+
+
+
+# delete current entry
+if ($query{Delete}) {
+    my($prev, $cur, $next, $new_key, $msg);
+
+    give_up("no entry selected to delete") if (!$cur_key);
+    give_up("entry '$cur_key' has disappeared")
+	if (!$cur_entry || !$$cur_entry[0]);
+
+    # find a neighbor of the entry to be deleted
+    ($prev, $cur, $next) = neighbors($cur_key);
+    $new_key = ${$file[$prev]}[0] if (defined($prev));
+
+    # write everything to the new file except the deleted entry
+    $whiteclnt_cur_key = $cur_key;
+    $msg = chg_white_entry(\@file, \%dict, $cur_key, undef);
+    give_up($msg) if ($msg);
+
+    # keep the add/change/delete form in place if possible
+    $cur_key = $new_key;
+    undef($cur_entry);
+    delete $query{comment};
+    delete $query{count};
+    delete $query{type};
+    delete $query{val};
+    $cur_entry = $dict{$cur_key} if ($cur_key);
+
+    finish("whitelist entry deleted");
+}
+
+
+# move the current entry up
+if ($query{Up}) {
+    up(1);
+}
+
+if ($query{Up5}) {
+    up(5);
+}
+
+sub up {
+    my($delta) = @_;
+    my($prev, $cur, $next, $moved, @new_file, $msg);
+
+    if ($cur_entry) {
+	# move an existing entry
+	while ($delta) {
+	    --$delta;
+	    # It is inefficient but easy and clearly correct to repeated
+	    #	search the array of entries for the target and then build
+	    #	a new array.
+	    ($prev, $cur, $next) = neighbors($cur_key);
+	    if (!$prev) {
+		give_up("cannot move above the top") if (!$moved);
+		last;
+	    }
+
+	    @new_file = (@file[0 .. $prev-1],
+			 $file[$cur], $file[$prev],
+			 @file[$cur+1 .. $#file]);
+	    @file = @new_file;
+	    $moved = 1;
+	}
+	$whiteclnt_cur_key = $cur_key;
+	$msg = write_whiteclnt(@file);
+	give_up($msg) if ($msg);
+	read_whiteclnt(\@file, \%dict);
+
+    } else {
+	# move a new or proposed entry
+	$cur_pos = prev_index($cur_pos, $delta);
+    }
+    print_form_file();
+}
+
+
+# move the current entry down
+if ($query{Down}) {
+    down(1);
+}
+
+if ($query{Down5}) {
+    down(5);
+}
+
+sub down {
+    my($delta) = @_;
+    my($prev, $cur, $next, @new_file, $msg);
+
+    if ($cur_entry) {
+	# move an existing entry
+	while ($delta) {
+	    --$delta;
+	    ($prev, $cur, $next) = neighbors($cur_key);
+	    if (!$next) {
+		give_up("cannot move below the bottom")  if (!$moved);
+		last;
+	    }
+
+	    @new_file = (@file[0 .. $cur-1],
+			 $file[$next], $file[$cur],
+			 @file[$next+1 .. $#file]);
+	    @file = @new_file;
+	    $moved = 1;
+	}
+	$whiteclnt_cur_key = $cur_key;
+	$msg = write_whiteclnt(@file);
+	give_up($msg) if ($msg);
+	read_whiteclnt(\@file, \%dict);
+
+    } elsif (defined($cur_pos)) {
+	# move position of a future entry
+	$cur_pos = next_index($cur_pos, $delta);
+    }
+    print_form_file();
+}
+
+
+# undo the previous change
+if ($query{Undo}) {
+    my $msg = undo_whiteclnt();
+    give_up($msg) if ($msg);
+
+    $cur_key = $whiteclnt_cur_key;
+    read_whiteclnt(\@file, \%dict);
+    $cur_key = $whiteclnt_cur_key if ($whiteclnt_cur_key);
+
+    # put the add/change/delete form back in place
+    if ($cur_key) {
+	$cur_entry = $dict{$cur_key};
+    } else {
+	undef($cur_entry);
+	delete $query{comment};
+	delete $query{count};
+	delete $query{type};
+	delete $query{val};
+    }
+
+    finish("change undone");
+}
+
+
+# change new log file mail notifcations
+my $old_notify = $whiteclnt_notify;
+if ($query{notify}) {
+    if ($query{notify} =~ /off/) {
+	$whiteclnt_notify =~ s/$whiteclnt_notify_pat$/${1}off$3$4/i;
+    } elsif ($query{notify} =~ /on/) {
+	$whiteclnt_notify =~ s/$whiteclnt_notify_pat$/${1}on$3$4/i;
+    }
+}
+if (defined($query{notifybox})) {
+    my $new_box = $query{notifybox};
+    $new_box =~ s/^\s+(.*)\s*$/$1/;
+    $whiteclnt_notify =~ s/$whiteclnt_notify_pat$/$1$2$3$new_box/i;
+
+    give_up('The notification mailbox is limited to  -, _, letters, and digits')
+	if ($whiteclnt_notify !~ /^$whiteclnt_notify_pat$/);
+}
+if ($whiteclnt_notify ne $old_notify) {
+    $whiteclnt_cur_key = "";
+    my $msg = write_whiteclnt(@file);
+    give_up($msg) if ($msg);
+    read_whiteclnt(\@file, \%dict);
+}
+
+# process requests to change options
+option_form("dccenable", "On", "dcc-on", "Off", "dcc-off");
+option_form("greyfilter", "On", "greylist-on", "Off", "greylist-off");;
+option_form("greylog", "On", "greylist-log-on", "Off", "greylist-log-off");
+option_form("mtafirst", "first", "MTA-first", "last", "MTA-last");
+option_form("rep", "On", "DCC-rep-on", "Off", "DCC-rep-off");
+option_form("dnsbl1", "On", "dnsbl1-on", "Off", "dnsbl1-off");
+option_form("dnsbl2", "On", "dnsbl2-on", "Off", "dnsbl2-off");
+option_form("dnsbl3", "On", "dnsbl3-on", "Off", "dnsbl3-off");
+option_form("dnsbl4", "On", "dnsbl4-on", "Off", "dnsbl4-off");
+option_form("logall", "On", "log-all", "Off", "log-normal");
+option_form("logsubdir", "day", "log-subdirectory-day",
+	    "hour", "log-subdirectory-hour",
+	    "minute", "log-subdirectory-minute");
+option_form("discardok", "discard spam", "forced-discard-ok",
+	    "delay mail", "no-forced-discard");
+
+# process requests from the HTTP client to change the threshold
+foreach my $ck (split(/,/, $thold_cks)) {
+    my $nm = "thold-$ck";
+    foreach my $val ($query{$nm}, $query{"text-$nm"}) {
+	next if (!$val);
+	if ($val =~ /^Default/) {
+	    set_option($nm);
+	} elsif (!parse_thold_value($ck, $val)) {
+	    give_up("invalid threshold setting $nm='$val'");
+	} else {
+	    set_option($nm, "option threshold $ck,$val\n");
+	}
+	last;
+    }
+}
+
+# nothing to do?
+give_up("entry '$cur_key' has disappeared")
+    if (!$query{auto} && $cur_key && (!$cur_entry || !$$cur_entry[0]));
+print_form_file($query{result}
+		? "<P class=warn>$query{result}</STRONG>\n"
+		: "");
+
+
+
+
+#############################################################################
+
+# display the whiteclnt file with the option setting form and and quit
+sub print_form_file {
+    my($result) = @_;			# "" or some kind of error message
+
+    close(WHITECLNT);
+
+    my $locked = ($whiteclnt_lock =~ /\blocked/) ? " disabled" : "";
+
+    # display any error message from the previous action
+    print $result ? $result : "<P>&nbsp;\n";
+
+    # generate table of forms to control option lines
+    print "<P>\n<TABLE border=0>\n";
+
+    print_form_start("<TR><TD>", "", "");
+    print "\t<DIV>";
+    undo_form($locked);
+    print "\t</DIV></FORM>\n";
+
+    # two HTML forms for the '#webuser...' line
+    $whiteclnt_notify =~ /$whiteclnt_notify_pat/;
+    my $notify_cur = $2;
+    my $notifybox = $4;
+    my $notify_on_locked = ($notify_cur eq "on") ? " disabled" : $locked;
+    my $notify_off_locked = ($notify_cur eq "off") ? " disabled" : $locked;
+    print_form_start("<TR><TD class=first>", "", "<DIV>");
+    print <<EOF;
+	mail notifications to
+	<INPUT $notify_off_locked type=text name=notifybox value='$notifybox' size=12>
+	<STRONG>$notify_cur</STRONG></DIV>
+	</FORM>
+EOF
+    print_form_start("    <TD>", "", "<DIV>");
+    print_button("\t", "notify", $notify_on_locked, "on");
+    print_button("\t", "notify", $notify_off_locked, "off");
+    print "\t</DIV></FORM>\n";
+
+    table_row_form("dccenable", "DCC", $locked, "dcc-off", "dcc-on");
+    if ($DCCM_ARGS =~ /-G/ || $DCCIFD_ARGS =~ /-G/
+	|| (defined($GREY_CLIENT_ARGS) && $GREY_CLIENT_ARGS ne "")) {
+	table_row_form("greyfilter", "greylist filter", $locked,
+		       "greylist-off", "greylist-on");
+	table_row_form("greylog", "greylist log", $locked,
+		       "greylist-log-off", "greylist-log-on");
+    }
+    table_row_form("mtafirst", "check MTA blacklist", $locked,
+		   "MTA-last", "MTA-first", "last", "first");
+    table_row_form("rep", "DCC Reputations", $locked,
+		   "DCC-rep-off", "DCC-rep-on");
+
+    # ask about DNSBLs if they are available
+    my $args = "$DNSBL_ARGS $DCCM_ARGS $DCCIFD_ARGS";
+    if ($args =~ /-B/) {
+	if (!defined($dict{dnsbl2}) && !defined($dict{dnsbl3})
+	    && !defined($dict{dnsbl4})
+	    && $args !~ /-B\s*set:group=\d+/i) {
+	    # only one question if there are no groups
+	    table_row_form("dnsbl1", "DNS list checking", $locked);
+	} else {
+	    table_row_form("dnsbl1", "DNS list #1 checking", $locked);
+	    table_row_form("dnsbl2", "DNS list #2 checking", $locked);
+	    table_row_form("dnsbl3", "DNS list #3 checking", $locked)
+		if (defined($dict{dnsbl3})|| defined($dict{dnsbl4})
+		    || $args =~ /-B\s*set:group=[34]/i);
+	    table_row_form("dnsbl4", "DNS list #4 checking", $locked)
+		if (defined($dict{dnsbl4})
+		    || $args =~ /-B\s*set:group=4/i);
+	}
+    }
+    table_row_form("logall", "debug logging", $locked,
+		   "log-normal", "log-all");
+    table_row_form("discardok",
+		   "<STRONG></STRONG> also addressed to others",
+		   $locked, "no-forced-discard", "forced-discard-ok",
+		   "delay mail", "discard spam");
+
+    # forms for checksum thresholds
+    foreach my $ck (split(/,/, $thold_cks)) {
+	my($cur_val, $sw_val, $nm, $def_label, $bydef,
+	   $dis_field, $dis_def, $dis_never);
+
+	$nm = "thold-" . $ck;
+	# construct label for the default button from default value
+	$def_label = $def_options{$nm};
+	$def_label =~ s/.*<STRONG>([^<]+)<.*/Default ($1)/;
+	if (defined($dict{$nm})) {
+	    $cur_val = $dict{$nm}[2];
+	    $cur_val =~ s/.*,([-_a-z0-9%]+)\s+$/$1/i;
+	    $bydef = '';
+	    $sw_val = $cur_val;
+	} else {
+	    $cur_val = $def_options{$nm};
+	    $cur_val =~ s@<STRONG>(.*)</STRONG>(.*)@$1@;
+	    $bydef = $2;
+	    $sw_val = 'Default';
+	}
+	$dis_field = $locked;
+	$dis_def = $locked;
+	$dis_never = $locked;
+	$dis_def = " class=selected disabled" if ($sw_val eq "Default");
+	$dis_never = " class=selected disabled" if ($sw_val eq "Never");
+	# changing reputation thresholds ought to affect tagging
+	#	even if reputation checking is turned off
+
+	print_form_start("<TR><TD class=first>", "", "<DIV>");
+	print <<EOF;
+	<EM>$ck</EM> threshold$bydef
+	<INPUT type=text$dis_field name='text-$nm' value='$cur_val' size=5>
+	</DIV></FORM>
+EOF
+	print_form_start("    <TD>", "", "<DIV>");
+	print_button("\t", $nm, $dis_def, $def_label);
+	print_button("\t", $nm, $dis_never, "Never");
+	# "many" makes no sense for either reputation threshold
+	print_button("\t", $nm,
+		     $sw_val =~ /^many$/i ? " disabled" : $locked,
+		     "MANY")
+	    if ($ck !~ /^rep/i);
+	print "\t</DIV></FORM>\n";
+    }
+
+    print "</TABLE>\n\n<HR>\n<P>\n";
+
+    # display a form for a new entry before the file if we have not
+    #	been given a position or an entry to modify
+    print_entry_form($locked, $result) if (!$cur_key && !defined($cur_pos));
+
+    print_whiteclnt_file($result, $locked);
+}
+
+
+
+# display the common start of forms
+sub print_form_start {
+    my($before,			# HTML before start of form
+       $tag,			# tag on action
+       $after			# HTML after start of form
+       ) = @_;
+
+    print $before if ($before);
+    print "<FORM class=nopad ACTION='$edit_url";
+    print $tag if ($tag);
+    print "' method=POST>$form_hidden\n";
+    print $after if ($after);
+    print "\t<INPUT type=hidden name=msg value='$query{msg}'>\n"
+	if ($query{msg});
+    if ($cur_key) {
+	print "\t<INPUT type=hidden name=key value='";
+	print html_str_encode($cur_key);
+	print "'>\n";
+    }
+    if ($cur_pos) {
+	print "\t<INPUT type=hidden name=pos value='";
+	print html_str_encode($cur_pos);
+	print "'>\n";
+    }
+}
+
+
+
+sub undo_form {
+    my($locked) = @_;
+
+    print "<INPUT class=small";
+    print newest_whiteclnt_bak() ? $locked : " disabled";
+    print " type=submit name=Undo value='Undo Previous Change'>\n";
+}
+
+
+
+# display the entry editing form
+sub print_entry_form {
+    my($locked, $result) = @_;
+    my($add_str, $new_val, $comment, $comment_rows,
+       $change_ok, $prev, $cur, $next);
+
+    return if ($have_entry_form);
+    $have_entry_form = 1;
+
+    # prime the form with the currently selected whiteclnt entry, if any
+    if ($cur_entry) {
+	$comment = $$cur_entry[1];
+	$query{comment} = html_str_encode($comment);
+
+	my $value = $$cur_entry[2];
+	$value =~ s/(\S+)\s+//;
+	$query{count} = $1;
+	($query{type}, $query{val}) = parse_type_value($value);
+	$change_ok = $locked;
+    } else {
+	# "disabled" does not work with Netscape 4.*, but we have to handle
+	#   changes without a valid key, so don't worry about it
+	$change_ok = " disabled";
+    }
+
+    # compute a comment if this came from a log file
+    if ($query{auto} && !$cur_entry) {
+	$comment = "\n#";
+	$comment .= "    added from logged message $query{msg}"
+	    if ($query{msg});
+	$comment .= strftime(" %x", localtime);
+	$comment = html_str_encode($comment);
+	$query{count} = "OK";
+    } else {
+	$comment = $query{comment};
+	$comment = '' if (!defined($comment));
+    }
+    $comment =~ s/\h+$//mg;
+    # need a blank on a leading blank line in <textarea></textarea>
+    $comment =~ s/^\n/ \n/;
+
+    $comment_rows = $comment;
+    $comment_rows =~ s/[^\n]//g;
+    $comment_rows = length($comment_rows);
+    $comment_rows = 2 if ($comment_rows < 2);
+    $comment_rows = 10 if ($comment_rows > 10);
+
+    if (!$form_marked) {
+	print_form_start("", "#cur_key",
+			 "<TABLE id='cur_key' border=0>\n<TR><TD>&nbsp;");
+    } else {
+	print_form_start("", "#cur_key",
+			 "<TABLE border=0>\n<TR><TD>&nbsp;");
+    }
+    print "    <TD>";
+    print_button("\t", "Add", $locked, "Add");
+    if (defined($cur_pos)) {
+	$prev = prev_index($cur_pos);
+	$next = next_index($cur_pos);
+    } elsif ($cur_key) {
+	($prev, $cur, $next) = neighbors($cur_key);
+    } else {
+	undef($prev);
+	undef($next);
+    }
+    if ($query{auto} && !$cur_entry) {
+	print_button("\t", "Change", " disabled", "Change");
+	print_button("\t", "Delete", " disabled", "Delete");
+	print "\tfrom $list_msg_link${url_ques}msg=$query{msg}\">logged message $query{msg}</A>";
+    } else {
+	print_button("\t", "Change", $change_ok, "Change");
+	print_button("\t", "Delete", $change_ok, "Delete");
+	undo_form($locked);
+    }
+    print_button("\t", "Up",
+		 !defined($prev) ? " disabled" : $locked, "Move Up");
+    print_button("\t", "Up5",
+		 !defined($prev) ? " disabled" : $locked, "Move Up 5");
+    print_button("\t", "Down",
+		 !$next ? " disabled" : $locked, "Move Down");
+    print_button("\t", "Down5",
+		 !$next ? " disabled" : $locked, "Move Down 5");
+    print <<EOF;
+
+<TR><TD>Description
+    <TD><TEXTAREA$locked name=comment rows=$comment_rows cols=70>$comment</TEXTAREA>
+<TR><TD>&nbsp;
+    <TD><SELECT class=small$locked name=count>
+EOF
+    $query{count} = "OK" if (!$query{count});
+    print_option("count", "OK");
+    print_option("count", "OK2");
+    print_option("count", "MANY");
+    print "\t</SELECT>\n";
+
+    print "\t<SELECT class=small$locked name=type>\n";
+    $query{type} = "env_From" if (!$query{type});
+    print_option("type", "env_From");
+    print_option("type", "env_To");
+    print_option("type", "From");
+    print_option("type", "IP");
+    print_option("type", "Message-ID");
+    # allow selection of checksums specified with -S in @prefix@/dcc_conf
+    foreach my $hdr (split(/[|)(]+/, $sub_white)) {
+	my($label);
+	$hdr =~ s/\\s\+/ /;
+	next if ($hdr =~ /^s*$/);
+	$label = $hdr;
+	$label =~ s/^substitute\s+//i;
+	print_option("type", $label, $hdr);
+    }
+    print_option("type", "Hex Body");
+    print_option("type", "Hex Fuz1");
+    print_option("type", "Hex Fuz2");
+    print "\t</SELECT>\n";
+
+    print "\t<INPUT  type=text name=val size=40";
+    if ($query{val}) {
+	print " value='";
+	print html_str_encode($query{val});
+	print "'";
+    }
+    print ">\n";
+
+    print "<TR><TD colspan=10>return to $list_msg_link${url_ques}msg=$query{msg}\">logged message $query{msg}</A>\n"
+	if ($query{msg});
+
+    print "<TR><TD colspan=10>\n";
+    print $result ? $result : "&nbsp;";
+    print "</TABLE>\n</FORM>\n\n";
+}
+
+
+
+# find indeces of previous, current, and next entries
+#   return a list of 3 entries of the preceding, current, and following indeces
+sub neighbors {
+    my($tgt_key) = @_;
+    my($prev, $cur, $index, $entry);
+
+    # look for the current entry while tracking predecessors
+    $index = 0;
+    foreach $entry (@file) {
+	next if (!ref($entry));
+
+	# ignore deleted lines, options, and include lines
+	next if (!$$entry[0] || !defined($$entry[1])
+		 || $$entry[2] =~ /^option/);
+
+	# stop at the first entry when there is no current position
+	return ($prev, $cur, $index) if (!$tgt_key);
+
+	if ($$entry[0] eq $tgt_key) {
+	    $cur = $index;
+	    last;
+	}
+	$prev = $index;
+    } continue { ++$index; }
+
+    do {
+	return ($prev, $cur, undef) if ($index >= $#file);
+	$entry = $file[++$index];
+    } while (!$$entry[0] || !defined($$entry[1]) || $$entry[2] =~ /^option/);
+    return ($prev, $cur, $index);
+}
+
+
+
+sub prev_index {
+    my($pos, $delta) = @_;
+    my ($entry);
+
+    $pos = $#file if (!$pos);
+
+    while (--$pos >= 0) {
+	$entry = $file[$pos];
+	# skip deleted entries
+	return $pos
+	    if ($$entry[0] && defined($$entry[1]) && $$entry[2] !~ /^option/
+		&& (!$delta || !--$delta));
+    }
+    return undef;
+}
+
+
+
+sub next_index {
+    my($pos, $delta) = @_;
+    my ($entry);
+
+    $pos = $#file if (!$pos);
+
+    while (++$pos <= $#file) {
+	$entry = $file[$pos];
+	# skip deleted entries
+	return $pos
+	    if ($$entry[0] && defined($$entry[1]) && $$entry[2] !~ /^option/
+		&& (!$delta || !--$delta));
+    }
+    return undef;
+}
+
+
+
+sub set_option {
+    my($key, $line) = @_;
+    my($msg);
+
+    # put the new value, if any, into the spare slot created when the file
+    #	was read into memory
+    $file[1] = ["", "", $line] if ($line);
+
+    # delete the old value if any
+    $whiteclnt_cur_key = "";
+
+    $msg = chg_white_entry(\@file, \%dict, $key);
+    give_up($msg) if ($msg);
+}
+
+
+
+# see if a form for an option was selected and process the result if so
+#	The first arg is the name of the option.  It is followed by
+#	(form-value,file-value) pairs
+sub option_form {
+    my($key, $new_formval, $formval, $fileval);
+
+    $key = shift @_;
+    $new_formval = $query{$key};
+    return if (!$new_formval);
+
+    if ($new_formval =~ /^Default/) {
+	set_option("$key");
+	return;
+    }
+    while ($#_ > 0) {
+	$formval = shift @_;
+	$fileval = shift @_;
+	if ($new_formval eq $formval) {
+	    set_option("$key", "option $fileval\n");
+	    return;
+	}
+    }
+    give_up("invalid setting $key='$new_formval'");
+}
+
+
+
+sub finish {
+    print_form_file("<P><STRONG>" . html_str_encode($_[0]) . "</STRONG>\n");
+}
+
+
+
+sub give_up {
+    print_form_file("<P class=warn><STRONG>"
+		    . html_str_encode($_[0]) . "</STRONG>\n");
+}
+
+
+
+# You cannot use real HTML 4 buttons because Microsoft gets them all wrong.
+#   Contrary to the standard, they return all type=submit buttons.
+#	They also return any text label instead of the value, thereby removing
+#	most or all reason to use <BUTTON> instead of <INPUT>.
+sub print_button {
+    my($lead,				# HTML text before the control
+       $nm,				# control name
+       $lock,				# "" or " disabled"
+       $val) = @_;			# value when selected
+
+    $lock = " class=small$lock" if ($lock !~ /class=/i);
+    print $lead;
+    print "<INPUT $lock type=submit name='$nm' value='$val'>\n";
+}
+
+
+
+# one line of the table of forms
+sub table_row_form {
+    my($nm,				# name of the option
+       $label,				# label; <STRONG></STRONG> gets current
+       $locked,				# "" or "disabled" when file read-only
+       $off, $on,			# replace "off" and "on" in the file
+       $off_label, $on_label,		# "off" & "on" for user
+       ) = @_;
+    my($button_cur, $dis_on, $dis_off, $dis_def, $label_cur,
+       $val_cur, $bydef);
+
+
+    $off = "$nm-off" if (!$off);
+    $on = "$nm-on" if (!$on);
+    $dis_on = $locked;
+    $dis_off = $locked;
+    $dis_def = $locked;
+    $button_cur = $locked ? $locked : " class=selected disabled";
+    if ($dict{$nm}
+	&& $dict{$nm}[2] eq "option $on\n") {
+	$label_cur = $on_label ? $on_label : "<STRONG>on</STRONG>";
+	$val_cur = $label_cur;
+	$bydef = "";
+	$dis_on = $button_cur;
+    } elsif ($dict{$nm}
+	     && $dict{$nm}[2] eq "option $off\n") {
+	$label_cur = $off_label ? $off_label : "<STRONG>off</STRONG>";
+	$val_cur = $label_cur;
+	$bydef = "";
+	$dis_off = $button_cur;
+    } else {
+	$label_cur = $def_options{$nm};
+	$val_cur = $label_cur;
+	$val_cur =~ s@(<STRONG>.*</STRONG>)(.*)@$1@;
+	$bydef = $2;
+	$dis_def = $button_cur;
+    }
+    # construct labels for "on" and "off" buttons
+    if ($on_label) {
+	$on_label =~ s/.*<STRONG>([^<]+)<.*/$1/;
+    } else {
+	$on_label = "On";
+    }
+    if ($off_label) {
+	$off_label =~ s/.*<STRONG>([^<]+)<.*/$1/;
+    } else {
+	$off_label = "Off";
+    }
+    # construct label for the default button from default value
+    $def_label = $def_options{$nm};
+    $def_label =~ s/.*<STRONG>([^<]+)<.*/Default ($1)/;
+    # construct label for the group of buttons
+    #	use it as a pattern if the provided label contains "<STRONG></STRONG>",
+    if ($label !~ s@<STRONG></STRONG>(.*)@<STRONG>$val_cur</STRONG>$1$bydef@) {
+	$label .= " $label_cur";
+    }
+
+    print "<TR><TD class=first>$label\n";
+    print_form_start("    <TD>", "", "<DIV>");
+    print_button("\t", $nm, $dis_def, $def_label);
+    print_button("\t", $nm, $dis_on, $on_label);
+    print_button("\t", $nm, $dis_off, $off_label);
+    print "\t</DIV></FORM>\n";
+}
+
+
+
+sub print_str {
+    my($lineno, $leader, $str) = @_;
+
+    while ($str =~ s/(.*\n?)// && $1) {
+	my $line = $1;
+	if ($line =~ /\n/) {
+	    ++$lineno;
+	} else {
+	    $line .= "\n";
+	    $leader .= "? ";
+	}
+	print $lineno if ($query{debug});
+	print $leader;
+	print $line;
+    }
+    return $lineno;
+}
+
+
+
+sub print_option {
+    my($field, $label, $value) = @_;
+    my($s);
+
+    $s = "";
+    if ($query{$field}) {
+	if (defined($value) && $query{$field} =~ /^$value$/i) {
+	    $s =  " selected"
+	} elsif ($query{$field} =~ /^$label$/i) {
+	    $s =  " selected";
+	}
+    }
+    if (defined($value)) {
+	$value = " value=\"$value\"";
+    } else {
+	$value = "";
+    }
+    print "\t    <OPTION class=small$s$value>$label</OPTION>\n";
+}
+
+
+
+# display the current contents of the whiteclnt file
+#   It is represented as an array or list of references to 3-tuples.
+#   The first of the three is the whitelist entry in a canonical form
+#	as a key uniquely identifying the entry.
+#   The second is a comment string of zero or more comment lines.
+#   The third is the DCC whiteclnt entry.
+#
+#   The canonical form and the whiteclnt line of the first 3-tuple for a file
+#   are null, because it contains the comments, if any, before the file's
+#   preamble of dates when the file has been changed and flags.
+#   The file[1] entry is an empty slot for adding option settings.
+#   The last triple in a file may also lack a whitelist entry.
+
+sub print_whiteclnt_file {
+    my($result, $locked) = @_;
+    my($preamble, $str, $url, $entry, $lineno, $in_pre, $leader, $end_select,
+       $tgt_key, $prev_key);
+
+    $url = $edit_link . $url_ques;
+    $url .= "msg=" . $query{msg} . "&amp;" if ($query{msg});
+    $url .= "key=";
+
+    $tgt_key = defined($cur_pos) ? ${$file[$cur_pos]}[0] : $cur_key;
+
+    # try to find an entry before the current entry to start the display
+    #	in the browser's window
+    if ($tgt_key) {
+	my @prev_keys;
+
+	foreach $entry (@file) {
+	    # ignore deleted lines, options, and include lines
+	    next if (!$$entry[0] || !defined($$entry[1])
+		     || $$entry[2] =~ /^option/);
+	    shift(@prev_keys) if ($#prev_keys >= 2);
+	    push(@prev_keys, $$entry[0]);
+	    last if ($$entry[0] eq $tgt_key);
+	}
+	$prev_key = shift(@prev_keys);
+    }
+
+    $lineno = 1;
+    foreach $entry (@file) {
+	# do not list deleted entries
+	next if (!defined($$entry[1]));
+
+	# no options if not debugging
+	next if ($$entry[2] =~ /^option/ && !$query{debug});
+
+	# tell the browser that the form will be soon
+	if ($prev_key && $$entry[0] && $$entry[0] eq $prev_key) {
+	    print "<DIV ID='cur_key'></DIV>";
+	    $form_marked = 1;
+	}
+
+	# mark the currently selected entry
+	if ($tgt_key && $$entry[0] && $$entry[0] eq $tgt_key) {
+	    print "<STRONG>";
+	    $leader = " &brvbar;\t";
+	    $end_select = 1;
+	} else {
+	    $leader = "\t";
+	    $end_select = undef;
+	}
+
+	if ($query{debug}) {
+	    if ($in_pre) {
+		$in_pre = undef;
+		print "</PRE>";
+	    }
+	    print "<HR><P>" if ($query{debug});
+	}
+	if (!$in_pre) {
+	    $in_pre = 1;
+	    print "<PRE class=nopad>";
+	}
+
+	# display comment lines
+	$str = $$entry[1];
+	if (!$preamble) {
+	    # Display the preamble parameters after comments in first triple
+	    #	but before the ultimate blank line in the comments, if present.
+	    $preamble = $whiteclnt_version;
+	    $preamble .= $whiteclnt_notify;
+	    $preamble .= $whiteclnt_lock;
+	    $preamble .= "#webuser cur_key $whiteclnt_cur_key\n"
+		if ($whiteclnt_cur_key);
+	    $preamble .= $whiteclnt_change_log;
+	    $str .= $preamble if ($query{debug});
+	}
+	$lineno = print_str($lineno, $leader, html_str_encode($str));
+
+	$str = $$entry[2];
+	if ($$entry[0] && $$entry[2] !~ /^option/) {
+	    # Display an ordinary entry as a link for editing.
+	    chomp($str);
+	    # Suppress "substitute" noise
+	    $str =~ s/^(\S*\s+)substitute\s+/$1/;
+	    # use tab for blanks between the type and value
+	    $str =~ s/^(\S+)\s+(\S+)\s+/$1\t$2\t/;
+	    # make columns
+	    $str =~ s/^(\S+\s+\S{1,7})\t/$1\t\t/;
+	    $str = $url . url_encode($$entry[0]) . "#cur_key\">"
+		    . html_str_encode($str)  . "</A>\n";
+	} else {
+	    # just display option lines
+	    $str = html_str_encode($str);
+	}
+	$lineno = print_str($lineno, $leader, $str);
+
+	# put the editing form after the selected entry
+	if ($end_select) {
+	    print "</STRONG></PRE>\n";
+	    $in_pre = undef;
+	    print_entry_form($locked, $result);
+	}
+    }
+    print "</PRE>\n" if ($in_pre);
+
+    print_entry_form($locked, $result) if (!$have_entry_form);
+
+    close(WHITECLNT);
+
+    html_footer();
+    print "</BODY>\n</HTML>\n";
+
+    exit;
+}
