@@ -106,16 +106,16 @@ done
 
 MYSQL_ROOT_USERNAME=root
 
-read -p "Enter MySQL(MariaDB) root user password you wish to use: "  MYSQL_ROOT_PASSWORD
+read -p "Enter MySQL(MariaDB) root user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_ROOT_PASSWORD
 read -p "Enter MySQL(MariaDB) Hermes SEG user username you wish to use (Example: hermes): "  MYSQL_HERMES_USERNAME
-read -p "Enter MySQL(MariaDB) Hermes SEG user password you wish to use: "  MYSQL_HERMES_PASSWORD
+read -p "Enter MySQL(MariaDB) Hermes SEG user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_HERMES_PASSWORD
 read -p "Enter MySQL(MariaDB) Syslog username you wish to use (Example: rsyslog): "  MYSQL_SYSLOG_USERNAME
-read -p "Enter MySQL(MariaDB) Syslog user password you wish to use: "  MYSQL_SYSLOG_PASSWORD
+read -p "Enter MySQL(MariaDB) Syslog user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_SYSLOG_PASSWORD
 read -p "Enter MySQL(MariaDB) Opendmarc username you wish to use (Example: opendmarc): "  MYSQL_OPENDMARC_USERNAME
-read -p "Enter MySQL(MariaDB) Opendmarc user password you wish to use: "  MYSQL_OPENDMARC_PASSWORD
+read -p "Enter MySQL(MariaDB) Opendmarc user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_OPENDMARC_PASSWORD
 read -p "Enter MySQL(MariaDB) Ciphermail username you wish to use (Example: ciphermail): "  MYSQL_CIPHERMAIL_USERNAME
-read -p "Enter MySQL(MariaDB) Ciphermail user password you wish to use: "  MYSQL_CIPHERMAIL_PASSWORD
-read -p "Enter Lucee Server and Web Administrator Password you wish to use: "  LUCEE_ADMIN_PASSWORD
+read -p "Enter MySQL(MariaDB) Ciphermail user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_CIPHERMAIL_PASSWORD
+read -p "Enter Lucee Server and Web Administrator Password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  LUCEE_ADMIN_PASSWORD
 read -p "Enter System Mailname (Example: smtp.domain.tld): "  MAIL_NAME
 
 
