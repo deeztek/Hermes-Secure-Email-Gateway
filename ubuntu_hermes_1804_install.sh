@@ -159,7 +159,7 @@ fi
 
 
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 59. Stopping MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 60. Stopping MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Stop MySQL
 /bin/systemctl stop mysql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -167,13 +167,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 59. Stopping MySQL(MariaDB) Database" >
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 1 OF 59: $ERR, occurred during stopping MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 1 OF 60: $ERR, occurred during stopping MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 1 OF 59. Completed stopping MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 1 OF 60. Completed stopping MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 59. Copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 60. Copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create /mnt/data/dbase directory, copy /var/lib/mysql/* to it and change owner to mysql
 /bin/mkdir /mnt/data/dbase && /bin/cp -r /var/lib/mysql/* /mnt/data/dbase && /bin/chown -R mysql:mysql /mnt/data/dbase 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -181,13 +181,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 59. Copying MySQL(MariaDB) data to /mnt
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 2 OF 59: $ERR, occurred during copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 2 OF 60: $ERR, occurred during copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 2 OF 59. Completed copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 2 OF 60. Completed copying MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 59. Reconfiguring MySQL(MariaDB) data directory to /mnt/data/dbase" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 60. Reconfiguring MySQL(MariaDB) data directory to /mnt/data/dbase" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Make backup of /etc/mysql/mariadb.conf.d/50-server.cnf file and reconfigure datadir to /mnt/data/dbase
 /bin/cp /etc/mysql/mariadb.conf.d/50-server.cnf /etc/mysql/mariadb.conf.d/50-server.ORIGINAL && /bin/sed -i -e "s|/var/lib/mysql|/mnt/data/dbase|g" "/etc/mysql/mariadb.conf.d/50-server.cnf" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -195,13 +195,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 59. Reconfiguring MySQL(MariaDB) data d
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 3 OF 59: $ERR, occurred during reconfiguring MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 3 OF 60: $ERR, occurred during reconfiguring MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 3 OF 59. Completed reconfiguring MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 3 OF 60. Completed reconfiguring MySQL(MariaDB) data to /mnt/data/dbase directory" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 59. Configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 60. Configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Make backup of /etc/mysql/my.cnf file and configure MySQL mode
 /bin/cp /etc/mysql/my.cnf /etc/mysql/my.ORIGINAL && /bin/echo "[mysqld]
@@ -210,13 +210,13 @@ sql_mode = STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_B
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 4 OF 59: $ERR, occurred during configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 4 OF 60: $ERR, occurred during configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 4 OF 59. Completed configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 4 OF 60. Completed configuring MySQL(MariaDB) mode" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 59. Starting MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 60. Starting MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Start MySQL
 /bin/systemctl start mysql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -224,13 +224,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 59. Starting MySQL(MariaDB) Database" >
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 5 OF 59: $ERR, occurred during starting MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 5 OF 60: $ERR, occurred during starting MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 5 OF 59. Completed starting MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 5 OF 60. Completed starting MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 59. Started creating Hermes SEG database and assigning user $MYSQL_HERMES_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 60. Started creating Hermes SEG database and assigning user $MYSQL_HERMES_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create hermes database
 /usr/bin/mysql -u $MYSQL_ROOT_USERNAME  -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE hermes CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; GRANT ALL ON hermes.* TO '$MYSQL_HERMES_USERNAME'@'localhost' IDENTIFIED BY '$MYSQL_HERMES_PASSWORD'; GRANT ALL ON hermes.* TO '$MYSQL_HERMES_USERNAME'@'127.0.0.1' IDENTIFIED BY '$MYSQL_HERMES_PASSWORD'; FLUSH PRIVILEGES;" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -238,13 +238,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 59. Started creating Hermes SEG databas
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 6 OF 59: $ERR, occurred during Hermes SEG database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 6 OF 60: $ERR, occurred during Hermes SEG database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 6 OF 59. Completed Hermes SEG database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 6 OF 60. Completed Hermes SEG database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 59. Started creating Syslog database and assigning user $MYSQL_SYSLOG_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 60. Started creating Syslog database and assigning user $MYSQL_SYSLOG_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Syslog database
 /usr/bin/mysql -u $MYSQL_ROOT_USERNAME  -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE Syslog CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; GRANT ALL ON Syslog.* TO '$MYSQL_SYSLOG_USERNAME'@'localhost' IDENTIFIED BY '$MYSQL_SYSLOG_PASSWORD'; GRANT ALL ON Syslog.* TO '$MYSQL_SYSLOG_USERNAME'@'127.0.0.1' IDENTIFIED BY '$MYSQL_SYSLOG_PASSWORD'; FLUSH PRIVILEGES;" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -252,13 +252,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 59. Started creating Syslog database an
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 7 OF 59: $ERR, occurred during Syslog database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 7 OF 60: $ERR, occurred during Syslog database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 7 OF 59. Completed Syslog database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 7 OF 60. Completed Syslog database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 59. Started creating Opendmarc database and assigning user $MYSQL_OPENDMARC_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 60. Started creating Opendmarc database and assigning user $MYSQL_OPENDMARC_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Opendmarc database
 /usr/bin/mysql -u $MYSQL_ROOT_USERNAME  -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE opendmarc CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; GRANT ALL ON opendmarc.* TO '$MYSQL_OPENDMARC_USERNAME'@'localhost' IDENTIFIED BY '$MYSQL_OPENDMARC_PASSWORD'; GRANT ALL ON opendmarc.* TO '$MYSQL_OPENDMARC_USERNAME'@'127.0.0.1' IDENTIFIED BY '$MYSQL_OPENDMARC_PASSWORD'; FLUSH PRIVILEGES;" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -266,13 +266,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 59. Started creating Opendmarc database
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 8 OF 59: $ERR, occurred during Opendmarc database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 8 OF 60: $ERR, occurred during Opendmarc database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 8 OF 59. Completed Opendmarc database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 8 OF 60. Completed Opendmarc database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 59. Started creating Ciphermail database and assigning user $MYSQL_CIPHERMAIL_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 60. Started creating Ciphermail database and assigning user $MYSQL_CIPHERMAIL_USERNAME to it" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create ciphermail database
 /usr/bin/mysql -u $MYSQL_ROOT_USERNAME  -p$MYSQL_ROOT_PASSWORD -e "CREATE DATABASE djigzo CHARACTER SET utf8 COLLATE utf8_general_ci; GRANT ALL ON djigzo.* TO '$MYSQL_CIPHERMAIL_USERNAME'@'localhost' IDENTIFIED BY '$MYSQL_CIPHERMAIL_PASSWORD'; GRANT ALL ON djigzo.* TO '$MYSQL_CIPHERMAIL_USERNAME'@'127.0.0.1' IDENTIFIED BY '$MYSQL_CIPHERMAIL_PASSWORD'; FLUSH PRIVILEGES;" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -280,13 +280,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 59. Started creating Ciphermail databas
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 9 OF 59: $ERR, occurred during Ciphermail database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 9 OF 60: $ERR, occurred during Ciphermail database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 9 OF 59. Completed Ciphermail database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 9 OF 60. Completed Ciphermail database creation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 59. Started creating Hermes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 60. Started creating Hermes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create hermes database schema
 /usr/bin/mysql --user="$MYSQL_ROOT_USERNAME" --password="$MYSQL_ROOT_PASSWORD" --database="hermes" < $SCRIPTPATH/download/hermes/mysql_schema/hermes.sql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -294,13 +294,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 59. Started creating Hermes SEG Databa
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 10 OF 59: $ERR, occurred during creating Hemes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 10 OF 60: $ERR, occurred during creating Hemes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 10 OF 59. Completed creating Hermes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 10 OF 60. Completed creating Hermes SEG Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 11 OF 59. Creating Opendmarc database schema." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 11 OF 60. Creating Opendmarc database schema." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Opendmarc database schema
 /usr/bin/mysql --user="$MYSQL_ROOT_USERNAME" --password="$MYSQL_ROOT_PASSWORD" --database="opendmarc" < $SCRIPTPATH/download/hermes/mysql_schema/opendmarc.sql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -308,13 +308,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 11 OF 59. Creating Opendmarc database schema
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 11 OF 59: $ERR, occurred during creating Opendmarc database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 11 OF 60: $ERR, occurred during creating Opendmarc database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 11 OF 59. Completed creating Opendmarc database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 11 OF 60. Completed creating Opendmarc database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 12 OF 59. Installing OpenJDK 8" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 12 OF 60. Installing OpenJDK 8" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install OpenJDK
 /usr/bin/apt install openjdk-8-jre openjdk-8-jre-headless -y && apt purge openjdk-11* -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -322,14 +322,14 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 12 OF 59. Installing OpenJDK 8" >> $SCRIPTPA
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 12 OF 59: $ERR, occurred during OpenJDK 8 installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 12 OF 60: $ERR, occurred during OpenJDK 8 installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 12 OF 59. Completed installing OpenJDK" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 12 OF 60. Completed installing OpenJDK" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 
-#echo "[`date +%m/%d/%Y-%H:%M`] STEP 12 OF 59. Started installing CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] STEP 12 OF 60. Started installing CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Commandbox
 #/usr/bin/curl -fsSl https://downloads.ortussolutions.com/debs/gpg | sudo apt-key add - && echo "deb https://downloads.ortussolutions.com/debs/noarch /" | sudo tee -a /etc/apt/sources.list.d/commandbox.list && /usr/bin/apt update && /usr/bin/apt install apt-transport-https commandbox -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -337,12 +337,12 @@ fi
 #ERR=$?
 #if [ $ERR != 0 ]; then
 #THEERROR=$(($THEERROR+$ERR))
-#echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 12 OF 59: $ERR, occurred during install of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 12 OF 60: $ERR, occurred during install of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 #else
-#echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 12 OF 59. Completed install of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 12 OF 60. Completed install of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 #fi
 
-#echo "[`date +%m/%d/%Y-%H:%M`] STEP 13 OF 59. Started configuring CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] STEP 13 OF 60. Started configuring CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Copy Lucee .jar files to /root/.CommandBox/engine/cfml/cli/lucee-server/bundles and Configure Commandbox
 #cp $SCRIPTPATH/download/lucee/* /root/.CommandBox/engine/cfml/cli/lucee-server/bundles && /usr/local/bin/box version 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -350,9 +350,9 @@ fi
 #ERR=$?
 #if [ $ERR != 0 ]; then
 #THEERROR=$(($THEERROR+$ERR))
-#echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 13 OF 59: $ERR, occurred during configuring of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 13 OF 60: $ERR, occurred during configuring of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 #else
-#echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 13 OF 59. Completed configuring of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 13 OF 60. Completed configuring of CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 #fi
 
 echo "Starting installation of rsyslog-mysql package"
@@ -363,13 +363,13 @@ echo "During installation of rsyslog-mysql package, you will be prompted to conf
 while true; do
     read -p "Do you wish to continue the installation of rsyslog-mysql package? (Enter y or Y. Warning!! Entering n or N will exit this script and the installation will fail!)" yn
     case $yn in
-        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 13 OF 59: Installing rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /usr/bin/apt install rsyslog-mysql -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 13 OF 59: Completed Installing rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
+        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 13 OF 60: Installing rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /usr/bin/apt install rsyslog-mysql -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 13 OF 60: Completed Installing rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
 done
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 14 OF 59. Started configuring rsyslog-mysql." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 14 OF 60. Started configuring rsyslog-mysql." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Make backup /etc/rsyslog.d/mysql.conf and configure /etc/rsylog.d/mysql.conf
 /bin/cp /etc/rsyslog.d/mysql.conf /etc/rsyslog.d/mysql.ORIGINAL &&  /bin/sed -i -e "s|rsyslog|${MYSQL_SYSLOG_USERNAME}|g" /etc/rsyslog.d/mysql.conf && /bin/sed -i -e 's|pwd=""|pwd="MYSQL_SYSLOG_PASSWORD"|g' /etc/rsyslog.d/mysql.conf && /bin/sed -i -e "s|MYSQL_SYSLOG_PASSWORD|${MYSQL_SYSLOG_PASSWORD}|g" /etc/rsyslog.d/mysql.conf 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -377,13 +377,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 14 OF 59. Started configuring rsyslog-mysql.
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 14 OF 59: $ERR, occurred during configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 14 OF 60: $ERR, occurred during configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 14 OF 59. Completed configuring configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 14 OF 60. Completed configuring configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 15 OF 59. Creating rsyslog-mysql database schema." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 15 OF 60. Creating rsyslog-mysql database schema." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create rsyslog-mysql database schema
 /usr/bin/mysql --user="$MYSQL_ROOT_USERNAME" --password="$MYSQL_ROOT_PASSWORD" --database="Syslog" < $SCRIPTPATH/download/hermes/mysql_schema/Syslog.sql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -391,13 +391,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 15 OF 59. Creating rsyslog-mysql database sc
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 15 OF 59: $ERR, occurred during creating rsyslog-mysql database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 15 OF 60: $ERR, occurred during creating rsyslog-mysql database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 15 OF 59. Completed creating rsyslog-mysql database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 15 OF 60. Completed creating rsyslog-mysql database schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 16 OF 59. Restarting rsyslog-mysql." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 16 OF 60. Restarting rsyslog-mysql." >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Restart rsyslog-mysql
 /bin/systemctl restart rsyslog 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -405,13 +405,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 16 OF 59. Restarting rsyslog-mysql." >> $SCR
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 16 OF 59: $ERR, occurred during configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 16 OF 60: $ERR, occurred during configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 16 OF 59. Completed configuring configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 16 OF 60. Completed configuring configuring rsyslog-mysql" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 17 OF 59. Installing dos2unix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 17 OF 60. Installing dos2unix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install dos2unix
 /usr/bin/apt install dos2unix -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -419,13 +419,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 17 OF 59. Installing dos2unix" >> $SCRIPTPAT
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 17 OF 59: $ERR, occurred during dos2unix installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 17 OF 60: $ERR, occurred during dos2unix installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 17 OF 59. Completed installing dos2unix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 17 OF 60. Completed installing dos2unix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 18 OF 59. Creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 18 OF 60. Creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #mkdir /opt/hermes directory, copy files, make scripts executable and ensure scripts are in unix format (probably unnecessary)
 /bin/mkdir /opt/hermes && \
@@ -446,13 +446,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 18 OF 59. Creating Hermes SEG directory stru
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 18 OF 59: $ERR, occurred during creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 18 OF 60: $ERR, occurred during creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 18 OF 59. Completed creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 18 OF 60. Completed creating Hermes SEG directory structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 59. Installing cifs-utils, 7zip, sendemail and haveged" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 60. Installing cifs-utils, 7zip, sendemail and haveged" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install cifs-tuils, 7zip, sendemail and haveged
 /usr/bin/apt install cifs-utils p7zip p7zip-rar sendemail haveged -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -460,13 +460,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 59. Installing cifs-utils, 7zip, sende
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 19 OF 59: $ERR, occurred during cifs-utils, 7zip, sendemail and haveged installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 19 OF 60: $ERR, occurred during cifs-utils, 7zip, sendemail and haveged installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 19 OF 59. Completed installing cifs-utils, 7zip, sendemail and haveged" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 19 OF 60. Completed installing cifs-utils, 7zip, sendemail and haveged" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 59. Installing GnuPG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 60. Installing GnuPG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install gnupg
 /usr/bin/apt install gnupg -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -474,13 +474,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 59. Installing GnuPG" >> $SCRIPTPATH/i
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 20 OF 59: $ERR, occurred during GnuPG installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 20 OF 60: $ERR, occurred during GnuPG installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 20 OF 59. Completed installing GnuPG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 20 OF 60. Completed installing GnuPG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 21 OF 59. Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 21 OF 60. Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #set GnuPG directory permissions
 /bin/mkdir /opt/hermes/.gnupg && /bin/chmod -R go-rwx /opt/hermes/.gnupg/ 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -488,13 +488,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 21 OF 59. Creating GnuPG directory and setti
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 21 OF 59: $ERR, occurred during Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 21 OF 60: $ERR, occurred during Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 21 OF 59. Completed Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 21 OF 60. Completed Creating GnuPG directory and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 22 OF 59. Installing ClamAV" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 22 OF 60. Installing ClamAV" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install ClamAV
 /usr/bin/apt install clamav clamav-daemon -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -502,13 +502,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 22 OF 59. Installing ClamAV" >> $SCRIPTPATH/
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 22 OF 59: $ERR, occurred during ClamAV installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 22 OF 60: $ERR, occurred during ClamAV installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 22 OF 59. Completed installing ClamAV" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 22 OF 60. Completed installing ClamAV" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 23 OF 59. Installing and Configuring amavisd-new" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 23 OF 60. Installing and Configuring amavisd-new" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install and configure amavisd-new
 /bin/echo $MAIL_NAME > /etc/mailname && /bin/hostname $MAIL_NAME && /usr/bin/apt install amavisd-new -y && /usr/sbin/adduser clamav amavis 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -516,13 +516,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 23 OF 59. Installing and Configuring amavisd
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 23 OF 59: $ERR, occurred during amavisd-new installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 23 OF 60: $ERR, occurred during amavisd-new installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 23 OF 59. Completed amavisd-new installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 23 OF 60. Completed amavisd-new installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 24 OF 59. Creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 24 OF 60. Creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create amavis directories under /mnt/data/ and set permissions
 /bin/mkdir /mnt/data/amavis && \
@@ -536,13 +536,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 24 OF 59. Creating amavisd-new directories a
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 24 OF 59: $ERR, occurred during creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 24 OF 60: $ERR, occurred during creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 24 OF 59. Completed creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 24 OF 60. Completed creating amavisd-new directories and setting permissions" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 25 OF 59. Installing spamassassin, razor and pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 25 OF 60. Installing spamassassin, razor and pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install spamassassin, razor pyzor
 /usr/bin/apt install spamassassin razor pyzor -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -550,13 +550,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 25 OF 59. Installing spamassassin, razor and
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 25 OF 59: $ERR, occurred during spamassassin, razor and pyzor installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 25 OF 60: $ERR, occurred during spamassassin, razor and pyzor installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 25 OF 59. Completed installing spamassassin, razor and pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 25 OF 60. Completed installing spamassassin, razor and pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 26 OF 59. Configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 26 OF 60. Configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Spamassassin
 /bin/cp /etc/default/spamassassin /etc/default/spamassassin.ORIGINAL && \
@@ -568,13 +568,13 @@ systemctl restart amavis 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 26 OF 59: $ERR, occurred during configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 26 OF 60: $ERR, occurred during configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 26 OF 59. Completed configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 26 OF 60. Completed configuring Spamassassin" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 27 OF 59. Configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 27 OF 60. Configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Pyzor
 /usr/bin/pyzor ping 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -582,13 +582,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 27 OF 59. Configuring Pyzor" >> $SCRIPTPATH/
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 27 OF 59: $ERR, occurred during configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 27 OF 60: $ERR, occurred during configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 27 OF 59. Completed configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 27 OF 60. Completed configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 26 OF 59. Configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 26 OF 60. Configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Razor
 /bin/rm /etc/razor/razor-agent.conf && \
@@ -598,13 +598,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 26 OF 59. Configuring Razor" >> $SCRIPTPATH/
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 26 OF 59: $ERR, occurred during configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 26 OF 60: $ERR, occurred during configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 26 OF 59. Completed configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 26 OF 60. Completed configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 27 OF 59. Installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 27 OF 60. Installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install DCC
 cd $SCRIPTPATH/download/dcc/dcc-2.3.167 && \
@@ -618,13 +618,13 @@ ln -s /var/dcc/libexec/dccifd /usr/local/bin/dccifd 2>> $SCRIPTPATH/install_log-
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 27 OF 59: $ERR, occurred during installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 27 OF 60: $ERR, occurred during installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 27 OF 59. Completed installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 27 OF 60. Completed installing DCC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 28 OF 59. Configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 28 OF 60. Configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure DCC and enable in SA
 /usr/local/bin/cdcc info && \
@@ -635,10 +635,10 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 28 OF 59. Configuring DCC and enabling in SA
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 28 OF 59: $ERR, occurred during configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 28 OF 60: $ERR, occurred during configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 28 OF 59. Completed configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 28 OF 60. Completed configuring DCC and enabling in SA" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 echo "==== WARNING ====" | boxes -d stone -p a2v1
@@ -647,13 +647,13 @@ echo "During installation of Postfix package, you will be prompted to select a m
 while true; do
     read -p "Do you wish to continue the installation of Postfix package? (Enter y or Y. Warning!! Entering n or N will exit this script and the installation will fail!)" yn
     case $yn in
-        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 29 OF 59: Installing Postfix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /usr/bin/apt install postfix postfix-mysql postfix-ldap postfix-pcre -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 29 OF 59: Completed Installing Postfix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
+        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 29 OF 60: Installing Postfix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /usr/bin/apt install postfix postfix-mysql postfix-ldap postfix-pcre -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 29 OF 60: Completed Installing Postfix" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
 done
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 30 OF 59. Installing Extractors" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 30 OF 60. Installing Extractors" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #install extractors
 /usr/bin/apt install arj bzip2 cabextract cpio file gzip lhasa nomarch pax rar unrar unzip zip -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -661,15 +661,15 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 30 OF 59. Installing Extractors" >> $SCRIPTP
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 30 OF 59: $ERR, occurred during extractors installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 30 OF 60: $ERR, occurred during extractors installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 30 OF 59. Completed installing extractors" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 30 OF 60. Completed installing extractors" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 31 OF 59. Configuring ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 31 OF 60. Configuring ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure ClamAV WhiteList
 /bin/systemctl stop clamav-daemon && \
@@ -681,13 +681,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 31 OF 59. Configuring ClamAV Whitelist" >> $
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 31 OF 59: $ERR, occurred during ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 31 OF 60: $ERR, occurred during ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 31 OF 59. Completed ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 31 OF 60. Completed ClamAV Whitelist" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 32 OF 59. Removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 32 OF 60. Removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Remove any existing clamav-unofficial-sigs
 /usr/bin/apt purge -y clamav-unofficial-sigs 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -695,13 +695,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 32 OF 59. Removing any existing clamav-unoff
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 32 OF 59: $ERR, occurred during removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 32 OF 60: $ERR, occurred during removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 32 OF 59. Completed removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 32 OF 60. Completed removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 33 OF 59. Installing and configuring extremeshok clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 33 OF 60. Installing and configuring extremeshok clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install and configure extremeshok clamav-unofficial-sigs
 /bin/mkdir -p /usr/local/sbin/ && \
@@ -720,13 +720,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 33 OF 59. Installing and configuring extreme
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 33 OF 59: $ERR, occurred during extremeshok clamav-unofficial-sigs installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 33 OF 60: $ERR, occurred during extremeshok clamav-unofficial-sigs installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 33 OF 59. Completed extremeshok clamav-unofficial-sigs installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 33 OF 60. Completed extremeshok clamav-unofficial-sigs installation and configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 34 OF 59. Copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 34 OF 60. Copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Copy Postfix and amavisd-new configuration files
 /bin/cp -r $SCRIPTPATH/download/postfix/* /etc/postfix && \
@@ -735,13 +735,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 34 OF 59. Copying Postfix and amavisd-new co
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 34 OF 59: $ERR, occurred during copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 34 OF 60: $ERR, occurred during copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 34 OF 59. Completed copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 34 OF 60. Completed copying Postfix and amavisd-new configuration files" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 35 OF 59. Installing SPF" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 35 OF 60. Installing SPF" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install SPF
 /usr/bin/apt install postfix-policyd-spf-python -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -749,13 +749,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 35 OF 59. Installing SPF" >> $SCRIPTPATH/ins
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 35 OF 59: $ERR, occurred during SPF installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 35 OF 60: $ERR, occurred during SPF installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 35 OF 59. Completed installing SPF" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 35 OF 60. Completed installing SPF" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 36 OF 59. Installing DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 36 OF 60. Installing DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install DKIM
 /usr/bin/apt install opendkim opendkim-tools -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -763,13 +763,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 36 OF 59. Installing DKIM" >> $SCRIPTPATH/in
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 36 OF 59: $ERR, occurred during DKIM installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 36 OF 60: $ERR, occurred during DKIM installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 36 OF 59. Completed installing DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 36 OF 60. Completed installing DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 37 OF 59. Configuring DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 37 OF 60. Configuring DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure DKIM
 /usr/sbin/usermod -a -G opendkim postfix && \
@@ -780,13 +780,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 37 OF 59. Configuring DKIM" >> $SCRIPTPATH/i
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 37 OF 59: $ERR, occurred during DKIM configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 37 OF 60: $ERR, occurred during DKIM configuration" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 37 OF 59. Completed configuring DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 37 OF 60. Completed configuring DKIM" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 38 OF 59. Installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 38 OF 60. Installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Apache
 /usr/bin/apt install apache2 -y && \
@@ -797,13 +797,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 38 OF 59. Installing Apache and enabling SSL
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 38 OF 59: $ERR, occurred during installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 38 OF 60: $ERR, occurred during installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 38 OF 59. Completed installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 38 OF 60. Completed installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 59. Started Downloading Ciphermail Back-End from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 60. Started Downloading Ciphermail Back-End from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Ciphermail Back-End
 /usr/bin/wget -O $SCRIPTPATH/djigzo_4.5.0-0_all.deb --no-check-certificate https://www.ciphermail.com/downloads/djigzo-release-4.5.0-0/djigzo_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -811,13 +811,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 59. Started Downloading Ciphermail Bac
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 39 OF 59: $ERR, occurred during dowload of Ciphermail Back-End" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 39 OF 60: $ERR, occurred during dowload of Ciphermail Back-End" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 39 OF 59. Completed download of Ciphermail Back-End" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 39 OF 60. Completed download of Ciphermail Back-End" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 59. Started Downloading Ciphermail Web GUI from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 60. Started Downloading Ciphermail Web GUI from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Ciphermail Web GUI
 /usr/bin/wget -O $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb --no-check-certificate https://www.ciphermail.com/downloads/djigzo-release-4.5.0-0/djigzo-web_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -825,13 +825,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 59. Started Downloading Ciphermail Web
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 40 OF 59: $ERR, occurred during dowload of Ciphermail Web GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 40 OF 60: $ERR, occurred during dowload of Ciphermail Web GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 40 OF 59. Completed download of Ciphermail Web GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 40 OF 60. Completed download of Ciphermail Web GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 41 OF 59. Installing Ciphermail Prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 41 OF 60. Installing Ciphermail Prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail prerequisites
 /usr/bin/apt install ant ant-optional libsasl2-modules symlinks -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -839,13 +839,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 41 OF 59. Installing Ciphermail Prerequisite
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 41 OF 59: $ERR, occurred during installing Ciphermail prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 41 OF 60: $ERR, occurred during installing Ciphermail prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 41 OF 59. Completed installing Ciphermail prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 41 OF 60. Completed installing Ciphermail prerequisites" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 42 OF 59. Installing Ciphermail Back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 42 OF 60. Installing Ciphermail Back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail back-end
 /usr/bin/dpkg -i $SCRIPTPATH/djigzo_4.5.0-0_all.deb && /bin/systemctl restart djigzo 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -853,13 +853,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 42 OF 59. Installing Ciphermail Back-end" >>
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 42 OF 59: $ERR, occurred during installing Ciphermail back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 42 OF 60: $ERR, occurred during installing Ciphermail back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 42 OF 59. Completed installing Ciphermail back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 42 OF 60. Completed installing Ciphermail back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 43 OF 59. Installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 43 OF 60. Installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail Web-GUI
 /usr/bin/dpkg -i $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -867,13 +867,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 43 OF 59. Installing Ciphermail Web-GUI" >> 
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 43 OF 59: $ERR, occurred during installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 43 OF 60: $ERR, occurred during installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 43 OF 59. Completed installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 43 OF 60. Completed installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 44 OF 59. Installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 44 OF 60. Installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Tomcat
 /usr/bin/apt install tomcat8 -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -881,13 +881,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 44 OF 59. Installing Apache Tomcat" >> $SCRI
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 44 OF 59: $ERR, occurred during installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 44 OF 60: $ERR, occurred during installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 44 OF 59. Completed installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 44 OF 60. Completed installing Apache Tomcat" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 45 OF 59. Configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 45 OF 60. Configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Apache Tomcat for ciphermail
 /bin/cp /etc/default/tomcat8 /etc/default/tomcat8.ORIGINAL && \
@@ -903,13 +903,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 45 OF 59. Configuring Apache Tomcat for Ciph
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 45 OF 59: $ERR, occurred during configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 45 OF 60: $ERR, occurred during configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 45 OF 59. Completed configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 45 OF 60. Completed configuring Apache Tomcat for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 46 OF 59. Configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 46 OF 60. Configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure MariaDB for Ciphermail
 /bin/cp $SCRIPTPATH/download/ciphermail/ciphermail.cnf /etc/mysql/conf.d/ciphermail.cnf && \
@@ -918,13 +918,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 46 OF 59. Configuring MySQL(MariaDB) for Cip
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 46 OF 59: $ERR, occurred during configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 46 OF 60: $ERR, occurred during configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 46 OF 59. Completed configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 46 OF 60. Completed configuring MySQL(MariaDB) for Ciphermail" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 47 OF 59. Started creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 47 OF 60. Started creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Ciphermail database schema
 /usr/bin/mysql --user="$MYSQL_ROOT_USERNAME" --password="$MYSQL_ROOT_PASSWORD" --database="djigzo" < /usr/share/djigzo/conf/database/sql/djigzo.mysql.sql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -932,13 +932,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 47 OF 59. Started creating Ciphermail Databa
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 47 OF 59: $ERR, occurred during creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 47 OF 60: $ERR, occurred during creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 47 OF 59. Completed creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 47 OF 60. Completed creating Ciphermail Database Schema" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 48 OF 59. Add Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 48 OF 60. Add Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Add Ciphermail Hermes SEG MySQL Customizations
 /usr/bin/mysql --user="$MYSQL_ROOT_USERNAME" --password="$MYSQL_ROOT_PASSWORD" --database="djigzo" < $SCRIPTPATH/download/ciphermail/ciphermail_hermes.sql 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -946,13 +946,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 48 OF 59. Add Ciphermail Hermes SEG MySQL Cu
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 48 OF 59: $ERR, occurred during Adding Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 48 OF 60: $ERR, occurred during Adding Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 48 OF 59. Completed Adding Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 48 OF 60. Completed Adding Ciphermail Hermes SEG MySQL Customizations" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 49 OF 59. Configuring Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 49 OF 60. Configuring Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Ciphermail for MySQL
 /bin/echo "-Dciphermail.hibernate.database.type=mysql" | sudo tee -a /usr/share/djigzo/wrapper/wrapper-additional-parameters.conf && \
@@ -964,13 +964,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 49 OF 59. Configuring Ciphermail for MySQL(M
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 49 OF 59: $ERR, occurred during configuring Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 49 OF 60: $ERR, occurred during configuring Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 49 OF 59. Completed creating Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 49 OF 60. Completed creating Ciphermail for MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 50 OF 59. Started Downloading Lucee from https://cdn.lucee.org/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 50 OF 60. Started Downloading Lucee from https://cdn.lucee.org/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Lucee
 /usr/bin/wget -O $SCRIPTPATH/lucee-5.2.9.031-pl0-linux-x64-installer.run --no-check-certificate https://cdn.lucee.org/lucee-5.2.9.031-pl0-linux-x64-installer.run 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -978,13 +978,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 50 OF 59. Started Downloading Lucee from htt
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 50 OF 59: $ERR, occurred during dowload of Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 50 OF 60: $ERR, occurred during dowload of Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 50 OF 59. Completed download of Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 50 OF 60. Completed download of Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 51 OF 59. Installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 51 OF 60. Installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Lucee
 /bin/sed -i -e "s|LUCEE-PASSWORD|$LUCEE_ADMIN_PASSWORD|g" "$SCRIPTPATH/download/lucee_install/lucee_install_options.txt" && \
@@ -994,13 +994,13 @@ $SCRIPTPATH/lucee-5.2.9.031-pl0-linux-x64-installer.run --mode unattended --opti
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 51 OF 59: $ERR, occurred during installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 51 OF 60: $ERR, occurred during installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 51 OF 59. Completed installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 51 OF 60. Completed installing Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 52 OF 59. Creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 52 OF 60. Creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Hermes SEG Web Directory Structure
 /bin/cp -r $SCRIPTPATH/dirstructure/var/www/html/admin/ /var/www/html/ && \
@@ -1011,13 +1011,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 52 OF 59. Creating Hermes SEG Web Directory 
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 52 OF 59: $ERR, occurred during creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 52 OF 60: $ERR, occurred during creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 52 OF 59. Completed Creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 52 OF 60. Completed Creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 53 OF 59. Copy Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 53 OF 60. Copy Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Copy Hermes SEG POP4 extension
 /bin/cp -r $SCRIPTPATH/dirstructure/opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components/hermes /opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -1025,13 +1025,27 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 53 OF 59. Copy Hermes SEG POP4 extension" >>
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 53 OF 59: $ERR, occurred during copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 53 OF 60: $ERR, occurred during copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 53 OF 59. Completed copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 53 OF 60. Completed copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 59. Configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Copy Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+#Copy Lucee Mappings
+/bin/cp $SCRIPTPATH/dirstructure/opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.xml 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+ERR=$?
+if [ $ERR != 0 ]; then
+THEERROR=$(($THEERROR+$ERR))
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 60: $ERR, occurred during copying Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+exit 1
+else
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 60. Completed copying Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+fi
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 55 OF 60. Configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Apache for Hermes SEG
 /usr/sbin/a2dissite 000-default.conf && \
@@ -1044,13 +1058,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 59. Configuring Apache for Hermes SEG"
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 59: $ERR, occurred during configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 55 OF 60: $ERR, occurred during configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 59. Completed configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 55 OF 60. Completed configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 55 OF 59. Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 56 OF 60. Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Configure Hermes SEG Application Datasources
 /bin/sed -i -e "s|HERMES_DATASOURCE_USERNAME|$MYSQL_HERMES_USERNAME|g" "/var/www/html/admin/Application.cfc" && \
@@ -1075,13 +1089,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 55 OF 59. Configuring Hermes SEG Application
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 55 OF 59: $ERR, occurred during Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 56 OF 60: $ERR, occurred during Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 55 OF 59. Completed Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 56 OF 60. Completed Configuring Hermes SEG Application Datasources" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 56 OF 59. Installing and configuring Lynx browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 57 OF 60. Installing and configuring Lynx browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install and configure Lynx browser
 /usr/bin/apt install lynx -y && \
@@ -1092,13 +1106,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 56 OF 59. Installing and configuring Lynx br
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 56 OF 59: $ERR, occurred during installing and configuring Lynx Browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 57 OF 60: $ERR, occurred during installing and configuring Lynx Browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS 56 65 OF 59. Completed installing and configuring Lynx Browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS 57 OF 60. Completed installing and configuring Lynx Browser" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 57 OF 59. Creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 58 OF 60. Creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Hermes SEG Scheduled Tasks
 /bin/cp $SCRIPTPATH/download/hermes/create_scheduled_tasks.cfm /var/www/html/schedule/ && \
@@ -1108,10 +1122,10 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 57 OF 59. Creating Hermes SEG Scheduled Task
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 57 OF 59: $ERR, occurred during creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 58 OF 60: $ERR, occurred during creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 57 OF 59. Completed creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 58 OF 60. Completed creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 echo "==== WARNING ====" | boxes -d stone -p a2v1
@@ -1121,13 +1135,13 @@ echo "During installation of Opendmarc, you will be prompted to configure databa
 while true; do
     read -p "Do you wish to continue the installation of Opendmarc? (Enter y or Y. Warning!! Entering n or N will exit this script and the installation will fail!)" yn
     case $yn in
-        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 58 OF 59: Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /bin/cp /etc/apt/sources.list /etc/apt/sources.list.ORIGINAL && /bin/echo "deb http://cz.archive.ubuntu.com/ubuntu eoan main universe" | sudo tee -a /etc/apt/sources.list && /usr/bin/apt update && /usr/bin/apt install opendmarc -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 58 OF 59: Completed Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
+        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 60: Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /bin/cp /etc/apt/sources.list /etc/apt/sources.list.ORIGINAL && /bin/echo "deb http://cz.archive.ubuntu.com/ubuntu eoan main universe" | sudo tee -a /etc/apt/sources.list && /usr/bin/apt update && /usr/bin/apt install opendmarc -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 59 OF 60: Completed Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
 done
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 59. Configuring Opendmarc. Please note, an error will be generated during configuration of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc will work normally after reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 60 OF 60. Configuring Opendmarc. Please note, an error will be generated during configuration of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc will work normally after reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 
 /bin/cp /etc/apt/sources.list.ORIGINAL /etc/apt/sources.list && \
@@ -1139,11 +1153,11 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 59. Configuring Opendmarc. Please note
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 59 OF 59: $ERR, occurred during Opendmarc configuration. Please note, This is expected behavior with Ubuntu 18.04 and Opendmarc should work normally after a reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 60 OF 60: $ERR, occurred during Opendmarc configuration. Please note, This is expected behavior with Ubuntu 18.04 and Opendmarc should work normally after a reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 #Do not exit on Opendmarc error since it's expected and SHOULD work after reboot
 #exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 59 OF 59. Completed configuring Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 60 OF 60. Completed configuring Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 echo "[`date +%m/%d/%Y-%H:%M`] ==== FINISHED INSTALLATION ==== Ensure no errors were logged during installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
