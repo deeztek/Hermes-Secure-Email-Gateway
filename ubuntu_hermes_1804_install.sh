@@ -1127,7 +1127,7 @@ while true; do
     esac
 done
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 59. Configuring Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 59. Configuring Opendmarc. Please note, an error will be generated during configuration of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc will work normally after reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 
 /bin/cp /etc/apt/sources.list.ORIGINAL /etc/apt/sources.list && \
