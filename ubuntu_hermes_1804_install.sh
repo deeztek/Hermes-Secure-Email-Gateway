@@ -583,7 +583,7 @@ ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
 echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 27 OF 60: $ERR, occurred during configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-exit 1
+#exit 1
 else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 27 OF 60. Completed configuring Pyzor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
@@ -599,7 +599,7 @@ ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
 echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 26 OF 60: $ERR, occurred during configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-exit 1
+#exit 1
 else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 26 OF 60. Completed configuring Razor" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
