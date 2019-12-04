@@ -1031,18 +1031,18 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 53 OF 60. Completed copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Copy Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Copy Lucee Mappings and Restart Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Copy Lucee Mappings
-/bin/cp $SCRIPTPATH/dirstructure/opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.xml 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/bin/cp $SCRIPTPATH/dirstructure/opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.xml && /etc/init.d/lucee_ctl restart 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 60: $ERR, occurred during copying Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 60: $ERR, occurred during copying Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 60. Completed copying Lucee Mappings" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 60. Completed copying Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 55 OF 60. Configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
