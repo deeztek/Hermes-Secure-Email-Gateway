@@ -11,7 +11,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="01:00"
 requesttimeout="10800"
-url="https://localhost:9080/schedule/message_cleanup.cfm"
+url="http://localhost:8080/schedule/message_cleanup.cfm"
 interval="daily">
 
 <cfschedule action="update"
@@ -20,7 +20,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="00:30"
 requesttimeout="3600"
-url="https://localhost:9080/schedule/quarantine_report_daily.cfm"
+url="http://localhost:8080/schedule/quarantine_report_daily.cfm"
 interval="daily">
 
 <cfschedule action="update"
@@ -29,7 +29,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="00:30"
 requesttimeout="3600"
-url="https://localhost:9080/schedule/quarantine_report_daily.cfm"
+url="http://localhost:8080/schedule/quarantine_report_daily.cfm"
 interval="daily">
 
 <cfschedule action="update"
@@ -38,7 +38,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="04:05"
 requesttimeout="3600"
-url="https://localhost:9080/schedule/quarantine_report.cfm?frequency=4"
+url="http://localhost:8080/schedule/quarantine_report.cfm?frequency=4"
 interval="240">
 
 <cfschedule action="update"
@@ -47,7 +47,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="08:10"
 requesttimeout="3600"
-url="https://localhost:9080/schedule/quarantine_report.cfm?frequency=8"
+url="http://localhost:8080/schedule/quarantine_report.cfm?frequency=8"
 interval="480">
 
 <cfschedule action="update"
@@ -56,7 +56,7 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="02:00"
 requesttimeout="3600"
-url="https://localhost:9080/schedule/quarantine_report.cfm?frequency=2"
+url="http://localhost:8080/schedule/quarantine_report.cfm?frequency=2"
 interval="120">
 
 <cfschedule action="update"
@@ -65,5 +65,5 @@ operation="HTTPRequest"
 startdate="#date1#"
 starttime="0:45"
 requesttimeout="7200"
-url="https://localhost:9080/schedule/dmarc_report.cfm"
+url="http://localhost:8080/schedule/dmarc_report.cfm"
 interval="daily">
