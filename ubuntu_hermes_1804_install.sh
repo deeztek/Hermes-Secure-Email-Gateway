@@ -104,6 +104,7 @@ while true; do
     esac
 done
 
+#Set Default username for MySQL root
 MYSQL_ROOT_USERNAME=root
 
 read -p "Enter MySQL(MariaDB) root user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_ROOT_PASSWORD
@@ -111,11 +112,11 @@ read -p "Enter MySQL(MariaDB) Hermes SEG user username you wish to use (Example:
 read -p "Enter MySQL(MariaDB) Hermes SEG user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_HERMES_PASSWORD
 read -p "Enter MySQL(MariaDB) Syslog username you wish to use (Example: rsyslog): "  MYSQL_SYSLOG_USERNAME
 read -p "Enter MySQL(MariaDB) Syslog user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_SYSLOG_PASSWORD
-read -p "Enter MySQL(MariaDB) Opendmarc username you wish to use (Example: opendmarc): "  MYSQL_OPENDMARC_USERNAME
-read -p "Enter MySQL(MariaDB) Opendmarc user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_OPENDMARC_PASSWORD
 read -p "Enter MySQL(MariaDB) Ciphermail username you wish to use (Example: ciphermail): "  MYSQL_CIPHERMAIL_USERNAME
 read -p "Enter MySQL(MariaDB) Ciphermail user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_CIPHERMAIL_PASSWORD
-read -p "Enter Lucee Server and Web Administrator Password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  LUCEE_ADMIN_PASSWORD
+read -p "Enter MySQL(MariaDB) Opendmarc username you wish to use (Example: opendmarc): "  MYSQL_OPENDMARC_USERNAME
+read -p "Enter MySQL(MariaDB) Opendmarc user password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  MYSQL_OPENDMARC_PASSWORD
+read -p "Enter Lucee Server and Web Administrator password you wish to use (Ensure you do NOT use $ , single or double quote special characters to form your password): "  LUCEE_ADMIN_PASSWORD
 read -p "Enter System Mailname (Example: smtp.domain.tld): "  MAIL_NAME
 
 
@@ -1031,18 +1032,20 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 53 OF 60. Completed copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Copy Lucee Mappings and Restart Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Create Lucee Mappings and Restart Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
-#Copy Lucee Mappings
-/bin/cp $SCRIPTPATH/dirstructure/opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.xml && /etc/init.d/lucee_ctl restart 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#create Lucee Mappings and restart Lucee
+/bin/cp /opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.bak && \
+/bin/sed -i 's|<mapping archive="{lucee-config}/context/lucee-doc.lar" inspect-template="once" primary="archive" readonly="true" toplevel="true" virtual="/lucee/doc"/>|&<mapping inspect-template="once" physical="/var/www/html/schedule" primary="physical" readonly="false" toplevel="true" virtual="/schedule"/><mapping inspect-template="once" physical="/var/www/html/admin" primary="physical" readonly="false" toplevel="true" virtual="/admin"/><mapping inspect-template="once" physical="/var/www/html/users" primary="physical" readonly="false" toplevel="true" virtual="/users"/><mapping inspect-template="once" physical="/var/www/html/main" primary="physical" readonly="false" toplevel="true" virtual="/main"/>|' /opt/lucee/tomcat/lucee-server/context/lucee-server.xml && \
+/etc/init.d/lucee_ctl restart 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 60: $ERR, occurred during copying Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 54 OF 60: $ERR, occurred during creating Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 60. Completed copying Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 54 OF 60. Completed creating Lucee Mappings and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 55 OF 60. Configuring Apache for Hermes SEG" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
