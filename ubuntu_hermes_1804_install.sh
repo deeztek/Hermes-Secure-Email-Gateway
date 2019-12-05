@@ -1018,7 +1018,7 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 52 OF 60. Completed Creating Hermes SEG Web Directory Structure" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 53 OF 60. Copy Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 53 OF 60. Copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Copy Hermes SEG POP4 extension
 /bin/cp -r $SCRIPTPATH/dirstructure/opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components/hermes /opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -1032,9 +1032,9 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 53 OF 60. Completed copying Hermes SEG POP4 extension" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Create Lucee Mappings and Restart Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 54 OF 60. Creating Lucee Mappings and Restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
-#create Lucee Mappings and restart Lucee
+#create Lucee mappings and restart Lucee
 /bin/cp /opt/lucee/tomcat/lucee-server/context/lucee-server.xml /opt/lucee/tomcat/lucee-server/context/lucee-server.bak && \
 /bin/sed -i 's|<mapping archive="{lucee-config}/context/lucee-doc.lar" inspect-template="once" primary="archive" readonly="true" toplevel="true" virtual="/lucee/doc"/>|&<mapping inspect-template="once" physical="/var/www/html/schedule" primary="physical" readonly="false" toplevel="true" virtual="/schedule"/><mapping inspect-template="once" physical="/var/www/html/admin" primary="physical" readonly="false" toplevel="true" virtual="/admin"/><mapping inspect-template="once" physical="/var/www/html/users" primary="physical" readonly="false" toplevel="true" virtual="/users"/><mapping inspect-template="once" physical="/var/www/html/main" primary="physical" readonly="false" toplevel="true" virtual="/main"/>|' /opt/lucee/tomcat/lucee-server/context/lucee-server.xml && \
 /etc/init.d/lucee_ctl restart 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
