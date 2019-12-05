@@ -26,35 +26,41 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 9. STARTED FILE EXTRACTION" >> $BACKUPS
 cd /
 /usr/bin/unrar x -y $BACKUPS/$THEFILE -x'*.sql' >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 9. COMPLETED FILE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 10. COMPLETED FILE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 9. STARTED DATABASE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 10. STARTED DATABASE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /bin/mkdir $BACKUPS/$TRANSACTION
 
 /usr/bin/unrar x -y $BACKUPS/$THEFILE mnt/hermesbackups/dbbkup/* $BACKUPS/$TRANSACTION  >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 9. COMPLETED DATABASE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 2 OF 10. COMPLETED DATABASE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 9. STARTED HERMES DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 10. STARTED HERMES DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /usr/bin/mysql -u $MYSQLUSER -p$MYSQLPASS hermes < $BACKUPS/$TRANSACTION/mnt/hermesbackups/dbbkup/hermes.sql
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 9. COMPLETED HERMES DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 3 OF 10. COMPLETED HERMES DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 9. STARTED DJIGZO DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 10. STARTED DJIGZO DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /usr/bin/mysql -u $MYSQLUSER -p$MYSQLPASS djigzo < $BACKUPS/$TRANSACTION/mnt/hermesbackups/dbbkup/djigzo.sql
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 9. COMPLETED DJIGZO DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 4 OF 10. COMPLETED DJIGZO DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 9. STARTED SYSLOG DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 10. STARTED SYSLOG DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /usr/bin/mysql -u $MYSQLUSER -p$MYSQLPASS Syslog < $BACKUPS/$TRANSACTION/mnt/hermesbackups/dbbkup/syslog.sql
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 9. COMPLETED SYSLOG DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 5 OF 10. COMPLETED SYSLOG DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 9. STARTED PERMISSIONS ADJUST" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 10. STARTED OPENDMARC DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+
+/usr/bin/mysql -u $MYSQLUSER -p$MYSQLPASS opendmarc < $BACKUPS/$TRANSACTION/mnt/hermesbackups/dbbkup/opendmarc.sql
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 10. COMPLETED OPENDMARC DATABASE IMPORT" >> $BACKUPS/restorelog-$TIMESTAMP.log
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 10. STARTED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 #ADJUST PERMISSIONS
 /bin/chown amavis:amavis /etc/postfix/relay_domains
@@ -69,26 +75,46 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 9. STARTED PERMISSIONS ADJUST" >> $BACK
 /bin/chown -R opendkim:opendkim /opt/hermes/dkim/keys/
 /bin/chown -R opendmarc:opendmarc /var/run/opendmarc/
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 6 OF 9. COMPLETED PERMISSIONS ADJUST" >> $BACKUPS/restorelog-$TIMESTAMP.log
+#Check if /var/www/html/admin/Application.cfc exists and if exists, delete /var/www/html/admin/Application.cfm
+if [ -f "/var/www/html/admin/Application.cfc" ]; then
+      /bin/rm /var/www/html/admin/Application.cfm
+   fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 9. STARTED BACKUPS CLEANUP" >> $BACKUPS/restorelog-$TIMESTAMP.log
+#Check if /var/www/html/users/Application.cfc exists and if exists, delete /var/www/html/users/Application.cfm
+if [ -f "/var/www/html/users/Application.cfc" ]; then
+      /bin/rm /var/www/html/users/Application.cfm
+   fi
+
+#Check if /var/www/html/schedule/Application.cfc exists and if exists, delete /var/www/html/schedule/Application.cfm
+if [ -f "/var/www/html/schedule/Application.cfc" ]; then
+      /bin/rm /var/www/html/schedule/Application.cfm
+   fi
+
+#Check if /var/www/html/main/Application.cfc exists and if exists, delete /var/www/html/main/Application.cfm
+if [ -f "/var/www/html/main/Application.cfc" ]; then
+      /bin/rm /var/www/html/main/Application.cfm
+   fi
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 10. COMPLETED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 10. STARTED BACKUPS CLEANUP" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /bin/rm -rf $BACKUPS/$TRANSACTION
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 7 OF 9. COMPLETED BACKUPS CLEANUP" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 10. COMPLETED BACKUPS CLEANUP" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 9. STARTED EMAIL NOTIFICATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 10. STARTED EMAIL NOTIFICATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 /usr/bin/sendemail -f FROM-EMAIL -t TO-EMAIL -u "Success `hostname --fqdn` Restore" -m "Success `hostname --fqdn` Restore"  -s localhost
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 8 OF 9. COMPLETED EMAIL NOTIFICATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 10. COMPLETED EMAIL NOTIFICATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 9. STARTED RESET BACKUP JOBS STATUS" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 10. STARTED RESET BACKUP JOBS STATUS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 #SET STOPPED STATUS ON BACKUP JOB
 /usr/bin/mysql -h localhost -u $MYSQLUSER -p$MYSQLPASS -e "use hermes; update backup_jobs set status = ''"
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 9. COMPLETED RESET BACKUP JOBS STATUS" >> $BACKUPS/restorelog-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 10. COMPLETED RESET BACKUP JOBS STATUS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 #REBOOT SYSTEM
 #/sbin/reboot
