@@ -2129,7 +2129,7 @@ INSERT INTO `system_settings` VALUES ('2', 'postmaster', 'postmaster@domain.tld'
 INSERT INTO `system_settings` VALUES ('3', 'pdf_sender', null);
 INSERT INTO `system_settings` VALUES ('4', 'portal_url', null);
 INSERT INTO `system_settings` VALUES ('25', 'certificate_file', null);
-INSERT INTO `system_settings` VALUES ('7', 'version_no', '16.04');
+INSERT INTO `system_settings` VALUES ('7', 'version_no', '18.04');
 INSERT INTO `system_settings` VALUES ('8', 'admin_email', 'someone@otherdomain.tld');
 INSERT INTO `system_settings` VALUES ('9', 'company', '');
 INSERT INTO `system_settings` VALUES ('10', 'address', '');
