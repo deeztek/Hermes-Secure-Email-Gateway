@@ -126,7 +126,7 @@ read -p "Enter System Mailname (Example: smtp.domain.tld): "  MAIL_NAME
 echo "Starting Installation... View progress of installation and/or any errors in $SCRIPTPATH/install_log-$TIMESTAMP.log file located in the path you started this script"
 echo "==== STARTING INSTALLATION ====" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
-echo "[`date +%m/%d/%Y-%H:%M`] Installing MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] PRELIMINARY STEP 1 OF 2: Installing MySQL(MariaDB) Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install MariaDB
 /usr/bin/apt install mariadb-server mariadb-client rsync -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
@@ -134,13 +134,13 @@ echo "[`date +%m/%d/%Y-%H:%M`] Installing MySQL(MariaDB) Database" >> $SCRIPTPAT
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR: $ERR, occurred during installing MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR PRELIMINARY STEP 1 OF 2: $ERR, occurred during installing MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS. Completed installing MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS PRELIMINARY STEP 1 OF 2. Completed installing MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] Configuring MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] PRELIMINARY STEP 2 OF 2: Configuring MySQL(MariaDB)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #configure MariaDB
 /usr/bin/mysql -e "UPDATE mysql.user SET Password=PASSWORD('$MYSQL_ROOT_PASSWORD') WHERE User='root';" \
@@ -152,10 +152,10 @@ echo "[`date +%m/%d/%Y-%H:%M`] Configuring MySQL(MariaDB)" >> $SCRIPTPATH/instal
 ERR=$?
 if [ $ERR != 0 ]; then
 THEERROR=$(($THEERROR+$ERR))
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR: $ERR, occurred during configuring MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR PRELIMINARY STEP 2 OF 2: $ERR, occurred during configuring MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 exit 1
 else
-echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS. Completed configuring MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS PRELIMINARY STEP 2 OF 2. Completed configuring MySQL(MariaDB) database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
 
