@@ -899,6 +899,7 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 45 OF 60. Configuring Apache Tomcat for Ciph
 /bin/cp /etc/tomcat8/server.xml /etc/tomcat8/server.ORIGINAL && \
 /bin/cp /usr/share/djigzo-web/conf/tomcat/server.xml /etc/tomcat8/ && \
 /bin/sed -i 's/unpackWARs="false"/unpackWARs="true"/' /etc/tomcat8/server.xml && \
+/bin/chown tomcat8:djigzo /usr/share/djigzo-web/ssl/sslCertificate.p12 && \
 /bin/systemctl restart tomcat8 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
