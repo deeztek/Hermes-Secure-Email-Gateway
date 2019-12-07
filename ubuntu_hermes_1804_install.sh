@@ -894,11 +894,11 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 45 OF 60. Configuring Apache Tomcat for Ciph
 /bin/cp /etc/default/tomcat8 /etc/default/tomcat8.ORIGINAL && \
 /bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Ddjigzo-web.home=/usr/share/djigzo-web -Ddjigzo.home=/usr/share/djigzo\"" | sudo tee -a /etc/default/tomcat8 && \
 /bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Djava.awt.headless=true -Xmx256M\"" | sudo tee -a /etc/default/tomcat8 && \
-/bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Ddjigzo.https.all=false\"" | sudo tee -a /etc/default/tomcat8 && \
 /bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo.war\" />" | sudo tee /etc/tomcat8/Catalina/localhost/ciphermail.xml && \
 /bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo-portal.war\" />" | sudo tee /etc/tomcat8/Catalina/localhost/web.xml && \
 /bin/cp /etc/tomcat8/server.xml /etc/tomcat8/server.ORIGINAL && \
-/bin/cp $SCRIPTPATH/download/ciphermail/server.xml /etc/tomcat8/server.xml && \
+/bin/cp /usr/share/djigzo-web/conf/tomcat/server.xml /etc/tomcat8/ && \
+/bin/sed -i 's/unpackWARs="false"/unpackWARs="true"/' /etc/tomcat8/server.xml && \
 /bin/systemctl restart tomcat8 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
