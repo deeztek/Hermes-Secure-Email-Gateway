@@ -26,10 +26,15 @@ ProxyPass /main ajp://localhost:8009/main
 ProxyPassReverse /main ajp://localhost:8009/main
 
 #CIPHERMAIL CONFIGURATION
-ProxyPass /ciphermail ajp://localhost:8010/ciphermail
-ProxyPassReverse /ciphermail ajp://localhost:8010/ciphermail
-ProxyPass /web ajp://localhost:8010/web
-ProxyPassReverse /web ajp://localhost:8010/web
+#ProxyPass /ciphermail ajp://localhost:8010/ciphermail
+#ProxyPassReverse /ciphermail ajp://localhost:8010/ciphermail
+#ProxyPass /web ajp://localhost:8010/web
+#ProxyPassReverse /web ajp://localhost:8010/web
+
+ProxyPass /ciphermail http://localhost:8080/ciphermail
+ProxyPassReverse /ciphermail http://localhost:8080/ciphermail
+ProxyPass /web http://localhost:8080/web
+ProxyPassReverse /web http://localhost:8080/web
 
 ProxyTimeout 3600
 
