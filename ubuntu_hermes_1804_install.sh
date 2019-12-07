@@ -1134,6 +1134,7 @@ fi
 
 echo "==== WARNING ====" | boxes -d stone -p a2v1
 echo "During installation of Opendmarc, you will be prompted to configure database for Opendmarc with dbconfig-common. You must answer NO since this script has already configured the database"
+echo "Additionally, as part of the Opendmarc installation, during libc6 configuration, you MAY be prompted to restart services during package upgrades without asking. You may answer YES to that prompt"
 
 #Install Opendmarc 1.3.2-6 from eoan main
 while true; do
