@@ -198,39 +198,55 @@ fi
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 19 OF 26. STARTED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
+fi
+
 #ADJUST PERMISSIONS
-/bin/chown amavis:amavis /etc/postfix/relay_domains
-/bin/chown -R amavis:amavis /mnt/data/amavis
-/bin/chown -R amavis:amavis /opt/hermes/sa-bayes
-/bin/chmod -R go-rwx /opt/hermes/.gnupg/
-/bin/chmod +x /opt/hermes/scripts/*
-/bin/chmod +x /opt/hermes/templates/*.sh
-/usr/bin/dos2unix /opt/hermes/scripts/*
-/usr/bin/dos2unix /opt/hermes/templates/*.sh
-/bin/chown -R opendkim /opt/hermes/dkim/
-/bin/chown -R opendkim:opendkim /opt/hermes/dkim/keys/
+/bin/chown amavis:amavis /etc/postfix/relay_domains && \
+/bin/chown -R amavis:amavis /mnt/data/amavis && \
+/bin/chown -R amavis:amavis /opt/hermes/sa-bayes && \
+/bin/chmod -R go-rwx /opt/hermes/.gnupg/ && \
+/bin/chmod +x /opt/hermes/scripts/* && \
+/bin/chmod +x /opt/hermes/templates/*.sh && \
+/usr/bin/dos2unix /opt/hermes/scripts/* && \
+/usr/bin/dos2unix /opt/hermes/templates/*.sh && \
+/bin/chown -R opendkim:opendkim /opt/hermes/dkim/ && \
+/bin/chown -R opendkim:opendkim /opt/hermes/dkim/keys/ && \
+/bin/chown -R opendkim:opendkim /var/run/opendkim/ && \
+/bin/chown -R opendmarc:opendmarc /var/run/opendmarc/ >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 #Check if /var/www/html/admin/Application.cfc exists and if exists, delete /var/www/html/admin/Application.cfm
 if [ -f "/var/www/html/admin/Application.cfc" ]; then
-      /bin/rm /var/www/html/admin/Application.cfm
+      /bin/rm /var/www/html/admin/Application.cfm >> $BACKUPS/restorelog-$TIMESTAMP.log
    fi
 
 #Check if /var/www/html/users/Application.cfc exists and if exists, delete /var/www/html/users/Application.cfm
 if [ -f "/var/www/html/users/Application.cfc" ]; then
-      /bin/rm /var/www/html/users/Application.cfm
+      /bin/rm /var/www/html/users/Application.cfm >> $BACKUPS/restorelog-$TIMESTAMP.log
    fi
 
 #Check if /var/www/html/schedule/Application.cfc exists and if exists, delete /var/www/html/schedule/Application.cfm
 if [ -f "/var/www/html/schedule/Application.cfc" ]; then
-      /bin/rm /var/www/html/schedule/Application.cfm
+      /bin/rm /var/www/html/schedule/Application.cfm >> $BACKUPS/restorelog-$TIMESTAMP.log
    fi
 
 #Check if /var/www/html/main/Application.cfc exists and if exists, delete /var/www/html/main/Application.cfm
 if [ -f "/var/www/html/main/Application.cfc" ]; then
-      /bin/rm /var/www/html/main/Application.cfm
+      /bin/rm /var/www/html/main/Application.cfm >> $BACKUPS/restorelog-$TIMESTAMP.log
    fi
 
+ERR=$?
+
+if [ $ERR != 0 ]; then
+
+THEERROR=$(($THEERROR+$ERR))
+
+echo "[`date +%m/%d/%Y-%H:%M`] ERROR: $ERR, OCCURED DURING PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
+
+else
+
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 19 OF 26. COMPLETED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
+
+fi
 
 #echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 26. STARTED VERSION MIGRATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
