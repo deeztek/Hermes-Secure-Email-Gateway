@@ -6,7 +6,7 @@ SyslogSuccess           Yes
 TemporaryDirectory      /var/tmp
 UMask                   022
 
-X-Header                Yes
+SoftwareHeader          Yes
 ReportAddress           someone@domain.tld
 OversignHeaders         From
 Quarantine              Yes
@@ -16,6 +16,11 @@ ExternalIgnoreList      refile:/opt/hermes/dkim/TrustedHosts
 InternalHosts           refile:/opt/hermes/dkim/TrustedHosts
 
 RequireSafeKeys         False
+
+Socket                  inet:8891@127.0.0.1
+
+UserID                 opendkim:opendkim
+PidFile                /var/run/opendkim/opendkim.pid
 
 #Hermes Configuration Below
 
@@ -29,3 +34,4 @@ On-Security             SECURITY-ACTION
 SignatureAlgorithm      SIGNATURE-ALGORITHM
 
 #Hermes Configuration Above
+
