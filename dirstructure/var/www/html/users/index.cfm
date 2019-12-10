@@ -19,7 +19,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>
 <head>
-<title>User Main</title>
+<title>System Status</title>
 <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
 <meta name="Generator" content="NetObjects (http://netobjects.com)">
 <script type="text/javascript" src="js/tinymce/tinymce.min.js"></script>
@@ -136,7 +136,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 -->
 </script>
 </head>
-<body style="background-color: rgb(192,192,192); background-image: none; background-attachment: scroll; margin: 0px;" class="nof-centerBody">
+<body style="background-color: rgb(192,192,192); background-attachment: scroll; margin: 0px;" class="nof-centerBody">
 <!-- DO NOT MOVE! The following AllWebMenus linking code section must always be placed right AFTER the BODY tag-->
 <!-- ******** BEGIN ALLWEBMENUS CODE FOR hermes_seg_menu_users ******** -->
 <script type='text/javascript'>var MenuLinkedBy='AllWebMenus [2]',awmMenuName='hermes_seg_menu_users',awmBN='FUS';awmAltUrl='';</script><script charset='UTF-8' src='./hermes_seg_menu_users.js' language='JavaScript1.2' type='text/javascript'></script><script type='text/javascript'>awmBuildMenu();</script>
