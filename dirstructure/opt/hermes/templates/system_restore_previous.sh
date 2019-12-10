@@ -198,7 +198,6 @@ fi
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 19 OF 26. STARTED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-fi
 
 #ADJUST PERMISSIONS
 /bin/chown amavis:amavis /etc/postfix/relay_domains && \
@@ -234,34 +233,10 @@ if [ -f "/var/www/html/main/Application.cfc" ]; then
       /bin/rm /var/www/html/main/Application.cfm >> $BACKUPS/restorelog-$TIMESTAMP.log
    fi
 
-ERR=$?
 
-if [ $ERR != 0 ]; then
-
-THEERROR=$(($THEERROR+$ERR))
-
-echo "[`date +%m/%d/%Y-%H:%M`] ERROR: $ERR, OCCURED DURING PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
-
-else
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 19 OF 26. COMPLETED PERMISSIONS ADJUST AND OTHER HOUSEKEEPING TASKS" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
-fi
-
-#echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 26. STARTED VERSION MIGRATION" >> $BACKUPS/restorelog-$TIMESTAMP.log
-
-
-
-# ===== THE SETTINGS BELOW ONLY VALID FOR RESTORING HERMES SEG 14.04 BACKUP TO HERMES SEG 16.04 ===
-
-
-# === LINES BELOW NOT USED SINCE WE DON'T EXTRACT THE /VAR/WWW/HTML/SCHEDULE OR THE /VAR/WWW/SCHEDULE DIRECTORIES FROM ABOVE. LEFT FOR REFERENCE ONLY ===
-#MOVE RESTORED /VAR/WWW/SCHEDULE TO /VAR/WWW/HTML/SCHEDULE
-#/bin/mv /var/www/schedule/* /var/www/html/schedule/
-
-#DELETE RESTORED /VAR/WWW/SCHEDULE
-#/bin/rm -rf /var/www/schedule/
-# === LINES ABOVE NOT USED SINCE WE DON'T EXTRACT THE /VAR/WWW/HTML/SCHEDULE OR THE /VAR/WWW/SCHEDULE DIRECTORIES FROM ABOVE. LEFT FOR REFERENCE ONLY ===
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 20 OF 26. STARTED SYSTEM_SETTINGS AND SYSTEM_UPDATES TABLES RESTORE" >> $BACKUPS/restorelog-$TIMESTAMP.log
 
