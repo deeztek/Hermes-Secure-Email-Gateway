@@ -1527,7 +1527,7 @@ INSERT INTO `parameters2` VALUES ('72', 'server_dns2', '', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('73', 'server_dns3', '', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('74', 'server_broadcast', '', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('75', 'debugLevel', '1', 'spf', '1', '1');
-INSERT INTO `parameters2` VALUES ('76', 'TestOnly', '', 'spf', '1', '1');
+INSERT INTO `parameters2` VALUES ('76', 'TestOnly', '1', 'spf', '1', '1');
 INSERT INTO `parameters2` VALUES ('77', 'HELO_reject', 'Fail', 'spf', '1', '1');
 INSERT INTO `parameters2` VALUES ('78', 'Mail_From_reject', 'Fail', 'spf', '1', '1');
 INSERT INTO `parameters2` VALUES ('79', 'PermError_reject', 'False', 'spf', '1', '1');
