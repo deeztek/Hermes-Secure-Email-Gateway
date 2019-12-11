@@ -1191,6 +1191,21 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 61 OF 61. Completed ensuring Hermes SEG permissions are set correctly" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
+#echo "[`date +%m/%d/%Y-%H:%M`] STEP 62 OF 62. Resetting Hermes SEG cfclasses and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+#Reset Hermes SEG cfclasses and restart Lucee
+#/bin/rm -rf /var/www/html/WEB-INF/lucee/cfclasses/ && \
+#/etc/init.d/lucee_ctl restart 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+#ERR=$?
+#if [ $ERR != 0 ]; then
+#THEERROR=$(($THEERROR+$ERR))
+#echo "[`date +%m/%d/%Y-%H:%M`] ERROR STEP 61 OF 62: $ERR, occurred during resetting Hermes SEG cfclasses and restarting Lucee " >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#exit 1
+#else
+#echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 61 OF 62. Completed resetting Hemres SEG cfclasses and restarting Lucee" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+#fi
+
 
 echo "[`date +%m/%d/%Y-%H:%M`] ==== FINISHED INSTALLATION ==== Ensure no errors were logged during installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
