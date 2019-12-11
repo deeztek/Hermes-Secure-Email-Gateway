@@ -2175,10 +2175,11 @@ CREATE TABLE `system_updates` (
 -- ----------------------------
 -- Records of system_updates
 -- ----------------------------
-INSERT INTO `system_updates` VALUES ('29', '16.04', '180831', '1', null, '1');
+INSERT INTO `system_updates` VALUES ('29', '16.04', '180831', '1', '2018-08-31 00:00:00', '1');
 INSERT INTO `system_updates` VALUES ('34', '16.04', '181221', '1', '2018-12-21 11:49:04', '2');
 INSERT INTO `system_updates` VALUES ('35', '16.04', '190405', '1', '2019-04-07 05:33:23', '3');
 INSERT INTO `system_updates` VALUES ('36', '16.04', '190415', '1', '2019-05-07 10:03:39', '4');
+INSERT INTO `system_updates` VALUES ('37', '18.04', '191205', '1', '2019-12-05 00:00:00', '5');
 
 -- ----------------------------
 -- Table structure for `system_users`
