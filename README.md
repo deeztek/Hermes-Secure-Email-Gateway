@@ -1,6 +1,10 @@
 **About**
 
-Hermes Secure Email Gateway is a Free Open Source Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization. It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
+Hermes Secure Email Gateway is a Free Open Source Ubuntu 18.04 Server based Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. It features the latest email authentication techniques such as SPF (Sender Policy Framework), DKIM (DomainKeys Identified Mail) and DMARC (Domain-based Message Authentication, Reporting and Conformance) in order to combat email spoofing, phishing, scams, email compromise attacks and spam.
+
+Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization.
+
+It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
 
 **Installation**
 
