@@ -67,6 +67,12 @@ dkim_key('domain2.tld', 'domain2.tld', '/etc/mail/domain2.tld.key.pem');
 
 #END DKIM CUSTOMIZATIONS
 
+#This policy serves to persuade Postfix to convert mail to 7-bit before submitting to Amavis
+$interface_policy{'10021'} = 'DISABLE8BITMIME';
+$policy_bank{'DISABLE8BITMIME'} = {
+smtpd_discard_ehlo_keywords => ['8BITMIME'],  # disable 8BITMIME
+};
+
 # This policy will bypass ALL checks.
 read_hash(\%whitelist_sender, '/etc/amavis/white.lst');
 @whitelist_sender_maps = (\%whitelist_sender);
@@ -78,6 +84,7 @@ $policy_bank{'BYPASSALLCHECKS'} = { # mail from the pickup daemon
     bypass_banned_checks_maps => ['@whitelist_sender_maps'],  # don't banned-check this mail
     bypass_header_checks_maps => ['@whitelist_sender_maps'],  # don't header-check this mail
     bypass_virus_checks_maps  => ['@whitelist_sender_maps'],  # don't virus-check this mail
+    smtpd_discard_ehlo_keywords => ['8BITMIME'],  # disable 8BITMIME
 };
 
 # Blacklist Senders
