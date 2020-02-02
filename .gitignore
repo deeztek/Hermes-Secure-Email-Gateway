@@ -15,3 +15,4 @@ syncfiles.log
 syncfiles.bat
 /synclogs/
 dos2unix.exe
+*.ffs_lock
