@@ -63,9 +63,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 select entry_name from archive_jobs limit 1
 </cfquery>
 
+<!---
 <cfschedule  
 action = "run"  
 task = "archivejob_#getjob.entry_name#"> 
+--->
+
+<cfexecute name = "/usr/bin/curl"
+arguments="--silent http://localhost:8888/schedule/#getjob.entry_name#_archive_task.cfm"
+timeout = "0">
+</cfexecute>
 
    
 <cflocation url="email_archive.cfm" addtoken="no">

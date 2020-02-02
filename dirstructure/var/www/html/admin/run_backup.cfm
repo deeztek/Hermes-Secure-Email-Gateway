@@ -68,14 +68,22 @@ select * from backup_jobs where id='#form.id#'
 update backup_jobs set status = 'running' where id='#form.id#'
 </cfquery>
 
+<!---
 <cfschedule  
 action = "run"  
 task = "backupjob_#getscheduled.entry_name#"> 
-    
-<cflocation url="system_backup.cfm?m2=2##existing">
+--->
+
+<cfexecute name = "/usr/bin/curl"
+arguments="--silent http://localhost:8888/schedule/#getscheduled.entry_name#_backup_task.cfm"
+timeout = "0">
+</cfexecute>
+
+  
+<cflocation url="system_backup.cfm" addtoken="no">
 
 <cfelseif #action# is "cancel">
-<cflocation url="system_backup.cfm">
+<cflocation url="system_backup.cfm" addtoken="no">
 </cfif>
 
                             <table border="0" cellspacing="0" cellpadding="0" width="635" id="LayoutRegion4" style="background-image: url('./background_635_middle.png'); height: 275px;">

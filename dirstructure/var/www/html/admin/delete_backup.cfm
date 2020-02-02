@@ -42,7 +42,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <tr valign="top" align="left">
               <td></td>
               <td width="644">
-                <table id="Table2" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 56px;">
+                <table id="Table2" border="0" cellspacing="0" cellpadding="0" width="644" style="height: 56px;">
                   <tr style="height: 28px;">
                     <td width="644" id="Cell8">
                       <p style="margin-bottom: 0px;"><img id="Picture1" height="28" width="635" src="./background_635_trop.png" vspace="0" hspace="0" align="left" border="0" alt="background_635_trop" title="background_635_trop"></p>
@@ -65,24 +65,27 @@ select * from backup_jobs where id='#form.id#'
 
 <cfif #getscheduled.recordcount# GTE 1>
 
+<!---
 <cfschedule  
 action = "delete"  
 task = "backupjob_#getscheduled.entry_name#"> 
+--->
 
 <cfquery name="getversion" datasource="#datasource#">
 select value from system_settings where parameter = 'version_no'
 </cfquery>
 
 
+<!--- DELETE /VAR/WWW/HTML/SCHEDULE BACKUP_TASK.CFM --->
 <cfset testfile="/var/www/html/schedule/#getscheduled.entry_name#_backup_task.cfm">
-
 <cfif fileExists(testfile)>
 <cffile 
 action = "delete"
 file = "#testfile#">
 </cfif>
 
-<cfset testfile="/opt/hermes/schedule/#getscheduled.entry_name#_system_backup.sh">
+<!--- DELETE /ETC/CRON.D/ HERMES_BACKUPJOB --->
+<cfset testfile="/etc/cron.d/hermes_backupjob_#getscheduled.entry_name#">
 <cfif fileExists(testfile)>
 <cffile 
 action = "delete"
@@ -93,17 +96,20 @@ file = "#testfile#">
 delete from backup_jobs where id='#form.id#'
 </cfquery>
 
+<cfinclude template="set_crontab.cfm">
    
 <cfelseif #getscheduled.recordcount# LT 1>
 <cfquery name="delete" datasource="#datasource#">
 delete from backup_jobs where id='#form.id#'
 </cfquery>
 
+<cfinclude template="set_crontab.cfm">
+
 </cfif>
     
-<cflocation url="system_backup.cfm?m2=1##existing">
+<cflocation url="system_backup.cfm?m2=1" addtoken="no">
 <cfelseif #action# is "cancel">
-<cflocation url="system_backup.cfm">
+<cflocation url="system_backup.cfm" addtoken="no">
 </cfif>
 
                             <table border="0" cellspacing="0" cellpadding="0" width="635" id="LayoutRegion4" style="background-image: url('./background_635_middle.png'); height: 132px;">
@@ -125,7 +131,7 @@ delete from backup_jobs where id='#form.id#'
                                     <tr valign="top" align="left">
                                       <td></td>
                                       <td width="615">
-                                        <table id="Table128" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 10px;">
+                                        <table id="Table128" border="0" cellspacing="0" cellpadding="0" width="615" style="height: 10px;">
                                           <tr style="height: 24px;">
                                             <td width="615" id="Cell769">
                                               <table width="100%" border="0" cellspacing="0" cellpadding="0">

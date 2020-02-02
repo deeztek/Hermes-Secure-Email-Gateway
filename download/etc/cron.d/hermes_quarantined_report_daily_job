@@ -1,0 +1,2 @@
+30 0 * * * root /usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report_daily.cfm &>/dev/null
+

@@ -124,6 +124,8 @@ CREATE TABLE `archive_jobs` (
   `customtrans` varchar(255) DEFAULT NULL,
   `startdate` timestamp NULL DEFAULT NULL,
   `enddate` timestamp NULL DEFAULT NULL,
+  `jobstartdate` timestamp NULL DEFAULT NULL,
+  `jobenddate` timestamp NULL DEFAULT NULL,
   `status` varchar(255) NOT NULL DEFAULT '',
   `pid` varchar(255) DEFAULT NULL,
   `archive_date` date DEFAULT NULL,

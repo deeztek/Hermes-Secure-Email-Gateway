@@ -24,7 +24,7 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 9. STARTED FILE EXTRACTION" >> $BACKUPS
 
 #PERFORM THE RESTORE
 cd /
-/usr/bin/unrar x -y $BACKUPS/$THEFILE -x'*.sql' >> $BACKUPS/restorelog-$TIMESTAMP.log
+/usr/bin/unrar x -y $BACKUPS/$THEFILE -x'*.sql' -x'/var/lib/clamav' >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 1 OF 10. COMPLETED FILE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 

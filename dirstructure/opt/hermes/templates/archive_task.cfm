@@ -43,7 +43,7 @@ Date Past: #datepast#
 </cfoutput>
 
 <cfquery name="setdates"  datasource="#datasource#">
-update archive_jobs set startdate = '#datenow# #timenow#', archive_date = '#datepast#' where id = '#getjob.id#'
+update archive_jobs set jobstartdate = '#datenow# #timenow#', archive_date = '#datepast#' where id = '#getjob.id#'
 </cfquery>
 
 
@@ -59,19 +59,19 @@ update archive_jobs set initial_count = '#getarchivesmsgs.recordcount#' where id
 
 <cfset FileData = "">
 
-<cffile action = "write" file = "/opt/hermes/tmp/#customtrans3#_rsyncfiles" output = "#FileData#" addnewline="no">
+<cffile action = "write" file = "/opt/hermes/tmp/#customtrans3#-rsyncfiles" output = "#FileData#" addnewline="no">
 
 <cfloop query="getarchivesmsgs">
-<cffile action = "append" file = "/opt/hermes/tmp/#customtrans3#_rsyncfiles" output = "/mnt/data/amavis/#quar_loc##Chr(10)#" addnewline="no">
+<cffile action = "append" file = "/opt/hermes/tmp/#customtrans3#-rsyncfiles" output = "/mnt/data/amavis/#quar_loc##Chr(10)#" addnewline="no">
 </cfloop>
 
 <cfset FileData2 = "">
 
-<cffile action = "write" file = "/opt/hermes/tmp/#customtrans3#_rsynccheck" output = "#FileData2#" addnewline="no">
+<cffile action = "write" file = "/opt/hermes/tmp/#customtrans3#-rsynccheck" output = "#FileData2#" addnewline="no">
 
 
 <cfloop query="getarchivesmsgs">
-<cffile action = "append" file = "/opt/hermes/tmp/#customtrans3#_rsynccheck" output = "#quar_loc##Chr(10)#" addnewline="no">
+<cffile action = "append" file = "/opt/hermes/tmp/#customtrans3#-rsynccheck" output = "#quar_loc##Chr(10)#" addnewline="no">
 </cfloop>
 
 <cfif #getjob.snapshot# is "no">
@@ -162,19 +162,19 @@ select parameter, value from system_settings where parameter='postmaster'
 
 <cffile action = "write"
     file = "/opt/hermes/tmp/#customtrans3#_system_archive.sh"
-    output = "#REReplace("#archive#","FROM","#getpostmaster.value#","ALL")#">
+    output = "#REReplace("#archive#","THE-SENDER","#getpostmaster.value#","ALL")#">
 
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_system_archive.sh" variable="archive">
 
 <cffile action = "write"
     file = "/opt/hermes/tmp/#customtrans3#_system_archive.sh"
-    output = "#REReplace("#archive#","TO","#getjob.notification#","ALL")#">
+    output = "#REReplace("#archive#","THE-RECIPIENT","#getjob.notification#","ALL")#">
 
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_system_archive.sh" variable="archive">
 
 <cffile action = "write"
     file = "/opt/hermes/tmp/#customtrans3#_system_archive.sh"
-    output = "#REReplace("#archive#","RETENTION","#getjob.retention#","ALL")#">
+    output = "#REReplace("#archive#","THE-RETENTION","#getjob.retention#","ALL")#">
 
 
 <cfexecute name = "/bin/chmod"

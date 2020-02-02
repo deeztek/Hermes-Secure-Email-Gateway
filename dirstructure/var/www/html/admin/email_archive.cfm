@@ -355,7 +355,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 <cfset show_interval = form.interval>
 </cfif></cfif>
 
-<cfparam name = "startdate" default = ""> 
+<cfparam name = "startdate" default = "1/1/2020"> 
 <cfif IsDefined("form.startdate") is "True">
 <cfif form.startdate is not "">
 <cfset startdate = form.startdate>
@@ -756,24 +756,26 @@ delete from salt where id='#stResult.GENERATED_KEY#'
 <cfif #show_directory# is "">
 <cfquery name="insertjob" datasource="#datasource#" result="adResult">
 insert into archive_jobs
-(entry_name, share, domain, server, username, password, mysqlusername, mysqlpassword, notification, archive_interval, scheduled_interval, retention, snapshot, smbversion)
+(entry_name, share, domain, server, username, password, mysqlusername, mysqlpassword, notification, archive_interval, scheduled_interval, retention, snapshot, smbversion, startdate)
 values
 ('#show_entry_name#', '#show_share#', '#show_domain#', '#show_server#', '#show_username#', '#show_password#', '#show_mysqlusername#',
- '#show_mysqlpassword#', '#show_notification#', '#email_age#', '#show_interval#', '#show_retention#', '#snapshot#', '#smbversion#')
+ '#show_mysqlpassword#', '#show_notification#', '#email_age#', '#show_interval#', '#show_retention#', '#snapshot#', '#smbversion#', '#date2# #time2#')
 </cfquery>
+
+
 
 <cfelseif #show_directory# is not "">
 <cfquery name="insertjob" datasource="#datasource#" result="adResult">
 insert into archive_jobs
-(entry_name, share, domain, server, username, password,  mysqlusername, mysqlpassword, notification, archive_interval, directory, scheduled_interval, retention, snapshot, smbversion)
+(entry_name, share, domain, server, username, password,  mysqlusername, mysqlpassword, notification, archive_interval, directory, scheduled_interval, retention, snapshot, smbversion, startdate)
 values
-('#show_entry_name#', '#show_share#', '#show_domain#', '#show_server#', '#show_username#', '#show_password#', '#show_mysqlusername#', '#show_mysqlpassword#', '#show_notification#', '#email_age#', '#show_directory#', '#show_interval#', '#show_retention#', '#snapshot#', '#smbversion#')
+('#show_entry_name#', '#show_share#', '#show_domain#', '#show_server#', '#show_username#', '#show_password#', '#show_mysqlusername#', '#show_mysqlpassword#', '#show_notification#', '#email_age#', '#show_directory#', '#show_interval#', '#show_retention#', '#snapshot#', '#smbversion#', '#date2# #time2#')
 </cfquery>
 
 </cfif>
 
 
-<!--- NOT USED. SCHEDULED TASK ALREADY IN RAILO --->
+<!---  
 <cfset date1="#dateformat(startdate, "dd/mm/yyyy")#">
 <cfset time1="#timeformat(starttime, "HH:mm")#">
 <cfschedule action="update"
@@ -784,8 +786,9 @@ starttime="#time1#"
 requesttimeout="7200"
 url="http://localhost:8888/schedule/#show_entry_name#_archive_task.cfm"
 interval="#show_interval#">
+--->
 
-
+<cfinclude template="set_crontab.cfm">
 
 <cffile action="read" file="/opt/hermes/templates/archive_task.cfm" variable="archivetask">
 
@@ -841,7 +844,7 @@ select value from system_settings where parameter = 'version_no'
                                     <table border="0" cellspacing="0" cellpadding="0">
                                       <tr valign="top" align="left">
                                         <td width="959">
-                                          <table id="Table76" border="0" cellspacing="0" cellpadding="0" width="959" style="height: 385px;">
+                                          <table id="Table76" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 385px;">
                                             <tr style="height: 14px;">
                                               <td width="959" id="Cell739">
                                                 <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Archive Job Create&nbsp; Mode</span></b></p>
@@ -1426,21 +1429,15 @@ select value from system_settings where parameter = 'version_no'
                                               </tr>
                                               <tr style="height: 41px;">
                                                 <td id="Cell1071">
-                                                  <table width="614" border="0" cellspacing="0" cellpadding="0" align="left">
+                                                  <table width="613" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
                                                       <td>
                                                         <table id="Table127" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 41px;">
                                                           <tr style="height: 19px;">
-                                                            <td width="92" id="Cell1023">
+                                                            <td width="105" id="Cell1023">
                                                               <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Frequency</span></b></p>
                                                             </td>
-                                                            <td width="45" id="Cell1046">
-                                                              <p style="margin-bottom: 0px;">&nbsp;</p>
-                                                            </td>
-                                                            <td width="327" id="Cell1022">
-                                                              <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Start Date</span></b></p>
-                                                            </td>
-                                                            <td width="150" id="Cell1021">
+                                                            <td width="508" id="Cell1021">
                                                               <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Start Time</span></b></p>
                                                             </td>
                                                           </tr>
@@ -1449,47 +1446,11 @@ select value from system_settings where parameter = 'version_no'
                                                               <table width="92" border="0" cellspacing="0" cellpadding="0" align="left">
                                                                 <tr>
                                                                   <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><cfif #show_interval# is "daily">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
-    <option value="daily" selected="selected">Daily</option>
-  <option value="weekly">Weekly</option>
-  <option value="monthly">Monthly</option>
+                                                                    <p style="margin-bottom: 0px;"><select id="FormsComboBox1" name="interval" style="height: 24px;">
+<option value="daily" selected="selected">Daily</option>
 </select>
 
-<cfelseif #show_interval# is "weekly">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
-    <option value="weekly" selected="selected">Weekly</option>
-  <option value="daily">Daily</option>
-  <option value="monthly">Monthly</option>
-</select>
-
-<cfelseif #show_interval# is "monthly">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
-    <option value="monthly" selected="selected">Monthly</option>
-  <option value="daily">Daily</option>
-  <option value="weekly">Weekly</option>
-</select>
-</cfif>&nbsp;</p>
-                                                                  </td>
-                                                                </tr>
-                                                              </table>
-                                                            </td>
-                                                            <td id="Cell1047">
-                                                              <table width="45" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                                <tr>
-                                                                  <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><a href="javascript:ShowCalendar('archive_form',%20'startdate')"><img id="Picture49" height="22" width="20" src="calendar1.png" border="0" alt="Show Calendar" title="Show Calendar"></a>&nbsp;</p>
-                                                                  </td>
-                                                                </tr>
-                                                              </table>
-                                                            </td>
-                                                            <td id="Cell1019">
-                                                              <table width="104" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                                <tr>
-                                                                  <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><cfoutput>
-<input type="text" name="startdate" size="10" maxlength="10" style="width: 76px; white-space: pre;" value="#startdate#">
-</cfoutput>&nbsp;</p>
+&nbsp;</p>
                                                                   </td>
                                                                 </tr>
                                                               </table>
@@ -1831,7 +1792,7 @@ select value from system_settings where parameter = 'version_no'
                                       <tr valign="top" align="left">
                                         <td width="958" id="Text367" class="TextObject">
                                           <p style="margin-bottom: 0px;"><cfquery name="getarchives" datasource="#datasource#">
-select id, server as server2, share, directory, entry_name, archive_interval, archive_date, scheduled_interval, startdate, initial_count, retention, snapshot from archive_jobs order by entry_name asc
+select id, server as server2, share, directory, entry_name, archive_interval, archive_date, scheduled_interval, jobstartdate, initial_count, retention, snapshot from archive_jobs order by entry_name asc
 </cfquery>
 
 <cfquery name="checkarchive" datasource="#datasource#">

@@ -1,0 +1,2 @@
+30 1 * * * root /usr/bin/curl --silent http://localhost:8888/schedule/message_cleanup.cfm &>/dev/null
+

@@ -333,7 +333,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 <cfset show_notification = form.notification>
 </cfif></cfif>
 
-<cfparam name = "startdate" default = ""> 
+<cfparam name = "startdate" default = "1/1/2020"> 
 <cfif IsDefined("form.startdate") is "True">
 <cfif form.startdate is not "">
 <cfset startdate = form.startdate>
@@ -711,7 +711,7 @@ values
 ('#show_entry_name#', '#show_server#', '#show_domain#', '#show_share#', '#show_username#', '#show_password#', '#show_mysqlusername#', '#show_mysqlpassword#', '1', '#show_interval#', '#show_directory#', '#date2# #time2#', '#show_notification#', '#show_retention#', '#archive#', '#encrypt#', '#smbversion#')
 </cfquery>
 
-
+<!--- LUCEE SHCEDULED TASK. NO LONGER USED 
 <cfset date1="#dateformat(startdate, "dd/mm/yyyy")#">
 <cfset time1="#timeformat(starttime, "HH:mm")#">
 <cfschedule action="update"
@@ -722,6 +722,9 @@ starttime="#time1#"
 requesttimeout="7200"
 url="http://localhost:8888/schedule/#show_entry_name#_backup_task.cfm"
 interval="#show_interval#">
+--->
+
+<cfinclude template="set_crontab.cfm">
 
 <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
 select random_letter as random from captcha_list_all2 order by RAND() limit 8
@@ -1325,16 +1328,10 @@ timeout = "60">
                                                       <td>
                                                         <table id="Table127" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 41px;">
                                                           <tr style="height: 17px;">
-                                                            <td width="98" id="Cell1023">
+                                                            <td width="102" id="Cell1023">
                                                               <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Frequency</span></b></p>
                                                             </td>
-                                                            <td width="50" id="Cell1046">
-                                                              <p style="margin-bottom: 0px;">&nbsp;</p>
-                                                            </td>
-                                                            <td width="109" id="Cell1022">
-                                                              <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Start Date</span></b></p>
-                                                            </td>
-                                                            <td width="356" id="Cell1021">
+                                                            <td width="511" id="Cell1021">
                                                               <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Start Time</span></b></p>
                                                             </td>
                                                           </tr>
@@ -1343,47 +1340,10 @@ timeout = "60">
                                                               <table width="92" border="0" cellspacing="0" cellpadding="0" align="left">
                                                                 <tr>
                                                                   <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><cfif #show_interval# is "daily">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
+                                                                    <p style="margin-bottom: 0px;"><select id="FormsComboBox1" name="interval" style="height: 24px;">
     <option value="daily" selected="selected">Daily</option>
-  <option value="weekly">Weekly</option>
-  <option value="monthly">Monthly</option>
-</select>
-
-<cfelseif #show_interval# is "weekly">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
-    <option value="weekly" selected="selected">Weekly</option>
-  <option value="daily">Daily</option>
-  <option value="monthly">Monthly</option>
-</select>
-
-<cfelseif #show_interval# is "monthly">
-<select id="FormsComboBox1" name="interval" style="height: 24px;">
-    <option value="monthly" selected="selected">Monthly</option>
-  <option value="daily">Daily</option>
-  <option value="weekly">Weekly</option>
-</select>
-</cfif>&nbsp;</p>
-                                                                  </td>
-                                                                </tr>
-                                                              </table>
-                                                            </td>
-                                                            <td id="Cell1047">
-                                                              <table width="45" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                                <tr>
-                                                                  <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><a href="javascript:ShowCalendar('backup_form',%20'startdate')"><img id="Picture49" height="22" width="20" src="calendar1.png" border="0" alt="Show Calendar" title="Show Calendar"></a>&nbsp;</p>
-                                                                  </td>
-                                                                </tr>
-                                                              </table>
-                                                            </td>
-                                                            <td id="Cell1019">
-                                                              <table width="104" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                                <tr>
-                                                                  <td class="TextObject">
-                                                                    <p style="margin-bottom: 0px;"><cfoutput>
-<input type="text" name="startdate" size="10" maxlength="10" style="width: 76px; white-space: pre;" value="#startdate#">
-</cfoutput>&nbsp;</p>
+  </select>
+&nbsp;</p>
                                                                   </td>
                                                                 </tr>
                                                               </table>

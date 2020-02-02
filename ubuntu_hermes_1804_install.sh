@@ -1120,9 +1120,14 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 58 OF 61. Creating Hermes SEG Scheduled Tasks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Create Hermes SEG Scheduled Tasks
-/bin/cp $SCRIPTPATH/download/hermes/create_scheduled_tasks.cfm /var/www/html/schedule/ && \
-/usr/bin/lynx -source https://localhost:9080/schedule/create_scheduled_tasks.cfm && \
-/bin/rm /var/www/html/schedule/create_scheduled_tasks.cfm 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+# === LUCEE SCHEDULED TASKS BELOW ARE DEPRECATED DUE TO ISSUES WITH LUCEE RUNNING DUPLICATE TASKS AS OF LUCEE 5.3.3.62 ====
+#/bin/cp $SCRIPTPATH/download/hermes/create_scheduled_tasks.cfm /var/www/html/schedule/ && \
+#/usr/bin/curl -source https://localhost:9080/schedule/create_scheduled_tasks.cfm && \
+#/bin/rm /var/www/html/schedule/create_scheduled_tasks.cfm 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+# === LUCEE SCHEDULED TASKS ABOVE ARE DEPRECATED DUE TO ISSUES WITH LUCEE RUNNING DUPLICATE TASKS AS OF LUCEE 5.3.3.62 ====
+
+# === CREATE SCHEDULED TASKS USING /ETC/CRON.D/ ====
+/bin/cp $SCRIPTPATH/download/etc/cron.d/* /etc/cron.d/ 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log 
 
 ERR=$?
 if [ $ERR != 0 ]; then
