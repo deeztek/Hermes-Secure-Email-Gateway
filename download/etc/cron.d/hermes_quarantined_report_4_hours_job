@@ -1,0 +1,2 @@
+15 */4 * * * root /usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=4 &>/dev/null
+

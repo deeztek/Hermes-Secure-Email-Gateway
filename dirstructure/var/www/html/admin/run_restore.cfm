@@ -42,7 +42,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <tr valign="top" align="left">
               <td></td>
               <td width="644">
-                <table id="Table2" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 56px;">
+                <table id="Table2" border="0" cellspacing="0" cellpadding="0" width="644" style="height: 56px;">
                   <tr style="height: 28px;">
                     <td width="644" id="Cell8">
                       <p style="margin-bottom: 0px;"><img id="Picture1" height="28" width="635" src="./background_635_trop.png" vspace="0" hspace="0" align="left" border="0" alt="background_635_trop" title="background_635_trop"></p>
@@ -227,22 +227,9 @@ arguments="+x /opt/hermes/tmp/#customtrans3#_system_restore.sh"
 timeout = "60">
 </cfexecute>
 
-<!-- SCHEDULE THE JOB TO RUN IMMMEDIATELY BELOW -->
+<!--- SCHEDULE THE JOB TO RUN IMMMEDIATELY BELOW --->
 
-<cffile action="read" file="/opt/hermes/templates/restore_task.cfm" variable="restoretask">
-
-<cfquery name="getversion" datasource="#datasource#">
-select value from system_settings where parameter = 'version_no'
-</cfquery>
-
-
-
-<cffile action = "write"
-    file = "/var/www/html/schedule/#customtrans3#_restore_task.cfm"
-    output = "#REReplace("#restoretask#","THE-TRANSACTION","#customtrans3#","ALL")#"> 
-    
-
-
+<!---
 <cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
 <cfset timenow="#TimeFormat(now(), "HH:mm:ss")#">
 <cfset theStamp="#datenow# #timenow#">
@@ -258,20 +245,38 @@ starttime="#time1#"
 requesttimeout="7200"
 url="http://localhost:8888/schedule/#customtrans3#_restore_task.cfm"
 interval="once">
+--->
 
-
+<!---
 <cfschedule  
 action = "run"  
-task = "restorejob_#customtrans3#"> 
+task = "restorejob_#customtrans3#">
+--->
+
+<!--- SCHEDULE THE JOB TO RUN IMMMEDIATELY ABOVE --->
+
+<cffile action="read" file="/opt/hermes/templates/restore_task.cfm" variable="restoretask">
+
+<cfquery name="getversion" datasource="#datasource#">
+select value from system_settings where parameter = 'version_no'
+</cfquery>
+
+
+
+<cffile action = "write"
+    file = "/var/www/html/schedule/#customtrans3#_restore_task.cfm"
+    output = "#REReplace("#restoretask#","THE-TRANSACTION","#customtrans3#","ALL")#"> 
+    
+<cfexecute name = "/usr/bin/curl"
+arguments="--silent http://localhost:8888/schedule/#customtrans3#_restore_task.cfm"
+timeout = "0">
+</cfexecute> 
 
    
-<cflocation url="logout.cfm">
-
-
-<!-- SCHEDULE THE JOB TO RUN IMMMEDIATELY ABOVE -->
+<cflocation url="logout.cfm" addtoken="no">
 
 <cfelseif #action# is "cancel">
-<cflocation url="system_restore.cfm">
+<cflocation url="system_restore.cfm" addtoken="no">
 </cfif>
 
 
@@ -305,7 +310,7 @@ task = "restorejob_#customtrans3#">
                                     <tr valign="top" align="left">
                                       <td></td>
                                       <td width="615">
-                                        <table id="Table128" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 10px;">
+                                        <table id="Table128" border="0" cellspacing="0" cellpadding="0" width="615" style="height: 10px;">
                                           <tr style="height: 24px;">
                                             <td width="615" id="Cell769">
                                               <table width="100%" border="0" cellspacing="0" cellpadding="0">

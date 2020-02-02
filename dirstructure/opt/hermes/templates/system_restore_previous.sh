@@ -103,9 +103,9 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 9 OF 26. STARTED FILE EXTRACTION" >> $BACKUP
 
 cd /
 
-# === EXTRACT ALL WITHOUT THE DATABASE .SQL BACKUP FILES AND WITHOUT /VAR/WWW/* DIRECTORIES AND CONTENTS ===
+# === EXTRACT ALL WITHOUT THE DATABASE .SQL BACKUP FILES AND WITHOUT /VAR/WWW/* AND WITHOUT THE /VAR/LIB/CLAMAV DIRECTORIES AND CONTENTS ===
 
-/usr/bin/unrar x -y $BACKUPS/$THEFILE -x'*.sql' -x'/var/www/schedule' -x'/var/www/html/schedule' -x'/var/www/WEB-INF/railo/scheduler' -x'/var/www/html/WEB-INF/lucee/scheduler' >> $BACKUPS/restorelog-$TIMESTAMP.log
+/usr/bin/unrar x -y $BACKUPS/$THEFILE -x'*.sql' -x'/var/www/schedule' -x'/var/www/html/schedule' -x'/var/www/WEB-INF/railo/scheduler' -x'/var/www/html/WEB-INF/lucee/scheduler' -x'/var/lib/clamav' >> $BACKUPS/restorelog-$TIMESTAMP.log
 
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 10 OF 26. COMPLETED FILE EXTRACTION" >> $BACKUPS/restorelog-$TIMESTAMP.log
 

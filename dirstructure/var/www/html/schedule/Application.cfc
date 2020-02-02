@@ -53,6 +53,7 @@
 	<cfset This.name="HermesSEGSchedule" />
 	<cfset This.Sessionmanagement="True" />
 	<cfset This.loginstorage="session" />
+	<cfset This.requestTimeout=createTimeSpan(0,1,0,0) />
 
        //Define POP4 Component  
 	<cfset This.componentpaths["/pop"]= "/opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components/hermes/extension/pop4" />

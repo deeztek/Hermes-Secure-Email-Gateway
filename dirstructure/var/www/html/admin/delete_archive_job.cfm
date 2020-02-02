@@ -65,18 +65,26 @@ select * from archive_jobs where id='#form.id#'
 
 <cfif #getscheduled.recordcount# GTE 1>
 
+<!---
 <cfschedule  
 action = "delete"  
 task = "archivejob_#getscheduled.entry_name#"> 
+--->
 
 <cfquery name="getversion" datasource="#datasource#">
 select value from system_settings where parameter = 'version_no'
 </cfquery>
 
-
+<!--- DELETE /VAR/WWW/HTML/SCHEDULE ARCHIVE_TASK.CFM --->
 <cfset testfile="/var/www/html/schedule/#getscheduled.entry_name#_archive_task.cfm">
+<cfif fileExists(testfile)>
+<cffile 
+action = "delete"
+file = "#testfile#">
+</cfif>
 
-
+<!--- DELETE /ETC/CRON.D/ HERMES_ARCHIVEJOB --->
+<cfset testfile="/etc/cron.d/hermes_archivejob_#getscheduled.entry_name#">
 <cfif fileExists(testfile)>
 <cffile 
 action = "delete"
@@ -87,11 +95,15 @@ file = "#testfile#">
 delete from archive_jobs where id='#form.id#'
 </cfquery>
 
+<cfinclude template="set_crontab.cfm">
+
    
 <cfelseif #getscheduled.recordcount# LT 1>
 <cfquery name="delete" datasource="#datasource#">
 delete from archive_jobs where id='#form.id#'
 </cfquery>
+
+<cfinclude template="set_crontab.cfm">
 
 </cfif>
     

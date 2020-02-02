@@ -159,9 +159,11 @@ arguments="-inputformat none">
 </cfcatch>
 </cftry>
 
+<!---
 <cfschedule
 action = "delete"
 task = "search_#form.customtrans#">
+--->
 
 <cfset testfile="/opt/hermes/tmp/#form.customtrans#_grepmail.sh">
 
@@ -251,7 +253,7 @@ delete from body_temp where customtrans = '#form.customtrans#'
                         <tr valign="top" align="left">
                           <td></td>
                           <td width="964">
-                            <table id="Table147" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 17px;">
+                            <table id="Table147" border="0" cellspacing="0" cellpadding="0" width="965" style="height: 17px;">
                               <tr style="height: 17px;">
                                 <td width="459" id="Cell869">
                                   <table width="215" border="0" cellspacing="0" cellpadding="0" align="left">
