@@ -1,3 +1,6 @@
+<!--- LUCEE SCHEDULED TAKS CODE BELOW NO LONGER USED. SWITCHED TO CRON AS OF HERMES BUILD: 200125 --->
+<!--- THIS FILE IS LEFT AS REFERENCE --->
+
 <cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
 <cfset timenow="#TimeFormat(now(), "HH:mm:ss")#">
 <cfset theStamp="#datenow# #timenow#">
