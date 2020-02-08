@@ -1089,7 +1089,9 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 56 OF 61. Configuring Hermes SEG Application
 /bin/sed -i -e "s|CIPHERMAIL_DATASOURCE_USERNAME|$MYSQL_CIPHERMAIL_USERNAME|g" "/var/www/html/schedule/Application.cfc" && \
 /bin/sed -i -e "s|CIPHERMAIL_DATASOURCE_PASSWORD|$MYSQL_CIPHERMAIL_PASSWORD|g" "/var/www/html/schedule/Application.cfc" && \
 /bin/sed -i -e "s|SYSLOG_DATASOURCE_USERNAME|$MYSQL_SYSLOG_USERNAME|g" "/var/www/html/schedule/Application.cfc" && \
-/bin/sed -i -e "s|SYSLOG_DATASOURCE_PASSWORD|$MYSQL_SYSLOG_PASSWORD|g" "/var/www/html/schedule/Application.cfc" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/bin/sed -i -e "s|SYSLOG_DATASOURCE_PASSWORD|$MYSQL_SYSLOG_PASSWORD|g" "/var/www/html/schedule/Application.cfc" && \
+/bin/sed -i -e "s|HERMES_DATASOURCE_USERNAME|$MYSQL_HERMES_USERNAME|g" "/var/www/html/main/Application.cfc" && \
+/bin/sed -i -e "s|HERMES_DATASOURCE_PASSWORD|$MYSQL_HERMES_PASSWORD|g" "/var/www/html/main/Application.cfc" 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then

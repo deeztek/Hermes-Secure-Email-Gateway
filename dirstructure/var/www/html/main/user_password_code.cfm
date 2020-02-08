@@ -170,9 +170,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
                         </tr>
                         <tr valign="top" align="left">
                           <td height="176"></td>
-                          <td width="957"><CFINCLUDE TEMPLATE="datasource.cfm">
-
-<cfif structKeyExists(url, 'uid')>
+                          <td width="957"><cfif structKeyExists(url, 'uid')>
 <cfif #url.uid# is not "">
 
 <cfquery name="checkkeywords" datasource="#datasource#">

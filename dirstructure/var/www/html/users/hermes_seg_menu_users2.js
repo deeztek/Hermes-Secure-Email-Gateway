@@ -1,7 +1,7 @@
-//----------DHTML Menu Created using AllWebMenus PRO ver 5.3-#924---------------
-//C:\Users\dino.edwards\Dropbox\sites\hermes_secure_email_gateway_12\hermes_secure_email_gateway_12\AWM\hermes_secure_email_gateway_users.awm
+//----------DHTML Menu Created using AllWebMenus PRO ver 5.3-#934---------------
+//C:\Users\dino.edwards\Dropbox\sites\hermes_seg_1404_users\hermes_seg_1404_users\AWM\hermes_seg_menu_users.awm
 var awmMenuName='hermes_seg_menu_users';
-var awmLibraryBuild=924;
+var awmLibraryBuild=934;
 var awmLibraryPath='/awmdata';
 var awmImagesPath='/awmdata/hermes_seg_menu_users';
 var awmSupported=(navigator.appName + navigator.appVersion.substring(0,1)=="Netscape5" || document.all || document.layers || navigator.userAgent.indexOf('Opera')>-1 || navigator.userAgent.indexOf('Konqueror')>-1)?1:0;
@@ -30,22 +30,23 @@ var awmPosClass='';
 var awmSubmenusFrame='';
 var awmSubmenusFrameOffset;
 var awmOptimize=0;
-var awmHash='HYGZBOIHENEECMGUUCCKESPADIGG';
+var awmHash='ULMWKNUZJQEECMGUUCCKESPADIGG';
 var awmNoMenuPrint=1;
 var awmUseTrs=0;
 var awmSepr=["0","","",""];
 var awmMarg=[0,0,0,0];
 function awmBuildMenu(){
 if (awmSupported){
-awmImagesColl=["cross.png",9,9];
+awmImagesColl=[];
 awmCreateCSS(0,1,0,n,n,n,n,n,'none','0','#000000','0px 0px 0px 0',0,'0px / 0px',n);
-awmCreateCSS(1,2,1,'#FFFFFF',n,n,'bold 12px Verdana, Arial, Helvetica, sans-serif',n,'none','0','#000000','6px 8px 6px 8',1,'0px / 0px',n);
-awmCreateCSS(0,2,1,'#FF0000',n,n,'bold 12px Verdana, Arial, Helvetica, sans-serif',n,'none','0','#000000','6px 8px 6px 8',1,'0px / 0px',n);
+awmCreateCSS(1,2,1,'#FFFFFF',n,n,'bold 10px Verdana, Arial, Helvetica, sans-serif',n,'none','0','#000000','6px 8px 6px 8',1,'0px / 0px',n);
+awmCreateCSS(0,2,1,'#FF0000',n,n,'bold 10px Verdana, Arial, Helvetica, sans-serif',n,'none','0','#000000','6px 8px 6px 8',1,'0px / 0px',n);
 var s0=awmCreateMenu(0,0,0,0,1,0,0,0,0,10,10,0,1,0,0,1,1,n,n,100,1,0,0,0,0,-1,1,200,200,0,0,0,"0,0,0",n,n,n,n,n,n,n,n,0,0,0,0,0,0,0,0,1,0,0,2,n,n,'',n,0,[],0,"");
 it=s0.addItemWithImages(1,2,2,"Mail Statistics &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"index.cfm",n,n,n,"index.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,1,n);
 it=s0.addItemWithImages(1,2,2,"Report Settings &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"user_reports.cfm",n,n,n,"user_reports.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,2,n);
-it=s0.addItemWithImages(1,2,2,"History &amp; Quarantine &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"loading.cfm",n,n,n,"loading.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,9,n);
+it=s0.addItemWithImages(1,2,2,"History &amp; Archive &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"loading.cfm",n,n,n,"loading.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,9,n);
 it=s0.addItemWithImages(1,2,2,"Sender Filters &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"user_filters.cfm",n,n,n,"user_filters.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,13,n);
-it=s0.addItemWithImages(1,2,2,"Spam/Virus Policy &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"user_policy.cfm",n,n,n,"user_policy.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,19,n);
+it=s0.addItemWithImages(1,2,2,"Password &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"user_change_password.cfm",n,n,n,"user_change_password.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,0,n);
+it=s0.addItemWithImages(1,2,2,"Logout &nbsp;",n,n,"",n,n,n,3,3,3,n,n,n,"user_logout.cfm",n,n,n,"user_logout.cfm",n,0,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,3,n);
 s0.pm.buildMenu();
 }}
