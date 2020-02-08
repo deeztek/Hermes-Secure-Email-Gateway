@@ -136,7 +136,7 @@ select email, password, password_set, train_bayes, download_msg from user_settin
 
 <cfif #getemail.recordcount# GTE 1>
 <cfif #getemail.password_set# is "0">
-<cflocation url="user_create_password.cfm?uid=#uid#&dest=#dest#&mid=#mid#&sid=#sid#" addtoken="no">
+<cflocation url="/main/user_create_password.cfm?uid=#uid#&dest=#dest#&mid=#mid#&sid=#sid#" addtoken="no">
 </cfif>
 
 <cfparam name = "action" default = ""> 

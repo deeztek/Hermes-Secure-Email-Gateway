@@ -34,9 +34,9 @@ var popupHeight = 600;
 var popupTop = 300;
 var popupLeft = 300;
 var isFullScreen = false;
-var isAutoCenter = true;
+var isAutoCenter = false;
 var popupTarget = "popupwin_27b5";
-var popupParams = "toolbar=0, scrollbars=1, menubar=0, status=0, resizable=1";
+var popupParams = "toolbar=0, scrollbars=1, menubar=0, status=0, resizable=0";
 
 if (isFullScreen) {
 	popupParams += ", fullscreen=1";
@@ -110,48 +110,54 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 -->
 </script>
 </head>
-<body style="background-color: rgb(192,192,192); background-image: none; margin: 0px;" class="nof-centerBody">
+<body style="margin: 0px;" class="nof-centerBody">
   <div align="center">
     <table border="0" cellspacing="0" cellpadding="0">
       <tr>
         <td>
-          <table border="0" cellspacing="0" cellpadding="0" width="988">
+          <table border="0" cellspacing="0" cellpadding="0" width="989">
             <tr valign="top" align="left">
-              <td height="26"></td>
+              <td width="1" height="24"></td>
+              <td width="987"></td>
+              <td width="1"></td>
             </tr>
             <tr valign="top" align="left">
-              <td height="97" width="988"><img id="Picture3" height="97" width="988" src="./top_blue_logon2_1.png" border="0" alt="top_blue_logon2" title="top_blue_logon2"></td>
+              <td height="97" colspan="2" width="988"><img id="Picture3" height="97" width="988" src="./top_blue_logon2.png" border="0" alt="top_blue_logon2" title="top_blue_logon2"></td>
+              <td></td>
             </tr>
             <tr valign="top" align="left">
-              <td height="510" width="988">
-                <table border="0" cellspacing="0" cellpadding="0" width="988" id="LayoutRegion7" style="background-image: url('./middle_988.png'); height: 510px;">
+              <td colspan="3" height="1"></td>
+            </tr>
+            <tr valign="top" align="left">
+              <td height="581" colspan="2" width="988">
+                <table border="0" cellspacing="0" cellpadding="0" width="988" id="LayoutRegion7" style="background-image: url('./middle_988.png'); height: 581px;">
                   <tr align="left" valign="top">
                     <td>
                       <table cellpadding="0" cellspacing="0" border="0" width="967">
                         <tr valign="top" align="left">
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="797">
+                            <table border="0" cellspacing="0" cellpadding="0" width="765">
                               <tr valign="top" align="left">
                                 <td width="11" height="14"></td>
-                                <td width="786"></td>
+                                <td width="754"></td>
                               </tr>
                               <tr valign="top" align="left">
                                 <td></td>
-                                <td width="786" id="Text291" class="TextObject"><cfoutput>
+                                <td width="754" id="Text291" class="TextObject"><cfoutput>
                                   <p style="margin-bottom: 0px;"><b><span style="font-size: 16px; color: rgb(0,51,153);">Create User Self-Service Portal Password</span></b></p>
                                   </cfoutput></td>
                               </tr>
                             </table>
                           </td>
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="170">
+                            <table border="0" cellspacing="0" cellpadding="0" width="202">
                               <tr valign="top" align="left">
-                                <td width="145" height="8"></td>
+                                <td width="177" height="8"></td>
                                 <td></td>
                               </tr>
                               <tr valign="top" align="left">
                                 <td height="25"></td>
-                                <td width="25"><a target="_self" href="javascript:openpopup_27b5('https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/user-self-service-portal-login/#firstime')"><img id="Picture2" height="25" width="25" src="./help.png" border="0" alt="Online Help" title="Online Help"></a></td>
+                                <td width="25"><a target="_self" href="javascript:openpopup_27b5('https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/user-self-service-portal-login/#forgotpassword')"><img id="Picture2" height="25" width="25" src="./help.png" border="0" alt="Online Help" title="Online Help"></a></td>
                               </tr>
                             </table>
                           </td>
@@ -159,7 +165,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
                       </table>
                       <table border="0" cellspacing="0" cellpadding="0" width="968">
                         <tr valign="top" align="left">
-                          <td width="11" height="3"></td>
+                          <td width="11" height="2"></td>
                           <td></td>
                         </tr>
                         <tr valign="top" align="left">
@@ -542,7 +548,7 @@ update user_settings set password='#thePassword#', password_set = '1' where id l
                             </table>
                             <table border="0" cellspacing="0" cellpadding="0">
                               <tr valign="top" align="left">
-                                <td width="11" height="2"></td>
+                                <td width="12" height="4"></td>
                                 <td></td>
                               </tr>
                               <tr valign="top" align="left">
@@ -589,7 +595,7 @@ update user_settings set password='#thePassword#', password_set = '1' where id l
                                                       </tr>
                                                       <tr valign="top" align="left">
                                                         <td width="956">
-                                                          <form name="apply_settings" action="<cfoutput>user_authenticate.cfm?uid=#uid#&dest=#dest#&mid=#URLEncodedFormat(Trim(mid))#&sid=#URLEncodedFormat(Trim(sid))#</cfoutput>" method="post">
+                                                          <form name="user_login" action="<cfoutput>/users/user_authenticate.cfm?uid=#uid#&dest=#dest#&mid=#URLEncodedFormat(Trim(mid))#&sid=#URLEncodedFormat(Trim(sid))#</cfoutput>" method="post">
                                                             <table id="Table90" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 24px;">
                                                               <tr style="height: 24px;">
                                                                 <td width="956" id="Cell518">
@@ -630,9 +636,11 @@ update user_settings set password='#thePassword#', password_set = '1' where id l
                         </tr>
                       </table>
                     </td>
+                    <td></td>
                   </tr>
                   <tr valign="top" align="left">
-                    <td height="49" width="988">
+                    <td height="49"></td>
+                    <td colspan="2" width="988">
                       <table border="0" cellspacing="0" cellpadding="0" width="988" id="LayoutRegion23" style="background-image: url('./bottom_988.png'); height: 49px;">
                         <tr align="left" valign="top">
                           <td>
