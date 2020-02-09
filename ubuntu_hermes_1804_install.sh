@@ -707,12 +707,11 @@ echo "[`date +%m/%d/%Y-%H:%M`] STEP 33 OF 61. Installing and configuring extreme
 
 #Install and configure extremeshok clamav-unofficial-sigs
 /bin/mkdir -p /usr/local/sbin/ && \
-/bin/cp $SCRIPTPATH/download/clamav-unofficial-sigs/clamav-unofficial-sigs.sh /usr/local/sbin/clamav-unofficial-sigs.sh && \
+/usr/bin/wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/clamav-unofficial-sigs.sh -O /usr/local/sbin/clamav-unofficial-sigs.sh && \
 /bin/mkdir -p /etc/clamav-unofficial-sigs/ && \
-/bin/cp $SCRIPTPATH/download/clamav-unofficial-sigs/config/master.conf /etc/clamav-unofficial-sigs/master.conf && \
-/bin/cp $SCRIPTPATH/download/clamav-unofficial-sigs/config/user.conf /etc/clamav-unofficial-sigs/user.conf && \
-/bin/cp $SCRIPTPATH/download/clamav-unofficial-sigs/config/user.HERMES /etc/clamav-unofficial-sigs/user.HERMES && \
-/bin/cp $SCRIPTPATH/download/clamav-unofficial-sigs/config/os/os.ubuntu.conf /etc/clamav-unofficial-sigs/os.conf && \
+/usr/bin/wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/master.conf -O /etc/clamav-unofficial-sigs/master.conf && \
+/usr/bin/wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/user.conf -O /etc/clamav-unofficial-sigs/user.conf && \
+/usr/bin/wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/os/os.ubuntu.conf -O /etc/clamav-unofficial-sigs/os.conf && \
 /bin/chmod +x /usr/local/sbin/clamav-unofficial-sigs.sh && \
 /usr/local/sbin/clamav-unofficial-sigs.sh --install-logrotate && \
 /usr/local/sbin/clamav-unofficial-sigs.sh --install-man && \
