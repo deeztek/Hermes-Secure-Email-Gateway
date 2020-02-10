@@ -1,16 +1,15 @@
 /*
 
-
-Source Server         : hermes secure email gateway template 16.04 64 -GOLD VMWARE
-Source Server Version : 50724
+Source Server         : Hermes SEG 18.04 Build 200125
+Source Server Version : 50505
 Source Host           : 192.168.xx.xx
 Source Database       : hermes
 
 Target Server Type    : MYSQL
-Target Server Version : 50724
+Target Server Version : 50505
 File Encoding         : 65001
 
-Date: 2019-11-16 06:47:51
+Date: 2020-02-10 11:47:40
 */
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -1060,7 +1059,7 @@ CREATE TABLE `malware_databases` (
   `fp` varchar(10) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=95 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=96 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of malware_databases
@@ -1123,6 +1122,7 @@ INSERT INTO `malware_databases` VALUES ('66', 'malware.expert.hdb', 'MALWARE.EXP
 INSERT INTO `malware_databases` VALUES ('75', 'malware/RANSOM_Petya.yar', 'Detects Petya Ransomware', 'true', 'yararules', 'low', '1');
 INSERT INTO `malware_databases` VALUES ('76', 'malware/RANSOM_Petya_MS17_010', 'Probable PETYA ransomware using ETERNALBLUE, WMIC, PsExec', 'true', 'yararules', 'low', '1');
 INSERT INTO `malware_databases` VALUES ('94', 'email/EMAIL_Cryptowall.yar', 'email/EMAIL_Cryptowall.yar', 'true', 'yararules', 'low', '1');
+INSERT INTO `malware_databases` VALUES ('95', 'urlhaus.ndb', 'URLHAUS DATABASE - Malicious URLs that are being used for malware distribution', 'true', 'urlhaus', 'low', '2');
 
 -- ----------------------------
 -- Table structure for `malware_feeds`
@@ -1138,18 +1138,20 @@ CREATE TABLE `malware_feeds` (
   `list` varchar(255) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   `malwarepatrol_free` varchar(10) DEFAULT NULL,
+  `securite_premium` varchar(255) DEFAULT NULL,
   `template` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=6 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of malware_feeds
 -- ----------------------------
-INSERT INTO `malware_feeds` VALUES ('1', 'sanesecurity', 'true', null, null, null, null, '2', null, null);
-INSERT INTO `malware_feeds` VALUES ('2', 'securiteinfo', 'true', '4', 'e7fe28d465808e0ce4278955d8e0a5bed43f76bae9d6bb24a6f6b9b685696e10b92af719c7adc07aa1ac2cc0dafa6638a0cc0d37688904075c8446781be5bb5f', null, null, '2', null, null);
-INSERT INTO `malware_feeds` VALUES ('3', 'linuxmalwaredetect', 'true', '8', null, null, null, '2', null, null);
-INSERT INTO `malware_feeds` VALUES ('4', 'yararules', 'true', '1', null, null, null, '2', null, null);
-INSERT INTO `malware_feeds` VALUES ('5', 'malwarepatrol', 'true', '2', '106261422496', '15', 'clamav_ext', '2', 'no', null);
+INSERT INTO `malware_feeds` VALUES ('1', 'sanesecurity', 'yes', null, null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('2', 'securiteinfo', 'yes', '4', 'e7fe28d465808e0ce4278955d8e0a5bed43f76bae9d6bb24a6f6b9b685696e10b92af719c7adc07aa1ac2cc0dafa6638a0cc0d37688904075c8446781be5bb5f', null, null, '2', null, 'no', null);
+INSERT INTO `malware_feeds` VALUES ('3', 'linuxmalwaredetect', 'yes', '8', null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('4', 'yararules', 'yes', '1', null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('5', 'malwarepatrol', 'yes', '2', '106261422496', '15', 'clamav_ext', '2', 'no', null, null);
+INSERT INTO `malware_feeds` VALUES ('6', 'urlhaus', 'yes', '0', null, null, null, '2', null, null, null);
 
 -- ----------------------------
 -- Table structure for `message_rules`
@@ -1345,8 +1347,8 @@ INSERT INTO `parameters` VALUES ('20', 'reject_unauth_pipelining', null, null, n
 INSERT INTO `parameters` VALUES ('180', 'permit_dnswl_client wl.mailspike.net', null, null, '-2', null, null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '13', '2', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('242', 'smtp_tls_note_starttls_offer', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('23', 'reject_rbl_client bl.spameatingmonkey.net', null, null, '2', null, 'Enable Mail-abuse Blocklist', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '13', '2', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('25', 'deeztek.com', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '1', '1', '1', '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('26', 'smtp.deeztek.com', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '2', '1', '1', '1', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('25', 'domain.tld', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '1', '1', '1', '1', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('26', 'hermes', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '2', '1', '1', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('29', 'smtpd_client_restrictions', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', 0x434C49454E5420504F4C4943494553202D20506F6C6963696573206170706C696564207768656E2065787465726E616C20534D5450207365727665727320617474656D707420746F20636F6E6E65637420746F207468697320736572766572, null, '2', null, '2', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('69', 'reject_unknown_sender_domain', null, null, null, null, 'Reject Unknown Sender Domain', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '7', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('27', 'ip', null, null, null, null, 'IP Address', 'network', null, '192.168.71.100', '1', 'interfaces', null, null, '2', '2', '2', '1', null, null, null);
@@ -1480,7 +1482,7 @@ INSERT INTO `parameters2` VALUES ('18', 'server_gateway_octet2', '168', 'network
 INSERT INTO `parameters2` VALUES ('19', 'server_gateway_octet3', '69', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('20', 'server_gateway_octet4', '1', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('21', 'server_dns1_octet1', '192', 'network', '1', '1');
-INSERT INTO `parameters2` VALUES ('22', 'network_mode', 'static', 'network', '1', '1');
+INSERT INTO `parameters2` VALUES ('22', 'network_mode', 'dhcp', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('23', 'server_name', 'hermes', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('24', 'server_domain', 'domain.tld', 'network', '1', '1');
 INSERT INTO `parameters2` VALUES ('27', 'server_dns1_octet4', '1', 'network', '1', '1');
@@ -1940,7 +1942,7 @@ CREATE TABLE `salt` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `salt` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=14825 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=14832 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of salt
@@ -2172,7 +2174,7 @@ CREATE TABLE `system_updates` (
   `date_installed` timestamp NULL DEFAULT NULL,
   `install_order` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=37 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of system_updates
@@ -3898,14 +3900,14 @@ CREATE TABLE `virtual_recipients` (
   `maps` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=285 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=288 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of virtual_recipients
 -- ----------------------------
-INSERT INTO `virtual_recipients` VALUES ('282', 'postmaster@domain.tld', 'someone@otherdomain.tld', '1');
-INSERT INTO `virtual_recipients` VALUES ('283', 'root@domain.tld', 'someone@otherdomain.tld', '1');
-INSERT INTO `virtual_recipients` VALUES ('284', 'abuse@domain.tld', 'someone@otherdomain.tld', '1');
+INSERT INTO `virtual_recipients` VALUES ('286', 'root@domain.tld', 'someone@otherdomain.tld', '1');
+INSERT INTO `virtual_recipients` VALUES ('285', 'postmaster@domain.tld', 'someone@otherdomain.tld', '1');
+INSERT INTO `virtual_recipients` VALUES ('287', 'abuse@domain.tld', 'someone@otherdomain.tld', '1');
 
 -- ----------------------------
 -- Table structure for `wblist`
