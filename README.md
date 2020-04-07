@@ -120,5 +120,5 @@ Check out the [Hermes SEG Administrator](https://www.deeztek.com/documentation/h
 
 Support can be obtained by visiting our Hermes SEG Support forums at:
 
-[https://forums.deeztek.com/viewforum.php?f=22](https://forums.deeztek.com/viewforum.php?f=22)
+[https://community.deeztek.com/c/hermes-seg-suppport](https://community.deeztek.com/c/hermes-seg-suppport)
 
