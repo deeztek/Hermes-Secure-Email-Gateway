@@ -807,7 +807,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 61. Started Downloading Ciphermail Back-End from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Ciphermail Back-End
-/usr/bin/wget -O $SCRIPTPATH/djigzo_4.5.0-0_all.deb --no-check-certificate https://www.ciphermail.com/downloads/djigzo-release-4.5.0-0/djigzo_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/wget -O $SCRIPTPATH/djigzo_4.5.0-0_all.deb --no-check-certificate https://www.deeztek.com/downloads/ciphermail/djigzo_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -821,7 +821,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 61. Started Downloading Ciphermail Web GUI from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Ciphermail Web GUI
-/usr/bin/wget -O $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb --no-check-certificate https://www.ciphermail.com/downloads/djigzo-release-4.5.0-0/djigzo-web_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/wget -O $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb --no-check-certificate https://www.deeztek.com/downloads/ciphermail/djigzo-web_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -849,7 +849,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 42 OF 61. Installing Ciphermail Back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail back-end
-/usr/bin/dpkg -i $SCRIPTPATH/djigzo_4.5.0-0_all.deb && /bin/systemctl restart djigzo 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/dpkg -i $SCRIPTPATH/djigzo_4.6.2-0_all.deb && /bin/systemctl restart djigzo 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -863,7 +863,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 43 OF 61. Installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail Web-GUI
-/usr/bin/dpkg -i $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/dpkg -i $SCRIPTPATH/djigzo-web_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
