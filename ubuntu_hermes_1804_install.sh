@@ -804,6 +804,7 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 38 OF 61. Completed installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
+#Set Ciphermail download variables
 CIPHERMAIL_DOWNLOAD_ADDRESS=https://www.deeztek.com/downloads/ciphermail
 CIPHERMAIL_BACKEND=djigzo_4.6.2-0_all.deb
 CIPHERMAIL_WEB=djigzo-web_4.6.2-0_all.deb
