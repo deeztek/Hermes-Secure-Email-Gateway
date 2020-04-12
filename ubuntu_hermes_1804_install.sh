@@ -804,10 +804,16 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 38 OF 61. Completed installing Apache and enabling SSL and proxy_ajp modules" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 61. Started Downloading Ciphermail Back-End from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+CIPHERMAIL_DOWNLOAD_ADDRESS=https://www.deeztek.com/downloads/ciphermail
+CIPHERMAIL_BACKEND=djigzo_4.6.2-0_all.deb
+CIPHERMAIL_WEB=djigzo-web_4.6.2-0_all.deb
+
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 39 OF 61. Started Downloading Ciphermail Back-End from $CIPHERMAIL_DOWNLOAD_ADDRESS" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+
 
 #Download Ciphermail Back-End
-/usr/bin/wget -O $SCRIPTPATH/djigzo_4.5.0-0_all.deb --no-check-certificate https://www.deeztek.com/downloads/ciphermail/djigzo_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/wget -O $SCRIPTPATH/$CIPHERMAIL_BACKEND --no-check-certificate $CIPHERMAIL_DOWNLOAD_ADDRESS/$CIPHERMAIL_BACKEND 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -818,10 +824,10 @@ else
 echo "[`date +%m/%d/%Y-%H:%M`] SUCCESS STEP 39 OF 61. Completed download of Ciphermail Back-End" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 fi
 
-echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 61. Started Downloading Ciphermail Web GUI from https://www.ciphermail.com/downloads/" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] STEP 40 OF 61. Started Downloading Ciphermail Web GUI from $CIPHERMAIL_DOWNLOAD_ADDRESS" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Download Ciphermail Web GUI
-/usr/bin/wget -O $SCRIPTPATH/djigzo-web_4.5.0-0_all.deb --no-check-certificate https://www.deeztek.com/downloads/ciphermail/djigzo-web_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/wget -O $SCRIPTPATH/$CIPHERMAIL_WEB --no-check-certificate $CIPHERMAIL_DOWNLOAD_ADDRESS/$CIPHERMAIL_WEB 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -849,7 +855,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 42 OF 61. Installing Ciphermail Back-end" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail back-end
-/usr/bin/dpkg -i $SCRIPTPATH/djigzo_4.6.2-0_all.deb && /bin/systemctl restart djigzo 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/dpkg -i $SCRIPTPATH/$CIPHERMAIL_BACKEND && /bin/systemctl restart djigzo 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -863,7 +869,7 @@ fi
 echo "[`date +%m/%d/%Y-%H:%M`] STEP 43 OF 61. Installing Ciphermail Web-GUI" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 #Install Ciphermail Web-GUI
-/usr/bin/dpkg -i $SCRIPTPATH/djigzo-web_4.6.2-0_all.deb 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
+/usr/bin/dpkg -i $SCRIPTPATH/$CIPHERMAIL_WEB 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 ERR=$?
 if [ $ERR != 0 ]; then
