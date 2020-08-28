@@ -416,48 +416,20 @@ select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
 <cfset quarfile="/mnt/data/amavis/#getmsg.quar_loc#">
 <cfif fileExists(quarfile)> 
 
-<cffile action = "copy" source = "#quarfile#" 
-    destination = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
-outputfile ="/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#"
-arguments="--no-sync --spam /opt/hermes/sa-learn/LEARNSPAM/">
+variable ="salearnresult"
+arguments="--no-sync --spam /mnt/data/amavis/#quarfile#">
 </cfexecute>
 
-<cffile action="read" file="/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#" variable="check">
-
-<cfif FindNoCase("Learned tokens from 1 message", check)>
+<cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
 <cfset success=#success#+1>
 
-
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#">
-
-
-
-<cfelse>
+<cfelseif #salearnresult# does not contain 'Learned tokens from 1 message(s)'>
 
 <cfset failure=#failure#+1>
-    
-
-
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#">
-
-
+   
 </cfif>
 
 
@@ -500,47 +472,20 @@ select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
 <cfset quarfile="/mnt/data/amavis/#getmsg.quar_loc#">
 <cfif fileExists(quarfile)> 
 
-<cffile action = "copy" source = "#quarfile#" 
-    destination = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
-outputfile ="/opt/hermes/sa-learn/LEARNHAM/result_#mailid#"
-arguments="--no-sync --ham /opt/hermes/sa-learn/LEARNHAM/">
+variable ="salearnresult"
+arguments="--no-sync --ham /mnt/data/amavis/#quarfile#">
 </cfexecute>
 
-<cffile action="read" file="/opt/hermes/sa-learn/LEARNHAM/result_#mailid#" variable="check">
-
-<cfif FindNoCase("Learned tokens from 1 message", check)>
+<cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
 <cfset success=#success#+1>
 
-
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/result_#mailid#">
-
-
-<cfelse>
+<cfelseif #salearnresult# does not contain 'Learned tokens from 1 message(s)'>
 
 <cfset failure=#failure#+1>
-    
-
-
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/result_#mailid#">
-
-
+   
 </cfif>
 
 
