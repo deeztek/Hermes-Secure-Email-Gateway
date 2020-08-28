@@ -54,8 +54,8 @@ ACTION: #form.action#<br>
 <cfif thefield contains 'cbox'>
 <cfoutput>
 CHECKBOX:#thefield#<br>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 MailID: #mailid#<br>
 SECRETID: #secretid#<br>
 
@@ -73,8 +73,8 @@ SECRETID: #secretid#<br>
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getrid" datasource="#datasource#">
 SELECT rid from msgrcpt where mail_id='#mailid#'
@@ -204,8 +204,8 @@ values
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getrid" datasource="#datasource#">
 SELECT rid from msgrcpt where mail_id='#mailid#'
@@ -324,8 +324,8 @@ values
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
@@ -369,8 +369,8 @@ arguments="#getmsg.quar_loc# #secretid# #getrec.email#">
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
@@ -405,11 +405,11 @@ file = "#quarfile#">
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id='#mailid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
@@ -418,17 +418,24 @@ select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
 
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
-variable ="salearnresult"
+variable = "salearnresult"
 arguments="--no-sync --spam #quarfile#">
 </cfexecute>
+
+<cfoutput>
+salearnresult:#salearnresult#<br>
+</cfoutput>
 
 <cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
 <cfset success=#success#+1>
 
+<cfoutput>Success:#success#<br></cfoutput>
+
 <cfelseif #salearnresult# does not contain 'Learned tokens from 1 message(s)'>
 
 <cfset failure=#failure#+1>
+<cfoutput>Failure: #failure#<br></cfoutput>
    
 </cfif>
 
@@ -461,8 +468,8 @@ arguments="-inputformat none">
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
@@ -477,6 +484,10 @@ timeout = "240"
 variable ="salearnresult"
 arguments="--no-sync --ham #quarfile#">
 </cfexecute>
+
+<cfoutput>
+salearnresult:#salearnresult#<br>
+</cfoutput>
 
 <cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
@@ -516,11 +527,17 @@ arguments="-inputformat none">
 
 </cfif>
 
+<cfoutput>
+success: #success#<br>
+failure: #failure#<br>
+</cfoutput>
 
 <cfoutput>
+
 <cflocation
  url="message_history_new.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#url.action#&a=#action#&s=#success#&f=#failure#"
  addtoken="no">
+
 </cfoutput></td>
     </tr>
   </table>
