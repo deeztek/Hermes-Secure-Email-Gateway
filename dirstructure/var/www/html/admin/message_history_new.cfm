@@ -953,7 +953,7 @@ SELECT time_iso FROM `msgs` order by time_iso asc limit 1
                                 <td width="579">
                                   <form name="Table144FORM" action="<cfoutput>message_history_filter.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
                                     <input type="hidden" name="setfilter" value="1">
-                                    <table id="Table144" border="0" cellspacing="0" cellpadding="0" width="579" style="height: 25px;">
+                                    <table id="Table144" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 25px;">
                                       <tr style="height: 25px;">
                                         <td width="235" id="Cell865">
                                           <table width="212" border="0" cellspacing="0" cellpadding="0" align="left">
@@ -1014,7 +1014,7 @@ select description from msg_content_type where content_type like binary '#sortby
                                 <td width="346">
                                   <form name="Table167FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
                                     <input type="hidden" name="action" value="displayrows">
-                                    <table id="Table167" border="0" cellspacing="0" cellpadding="0" width="346" style="height: 2px;">
+                                    <table id="Table167" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 2px;">
                                       <tr style="height: 24px;">
                                         <td width="185" id="Cell1047">
                                           <p style="text-align: right; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">No of Msgs to display</span></p>
@@ -1080,7 +1080,7 @@ select description from msg_content_type where content_type like binary '#sortby
                           <td width="947">
                             <form name="advanced" action="<cfoutput>message_history_filter_advanced.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
                               <input type="hidden" name="setfilter2" value="1">
-                              <table id="Table165" border="0" cellspacing="0" cellpadding="0" width="951" style="height: 45px;">
+                              <table id="Table165" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 45px;">
                                 <tr style="height: 21px;">
                                   <td width="160" id="Cell1036">
                                     <p style="text-align: left; margin-bottom: 0px;"><span style="font-size: 12px;">Search Phrase</span></p>
@@ -1542,7 +1542,7 @@ select description from msg_content_type where content_type like binary '#sortby
                         <tr valign="top" align="left">
                           <td></td>
                           <td width="952">
-                            <table id="Table147" border="0" cellspacing="0" cellpadding="0" width="953" style="height: 17px;">
+                            <table id="Table147" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 17px;">
                               <tr style="height: 17px;">
                                 <td width="272" id="Cell869">
                                   <table width="215" border="0" cellspacing="0" cellpadding="0" align="left">
@@ -1736,21 +1736,23 @@ select description from msg_content_type where content_type like binary '#sortby
                           </td>
                         </tr>
                       </table>
-                      <table border="0" cellspacing="0" cellpadding="0" width="968">
+                      <table border="0" cellspacing="0" cellpadding="0" width="962">
                         <tr valign="top" align="left">
-                          <td width="16" height="3"></td>
-                          <td width="952"></td>
+                          <td width="14" height="3"></td>
+                          <td width="948"></td>
                         </tr>
                         <tr valign="top" align="left">
                           <td></td>
-                          <td width="952" id="Text226" class="TextObject">
-                            <p style="margin-bottom: 0px;">
-<cfif #m5# is "">
+                          <td width="948" id="Text497" class="TextObject">
+                            <p style="margin-bottom: 0px;">&nbsp;</p>
+                            <cfif #m5# is "">
 <cfif #totalevents# GTE 1>
 
 
 
-<form name="edit" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
+<form name="edit"
+ action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&s
+tarttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
 <hr id="HRRule8" width="977" size="1">
 
 <table id="Table166" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 28px;">
@@ -1808,7 +1810,8 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
 <td width="138" id="Cell1049">
       <table width="120" border="0" cellspacing="0" cellpadding="0" align="center">
         <tr>
-          <td><input type="submit" id="FormsButton1" name="action" value="Train as Spam" disabled="disabled" style="height: 24px; width: 153px;"></td>
+          <td><input type="submit" id="FormsButton1" name="action" value="Train as Spam" disabled="disabled" style="height: 24px; width:
+ 153px;"></td>
         </tr>
       </table>
     </td>
@@ -1816,7 +1819,8 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
 <td width="138" id="Cell1049">
       <table width="120" border="0" cellspacing="0" cellpadding="0" align="center">
         <tr>
-          <td><input type="submit" id="FormsButton1" name="action" value="Train as NOT Spam"  disabled="disabled" style="height: 24px; width: 153px;"></td>
+          <td><input type="submit" id="FormsButton1" name="action" value="Train as NOT Spam"  disabled="disabled" style="height: 24px; width:
+ 153px;"></td>
         </tr>
       </table>
     </td>
@@ -1896,7 +1900,7 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
 
      
 <td align="center">
-<input type="checkbox" name="cbox#mail_id#" value="#mail_id#_#secret_id#" style="height: 13px; width: 13px;">
+<input type="checkbox" name="cbox#mail_id#" value="#mail_id#|#secret_id#" style="height: 13px; width: 13px;">
 </td>
 
     <td id="Cell1055">
@@ -2008,7 +2012,7 @@ select content_type, description from msg_content_type where content_type like b
 
 </cfif>
 
-<td align="center"><a href="loading3.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="view_icon.png" border="0" alt="View Message" title="View Message" </td>
+<td align="center"><a href="loading3.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#starttime=#starttime#&endtime=#endtime#&action=#action#&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="view_icon.png" border="0" alt="View Message" title="View Message" </td>
 
 
 
@@ -2024,8 +2028,7 @@ select content_type, description from msg_content_type where content_type like b
  
 </cfif>
       
-</cfif>&nbsp;</p>
-                          </td>
+</cfif></td>
                         </tr>
                       </table>
                     </td>
