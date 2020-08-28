@@ -345,6 +345,8 @@ fi
 
 #echo "[`date +%m/%d/%Y-%H:%M`] STEP 13 OF 61. Started configuring CommandBox" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
+#Initialize Commandbox
+#/usr/local/bin/box exit
 #Copy Lucee .jar files to /root/.CommandBox/engine/cfml/cli/lucee-server/bundles and Configure Commandbox
 #cp $SCRIPTPATH/download/lucee/* /root/.CommandBox/engine/cfml/cli/lucee-server/bundles && /usr/local/bin/box version 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
