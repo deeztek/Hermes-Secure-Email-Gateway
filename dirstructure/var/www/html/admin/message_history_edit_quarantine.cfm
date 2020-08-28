@@ -419,7 +419,7 @@ select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
 variable ="salearnresult"
-arguments="--no-sync --spam /mnt/data/amavis/#quarfile#">
+arguments="--no-sync --spam #quarfile#">
 </cfexecute>
 
 <cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
@@ -475,7 +475,7 @@ select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
 variable ="salearnresult"
-arguments="--no-sync --ham /mnt/data/amavis/#quarfile#">
+arguments="--no-sync --ham #quarfile#">
 </cfexecute>
 
 <cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
