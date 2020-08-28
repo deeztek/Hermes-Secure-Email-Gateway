@@ -2012,7 +2012,7 @@ select content_type, description from msg_content_type where content_type like b
 
 </cfif>
 
-<td align="center"><a href="loading3.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#starttime=#starttime#&endtime=#endtime#&action=#action#&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="view_icon.png" border="0" alt="View Message" title="View Message" </td>
+<td align="center"><a href="loading3.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="view_icon.png" border="0" alt="View Message" title="View Message" </td>
 
 
 
