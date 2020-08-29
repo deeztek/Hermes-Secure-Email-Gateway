@@ -77,7 +77,7 @@ SECRETID: #secretid#<br>
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getrid" datasource="#datasource#">
-SELECT rid from msgrcpt where mail_id='#mailid#'
+SELECT rid from msgrcpt where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="#datasource#">
@@ -101,7 +101,7 @@ select id, recipient from recipients where recipient='#gettoaddr.toAddress#'
 </cfif>
 
 <cfquery name="getsenderid" datasource="#datasource#">
-SELECT sid from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getsenderemail" datasource="#datasource#">
@@ -208,7 +208,7 @@ values
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getrid" datasource="#datasource#">
-SELECT rid from msgrcpt where mail_id='#mailid#'
+SELECT rid from msgrcpt where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="#datasource#">
@@ -225,8 +225,7 @@ select id, recipient from recipients where recipient='#gettoaddr.toAddress#'
 <cfelse>
 
 <cfoutput>
-<cflocation
- url="message_history_new.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#url.action#&a=virtual&s=#success#&f=#failure#" addtoken="no">
+<cflocation url="message_history_new.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#url.action#&a=virtual&s=#success#&f=#failure#" addtoken="no">
 </cfoutput>
 
 
@@ -234,7 +233,7 @@ select id, recipient from recipients where recipient='#gettoaddr.toAddress#'
 </cfif>
 
 <cfquery name="getsenderid" datasource="#datasource#">
-SELECT sid from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getsenderemail" datasource="#datasource#">
@@ -328,11 +327,11 @@ values
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getrid" datasource="#datasource#">
-select rid from msgrcpt where mail_id='#mailid#'
+select rid from msgrcpt where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfquery name="getrec" datasource="#datasource#">
@@ -373,7 +372,7 @@ arguments="#getmsg.quar_loc# #secretid# #getrec.email#">
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
@@ -409,7 +408,7 @@ file = "#quarfile#">
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#'
+select * from msgs where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
@@ -472,7 +471,7 @@ arguments="-inputformat none">
 <cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
@@ -534,9 +533,7 @@ failure: #failure#<br>
 
 <cfoutput>
 
-<cflocation
- url="message_history_new.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#url.action#&a=#action#&s=#success#&f=#failure#"
- addtoken="no">
+<cflocation url="message_history_new.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#url.action#&a=#action#&s=#success#&f=#failure#" addtoken="no">
 
 </cfoutput></td>
     </tr>

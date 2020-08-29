@@ -107,7 +107,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 <cfset mailid = "#url.mid#">
 
 <cfquery name="checkq" datasource="#datasource#">
-select archive, quar_loc from msgs where mail_id='#mailid#'
+select archive, quar_loc from msgs where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfif #checkq.archive# is "N">
@@ -120,31 +120,25 @@ select * from archive_jobs limit 1
 <cfif #getarchive.recordcount# GTE 1>
 <cfset quarfile="/mnt/hermesemail_archive/mnt/data/amavis/#checkq.quar_loc#">
 <cfelseif #getarchive.recordcount# LT 1>
-<cflocation
- url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.
-starttime#&endtime=#url.endtime#&action=#action#&m3=5">
+<cflocation url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#&m3=5">
 </cfif>
 </cfif>
 
 <cfif NOT fileExists(quarfile)> 
 <cfif #checkq.archive# is "N">
 
-<cflocation
- url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.
-starttime#&endtime=#url.endtime#&action=#action#&m3=4">
+<cflocation url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#&m3=4">
 
 <cfelseif #checkq.archive# is "Y">
 
-<cflocation
- url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.
-starttime#&endtime=#url.endtime#&action=#action#&m3=5">
+<cflocation url="loading4.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#&m3=5">
 
 </cfif>
 
 <cfelseif fileExists(quarfile)>
 
 <cfquery name="getmsgother" datasource="#datasource#">
-SELECT * FROM msgs where mail_id='#mailid#'
+SELECT * FROM msgs where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfset secretid = "#getmsgother.secret_id#">
@@ -176,7 +170,7 @@ SELECT email as fromAddress FROM maddr where id='#getsid.sid#'
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="#datasource#">
-SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id='#mailid#'
+SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfset from = "#getfromaddr.fromAddress#">

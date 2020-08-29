@@ -195,7 +195,7 @@ readonly: true,
 <cfset mailid = "#url.mid#">
 
 <cfquery name="checkq" datasource="#datasource#">
-select archive, quar_loc from msgs where mail_id='#mailid#'
+select archive, quar_loc from msgs where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfif #checkq.archive# is "N">
@@ -232,7 +232,7 @@ starttime#&endtime=#url.endtime#&action=#action#&m3=5">
 <cfelseif fileExists(quarfile)>
 
 <cfquery name="getmsgother" datasource="#datasource#">
-SELECT * FROM msgs where mail_id='#mailid#'
+SELECT * FROM msgs where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfset secretid = "#getmsgother.secret_id#">
@@ -263,7 +263,7 @@ SELECT email as fromAddress FROM maddr where id='#getsid.sid#'
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="#datasource#">
-SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id='#mailid#'
+SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfset from = "#getfromaddr.fromAddress#">
