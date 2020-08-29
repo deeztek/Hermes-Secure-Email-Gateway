@@ -29,14 +29,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <body style="background-color: rgb(255,255,255); background-image: none; margin: 0px;">
   <table border="0" cellspacing="0" cellpadding="0" width="867">
     <tr valign="top" align="left">
-      <td width="47" height="57"></td>
-      <td width="820"></td>
+      <td width="48" height="31"></td>
+      <td width="819"></td>
     </tr>
     <tr valign="top" align="left">
       <td></td>
-      <td width="820" id="Text378" class="TextObject">
-        <p style="margin-bottom: 0px;">
-<cfset success=0>
+      <td width="819" id="Text381" class="TextObject">
+        <p style="margin-bottom: 0px;">&nbsp;</p>
+        <cfset success=0>
 <cfset failure=0>
 
 <cfquery name="getrecipientid" datasource="#datasource#">
@@ -53,7 +53,7 @@ select id, recipient from recipients where recipient='#session.email#'
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getsenderid" datasource="#datasource#">
-SELECT sid from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getsenderemail" datasource="#datasource#">
@@ -144,7 +144,7 @@ values
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getsenderid" datasource="#datasource#">
-SELECT sid from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getsenderemail" datasource="#datasource#">
@@ -256,11 +256,11 @@ values
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfquery name="getrid" datasource="#datasource#">
-select rid from msgrcpt where mail_id='#mailid#'
+select rid from msgrcpt where mail_id like binary '#mailid#'
 </cfquery>
 
 <cfquery name="getrec" datasource="#datasource#">
@@ -301,7 +301,7 @@ arguments="#getmsg.quar_loc# #secretid# #getrec.email#">
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
@@ -339,55 +339,34 @@ delete FROM quarantine where mail_id = '#mailid#'
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
 <cfset quarfile="/mnt/data/amavis/#getmsg.quar_loc#">
 <cfif fileExists(quarfile)> 
 
-<cffile action = "copy" source = "#quarfile#" 
-    destination = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
-outputfile ="/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#"
-arguments="--no-sync --spam /opt/hermes/sa-learn/LEARNSPAM/">
+variable = "salearnresult"
+arguments="--no-sync --spam #quarfile#">
 </cfexecute>
 
-<cffile action="read" file="/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#" variable="check">
+<cfoutput>
+salearnresult:#salearnresult#<br>
+</cfoutput>
 
-<cfif FindNoCase("Learned tokens from 1 message", check)>
+<cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
 <cfset success=#success#+1>
 
+<cfoutput>Success:#success#<br></cfoutput>
 
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#">
-
-
-
-<cfelse>
+<cfelseif #salearnresult# does not contain 'Learned tokens from 1 message(s)'>
 
 <cfset failure=#failure#+1>
-    
-
-
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNSPAM/result_#mailid#">
-
-
+<cfoutput>Failure: #failure#<br></cfoutput>
+   
 </cfif>
 
 
@@ -423,54 +402,34 @@ arguments="-inputformat none">
 <cfset mailid = listGetAt(form[thefield], 1, "_")>
 
 <cfquery name="getmsg" datasource="#datasource#">
-select * from msgs where mail_id='#mailid#' and secret_id='#secretid#'
+select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
 </cfquery>
 
 <cfif #getmsg.recordcount# GTE 1>
 <cfset quarfile="/mnt/data/amavis/#getmsg.quar_loc#">
 <cfif fileExists(quarfile)> 
 
-<cffile action = "copy" source = "#quarfile#" 
-    destination = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-
 <cfexecute name = "/usr/bin/sa-learn"
 timeout = "240"
-outputfile ="/opt/hermes/sa-learn/LEARNHAM/result_#mailid#"
-arguments="--no-sync --ham /opt/hermes/sa-learn/LEARNHAM/">
+variable = "salearnresult"
+arguments="--no-sync --ham #quarfile#">
 </cfexecute>
 
-<cffile action="read" file="/opt/hermes/sa-learn/LEARNHAM/result_#mailid#" variable="check">
+<cfoutput>
+salearnresult:#salearnresult#<br>
+</cfoutput>
 
-<cfif FindNoCase("Learned tokens from 1 message", check)>
+<cfif #salearnresult# contains 'Learned tokens from 1 message(s)'>
 
 <cfset success=#success#+1>
 
+<cfoutput>Success:#success#<br></cfoutput>
 
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/result_#mailid#">
-
-
-<cfelse>
+<cfelseif #salearnresult# does not contain 'Learned tokens from 1 message(s)'>
 
 <cfset failure=#failure#+1>
-    
-
-
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/#mailid#">
-    
-<cffile
-    action = "delete"
-    file = "/opt/hermes/sa-learn/LEARNHAM/result_#mailid#">
-
-
+<cfoutput>Failure: #failure#<br></cfoutput>
+   
 </cfif>
 
 
@@ -502,8 +461,7 @@ arguments="-inputformat none">
 
 <cfoutput>
 <cflocation url="loading.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#form.todo#&s=#success#&f=#failure#&a=#form.todo#" addtoken="no">
-</cfoutput>&nbsp;</p>
-      </td>
+</cfoutput></td>
     </tr>
   </table>
 </body>
