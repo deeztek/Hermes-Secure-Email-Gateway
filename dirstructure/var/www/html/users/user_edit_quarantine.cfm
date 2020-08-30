@@ -49,8 +49,8 @@ select id, recipient from recipients where recipient='#session.email#'
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getsenderid" datasource="#datasource#">
 SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
@@ -140,8 +140,8 @@ values
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getsenderid" datasource="#datasource#">
 SELECT sid from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
@@ -252,8 +252,8 @@ values
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
@@ -297,8 +297,8 @@ arguments="#getmsg.quar_loc# #secretid# #getrec.email#">
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
@@ -335,8 +335,8 @@ delete FROM quarantine where mail_id = '#mailid#'
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'
@@ -398,8 +398,8 @@ arguments="-inputformat none">
 <cfloop index="thefield" list="#form.fieldnames#">
 <cfif thefield contains 'cbox'>
 <cfoutput>
-<cfset secretid = listGetAt(form[thefield], 2, "_")>
-<cfset mailid = listGetAt(form[thefield], 1, "_")>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
 
 <cfquery name="getmsg" datasource="#datasource#">
 select * from msgs where mail_id like binary '#mailid#' and secret_id like binary '#secretid#'

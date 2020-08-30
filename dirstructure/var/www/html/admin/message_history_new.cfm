@@ -1612,23 +1612,27 @@ select description from msg_content_type where content_type like binary '#sortby
                           </td>
                         </tr>
                       </table>
-                      <table border="0" cellspacing="0" cellpadding="0" width="967">
+                      <table border="0" cellspacing="0" cellpadding="0" width="966">
                         <tr valign="top" align="left">
-                          <td width="15" height="1"></td>
-                          <td width="952"></td>
+                          <td width="15" height="2"></td>
+                          <td width="951"></td>
                         </tr>
                         <tr valign="top" align="left">
                           <td></td>
-                          <td width="952" id="Text453" class="TextObject">
-                            <p style="margin-bottom: 0px;"><cfif #m3# is "1">
+                          <td width="951" id="Text498" class="TextObject">
+                            <p style="margin-bottom: 0px;">&nbsp;</p>
+                            <cfif #m3# is "1">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Message has been released</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Message has been released</span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #m3# is "2">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to release message. This usually happens if the message does not exist or if the message has been archived. Archived messages cannot be released. They can only be viewed or downloaded individually</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top"
+ border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to release message. This usually happens if the message does not exist or if the message has been archived. Archived messages cannot be released. They can only
+ be viewed or downloaded individually</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -1636,47 +1640,68 @@ select description from msg_content_type where content_type like binary '#sortby
 
 <cfif #m3# is "4">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon" title="warning_icon">&nbsp;the message you are attempting to view does not exist</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top"
+ border="0" alt="warning_icon" title="warning_icon">&nbsp;the message you are attempting to view does not exist</span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #m3# is "5">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to retrieve the archived message you are attempting to view. Ensure that an archive job that points to the correct archived messages share exists and that the share is succesfully mounted</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top"
+ border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to retrieve the archived message you are attempting to view. Ensure that an archive job that points to the correct archived messages share exists and that the
+ share is succesfully mounted</span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "Allow Sender">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully allow #s# sender(s). <cfif #f# GTE 1>However it was NOT able to allow #f# sender(s). This is usually caused by the fact that the sender(s) already exist</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully allow #s# sender(s). <cfif #f# GTE 1>However it was NOT able to allow #f# sender(s). This is usually
+ caused by the fact that the sender(s) already exist</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "Block Sender">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully block #s# sender(s). <cfif #f# GTE 1>However it was NOT able to block #f# sender(s). This is usually caused by the fact that the sender(s) already exist</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully block #s# sender(s). <cfif #f# GTE 1>However it was NOT able to block #f# sender(s). This is usually
+ caused by the fact that the sender(s) already exist</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "Release Msg">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully release #s# message(s). <cfif #f# GTE 1>However it was NOT able to release #f# message(s). This is usually caused by the fact that some of the messages you selected do not exist in quarantine, or they have been archived. Archived messages cannot be released. They can only be viewed or downloaded individually</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully release #s# message(s). <cfif #f# GTE 1>However it was NOT able to release #f# message(s). This is
+ usually caused by the fact that some of the messages you selected do not exist in quarantine, or they have been archived. Archived messages cannot be released. They can only be viewed or downloaded individually</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "Delete Msg">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully delete #s# message(s). <cfif #f# GTE 1>However it was NOT able to delete #f# message(s). This is usually caused by the fact that some of the messages you selected were already deleted</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system processed your request and it was able to successfully delete #s# message(s). <cfif #f# GTE 1>However it was NOT able to delete #f# message(s). This is
+ usually caused by the fact that some of the messages you selected were already deleted</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "Train as Spam">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system was able to train the Spam/Virus Filter with #s# message(s) as Spam. <cfif #f# GTE 1>However, the system was NOT able to train the Spam/Virus filter with #f# message(s). This is usually caused by the fact that some of the messages you selected were already processed. Please note that it may take multiple times for the Spam/Virus filter to start recognizing certain e-mails as Spam</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system was able to train the Spam/Virus Filter with #s# message(s) as Spam. <cfif #f# GTE 1>However, the system was NOT able to train the Spam/Virus filter with
+ #f# message(s). This is usually caused by the fact that some of the messages you selected were already processed. Please note that it may take multiple times for the Spam/Virus filter to start recognizing certain e-mails as Spam</cfif>
+</span></i></b></p>
+</cfoutput>
+</cfif>
+
+<cfif #a# is "Forget">
+<cfoutput>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The Spam/Virus Filter was able to forget #s# message(s). <cfif #f# GTE 1>However, the Spam/Virus filter was not able to forget #f# message(s).</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
@@ -1684,24 +1709,27 @@ select description from msg_content_type where content_type like binary '#sortby
 
 <cfif #a# is "Train as NOT Spam">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system was able to train the Spam/Virus Filter with #s# message(s) as NOT Spam. <cfif #f# GTE 1>However, the system was NOT able to train the Spam/Virus filter with #f# message(s). This is usually caused by the fact that some of the messages you selected were already processed. Please note that it may take multiple times for the Spam/Virus filter to start recognizing certain e-mails as NOT Spam</cfif>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0"
+ align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;The system was able to train the Spam/Virus Filter with #s# message(s) as NOT Spam. <cfif #f# GTE 1>However, the system was NOT able to train the Spam/Virus filter
+ with #f# message(s). This is usually caused by the fact that some of the messages you selected were already processed. Please note that it may take multiple times for the Spam/Virus filter to start recognizing certain e-mails as NOT
+ Spam</cfif>
 </span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "notlocal">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to Block/Allow this sender because the recipient is not local</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top"
+ border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to Block/Allow this sender because the recipient is not local</span></i></b></p>
 </cfoutput>
 </cfif>
 
 <cfif #a# is "virtual">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to Block/Allow this sender because the recipient is virtual</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top"
+ border="0" alt="warning_icon" title="warning_icon">&nbsp;the system was unable to Block/Allow this sender because the recipient is virtual</span></i></b></p>
 </cfoutput>
-</cfif>
-&nbsp;</p>
-                          </td>
+</cfif></td>
                         </tr>
                       </table>
                       <table cellpadding="0" cellspacing="0" border="0" width="200">
@@ -1709,7 +1737,7 @@ select description from msg_content_type where content_type like binary '#sortby
                           <td>
                             <table border="0" cellspacing="0" cellpadding="0" width="104">
                               <tr valign="top" align="left">
-                                <td width="15" height="4"></td>
+                                <td width="15" height="3"></td>
                                 <td width="89"></td>
                               </tr>
                               <tr valign="top" align="left">
@@ -1723,7 +1751,7 @@ select description from msg_content_type where content_type like binary '#sortby
                           <td>
                             <table border="0" cellspacing="0" cellpadding="0" width="96">
                               <tr valign="top" align="left">
-                                <td width="7" height="4"></td>
+                                <td width="7" height="3"></td>
                                 <td width="89"></td>
                               </tr>
                               <tr valign="top" align="left">
@@ -1804,6 +1832,15 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
         </tr>
       </table>
     </td>
+    
+    <td width="138" id="Cell1049">
+      <table width="120" border="0" cellspacing="0" cellpadding="0" align="center">
+        <tr>
+          <td><input type="submit" id="FormsButton1" name="action" value="Forget" style="height: 24px; width: 153px;"></td>
+        </tr>
+      </table>
+    </td>
+
 
 <cfelseif #getbayes.value# EQ 0>
 
@@ -1820,6 +1857,15 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
       <table width="120" border="0" cellspacing="0" cellpadding="0" align="center">
         <tr>
           <td><input type="submit" id="FormsButton1" name="action" value="Train as NOT Spam"  disabled="disabled" style="height: 24px; width:
+ 153px;"></td>
+        </tr>
+      </table>
+    </td>
+    
+    <td width="138" id="Cell1049">
+      <table width="120" border="0" cellspacing="0" cellpadding="0" align="center">
+        <tr>
+          <td><input type="submit" id="FormsButton1" name="action" value="Forget"  disabled="disabled" style="height: 24px; width:
  153px;"></td>
         </tr>
       </table>

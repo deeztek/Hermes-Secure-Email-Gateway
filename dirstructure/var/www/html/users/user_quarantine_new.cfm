@@ -1233,15 +1233,16 @@ select description from msg_content_type where content_type like binary '#sortby
                           </td>
                         </tr>
                       </table>
-                      <table border="0" cellspacing="0" cellpadding="0" width="970">
+                      <table border="0" cellspacing="0" cellpadding="0" width="969">
                         <tr valign="top" align="left">
-                          <td width="15" height="1"></td>
-                          <td width="955"></td>
+                          <td width="16" height="2"></td>
+                          <td width="953"></td>
                         </tr>
                         <tr valign="top" align="left">
                           <td></td>
-                          <td width="955" id="Text226" class="TextObject">
-                            <p style="margin-bottom: 0px;"><cfif #m5# is "">
+                          <td width="953" id="Text465" class="TextObject">
+                            <p style="margin-bottom: 0px;">&nbsp;</p>
+                            <cfif #m5# is "">
 <cfif #totalevents# GTE 1>
 <form name="edit" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#StartRow#&DisplayRows=#DisplayRows#&startdate=#startdate#&enddate=#enddate#&starttime=#starttime#&endtime=#endtime#&action=#action#</cfoutput>" method="post">
 <hr id="HRRule8" width="955" size="1">
@@ -1387,7 +1388,7 @@ SELECT parameter, value FROM spam_settings where parameter = 'use_bayes'
 
      
 <td align="center">
-<input type="checkbox" name="cbox#mail_id#" value="#mail_id#_#secret_id#" style="height: 13px; width: 13px;">
+<input type="checkbox" name="cbox#mail_id#" value="#mail_id#|#secret_id#" style="height: 13px; width: 13px;">
 </td>
 
 
@@ -1455,9 +1456,7 @@ select content_type, description from msg_content_type where content_type like b
  
 </cfif>
       
-</cfif>
-      &nbsp;</p>
-                          </td>
+</cfif></td>
                         </tr>
                       </table>
                     </td>
