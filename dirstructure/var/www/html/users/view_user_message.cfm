@@ -287,17 +287,17 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                       <table cellpadding="0" cellspacing="0" border="0" width="967">
                         <tr valign="top" align="left">
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="938">
+                            <table border="0" cellspacing="0" cellpadding="0" width="932">
                               <tr valign="top" align="left">
-                                <td width="13" height="11"></td>
-                                <td width="1"></td>
-                                <td width="264"></td>
-                                <td width="660"></td>
+                                <td width="13" height="13"></td>
+                                <td width="265"></td>
+                                <td width="654"></td>
                               </tr>
                               <tr valign="top" align="left">
-                                <td colspan="2"></td>
-                                <td colspan="2" width="924" id="Text463" class="TextObject">
-                                  <p style="margin-bottom: 0px;"><cfquery name="getusertrainfilter" datasource="#datasource#">
+                                <td></td>
+                                <td colspan="2" width="919" id="Text465" class="TextObject">
+                                  <p style="margin-bottom: 0px;">&nbsp;</p>
+                                  <cfquery name="getusertrainfilter" datasource="#datasource#">
 select value from spam_settings where parameter = 'user_portal_spam_training'
 </cfquery>
 
@@ -309,7 +309,8 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
 
 
     <td width="125" id="Cell1018">
-      <form name="Cell1018FORM" action="<cfoutput>loading.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+      <form name="Cell1018FORM" action="<cfoutput>loading.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>"
+ method="post">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center"><input type="submit" id="FormsButton2" name="FormsButton2" value="BACK" style="height: 24px; width: 61px;"></td>
@@ -320,22 +321,12 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
 
 
 
-<!--
-<td width="125" id="Cell1018">
-     
-        <table width="100%" border="0" cellspacing="0" cellpadding="0">
-          <tr>
-            <td align="center"><button onclick="self.close()">Close</button></td>
-          </tr>
-        </table>
-      
-    </td>
 
--->
 
     <td width="122" id="Cell1040">
-      <form name="Cell1040FORM" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-        <input type="hidden" name="todo" value="Block Sender"><input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>">
+      <form name="Cell1040FORM"
+ action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+        <input type="hidden" name="todo" value="Block Sender"><input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center"><input type="submit" id="FormsButton3" value="Block" style="height: 24px; width: 60px;"></td>
@@ -344,8 +335,9 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
       </form>
     </td>
     <td width="116" id="Cell1041">
-      <form name="Cell1041FORM" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="todo" value="Allow Sender">
+      <form name="Cell1041FORM"
+ action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="todo" value="Allow Sender">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center"><input type="submit" id="FormsButton4" value="Allow" style="height: 24px; width: 57px;"></td>
@@ -354,8 +346,9 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
       </form>
     </td>
     <td width="179" id="Cell1054">
-      <form name="Cell1054FORM" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="todo" value="Release Msg">
+      <form name="Cell1054FORM"
+ action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="todo" value="Release Msg">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
             <td align="center"><input type="submit" id="FormsButton5" value="Release" style="height: 24px; width: 87px;"></td>
@@ -366,8 +359,9 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
 
 
     <td width="129" id="Cell1055">
-      <form name="Cell1055FORM" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="todo" value="Train as Spam">
+      <form name="Cell1055FORM"
+ action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="todo" value="Train as Spam">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
 <cfif #session.train_bayes# EQ 1>   
@@ -385,8 +379,9 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
       </form>
     </td>
     <td width="228" id="Cell1056">
-      <form name="Cell1056FORM" action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="todo" value="Train as NOT Spam">
+      <form name="Cell1056FORM"
+ action="<cfoutput>user_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
+        <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="todo" value="Train as NOT Spam">
         <table width="100%" border="0" cellspacing="0" cellpadding="0">
           <tr>
 
@@ -405,15 +400,14 @@ select value from spam_settings where parameter = 'user_portal_spam_training'
       </form>
     </td>
   </tr>
-</table>&nbsp;</p>
-                                </td>
+</table></td>
                               </tr>
                               <tr valign="top" align="left">
-                                <td colspan="4" height="3"></td>
+                                <td colspan="3" height="1"></td>
                               </tr>
                               <tr valign="top" align="left">
                                 <td></td>
-                                <td colspan="2" width="265" id="Text458" class="TextObject">
+                                <td width="265" id="Text458" class="TextObject">
                                   <p style="text-align: left; margin-bottom: 0px;"><cfif #session.download_msg# EQ 1>
 <p style="text-align: left; margin-bottom: 0px;"><a style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"
 href="<cfoutput>user_download_message.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#&mid=#URLEncodedFormat(Trim(mailid))#</cfoutput>">Download
@@ -425,9 +419,9 @@ href="<cfoutput>user_download_message.cfm?StartRow=#url.StartRow#&DisplayRows=#u
                             </table>
                           </td>
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="29">
+                            <table border="0" cellspacing="0" cellpadding="0" width="35">
                               <tr valign="top" align="left">
-                                <td width="4" height="6"></td>
+                                <td width="10" height="6"></td>
                                 <td></td>
                               </tr>
                               <tr valign="top" align="left">

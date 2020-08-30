@@ -399,6 +399,69 @@ file = "#quarfile#">
 </cfif>
 </cfloop>
 
+<cfelseif #action# is "Forget">
+<cfloop index="thefield" list="#form.fieldnames#">
+<cfif thefield contains 'cbox'>
+<cfoutput>
+<cfset secretid = listGetAt(form[thefield], 2, "|")>
+<cfset mailid = listGetAt(form[thefield], 1, "|")>
+
+<cfquery name="getmsg" datasource="#datasource#">
+select * from msgs where mail_id like binary '#mailid#'
+</cfquery>
+
+<cfif #getmsg.recordcount# GTE 1>
+<cfset quarfile="/mnt/data/amavis/#getmsg.quar_loc#">
+<cfif fileExists(quarfile)> 
+
+<cfexecute name = "/usr/bin/sa-learn"
+timeout = "240"
+variable = "salearnresult"
+arguments="--forget #quarfile#">
+</cfexecute>
+
+<cfoutput>
+salearnresult:#salearnresult#<br>
+</cfoutput>
+
+<cfif #salearnresult# contains 'Forgot tokens from 1 message(s)'>
+
+<cfset success=#success#+1>
+
+<cfoutput>Success:#success#<br></cfoutput>
+
+<cfelseif #salearnresult# does not contain 'Forgot tokens from 1 message(s)'>
+
+<cfset failure=#failure#+1>
+<cfoutput>Failure: #failure#<br></cfoutput>
+   
+</cfif>
+
+
+<cfelseif NOT fileExists(quarfile)> 
+<cfset failure=#failure#+1>
+</cfif>
+
+<cfelseif #getmsg.recordcount# LT 1>
+<cfset failure=#failure#+1>
+
+</cfif>
+
+</cfoutput>
+</cfif>
+</cfloop>
+
+<cftry>
+<cfexecute name = "/opt/hermes/scripts/bayes_chown_amavis.sh"
+timeout = "240"
+outputfile ="/dev/null"
+arguments="-inputformat none">
+</cfexecute>
+
+<cfcatch type="any">
+</cfcatch>
+</cftry>
+
 
 <cfelseif #action# is "Train as Spam">
 <cfloop index="thefield" list="#form.fieldnames#">

@@ -238,7 +238,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                                 </td>
                                 <td width="122" id="Cell1040">
                                   <form name="Cell1040FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-                                    <input type="hidden" name="action" value="Block Sender"><input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>">
+                                    <input type="hidden" name="action" value="Block Sender"><input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                       <tr>
                                         <td align="center"><input type="submit" id="FormsButton3" value="Block" style="height: 24px; width: 60px;"></td>
@@ -248,7 +248,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                                 </td>
                                 <td width="116" id="Cell1041">
                                   <form name="Cell1041FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="action" value="Allow Sender">
+                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="action" value="Allow Sender">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                       <tr>
                                         <td align="center"><input type="submit" id="FormsButton4" value="Allow" style="height: 24px; width: 57px;"></td>
@@ -258,7 +258,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                                 </td>
                                 <td width="178" id="Cell1054">
                                   <form name="Cell1054FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="action" value="Release Msg">
+                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="action" value="Release Msg">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                       <tr>
                                         <td align="center"><input type="submit" id="FormsButton5" value="Release" style="height: 24px; width: 87px;"></td>
@@ -268,7 +268,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                                 </td>
                                 <td width="129" id="Cell1055">
                                   <form name="Cell1055FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="action" value="Train as Spam">
+                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="action" value="Train as Spam">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                       <tr>
                                         <td align="center"><input type="submit" id="FormsButton6" value="Spam" style="height: 24px; width: 63px;"></td>
@@ -278,7 +278,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
                                 </td>
                                 <td width="227" id="Cell1056">
                                   <form name="Cell1056FORM" action="<cfoutput>message_history_edit_quarantine.cfm?StartRow=#url.StartRow#&DisplayRows=#url.DisplayRows#&startdate=#url.startdate#&enddate=#url.enddate#&starttime=#url.starttime#&endtime=#url.endtime#&action=#action#</cfoutput>" method="post">
-                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#_#secretid#</cfoutput>"><input type="hidden" name="action" value="Train as NOT Spam">
+                                    <input type="hidden" name="<cfoutput>cbox#mailid#</cfoutput>" value="<cfoutput>#mailid#|#secretid#</cfoutput>"><input type="hidden" name="action" value="Train as NOT Spam">
                                     <table width="100%" border="0" cellspacing="0" cellpadding="0">
                                       <tr>
                                         <td align="center"><input type="submit" id="FormsButton7" value="NOT Spam" style="height: 24px; width: 111px;"></td>
