@@ -116,9 +116,18 @@ Check out our [Getting Started Guide](https://www.deeztek.com/documentation/herm
 
 Check out the [Hermes SEG Administrator](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/) and [Hermes SEG User](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/) guides
 
+Support can be obtained by visiting our Hermes SEG Discussions at:
+
 **Support**
 
-Support can be obtained by visiting our Hermes SEG Support forums at:
+Support can be obtained by visiting our Hermes SEG Discussions at:
 
-[https://community.deeztek.com/c/hermes-seg-suppport](https://community.deeztek.com/c/hermes-seg-suppport)
+[https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
+
+**Bugs**
+
+Bugs can be posted on Github Issues at:
+
+[https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues)
+
 
