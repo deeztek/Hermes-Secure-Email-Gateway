@@ -110,7 +110,7 @@ Run the script as root:
 
 **Getting Started Guide**
 
-Check out our [Getting Started Guide](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/getting-started/) to get your Hermes SEG installation configured quickly.
+Check out our [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly.
 
 **Documentation**
 
