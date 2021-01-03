@@ -114,7 +114,7 @@ Check out our [Getting Started Guide](https://www.deeztek.com/documentation/herm
 
 **Documentation**
 
-Check out the [Hermes SEG Administrator](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/) and [Hermes SEG User](https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/) guides
+Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User](https://docs.deeztek.com/books/hermes-seg-user-guide) guides
 
 Support can be obtained by visiting our Hermes SEG Discussions at:
 
