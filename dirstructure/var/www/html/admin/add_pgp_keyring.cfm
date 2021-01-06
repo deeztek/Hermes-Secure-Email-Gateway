@@ -375,19 +375,21 @@ timeout = "240"
 arguments="-inputformat none">
 </cfexecute>
 
-<!-- DELETE CREATE_PGP_KEY -->
+<!--- DELETE CREATE_PGP_KEY --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_create_pgp_key.sh">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
 
-<!-- DELETE GPG_TEMPLATE -->
+
+<!--- DELETE GPG_TEMPLATE --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_gpg_template">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
+
     
 <!-- CREATE GPG SCRIPT ENDS HERE -->
 
@@ -419,26 +421,29 @@ timeout = "240"
 arguments="-inputformat none">
 </cfexecute>
 
-<!-- DELETE EXPORT_IMPORT_PGP_KEY -->
+<!--- DELETE EXPORT_IMPORT_PGP_KEY --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_export_import_pgp_key.sh">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
 
-<!-- DELETE public.key THAT THE EXPORT_IMPORT_PGP_KEY.SH SCRIPT CREATES -->
+
+<!--- DELETE public.key THAT THE EXPORT_IMPORT_PGP_KEY.SH SCRIPT CREATES --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_public.key">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
 
-<!-- DELETE private.key THAT THE EXPORT_IMPORT_PGP_KEY.SH SCRIPT CREATES -->
+
+<!--- DELETE private.key THAT THE EXPORT_IMPORT_PGP_KEY.SH SCRIPT CREATES --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_private.key">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
+
 
 <!-- EXPORT_IMPORT_PGP_KEY SCRIPT ENDS HERE -->
 
@@ -446,12 +451,13 @@ file = "#FiletoDelete#">
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_gpg_output" variable="theKeyID2">
 <cfset theKeyID = #TRIM(theKeyID2)#>
 
-<!-- DELETE _GPG_OUTPUT FILE -->
+<!--- DELETE _GPG_OUTPUT FILE --->
 <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_gpg_output">
 <cfif fileExists(FiletoDelete)> 
 <cffile action="delete" 
 file = "#FiletoDelete#">
 </cfif>
+
 
 <cfquery name="getparentdjigzokeyring" datasource="djigzo">
 select * from cm_keyring where cm_keyidhex='#theKeyID#' and cm_master='1'
