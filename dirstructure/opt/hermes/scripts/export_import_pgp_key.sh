@@ -5,8 +5,11 @@ THEKEYID=`cat /opt/hermes/tmp/CUSTOM-TRANS_gpg_output`
 #Export Public Key
 /usr/bin/gpg --homedir /opt/hermes/.gnupg/ --export -a "$THEKEYID" > /opt/hermes/tmp/CUSTOM-TRANS_public.key
 
-#Export Private Key
-/usr/bin/gpg --homedir /opt/hermes/.gnupg/ --export-secret-key -a "$THEKEYID" > /opt/hermes/tmp/CUSTOM-TRANS_private.key
+#Export Private Key (OLD)
+#/usr/bin/gpg --homedir /opt/hermes/.gnupg/ --export-secret-key -a "$THEKEYID" > /opt/hermes/tmp/CUSTOM-TRANS_private.key
+
+#Export Private Key (NEW)
+/usr/bin/gpg --pinentry-mode=loopback --passphrase "THE-PASSWORD" --homedir /opt/hermes/.gnupg/ --export-secret-key -a "$THEKEYID" > /opt/hermes/tmp/CUSTOM-TRANS_private.key
 
 cd /usr/share/djigzo
 
