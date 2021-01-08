@@ -1152,11 +1152,11 @@ echo "==== WARNING ====" | boxes -d stone -p a2v1
 echo "During installation of Opendmarc, you will be prompted to configure database for Opendmarc with dbconfig-common. You must answer NO since this script has already configured the database"
 echo "Additionally, as part of the Opendmarc installation, during libc6 configuration, you MAY be prompted to restart services during package upgrades without asking. You may answer YES to that prompt"
 
-#Install Opendmarc 1.3.2-6 from eoan main
+#Install Opendmarc 1.3.2-7 from focal main
 while true; do
     read -p "Do you wish to continue the installation of Opendmarc? (Enter y or Y. Warning!! Entering n or N will exit this script and the installation will fail!)" yn
     case $yn in
-        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 61: Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /bin/cp /etc/apt/sources.list /etc/apt/sources.list.ORIGINAL && /bin/echo "deb http://cz.archive.ubuntu.com/ubuntu eoan main universe" | sudo tee -a /etc/apt/sources.list && /usr/bin/apt update && /usr/bin/apt install opendmarc -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 59 OF 61: Completed Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
+        [Yy]* ) echo "[`date +%m/%d/%Y-%H:%M`] STEP 59 OF 61: Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; /bin/cp /etc/apt/sources.list /etc/apt/sources.list.ORIGINAL && /bin/echo "deb http://mirrors.kernel.org/ubuntu focal main universe" | sudo tee -a /etc/apt/sources.list && /usr/bin/apt update && /usr/bin/apt install opendmarc -y 2>> $SCRIPTPATH/install_log-$TIMESTAMP.log; echo "[`date +%m/%d/%Y-%H:%M`] SUCESS STEP 59 OF 61: Completed Installing Opendmarc" >> $SCRIPTPATH/install_log-$TIMESTAMP.log; break;;
         [Nn]* ) exit;;
         * ) echo "Please answer yes or no.";;
     esac
