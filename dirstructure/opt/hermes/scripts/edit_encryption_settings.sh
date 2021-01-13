@@ -1,5 +1,8 @@
 cd /usr/share/djigzo
 
+#Set user.otbEnabled to true in order to fix Github Issue #9
+/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.otpEnabled --value true --global
+
 /usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.pdf.replySender --value PDFREPLY-SENDER --global
 
 /usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.portal.baseURL --value PORTAL-URL --global
