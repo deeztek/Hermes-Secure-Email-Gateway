@@ -2185,6 +2185,9 @@ INSERT INTO `system_updates` VALUES ('35', '16.04', '190405', '1', '2019-04-07 0
 INSERT INTO `system_updates` VALUES ('36', '16.04', '190415', '1', '2019-05-07 10:03:39', '4');
 INSERT INTO `system_updates` VALUES ('37', '18.04', '191205', '1', '2019-12-05 00:00:00', '5');
 INSERT INTO `system_updates` VALUES ('38', '18.04', '200125', '1', '2020-01-25 00:00:00', '6');
+INSERT INTO `system_updates` VALUES ('39', '18.04', '200829', '1', '2020-08-29 00:00:00', '8');
+INSERT INTO `system_updates` VALUES ('40', '18.04', '200830', '1', '2020-08-30 00:00:00', '9');
+INSERT INTO `system_updates` VALUES ('41', '18.04', '210113', '1', '2021-01-13 00:00:00', '10');
 
 -- ----------------------------
 -- Table structure for `system_users`
