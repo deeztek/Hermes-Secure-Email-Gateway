@@ -32,7 +32,9 @@ TIMESTAMP=`date +%m-%d-%Y-%H%M`
 /usr/bin/wget https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/master/download/opendmarc/opendmarc.conf $SCRIPTPATH && \
 /bin/cp $SCRIPTPATH/opendmarc.conf /etc/opendmarc.conf && \
 /bin/systemctl restart opendmarc && \
-/bin/chown -R opendmarc:opendmarc /var/run/opendmarc/ 2>> $SCRIPTPATH/abe7a52_issue_6_patch_install_log-$TIMESTAMP.log
+/bin/chown -R opendmarc:opendmarc /var/run/opendmarc/ && \
+/bin/cp /etc/apt/sources.ORIGINAL /etc/apt/sources.list && \
+/usr/bin/apt update 2>> $SCRIPTPATH/abe7a52_issue_6_patch_install_log-$TIMESTAMP.log
 
 echo "Finished Patch Installation. An error most likely occurred during Opendmarc configuration. This is expected behavior with Ubuntu 18.04 and Opendmarc should work normally after a reboot."
 
