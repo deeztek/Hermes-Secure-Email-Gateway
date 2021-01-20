@@ -14,10 +14,9 @@
 - [About](#about)
 - [Installation](#installation)
 - [Getting Started Guide](#getting-started-guide)
-- [Build Process](#build-process)
-- [Backers](#backers-)
-- [Sponsors](#sponsors-)
-- [Acknowledgments](#acknowledgments)
+- [Documentation](#documentation)
+- [Support](#support)
+- [Bugs](#bugs)
 
 ## About
 
@@ -133,19 +132,19 @@ Run the script as root:
 
 Check out our [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly.
 
-**Documentation**
+## Documentation
 
 Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User](https://docs.deeztek.com/books/hermes-seg-user-guide) guides
 
 Support can be obtained by visiting our Hermes SEG Discussions at:
 
-**Support**
+## Support
 
 Support can be obtained by visiting our Hermes SEG Discussions at:
 
 [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
 
-**Bugs**
+## Bugs
 
 Bugs can be posted on Github Issues at:
 
