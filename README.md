@@ -11,9 +11,9 @@
 
 ## Table of Contents
 
-- [Introduction](#about)
-- [Features](#installation)
-- [Contributors](#getting-started-guide)
+- [About](#about)
+- [Installation](#installation)
+- [Getting Started Guide](#getting-started-guide)
 - [Build Process](#build-process)
 - [Backers](#backers-)
 - [Sponsors](#sponsors-)
