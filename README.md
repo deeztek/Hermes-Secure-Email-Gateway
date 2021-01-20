@@ -1,7 +1,7 @@
 <h1 align="center"> Hermes Secure E-mail Gateway </h1> <br>
 <p align="center">
-  <a href="https://gitpoint.co/">
-    <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://imgur.com/XYN1OLa" width="450">
+  <a href="https://www.deeztek.com/products/hermes-secure-email-gateway/">
+    <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://i.imgur.com/XYN1OLa.png" width="450">
   </a>
 </p>
 
