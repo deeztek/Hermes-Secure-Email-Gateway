@@ -1,4 +1,4 @@
-<h1 align="center"> Hermes Secure E-mail Gateway </h1> <br>
+<h1 align="center"> Hermes Secure Email Gateway </h1> <br>
 <p align="center">
   <a href="https://www.deeztek.com/products/hermes-secure-email-gateway/">
     <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://i.imgur.com/XYN1OLa.png" width="auto">
