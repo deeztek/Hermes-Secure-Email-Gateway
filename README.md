@@ -5,6 +5,10 @@
   </a>
 </p>
 
+<p align="center">
+  Open Source Unified Secure Email Gateway
+</p>
+
 **About**
 
 Hermes Secure Email Gateway is a Free Open Source Ubuntu 18.04 Server based Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. It features the latest email authentication techniques such as SPF (Sender Policy Framework), DKIM (DomainKeys Identified Mail) and DMARC (Domain-based Message Authentication, Reporting and Conformance) in order to combat email spoofing, phishing, scams, email compromise attacks and spam.
