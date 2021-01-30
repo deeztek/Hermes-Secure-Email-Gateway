@@ -1,0 +1,9 @@
+UPDATE recipients_temp SET recipient = REPLACE(`recipient`, ' ', ''); 
+UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\n', ''); 
+UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\t', ''); 
+UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\r', ''); 
+UPDATE recipients_temp SET recipient = TRIM(`recipient`); 
+UPDATE recipients_temp set policy_id='7'; 
+UPDATE recipients_temp set status='OK'; 
+UPDATE recipients_temp set applied='2'; 
+UPDATE recipients_temp set action='insert';
