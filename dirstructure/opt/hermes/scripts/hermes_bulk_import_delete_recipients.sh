@@ -133,6 +133,6 @@ THEERROR=$(($THEERROR+$ERR))
 echo "$ERR Error occurred"
 exit 1
 else
-echo "${GREEN}Hermes SEG Recipient Bulk ${THEACTION} completed succesfully. Please navigate to 'System --> Internal Recipients' to 'Apply Settings' and complete the recipient ${THEACTION} into your system.${RESET}"
+echo "${GREEN}Hermes SEG Recipient Bulk ${THEACTION} completed succesfully. Please navigate to 'Gateway --> Internal Recipients' to 'Apply Settings' and complete the recipient ${THEACTION} into your system.${RESET}"
 fi
 
