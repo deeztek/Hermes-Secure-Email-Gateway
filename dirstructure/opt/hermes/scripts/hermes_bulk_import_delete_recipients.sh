@@ -28,7 +28,7 @@ apt install boxes -y
 
 echo "Hermes SEG Bulk Recipient Import/Delete" | boxes -d stone -p a2v1
 
-echo "${RED}You must have the domain for each recipient to be imported/deleted already configured under 'System --> Relay Domains' before attempting to run this script. If you don't, select 'No' below to cancel running this script${RESET}"
+echo "${RED}You must have the domain for each recipient to be imported/deleted already configured under 'Gateway --> Relay Domains' before attempting to run this script. If you don't, select 'No' below to cancel running this script${RESET}"
 
 PS3='Do you wish to continue running this script?: '
 options=("Yes" "No")
