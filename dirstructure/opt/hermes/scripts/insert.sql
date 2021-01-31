@@ -2,6 +2,7 @@ UPDATE recipients_temp SET recipient = REPLACE(`recipient`, ' ', '');
 UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\n', ''); 
 UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\t', ''); 
 UPDATE recipients_temp SET recipient = REPLACE(`recipient`, '\r', ''); 
+UPDATE recipients_temp set recipient = TRIM(BOTH '"' from `recipient`);
 UPDATE recipients_temp SET recipient = TRIM(`recipient`); 
 UPDATE recipients_temp set policy_id='7'; 
 UPDATE recipients_temp set status='OK'; 
