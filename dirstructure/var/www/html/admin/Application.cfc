@@ -74,11 +74,20 @@
 
       <!--- If Firewall is enabled --->
       <cfif #checkfirewall.value2# is "enabled">
+      <!--- Get IP using X-Forwarded-For --->
+       <cfset theIP=#GetHttpRequestData().headers['X-Forwarded-For']#>
 
-      <!--- Get Client IP and check against the firewall table --->
-      <cfquery name="checkip" datasource="hermes">
-      select ip from firewall where ip='#GetHttpRequestData().headers['X-Forwarded-For']#'
-      </cfquery>
+      <!--- If IP contains multiple IPs separated by comma due to reverse proxy in front of Hermes --->
+       <cfif #theIP# contains ",">
+       <!--- Get the left most value which is most likely the client IP --->
+       <cfset theIP = #trim(ListGetAt(theIP, 1, ","))#>
+       </cfif>
+       
+       <!--- Get Client IP and check against the firewall table --->
+       <cfquery name="checkip" datasource="hermes">
+       select ip from firewall where ip='#theIP#'
+       </cfquery>
+       
 
       <!--- If IP is not in the firewall table display unauthorized.cfm page and stop all processing --->
       <cfif #checkip.recordcount# LT 1>
