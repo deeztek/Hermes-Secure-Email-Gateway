@@ -23,7 +23,7 @@
 
 Hermes Secure Email Gateway is a Free Open Source Ubuntu 18.04 Server based Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. It features the latest email authentication techniques such as SPF (Sender Policy Framework), DKIM (DomainKeys Identified Mail) and DMARC (Domain-based Message Authentication, Reporting and Conformance) in order to combat email spoofing, phishing, scams, email compromise attacks and spam.
 
-Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization.
+Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your organization's incoming and outgoing email.
 
 It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
 
@@ -40,7 +40,7 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 
 ## Installation
 
-Hermes SEG can be easily installed in your existing Ubuntu 18.04 server machine by utilizing the **ubuntu_hermes_1804_install.sh** script. The script requires that you have a fully updated Ubuntu 18.04 server installation and that you have a /mnt/data directory for database and email archive storage. 
+Hermes SEG can be easily installed on your existing Ubuntu 18.04 server machine by utilizing the **ubuntu_hermes_1804_install.sh** script. The script requires that you have a fully updated Ubuntu 18.04 server installation and that you have a `/mnt/data` directory for database and email archive storage.
 
 **Required Information**
 
@@ -59,9 +59,9 @@ The script will prompt you for the following information before it starts instal
 * System Mailname (Example: smtp.domain.tld)
 
 
-The **Configure /mnt/data partition** directions below assume you have a 250GB secondary drive which you will partition, format and mount as /mnt/data. 
+The **Configure /mnt/data partition** instructions below assume you have a 250 GB secondary drive which you will partition, format and mount as `/mnt/data`.
 
-Technically a secondary drive for the /mnt/data directory is not a requirement but it's highly recommended for performance reasons. If you don't wish to use a secondary drive for the /mnt/data directory, simply create a /mnt/data directory in your system and skip to the **Quick script install and run instructions** section. 
+Technically, a secondary drive for the `/mnt/data` directory is not a requirement but it's highly recommended for performance reasons. If you don't wish to use a secondary drive for the `/mnt/data` directory, simply create a `/mnt/data` directory in your system and skip to the **Quick script install and run instructions** section.
 
 **Configure /mnt/data partition**
 
@@ -69,17 +69,17 @@ Technically a secondary drive for the /mnt/data directory is not a requirement b
 
 `sudo fdisk -l `
 
-Look for 250 GB drive you created earlier device ID, usually /dev/sdb. Ensure you select correct device ID before running the commands below)
+Look for the device ID of the 250 GB drive you created earlier, it's usually `/dev/sdb`. Ensure you select the correct device ID before running the commands below.
 
-**Create partititon**
+**Create partition**
 
 `sudo fdisk /dev/sdb`
 
 * Hit "n" to add new partition
 * Hit "p" for primary partition
 * Hit "Enter" for partition 1
-* Hit "Enter" for default first sector
-* Hit "Enter" for default last sector
+* Hit "Enter" for default: first sector
+* Hit "Enter" for default: last sector
 * Hit "w" to write changes to disk and exit
 
 **Format Partition**
@@ -122,11 +122,11 @@ tmpfs           395M     0  395M   0% /run/user/1000
 /dev/sdb1       246G   61M  233G   1% /mnt/data
 ```
 
-Reboot and ensure /mnt/data gets mounted automatically
+Reboot and ensure `/mnt/data` gets mounted automatically.
 
 **Quick script install and run instructions**
 
-Git clone the Hermes SEG repository:
+Clone the Hermes SEG repository:
 
 `sudo git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git`
 
@@ -142,11 +142,11 @@ Run the script as root:
 
 ## Getting Started Guide
 
-Ensure you follow the [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly and correctly. 
+Ensure you follow the [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly and correctly.
 
 ## Documentation
 
-Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User](https://docs.deeztek.com/books/hermes-seg-user-guide) guides
+Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User](https://docs.deeztek.com/books/hermes-seg-user-guide) guides.
 
 ## Support
 
@@ -156,7 +156,7 @@ Support can be obtained by visiting our Hermes SEG Discussions at:
 
 ## Bugs
 
-Bugs can be posted on Github Issues at:
+Bugs can be posted on GitHub Issues at:
 
 [https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues)
 
