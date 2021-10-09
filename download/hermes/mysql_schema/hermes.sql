@@ -1,15 +1,5 @@
 /*
-
-Source Server         : Hermes SEG 18.04 Build 200125
-Source Server Version : 50505
-Source Host           : 192.168.xx.xx
-Source Database       : hermes
-
-Target Server Type    : MYSQL
-Target Server Version : 50505
-File Encoding         : 65001
-
-Date: 2020-02-10 11:47:40
+BUILD HERMES DATABASE
 */
 
 SET FOREIGN_KEY_CHECKS=0;
@@ -40,7 +30,7 @@ CREATE TABLE `ad_import_temp` (
   `smime_certificate_name` varchar(255) DEFAULT NULL,
   `ca_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=10445 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=10445 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of ad_import_temp
@@ -62,7 +52,7 @@ CREATE TABLE `ad_integration` (
   `scheduled` int(11) DEFAULT NULL,
   `scheduled_interval` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=48 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=48 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of ad_integration
@@ -77,7 +67,7 @@ CREATE TABLE `aliases` (
   `alias` varchar(255) DEFAULT NULL,
   `maps` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of aliases
@@ -101,7 +91,7 @@ CREATE TABLE `amavis_sender_bypass` (
   `description` varchar(255) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of amavis_sender_bypass
@@ -138,7 +128,7 @@ CREATE TABLE `archive_jobs` (
   `snapshot` varchar(255) DEFAULT NULL,
   `smbversion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=96 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=96 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of archive_jobs
@@ -169,7 +159,7 @@ CREATE TABLE `backup_jobs` (
   `encrypt` varchar(255) DEFAULT NULL,
   `smbversion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=124 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=124 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of backup_jobs
@@ -184,7 +174,7 @@ CREATE TABLE `body_temp` (
   `quar_loc` varbinary(255) DEFAULT NULL,
   `customtrans` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=327810 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=327810 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of body_temp
@@ -215,7 +205,7 @@ CREATE TABLE `ca_settings` (
   `ca_djigzo_id` int(11) DEFAULT NULL,
   `ca_djigzo_subject` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of ca_settings
@@ -418,7 +408,7 @@ CREATE TABLE `clients` (
   `client` varchar(255) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of clients
@@ -440,7 +430,7 @@ CREATE TABLE `command` (
   `command` blob,
   `trans_id` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3294 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=3294 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of command
@@ -466,7 +456,7 @@ CREATE TABLE `configuration` (
   `enabled` int(11) DEFAULT NULL,
   `editable` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=26 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=26 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of configuration
@@ -497,6 +487,27 @@ INSERT INTO `configuration` VALUES ('23', 'main.cf', 'smtpd_recipient_restrictio
 INSERT INTO `configuration` VALUES ('24', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client dnsbl.njabl.org', 'postfix', 'reject_rbl_client dnsbl.njabl.org', '2', '5', '12', null, null, 'Enable njabl.org blacklist', '1', '1');
 
 -- ----------------------------
+-- Table structure for `crontab_entries`
+-- ----------------------------
+DROP TABLE IF EXISTS `crontab_entries`;
+CREATE TABLE `crontab_entries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `value` varchar(255) DEFAULT NULL,
+  `label` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of crontab_entries
+-- ----------------------------
+INSERT INTO `crontab_entries` VALUES ('1', '15 */1 * * *', 'Every 1 Hours');
+INSERT INTO `crontab_entries` VALUES ('2', '15 */2 * * *', 'Every 2 Hours');
+INSERT INTO `crontab_entries` VALUES ('3', '15 */4 * * *', 'Every 4 Hours');
+INSERT INTO `crontab_entries` VALUES ('4', '15 */8 * * *', 'Every 8 Hours');
+INSERT INTO `crontab_entries` VALUES ('5', '15 */12 * * *', 'Every 12 Hours');
+INSERT INTO `crontab_entries` VALUES ('6', '30 0 * * *', 'Every 24 Hours');
+
+-- ----------------------------
 -- Table structure for `dkim_bypass`
 -- ----------------------------
 DROP TABLE IF EXISTS `dkim_bypass`;
@@ -507,7 +518,7 @@ CREATE TABLE `dkim_bypass` (
   `applied` int(11) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of dkim_bypass
@@ -526,7 +537,7 @@ CREATE TABLE `dkim_sign` (
   `enabled` int(11) DEFAULT NULL,
   `generated` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=207 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=207 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of dkim_sign
@@ -547,7 +558,7 @@ CREATE TABLE `dkim_trusted_hosts` (
   `note` varchar(255) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=196 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=196 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of dkim_trusted_hosts
@@ -568,7 +579,7 @@ CREATE TABLE `domains` (
   `default` int(11) DEFAULT NULL,
   `type` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=456 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=456 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of domains
@@ -592,7 +603,7 @@ CREATE TABLE `domains_temp` (
   `destination` varchar(255) DEFAULT NULL,
   `recipients_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=443 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=443 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of domains_temp
@@ -621,7 +632,7 @@ CREATE TABLE `encrypted_recipients` (
   `ca_id` int(11) DEFAULT NULL,
   `recipient_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=456 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=456 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of encrypted_recipients
@@ -637,7 +648,7 @@ CREATE TABLE `encryption_settings` (
   `property` varchar(255) DEFAULT NULL,
   `value` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=624 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=624 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of encryption_settings
@@ -675,7 +686,7 @@ CREATE TABLE `external_recipient_certificates` (
   `thumbprint` varchar(255) DEFAULT NULL,
   `djigzo_certificate_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=33 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of external_recipient_certificates
@@ -697,7 +708,7 @@ CREATE TABLE `external_recipients` (
   `pgp` int(255) DEFAULT NULL,
   `pgp_mode` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=184 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=184 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of external_recipients
@@ -722,7 +733,7 @@ CREATE TABLE `fetchmail` (
   `encryption` varchar(255) DEFAULT NULL,
   `encryption_protocol` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of fetchmail
@@ -749,7 +760,7 @@ CREATE TABLE `file_rule_components` (
   `priority` int(11) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=2374 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=2374 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of file_rule_components
@@ -791,7 +802,7 @@ CREATE TABLE `file_rule_components_temp` (
   `applied` int(11) DEFAULT NULL,
   `priority` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=4794 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=4794 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of file_rule_components_temp
@@ -807,7 +818,7 @@ CREATE TABLE `file_rules` (
   `rule_name` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of file_rules
@@ -821,7 +832,7 @@ DROP TABLE IF EXISTS `file_types`;
 CREATE TABLE `file_types` (
   `name` varchar(255) DEFAULT NULL,
   `description` varchar(255) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of file_types
@@ -846,7 +857,7 @@ CREATE TABLE `files` (
   `allow` varchar(255) DEFAULT NULL,
   `ban` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`,`file`)
-) ENGINE=MyISAM AUTO_INCREMENT=118 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=118 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of files
@@ -964,7 +975,7 @@ CREATE TABLE `header_checks` (
   `pattern` varchar(255) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of header_checks
@@ -979,7 +990,7 @@ CREATE TABLE `keywords` (
   `keyword` varchar(255) DEFAULT NULL,
   `banned` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of keywords
@@ -1059,7 +1070,7 @@ CREATE TABLE `malware_databases` (
   `fp` varchar(10) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=96 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=96 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of malware_databases
@@ -1141,7 +1152,7 @@ CREATE TABLE `malware_feeds` (
   `securite_premium` varchar(255) DEFAULT NULL,
   `template` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=7 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of malware_feeds
@@ -1186,7 +1197,7 @@ CREATE TABLE `msg_cleanup_table` (
   `mail_id` varbinary(255) DEFAULT NULL,
   `secret_id` varbinary(255) DEFAULT NULL,
   `time_iso` timestamp NULL DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of msg_cleanup_table
@@ -1200,7 +1211,7 @@ CREATE TABLE `msg_cleanup_table_backup` (
   `mail_id` varbinary(255) DEFAULT NULL,
   `secret_id` varbinary(255) DEFAULT NULL,
   `time_iso` timestamp NULL DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of msg_cleanup_table_backup
@@ -1217,7 +1228,7 @@ CREATE TABLE `msg_content_type` (
   `user` int(11) DEFAULT NULL,
   `user_stats` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of msg_content_type
@@ -1322,7 +1333,7 @@ CREATE TABLE `parameters` (
   `network_entry` int(11) DEFAULT NULL,
   `note` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=355 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=355 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of parameters
@@ -1439,7 +1450,7 @@ CREATE TABLE `parameters_temp` (
   `enabled` int(11) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=144 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=144 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of parameters_temp
@@ -1457,7 +1468,7 @@ CREATE TABLE `parameters2` (
   `active` int(11) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=88 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=88 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of parameters2
@@ -1553,12 +1564,11 @@ CREATE TABLE `pgp_keyservers` (
   `keyserver` varchar(255) DEFAULT NULL,
   `note` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of pgp_keyservers
 -- ----------------------------
-INSERT INTO `pgp_keyservers` VALUES ('7', 'ha.pool.sks-keyservers.net', 'OpenPGP SKS Key Server High Availability');
 INSERT INTO `pgp_keyservers` VALUES ('8', 'keyserver.ubuntu.com', 'Ubuntu SKS OpenPGP Public Key Server');
 
 -- ----------------------------
@@ -1639,7 +1649,7 @@ CREATE TABLE `policy2` (
   `spam_tag2_level` float DEFAULT '999',
   `spam_kill_level` float DEFAULT '999',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=11 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of policy2
@@ -1662,7 +1672,7 @@ CREATE TABLE `postfix_queue` (
   `msg_id` varchar(255) DEFAULT NULL,
   `on_hold` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of postfix_queue
@@ -1680,7 +1690,7 @@ CREATE TABLE `postscreen_access` (
   `applied` int(11) DEFAULT NULL,
   `note` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=192 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=192 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of postscreen_access
@@ -1767,7 +1777,7 @@ CREATE TABLE `rbl_override` (
   `sender` varchar(255) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=27 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=27 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of rbl_override
@@ -1798,7 +1808,7 @@ CREATE TABLE `recipient_certificates` (
   `djigzo_certificate_id` int(11) DEFAULT NULL,
   `external` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=188 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=188 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of recipient_certificates
@@ -1825,7 +1835,7 @@ CREATE TABLE `recipient_keystores` (
   `master` int(11) DEFAULT NULL,
   `parent` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=402 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=402 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of recipient_keystores
@@ -1861,7 +1871,7 @@ CREATE TABLE `recipients` (
   `priority` int(11) NOT NULL DEFAULT '7',
   `uniqueid` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=1481 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1481 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of recipients
@@ -1895,7 +1905,7 @@ CREATE TABLE `recipients_temp` (
   `smime_certificate_name` varchar(255) DEFAULT NULL,
   `ca_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=11227 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=11227 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of recipients_temp
@@ -1927,7 +1937,7 @@ CREATE TABLE `restore_jobs` (
   `restoreprevious` varchar(255) DEFAULT NULL,
   `smbversion` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=78 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=78 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of restore_jobs
@@ -1942,7 +1952,7 @@ CREATE TABLE `salt` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `salt` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=14832 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=14832 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of salt
@@ -1965,7 +1975,7 @@ CREATE TABLE `searches` (
   `searchfor` varchar(255) DEFAULT NULL,
   `status` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of searches
@@ -1980,7 +1990,7 @@ CREATE TABLE `senders` (
   `sender` varchar(255) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=413 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=413 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of senders
@@ -1999,7 +2009,7 @@ CREATE TABLE `spam_policies` (
   `system` int(11) DEFAULT NULL,
   `default_policy` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of spam_policies
@@ -2027,7 +2037,7 @@ CREATE TABLE `spam_settings` (
   `active` int(11) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=1474 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1474 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of spam_settings
@@ -2067,7 +2077,7 @@ CREATE TABLE `spf_bypass` (
   `action` varchar(255) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of spf_bypass
@@ -2083,7 +2093,7 @@ CREATE TABLE `subnet` (
   `value3` varchar(255) DEFAULT NULL,
   `mask` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=34 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=34 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of subnet
@@ -2123,7 +2133,7 @@ CREATE TABLE `system_settings` (
   `value` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`,`parameter`),
   UNIQUE KEY `parameter` (`parameter`)
-) ENGINE=MyISAM AUTO_INCREMENT=75 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=75 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of system_settings
@@ -2174,7 +2184,7 @@ CREATE TABLE `system_updates` (
   `date_installed` timestamp NULL DEFAULT NULL,
   `install_order` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=latin1;
+) ENGINE=InnoDB AUTO_INCREMENT=39 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of system_updates
@@ -2200,7 +2210,7 @@ CREATE TABLE `system_users` (
   `password` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of system_users
@@ -2224,7 +2234,7 @@ CREATE TABLE `tasks` (
   `user_domain` varchar(255) DEFAULT NULL,
   `completed` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=2874 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=2874 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of tasks
@@ -3531,7 +3541,7 @@ CREATE TABLE `tasks2` (
   `command` varchar(255) DEFAULT NULL,
   `completed` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=961 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=961 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of tasks2
@@ -3552,7 +3562,7 @@ CREATE TABLE `temp_mail_view` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `mail_text` longblob,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=149 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=149 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of temp_mail_view
@@ -3568,7 +3578,7 @@ CREATE TABLE `temp_table` (
   `djigzo_certificate_id` int(11) DEFAULT NULL,
   `recipient_id` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=52 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of temp_table
@@ -3591,7 +3601,7 @@ CREATE TABLE `testing` (
   `name` varchar(255) DEFAULT NULL,
   `company` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=164 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=164 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of testing
@@ -3769,7 +3779,7 @@ CREATE TABLE `tls_policies` (
   `applied` int(11) DEFAULT NULL,
   `action` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=33 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=33 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of tls_policies
@@ -3788,7 +3798,7 @@ CREATE TABLE `transport` (
   `port` float DEFAULT NULL,
   `mx` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=367 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=367 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of transport
@@ -3806,7 +3816,7 @@ CREATE TABLE `transport_temp` (
   `destination` varchar(255) DEFAULT NULL,
   `method` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=159 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=159 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of transport_temp
@@ -3819,7 +3829,7 @@ DROP TABLE IF EXISTS `user_destinations`;
 CREATE TABLE `user_destinations` (
   `id` int(11) DEFAULT NULL,
   `destination` varchar(255) DEFAULT NULL
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of user_destinations
@@ -3851,7 +3861,7 @@ CREATE TABLE `user_settings` (
   `reset_password_ip` varchar(255) DEFAULT NULL,
   `reset_password_datetime` datetime DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of user_settings
@@ -3887,7 +3897,7 @@ CREATE TABLE `users` (
   `priority` int(11) NOT NULL DEFAULT '7',
   `uniqueid` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=1481 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=1481 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of users
@@ -3904,7 +3914,7 @@ CREATE TABLE `virtual_recipients` (
   `maps` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=288 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=288 DEFAULT CHARSET=utf8mb4;
 
 -- ----------------------------
 -- Records of virtual_recipients

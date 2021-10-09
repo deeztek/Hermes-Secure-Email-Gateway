@@ -190,23 +190,32 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
                       <table cellpadding="0" cellspacing="0" border="0" width="970">
                         <tr valign="top" align="left">
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="521">
-                              <tr valign="top" align="left">
-                                <td width="15" height="18"></td>
-                                <td width="506"></td>
-                              </tr>
+                            <table border="0" cellspacing="0" cellpadding="0" width="892">
                               <tr valign="top" align="left">
                                 <td></td>
+                                <td colspan="3" width="879" id="Text500" class="TextObject" style="background-color: rgb(102,153,51);">
+                                  <p style="margin-bottom: 0px;"><b><span style="color: rgb(255,255,255);">This page has been upgraded to our 2.0 interface. Please click <a href="/admin/2/view_internal_recipients.cfm">here</a> to use the new version</span></b></p>
+                                </td>
+                              </tr>
+                              <tr valign="top" align="left">
+                                <td width="13" height="34"></td>
+                                <td width="2"></td>
+                                <td width="506"></td>
+                                <td width="371"></td>
+                              </tr>
+                              <tr valign="top" align="left">
+                                <td colspan="2"></td>
                                 <td width="506" id="Text369" class="TextObject">
                                   <p style="margin-bottom: 0px;"><b><span style="color: rgb(0,51,153);">Internal Recipients Encryption</span></b></p>
                                 </td>
+                                <td></td>
                               </tr>
                             </table>
                           </td>
                           <td>
-                            <table border="0" cellspacing="0" cellpadding="0" width="449">
+                            <table border="0" cellspacing="0" cellpadding="0" width="78">
                               <tr valign="top" align="left">
-                                <td width="424" height="6"></td>
+                                <td width="53" height="6"></td>
                                 <td></td>
                               </tr>
                               <tr valign="top" align="left">
@@ -217,9 +226,9 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
                           </td>
                         </tr>
                       </table>
-                      <table border="0" cellspacing="0" cellpadding="0" width="966">
+                      <table border="0" cellspacing="0" cellpadding="0" width="967">
                         <tr valign="top" align="left">
-                          <td width="15" height="4"></td>
+                          <td width="16" height="3"></td>
                           <td></td>
                         </tr>
                         <tr valign="top" align="left">
@@ -420,20 +429,21 @@ select * from recipients where recipient like '%#filter#%' and domain is NULL or
                       </table>
                       <table border="0" cellspacing="0" cellpadding="0" width="965">
                         <tr valign="top" align="left">
-                          <td width="15" height="2"></td>
-                          <td></td>
-                          <td width="1"></td>
+                          <td width="13" height="1"></td>
+                          <td width="2"></td>
+                          <td width="947"></td>
+                          <td width="3"></td>
                         </tr>
                         <tr valign="top" align="left">
-                          <td height="30"></td>
+                          <td colspan="2" height="30"></td>
                           <td colspan="2" valign="middle" width="950"><hr id="HRRule14" width="950" size="1"></td>
                         </tr>
                         <tr valign="top" align="left">
-                          <td colspan="3" height="4"></td>
+                          <td colspan="4" height="3"></td>
                         </tr>
                         <tr valign="top" align="left">
                           <td height="128"></td>
-                          <td width="949">
+                          <td colspan="2" width="949">
 
 
 

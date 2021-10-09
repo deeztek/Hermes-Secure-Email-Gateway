@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FreeFileSync XmlType="BATCH" XmlFormat="17">
+    <Compare>
+        <Variant>TimeAndSize</Variant>
+        <Symlinks>Exclude</Symlinks>
+        <IgnoreTimeShift/>
+    </Compare>
+    <Synchronize>
+        <Variant>Mirror</Variant>
+        <DetectMovedFiles>true</DetectMovedFiles>
+        <DeletionPolicy>Permanent</DeletionPolicy>
+        <VersioningFolder Style="Replace"/>
+    </Synchronize>
+    <Filter>
+        <Include>
+            <Item>*</Item>
+        </Include>
+        <Exclude>
+            <Item>\System Volume Information\</Item>
+            <Item>\$Recycle.Bin\</Item>
+            <Item>\RECYCLE?\</Item>
+            <Item>*\desktop.ini</Item>
+            <Item>*\thumbs.db</Item>
+            <Item>*\.git\</Item>
+            <Item>*.gitattributes | *.gitignore | *.ffs_batch | *.ffs_db |</Item>
+            <Item>*.html</Item>
+            <Item>*\CODE_OF_CONDUCT.md</Item>
+            <Item>*\LICENSE</Item>
+            <Item>*\README.md</Item>
+            <Item>*\edit_ad_connection.cfm</Item>
+            <Item>*\view_ad_connection.cfm</Item>
+            <Item>*\view_internal_recipients.cfm</Item>
+            <Item>*\add_internal_recipients.cfm</Item>
+            <Item>*\edit_internal_recipient.cfm</Item>
+        </Exclude>
+        <TimeSpan Type="None">0</TimeSpan>
+        <SizeMin Unit="None">0</SizeMin>
+        <SizeMax Unit="None">0</SizeMax>
+    </Filter>
+    <FolderPairs>
+        <Pair>
+            <Left>sftp://dedwards@192.168.10.145:22/var/www/html/admin/2|pass64=THd0Y2RpMiE=</Left>
+            <Right>C:\publish\hermes-seg-18.04\dirstructure\var\www\html\admin\2</Right>
+        </Pair>
+    </FolderPairs>
+    <Errors Ignore="false" Retry="0" Delay="5"/>
+    <PostSyncCommand Condition="Completion"/>
+    <LogFolder/>
+    <EmailNotification Condition="Always"/>
+    <Batch>
+        <ProgressDialog Minimized="true" AutoClose="true"/>
+        <ErrorDialog>Show</ErrorDialog>
+        <PostSyncAction>None</PostSyncAction>
+    </Batch>
+</FreeFileSync>

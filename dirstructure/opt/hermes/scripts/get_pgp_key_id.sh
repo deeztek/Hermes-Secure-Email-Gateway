@@ -1,1 +1,1 @@
-/usr/bin/gpg --with-fingerprint --with-colons /opt/hermes/tmp/THE-FILE | awk -F: '/^pub:/ { print $5 }' 2>&1
+/usr/bin/gpg --list-packets /opt/hermes/tmp/THE-FILE | awk  -F: '/keyid:/ { print $2; exit }' 2>&1

@@ -1,1 +1,1 @@
-/usr/bin/gpg --with-fingerprint --with-colons /opt/hermes/tmp/THE-FILE | awk -F: '/^sec:/ { print $10 }' 2>&1
+/usr/bin/gpg --list-packets /opt/hermes/tmp/THE-FILE | awk -F: '/^:user ID packet:/ { print $3 }' 2>&1
