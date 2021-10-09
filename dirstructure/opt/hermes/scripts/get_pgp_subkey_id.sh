@@ -1,1 +1,1 @@
-/usr/bin/gpg  --home /opt/hermes/.gnupg/ --with-fingerprint --with-colons /opt/hermes/tmp/THE-FILE | awk -F: '/^ssb:/ { print $5 }' 2>&1
+/usr/bin/gpg --list-packets /opt/hermes/tmp/THE-FILE | awk  -F: '/keyid:/ { print $2; exit }' 2>&1
