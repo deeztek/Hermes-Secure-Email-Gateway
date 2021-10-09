@@ -7,7 +7,7 @@ scratch. This page gets rid of all links and provides the needed markup only.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Deeztek Admin | Welcome</title>
+  <title>Hermes SEG | Welcome</title>
 
   <!-- Google Font: Source Sans Pro -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
@@ -36,7 +36,7 @@ scratch. This page gets rid of all links and provides the needed markup only.
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
-            <h1 class="m-0">Welcome Dino!</h1>
+            <h1 class="m-0">Welcome Admin!</h1>
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
             --->

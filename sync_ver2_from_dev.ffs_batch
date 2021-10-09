@@ -24,12 +24,15 @@
             <Item>*\.git\</Item>
             <Item>*.gitattributes | *.gitignore | *.ffs_batch | *.ffs_db |</Item>
             <Item>*.html</Item>
+            <Item>*.json</Item>
+            <Item>\docs\</Item>
             <Item>*\CODE_OF_CONDUCT.md</Item>
             <Item>*\LICENSE</Item>
             <Item>*\README.md</Item>
             <Item>*\edit_ad_connection.cfm</Item>
             <Item>*\view_ad_connection.cfm</Item>
             <Item>*\view_internal_recipients.cfm</Item>
+            <Item>*\view_internal_recipients_json.cfm</Item>
             <Item>*\add_internal_recipients.cfm</Item>
             <Item>*\edit_internal_recipient.cfm</Item>
         </Exclude>
