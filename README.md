@@ -154,7 +154,7 @@ Post your questions at:
 [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
 
 Chat with us at:
-[https://cloud.deeztek.com/call/g8n8ydzi]https://cloud.deeztek.com/call/g8n8ydzi)
+[https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
 
 
 ## Bugs
