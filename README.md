@@ -34,9 +34,13 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 * Administrator Web GUI
 * User Self-Service Web GUI
 * Built-In Email Archiving
-* Active Directory Integration
+* Active Directory Integration (Pro Feature)
 * Searchable Event Logs
-* Integration with 3rd Party Threat Feeds
+* Integration with 3rd Party Threat Feeds (Pro Feature)
+* Built-In Firewall (PRO Feature)
+* Multifactor Authentication
+* Lets Encrypt (ACME) Certificate Integration (PRO Feature)
+* haveibeenpwned.com Password Check Integration
 
 ## Installation
 
@@ -132,13 +136,17 @@ Git clone the Hermes SEG repository:
 
 This will clone the repository and create a Hermes-Secure-Email-Gateway directory in the directory you ran the git clone command from.
 
-Change to the Hermes-Secure-Email-Gateway directory:
+Change to the **Hermes-Secure-Email-Gateway** directory:
 
 `cd Hermes-Secure-Email-Gateway/`
 
+Make script executable:
+
+`sudo chmod +x ubuntu_hermes_1804_install.sh`
+
 Run the script as root:
 
-`bash ubuntu_hermes_1804_install.sh`
+`./ubuntu_hermes_1804_install.sh`
 
 ## Getting Started Guide
 
@@ -150,10 +158,8 @@ Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-s
 
 ## Support
 
-Support can be obtained by visiting our Hermes SEG Discussions at:
-
-[https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
-
+Post your questions at: [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
+Chat with us: [https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
 ## Bugs
 
 Bugs can be posted on Github Issues at:

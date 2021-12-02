@@ -562,11 +562,26 @@ arguments="+x /opt/hermes/tmp/validate_share_#customtrans3#"
 timeout = "60">
 </cfexecute>
 
+
+
+<cftry>
+
+
 <cfexecute name = "/opt/hermes/tmp/validate_share_#customtrans3#"
 timeout = "240"
 outputfile ="/dev/null"
 arguments="-inputformat none">
 </cfexecute>
+
+
+<cfcatch type="any">
+
+<cfset m=20>
+<cfset step=0>
+
+</cfcatch>
+</cftry>
+
 
 
 <cffile
@@ -747,6 +762,9 @@ select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
 delete from salt where id='#stResult.GENERATED_KEY#'
 </cfquery>
 
+<!--- NO LONGER USED. CRONTAB WILL RUN #SHOW_ENTRY_NAME#_SYSTEM_BACKUP.SH DIRECTLY INSTEAD OF RUNNING THROUGH CFEXECUTE IN #SHOW_ENTRY_NAME_BACKUP_TASK.CFM --->
+
+<!---
 <cffile action="read" file="/opt/hermes/templates/backup_task.cfm" variable="backuptask">
 
 <cfquery name="getversion" datasource="#datasource#">
@@ -759,7 +777,7 @@ select value from system_settings where parameter = 'version_no'
     file = "/var/www/html/schedule/#show_entry_name#_backup_task.cfm"
     output = "#REReplace("#backuptask#","ENTRY-NAME","#show_entry_name#","ALL")#"> 
     
-
+--->
 
 <cfif #archive# is "no">     
 <cffile action="read" file="/opt/hermes/templates/system_backup.sh" variable="backup">

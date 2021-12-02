@@ -1,0 +1,13 @@
+users:
+  admin:
+    displayname: "System User"
+    password: "$argon2id$v=19$m=65536,t=1,p=8$TEVla212MnJOeEV4RGNEWA$vJlaEm/liD9PRgGKEvoidKldw7xgcrhw0kDN+YH8Pck"
+    email: someone@domain.tld
+    groups:
+      - one_factor
+
+
+
+
+
+

@@ -1,4 +1,22 @@
 
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+
+This file is part of Hermes Secure Email Gateway Community Edition.
+
+    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+--->
  
  <!-- Navbar -->
  <nav class="main-header navbar navbar-expand navbar-white navbar-light">
@@ -8,7 +26,7 @@
         <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
       </li>
       <li class="nav-item d-none d-sm-inline-block">
-        <a href="index.cfm" class="nav-link">Home</a>
+        <a href="/admin/index.cfm" class="nav-link">Old Web GUI</a>
       </li>
       <!---
       <li class="nav-item d-none d-sm-inline-block">
@@ -16,30 +34,54 @@
       </li>
     --->
 
-    <!---
+<!---
       <li class="nav-item">
         <a class="nav-link" href="https://store.deeztek.com/cart/cart.cfm" role="button"><i class="fa fa-shopping-cart"></i>
-          <cfoutput>
-          <cfif #getcart.cartitems# EQ 1>
-            &nbsp;#getcart.cartitems# Item
-            <cfelseif #getcart.cartitems# GT 1>
-            &nbsp;#getcart.cartitems# Items
-            <cfelseif #getcart.cartitems# LT 1>
-            &nbsp;          
-            </cfif>
-          </cfoutput>
           </a>
       </li>
+    --->
+
     </ul>
+  
 
 
-  --->
 
     <!-- Right navbar links -->
     <ul class="navbar-nav ml-auto">
 
+      <li class="nav-item">
+        <cfoutput>
+        <a class="nav-link" role="button" title="My IP Address: #ClientIP#"><i class="fas fa-network-wired fa-lg"></i>
+          </a>
+        </cfoutput>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide')" role="button" title="Documentation"><i class="fas fa-book fa-lg"></i>
+          </a>
+      </li>
+
+      
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions/categories/support')" role="button" title="Support Forums"><i class="fas fa-users fa-lg"></i>
+          </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway')" role="button" title="GitHub"><i class="fab fa-github fa-lg"></i>
+          </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.open('https://gitlab.deeztek.com/dedwards/hermes-seg-18.04')" role="button" title="GitLab"><i class="fab fa-gitlab fa-lg"></i>
+          </a>
+      </li>
+
+      
+
+
       <!-- Navbar Search -->
-      <!---
+    <!--
       <li class="nav-item">
         <a class="nav-link" data-widget="navbar-search" href="#" role="button">
           <i class="fas fa-search"></i>
@@ -60,7 +102,9 @@
           </form>
         </div>
       </li>
+    -->
 
+        <!---
       <!-- Messages Dropdown Menu -->
       <li class="nav-item dropdown">
         <a class="nav-link" data-toggle="dropdown" href="#">

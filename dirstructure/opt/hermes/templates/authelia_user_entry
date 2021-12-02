@@ -1,0 +1,6 @@
+  THE_USERNAME:
+    displayname: "FIRST_NAME LAST_NAME"
+    password: "THE_PASSWORD"
+    email: THE_EMAIL
+    groups:
+      - THE_GROUP

@@ -656,7 +656,7 @@ CREATE TABLE `encryption_settings` (
 INSERT INTO `encryption_settings` VALUES ('614', 'subjectenable', 'user.subjectTriggerEnabled', 'true');
 INSERT INTO `encryption_settings` VALUES ('615', 'subject_trigger', 'user.subjectTrigger', '[encrypt]');
 INSERT INTO `encryption_settings` VALUES ('616', 'encryptreceipt', 'user.sendEncryptionNotification', 'true');
-INSERT INTO `encryption_settings` VALUES ('617', 'portal_url', 'user.portal.baseURL', 'https://hermes.domain.tld:9080/web/portal');
+INSERT INTO `encryption_settings` VALUES ('617', 'portal_url', 'user.portal.baseURL', 'https://hermes.domain.tld/web/portal');
 INSERT INTO `encryption_settings` VALUES ('618', 'pdfreply_sender', 'user.pdf.replySender', 'postmaster@domain.tld');
 INSERT INTO `encryption_settings` VALUES ('619', 'removesubjecttrigger', 'user.subjectTriggerRemovePattern', 'true');
 INSERT INTO `encryption_settings` VALUES ('621', 'serverkeyword', 'user.serverSecret', '');
@@ -958,9 +958,12 @@ DROP TABLE IF EXISTS `firewall`;
 CREATE TABLE `firewall` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `ip` varchar(50) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `note` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `hermesadmin` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `ciphermailadmin` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL,
   `datetime` timestamp NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=77 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+) ENGINE=MyISAM AUTO_INCREMENT=99 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
 
 -- ----------------------------
 -- Records of firewall
@@ -1554,6 +1557,78 @@ INSERT INTO `parameters2` VALUES ('84', 'report_org', null, 'dmarc', '1', '1');
 INSERT INTO `parameters2` VALUES ('85', 'interval', 'daily', 'dmarc', '1', '1');
 INSERT INTO `parameters2` VALUES ('86', 'startdate', null, 'dmarc', '1', '1');
 INSERT INTO `parameters2` VALUES ('87', 'starttime', null, 'dmarc', '1', '1');
+INSERT INTO `parameters2` VALUES ('88', 'jwt_secret', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('89', 'access_control.rules.policy', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('90', 'authentication_backend.disable_reset_password', 'false', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('91', 'session.name', 'hermes_session', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('92', 'session.secret', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('93', 'session.expiration', '3600', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('94', 'session.inactivity', '3600', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('95', 'session.domain', null, 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('96', 'notifier.smtp.host', '[127.0.0.1]', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('97', 'notifier.smtp.port', '10026', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('98', 'notifier.smtp.sender', 'no-reply@domain.tld', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('99', 'notifier.smtp.subject', '[Hermes SEG] {title}', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('100', 'regulation.max_retries', '5', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('101', 'regulation.find_time', '120', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('102', 'regulation.ban_time', '300', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('103', 'log.level', 'debug', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('104', 'log.format', 'text', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('105', 'access_control.domain', 'domain.tld', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('106', 'console.certificate', '1', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('107', 'smtp.certificate', '1', 'certificates', '1', '1');
+INSERT INTO `parameters2` VALUES ('109', 'console.host', 'host.domain.tld', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('108', 'console.mode', 'ip', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('133', 'console.dhparam', 'disable', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('134', 'console.hsts', 'disable', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('135', 'console.ssl_stapling', 'disable', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('136', 'console.ssl_stapling_verify', 'disable', 'console', '1', '2');
+
+-- ----------------------------
+-- Table structure for `system_certificates`
+-- ----------------------------
+DROP TABLE IF EXISTS `system_certificates`;
+CREATE TABLE `system_certificates` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `type` varchar(255) DEFAULT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `issuer` varchar(255) DEFAULT NULL,
+  `serial` varchar(255) DEFAULT NULL,
+  `fingerprint` varchar(255) DEFAULT NULL,
+  `startdate` varchar(255) DEFAULT NULL,
+  `enddate` varchar(255) DEFAULT NULL,
+  `file_name` varchar(255) DEFAULT NULL,
+  `friendly_name` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=24 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of system_certificates
+-- ----------------------------
+INSERT INTO `system_certificates` VALUES ('1', 'Imported', '=== DO NOT DELETE ===', '=== DO NOT DELETE ===', '=== DO NOT DELETE ===', '=== DO NOT DELETE ===', null, null, 'ssl-cert-snakeoil', 'system-self-signed');
+
+
+
+-- ----------------------------
+-- Table structure for `api_tokens`
+-- ----------------------------
+DROP TABLE IF EXISTS `api_tokens`;
+CREATE TABLE `api_tokens` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `token` varchar(255) DEFAULT NULL,
+  `name` varchar(255) DEFAULT NULL,
+  `ip` varchar(255) DEFAULT NULL,
+  `system` int(11) DEFAULT NULL,
+  `active` int(11) DEFAULT NULL,
+  `verify` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of api_tokens
+-- ----------------------------
+INSERT INTO `api_tokens` VALUES ('1', '', 'Built-In System', '127.0.0.1', '1', '1', '');
+
 
 -- ----------------------------
 -- Table structure for `pgp_keyservers`
@@ -2042,7 +2117,7 @@ CREATE TABLE `spam_settings` (
 -- ----------------------------
 -- Records of spam_settings
 -- ----------------------------
-INSERT INTO `spam_settings` VALUES ('1', 'user_portal', 'https://hermes.domain.tld:9080/users', null, null, null, null, null, null, '1', '1');
+INSERT INTO `spam_settings` VALUES ('1', 'user_portal', 'https://hermes.domain.tld/users/', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('2', 'sa_spam_modifies_subj', '1', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('3', 'sa_spam_subject_tag', '[SUSPECTED SPAM]', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('4', 'final_virus_destiny', 'D_BOUNCE', null, null, null, null, null, null, '1', '1');
@@ -2168,7 +2243,7 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '211009');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '211019');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 
@@ -2200,6 +2275,7 @@ INSERT INTO `system_updates` VALUES ('40', '18.04', '200830', '1', '2020-08-30 0
 INSERT INTO `system_updates` VALUES ('41', '18.04', '210113', '1', '2021-01-13 00:00:00', '10');
 INSERT INTO `system_updates` VALUES ('42', '18.04', '210501', '1', '2021-05-01 00:00:00', '11');
 INSERT INTO `system_updates` VALUES ('43', '18.04', '211009', '1', '2021-10-09 00:00:00', '12');
+INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 00:00:00', '13');
 
 -- ----------------------------
 -- Table structure for `system_users`
@@ -2209,14 +2285,19 @@ CREATE TABLE `system_users` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `username` varchar(255) DEFAULT NULL,
   `password` varchar(255) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `first_name` varchar(255) DEFAULT NULL,
+  `last_name` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
+  `access_control` varchar(255) DEFAULT NULL,
+  `applied` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=3 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=26 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of system_users
 -- ----------------------------
-INSERT INTO `system_users` VALUES ('1', 'admin', 'AJVm@ECdx7*nByXuWr$jM5siHQLqe$9A2F7CBDF2575E1A2209671B495CC394BE226E095CEDFE8B959330D3C900A69F6506492372E274B7AC4F4B31538A1378540616CB22BEABB0042E39DDE7AE1E19', '1');
+INSERT INTO `system_users` VALUES ('1', 'admin', '$argon2id$v=19$m=65536,t=1,p=8$TEVla212MnJOeEV4RGNEWA$vJlaEm/liD9PRgGKEvoidKldw7xgcrhw0kDN+YH8Pck', 'someone@domain.tld', 'System', 'User', '1', 'one_factor', '1');
 
 -- ----------------------------
 -- Table structure for `tasks`

@@ -1,0 +1,140 @@
+###############################################################
+#                   Authelia configuration                    #
+###############################################################
+
+host: 0.0.0.0
+port: 9091
+
+# This secret can also be set using the env variables AUTHELIA_JWT_SECRET_FILE
+jwt_secret: hermes_jwt_secret
+default_redirection_url: https://hermes_access_control_domain/admin/
+totp:
+  issuer: HermesSEG
+
+#duo_api:
+#  hostname: api-123456789.example.com
+#  integration_key: ABCDEF
+#  # This secret can also be set using the env variables AUTHELIA_DUO_API_SECRET_KEY_FILE
+#  secret_key: 1234567890abcdefghifjkl
+
+authentication_backend:
+  file:
+    path: /etc/authelia/users_database.yml
+
+  # Disable both the HTML element and the API for reset password functionality
+  disable_reset_password: false
+
+
+access_control:
+  default_policy: deny
+  rules:
+    # Rules applied to everyone
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject: "group:one_factor"
+      policy: one_factor
+
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject: "group:two_factor"
+      policy: two_factor
+
+    - domain: hermes_access_control_domain
+      #subject: "group:store_users"
+      policy: bypass
+
+#access_control:
+  #default_policy: deny
+  #rules:
+    #- domain: app.example.com
+      #policy: two_factor
+      #resources:
+      #- '^/admin([/?].*)?$'
+      #- domain: app.example.com
+      #policy: bypass
+      #
+      #- "^/admin/.*$"
+
+totp:
+  issuer: HermesSEG
+  period: 30
+  skew: 1
+
+ntp:
+  address: "time.cloudflare.com:123"
+  version: 3
+  max_desync: 30s
+  disable_startup_check: false
+  disable_failure: true
+
+
+
+session:
+  name: hermes_session
+  # This secret can also be set using the env variables AUTHELIA_SESSION_SECRET_FILE
+  secret: hermes_session_secret
+  expiration: 3600 # 1 hour
+  inactivity:  3600 # 5 minutes
+  domain: hermes_access_control_domain # Should match whatever your root protected domain is
+  
+  redis:
+    host: 127.0.0.1
+    port: 6379
+
+
+storage:
+  local:
+    path: /etc/authelia/db.sqlite3
+
+#server:
+    #path: admin-auth
+
+notifier:
+  smtp:
+    #username: no-reply@domain.tld
+    # This secret can also be set using the env variables AUTHELIA_NOTIFIER_SMTP_PASSWORD_FILE
+    #password: super_secret_password
+    host: "[127.0.0.1]"
+    port: 10026
+    sender: no-reply@domain.tld
+    subject: "[Hermes SEG] {title}"
+    disable_require_tls: true
+
+    
+    tls:
+      # Server Name for certificate validation (in case you are using the IP or non-FQDN in the host option).
+      # server_name: smtp.example.com
+
+      ## Skip verifying the server certificate (to allow a self-signed certificate).
+      ## In preference to setting this we strongly recommend you add the public portion of the certificate to the
+      ## certificates directory which is defined by the `certificates_directory` option at the top of the config.
+      skip_verify: true
+
+      # Minimum TLS version for either StartTLS or SMTPS.
+      #minimum_version: TLS1.2
+
+
+# Level of verbosity for logs: info, debug, trace
+log.level: debug
+# Format the logs are written as: json, text
+log.format: text
+# File path where the logs will be written. If not set logs are written to stdout.
+log.file_path: /etc/authelia/authelia.log
+
+regulation:
+  # The number of failed login attempts before user is banned.
+  # Set it to 0 to disable regulation.
+  max_retries: 5
+
+  # The time range during which the user can attempt login before being banned.
+  # The user is banned if the authentication failed 'max_retries' times in a 'find_time' seconds window.
+  # Find Time accepts duration notation. See: https://docs.authelia.com/configuration/index.html#duration-notation-format
+  find_time: 120
+
+  # The length of time before a banned user can login again.
+  # Ban Time accepts duration notation. See: https://docs.authelia.com/configuration/index.html#duration-notation-format
+  ban_time: 300
+
+

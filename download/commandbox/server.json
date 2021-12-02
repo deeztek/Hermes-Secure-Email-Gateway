@@ -1,0 +1,35 @@
+{
+    "name":"hermesseg",
+    "debug":false,
+    "trace":false,
+    "web":{
+        "aliases":{
+            "/admin":"/var/www/html/admin",
+            "/users":"/var/www/html/users",
+            "/main":"/var/www/html/main",
+            "/schedule":"/var/www/html/schedule",
+            "/user-auth":"/var/www/html/user-auth",
+            "/hermes-api":"/var/www/html/hermes-api"
+        },
+        "host":"0.0.0.0",
+        "HTTP":{
+            "enable":true,
+            "port":8888
+        },
+        "blockCFAdmin":"false",
+        "rewrites":{
+            "enable":"true"
+        },
+        "debug":{
+            "enable":"false"
+        }
+    },
+    "app":{
+        "sessionCookieSecure":true,
+        "sessionCookieHTTPOnly":true,
+        "openbrowser":false,
+        "debug":true,
+        "cfengine":"lucee@5.2.9+31",
+        "serverHomeDirectory":"/opt/CommandBox/web-contexts/wwwroot-hermesseg"
+    }
+}
