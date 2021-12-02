@@ -158,8 +158,18 @@ Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-s
 
 ## Support
 
+<<<<<<< HEAD
 Post your questions at: [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
 Chat with us: [https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
+=======
+Post your questions at:
+[https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
+
+Chat with us at:
+[https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
+
+
+>>>>>>> a9ea8e0eb4e4f8a35456f03a43917ef4866c7145
 ## Bugs
 
 Bugs can be posted on Github Issues at:
