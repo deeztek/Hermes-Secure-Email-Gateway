@@ -164,7 +164,6 @@ Post your questions at:
 Chat with us at:
 [https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
 
-
 ## Bugs
 
 Bugs can be posted on Github Issues at:
