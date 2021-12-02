@@ -1,0 +1,7 @@
+[Unit]
+Description=Hermes SEG Service
+[Service]
+ExecStart=/usr/local/bin/box server start /var/www/html/server.json
+Type=forking
+[Install]
+WantedBy=multi-user.target

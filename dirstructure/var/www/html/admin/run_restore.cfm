@@ -93,6 +93,48 @@ values
 '#form.smbversion#')
 </cfquery>
 
+
+<cfquery name="resetwizard" datasource="#datasource#">
+update system_settings set value = '2' where parameter = 'wizard_settings'
+</cfquery>
+
+<cfquery name="resetmysql_username_hermes" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_username_hermes'
+</cfquery>
+
+<cfquery name="resetmysql_password_hermes" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_password_hermes'
+</cfquery>
+
+<cfquery name="resetmysql_username_djigzo" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_username_djigzo'
+</cfquery>
+
+<cfquery name="resetmysql_password_djigzo" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_password_djigzo'
+</cfquery>
+
+<cfquery name="resetmysql_username_syslog" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_username_syslog'
+</cfquery>
+
+<cfquery name="resetmysql_password_syslog" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_password_syslog'
+</cfquery>
+
+<cfquery name="resetmysql_username_opendmarc" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_username_opendmarc'
+</cfquery>
+
+<cfquery name="resetmysql_password_opendmarc" datasource="#datasource#">
+update system_settings set value = '' where parameter = 'mysql_password_opendmarc'
+</cfquery>
+
+<cfquery name="disablefirewall" datasource="#datasource#">
+update parameters2 set value2 = 'disabled' where parameter = 'firewall_status' and module='firewall'
+</cfquery>
+
+
 <cfquery name="getbuild" datasource="#datasource#">
 SELECT RIGHT(value,6) as thebuild FROM system_settings where parameter = 'version_no' 
 </cfquery>

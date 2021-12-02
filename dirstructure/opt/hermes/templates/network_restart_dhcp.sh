@@ -26,7 +26,8 @@
 /usr/bin/hostnamectl set-hostname SERVER-NAME
 
 #Restart Amavis
-/etc/init.d/amavis restart
+/bin/systemctl restart amavis
+
 
 #Set Server Hostname and Server Domain in /etc/main.cf
 /usr/sbin/postconf -e "myorigin = SERVER-DOMAIN"
@@ -34,7 +35,20 @@
 
 #Reload & Restart Postfix
 /usr/sbin/postfix reload
-/etc/init.d/postfix restart
+/bin/systemctl restart postfix
+
 
 #Restart Networking
 THE-NET-COMMAND
+
+#generate Auth NGinx Configuration
+/usr/bin/curl -X 'POST' -k 'http://127.0.0.1:8888/hermes-api/' -H 'accept: */*' -H 'X-Original-URL: /admin/2/inc/generate_auth_nginx_configuration.cfm' -H 'X-Token: THE-TOKEN'
+
+#Reload Nginx
+/bin/systemctl reload nginx
+
+#Generate Authelia Configuration
+/usr/bin/curl -X 'POST' -k 'http://127.0.0.1:8888/hermes-api/' -H 'accept: */*' -H 'X-Original-URL: /admin/2/inc/generate_authelia_configuration.cfm' -H 'X-Token: THE-TOKEN'
+
+#Restart Authelia
+/bin/systemctl restart authelia

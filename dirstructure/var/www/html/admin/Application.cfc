@@ -1,6 +1,8 @@
+<cfsetting enablecfoutputonly="yes">
+
 <cfcomponent displayname="HermesSEG" output="false" hint="Handle the applications">
-	
-      //Define hermes Datasource
+
+     //Define hermes Datasource
       <cfscript>
 		this.datasources["hermes"] = {
 		class: 'com.mysql.jdbc.Driver'
@@ -48,15 +50,14 @@
 		};
 	</cfscript>
 
-
        
 	<cfset This.name="AdminGUI" />
 	<cfset This.Sessionmanagement="True" />
        <cfset This.loginstorage="session" />
        <cfset This.requestTimeout=createTimeSpan(0,1,0,0) />
 
-       //Define POP4 Component  
-	<cfset This.componentpaths["/pop"]= "/opt/lucee/tomcat/webapps/ROOT/WEB-INF/lucee/components/hermes/extension/pop4" />
+       //Define POP4 Component
+       <cfset This.componentpaths["/pop"]= "/var/www/html/cfc/pop4" />
 
 	<cffunction name="onRequest">
        <cfargument name="targetPage" type="String" required=true />
@@ -66,131 +67,200 @@
 	
        <!--- Set default datasource name ---> 
        <cfset datasource="hermes" />
+
+       <!--- Authentication Session --->
+
+
+
+       <!--- DETERMINE CONSOLE MODE --->
        
-       <!--- check if Firewall is enabled --->
-       <cfquery name="checkfirewall" datasource="hermes">
-       select value2 from parameters2 where parameter='firewall_status'
-       </cfquery>
+       <cfinclude template="/admin/2/inc/get_console_mode.cfm">
 
-      <!--- If Firewall is enabled --->
-      <cfif #checkfirewall.value2# is "enabled">
-      <!--- Get IP using X-Forwarded-For --->
-       <cfset theIP=#GetHttpRequestData().headers['X-Forwarded-For']#>
 
-      <!--- If IP contains multiple IPs separated by comma due to reverse proxy in front of Hermes --->
-       <cfif #theIP# contains ",">
-       <!--- Get the left most value which is most likely the client IP --->
-       <cfset theIP = #trim(ListGetAt(theIP, 1, ","))#>
+      <cfset reqData = GetHttpRequestData() />
+
+      <!--- GET CLIENT IP --->
+      <cfif IsStruct( reqData ) 
+        AND StructKeyExists( reqData, "Headers" )
+        AND IsStruct( reqData.Headers )
+        AND StructKeyExists( reqData.Headers , "X-Forwarded-For" )>
+
+        <!--- Get IP using X-Forwarded-For --->
+        <cfset ClientIP=#GetHttpRequestData().headers['X-Forwarded-For']#>
+
+        <!--- If IP contains multiple IPs separated by comma due to reverse proxy in front of Hermes --->
+        <cfif #ClientIP# contains ",">
+        <!--- Get the left most value which is most likely the client IP --->
+        <cfset ClientIP = #trim(ListGetAt(ClientIP, 1, ","))#>
        </cfif>
-       
-       <!--- Get Client IP and check against the firewall table --->
-       <cfquery name="checkip" datasource="hermes">
-       select ip from firewall where ip='#theIP#'
-       </cfquery>
-       
 
-      <!--- If IP is not in the firewall table display unauthorized.cfm page and stop all processing --->
-      <cfif #checkip.recordcount# LT 1>
-      <cfinclude template="/main/unauthorized.cfm" />
-      <cfabort />
+    <!--- IsStruct( reqData ) --->
+    </cfif>
 
+     <!--- ATTEMPT TO CHECK FOR TOKEN STARTS HERE --->
 
-      <!-- /CFIF #checkip.recordcount# LT 1 -->
-      </cfif>
+     <!--- CHECK FOR X-TOKEN HEADER --->
 
-      <!-- /CFIF #checkfirewall.value2# is "enabled" -->
-      </cfif>
+       <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Token" )>
 
-      <!--- URL Variable Checks Starts Here --->
-      
-      <!--- url.ID --->
-      <cfif structKeyExists(url, "ID")>
-   
-      <cfif not IsNumeric(URL.ID)>
-      <cfinclude template="error.cfm" />
-      <cfabort />
-      
-      <!--- /CFIF not IsNumeric ---> 
-      </cfif>
-
-      <!--- /CFIF StuctKeyExists ---> 
-      </cfif>
-
-      <!--- url.startrow --->
-      <cfif structKeyExists(url, "startrow")>
-   
-      <cfif not IsNumeric(url.startrow)>
-      <cfinclude template="error.cfm" />
-      <cfabort />
-      
-      <!--- /CFIF not IsNumeric ---> 
-      </cfif>
-
-      <!--- /CFIF StuctKeyExists ---> 
-      </cfif>
-
-      <!--- url.displayrows --->
-      <cfif structKeyExists(url, "displayrows")>
-   
-      <cfif not IsNumeric(url.displayrows)>
-      <cfinclude template="error.cfm" />
-      <cfabort />
-      
-      <!--- /CFIF not IsNumeric ---> 
-      </cfif>
-
-      <!--- /CFIF StuctKeyExists ---> 
-      </cfif>
-
-
-      <!--- url.email --->
-      <cfif structKeyExists(url, "email")>
-   
-      <cfif not IsValid("email", url.email)>
-      <cfinclude template="error.cfm" />
-      <cfabort />
-      
-      <!--- /CFIF not IsValid ---> 
-      </cfif>
-
-      <!--- /CFIF StuctKeyExists ---> 
-      </cfif>
-
-      <!--- url.mid --->
-      <cfif structKeyExists(url, "mid")>
-   
-      <cfif REFind("[^A-Za-z0-9\\[%]\\-]",url.mid) gt 0>
-      <cfinclude template="error.cfm" />
-      <cfabort />
-      
-      <cfelse>
-      <cfquery name="checkkeywords" datasource="hermes">
-      SELECT * FROM keywords where keyword IN ('#url.mid#') and banned='1'
-      </cfquery>
+       <cfset theToken = getHttpRequestData().headers["X-Token"]>
  
-      <cfif #checkkeywords.recordcount# GTE 1>
-      <cfinclude template="error.cfm" />
-      <cfabort />
+       <cfif #theToken# is "">
+ 
+        <cfset m="Appplication.cfc: There was an error verifying token session. X-Token is blank">
+        <cfinclude template="/admin/2/inc/error.cfm">
+        <cfabort>     
+ 
+       <cfelse>
+ 
+         <!--- CHECK FOR X-VERIFY-TOKEN HEADER --->
+        <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Verify-Token" )>
+ 
+        <cfset VerifyToken = getHttpRequestData().headers["X-Verify-Token"]>
+ 
+        <cfif #VerifyToken# is "">
+ 
+               
+        <cfset m="Appplication.cfc: There was an error verifying token session. X-Verify-Token is blank">
+        <cfinclude template="/admin/2/inc/error.cfm">
+        <cfabort>   
+ 
+        <cfelse>
+ 
+               
+        <CFQUERY NAME="checktoken" DATASOURCE="hermes">
+               SELECT token, name, ip, system, active, verify
+               FROM api_tokens
+               WHERE token like binary '#theToken#' and verify like binary '#VerifyToken#'
+               </CFQUERY>
+        
+               <cfif #checktoken.recordcount# EQ 1>
+ 
+               <!--- DELETE VERIFY TOKEN  --->
+               <CFQUERY NAME="deleteverify" DATASOURCE="hermes">
+               update api_tokens set verify = ''
+               WHERE token like binary '#theToken#' and verify like binary '#VerifyToken#'
+               </CFQUERY>
+               
+                      
+               <!--- PROCESS TOKEN REQUEST --->      
+               <cfinclude template="/admin/2/inc/setsession.cfm">     
+   
+               <cfelse>
+        
+               <cfset m="Appplication.cfc: There was an error verifying token session. checktoken.recordcount NEQ 1">
+               <cfinclude template="/admin/2/inc/error.cfm">
+               <cfabort>     
+               
+               <!--- /CFIF #checktoken.recordcount# --->
+               </cfif>
+ 
+      
+        <!--- /CFIF  #VerifyToken# is "" --->
+        </cfif>
+ 
+        <!--- /CFIF IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Verify-Token" --->
+        </cfif>
+ 
+             
+        <!--- /CFIF  #theToken# is "" --->
+        </cfif>
 
-      <!--- /CFIF checkkeywords.recordcount --->
+
+     <!--- ATTEMPT TO CHECK FOR TOKEN ENDS HERE --->
+
+       <!--- IF X-Token Header does NOT exist check for remote-user and cookie headers --->
+       <cfelse>
+
+       <cfset session.theUser = getHttpRequestData().headers["remote-user"]>  
+
+      <!--- CHECK FOR REMOTE-USER HEADER --->
+      <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "remote-user" )>
+
+      
+       <cfset session.theUser = getHttpRequestData().headers["remote-user"]>
+
+      <cfelse>
+
+     <cfset m="Appplication.cfc: remote-user header does NOT exist">
+     <cfinclude template="/admin/2/inc/error.cfm">
+     <cfabort>
+
+     
+     <!--- IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "remote-user" ) --->
+     </cfif>
+
+     <!--- CHECK FOR COOKIE HEADER --->
+
+     <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "cookie" )>
+
+     <cfset theCookie = getHttpRequestData().headers["cookie"]>
+       
+     <!--- DEBUG BELOW --->
+     
+     <!---
+    <cfoutput>the cookie: #theCookie#<br>
+the url: #theurl#</cfoutput>
+    --->
+
+       
+         <cfexecute name="/usr/bin/curl"
+         arguments="-X 'GET' -k '#theurl#/api/verify' -H 'accept: */*' -H 'X-Original-URL: #theurl#/admin/' -H 'Cookie: #theCookie#'"
+         variable="curlresult"
+         timeout="10" />
+
+       <cfif #curlresult# is "Unauthorized">
+
+       <cfset m="Appplication.cfc: session is unauthorized">
+       <cfinclude template="/admin/2/inc/error.cfm">
+       <cfabort>      
+       </cfif>
+
+     <cfelse>
+
+       <cfset m="Appplication.cfc: cookie header does NOT exist">
+       <cfinclude template="/admin/2/inc/error.cfm">
+       <cfabort>
+    
+    <!--- IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "cookie" ) --->
+        </cfif>
+    
+      
+      <!---
+      <cfset session.theGroups = getHttpRequestData().headers["remote-groups"]>
+      --->
+
+      <cfif #session.theUser# is not "">
+
+       <CFQUERY NAME="checkuser" DATASOURCE="hermes">
+       SELECT id, username, first_name, last_name, email
+       FROM system_users
+       WHERE username='#session.theUser#'
+       </CFQUERY>
+
+       <cfif #checkuser.recordcount# LT 1>
+
+       <!--- PROCESS SYSTEM USER LOG IN --->
+       <cfelseif #checkuser.recordcount# GTE 1>
+
+       <cfset session.loggedin = "true">
+       <cfoutput>
+       <cfset session.first_name = #checkuser.first_name#>
+       <cfset session.last_name = #checkuser.last_name#>
+       <cfset session.email = #checkuser.email#>
+       <cfset session.userid = #checkuser.id#>
+       </cfoutput>
+       
+       <cfinclude template="/admin/2/inc/setsession.cfm"  >
+
+       <!--- /CFIF checkuser.recordcount LT 1 --->
+       </cfif>
+
+       <!--- /CFIF session.theUser is not "" --->
       </cfif>
 
-      <!--- /CFIF REFind ---> 
-      </cfif>
-
-      <!--- /CFIF StuctKeyExists ---> 
-      </cfif>
-
-  
-      <!--- URL Variable Checks Ends Here --->
-
-      <!--- Authentication Session --->
-      <cfif not session.Loggedin>
-      <cfinclude template="logon.cfm" />
-      <cfabort />
-
-      <!--- </CFIF session.loggedIn --->     
-      </cfif>
+       <!--- /CFIF IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Token" --->
+       </cfif>
 
       <!--- Check if Wizard has been ran --->
       <cfquery name="checkwizard" datasource="hermes">
@@ -199,10 +269,13 @@
        
        <cfif #checkwizard.value# is "2">
        
-       <cfif NOT ListFindNoCase("login.cfm,logout.cfm,system_settings.cfm,system_backup.cfm,system_restore.cfm,run_restore.cfm,system_restart.cfm", ListLast(CGI.SCRIPT_NAME, "/"))>
+       <cfif NOT ListFindNoCase("logout.cfm,system_settings.cfm,system_backup.cfm,system_restore.cfm,run_restore.cfm,system_restart.cfm", ListLast(CGI.SCRIPT_NAME, "/"))>
+     
        <cfinclude template="system_settings.cfm" />
        <cfabort />
-       
+   
+  
+
        <!--- /CFIF NOT ListFindNoCase ---> 
        </cfif>
        
@@ -217,4 +290,3 @@
        </cffunction>
 
 </cfcomponent>
-

@@ -179,7 +179,7 @@ select parameter, value from system_settings where parameter='postmaster'
 
 <cfexecute name = "/bin/chmod"
 arguments="+x /opt/hermes/tmp/#customtrans3#_system_archive.sh"
-timeout = "60">
+timeout = "0">
 </cfexecute>
 
 <cfexecute name = "/opt/hermes/tmp/#customtrans3#_system_archive.sh"

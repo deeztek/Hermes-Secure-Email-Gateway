@@ -1,4 +1,4 @@
-<!--
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2017. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Pro Edition.
@@ -6,7 +6,7 @@ This file is part of Hermes Secure Email Gateway Pro Edition.
 Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered under the Hermes Secure Email Gateway Pro Edition License.
 
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see <http://www.deeztek.com/products-and-services/hermes-secure-email-gateway/hermes-secure-email-gateway-pro-end-user-license-agreement/>.
--->
+--->
 
 <!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
 <html>

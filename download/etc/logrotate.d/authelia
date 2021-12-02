@@ -1,0 +1,10 @@
+/etc/authelia/authelia.log {
+    daily
+    rotate 14
+    size 10M
+    compress
+    delaycompress
+    notifempty
+    nomail
+    missingok
+}
