@@ -13,6 +13,7 @@
 
 - [About](#about)
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Installation](#installation)
 - [Getting Started Guide](#getting-started-guide)
 - [Documentation](#documentation)
