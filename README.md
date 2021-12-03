@@ -29,18 +29,24 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 
 ## Features
 
-* Free Open Source Malware and Spam Protection
-* In Transit Email Encryption
-* Administrator Web GUI
-* User Self-Service Web GUI
+* Malware and Spam Protection
+* In Transit Email Encryption via Encrypted PDF, S/MIME, PGP and SMTP TLS
+* Administrator Console
+* User Self-Service Console
 * Built-In Email Archiving
-* Active Directory Integration (Pro Feature)
+* Active Directory Integration (PRO Feature)
 * Searchable Event Logs
-* Integration with 3rd Party Threat Feeds (Pro Feature)
+* Searchable Messages by Date/Time, Subject, Sender, Receiver, Type, Action 
+* Train Messages as Spam/Ham, Block/Allow Senders, Release to Recipient, Download Messages
+* Integration with 3rd Party Threat Feeds such as Malware Patrol, Sanesecurity, Securite Info, Yara (Pro Feature)
 * Built-In Firewall (PRO Feature)
 * Multifactor Authentication
 * Lets Encrypt (ACME) Certificate Integration (PRO Feature)
-* haveibeenpwned.com Password Check Integration
+* haveibeenpwned.com Password Check Integration 
+## Screenshots
+
+![Screenshot](2021_12_02_19_12_43_.png)
+![Screenshot](2021_12_02_19_31_28_.png)
 
 ## Installation
 
