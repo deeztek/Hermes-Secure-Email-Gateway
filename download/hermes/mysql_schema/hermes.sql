@@ -2117,7 +2117,7 @@ CREATE TABLE `spam_settings` (
 -- ----------------------------
 -- Records of spam_settings
 -- ----------------------------
-INSERT INTO `spam_settings` VALUES ('1', 'user_portal', 'https://hermes.domain.tld/users/', null, null, null, null, null, null, '1', '1');
+INSERT INTO `spam_settings` VALUES ('1', 'user_portal', 'https://hermes.domain.tld/users', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('2', 'sa_spam_modifies_subj', '1', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('3', 'sa_spam_subject_tag', '[SUSPECTED SPAM]', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('4', 'final_virus_destiny', 'D_BOUNCE', null, null, null, null, null, null, '1', '1');

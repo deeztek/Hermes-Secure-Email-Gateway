@@ -624,7 +624,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                           <table id="Table160" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 640px;">
                                             <tr style="height: 14px;">
                                               <td width="959" id="Cell1142">
-                                                <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>User Portal Address </b><span style="color: rgb(51,51,51); font-weight: normal;">(Default: https://hermes.domain.tld:9080/users)</span></span></p>
+                                                <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>User Portal Address </b><span style="color: rgb(51,51,51); font-weight: normal;">(Default: https://hermes.domain.tld/users)</span></span></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 22px;">
