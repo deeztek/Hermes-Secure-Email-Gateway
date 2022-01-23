@@ -168,7 +168,7 @@ Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-s
 Post your questions at:
 [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
 
-Chat with us on Matrix:
+Chat with us at Matrix:
 [https://matrix.to/#/#hermesseg:matrix.org](https://matrix.to/#/#hermesseg:matrix.org)
 
 ## Bugs
