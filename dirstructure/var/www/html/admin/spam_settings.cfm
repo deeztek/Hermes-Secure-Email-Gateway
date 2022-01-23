@@ -263,9 +263,6 @@ select parameter, value from spam_settings where parameter='use_razor2' and acti
 select parameter, value from spam_settings where parameter='use_pyzor' and active = '1'
 </cfquery>
 
-<cfquery name="get_user_portal" datasource="#datasource#">
-select parameter, value from spam_settings where parameter='user_portal' and active = '1'
-</cfquery>
 
 <cfquery name="get_sa_spam_subject_tag" datasource="#datasource#">
 select parameter, value from spam_settings where parameter='sa_spam_subject_tag' and active = '1'
@@ -320,11 +317,6 @@ select parameter, value from spam_settings where parameter='final_bad_header_des
 <cfparam name = "use_pyzor" default = "#get_use_pyzor.value#"> 
 <cfif IsDefined("form.use_pyzor") is "True">
 <cfset use_pyzor= form.use_pyzor>
-</cfif>
-
-<cfparam name = "show_user_portal" default = "#get_user_portal.value#"> 
-<cfif IsDefined("form.user_portal") is "True">
-<cfset show_user_portal = form.user_portal>
 </cfif>
 
 <cfparam name = "show_sa_spam_subject_tag" default = "#get_sa_spam_subject_tag.value#"> 
@@ -392,12 +384,8 @@ select parameter, value from system_settings where parameter='mysql_password_her
 
 <cfif #step# is "2">
 
-<cfif #show_user_portal# is not "">
 <cfset step=3>
-<cfelseif #show_user_portal# is "">
-<cfset step=0>
-<cfset m=1>
-</cfif>
+
 
 <!--- /CFIF STEP 2 --->
 </cfif>
@@ -475,9 +463,7 @@ select parameter, value from system_settings where parameter='mysql_password_her
 </cfif>
 
 <cfif #step# is "6">
-<cfquery name="update_user_portal" datasource="#datasource#">
-update spam_settings set value='#show_user_portal#', applied='2' where parameter='user_portal'
-</cfquery>
+
 
 <cfquery name="update_sa_spam_subject_tag" datasource="#datasource#">
 update spam_settings set value='#show_sa_spam_subject_tag#', applied='2' where parameter='sa_spam_subject_tag'
@@ -623,30 +609,11 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                         <td width="959">
                                           <table id="Table160" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 640px;">
                                             <tr style="height: 14px;">
-                                              <td width="959" id="Cell1142">
-                                                <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>User Portal Address </b><span style="color: rgb(51,51,51); font-weight: normal;">(Default: https://hermes.domain.tld/users)</span></span></p>
-                                              </td>
-                                            </tr>
-                                            <tr style="height: 22px;">
-                                              <td id="Cell1141">
-                                                <table width="404" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                  <tr>
-                                                    <td class="TextObject"><cfoutput>
-<input type="text" name="user_portal" size="50" maxlength="255" style="width: 396px; white-space: pre;" value="#show_user_portal#" >
-</cfoutput>
-
-                                                      <p style="margin-bottom: 0px;">&nbsp;</p>
-                                                    </td>
-                                                  </tr>
-                                                </table>
-                                              </td>
-                                            </tr>
-                                            <tr style="height: 14px;">
-                                              <td id="Cell889">
+                                              <td width="959" id="Cell889">
                                                 <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Filter Uses Distributed Checksum Clearninghouse (DCC)</span></b></p>
                                               </td>
                                             </tr>
-                                            <tr style="height: 38px;">
+                                            <tr style="height: 40px;">
                                               <td id="Cell890">
                                                 <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"></span>
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
@@ -713,7 +680,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Filter Uses Vipul&#8217;s Razor v2</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell1092">
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -779,7 +746,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Filter Uses Pyzor</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell1144">
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -845,7 +812,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Message Modified Subject String</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 22px;">
+                                              <tr style="height: 23px;">
                                                 <td id="Cell1099">
                                                   <table width="404" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -864,7 +831,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;">Virus Messages Action to take</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell1109">
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -931,7 +898,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Banned File Messages Action to take</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell1111">
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -998,7 +965,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Messages Action to take</span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell1047">
                                                   <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                     <tr>
@@ -1065,7 +1032,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                   <p style="margin-bottom: 0px;"><b><span style="font-size: 12px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif;">Bad-Header Messages Action to take</span></span></b></p>
                                                 </td>
                                               </tr>
-                                              <tr style="height: 38px;">
+                                              <tr style="height: 40px;">
                                                 <td id="Cell892">
                                                   <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"></span>
                                                     <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
@@ -1133,7 +1100,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                     <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif;"><span style="font-size: 12px;"></span><b><span style="font-size: 12px;">Bayes Database <span style="font-size: 10px; font-weight: normal;">(<b><span style="font-size: 12px; color: rgb(255,0,0);">NOTE:</span></b> <span style="font-size: 12px;">Modifying will reset ALL Spam Filter Tests to their DEFAULT values thus erasing any custom values you may have previously set )</span></span></span></b></span></p>
                                                   </td>
                                                 </tr>
-                                                <tr style="height: 38px;">
+                                                <tr style="height: 40px;">
                                                   <td id="Cell912">
                                                     <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"></span>
                                                       <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
@@ -1201,7 +1168,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                       <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>Bayes Database Auto Learn </b>(Bayes Database must be Enabled, otherwise the setting below will have no effect)</span></p>
                                                     </td>
                                                   </tr>
-                                                  <tr style="height: 38px;">
+                                                  <tr style="height: 40px;">
                                                     <td id="Cell1058">
                                                       <table width="487" border="0" cellspacing="0" cellpadding="0" align="left">
                                                         <tr>
@@ -1268,7 +1235,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                       <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>Bayes Database Auto Learn Spam Threshold Score </b>(Bayes Database Auto Learn must be Enabled, otherwise the setting below will have no effect)</span></p>
                                                     </td>
                                                   </tr>
-                                                  <tr style="height: 22px;">
+                                                  <tr style="height: 23px;">
                                                     <td id="Cell1147">
                                                       <table width="404" border="0" cellspacing="0" cellpadding="0" align="left">
                                                         <tr>
@@ -1287,7 +1254,7 @@ update spam_settings set value='#use_pyzor#', applied='2' where parameter='use_p
                                                       <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;"><b>Bayes Database Auto Learn Non-Spam Threshold Score </b>(Bayes Database Auto Learn must be Enabled, otherwise the setting below will have no effect)</span></p>
                                                     </td>
                                                   </tr>
-                                                  <tr style="height: 22px;">
+                                                  <tr style="height: 23px;">
                                                     <td id="Cell1149">
                                                       <table width="404" border="0" cellspacing="0" cellpadding="0" align="left">
                                                         <tr>
@@ -1505,9 +1472,6 @@ select parameter, value from spam_settings where parameter='use_razor2' and acti
 select parameter, value from spam_settings where parameter='use_pyzor' and active = '1'
 </cfquery>
 
-<cfquery name="get_user_portal" datasource="#datasource#">
-select parameter, value from spam_settings where parameter='user_portal' and active = '1'
-</cfquery>
 
 <cfquery name="get_user_portal_spam_training" datasource="#datasource#">
 select parameter, value from spam_settings where parameter='user_portal_spam_training' and active = '1'

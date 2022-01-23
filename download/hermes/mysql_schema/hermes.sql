@@ -2243,7 +2243,7 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '211019');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '211207');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 
@@ -2276,6 +2276,7 @@ INSERT INTO `system_updates` VALUES ('41', '18.04', '210113', '1', '2021-01-13 0
 INSERT INTO `system_updates` VALUES ('42', '18.04', '210501', '1', '2021-05-01 00:00:00', '11');
 INSERT INTO `system_updates` VALUES ('43', '18.04', '211009', '1', '2021-10-09 00:00:00', '12');
 INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 00:00:00', '13');
+INSERT INTO `system_updates` VALUES ('45', '18.04', '211207', '1', '2022-01-14 00:00:00', '14');
 
 -- ----------------------------
 -- Table structure for `system_users`
@@ -2456,14 +2457,14 @@ CREATE TABLE `user_destinations` (
 -- ----------------------------
 -- Records of user_destinations
 -- ----------------------------
-INSERT INTO `user_destinations` VALUES ('1', 'index.cfm');
-INSERT INTO `user_destinations` VALUES ('2', 'loading.cfm');
+INSERT INTO `user_destinations` VALUES ('1', '2/index.cfm');
+INSERT INTO `user_destinations` VALUES ('2', '2/preloader_view_message_history.cfm');
 INSERT INTO `user_destinations` VALUES ('3', 'user_reports.cfm');
-INSERT INTO `user_destinations` VALUES ('4', 'user_filters.cfm');
+INSERT INTO `user_destinations` VALUES ('4', '2/view_sender_filters.cfm');
 INSERT INTO `user_destinations` VALUES ('5', 'user_policy.cfm');
 INSERT INTO `user_destinations` VALUES ('6', 'user_virtual.cfm');
-INSERT INTO `user_destinations` VALUES ('7', 'loading2.cfm');
-INSERT INTO `user_destinations` VALUES ('8', 'user_release_message.cfm');
+INSERT INTO `user_destinations` VALUES ('7', '2/preloader_view_message.cfm');
+INSERT INTO `user_destinations` VALUES ('8', '2/release_message.cfm');
 
 -- ----------------------------
 -- Table structure for `user_settings`

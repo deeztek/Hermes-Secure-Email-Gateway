@@ -175,7 +175,7 @@ select * from external_recipients where email = '#url.email#'
 
 <cfif #action# is "edit">
 <cfset session.mode="insert">
-<cfset session.email=#show_email#>
+<cfset session.ext_recipient=#show_email#>
 <cfset session.encryption_mode=#show_encryption_mode#>
 <cfif #show_encryption_mode# is "pdf_mandatory">
 <cfoutput>

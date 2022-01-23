@@ -174,7 +174,7 @@ select * from external_recipients where id = <cfqueryparam value = #url.id# CFSQ
 
 <cfif #action# is "edit">
 <cfset session.mode="edit">
-<cfset session.email=#show_email#>
+<cfset session.ext_recipient=#show_email#>
 <cfset session.encryption_mode=#show_encryption_mode#>
 <cfif #show_encryption_mode# is "pdf_mandatory">
 <cfoutput>
@@ -211,7 +211,7 @@ select * from external_recipients where id = <cfqueryparam value = #url.id# CFSQ
                                     <table border="0" cellspacing="0" cellpadding="0">
                                       <tr valign="top" align="left">
                                         <td width="952">
-                                          <table id="Table76" border="0" cellspacing="2" cellpadding="0" width="952" style="height: 137px;">
+                                          <table id="Table76" border="0" cellspacing="2" cellpadding="0" width="100%" style="height: 137px;">
                                             <tr style="height: 14px;">
                                               <td width="948" id="Cell466">
                                                 <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Specify E-Mail Address</span></b></p>

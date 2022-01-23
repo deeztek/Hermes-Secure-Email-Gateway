@@ -151,7 +151,9 @@ timeout="10" />
         <!---
         <cfoutput>Redirect: #theUrl#</cfoutput><br>       
         --->
+     
         <cfoutput>Authorized</cfoutput>
+        <cfoutput>#curlresult#</cfoutput>
            
         <cfelse>
         

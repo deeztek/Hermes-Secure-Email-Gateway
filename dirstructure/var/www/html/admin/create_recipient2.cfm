@@ -118,10 +118,10 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
                         </tr>
                         <tr valign="top" align="left">
                           <td height="357"></td>
-                          <td colspan="2" width="949"><cfif NOT IsDefined('session.email')>
+                          <td colspan="2" width="949"><cfif NOT IsDefined('session.ext_recipient')>
 <cflocation url="create_recipient.cfm">
-<cfelseif IsDefined('session.email')>
-<cfif #session.email# is "">
+<cfelseif IsDefined('session.ext_recipient')>
+<cfif #session.ext_recipient# is "">
 <cflocation url="create_recipient.cfm">
 </cfif>
 </cfif>
@@ -314,7 +314,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
                                                           <td width="617" id="Cell797">
                                                             <table width="360" border="0" cellspacing="0" cellpadding="0" align="left">
                                                               <tr>
-                                                                <td><cfoutput><input type="text" id="FormsEditField24" name="user" size="45" maxlength="45" disabled="disabled" style="width: 356px; white-space: pre;" value="#session.email#"></cfoutput></td>
+                                                                <td><cfoutput><input type="text" id="FormsEditField24" name="user" size="45" maxlength="45" disabled="disabled" style="width: 356px; white-space: pre;" value="#session.ext_recipient#"></cfoutput></td>
                                                               </tr>
                                                             </table>
                                                           </td>

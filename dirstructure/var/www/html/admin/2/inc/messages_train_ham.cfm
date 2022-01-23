@@ -81,11 +81,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif fileExists(quarfile)> 
     
-<cfexecute name = "/usr/bin/sa-learn"
-timeout = "240"
-variable ="salearnresult"
-arguments="--no-sync --ham #quarfile#">
-</cfexecute>
+      <cftry>
+
+        <cfexecute name = "/usr/bin/sa-learn"
+        timeout = "240"
+        variable ="salearnresult"
+        arguments="--no-sync --ham #quarfile#">
+        </cfexecute>
+                    
+            <cfcatch type="any">
+                
+            <cfset m="Messages Train Ham: There was an error executing /usr/bin/sa-learn">
+            <cfinclude template="error.cfm">
+            <cfabort>   
+                
+            </cfcatch>
+            </cftry>
         
         
          <!--- IF COMMAND OUTPUT CONTAINS Learned tokens from 1 message(s) THEN TRAIN SUCCEEDED --->

@@ -112,7 +112,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif></cfif>
             </cfif>
           
-          
+   
           
           <cfparam name = "errormessage" default = "0">
           <cfparam name = "step" default = "0"> 
@@ -152,6 +152,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfif form.action2 is not "">
           <cfset show_action2 = form.action2>
           </cfif></cfif> 
+
+ 
           
           
           <cfquery name="server_ip" datasource="hermes">
@@ -750,7 +752,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           
             <!--- MODIFY /opt/hermes/conf_files/hosts ABOVE --->
             
-            <!--- Create Network Restart Script BELOW ---> 
+            <!--- Create Network Restart Script BELOW  which will update Auth Nginx, Nginx, authelia, Console IP and Ciphermail via API ---> 
             
             <cfinclude template="./inc/create_network_restart_script.cfm" />
           
@@ -879,7 +881,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           
             <!--- MODIFY /opt/hermes/conf_files/hosts ABOVE --->
             
-            <!--- Create Network Restart Script BELOW ---> 
+            <!--- Create Network Restart Script BELOW  which will update Auth Nginx, Nginx, authelia, Console IP and Ciphermail via API---> 
             
             <cfinclude template="./inc/create_network_restart_script.cfm" />
           
@@ -1154,6 +1156,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
                       <cfoutput>
                           <div class="form-group" id="NetworkMode">
+
                             <label for="server_ip"><strong>IP Address</strong></label>
                             <input type="text" class="form-control" name="server_ip" value="#show_server_ip#" placeholder="Enter Server IP Address (Ex: 192.168.0.1)" >
                      
@@ -1230,7 +1233,94 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                              <!--- /DIV  <div class="form-group" id="NetworkMode"> --->            
                             </div>
 
-                          <!--- /CFIF #show_network_mode# is "static" --->
+
+                          <cfelseif #show_network_mode# is "dhcp">
+
+                              <cfoutput>
+                                  <div class="form-group" id="NetworkMode" style="display:none;">
+        
+                                    <label for="server_ip"><strong>IP Address</strong></label>
+                                    <input type="text" class="form-control" name="server_ip" value="#show_server_ip#" placeholder="Enter Server IP Address (Ex: 192.168.0.1)" >
+                             
+                                  </cfoutput>
+                  
+                        
+                              <cfif #show_server_subnet# is "">
+                                  <cfset default_value="24">
+                                  <cfset default_mask="/24 (255.255.255.0)">
+        
+                              <cfelseif #show_server_subnet# is not "">
+                                  <cfquery name="getmask" datasource="hermes">
+                                  select mask,value3 from subnet where value3='#show_server_subnet#'
+                                  </cfquery>
+                                  <cfset default_value="#getmask.value3#">
+                                  <cfset default_mask="#getmask.mask#">
+                                  
+                                  <!--- /CFIF for #show_server_subnet# is --->
+                                  </cfif>
+                                  
+                                  <cfquery name="getsubnet" datasource="hermes">
+                                  select * from subnet where value3 <> '#default_value#' order by value2 asc
+                                  </cfquery>
+                  
+                    
+                                      <label><strong>Subnet Mask</strong></label>
+                                      <select class="form-control select2" name="server_subnet" data-placeholder="Subnet Mask"
+                                              style="width: 100%;">
+                                        <cfoutput><option value="#default_value#" selected="selected">#default_mask#</option></cfoutput>
+                                        <cfoutput query="getsubnet">
+                                          <option value="#value3#">#mask#</option>
+                                          </cfoutput>
+                                          </select>
+                                   
+                                      
+                  
+                               
+                                              <cfoutput>
+                                              
+                                                    <label for="server_gateway"><strong>Gateway</strong></label>
+                                                    <input type="text" class="form-control" name="server_gateway" value="#show_server_gateway#" id="server_gateway" placeholder="Enter Server Gateway Address (Ex: 192.168.0.1)" >
+                                              
+                                                  </cfoutput>
+                                  
+                                    
+                                        
+                                              
+                                       
+                                      
+                                                  <cfoutput>
+                                               
+                                                        <label for="server_dns1"><strong>DNS1</strong></label>
+                                                        <input type="text" class="form-control" name="server_dns1" value="#show_server_dns1#" id="server_dns1" placeholder="Enter Server DNS1 Address (Ex: 192.168.0.1)" >
+                                                  
+                                                      </cfoutput>
+                                           
+                  
+                                            
+                                                      <cfoutput>
+                                                    
+                                                            <label for="server_dns2"><strong>DNS2</strong></label>
+                                                            <input type="text" class="form-control" name="server_dns2" value="#show_server_dns2#" id="server_dns2" placeholder="Enter Server DNS2 Address (Ex: 192.168.0.1)" >
+                                                     
+                                                          </cfoutput>
+                                          
+                                                    
+                                                          <cfoutput>
+                                                        
+                                                                <label for="server_dns3"><strong>DNS3</strong></label>
+                                                                <input type="text" class="form-control" name="server_dns3" value="#show_server_dns3#" id="server_dns3" placeholder="Enter Server DNS3 Address (Ex: 192.168.0.1)" >
+                                                           
+                                                              </cfoutput>
+                                              
+                                     <!--- /DIV  <div class="form-group" id="NetworkMode"> --->            
+                                    </div>
+        
+
+                            
+
+
+
+                          <!--- /CFIF #show_network_mode# is "" --->
                           </cfif>
           
             

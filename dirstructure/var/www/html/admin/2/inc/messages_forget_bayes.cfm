@@ -89,11 +89,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif fileExists(quarfile)> 
     
-<cfexecute name = "/usr/bin/sa-learn"
-timeout = "240"
-variable ="salearnresult"
-arguments="--no-sync --forget #quarfile#">
-</cfexecute>
+        <cftry>
+
+            <cfexecute name = "/usr/bin/sa-learn"
+            timeout = "240"
+            variable ="salearnresult"
+            arguments="--no-sync --forget #quarfile#">
+            </cfexecute>
+                        
+                <cfcatch type="any">
+                    
+                <cfset m="Messages Forget Bayes: There was an error executing /usr/bin/sa-learn --forget">
+                <cfinclude template="error.cfm">
+                <cfabort>   
+                    
+                </cfcatch>
+                </cftry>
         
         
          <!--- IF COMMAND OUTPUT CONTAINS Forgot tokens from 1 message(s) THEN TRAIN SUCCEEDED --->

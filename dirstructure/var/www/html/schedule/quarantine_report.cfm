@@ -1,33 +1,14 @@
-<!--
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2017. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Pro Edition.
 
 Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered under the Hermes Secure Email Gateway Pro Edition License.
 
-You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see <http://www.deeztek.com/products-and-services/hermes-secure-email-gateway/hermes-secure-email-gateway-pro-end-user-license-agreement/>.
--->
+You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see <https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula>.
+--->
 
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
-<html>
-<head>
-<title>Quarantine Report</title>
-<meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
-<meta name="Generator" content="NetObjects (http://netobjects.com)">
-<link rel="stylesheet" type="text/css" href="./fusion.css">
-<link rel="stylesheet" type="text/css" href="./style.css">
-<link rel="stylesheet" type="text/css" href="./site.css">
-</head>
-<body style="background-color: rgb(255,255,255); background-image: none; margin: 0px;">
-  <table border="0" cellspacing="0" cellpadding="0" width="696">
-    <tr valign="top" align="left">
-      <td width="24" height="37"></td>
-      <td width="672"></td>
-    </tr>
-    <tr valign="top" align="left">
-      <td></td>
-      <td width="672" id="Text440" class="TextObject">
-        <p style="margin-bottom: 0px;"><cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
+<cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
 <cfset timenow="#TimeFormat(now(), "HH")#">
 <cfset theDate=#DateFormat(DateAdd('d', -1, datenow),'yyyy-mm-dd')#>
 <cfset datenow2=#DateFormat(datenow,"mm/dd/yyyy")#>
@@ -36,22 +17,22 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT REGARDLESS STARTS HERE--->
 
-<cfquery name="getrecipientsall" datasource="#datasource#">
+<cfquery name="getrecipientsall" datasource="hermes">
 SELECT users.email as rcptemail, user_settings.id as customid, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'ALL' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
 </cfquery>
 
 <cfloop query="getrecipientsall">
 <cfoutput>
-<cfquery name="getrid" datasource="#datasource#">
+<cfquery name="getrid" datasource="hermes">
 select id as rcptid from maddr where email='#rcptemail#'
 </cfquery>
 #rcptemail#<br>
 
-<cfquery name="getquarantineall" datasource="#datasource#">
+<cfquery name="getquarantineall" datasource="hermes">
 SELECT msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgrcpt.mail_id, msgrcpt.rid, msgrcpt.ds from msgrcpt LEFT JOIN msgs ON msgs.mail_id = msgrcpt.mail_id where (msgrcpt.ds like binary 'B' or msgrcpt.ds like binary 'D') and msgrcpt.rid='#getrid.rcptid#' and msgs.time_iso between '#datenow# 00:00:00' and '#datenow# 23:59:59' group by msgrcpt.mail_id order by msgs.time_iso desc
 </cfquery>
 
-<cfquery name="getpostmaster" datasource="#datasource#">
+<cfquery name="getpostmaster" datasource="hermes">
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
@@ -87,19 +68,18 @@ If you wish to view a message, click on the View Msg button.<br><br>
 
 If you wish to release a message to your mailbox, click the the Release Msg button. <br><br>
 
-Additionally, click the links below to access the different sections of the User Self-Service Portal:
+Additionally, click the links below to access the different sections of the User Console:
 
-<cfquery name="getportal" datasource="#datasource#">
-select value from spam_settings where parameter='user_portal'
+<cfquery name="getportal" datasource="hermes">
+select value2 from parameters2 where parameter='console.host' and module='console'
 </cfquery>
 
 <ul>
 
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=1">Mail Statistics</a> - Clicking this link will direct you to the Mail Statistics page where you can view email statistics customized to your email address.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=3">Report Settings</a> - Clicking this link will direct you to the Report Settings page where you can adjust the settings for this report.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=2">History & Archive</a> - Clicking this link will direct you to the History & Archive page where you can search, view/download and release email messages to your mailbox.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=4">Sender Filters</a> - Clicking this link will direct you to the Sender Filters page where you can create block/allow filters for outside email addresses.</li>
-<li><a href="https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/accessing-the-user-self-service-portal/">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Self-Service Portal</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=3">Report Settings</a> - Clicking this link will direct you to the Report Settings where you can adjust the settings for this report.</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=2">History and Archive</a> - Clicking this link will direct you to the Message History where you can search, view/download and release email messages to your mailbox.</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=4">Sender Filters</a> - Clicking this link will direct you to the Sender Filters where you can create block/allow filters for outside email addresses.</li>
+<li><a href="https://docs.deeztek.com/books/hermes-seg-user-guide/page/accessing-the-user-self-service-portal">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Console</li>
 </ul>
 </span></p>
 
@@ -161,7 +141,7 @@ select value from spam_settings where parameter='user_portal'
     </td>
     
 
-<cfquery name="getfromaddr" datasource="#datasource#">
+<cfquery name="getfromaddr" datasource="hermes">
 SELECT email as fromAddress FROM maddr where id='#sid#'
 </cfquery>
 
@@ -177,7 +157,7 @@ SELECT email as fromAddress FROM maddr where id='#sid#'
 </div>
     </td>
 
-<cfquery name="gettype" datasource="#datasource#">
+<cfquery name="gettype" datasource="hermes">
 select content_type, description from msg_content_type where content_type like binary '#content#'
 </cfquery>
 
@@ -195,11 +175,11 @@ select content_type, description from msg_content_type where content_type like b
     </td>
 
 <td align="center">
-<a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=7&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesview" border="0" alt="View Message" title="View Message"></a>
+<a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=7&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesview" border="0" alt="View Message" title="View Message"></a>
     </td>
 
 <td align="center">
-<a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=8&mid=#URLEncodedFormat(Trim(mail_id))#&sid=#URLEncodedFormat(Trim(secret_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesrelease" border="0" alt="Release Message" title="Release Message"></a>
+<a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=8&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesrelease" border="0" alt="Release Message" title="Release Message"></a>
     </td>
 
  
@@ -237,7 +217,7 @@ disposition="inline"
 <!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT REGARDLESS ENDS HERE--->
 
 
-<cfquery name="getrecipients" datasource="#datasource#">
+<cfquery name="getrecipients" datasource="hermes">
 SELECT users.email as rcptemail, user_settings.id as customid, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'YES' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
 </cfquery>
 
@@ -245,17 +225,17 @@ SELECT users.email as rcptemail, user_settings.id as customid, user_settings.rep
 
 <cfloop query="getrecipients">
 <cfoutput>
-<cfquery name="getrid" datasource="#datasource#">
+<cfquery name="getrid" datasource="hermes">
 select id as rcptid from maddr where email='#rcptemail#'
 </cfquery>
 #rcptemail#<br>
 
-<cfquery name="getquarantine" datasource="#datasource#">
+<cfquery name="getquarantine" datasource="hermes">
 SELECT msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgrcpt.mail_id, msgrcpt.rid, msgrcpt.ds from msgrcpt LEFT JOIN msgs ON msgs.mail_id = msgrcpt.mail_id where (msgrcpt.ds like binary 'B' or msgrcpt.ds like binary 'D') and msgrcpt.rid='#getrid.rcptid#' and msgs.time_iso between '#datenow# 00:00:00' and '#datenow# 23:59:59' group by msgrcpt.mail_id order by msgs.time_iso desc
 </cfquery>
 
 <cfif #getquarantine.recordcount# GTE 1>
-<cfquery name="getpostmaster" datasource="#datasource#">
+<cfquery name="getpostmaster" datasource="hermes">
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
@@ -289,19 +269,18 @@ If you wish to view a message, click on the View Msg button.<br><br>
 
 If you wish to release a message to your mailbox, click the the Release Msg button. <br><br>
 
-Additionally, click the links below to access the different sections of the User Self-Service Portal:
+Additionally, click the links below to access the different sections of the User Console:
 
-<cfquery name="getportal" datasource="#datasource#">
-select value from spam_settings where parameter='user_portal'
+<cfquery name="getportal" datasource="hermes">
+select value2 from parameters2 where parameter='console.host' and module='console'
 </cfquery>
 
 <ul>
 
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=1">Mail Statistics</a> - Clicking this link will direct you to the Mail Statistics page where you can view email statistics customized to your email address.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=3">Report Settings</a> - Clicking this link will direct you to the Report Settings page where you can adjust the settings for this report.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=2">History & Archive</a> - Clicking this link will direct you to the History & Archive page where you can search, view/download and release email messages to your mailbox.</li>
-<li><a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=4">Sender Filters</a> - Clicking this link will direct you to the Sender Filters page where you can create block/allow filters for outside email addresses.</li>
-<li><a href="https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-user-guide/accessing-the-user-self-service-portal/">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Self-Service Portal</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=3">Report Settings</a> - Clicking this link will direct you to the Report Settings where you can adjust the settings for this report.</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=2">History and Archive</a> - Clicking this link will direct you to the Message History where you can search, view/download and release email messages to your mailbox.</li>
+<li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=4">Sender Filters</a> - Clicking this link will direct you to the Sender Filters where you can create block/allow filters for outside email addresses.</li>
+<li><a href="https://docs.deeztek.com/books/hermes-seg-user-guide/page/accessing-the-user-self-service-portal">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Console</li>
 </ul>
 </span></p>
 
@@ -364,7 +343,7 @@ select value from spam_settings where parameter='user_portal'
     </td>
     
 
-<cfquery name="getfromaddr" datasource="#datasource#">
+<cfquery name="getfromaddr" datasource="hermes">
 SELECT email as fromAddress FROM maddr where id='#sid#'
 </cfquery>
 
@@ -380,7 +359,7 @@ SELECT email as fromAddress FROM maddr where id='#sid#'
 </div>
     </td>
 
-<cfquery name="gettype" datasource="#datasource#">
+<cfquery name="gettype" datasource="hermes">
 select content_type, description from msg_content_type where content_type like binary '#content#'
 </cfquery>
 
@@ -398,11 +377,11 @@ select content_type, description from msg_content_type where content_type like b
     </td>
 
 <td id="Cell1060">
-<a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=7&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesview" border="0" alt="View Message" title="View Message"></a>
+<a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=7&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesview" border="0" alt="View Message" title="View Message"></a>
     </td>
 
 <td id="Cell1060">
-<a href="#getportal.value#/user_authenticate.cfm?uid=#customid#&dest=8&mid=#URLEncodedFormat(Trim(mail_id))#&sid=#URLEncodedFormat(Trim(secret_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesrelease" border="0" alt="Release Message" title="Release Message"></a>
+<a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=8&mid=#URLEncodedFormat(Trim(mail_id))#"><img id="Picture52" height="19" width="17" src="cid:hermesrelease" border="0" alt="Release Message" title="Release Message"></a>
     </td>
 
 
@@ -436,10 +415,4 @@ disposition="inline"
 
 </cfif>
 </cfoutput>
-</cfloop>&nbsp;</p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-   
+</cfloop>

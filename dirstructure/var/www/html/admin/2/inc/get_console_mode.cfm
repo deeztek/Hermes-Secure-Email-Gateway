@@ -41,7 +41,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset theIpAddress = #trim(theIpAddress)#>
       
         <cfset theurl="https://#theIpAddress#">
-        
+
+         
         <!--- /CFIF #theIpAddress# is "" --->
           </cfif>
         
@@ -53,6 +54,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfquery>
       
       <cfset theurl="https://#getconsolehost.value2#">
+
+
       
     <cfelse>
 

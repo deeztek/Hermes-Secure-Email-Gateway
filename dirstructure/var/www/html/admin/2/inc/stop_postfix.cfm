@@ -18,8 +18,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
+
+
+<cftry>
+  
+
 <cfexecute name = "/bin/systemctl stop postfix"
 timeout = "240"
 outputfile ="/dev/null">
 </cfexecute>
-
+                
+<cfcatch type="any">
+            
+<cfset m="Stop Postfix: There was an error stopping postfix ">
+<cfinclude template="error.cfm">
+<cfabort>   
+            
+</cfcatch>
+</cftry>

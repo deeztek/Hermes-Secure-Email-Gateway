@@ -149,11 +149,11 @@ Change to the **Hermes-Secure-Email-Gateway** directory:
 
 Make script executable:
 
-`sudo chmod +x ubuntu_hermes_1804_install.sh`
+`sudo chmod +x ubuntu_hermes_install.sh`
 
 Run the script as root:
 
-`./ubuntu_hermes_1804_install.sh`
+`sudo ./ubuntu_hermes_install.sh`
 
 ## Getting Started Guide
 
@@ -168,8 +168,8 @@ Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-s
 Post your questions at:
 [https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
 
-Chat with us at:
-[https://cloud.deeztek.com/call/g8n8ydzi](https://cloud.deeztek.com/call/g8n8ydzi)
+Chat with us on Matrix:
+[https://matrix.to/#/#hermesseg:matrix.org](https://matrix.to/#/#hermesseg:matrix.org)
 
 ## Bugs
 

@@ -34,6 +34,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cfcatch>
       </cftry>
 
+<cfoutput>
+<cfset theIpAddress=#TRIM(theIPAddress)#>
+</cfoutput>
+
       <!---
       <cfoutput>IP no trim: #theIpAddress#<br></cfoutput>
       --->

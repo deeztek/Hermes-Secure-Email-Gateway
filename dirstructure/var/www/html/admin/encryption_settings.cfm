@@ -245,7 +245,7 @@ select property, value from encryption_settings where property='user.subjectTrig
 </cfquery>
 
 <cfquery name="get_portal_url" datasource="#datasource#">
-select property, value from encryption_settings where property='user.portal.baseURL'
+select value2 from parameters2 where parameter='console.host' and module='console'
 </cfquery>
 
 <cfquery name="get_pdfreply_sender" datasource="#datasource#">
@@ -331,10 +331,7 @@ select property, value from encryption_settings where property='user.systemMailS
 </cfif>
 
 
-<cfparam name = "show_portal_url" default = "#get_portal_url.value#"> 
-<cfif IsDefined("form.portal_url") is "True">
-<cfset show_portal_url = form.portal_url>
-</cfif>
+<cfparam name = "show_portal_url" default = "https://#get_portal_url.value2#/web/portal"> 
 
 
 <cfparam name = "show_pdfreply_sender" default = "#get_pdfreply_sender.value#"> 
@@ -831,25 +828,6 @@ arguments="-inputformat none">
                                               </td>
                                             </tr>
                                             <tr style="height: 14px;">
-                                              <td id="Cell1017">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Secure Portal Address<span style="font-weight: normal;"> (Default: https://hermes.domain.tld/web/portal)</span></span></b></p>
-                                              </td>
-                                            </tr>
-                                            <tr style="height: 22px;">
-                                              <td id="Cell1018">
-                                                <table width="404" border="0" cellspacing="0" cellpadding="0" align="left">
-                                                  <tr>
-                                                    <td class="TextObject"><cfoutput>
-<input type="text" name="portal_url" size="55" maxlength="255" style="width: 396px; white-space: pre;" value="#show_portal_url#" >
-</cfoutput>
-
-                                                      <p style="margin-bottom: 0px;">&nbsp;</p>
-                                                    </td>
-                                                  </tr>
-                                                </table>
-                                              </td>
-                                            </tr>
-                                            <tr style="height: 14px;">
                                               <td id="Cell1019">
                                                 <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">PDF Reply Sender E-mail</span></b></p>
                                               </td>
@@ -1034,7 +1012,7 @@ arguments="-inputformat none">
                                     </table>
                                     <table border="0" cellspacing="0" cellpadding="0" width="964">
                                       <tr valign="top" align="left">
-                                        <td width="964" height="11"></td>
+                                        <td width="964" height="51"></td>
                                       </tr>
                                       <tr valign="top" align="left">
                                         <td width="964" id="Text185" class="TextObject">
