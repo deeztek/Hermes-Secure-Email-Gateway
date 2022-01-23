@@ -19,10 +19,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!-- Font Awesome Icons -->
-<link rel="stylesheet" href="plugins/fontawesome-free/css/all.min.css">
+<link rel="stylesheet" href="/plugins/fontawesome-free/css/all.min.css">
 
 <!-- Theme style -->
-<link rel="stylesheet" href="dist/css/adminlte.min.css">
+<link rel="stylesheet" href="/dist/css/adminlte.min.css">
 
 <!-- REQUIRED SCRIPTS -->
 
@@ -32,59 +32,60 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <script src="https://code.jquery.com/jquery-3.6.0.min.js" type="text/javascript"></script>
 -->
 
-<script src="plugins/jquery/jquery.min.js" type="text/javascript"></script>
+<script src="/plugins/jquery/jquery.min.js" type="text/javascript"></script>
 
 <!--- jQuery UI --->
-<link rel="stylesheet" href="plugins/jquery-ui/jquery-ui.min.css">
-<script src="plugins/jquery-ui/jquery-ui.min.js" type="text/javascript"></script>
+<link rel="stylesheet" href="/plugins/jquery-ui/jquery-ui.min.css">
+<script src="/plugins/jquery-ui/jquery-ui.min.js" type="text/javascript"></script>
 
 
 
 <!-- Bootstrap 4 -->
-<script src="plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+<script src="/plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
 
 <!-- AdminLTE App -->
-<script src="dist/js/adminlte.min.js"></script>
+<script src="/dist/js/adminlte.min.js"></script>
 
  <!-- Tempusdominus Bootstrap 4 -->
- <link rel="stylesheet" href="plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css">
+ <link rel="stylesheet" href="/plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css">
 
 <!-- DateRange Picker -->
 
 <!-- InputMask -->
-<script src="plugins/moment/moment.min.js"></script>
-<script src="plugins/inputmask/jquery.inputmask.min.js"></script>
+<script src="/plugins/moment/moment.min.js"></script>
+<script src="/plugins/inputmask/jquery.inputmask.min.js"></script>
+
 <!-- date-range-picker -->
-<script src="plugins/daterangepicker/daterangepicker.js"></script>
+<script src="/plugins/daterangepicker/daterangepicker.js"></script>
 
 <!-- InputMask -->
-<script src="plugins/moment/moment.min.js"></script>
-<script src="plugins/inputmask/jquery.inputmask.min.js"></script>
+<script src="/plugins/moment/moment.min.js"></script>
+<script src="/plugins/inputmask/jquery.inputmask.min.js"></script>
 <!-- date-range-picker -->
-<script src="plugins/daterangepicker/daterangepicker.js"></script>
+<script src="/plugins/daterangepicker/daterangepicker.js"></script>
 <!-- bootstrap color picker -->
-<script src="plugins/bootstrap-colorpicker/js/bootstrap-colorpicker.min.js"></script>
+<script src="/plugins/bootstrap-colorpicker/js/bootstrap-colorpicker.min.js"></script>
 <!-- Tempusdominus Bootstrap 4 -->
-<script src="plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js"></script>
+<script src="/plugins/tempusdominus-bootstrap-4/js/tempusdominus-bootstrap-4.min.js"></script>
 
 <!-- DataTables -->
-<link rel="stylesheet" href="plugins/datatables-bs4/css/dataTables.bootstrap4.min.css">
-<link rel="stylesheet" href="plugins/datatables-responsive/css/responsive.bootstrap4.min.css">
-<link rel="stylesheet" href="plugins/datatables-buttons/css/buttons.bootstrap4.min.css">
+<link rel="stylesheet" href="/plugins/datatables-bs4/css/dataTables.bootstrap4.min.css">
+<link rel="stylesheet" href="/plugins/datatables-responsive/css/responsive.bootstrap4.min.css">
+<link rel="stylesheet" href="/plugins/datatables-buttons/css/buttons.bootstrap4.min.css">
 
 <!-- DataTables  & Plugins -->
-<script src="plugins/datatables/jquery.dataTables.min.js"></script>
-<script src="plugins/datatables-bs4/js/dataTables.bootstrap4.min.js"></script>
-<script src="plugins/datatables-responsive/js/dataTables.responsive.min.js"></script>
-<script src="plugins/datatables-responsive/js/responsive.bootstrap4.min.js"></script>
-<script src="plugins/datatables-buttons/js/dataTables.buttons.min.js"></script>
-<script src="plugins/datatables-buttons/js/buttons.bootstrap4.min.js"></script>
-<script src="plugins/jszip/jszip.min.js"></script>
-<script src="plugins/pdfmake/pdfmake.min.js"></script>
-<script src="plugins/pdfmake/vfs_fonts.js"></script>
-<script src="plugins/datatables-buttons/js/buttons.html5.min.js"></script>
-<script src="plugins/datatables-buttons/js/buttons.print.min.js"></script>
-<script src="plugins/datatables-buttons/js/buttons.colVis.min.js"></script>
+<script src="/plugins/datatables/jquery.dataTables.min.js"></script>
+<script src="/plugins/datatables-bs4/js/dataTables.bootstrap4.min.js"></script>
+<script src="/plugins/datatables-responsive/js/dataTables.responsive.min.js"></script>
+<script src="/plugins/datatables-responsive/js/responsive.bootstrap4.min.js"></script>
+<script src="/plugins/datatables-buttons/js/dataTables.buttons.min.js"></script>
+<script src="/plugins/datatables-buttons/js/buttons.bootstrap4.min.js"></script>
+<script src="/plugins/jszip/jszip.min.js"></script>
+<script src="/plugins/pdfmake/pdfmake.min.js"></script>
+<script src="/plugins/pdfmake/vfs_fonts.js"></script>
+<script src="/plugins/datatables-buttons/js/buttons.html5.min.js"></script>
+<script src="/plugins/datatables-buttons/js/buttons.print.min.js"></script>
+<script src="/plugins/datatables-buttons/js/buttons.colVis.min.js"></script>
 
 <!--- DataTables Checkbox includes --->
 

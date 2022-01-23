@@ -23,7 +23,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <!-- Brand Logo -->
     <a href="index.cfm" class="brand-link">
-      <img src="dist/img/hermes_logo.png" alt="Hermes SEG" class="brand-image " style="opacity: .8">
+      <img src="/dist/img/hermes_logo.png" alt="Hermes SEG" class="brand-image " style="opacity: .8">
     
       <span class="brand-text ">SEG Admin</span>
     
@@ -35,7 +35,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="user-panel mt-3 pb-3 mb-3 d-flex">
         <div class="image">
           <cfoutput>
-          <a href="edit_system_user.cfm?id=#session.userid#"><img src="dist/img/generic-user-160-160.png" class="img-circle elevation-2" alt="User Image" title="My Profile" \></a>
+          <a href="edit_system_user.cfm?id=#session.userid#"><img src="/dist/img/generic-user-160-160.png" class="img-circle elevation-2" alt="User Image" title="My Profile" \></a>
         </cfoutput>
         </div>
         <div class="info">
@@ -219,18 +219,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
        
 
               <li class="nav-item">
-                <a href="##" class="nav-link">
+                <a href="view_smtp_tls_settings.cfm" class="nav-link">
                   <i class="fab fa-expeditedssl nav-icon"></i>
                   <p>SMTP TLS Settings</p>
                 </a>
               </li>
 
-              <li class="nav-item">
-                <a href="##" class="nav-link">
-                  <i class="fas fa-fire nav-icon"></i>
-                  <p>SMTP TLS Policy</p>
-                </a>
-              </li>
               <li class="nav-item">
                 <a href="##" class="nav-link">
                   <i class="fab fa-microsoft nav-icon"></i>

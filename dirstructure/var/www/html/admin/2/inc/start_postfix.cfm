@@ -18,7 +18,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfexecute name = "/bin/systemctl start postfix"
-timeout = "240"
-outputfile ="/dev/null">
-</cfexecute>
+
+
+<cftry>
+  
+
+    <cfexecute name = "/bin/systemctl start postfix"
+    timeout = "240"
+    outputfile ="/dev/null">
+    </cfexecute>
+
+    <cfcatch type="any">
+                
+    <cfset m="Stop Postfix: There was an error starting postfix ">
+    <cfinclude template="error.cfm">
+    <cfabort>   
+                
+    </cfcatch>
+    </cftry>

@@ -19,19 +19,35 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Login</title>
 
-  <!-- Google Font: Source Sans Pro -->
-  <!---
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
-  --->
-  <!-- Font Awesome -->
-  <link rel="stylesheet" href="./plugins/fontawesome-free/css/all.min.css">
-  <!-- icheck bootstrap -->
-  <link rel="stylesheet" href="./plugins/icheck-bootstrap/icheck-bootstrap.min.css">
-  <!-- Theme style -->
-  <link rel="stylesheet" href="./dist/css/adminlte.min.css">
+  <cfinclude template="./inc/html_head.cfm" />
+
 </head>
 
 <!-- CFML CODE STARTS HERE -->
+
+<cfparam name = "reason" default = "0">
+<cfif StructKeyExists(session, "reason")>
+<cfif session.reason is not "">
+<cfset reason = session.reason>
+
+<!--- /CFIF for session.reason is not "" --->
+</cfif>
+
+<!--- /CFIF for StructKeyExists session.reason --->
+</cfif>
+
+<!---
+<cfoutput>#reason#</cfoutput>
+--->
+
+<cfif #session.UserPassword# is "0">
+
+<cfoutput>
+<cflocation url="set_password.cfm?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no">
+</cfoutput>
+
+<!--- /CFIF #session.UserPassword# is "0" --->
+</cfif>
 
 <cfparam name = "logoncount" default = "1">
 <cfif StructKeyExists(session, "logoncount")>
@@ -43,6 +59,8 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <!--- /CFIF for StructKeyExists session.logoncount --->
 </cfif>
+
+
 
 
 <cfparam name = "action" default = "">
@@ -57,8 +75,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfelse>
 
   <cfset session.logoncount = #logoncount# + 5>
-  <CFSET session.reason = 'The system has detected illegal activity (form.action is not login). The login failure count is increased by 5'>
-  <CFLOCATION url="index.cfm" addtoken="no">  
+  <CFSET session.reason = 8>
+
+  <cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
+
 
 <!--- /CFIF for form.action is not "" --->
 </cfif>
@@ -66,28 +89,6 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <!--- /CFIF for StructKeyExists form.action --->
 </cfif>
 
-<cfparam name = "reason" default = "">
-<cfif StructKeyExists(session, "reason")>
-<cfif session.reason is not "">
-<cfset reason = session.reason>
-
-<!--- /CFIF for session.reason is not "" --->
-</cfif>
-
-<!--- /CFIF for StructKeyExists session.reason --->
-</cfif>
-
-
-<cfparam name = "loggedin" default = "false">
-<cfif StructKeyExists(session, "loggedin")>
-<cfif session.loggedin is not "">
-<cfset loggedin = session.loggedin>
-
-<!--- /CFIF for session.loggedin is not "" --->
-</cfif>
-
-<!--- /CFIF for StructKeyExists session.loggedin --->
-</cfif>
 
 <cfif #action# is "login">
 
@@ -99,8 +100,12 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfelse>
 
   <cfset session.logoncount = #logoncount# + 1>
-  <CFSET session.reason = 'The Username cannot be blank. Logon attempt #logoncount# of 5'>
-  <CFLOCATION url="index.cfm" addtoken="no">  
+  <CFSET session.reason = 1>
+
+   <cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+ 
 
 <!--- /CFIF for form.username is not "" --->
 </cfif>
@@ -108,8 +113,12 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfelse>
 
   <cfset session.logoncount = #logoncount# + 5>
-  <CFSET session.reason = 'The system has detected illegal activity (form.username does not exist). The login failure count is increased by 5'>
-  <CFLOCATION url="index.cfm" addtoken="no">  
+  <CFSET session.reason = 2>
+
+  <cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
 
 <!--- /CFIF for StructKeyExists form.username --->
 </cfif>
@@ -122,8 +131,12 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfelse>
 
   <cfset session.logoncount = #logoncount# + 1>
-  <CFSET session.reason = 'The Password cannot be blank. Logon attempt #logoncount# of 5'>
-  <CFLOCATION url="index.cfm" addtoken="no">  
+  <CFSET session.reason = 3>
+
+   <cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
 
 <!--- /CFIF for form.usrname is not "" --->
 </cfif>
@@ -131,15 +144,23 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfelse>
 
 <cfset session.logoncount = #logoncount# + 5>
-<CFSET session.reason = 'The system has detected illegal activity (form.password does not exist). The login failure count is increased by 5'>
-<CFLOCATION url="index.cfm" addtoken="no">  
+<CFSET session.reason = 4>
+
+<cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+ 
 
 <!--- /CFIF for StructKeyExists form.password --->
 </cfif>
 
 <cfif #logoncount# GT 5>
-<CFSET session.reason = 'You have exceeded the maximum number of logons. Please wait 1 hour before trying to login again'>
-<CFLOCATION url="index.cfm" addtoken="no">
+<CFSET session.reason = 5>
+
+<cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
 
 <cfelseif #logoncount# LTE 5>
 
@@ -148,179 +169,95 @@ select status from restore_jobs where status='running'
 </cfquery>
 
 <cfif #checkrestore.recordcount# GTE 1>
-<CFSET session.reason = 'System Restore is in Progress. You will not be be able to log into the system until the process has completed'>
-<CFLOCATION url="index.cfm" addtoken="no">
+<CFSET session.reason = 6>
+
+<cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
+<!--- /CFIF #checkrestore.recordcount# GTE 1 --->
 </cfif>
 
 <CFSET SESSION.LOGGEDIN = FALSE>
+
 <cfparam name = "step" default = "0"> 
 
-<CFQUERY NAME="checkuser" DATASOURCE="hermes">
-	SELECT username, password
-	FROM system_users
-	WHERE username='#username#'
-</CFQUERY>
+<cfquery name="getpassword" datasource="#datasource#">
+  select email, password from user_settings where id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.uid#">
+  </cfquery>
+  
 
-<!-- is the username present in the database? -->
+<cfset theSalt="#Left(getpassword.password, 30)#">
 
-<cfif checkuser.recordcount LTE 0>
-
-<cfset session.logoncount = #logoncount# + 1>
-<CFSET session.reason = 'The username/password combination you typed is invalid. Please try again. Logon attempt #logoncount# of 5'>
-<CFLOCATION url="index.cfm" addtoken="no">
-
-<cfelseif checkuser.recordcount GT 0>
-
-<cfset theSalt="#Left(checkuser.password, 30)#">
-
-<cfloop index="hashCount" from="1" to="5000">
+<cfloop index="hashCount" from="1" to="10000">
 <cfset passwordHash512=Hash(form.password & theSalt, 'SHA-512', 'UTF-8') />
 </cfloop>
 
 
 <cfset thePassword="#theSalt##passwordHash512#" />
 
-<cfset compare_password = Compare(#thePassword#, #checkuser.password#)>
+<cfset compare_password = Compare(#thePassword#, #getpassword.password#)>
 
 <cfif #compare_password# is "1">
 
 <cfset session.logoncount = #logoncount# + 1>
-<CFSET session.reason = 'The username/password combination you typed is invalid. Please try again. Logon attempt #logoncount# of 5'>
-<CFLOCATION url="index.cfm" addtoken="no">
+
+<CFSET session.reason = 7>
+
+<cfoutput>
+<cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+</cfoutput>
+
 
 
 <cfelseif #compare_password# is "-1">
+
 <cfset session.logoncount = #logoncount# + 1>
-<CFSET session.reason = 'The username/password combination you typed is invalid. Please try again. Logon attempt #logoncount# of 5'>
-<CFLOCATION url="index.cfm" addtoken="no">
+
+<CFSET session.reason = 7>
+
+<cfoutput>
+  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
+  </cfoutput>
+
 
 <cfelseif #compare_password# is "0">
-<cfset session.loggedin = true>
-<cfset session.logoncount = 1>
 
-<cfexecute name = "/opt/hermes/scripts/dmidecode"
-arguments=""
-timeout = "60">
-</cfexecute>
-
-<cffile action="read" file="/usr/share/UUID" variable="temp1">
-
-<cfset temp2="#REReplace("#temp1#","#chr(10)#","","ALL")#">
-
-<cfset temp3="#REReplace("#temp2#","#chr(13)#","","ALL")#">
-<cfset temp4="#REReplace("#temp3#","","","ALL")#">
-<cfset temp5="#REReplace("#temp4#","UUID:","","ALL")#">
-
-<cffile action = "write"
-    file = "/usr/share/UUID"
-    output = "#TRIM(temp5)#" addnewline="no">
-
-<cfset uuid2_file="/usr/share/UUID2">
-<cfif fileExists(uuid2_file)> 
-
-<cffile action="read" file="/usr/share/UUID" variable="uuid">
-<cffile action="read" file="/usr/share/UUID2" variable="uuid2">
-<cfset compare_uuid = Compare(#uuid#, #uuid2#)>
-
-<cfif #compare_uuid# is "0">
-
-<cffile action="read" file="/usr/share/lt" variable="lt">
-
-<cfset lt2=#TRIM(lt)#>
-
-<cfif #lt2# is "1">
-<cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
-<cfset timenow="#TimeFormat(now(), "HH:mm:ss")#">
-<cffile action="read" file="/usr/share/djigzo/ADDITIONAL-NOTES.TXT" variable="date">
-<cfset difference = #datediff("d", '#datenow# #timenow#', '#date#')#>
-
-<cfif #difference# LT 1>
-
-<cfquery name="getserial" datasource="hermes">
-select parameter, value from system_settings where parameter='serial'
-</cfquery>
-
-<cffile action = "write"
-    file = "/usr/share/UUID3"
-    output = "#TRIM(getserial.value)#" addnewline="no">
-
-<cffile action = "delete"
-    file = "/usr/share/UUID2">
-
-<cfset session.license="NEW">
-<cfset session.edition="Community">
-<CFSET session.reason = "">
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-<cfelseif #difference# GTE 1>
-<cfset session.license="VALID">
-<cfset session.edition="Pro">
-<CFSET session.reason = "">
-
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-</cfif>
-
-<cfelseif #lt2# is "2">
-<cfset session.license="VALID">
-<cfset session.edition="Pro">
-<CFSET session.reason = "">
-
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-</cfif>
-
-<cfelseif #compare_uuid# is "1">
-<cfquery name="getserial" datasource="hermes">
-select parameter, value from system_settings where parameter='serial'
-</cfquery>
-
-<cffile action = "write"
-    file = "/usr/share/UUID3"
-    output = "#TRIM(getserial.value)#" addnewline="no">
-
-<cfset session.license="VIOLATION">
-<cfset session.edition="Pro">
-<CFSET session.reason = "">
-
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-<cfelseif #compare_uuid# is "-1">
-<cfquery name="getserial" datasource="hermes">
-select parameter, value from system_settings where parameter='serial'
-</cfquery>
-
-
-<cffile action = "write"
-    file = "/usr/share/UUID3"
-    output = "#TRIM(getserial.value)#" addnewline="no">
-
-<cfset session.license="VIOLATION">
-<cfset session.edition="Pro">
-<CFSET session.reason = "">
-
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-</cfif>
-
-<cfelseif NOT fileExists(uuid2_file)> 
-<cfset session.license="NEW">
-<cfset session.edition="Community">
-<CFSET session.reason = "">
-
-<CFLOCATION url="../admin/index.cfm" addtoken="no">
-
-</cfif>
-
-
-</cfif>
-</cfif>
-
-<!-- /CFIF FOR LOGONCOUNT -->
-</cfif>
-
-<!-- /CFIF FOR ACTION -->
-</cfif>
+  <cfset session.UserLoggedin = true>
+  <cfset session.logoncount = 1>
+  
+  <cfquery name="getid" datasource="#datasource#">
+  select id from maddr where email='#getpassword.email#'
+  </cfquery>
+  
+  <cfset session.owner = #getid.id#>
+  <cfset session.email = #getemail.email#>
+  <cfset session.uid = #uid#>
+  <cfset session.train_bayes = #getemail.train_bayes#>
+  <cfset session.download_msg = #getemail.download_msg#>
+  <cfset session.reason = "0">
+  
+  <cfquery name="getdestination" datasource="#datasource#">
+  select destination from user_destinations where id='#dest#'
+  </cfquery>
+  
+  <cfif #dest# is "7">
+  <cflocation url="/users/#getdestination.destination#?mid=#URLEncodedFormat(Trim(mid))#" addtoken="no">
+  <cfelseif #dest# is "8">
+  <cflocation url="/users/#getdestination.destination#?mid=#URLEncodedFormat(Trim(mid))#&sid=#URLEncodedFormat(Trim(sid))#" addtoken="no">
+  <cfelse>
+  <cflocation url="/users/#getdestination.destination#" addtoken="no">
+  </cfif>
+  
+  <!-- /CFIF FOR COMPAREPASSWORD -->
+  </cfif>
+  
+  
+  <!-- /CFIF FOR LOGONCOUNT -->
+  </cfif>
+  
+  <!-- /CFIF FOR ACTION -->
+  </cfif>
 
 <!-- CFML CODE ENDS HERE -->
 
@@ -330,25 +267,107 @@ select parameter, value from system_settings where parameter='serial'
 <body class="hold-transition login-page">
 <div class="login-box">
 
-  <cfif #loggedin# is "false">
+  <cfif #session.UserLoggedin# is "false">
 
   <!-- ERROR MESSAGES STARTS HERE -->
 
-<cfif #reason# is "">
+  <cfif #reason# is "1">
 
-<cfelse>
-
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>#reason#</cfoutput>
-  </div>
-
-  <CFSET session.reason = "">
-
-  <!--- /CFIF session.reason is  --->
-</cfif>
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The Username cannot be blank. Logon attempt #logoncount# of 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  <cfif #reason# is "2">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The system has detected illegal activity (form.username does not exist). The login failure count is increased by 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  
+  <cfif #reason# is "3">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The Password cannot be blank. Logon attempt #logoncount# of 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  
+  <cfif #reason# is "4">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The system has detected illegal activity (form.password does not exist). The login failure count is increased by 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  <cfif #reason# is "5">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>You have exceeded the maximum number of login attempts. Please wait 1 hour before trying to login again</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  <cfif #reason# is "6">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>System Restore is in Progress. You will not be be able to log into the system until the process has completed</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  <cfif #reason# is "7">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The username/password combination you typed is invalid. Please try again. Logon attempt #logoncount# of 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
+  
+  <cfif #reason# is "8">
+  
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+      <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+      <cfoutput>The system has detected illegal activity (form.action is not login). The login failure count is increased by 5</cfoutput>
+    </div>
+  
+    <cfset session.reason = 0>
+  
+  </cfif>
 
 
 <!-- ERROR MESSAGES ENDS HERE -->
@@ -360,12 +379,16 @@ select parameter, value from system_settings where parameter='serial'
       <a href="../../index2.html" class="h1"><b>Hermes</b>&nbsp;SEG</a>
     </div>
     <div class="card-body">
-      <p class="login-box-msg">Administration Console</p>
+      <p class="login-box-msg">User Console</p>
 
       <form action="" method="post">
         <input type="hidden" name="action" value="login">
         <div class="input-group mb-3">
-          <input type="text" name="username" class="form-control" placeholder="Username">
+
+          <cfoutput>
+          <input type="text" name="username" value="#getemail.email#" class="form-control" placeholder="Username" readonly>
+        </cfoutput>
+
           <div class="input-group-append">
             <div class="input-group-text">
               <span class="fas fa-user"></span>
@@ -373,7 +396,7 @@ select parameter, value from system_settings where parameter='serial'
           </div>
         </div>
         <div class="input-group mb-3">
-          <input type="password" name="password" class="form-control" placeholder="Password">
+          <input type="password" name="password" class="form-control" placeholder="Password" maxLength="64">
           <div class="input-group-append">
             <div class="input-group-text">
               <span class="fas fa-lock"></span>
@@ -402,20 +425,28 @@ select parameter, value from system_settings where parameter='serial'
             <button type="submit" class="btn btn-primary btn-block" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Sign In</button>
             --->
 
+           
           </div>
           <!-- /.col -->
+
         </div>
       </form>
+<div>&nbsp;</div>
+      <div style="float: right;">
+        <cfoutput>
+        <a href="set_password.cfm?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#">Forgot Password?</a>
+      </cfoutput>
+      </div>
 
-    <cfelseif #loggedin# is "true">
+    <cfelseif #session.UserLoggedin# is "true">
 
       <div class="alert alert-success alert-dismissible">
         <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
         <h4><i class="icon fa fa-check"></i> Logged In!</h4>
-        <cfoutput>You are already logged in to the system. Access the <a href="../admin/">Administration Console</a> or <a href="../admin/logout.cfm">Logout</a></cfoutput><br> 
+        <cfoutput>You are already logged in to the system. Access the <a href="/users/2/">User Console</a> or <a href="/users/2/logout.cfm">Logout</a></cfoutput><br> 
       </div>
 
-      <!--- /CFIF #loggedin# is --->
+      <!--- /CFIF #session.UserLoggedin# is --->
     </cfif>
 
       <!---

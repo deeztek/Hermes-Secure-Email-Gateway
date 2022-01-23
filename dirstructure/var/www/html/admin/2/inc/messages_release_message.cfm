@@ -128,17 +128,39 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             file = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
             output = "#REReplace("#temp#","THE-RECIPIENT","#getemail.secret_id#","ALL")#" addnewline="no">
         
-        <cfexecute name = "/bin/chmod"
-        arguments="+x /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-        timeout = "60">
-        </cfexecute>
+            <cftry>
+
+                <cfexecute name = "/bin/chmod"
+                arguments="+x /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
+                timeout = "60">
+                </cfexecute>
+                    
+            <cfcatch type="any">
+                
+            <cfset m="Messages Release message: There was an error making /opt/hermes/amavis_release_message.sh executable">
+            <cfinclude template="error.cfm">
+            <cfabort>   
+                
+            </cfcatch>
+            </cftry>
         
         
-        <cfexecute name = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-        timeout = "240"
-        variable ="release"
-        arguments="">
-        </cfexecute>
+            <cftry>
+
+                <cfexecute name = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
+                timeout = "240"
+                variable ="release"
+                arguments="">
+                </cfexecute>
+                    
+            <cfcatch type="any">
+                
+            <cfset m="Messages Release message: There was an error executing /opt/hermes/tmp/amavis_release_message.sh">
+            <cfinclude template="error.cfm">
+            <cfabort>   
+                
+            </cfcatch>
+            </cftry>
         
      
         <!--- DELETE SCRIPT --->

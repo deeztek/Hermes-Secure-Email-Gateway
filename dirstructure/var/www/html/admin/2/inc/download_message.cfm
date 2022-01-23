@@ -25,7 +25,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif url.mid is not "">
 
 <cfquery name="checkq" datasource="hermes">
-select archive, quar_loc from msgs where mail_id like binary '#url.mid#'
+select archive, quar_loc from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
 </cfquery>
 
 <cfif #checkq.recordcount# GTE 1>
@@ -60,7 +60,7 @@ select archive, quar_loc from msgs where mail_id like binary '#url.mid#'
 
 
 <cfquery name="checkq" datasource="hermes">
-select archive, quar_loc from msgs where mail_id='#mailid#'
+select archive, quar_loc from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfif #checkq.archive# is "N">

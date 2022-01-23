@@ -33,7 +33,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <!-- Preloader -->
   <div class="preloader flex-column justify-content-center align-items-center">
-    <img src="dist/img/hermes_preloader.gif" alt="Loading" >
+    <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
     </div>
 
 <!--- TEXT AREA STYLE ---> 
@@ -160,8 +160,11 @@ textarea{
 <cfif url.mid is not "">
 
 <cfquery name="checkq" datasource="hermes">
-select archive, quar_loc from msgs where mail_id like binary '#url.mid#'
+select archive, quar_loc from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
 </cfquery>
+
+
+
 
 <cfif #checkq.recordcount# GTE 1>
     
@@ -221,7 +224,7 @@ select * from archive_jobs limit 1
 <cfif fileExists(quarfile)>
 
 <cfquery name="getmsgother" datasource="hermes">
-SELECT * FROM msgs where mail_id like binary '#mailid#'
+SELECT * FROM msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset popAccount = createObject("component", "pop").init()>
@@ -253,7 +256,7 @@ SELECT email as fromAddress FROM maddr where id='#getsid.sid#'
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="hermes">
-SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id like binary '#mailid#'
+SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset from = "#getfromaddr.fromAddress#">

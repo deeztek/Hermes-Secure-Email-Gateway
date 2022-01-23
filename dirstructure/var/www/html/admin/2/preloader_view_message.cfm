@@ -1,5 +1,5 @@
 <script language="JavaScript">
-  if(document.images) image1 = new Image(); image1.src = 'dist/img/hermes_preloader.gif';
+  if(document.images) image1 = new Image(); image1.src = '/dist/img/hermes_preloader.gif';
   </script>
 
 
@@ -139,7 +139,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 
 
-<body style="background-image: url(dist/img/hermes_preloader.gif); background-repeat: no-repeat; background-position: 50% 50%;">
+<body style="background-image: url(/dist/img/hermes_preloader.gif); background-repeat: no-repeat; background-position: 50% 50%;">
 
 <cfoutput>
 <meta http-equiv="refresh" content="3;url=view_message.cfm?mid=#url.mid#&startdate=#url.startdate#&enddate=#url.enddate#&limit=#url.limit#">

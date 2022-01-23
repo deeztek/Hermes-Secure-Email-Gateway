@@ -30,18 +30,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <link rel="stylesheet" type="text/css" href="./site.css">
 </head>
 <body style="background-color: rgb(255,255,255); background-image: none; margin: 0px;">
-  <table border="0" cellspacing="0" cellpadding="0" width="825">
+  <table border="0" cellspacing="0" cellpadding="0" width="827">
     <tr valign="top" align="left">
-      <td width="40" height="35"></td>
-      <td width="785"></td>
+      <td width="40" height="62"></td>
+      <td width="787"></td>
     </tr>
     <tr valign="top" align="left">
       <td></td>
-      <td width="785" id="Text438" class="TextObject">
-        <p style="margin-bottom: 0px;"><cfif NOT IsDefined('session.email')>
+      <td width="787" id="Text499" class="TextObject"><cfif NOT IsDefined('session.ext_recipient')>
 <cflocation url="create_recipient.cfm">
-<cfelseif IsDefined('session.email')>
-<cfif #session.email# is "">
+<cfelseif IsDefined('session.ext_recipient')>
+<cfif #session.ext_recipient# is "">
 <cflocation url="create_recipient.cfm">
 </cfif>
 </cfif>
@@ -105,7 +104,7 @@ delete from salt where id='#stResult.GENERATED_KEY#'
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_create_extrecipient.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 
 <cfexecute name = "/bin/chmod"
@@ -133,7 +132,7 @@ arguments="-inputformat none">
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_mandatory.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 
 <cfexecute name = "/bin/chmod"
@@ -158,7 +157,7 @@ arguments="-inputformat none">
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_by_subject.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 
 <cfexecute name = "/bin/chmod"
@@ -187,7 +186,7 @@ arguments="-inputformat none">
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_static.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 <cffile action="read" file="/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_static.sh" variable="temp">
 
@@ -219,7 +218,7 @@ arguments="-inputformat none">
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_random.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 
 <cfexecute name = "/bin/chmod"
@@ -247,7 +246,7 @@ arguments="-inputformat none">
 
 <cffile action = "write"
     file = "/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_backtosender.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#session.email#","ALL")#" addnewline="no">
+    output = "#REReplace("#temp#","THE-RECIPIENT","#session.ext_recipient#","ALL")#" addnewline="no">
 
 <cffile action="read" file="/opt/hermes/scripts/#customtrans3#_enable_extrecipient_pdf_backtosender.sh" variable="temp">
 
@@ -299,7 +298,7 @@ pdf,
 pdf_mode,
 pdf_password)
 values
-('#session.email#',
+('#session.ext_recipient#',
 '#session.encryption_mode#',
 '2',
 '1',
@@ -312,7 +311,7 @@ update cm_users
 set 
 cm_locality='manual'
 where
-cm_email = '#session.email#'
+cm_email = '#session.ext_recipient#'
 </cfquery>
 
 <cfelse>
@@ -324,7 +323,7 @@ smime,
 pdf, 
 pdf_mode)
 values
-('#session.email#',
+('#session.ext_recipient#',
 '#session.encryption_mode#',
 '2',
 '1',
@@ -336,7 +335,7 @@ update cm_users
 set 
 cm_locality='manual'
 where
-cm_email = '#session.email#'
+cm_email = '#session.ext_recipient#'
 </cfquery>
 
 </cfif>
@@ -376,7 +375,7 @@ smime='2',
 pdf='1',
 pdf_mode='#session.pdf_mode#',
 pdf_password='#encryptedPassword#'
-where email='#session.email#'
+where email='#session.ext_recipient#'
 </cfquery>
 
 <cfquery name="updatedjigzo" datasource="djigzo">
@@ -384,7 +383,7 @@ update cm_users
 set 
 cm_locality='manual'
 where
-cm_email = '#session.email#'
+cm_email = '#session.ext_recipient#'
 </cfquery>
 
 
@@ -396,7 +395,7 @@ encryption_mode='#session.encryption_mode#',
 smime='2',
 pdf='1',
 pdf_mode='#session.pdf_mode#'
-where email='#session.email#'
+where email='#session.ext_recipient#'
 </cfquery>
 
 <cfquery name="updatedjigzo" datasource="djigzo">
@@ -404,7 +403,7 @@ update cm_users
 set 
 cm_locality='manual'
 where
-cm_email = '#session.email#'
+cm_email = '#session.ext_recipient#'
 </cfquery>
 
 </cfif>
@@ -416,12 +415,13 @@ cm_email = '#session.email#'
 <cfset session.pdf_mode="">
 <cfset session.encryption_mode="">
 <cfset session.pdf_password="">
-<cfset session.email="">
+<cfset session.ext_recipient="">
 <cfset session.mode="">
 
 <cfoutput>
 <cflocation url="external_encryption_users.cfm?m2=1&StartRow=#StartRow#&DisplayRows=#DisplayRows#&filter=#filter#&show=#show#">
-</cfoutput>&nbsp;</p>
+</cfoutput>
+        <p style="margin-bottom: 0px;">&nbsp;</p>
       </td>
     </tr>
   </table>

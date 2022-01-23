@@ -31,7 +31,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <!-- Preloader -->
     <div class="preloader flex-column justify-content-center align-items-center">
-      <img src="dist/img/hermes_preloader.gif" alt="Loading" >
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
       </div>
 
 <!--- Sort Table Script Default Sort by Column 4 Desc --->
@@ -1345,7 +1345,7 @@ a, a:hover{
        <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
         <cfquery name="getemail" datasource="hermes">
-        select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+        select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
         </cfquery>
 
         <cfif #getemail.recordcount# GTE 1>
@@ -1415,7 +1415,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1486,7 +1486,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1557,7 +1557,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1579,6 +1579,8 @@ a, a:hover{
    
   
   </cfloop>
+
+  <cfinclude template="./inc/messages_sa_learn_sync.cfm">
 
 
 <cfset session.m = 6>
@@ -1639,7 +1641,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> 
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1661,6 +1663,8 @@ a, a:hover{
    
   
   </cfloop>
+
+  <cfinclude template="./inc/messages_sa_learn_sync.cfm">
 
 
 <cfset session.m = 7>
@@ -1722,7 +1726,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary '#i#' 
+  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1742,6 +1746,7 @@ a, a:hover{
   </cfif>
 
    
+  <cfinclude template="./inc/messages_sa_learn_sync.cfm">
   
   </cfloop>
 
@@ -2009,7 +2014,7 @@ a, a:hover{
             <td>#Numberformat (spam_level, '____.__')#</td>
 
             <cfquery name="gettype" datasource="hermes">
-              select content_type, description from msg_content_type where content_type like binary '#content#'
+              select content_type, description from msg_content_type where content_type like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#content#">
               </cfquery>
 
             <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#gettype.description#</td>

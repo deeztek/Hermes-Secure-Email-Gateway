@@ -145,7 +145,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 <cfset filter = url.filter>
 </cfif></cfif>
 
-<cfset session.email="">
+<cfset session.ext_recipient="">
 <cfparam name = "m" default = "0">
 <cfparam name = "step" default = "0">
 
@@ -228,7 +228,7 @@ select * from cm_properties where cm_category='user:#show_email#'
 
 <cfif step is "2">
 <cfset session.mode="insert">
-<cfset session.email=#show_email#>
+<cfset session.ext_recipient=#show_email#>
 <cfset session.encryption_mode=#show_encryption_mode#>
 <cfif #show_encryption_mode# is "pdf_mandatory">
 <cfoutput>

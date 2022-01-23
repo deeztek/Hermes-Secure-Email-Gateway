@@ -89,12 +89,12 @@ $sql_allow_8bit_address = 1;
      'HERMES-USERNAME',
      'HERMES-PASSWORD']);
 
-#$sql_select_policy = 'SELECT users.id, users.policy_id, users.email FROM users,policy'.
-#' WHERE (users.policy_id=policy.id) AND (users.email IN (%k))';
+#$sql_select_policy = 'SELECT recipients.id, recipients.policy_id, recipients.recipient FROM recipients,policy'.
+#' WHERE (recipients.policy_id=policy.id) AND (recipients.email IN (%k))';
 
-$sql_select_policy = 'SELECT *, users.id FROM users,policy'.
-' WHERE (users.policy_id=policy.id) AND (users.email IN (%k))';
-' ORDER BY users.priority DESC';
+$sql_select_policy = 'SELECT *, recipients.id FROM recipients,policy'.
+' WHERE (recipients.policy_id=policy.id) AND (recipients.recipient IN (%k))';
+' ORDER BY recipients.priority DESC';
 
 #$sql_select_white_black_list = 'SELECT wb FROM wblist,mailaddr'.
 #' WHERE (wblist.rid=?) AND (wblist.sid=mailaddr.id) AND (mailaddr.email IN (%k))'; 
@@ -102,9 +102,9 @@ $sql_select_policy = 'SELECT *, users.id FROM users,policy'.
 #$sql_select_white_black_list = 'SELECT wb FROM wblist LEFT JOIN mailaddr ON wblist.sid=mailaddr.id WHERE (wblist.rid=?) AND (mailaddr.email IN (%k)) ORDER BY mailaddr.priority ASC';
 
 $sql_select_white_black_list =
-  'SELECT wb FROM wblist,mailaddr,users'
-  . ' WHERE (users.id=?)'
-  . ' AND (wblist.rid=users.id)'
+  'SELECT wb FROM wblist,mailaddr,recipients'
+  . ' WHERE (recipients.id=?)'
+  . ' AND (wblist.rid=recipients.id)'
   . ' AND (wblist.sid=mailaddr.id)'
   . ' AND (mailaddr.email IN (%k))';
 #  . ' ORDER BY mailaddr.priority DESC';

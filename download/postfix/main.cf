@@ -112,7 +112,6 @@ policy-spf_time_limit = 3600s
 #TLS Policy
 smtp_tls_policy_maps = hash:/etc/postfix/tls_policy
 smtp_tls_note_starttls_offer = yes
-smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
 # TLS parameters
 smtpd_tls_cert_file = /opt/hermes/ssl/hermes-tls.cer
 smtpd_tls_key_file = /opt/hermes/ssl/hermes-tls.key

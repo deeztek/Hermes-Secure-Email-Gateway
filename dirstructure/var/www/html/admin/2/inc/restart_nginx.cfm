@@ -20,14 +20,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 
-
-
-<!--- RELOAD NGINX --->
+<cftry>
   
-<cfexecute name = "/bin/systemctl reload nginx"
-timeout = "240"
-outputfile ="/dev/null">
-</cfexecute>
+
+    <cfexecute name = "/bin/systemctl reload nginx"
+    timeout = "240"
+    outputfile ="/dev/null">
+    </cfexecute>
+
+    <cfcatch type="any">
+                
+    <cfset m="Reload Nginx: There was an error re-loading Nginx ">
+    <cfinclude template="error.cfm">
+    <cfabort>   
+                
+    </cfcatch>
+    </cftry>
+
 
 <!--- SLEEP 5 SECONDS WAITING FOR NGINX TO RESTART --->
 <cfscript> 

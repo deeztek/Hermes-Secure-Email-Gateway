@@ -80,6 +80,8 @@ select parameter, value2 from parameters2 where parameter='console.mode'
 file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
 output = "#REReplace("#authelia#","hermes_access_control_domain","#trim(GenerateAutheliaIpAddress)#","ALL")#" addnewline="no">
 
+
+
 <cfelseif #getconsolemode.value2# is "fqdn">
 
 <cfquery name="getconsolehost" datasource="hermes">
@@ -210,7 +212,7 @@ destination = "/etc/authelia/configuration.yml">
 <!--- SLEEP 5 SECONDS WAITING FOR AUTHELIA TO RESTART --->
 <cfscript> 
     thread = CreateObject("java", "java.lang.Thread"); 
-    thread.sleep(5000); 
+    thread.sleep(10000); 
     </cfscript> 
 
 

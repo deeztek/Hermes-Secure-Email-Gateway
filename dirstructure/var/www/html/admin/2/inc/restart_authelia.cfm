@@ -18,7 +18,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfexecute name = "/bin/systemctl restart authelia"
-timeout = "240"
-outputfile ="/dev/null">
-</cfexecute>
+<cftry>
+  
+
+    <cfexecute name = "/bin/systemctl restart authelia"
+    timeout = "240"
+    outputfile ="/dev/null">
+    </cfexecute>
+
+    <cfcatch type="any">
+                
+    <cfset m="Restart Authelia: There was an error re-staring Authelia ">
+    <cfinclude template="error.cfm">
+    <cfabort>   
+                
+    </cfcatch>
+    </cftry>
