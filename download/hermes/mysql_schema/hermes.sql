@@ -2129,16 +2129,10 @@ INSERT INTO `spam_settings` VALUES ('10', 'use_pyzor', '1', null, null, null, nu
 INSERT INTO `spam_settings` VALUES ('11', 'use_razor2', '1', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('12', 'use_bayes', '1', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('13', 'bayes_auto_learn', '0', null, null, null, null, null, null, '1', '1');
-INSERT INTO `spam_settings` VALUES ('1472', 'DKIM_ADSP_DISCARD', '10', null, null, null, null, 'DKIM: Domain signs all mail and suggests discarding mail with no valid author domain signature, no valid author domain signature', '1', '1', '1');
-INSERT INTO `spam_settings` VALUES ('1467', 'SPF_FAIL', '4', null, null, null, null, 'SPF: sender does not match SPF record (fail)', '1', '1', '1');
-INSERT INTO `spam_settings` VALUES ('1468', 'SPF_HELO_FAIL', '4', null, null, null, null, 'SPF: HELO does not match SPF record (fail)', '1', '1', '1');
-INSERT INTO `spam_settings` VALUES ('1469', 'SPF_HELO_SOFTFAIL', '3', null, null, null, null, 'SPF: HELO does not match SPF record (softfail)', '1', '1', '1');
-INSERT INTO `spam_settings` VALUES ('1470', 'SPF_SOFTFAIL', '3', null, null, null, null, 'SPF: sender does not match SPF record (softfail)', '1', '1', '1');
-INSERT INTO `spam_settings` VALUES ('1471', 'DKIM_ADSP_ALL', '3', null, null, null, null, 'DKIM: No valid author signature, domain signs all mail', '1', '1', '1');
 INSERT INTO `spam_settings` VALUES ('1462', 'bayes_auto_learn_threshold_nonspam', '-5', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('1463', 'bayes_auto_learn_threshold_spam', '15', null, null, null, null, null, null, '1', '1');
 INSERT INTO `spam_settings` VALUES ('1444', 'previous_use_bayes', '1', null, null, null, null, null, null, null, null);
-INSERT INTO `spam_settings` VALUES ('1473', 'DKIM_ADSP_NXDOMAIN', '3', null, null, null, null, 'DKIM: No valid author signature and domain not in DNS', '1', '1', '1');
+
 
 -- ----------------------------
 -- Table structure for `spf_bypass`

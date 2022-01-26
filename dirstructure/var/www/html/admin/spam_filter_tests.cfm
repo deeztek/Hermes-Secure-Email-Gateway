@@ -202,15 +202,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted
               </td>
             </tr>
             <tr valign="top" align="left">
-              <td height="920" width="988"><cfif IsDefined("session.license")>
-<cfif #session.license# is "VIOLATION">
-<cflocation url="license_invalid.cfm">
-<cfelseif #session.license# is "NEW">
-<cflocation url="license_invalid.cfm">
-</cfif>
-</cfif>
-
-<cfparam name = "m1" default = "0">
+              <td height="920" width="988"><cfparam name = "m1" default = "0">
 <cfparam name = "m2" default = "0">
 <cfparam name = "step" default = "0">
 
