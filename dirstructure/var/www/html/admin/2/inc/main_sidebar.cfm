@@ -250,7 +250,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </a>
               </li>
               <li class="nav-item">
-                <a href="##" class="nav-link">
+                <a href="view_virtual_recipients.cfm" class="nav-link">
                   <i class="fas fa-key nav-icon"></i>
                   <p>Virtual Recipients</p>
                 </a>
