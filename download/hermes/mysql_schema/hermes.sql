@@ -2237,7 +2237,7 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '211207');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '220203');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 
@@ -2271,6 +2271,8 @@ INSERT INTO `system_updates` VALUES ('42', '18.04', '210501', '1', '2021-05-01 0
 INSERT INTO `system_updates` VALUES ('43', '18.04', '211009', '1', '2021-10-09 00:00:00', '12');
 INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 00:00:00', '13');
 INSERT INTO `system_updates` VALUES ('45', '18.04', '211207', '1', '2022-01-14 00:00:00', '14');
+INSERT INTO `system_updates` VALUES ('46', '18.04', '220203', '1', '2022-04-02 00:00:00', '15');
+
 
 -- ----------------------------
 -- Table structure for `system_users`

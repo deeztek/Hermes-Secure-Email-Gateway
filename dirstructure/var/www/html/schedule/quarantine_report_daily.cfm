@@ -36,9 +36,9 @@ SELECT msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, m
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
-<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes Secure Email Gateway Daily Quarantine Report" type="HTML" server="localhost" port="10026">
+<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Daily Quarantine Report" type="HTML" server="localhost" port="10026">
     <HTML>
-       <head><title>Hermes Secure Email Gateway Daily Quarantine Report</title>
+       <head><title>Hermes SEG Daily Quarantine Report</title>
 
        </head>
        <body>
@@ -52,19 +52,25 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 
 <table id="Table2" border="0" cellspacing="6" cellpadding="2" width="100%" style="height: 50px;">
   <tr style="height: 75px;">
-    <td width="750" id="Cell9" style="background-color: rgb(45,103,228);">
-      <p style="margin-bottom: 0px;"><img id="Picture1" height="75" width="750" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Email Gateway"></p>
+    <td style="background-color: rgb(255,255,255);">
+      <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Email Gateway"></p>
     </td>
   </tr>
+
+  <hr></hr>
+
   <tr style="height: 96px;">
-    <td id="Cell10">
-      <p style="text-align: left; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;"><b>Daily Quarantine Report for #rcptemail# for period #datenow2#</b><br><br> The listing below shows <b>#getquarantineall.recordcount# messages</b> that the system has quarantined. <br><br>
+    <td>
+      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;"><b>Daily Quarantine Report for #rcptemail# for period #datenow2#</b><br><br> The listing below shows <b>#getquarantineall.recordcount# messages</b> that the system has quarantined. <br><br>
 
-If there are no messages listed, then the system did not quarantine any messages for the period listed above.<br><br>
+If there are no messages listed, then the system did not quarantine any messages for the period listed above.</p>
 
-If you wish to view a message, click on the View Msg button.<br><br>
+<hr></hr>
 
-If you wish to release a message to your mailbox, click the the Release Msg button. <br><br>
+<p style="text-align: left; margin-bottom: 0px;">
+If you wish to view a message, click on the <b>View Msg</b> button.<br><br>
+
+If you wish to release a message to your mailbox, click the the <b>Release Msg</b> button. <br><br>
 
 Additionally, click the links below to access the different sections of the User Console:
 
@@ -79,48 +85,46 @@ select value2 from parameters2 where parameter='console.host' and module='consol
 <li><a href="https://#getportal.value2#/user-auth/?uid=#customid#&dest=4">Sender Filters</a> - Clicking this link will direct you to the Sender Filters where you can create block/allow filters for outside email addresses.</li>
 <li><a href="https://docs.deeztek.com/books/hermes-seg-user-guide/page/accessing-the-user-self-service-portal">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Console</li>
 </ul>
-</span></p>
+</p>
 
 
-<p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;">
-<b>Please note the system periodically purges oldest messages in order to conserve system resources</b></span></p>
 
     </td>
   </tr>
 </table>
 
 
-<hr id="HRRule7" width="100%" size="1">
+<hr>
 
 
 <table style="table-layout: fixed; width: 100%" class="bottomBorder">
   <tr style="height: 28px;">
-    <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Date/Time</span></b></p>
+    <td align="center">
+    <b>Date/Time</b>
     </td>
    
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">From</span></b></p>
+   <td align="center">
+    <b>From</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Subject</span></b></p>
+   <td align="center">
+    <b>Subject</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Type</span></b></p>
+   <td align="center">
+    <b>Type</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Score</span></b></p>
+   <td align="center">
+  <b>Spam Score</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">View Msg</span></b></p>
+   <td align="center">
+  <b>View Msg</b>
     </td>
 
-  <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Release Msg</span></b></p>
+  <td align="center">
+  <b>Release Msg</b>
     </td>
     
 
@@ -133,9 +137,9 @@ select value2 from parameters2 where parameter='console.host' and module='consol
 <cfset date = #DateFormat(time_iso, "mm/dd/yyyy")#>
 <cfset time = #TimeFormat(time_iso, "HH:mm:ss")#>
   <tr style="height: 28px;">
-    <td id="Cell1056">
+    <td  align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#date# #time# </span></p>
+  #date# #time#
 </div>
     </td>
     
@@ -144,15 +148,15 @@ select value2 from parameters2 where parameter='console.host' and module='consol
 SELECT email as fromAddress FROM maddr where id='#sid#'
 </cfquery>
 
-    <td id="Cell1059">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#getfromaddr.fromAddress#</span></p>
+  #getfromaddr.fromAddress#
 </div>
     </td>
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#subject#</span></p>
+  #subject#
 </div>
     </td>
 
@@ -161,15 +165,15 @@ select content_type, description from msg_content_type where content_type like b
 </cfquery>
 
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#gettype.description#</span></p>
+#gettype.description#
 </div>
     </td>
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#Numberformat (spam_level, '____.__')#</span></p>
+#Numberformat (spam_level, '____.__')#
 </div>
     </td>
 
@@ -218,6 +222,8 @@ disposition="inline"
 
 <!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT REGARDLESS ENDS HERE--->
 
+<!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT IF QURANTINE EXIST STARTS HERE --->
+
 
 <cfquery name="getrecipients" datasource="hermes">
 SELECT users.email as rcptemail, user_settings.id as customid, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'YES' and user_settings.report_frequency = '24' and users.email is not NULL
@@ -241,7 +247,7 @@ SELECT msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, m
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
-<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes Secure Email Gateway Daily Quarantine Report" type="HTML" server="localhost" port="10026">
+<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Daily Quarantine Report" type="HTML" server="localhost" port="10026">
     <HTML>
        <head><title>Hermes Secure Mail Gateway Daily Quarantine Report</title>
 
@@ -257,20 +263,25 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 
 <table id="Table2" border="0" cellspacing="6" cellpadding="2" width="100%" style="height: 50px;">
   <tr style="height: 75px;">
-    <td width="750" id="Cell9" style="background-color: rgb(45,103,228);">
-      <p style="margin-bottom: 0px;"><img id="Picture1" height="75" width="750" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
+    <td style="background-color: rgb(255,255,255);">
+      <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
     </td>
   </tr>
+
+  <hr></hr>
+
   <tr style="height: 96px;">
     <td id="Cell10">
 
-      <p style="text-align: left; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;"><b>Daily Quarantine Report for #rcptemail# for period #datenow2#</b><br><br> The listing below shows <b>#getquarantineall.recordcount# messages</b> that the system has quarantined. <br><br>
+      <p style="text-align: left; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;"><b>Daily Quarantine Report for #rcptemail# for period #datenow2#</b><br><br> The listing below shows <b>#getquarantineall.recordcount# messages</b> that the system has quarantined. </p><br><br>
 
-If there are no messages listed, then the system did not quarantine any messages for the period listed above.<br><br>
 
-If you wish to view a message, click on the View Msg button.<br><br>
+<hr></hr>
 
-If you wish to release a message to your mailbox, click the the Release Msg button. <br><br>
+<p style="text-align: left; margin-bottom: 0px;">
+If you wish to view a message, click on the <b>View Msg</b> button.<br><br>
+
+If you wish to release a message to your mailbox, click the the <b>Release Msg</b> button. <br><br>
 
 Additionally, click the links below to access the different sections of the User Console:
 
@@ -286,47 +297,44 @@ select value2 from parameters2 where parameter='console.host' and module='consol
   <li><a href="https://docs.deeztek.com/books/hermes-seg-user-guide/page/accessing-the-user-self-service-portal">Online Help</a> - Clicking this link will direct you to the Hermes SEG Online Help where you can read detailed instructions on how to use each part of the User Console</li>
   </ul>
 </ul>
-</span></p>
+</p>
 
-
-<p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12pt;">
-<b>Please note the system periodically purges oldest messages in order to conserve system resources</b></span></p>
 
     </td>
   </tr>
 </table>
 
 
-<hr id="HRRule7" width="100%" size="1">
+<hr>
 
 <table style="table-layout: fixed; width: 100%" class="bottomBorder">
   <tr style="height: 28px;">
-    <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Date/Time</span></b></p>
+    <td align="center">
+    <b>Date/Time</b>
     </td>
    
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">From</span></b></p>
+   <td align="center">
+    <b>From</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Subject</span></b></p>
+   <td align="center">
+    <b>Subject</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Type</span></b></p>
+   <td align="center">
+  <b>Type</b>
     </td>
 
-   <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Spam Score</span></b></p>
+   <td align="center">
+    <b>Spam Score</b>
     </td>
 
-<td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">View Msg</span></b></p>
+<td align="center">
+    <b>View Msg</b>
     </td>
 
-  <td>
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Release Msg</span></b></p>
+  <td align="center">
+  <b>Release Msg</b>
     </td>
     
 
@@ -339,9 +347,9 @@ select value2 from parameters2 where parameter='console.host' and module='consol
 <cfset date = #DateFormat(time_iso, "mm/dd/yyyy")#>
 <cfset time = #TimeFormat(time_iso, "HH:mm:ss")#>
   <tr style="height: 28px;">
-    <td id="Cell1056">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#date# #time# </span></p>
+#date# #time# 
 </div>
     </td>
     
@@ -350,15 +358,15 @@ select value2 from parameters2 where parameter='console.host' and module='consol
 SELECT email as fromAddress FROM maddr where id='#sid#'
 </cfquery>
 
-    <td id="Cell1059">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#getfromaddr.fromAddress#</span></p>
+  #getfromaddr.fromAddress#
 </div>
     </td>
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#subject#</span></p>
+    #subject#
 </div>
     </td>
 
@@ -367,15 +375,15 @@ select content_type, description from msg_content_type where content_type like b
 </cfquery>
 
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#gettype.description#</span></p>
+#gettype.description#
 </div>
     </td>
 
-    <td id="Cell1060">
+    <td align="center">
 <div style="word-wrap: break-word;">
-      <p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">#Numberformat (spam_level, '____.__')#</span></p>
+#Numberformat (spam_level, '____.__')#
 </div>
     </td>
 
@@ -419,3 +427,5 @@ disposition="inline"
 </cfif>
 </cfoutput>
 </cfloop>
+
+<!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT IF QURANTINE EXIST STARTS HERE --->
