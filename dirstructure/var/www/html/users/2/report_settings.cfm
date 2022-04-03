@@ -334,9 +334,9 @@ select id, report_frequency, report_enabled from user_settings where id like bin
 
 <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
 <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-<option value="2">Every 2 Hours (Current Day's Quarantine Report)</option>
-<option value="4">Every 4 Hours (Current Day's Quarantine Report)</option>
-<option value="8">Every 8 Hours (Current Day's Quarantine Report)</option>
+<option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
+<option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
+<option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
 </select> 
 </div>
 
