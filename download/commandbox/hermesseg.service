@@ -3,5 +3,8 @@ Description=Hermes SEG Service
 [Service]
 ExecStart=/usr/local/bin/box server start /var/www/html/server.json
 Type=forking
+TimeoutSec=360
+Restart=always
+
 [Install]
 WantedBy=multi-user.target
