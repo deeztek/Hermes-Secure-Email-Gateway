@@ -171,6 +171,8 @@ timeout="10" />
         <cfabort>
         
         <cfelseif #gettoken.recordcount# LT 1>
+
+        <cfoutput>The IP: #theIP#</cfoutput>
         
         <cfoutput>Unauthorized Access: Invalid Token LT 1</cfoutput> 
         <cfabort>

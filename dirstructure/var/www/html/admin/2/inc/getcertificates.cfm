@@ -21,9 +21,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif #form.request# is "1">
        
 
+
     <cfquery name = "getcertificates" datasource="hermes">
-        select * from system_certificates where (type like  '%#form.search#%') or (subject like  '%#form.search#%') or (issuer like  '%#form.search#%') or (serial like  '%#form.search#%') or (fingerprint like  '%#form.search#%') or (friendly_name like  '%#form.search#%')
-        </cfquery>
+        select * from system_certificates where type like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or subject like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or issuer like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or serial like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or fingerprint like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or friendly_name like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%">
+         </cfquery>
+        
 
         
     <cfif #getcertificates.recordcount# GTE 1>
@@ -53,9 +55,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cfelseif #form.request# is "2">
-    <cfquery name = "getcertificates" datasource="hermes">
-        select * from system_certificates where id like binary '#form.id#'
-        </cfquery>
+<cfquery name = "getcertificates" datasource="hermes">
+select * from system_certificates where id = <cfqueryparam value = #form.id# CFSQLType = "CF_SQL_INTEGER">
+</cfquery>
 
 <cfif #getcertificates.recordcount# GTE 1>
 

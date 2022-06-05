@@ -22,7 +22,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
        
 
     <cfquery name = "getrecipients" datasource="hermes">
-        select id, recipient from recipients where (recipient like  '%#form.search#%') and domain is NULL
+        select id, recipient from recipients where recipient like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> and domain is NULL
         </cfquery>
 
         

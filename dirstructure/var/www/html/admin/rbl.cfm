@@ -269,10 +269,6 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 select id from parameters where parameter='smtpd_recipient_restrictions' and child = '2'
 </cfquery>
 
-<cfquery name="get_reject_rbl_client" datasource="#datasource#">
-select * from parameters where parameter like '%reject_rbl_client%' and child = '1'  and parent='#get_smtpd_recipient_restrictions_id.id#' and applied='1' order by order1 asc
-</cfquery>
-
 <cfquery name="get_permit_dnswl_client" datasource="#datasource#">
 select * from parameters where parameter like '%permit_dnswl_client%' and child = '1'  and parent='#get_smtpd_recipient_restrictions_id.id#' and applied='1' order by order1 asc
 </cfquery>
@@ -284,6 +280,20 @@ select id from parameters where parameter='postscreen_dnsbl_sites' and child = '
 <cfquery name="get_postscreen_dnsbl_sites" datasource="#datasource#">
 select * from parameters where child = '1'  and parent='#get_postscreen_dnsbl_sites_id.id#' and applied='1' order by order1 asc
 </cfquery>
+
+<cfoutput>
+<cfquery name="get_reject_rbl_client" datasource="#datasource#">
+select * from parameters where child = '1' and parent='#get_postscreen_dnsbl_sites_id.id#' and weight > 0 and applied='1' order by order1 asc
+</cfquery>
+</cfoutput>
+
+
+<cfoutput>
+<cfquery name="get_permit_dnswl_client" datasource="#datasource#">
+select * from parameters where child = '1' and parent='#get_postscreen_dnsbl_sites_id.id#' and weight < 0 and applied='1' order by order1 asc
+</cfquery>
+</cfoutput>
+
 
 <cfif #action# is "canceladd">
 <cfquery name="canceladd" datasource="#datasource#">
@@ -437,9 +447,10 @@ update parameters set action='NONE', applied='1' where action='delete' and appli
 <cfquery name="checkexists" datasource="#datasource#">
 select * from parameters where parameter like '%#list#%' and child='1'
 </cfquery>
-
-
 <cfif #checkexists.recordcount# LT 1>
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="getmaxorder" datasource="#datasource#">
 SELECT max(order1) as maximum FROM `parameters` where parent='#get_smtpd_recipient_restrictions_id.id#' and parameter like '%reject_rbl_client%'and child='1'
 </cfquery>
@@ -449,6 +460,8 @@ SELECT max(order1) as maximum FROM `parameters` where parent='#get_smtpd_recipie
 <cfelse>
 <cfset max=#getmaxorder.maximum#>
 </cfif>
+
+--->
 
 <cfquery name="getmaxorder2" datasource="#datasource#">
 SELECT max(order1) as maximum FROM `parameters` where parent='#get_postscreen_dnsbl_sites_id.id#' and child='1'
@@ -460,17 +473,19 @@ SELECT max(order1) as maximum FROM `parameters` where parent='#get_postscreen_dn
 <cfset max2=#getmaxorder2.maximum#>
 </cfif>
 
-
-<cfset nextup=#max#>
 <cfset nextup2=#max2#+1>
 
 <cfif #weight# is not "">
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('reject_rbl_client #list#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '#weight#', '2', 'insert')
 </cfquery>
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -480,12 +495,16 @@ values
 </cfquery>
 
 <cfelseif #weight# is "">
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('reject_rbl_client #list#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '1', '2', 'insert')
 </cfquery>
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -631,6 +650,9 @@ select * from parameters where parameter = '#list##options#' and parent='#get_po
 </cfif>
 
 <cfif #checkexists.recordcount# LT 1>
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="getmaxorder" datasource="#datasource#">
 SELECT max(order1) as maximum FROM `parameters` where parent='#get_smtpd_recipient_restrictions_id.id#' and parameter like '%reject_rbl_client%'and child='1'
 </cfquery>
@@ -640,6 +662,7 @@ SELECT max(order1) as maximum FROM `parameters` where parent='#get_smtpd_recipie
 <cfelse>
 <cfset max=#getmaxorder.maximum#>
 </cfif>
+--->
 
 <cfquery name="getmaxorder2" datasource="#datasource#">
 SELECT max(order1) as maximum FROM `parameters` where parent='#get_postscreen_dnsbl_sites_id.id#' and child='1'
@@ -652,16 +675,20 @@ SELECT max(order1) as maximum FROM `parameters` where parent='#get_postscreen_dn
 </cfif>
 
 
-<cfset nextup=#max#>
 <cfset nextup2=#max2#+1>
 
 <cfif #weight# is not "" and #options# is not "">
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('permit_dnswl_client #list##options#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '#weight#', '2', 'insert')
 </cfquery>
+
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -671,12 +698,16 @@ values
 </cfquery>
 
 <cfelseif #weight# is not "" and #options# is "">
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('permit_dnswl_client #list#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '#weight#', '2', 'insert')
 </cfquery>
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -686,12 +717,16 @@ values
 </cfquery>
 
 <cfelseif #weight# is "" and #options# is not "">
+
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('permit_dnswl_client #list##options#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '1', '2', 'insert')
 </cfquery>
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -701,12 +736,15 @@ values
 </cfquery>
 
 <cfelseif #weight# is "" and #options# is "">
+<!--- NO LONGER USED --->
+<!---
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
 (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
 values
 ('permit_dnswl_client #list#', 'postfix', '1', 'main.cf', '#get_smtpd_recipient_restrictions_id.id#', '1', '#nextup#', '2', '1', '2', 'insert')
 </cfquery>
+--->
 
 <cfquery name="add" datasource="#datasource#">
 insert into parameters 
@@ -1051,24 +1089,23 @@ update parameters set applied='2', action='delete' where parameter like '%#rbl_e
                                                 <table id="Table1" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 50px;">
                                                   <tr style="height: 24px;">
                                                     <td width="614" id="Cell7">
-                                                      <table width="614" border="0" cellspacing="0" cellpadding="0" align="left">
+                                                      <table width="613" border="0" cellspacing="0" cellpadding="0" align="left">
                                                         <tr>
-                                                          <td class="TextObject">
-                                                            <p style="margin-bottom: 0px;">
-<select name="rbl" style="height: 88px;" size="300">
+                                                          <td class="TextObject"><select name="rbl" style="height: 88px;" size="300">
 <option value="-666">==== BLOCK LISTS ====</option>
 <cfoutput query="get_reject_rbl_client">
-<option value="#trim(ListGetAt(parameter, 2, " "))#">#trim(ListGetAt(parameter, 2, " "))# // #weight#</option>
+<option value="#trim(ListGetAt(parameter, 1, "*"))#">#trim(ListGetAt(parameter, 1, "*"))# // #weight#</option>
 </cfoutput>
 <option value="-666">==== ALLOW LISTS ====</option>
 <cfoutput query="get_permit_dnswl_client">
-<option value="#trim(ListGetAt(parameter, 2, " "))#">#trim(ListGetAt(parameter, 2, " "))# // #weight#</option>
+<option value="#trim(ListGetAt(parameter, 1, "*"))#">#trim(ListGetAt(parameter, 1, "*"))# // #weight#</option>
 </cfoutput>
 </select>&nbsp;</p>
+                                                            <p style="margin-bottom: 0px;">&nbsp;</p>
                                                           </td>
                                                         </tr>
                                                       </table>
-                                                    </td>
+                                                      &nbsp;</td>
                                                   </tr>
                                                   <tr style="height: 26px;">
                                                     <td id="Cell1">

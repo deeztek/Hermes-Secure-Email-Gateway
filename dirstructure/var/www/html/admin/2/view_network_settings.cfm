@@ -30,7 +30,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
-
+   <!-- Preloader -->
+   <div class="preloader flex-column justify-content-center align-items-center">
+    <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+    </div>
 
 
 
@@ -246,42 +249,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           
           <cfif #show_action# is "edit" and #show_network_mode# is "static">
           
-          <!--- GET HERMES USERNAME --->
-          <cfquery name="get_mysql_username_hermes" datasource="hermes">
-          select parameter, value from system_settings where parameter='mysql_username_hermes'
-          </cfquery>
           
-          <cfif #get_mysql_username_hermes.value# is "">
-          <cfset step=0>
-          <cfset errormessage=17>
-          <cfelseif #get_mysql_username_hermes.value# is not "">
-          <cfset step=1>
-          
-          <!--- /CFIF FOR get_mysql_username_hermes.value --->
-          </cfif>
-          
-          <cfif step is "1">
-          
-          <!--- GET HERMES PASSWORD --->
-          <cfquery name="get_mysql_password_hermes" datasource="hermes">
-          select parameter, value from system_settings where parameter='mysql_password_hermes'
-          </cfquery>
-          
-          <cfif #get_mysql_password_hermes.value# is "">
-          <cfset step=0>
-          <cfset errormessage=18>
-          
-          <cfelseif #get_mysql_password_hermes.value# is not "">
-          
-          <cfset step=2>
-          
-          <!--- /CFIF FOR get_mysql_password_hermes.value --->
-          </cfif>
-          
-          <!--- /CFIF FOR STEP 1 --->
-          </cfif>
-          
-          <cfif step is "2">
           
           <cfif #show_server_ip# is not "">
           
@@ -303,9 +271,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <!--- /CFIF #show_server_ip# is --->
           </cfif>
           
-          <!--- /CFIF FOR STEP 2 --->
-          </cfif>
-          
+  
           <cfif step is "3">
           
           <cfif #show_server_gateway# is not "">
@@ -521,46 +487,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           
           <cfelseif #show_action# is "edit" and #show_network_mode# is "dhcp">
           
-          <!--- GET HERMES USERNAME --->
-          <cfquery name="get_mysql_username_hermes" datasource="hermes">
-          select parameter, value from system_settings where parameter='mysql_username_hermes'
-          </cfquery>
           
-          <cfif #get_mysql_username_hermes.value# is "">
-          <cfset step=0>
-          <cfset errormessage=17>
-          <cfelseif #get_mysql_username_hermes.value# is not "">
-          <cfset mysqlusernamehermes=#get_mysql_username_hermes.value#>
-          <cfset step=1>
-          
-          <!--- /CFIF FOR get_mysql_username_hermes.value --->
-          </cfif>
-          
-          <cfif step is "1">
-          
-          <!--- GET HERMES PASSWORD --->
-          <cfquery name="get_mysql_password_hermes" datasource="hermes">
-          select parameter, value from system_settings where parameter='mysql_password_hermes'
-          </cfquery>
-          
-          <cfif #get_mysql_password_hermes.value# is "">
-          <cfset step=0>
-          <cfset errormessage=18>
-          
-          <cfelseif #get_mysql_password_hermes.value# is not "">
-          
-          <!--- DECRYPT HERMES PASSWORD --->
-          <cfset mysqlpasswordhermes=decrypt(get_mysql_password_hermes.value, #authkey#, #algo#, #encoding#)>
-          
-          <cfset step=2>
-          
-          <!--- /CFIF FOR get_mysql_password_hermes.value --->
-          </cfif>
-          
-          <!--- /CFIF FOR STEP 1 --->
-          </cfif>
-          
-          <cfif step is "2">
+         
           
           <cfif #show_server_domain# is not "">
           <cfset temp_email="bob@#show_server_domain#">
@@ -575,8 +503,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfset errormessage=12>
           </cfif>
           
-          <!--- /CFIF FOR STEP 2 --->
-          </cfif>
+
           
           
           <cfif step is "3" and #show_server_name# is "">
@@ -671,11 +598,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <!--- /CFIF #getsystoken.recordcount# --->
             </cfif>
             
-            <!--- VALIDATE HERMES DATABASE MYSQL CREDENTIALS BELOW --->
-            
-            <cfinclude template="./inc/validate_hermes_db_creds.cfm" />
-            
-            <!--- VALIDATE HERMES DATABASE MYSQL CREDENTIALS ABOVE --->
           
             <cfset errormessage=16>
             
@@ -742,7 +664,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             
             <!--- MODIFY /etc/amavis/conf.d/50-user BELOW --->
             
-            <cfinclude template="./inc/modify_amavis_50_user.cfm" />
+            <cfinclude template="./inc/update_amavis_config_files.cfm" />
             
              <!--- MODIFY /etc/amavis/conf.d/50-user ABOVE --->
             
@@ -813,11 +735,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                    <!--- /CFIF #getsystoken.recordcount# --->
                    </cfif>
             
-            <!--- VALIDATE HERMES DATABASE MYSQL CREDENTIALS BELOW --->
-            
-            <cfinclude template="./inc/validate_hermes_db_creds.cfm" />
-            
-            <!--- VALIDATE HERMES DATABASE MYSQL CREDENTIALS ABOVE --->
+
             
             <cfset errormessage=16>
             
@@ -871,7 +789,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             
             <!--- MODIFY /etc/amavis/conf.d/50-user BELOW --->
             
-            <cfinclude template="./inc/modify_amavis_50_user.cfm" />
+            <cfinclude template="./inc/update_amavis_config_files.cfm" />
             
              <!--- MODIFY /etc/amavis/conf.d/50-user ABOVE --->
             
@@ -895,7 +813,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <!-- CFML CODE ENDS HERE -->
           
           
-          <!-- CFML APPLICATION ALERTS STARTS HERE -->
+          <!-- ERROR MESSAGES START HERE -->
           
           <cfif #errormessage# is "1"> 
           
@@ -1112,7 +1030,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   
                   </cfif>
           
-          <!-- CFML APPLICATION ALERTS ENDS HERE -->
+          <!-- ERROR MESSAGES END HERE -->
 
           <!-- UPDATE NETWORK SETTINGS FORM STARTS HERE -->
           

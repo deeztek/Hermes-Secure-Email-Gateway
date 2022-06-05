@@ -30,6 +30,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
 
 
 <!--- Sort Table Script Default Sort by Column 4 Desc --->
@@ -74,7 +78,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </script>
 
 
+<!--- BACK TO TOP BUTTON STYLE STARTS HERE ---> 
+<style>
+  #btn-back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: none;
+  }
+  </style>
 
+  <!--- BACK TO TOP BUTTON STYLE ENDS HERE ---> 
 
 
 
@@ -116,6 +130,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!-- Main content -->
     <div class="content">
       <div class="container-fluid">
+
+
+        
+<!-- BACK TO TO TOP BUTTON STARTS HERE -->
+<button
+type="button"
+class="btn btn-danger btn-floating btn-lg"
+id="btn-back-to-top"
+>
+<i class="fas fa-arrow-up"></i>
+</button>
+ 
+<!-- BACK TO TO TOP BUTTON ENDS HERE -->
+
 
   <cfparam name = "m" default = "0">
   <cfif StructKeyExists(session, "m")>
@@ -195,95 +223,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         
         
         <!--- ERROR MESSAGES END HERE --->
-
-         <!--- EDIT MODAL HTML STARTS HERE --->
- 
-
-  <div class="modal fade" id="edit_modal" tabindex="-1" role="dialog" aria-labelledby="editModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-      <div class="modal-content">
-        <div class="modal-header alert-primary">
-          <!---
-          <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-          --->
-            <h4 class="modal-title">Edit Virtual Recipient</h4>
-        </div>
-          
-        <div class="modal-body">
-
-
-          <form name="edit_options" method="post" action="">
-    
-            <input type="hidden" name="action" value="edit">
-            <div id="editoptionsid"></div>
-         
-               
-            <div class="form-group">
-                <label>Local-Part</label>
-                <div class="input-group">
-                <cfoutput>
-                <input type="text" name="local_part" class="local_part form-control" id="local_part" placeholder="Enter the local-part(s) (part before the @ symbol of an e-mail address) each in its own line or leave empty to forward entire domain" value="" autocomplete="off">
-                </cfoutput>
-                
-                <!--- /div class="input-group" --->
-                </div>
-                
-                <!--- /div class="form-group" --->
-                </div>
-
-                <cfquery name="getdomains" datasource="hermes">
-                    select id, domain from domains order by domain asc
-                    </cfquery>
-        
-        
-        
-        
-                            <div class="form-group">
-                              <label><strong>@Domain</strong></label>
-                              <select class="form-control select2" name="domain" data-placeholder="Domain"
-                                      style="width: 100%;">
-                              
-                                <cfoutput query="getdomains">
-                                  <option value="#domain#">#domain#</option>
-                                
-                                  </cfoutput>
-                                  </select>
-                               
-              <!--- /div class="form-group" --->
-            </div>
-    
-            <div class="form-group">
-                <label>Forwards To</label>
-                <div class="input-group">
-                <cfoutput>
-                <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1" placeholder="Start typing to search existing Internal Recipients or enter external recipient manually" value="" autocomplete="off">
-                </cfoutput>
-                
-                <!--- /div class="input-group" --->
-                </div>
-                
-                <!--- /div class="form-group" --->
-                </div>
-        
-         
-   
-
-  
-            <input type="submit" class="btn btn-danger" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-  
-              </form>
-        </div>
-        <div class="modal-footer">
-      
-          <button type="button" class="btn btn-primary" data-dismiss="modal">Cancel</button>
-        </div>
-
-
-      </div>
-    </div>
-    </div>
-    <!--- EDIT MODAL HTML ENDS HERE --->
-      
 
         
   <!--- DELETE RECIPIENT MODAL HTML STARTS HERE --->
@@ -627,6 +566,40 @@ select * from virtual_recipients order by virtual_address asc
     </script>
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE ENDS HERE --->
 
+  <!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
+
+<script>
+
+  //Get the button
+  let mybutton = document.getElementById("btn-back-to-top");
   
+  // When the user scrolls down 20px from the top of the document, show the button
+  window.onscroll = function () {
+    scrollFunction();
+  };
+  
+  function scrollFunction() {
+    if (
+      document.body.scrollTop > 200 ||
+      document.documentElement.scrollTop > 200
+    ) {
+      mybutton.style.display = "block";
+    } else {
+      mybutton.style.display = "none";
+    }
+  }
+  // When the user clicks on the button, scroll to the top of the document
+  mybutton.addEventListener("click", backToTop);
+  
+  function backToTop() {
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }
+  
+  </script>
+  
+  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
+
+    
 
 </html>

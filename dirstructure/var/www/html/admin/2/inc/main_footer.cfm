@@ -38,7 +38,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </div>
   --->
     <!-- Default to the left -->
-    <strong>Hermes Secure Email Gateway #getversion.value# - #getbuild.value# Copyright &copy; 2011-#year(now())# <a href="https://www.deeztek.com">Dionyssios Edwards</a>.</strong> All rights reserved. Portions of this program are covered under the AGPLv3 License.
+    <strong>Hermes Secure Email Gateway | #getversion.value# - #getbuild.value# - #session.edition# | Copyright &copy; 2011-#year(now())# <a href="https://www.deeztek.com">Dionyssios Edwards</a>.</strong> All rights reserved. Portions of this program are covered under the AGPLv3 License.
   </footer>
 </div>
 </cfoutput>

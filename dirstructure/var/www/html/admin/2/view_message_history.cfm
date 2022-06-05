@@ -93,6 +93,16 @@ a, a:hover{
 </style>
 <!--- STYLE FOR EYE-SLASH ENDS HERE --->  
 
+<!--- BACK TO TOP BUTTON STYLE ---> 
+<style>
+  #btn-back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: none;
+  }
+  </style>
+
 </head>
 <body class="hold-transition sidebar-mini">
 <div class="wrapper">
@@ -132,7 +142,14 @@ a, a:hover{
     <div class="content">
       <div class="container-fluid">
 
-    
+    <!-- Back to top button -->
+<button
+type="button"
+class="btn btn-danger btn-floating btn-lg"
+id="btn-back-to-top"
+>
+<i class="fas fa-arrow-up"></i>
+</button>
     
     <cfparam name = "errormessage" default = "0">
     
@@ -741,7 +758,7 @@ a, a:hover{
       
       </cfif>
 
-    <!--- BLOCK SENDER ERROR CODES START HERE --->
+<!--- BLOCK SENDER ERROR CODES START HERE --->
 
 <cfif #failureblocksender# is not "0">
         
@@ -1786,15 +1803,35 @@ a, a:hover{
     <span>
       <p>  
 
+            <!--- RELOAD MESSAGE HISTORY BUTTON STARTS HERE --->
+<a href="preloader_view_message_history.cfm" class="btn btn-primary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Reload Message History</a>
+
+<!--- RELOAD MESSAGE HISTORY BUTTON ENDS HERE --->
+
+&nbsp;&nbsp;
+
     <button type="button" id="messageactions" class="btn btn-primary"><i class="fa fa-edit"></i>&nbsp;&nbsp;Message Actions</button>
     &nbsp;&nbsp;
 
   </p>
 </span>
 
+<div class="card col-sm-8">
+    
+  <!---
+  <div class="card-header border-1">
+
+    <h3 class="card-title"><strong>Mail Queue Settings</strong></h3>
+
+  <!--- class="card-header border-1" --->
+</div>
+--->
+
+<br>
+
 <form>
 
-<div class="col-sm-4">
+<div class="col-sm-6">
   <label>Start Date/Time</label>
     <div class="form-group">
         <div class="input-group date" id="startdatetime" data-target-input="nearest">
@@ -1821,7 +1858,7 @@ a, a:hover{
 
 
 
-  <div class="col-sm-4">
+  <div class="col-sm-6">
     <label>End Date/Time</label>
       <div class="form-group">
           <div class="input-group date" id="enddatetime" data-target-input="nearest">
@@ -1846,7 +1883,7 @@ a, a:hover{
       });
   </script>
 
-<div class="form-group col-sm-4">
+<div class="form-group col-sm-6">
   <label>Search Results Limit</label>
   <div class="alert alert-warning">
 <!---
@@ -1922,14 +1959,17 @@ a, a:hover{
   <!--- /div class="input-group" --->
   </div>
 
-<div class="col-sm-4">
+<div class="col-sm-6">
 
 <input type="submit" class="btn btn-primary" name="" value="Fetch Messages" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
 </div>
+
+<br>
   
 </form>
 
-
+    <!--- div class="card"  --->  
+  </div>
 
 <br>
 
@@ -2145,6 +2185,42 @@ a, a:hover{
       } 
     });
     </script>
+
+    <!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
+
+<script>
+
+  //Get the button
+  let mybutton = document.getElementById("btn-back-to-top");
+  
+  // When the user scrolls down 20px from the top of the document, show the button
+  window.onscroll = function () {
+    scrollFunction();
+  };
+  
+  function scrollFunction() {
+    if (
+      document.body.scrollTop > 200 ||
+      document.documentElement.scrollTop > 200
+    ) {
+      mybutton.style.display = "block";
+    } else {
+      mybutton.style.display = "none";
+    }
+  }
+  // When the user clicks on the button, scroll to the top of the document
+  mybutton.addEventListener("click", backToTop);
+  
+  function backToTop() {
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }
+  
+  </script>
+  
+  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
+
+
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE ENDS HERE --->
 
   <!---

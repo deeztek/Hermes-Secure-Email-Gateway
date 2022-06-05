@@ -30,6 +30,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
+
 
 
 <!--- Sort Table Script Default Sort by Column 4 Desc --->
@@ -83,6 +88,17 @@ a, a:hover{
 </style>
 <!--- STYLE FOR EYE-SLASH ENDS HERE --->  
 
+<!--- BACK TO TOP BUTTON STYLE STARTS HERE ---> 
+<style>
+  #btn-back-to-top {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: none;
+  }
+  </style>
+
+  <!--- BACK TO TOP BUTTON STYLE ENDS HERE ---> 
 
 </head>
 <body class="hold-transition sidebar-mini">
@@ -123,7 +139,16 @@ a, a:hover{
     <div class="content">
       <div class="container-fluid">
 
-    
+<!-- BACK TO TO TOP BUTTON STARTS HERE -->
+<button
+type="button"
+class="btn btn-danger btn-floating btn-lg"
+id="btn-back-to-top"
+>
+<i class="fas fa-arrow-up"></i>
+</button>
+ 
+<!-- BACK TO TO TOP BUTTON ENDS HERE -->
     
     <cfparam name = "errormessage" default = "0">
     
@@ -373,6 +398,42 @@ a, a:hover{
 
 
 </body>
+
+<!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
+
+<script>
+
+  //Get the button
+  let mybutton = document.getElementById("btn-back-to-top");
+  
+  // When the user scrolls down 20px from the top of the document, show the button
+  window.onscroll = function () {
+    scrollFunction();
+  };
+  
+  function scrollFunction() {
+    if (
+      document.body.scrollTop > 200 ||
+      document.documentElement.scrollTop > 200
+    ) {
+      mybutton.style.display = "block";
+    } else {
+      mybutton.style.display = "none";
+    }
+  }
+  // When the user clicks on the button, scroll to the top of the document
+  mybutton.addEventListener("click", backToTop);
+  
+  function backToTop() {
+    document.body.scrollTop = 0;
+    document.documentElement.scrollTop = 0;
+  }
+  
+  </script>
+  
+  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
+
+    
 
 
 </html>

@@ -683,12 +683,54 @@ sleep 1
 
 stop_spinner $?
 
-#CREATE SSL-CERT-SNAKEOIL SYMLINKS
+echo "[`date +%m/%d/%Y-%H:%M`] Installing DMARC" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+
+start_spinner 'Installing DMARC...'
+sleep 1
+
+
+#Install Opendmarc 1.4.2 from source
+
+apt-get install -y autoconf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+apt-get install libtool -y >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+apt-get install libmilter-dev -y >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+apt-get install -y libspf2-dev >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+apt-get install -y libswitch-perl >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+apt-get install -y libjson-perl >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+addgroup opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+adduser --system --disabled-password --shell /sbin/nologin --no-create-home --home /var/run/opendmarc --group opendmarc --gecos opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+cd $SCRIPTPATH/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+git clone https://github.com/trusteddomainproject/OpenDMARC.git >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+cd $SCRIPTPATH/OpenDMARC >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+autoreconf -v -i >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+./configure --with-spf --with-spf2-include=/usr/include/spf2 --with-spf2-lib=/usr/lib/ --with-sql-backend --sysconfdir=/etc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+make install >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+install -d -o opendmarc -g opendmarc /etc/opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+make >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc /usr/sbin/opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-import /usr/sbin/opendmarc-import >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-reports /usr/sbin/opendmarc-reports >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-expire /usr/sbin/opendmarc-expire >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-check /usr/sbin/opendmarc-check >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-importstats /usr/sbin/opendmarc-importstats >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/sbin/opendmarc-params /usr/sbin/opendmarc-params >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+ln -s /usr/local/lib/libopendmarc.so.2.0.3 /usr/lib/libopendmarc.so.2 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+cp $SCRIPTPATH/download/etc/opendmarc/opendmarc.conf /etc/opendmarc/opendmarc.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+dos2unix /etc/opendmarc/opendmarc.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+touch /etc/opendmarc/whitelist.domains >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+chown -R opendmarc:opendmarc /etc/opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+cp $SCRIPTPATH/download/lib/systemd/system/opendmarc.service /lib/systemd/system/opendmarc.service >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+systemctl unmask opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/systemctl enable --now opendmarc.service >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+
+stop_spinner $?
+
 echo "[`date +%m/%d/%Y-%H:%M`] Creating Self Signed Certificate and Key Symlinks" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 start_spinner 'Creating Self Signed Certificate and Key Symlinks...'
 sleep 1
 
+#CREATE SSL-CERT-SNAKEOIL SYMLINKS
 /bin/ln -s /etc/ssl/certs/ssl-cert-snakeoil.pem /opt/hermes/ssl/ssl-cert-snakeoil_hermes.pem >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
 /bin/ln -s /etc/ssl/private/ssl-cert-snakeoil.key /opt/hermes/ssl/ssl-cert-snakeoil_hermes.key >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
@@ -1142,8 +1184,6 @@ sleep 1
 
 stop_spinner $?
 
-
-
 echo "[`date +%m/%d/%Y-%H:%M`] Configuring and Enabling Uncomplicated Firewall (UFW)" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 start_spinner 'Configuring and Enabling Uncomplicated Firewall (UFW)...'
@@ -1161,34 +1201,6 @@ sleep 1
 
 stop_spinner $?
 
-echo "[`date +%m/%d/%Y-%H:%M`] Installing Opendmarc. Please note, errors will be generated during installation of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc SHOULD work normally after reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Installing Opendmarc. Please note, errors will be generated during installation of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc SHOULD work normally after reboot...'
-sleep 1
-
-
-#Install Opendmarc 1.3.2-7 from focal main
-export DEBIAN_FRONTEND=noninteractive >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp /etc/apt/sources.list /etc/apt/sources.list.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/echo "deb http://mirrors.kernel.org/ubuntu focal main universe" | sudo tee -a /etc/apt/sources.list >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/bin/apt-get update >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/bin/apt-get install opendmarc -y >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
-
-echo "[`date +%m/%d/%Y-%H:%M`] Configuring Opendmarc. Please note, errors will be generated during configuration of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc SHOULD work normally after reboot" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Configuring Opendmarc. Please note, an error will be generated during configuration of Opendmarc. This is expected behavior with Ubuntu 18.04 and Opendmarc SHOULD work normally after reboot...'
-sleep 1
-
-export DEBIAN_FRONTEND=noninteractive >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp /etc/apt/sources.list.ORIGINAL /etc/apt/sources.list >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/bin/apt-get update >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp /etc/opendmarc.conf /etc/opendmarc.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp $SCRIPTPATH/download/opendmarc/opendmarc.conf /etc/opendmarc.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/systemctl restart opendmarc >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
 
 echo "[`date +%m/%d/%Y-%H:%M`] Ensuring Hermes SEG permissions are set correctly" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
@@ -1206,13 +1218,12 @@ sleep 1
 /usr/bin/dos2unix /opt/hermes/templates/*.sh >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
 /bin/chown -R opendkim:opendkim /opt/hermes/dkim/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
 /bin/chown -R opendkim:opendkim /opt/hermes/dkim/keys/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/chown -R opendkim:opendkim /var/run/opendkim/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/chown -R opendmarc:opendmarc /var/run/opendmarc/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+/bin/chown -R opendkim:opendkim /var/run/opendkim/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
 
-echo "[`date +%m/%d/%Y-%H:%M`] ==== FINISHED INSTALLATION ==== With the exception of Opendmarc, ensure no other errors were logged during installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] ==== FINISHED INSTALLATION ==== Ensure no errors were logged during installation" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 echo "${GREEN}FINISHED INSTALLATION. PLEASE REBOOT YOUR MACHINE!!${RESET}" | boxes -d stone -p a2v1
 
