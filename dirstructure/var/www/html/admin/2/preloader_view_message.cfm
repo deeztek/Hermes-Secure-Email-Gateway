@@ -36,6 +36,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 
+<cfif IsDefined("url.mid") is "True">
+
+<cfif url.mid is not "">
+
+<cfelseif #url.mid# is "">
+
+<cfset m="View Message: url.mid is empty">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+
+<!--- /CFIF url.mid is "" --->
+</cfif>
+
+<cfelse>
+
+<cfset m="View Message: url.mid is undefined">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+
+ <!--- /CFIF IsDefined("url.mid") --->
+</cfif>
+
+
     <cfparam name = "startdate" default = ""> 
     <cfif IsDefined("url.startdate") is "True">
     <cfif url.startdate is not "">

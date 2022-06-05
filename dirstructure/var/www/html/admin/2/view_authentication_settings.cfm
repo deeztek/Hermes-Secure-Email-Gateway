@@ -30,6 +30,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
+
 
 <!--- STYLE FOR EYE-SLASH STARTS HERE --->    
 <style>

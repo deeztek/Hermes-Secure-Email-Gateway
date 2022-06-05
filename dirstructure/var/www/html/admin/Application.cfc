@@ -269,6 +269,9 @@ the url: #theurl#</cfoutput>
        <!--- /CFIF IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Token" --->
        </cfif>
 
+<!--- CHECK IF WIZARD HAS BEEN RAN FUNCTIONALITY HAS BEEN MOVED TO INDEX.CFM AS OF BUILD 220410 --->
+<!---       
+
       <!--- Check if Wizard has been ran --->
       <cfquery name="checkwizard" datasource="hermes">
        select parameter, value from system_settings where parameter='wizard_settings'
@@ -288,7 +291,8 @@ the url: #theurl#</cfoutput>
        
        <!--- /CFIF #checkwizard.value# is "2" ---> 
        </cfif>
-       
+      --->
+
       <cfinclude template="#Arguments.targetPage#" />
       <cfreturn />
 

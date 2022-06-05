@@ -1,0 +1,17 @@
+[Unit]
+Description=OpenDMARC Milter
+Documentation=man:opendmarc(8) man:opendmarc.conf(5)
+After=network.target nss-lookup.target
+
+[Service]
+Type=forking
+RuntimeDirectory=opendmarc
+PIDFile=/var/run/opendmarc/opendmarc.pid
+User=opendmarc
+ExecStart=/usr/sbin/opendmarc -c /etc/opendmarc/opendmarc.conf
+Restart=on-failure
+ExecReload=/bin/kill -USR1 $MAINPID
+
+[Install]
+WantedBy=multi-user.target
+

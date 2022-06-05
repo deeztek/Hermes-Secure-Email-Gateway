@@ -30,6 +30,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
+
 <!--- SCRIPT TO SHOW/HIDE UPDATE PASSWORD --->
 <script>
 
@@ -188,7 +193,7 @@ select applied from system_users where applied = '2'
 </cfif> 
 
 <cfquery name="getuser" datasource="hermes">
-select * from system_users where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
+select id, username, password, email, first_name, last_name, system, access_control, applied from system_users where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
 </cfquery>
 
 <cfif #getuser.recordcount# LT 1>

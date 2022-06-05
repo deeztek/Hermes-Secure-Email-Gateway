@@ -5,6 +5,487 @@ BUILD HERMES DATABASE
 SET FOREIGN_KEY_CHECKS=0;
 
 -- ----------------------------
+-- Table structure for `timezones`
+-- ----------------------------
+DROP TABLE IF EXISTS `timezones`;
+CREATE TABLE `timezones` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `timezone` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=452 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of timezones
+-- ----------------------------
+INSERT INTO `timezones` VALUES ('2', 'Africa/Abidjan');
+INSERT INTO `timezones` VALUES ('3', 'Africa/Accra');
+INSERT INTO `timezones` VALUES ('4', 'Africa/Addis_Ababa');
+INSERT INTO `timezones` VALUES ('5', 'Africa/Algiers');
+INSERT INTO `timezones` VALUES ('6', 'Africa/Asmara');
+INSERT INTO `timezones` VALUES ('7', 'Africa/Bamako');
+INSERT INTO `timezones` VALUES ('8', 'Africa/Bangui');
+INSERT INTO `timezones` VALUES ('9', 'Africa/Banjul');
+INSERT INTO `timezones` VALUES ('10', 'Africa/Bissau');
+INSERT INTO `timezones` VALUES ('11', 'Africa/Blantyre');
+INSERT INTO `timezones` VALUES ('12', 'Africa/Brazzaville');
+INSERT INTO `timezones` VALUES ('13', 'Africa/Bujumbura');
+INSERT INTO `timezones` VALUES ('14', 'Africa/Cairo');
+INSERT INTO `timezones` VALUES ('15', 'Africa/Casablanca');
+INSERT INTO `timezones` VALUES ('16', 'Africa/Ceuta');
+INSERT INTO `timezones` VALUES ('17', 'Africa/Conakry');
+INSERT INTO `timezones` VALUES ('18', 'Africa/Dakar');
+INSERT INTO `timezones` VALUES ('19', 'Africa/Dar_es_Salaam');
+INSERT INTO `timezones` VALUES ('20', 'Africa/Djibouti');
+INSERT INTO `timezones` VALUES ('21', 'Africa/Douala');
+INSERT INTO `timezones` VALUES ('22', 'Africa/El_Aaiun');
+INSERT INTO `timezones` VALUES ('23', 'Africa/Freetown');
+INSERT INTO `timezones` VALUES ('24', 'Africa/Gaborone');
+INSERT INTO `timezones` VALUES ('25', 'Africa/Harare');
+INSERT INTO `timezones` VALUES ('26', 'Africa/Johannesburg');
+INSERT INTO `timezones` VALUES ('27', 'Africa/Juba');
+INSERT INTO `timezones` VALUES ('28', 'Africa/Kampala');
+INSERT INTO `timezones` VALUES ('29', 'Africa/Khartoum');
+INSERT INTO `timezones` VALUES ('30', 'Africa/Kigali');
+INSERT INTO `timezones` VALUES ('31', 'Africa/Kinshasa');
+INSERT INTO `timezones` VALUES ('32', 'Africa/Lagos');
+INSERT INTO `timezones` VALUES ('33', 'Africa/Libreville');
+INSERT INTO `timezones` VALUES ('34', 'Africa/Lome');
+INSERT INTO `timezones` VALUES ('35', 'Africa/Luanda');
+INSERT INTO `timezones` VALUES ('36', 'Africa/Lubumbashi');
+INSERT INTO `timezones` VALUES ('37', 'Africa/Lusaka');
+INSERT INTO `timezones` VALUES ('38', 'Africa/Malabo');
+INSERT INTO `timezones` VALUES ('39', 'Africa/Maputo');
+INSERT INTO `timezones` VALUES ('40', 'Africa/Maseru');
+INSERT INTO `timezones` VALUES ('41', 'Africa/Mbabane');
+INSERT INTO `timezones` VALUES ('42', 'Africa/Mogadishu');
+INSERT INTO `timezones` VALUES ('43', 'Africa/Monrovia');
+INSERT INTO `timezones` VALUES ('44', 'Africa/Nairobi');
+INSERT INTO `timezones` VALUES ('45', 'Africa/Ndjamena');
+INSERT INTO `timezones` VALUES ('46', 'Africa/Niamey');
+INSERT INTO `timezones` VALUES ('47', 'Africa/Nouakchott');
+INSERT INTO `timezones` VALUES ('48', 'Africa/Ouagadougou');
+INSERT INTO `timezones` VALUES ('49', 'Africa/Porto-Novo');
+INSERT INTO `timezones` VALUES ('50', 'Africa/Sao_Tome');
+INSERT INTO `timezones` VALUES ('51', 'Africa/Tripoli');
+INSERT INTO `timezones` VALUES ('52', 'Africa/Tunis');
+INSERT INTO `timezones` VALUES ('53', 'Africa/Windhoek');
+INSERT INTO `timezones` VALUES ('54', 'America/Adak');
+INSERT INTO `timezones` VALUES ('55', 'America/Anchorage');
+INSERT INTO `timezones` VALUES ('56', 'America/Anguilla');
+INSERT INTO `timezones` VALUES ('57', 'America/Antigua');
+INSERT INTO `timezones` VALUES ('58', 'America/Araguaina');
+INSERT INTO `timezones` VALUES ('59', 'America/Argentina/Buenos_Aires');
+INSERT INTO `timezones` VALUES ('60', 'America/Argentina/Catamarca');
+INSERT INTO `timezones` VALUES ('61', 'America/Argentina/Cordoba');
+INSERT INTO `timezones` VALUES ('62', 'America/Argentina/Jujuy');
+INSERT INTO `timezones` VALUES ('63', 'America/Argentina/La_Rioja');
+INSERT INTO `timezones` VALUES ('64', 'America/Argentina/Mendoza');
+INSERT INTO `timezones` VALUES ('65', 'America/Argentina/Rio_Gallegos');
+INSERT INTO `timezones` VALUES ('66', 'America/Argentina/Salta');
+INSERT INTO `timezones` VALUES ('67', 'America/Argentina/San_Juan');
+INSERT INTO `timezones` VALUES ('68', 'America/Argentina/San_Luis');
+INSERT INTO `timezones` VALUES ('69', 'America/Argentina/Tucuman');
+INSERT INTO `timezones` VALUES ('70', 'America/Argentina/Ushuaia');
+INSERT INTO `timezones` VALUES ('71', 'America/Aruba');
+INSERT INTO `timezones` VALUES ('72', 'America/Asuncion');
+INSERT INTO `timezones` VALUES ('73', 'America/Atikokan');
+INSERT INTO `timezones` VALUES ('74', 'America/Bahia');
+INSERT INTO `timezones` VALUES ('75', 'America/Bahia_Banderas');
+INSERT INTO `timezones` VALUES ('76', 'America/Barbados');
+INSERT INTO `timezones` VALUES ('77', 'America/Belem');
+INSERT INTO `timezones` VALUES ('78', 'America/Belize');
+INSERT INTO `timezones` VALUES ('79', 'America/Blanc-Sablon');
+INSERT INTO `timezones` VALUES ('80', 'America/Boa_Vista');
+INSERT INTO `timezones` VALUES ('81', 'America/Bogota');
+INSERT INTO `timezones` VALUES ('82', 'America/Boise');
+INSERT INTO `timezones` VALUES ('83', 'America/Cambridge_Bay');
+INSERT INTO `timezones` VALUES ('84', 'America/Campo_Grande');
+INSERT INTO `timezones` VALUES ('85', 'America/Cancun');
+INSERT INTO `timezones` VALUES ('86', 'America/Caracas');
+INSERT INTO `timezones` VALUES ('87', 'America/Cayenne');
+INSERT INTO `timezones` VALUES ('88', 'America/Cayman');
+INSERT INTO `timezones` VALUES ('89', 'America/Chicago');
+INSERT INTO `timezones` VALUES ('90', 'America/Chihuahua');
+INSERT INTO `timezones` VALUES ('91', 'America/Costa_Rica');
+INSERT INTO `timezones` VALUES ('92', 'America/Creston');
+INSERT INTO `timezones` VALUES ('93', 'America/Cuiaba');
+INSERT INTO `timezones` VALUES ('94', 'America/Curacao');
+INSERT INTO `timezones` VALUES ('95', 'America/Danmarkshavn');
+INSERT INTO `timezones` VALUES ('96', 'America/Dawson');
+INSERT INTO `timezones` VALUES ('97', 'America/Dawson_Creek');
+INSERT INTO `timezones` VALUES ('98', 'America/Denver');
+INSERT INTO `timezones` VALUES ('99', 'America/Detroit');
+INSERT INTO `timezones` VALUES ('100', 'America/Dominica');
+INSERT INTO `timezones` VALUES ('101', 'America/Edmonton');
+INSERT INTO `timezones` VALUES ('102', 'America/Eirunepe');
+INSERT INTO `timezones` VALUES ('103', 'America/El_Salvador');
+INSERT INTO `timezones` VALUES ('104', 'America/Fort_Nelson');
+INSERT INTO `timezones` VALUES ('105', 'America/Fortaleza');
+INSERT INTO `timezones` VALUES ('106', 'America/Glace_Bay');
+INSERT INTO `timezones` VALUES ('107', 'America/Goose_Bay');
+INSERT INTO `timezones` VALUES ('108', 'America/Grand_Turk');
+INSERT INTO `timezones` VALUES ('109', 'America/Grenada');
+INSERT INTO `timezones` VALUES ('110', 'America/Guadeloupe');
+INSERT INTO `timezones` VALUES ('111', 'America/Guatemala');
+INSERT INTO `timezones` VALUES ('112', 'America/Guayaquil');
+INSERT INTO `timezones` VALUES ('113', 'America/Guyana');
+INSERT INTO `timezones` VALUES ('114', 'America/Halifax');
+INSERT INTO `timezones` VALUES ('115', 'America/Havana');
+INSERT INTO `timezones` VALUES ('116', 'America/Hermosillo');
+INSERT INTO `timezones` VALUES ('117', 'America/Indiana/Indianapolis');
+INSERT INTO `timezones` VALUES ('118', 'America/Indiana/Knox');
+INSERT INTO `timezones` VALUES ('119', 'America/Indiana/Marengo');
+INSERT INTO `timezones` VALUES ('120', 'America/Indiana/Petersburg');
+INSERT INTO `timezones` VALUES ('121', 'America/Indiana/Tell_City');
+INSERT INTO `timezones` VALUES ('122', 'America/Indiana/Vevay');
+INSERT INTO `timezones` VALUES ('123', 'America/Indiana/Vincennes');
+INSERT INTO `timezones` VALUES ('124', 'America/Indiana/Winamac');
+INSERT INTO `timezones` VALUES ('125', 'America/Inuvik');
+INSERT INTO `timezones` VALUES ('126', 'America/Iqaluit');
+INSERT INTO `timezones` VALUES ('127', 'America/Jamaica');
+INSERT INTO `timezones` VALUES ('128', 'America/Juneau');
+INSERT INTO `timezones` VALUES ('129', 'America/Kentucky/Louisville');
+INSERT INTO `timezones` VALUES ('130', 'America/Kentucky/Monticello');
+INSERT INTO `timezones` VALUES ('131', 'America/Kralendijk');
+INSERT INTO `timezones` VALUES ('132', 'America/La_Paz');
+INSERT INTO `timezones` VALUES ('133', 'America/Lima');
+INSERT INTO `timezones` VALUES ('134', 'America/Los_Angeles');
+INSERT INTO `timezones` VALUES ('135', 'America/Lower_Princes');
+INSERT INTO `timezones` VALUES ('136', 'America/Maceio');
+INSERT INTO `timezones` VALUES ('137', 'America/Managua');
+INSERT INTO `timezones` VALUES ('138', 'America/Manaus');
+INSERT INTO `timezones` VALUES ('139', 'America/Marigot');
+INSERT INTO `timezones` VALUES ('140', 'America/Martinique');
+INSERT INTO `timezones` VALUES ('141', 'America/Matamoros');
+INSERT INTO `timezones` VALUES ('142', 'America/Mazatlan');
+INSERT INTO `timezones` VALUES ('143', 'America/Menominee');
+INSERT INTO `timezones` VALUES ('144', 'America/Merida');
+INSERT INTO `timezones` VALUES ('145', 'America/Metlakatla');
+INSERT INTO `timezones` VALUES ('146', 'America/Mexico_City');
+INSERT INTO `timezones` VALUES ('147', 'America/Miquelon');
+INSERT INTO `timezones` VALUES ('148', 'America/Moncton');
+INSERT INTO `timezones` VALUES ('149', 'America/Monterrey');
+INSERT INTO `timezones` VALUES ('150', 'America/Montevideo');
+INSERT INTO `timezones` VALUES ('151', 'America/Montserrat');
+INSERT INTO `timezones` VALUES ('152', 'America/Nassau');
+INSERT INTO `timezones` VALUES ('153', 'America/New_York');
+INSERT INTO `timezones` VALUES ('154', 'America/Nipigon');
+INSERT INTO `timezones` VALUES ('155', 'America/Nome');
+INSERT INTO `timezones` VALUES ('156', 'America/Noronha');
+INSERT INTO `timezones` VALUES ('157', 'America/North_Dakota/Beulah');
+INSERT INTO `timezones` VALUES ('158', 'America/North_Dakota/Center');
+INSERT INTO `timezones` VALUES ('159', 'America/North_Dakota/New_Salem');
+INSERT INTO `timezones` VALUES ('160', 'America/Nuuk');
+INSERT INTO `timezones` VALUES ('161', 'America/Ojinaga');
+INSERT INTO `timezones` VALUES ('162', 'America/Panama');
+INSERT INTO `timezones` VALUES ('163', 'America/Pangnirtung');
+INSERT INTO `timezones` VALUES ('164', 'America/Paramaribo');
+INSERT INTO `timezones` VALUES ('165', 'America/Phoenix');
+INSERT INTO `timezones` VALUES ('166', 'America/Port-au-Prince');
+INSERT INTO `timezones` VALUES ('167', 'America/Port_of_Spain');
+INSERT INTO `timezones` VALUES ('168', 'America/Porto_Velho');
+INSERT INTO `timezones` VALUES ('169', 'America/Puerto_Rico');
+INSERT INTO `timezones` VALUES ('170', 'America/Punta_Arenas');
+INSERT INTO `timezones` VALUES ('171', 'America/Rainy_River');
+INSERT INTO `timezones` VALUES ('172', 'America/Rankin_Inlet');
+INSERT INTO `timezones` VALUES ('173', 'America/Recife');
+INSERT INTO `timezones` VALUES ('174', 'America/Regina');
+INSERT INTO `timezones` VALUES ('175', 'America/Resolute');
+INSERT INTO `timezones` VALUES ('176', 'America/Rio_Branco');
+INSERT INTO `timezones` VALUES ('177', 'America/Santarem');
+INSERT INTO `timezones` VALUES ('178', 'America/Santiago');
+INSERT INTO `timezones` VALUES ('179', 'America/Santo_Domingo');
+INSERT INTO `timezones` VALUES ('180', 'America/Sao_Paulo');
+INSERT INTO `timezones` VALUES ('181', 'America/Scoresbysund');
+INSERT INTO `timezones` VALUES ('182', 'America/Sitka');
+INSERT INTO `timezones` VALUES ('183', 'America/St_Barthelemy');
+INSERT INTO `timezones` VALUES ('184', 'America/St_Johns');
+INSERT INTO `timezones` VALUES ('185', 'America/St_Kitts');
+INSERT INTO `timezones` VALUES ('186', 'America/St_Lucia');
+INSERT INTO `timezones` VALUES ('187', 'America/St_Thomas');
+INSERT INTO `timezones` VALUES ('188', 'America/St_Vincent');
+INSERT INTO `timezones` VALUES ('189', 'America/Swift_Current');
+INSERT INTO `timezones` VALUES ('190', 'America/Tegucigalpa');
+INSERT INTO `timezones` VALUES ('191', 'America/Thule');
+INSERT INTO `timezones` VALUES ('192', 'America/Thunder_Bay');
+INSERT INTO `timezones` VALUES ('193', 'America/Tijuana');
+INSERT INTO `timezones` VALUES ('194', 'America/Toronto');
+INSERT INTO `timezones` VALUES ('195', 'America/Tortola');
+INSERT INTO `timezones` VALUES ('196', 'America/Vancouver');
+INSERT INTO `timezones` VALUES ('197', 'America/Whitehorse');
+INSERT INTO `timezones` VALUES ('198', 'America/Winnipeg');
+INSERT INTO `timezones` VALUES ('199', 'America/Yakutat');
+INSERT INTO `timezones` VALUES ('200', 'America/Yellowknife');
+INSERT INTO `timezones` VALUES ('201', 'Antarctica/Casey');
+INSERT INTO `timezones` VALUES ('202', 'Antarctica/Davis');
+INSERT INTO `timezones` VALUES ('203', 'Antarctica/DumontDUrville');
+INSERT INTO `timezones` VALUES ('204', 'Antarctica/Macquarie');
+INSERT INTO `timezones` VALUES ('205', 'Antarctica/Mawson');
+INSERT INTO `timezones` VALUES ('206', 'Antarctica/McMurdo');
+INSERT INTO `timezones` VALUES ('207', 'Antarctica/Palmer');
+INSERT INTO `timezones` VALUES ('208', 'Antarctica/Rothera');
+INSERT INTO `timezones` VALUES ('209', 'Antarctica/Syowa');
+INSERT INTO `timezones` VALUES ('210', 'Antarctica/Troll');
+INSERT INTO `timezones` VALUES ('211', 'Antarctica/Vostok');
+INSERT INTO `timezones` VALUES ('212', 'Arctic/Longyearbyen');
+INSERT INTO `timezones` VALUES ('213', 'Asia/Aden');
+INSERT INTO `timezones` VALUES ('214', 'Asia/Almaty');
+INSERT INTO `timezones` VALUES ('215', 'Asia/Amman');
+INSERT INTO `timezones` VALUES ('216', 'Asia/Anadyr');
+INSERT INTO `timezones` VALUES ('217', 'Asia/Aqtau');
+INSERT INTO `timezones` VALUES ('218', 'Asia/Aqtobe');
+INSERT INTO `timezones` VALUES ('219', 'Asia/Ashgabat');
+INSERT INTO `timezones` VALUES ('220', 'Asia/Atyrau');
+INSERT INTO `timezones` VALUES ('221', 'Asia/Baghdad');
+INSERT INTO `timezones` VALUES ('222', 'Asia/Bahrain');
+INSERT INTO `timezones` VALUES ('223', 'Asia/Baku');
+INSERT INTO `timezones` VALUES ('224', 'Asia/Bangkok');
+INSERT INTO `timezones` VALUES ('225', 'Asia/Barnaul');
+INSERT INTO `timezones` VALUES ('226', 'Asia/Beirut');
+INSERT INTO `timezones` VALUES ('227', 'Asia/Bishkek');
+INSERT INTO `timezones` VALUES ('228', 'Asia/Brunei');
+INSERT INTO `timezones` VALUES ('229', 'Asia/Chita');
+INSERT INTO `timezones` VALUES ('230', 'Asia/Choibalsan');
+INSERT INTO `timezones` VALUES ('231', 'Asia/Colombo');
+INSERT INTO `timezones` VALUES ('232', 'Asia/Damascus');
+INSERT INTO `timezones` VALUES ('233', 'Asia/Dhaka');
+INSERT INTO `timezones` VALUES ('234', 'Asia/Dili');
+INSERT INTO `timezones` VALUES ('235', 'Asia/Dubai');
+INSERT INTO `timezones` VALUES ('236', 'Asia/Dushanbe');
+INSERT INTO `timezones` VALUES ('237', 'Asia/Famagusta');
+INSERT INTO `timezones` VALUES ('238', 'Asia/Gaza');
+INSERT INTO `timezones` VALUES ('239', 'Asia/Hebron');
+INSERT INTO `timezones` VALUES ('240', 'Asia/Ho_Chi_Minh');
+INSERT INTO `timezones` VALUES ('241', 'Asia/Hong_Kong');
+INSERT INTO `timezones` VALUES ('242', 'Asia/Hovd');
+INSERT INTO `timezones` VALUES ('243', 'Asia/Irkutsk');
+INSERT INTO `timezones` VALUES ('244', 'Asia/Jakarta');
+INSERT INTO `timezones` VALUES ('245', 'Asia/Jayapura');
+INSERT INTO `timezones` VALUES ('246', 'Asia/Jerusalem');
+INSERT INTO `timezones` VALUES ('247', 'Asia/Kabul');
+INSERT INTO `timezones` VALUES ('248', 'Asia/Kamchatka');
+INSERT INTO `timezones` VALUES ('249', 'Asia/Karachi');
+INSERT INTO `timezones` VALUES ('250', 'Asia/Kathmandu');
+INSERT INTO `timezones` VALUES ('251', 'Asia/Khandyga');
+INSERT INTO `timezones` VALUES ('252', 'Asia/Kolkata');
+INSERT INTO `timezones` VALUES ('253', 'Asia/Krasnoyarsk');
+INSERT INTO `timezones` VALUES ('254', 'Asia/Kuala_Lumpur');
+INSERT INTO `timezones` VALUES ('255', 'Asia/Kuching');
+INSERT INTO `timezones` VALUES ('256', 'Asia/Kuwait');
+INSERT INTO `timezones` VALUES ('257', 'Asia/Macau');
+INSERT INTO `timezones` VALUES ('258', 'Asia/Magadan');
+INSERT INTO `timezones` VALUES ('259', 'Asia/Makassar');
+INSERT INTO `timezones` VALUES ('260', 'Asia/Manila');
+INSERT INTO `timezones` VALUES ('261', 'Asia/Muscat');
+INSERT INTO `timezones` VALUES ('262', 'Asia/Nicosia');
+INSERT INTO `timezones` VALUES ('263', 'Asia/Novokuznetsk');
+INSERT INTO `timezones` VALUES ('264', 'Asia/Novosibirsk');
+INSERT INTO `timezones` VALUES ('265', 'Asia/Omsk');
+INSERT INTO `timezones` VALUES ('266', 'Asia/Oral');
+INSERT INTO `timezones` VALUES ('267', 'Asia/Phnom_Penh');
+INSERT INTO `timezones` VALUES ('268', 'Asia/Pontianak');
+INSERT INTO `timezones` VALUES ('269', 'Asia/Pyongyang');
+INSERT INTO `timezones` VALUES ('270', 'Asia/Qatar');
+INSERT INTO `timezones` VALUES ('271', 'Asia/Qostanay');
+INSERT INTO `timezones` VALUES ('272', 'Asia/Qyzylorda');
+INSERT INTO `timezones` VALUES ('273', 'Asia/Riyadh');
+INSERT INTO `timezones` VALUES ('274', 'Asia/Sakhalin');
+INSERT INTO `timezones` VALUES ('275', 'Asia/Samarkand');
+INSERT INTO `timezones` VALUES ('276', 'Asia/Seoul');
+INSERT INTO `timezones` VALUES ('277', 'Asia/Shanghai');
+INSERT INTO `timezones` VALUES ('278', 'Asia/Singapore');
+INSERT INTO `timezones` VALUES ('279', 'Asia/Srednekolymsk');
+INSERT INTO `timezones` VALUES ('280', 'Asia/Taipei');
+INSERT INTO `timezones` VALUES ('281', 'Asia/Tashkent');
+INSERT INTO `timezones` VALUES ('282', 'Asia/Tbilisi');
+INSERT INTO `timezones` VALUES ('283', 'Asia/Tehran');
+INSERT INTO `timezones` VALUES ('284', 'Asia/Thimphu');
+INSERT INTO `timezones` VALUES ('285', 'Asia/Tokyo');
+INSERT INTO `timezones` VALUES ('286', 'Asia/Tomsk');
+INSERT INTO `timezones` VALUES ('287', 'Asia/Ulaanbaatar');
+INSERT INTO `timezones` VALUES ('288', 'Asia/Urumqi');
+INSERT INTO `timezones` VALUES ('289', 'Asia/Ust-Nera');
+INSERT INTO `timezones` VALUES ('290', 'Asia/Vientiane');
+INSERT INTO `timezones` VALUES ('291', 'Asia/Vladivostok');
+INSERT INTO `timezones` VALUES ('292', 'Asia/Yakutsk');
+INSERT INTO `timezones` VALUES ('293', 'Asia/Yangon');
+INSERT INTO `timezones` VALUES ('294', 'Asia/Yekaterinburg');
+INSERT INTO `timezones` VALUES ('295', 'Asia/Yerevan');
+INSERT INTO `timezones` VALUES ('296', 'Atlantic/Azores');
+INSERT INTO `timezones` VALUES ('297', 'Atlantic/Bermuda');
+INSERT INTO `timezones` VALUES ('298', 'Atlantic/Canary');
+INSERT INTO `timezones` VALUES ('299', 'Atlantic/Cape_Verde');
+INSERT INTO `timezones` VALUES ('300', 'Atlantic/Faroe');
+INSERT INTO `timezones` VALUES ('301', 'Atlantic/Madeira');
+INSERT INTO `timezones` VALUES ('302', 'Atlantic/Reykjavik');
+INSERT INTO `timezones` VALUES ('303', 'Atlantic/South_Georgia');
+INSERT INTO `timezones` VALUES ('304', 'Atlantic/St_Helena');
+INSERT INTO `timezones` VALUES ('305', 'Atlantic/Stanley');
+INSERT INTO `timezones` VALUES ('306', 'Australia/Adelaide');
+INSERT INTO `timezones` VALUES ('307', 'Australia/Brisbane');
+INSERT INTO `timezones` VALUES ('308', 'Australia/Broken_Hill');
+INSERT INTO `timezones` VALUES ('309', 'Australia/Darwin');
+INSERT INTO `timezones` VALUES ('310', 'Australia/Eucla');
+INSERT INTO `timezones` VALUES ('311', 'Australia/Hobart');
+INSERT INTO `timezones` VALUES ('312', 'Australia/Lindeman');
+INSERT INTO `timezones` VALUES ('313', 'Australia/Lord_Howe');
+INSERT INTO `timezones` VALUES ('314', 'Australia/Melbourne');
+INSERT INTO `timezones` VALUES ('315', 'Australia/Perth');
+INSERT INTO `timezones` VALUES ('316', 'Australia/Sydney');
+INSERT INTO `timezones` VALUES ('317', 'Europe/Amsterdam');
+INSERT INTO `timezones` VALUES ('318', 'Europe/Andorra');
+INSERT INTO `timezones` VALUES ('319', 'Europe/Astrakhan');
+INSERT INTO `timezones` VALUES ('320', 'Europe/Athens');
+INSERT INTO `timezones` VALUES ('321', 'Europe/Belgrade');
+INSERT INTO `timezones` VALUES ('322', 'Europe/Berlin');
+INSERT INTO `timezones` VALUES ('323', 'Europe/Bratislava');
+INSERT INTO `timezones` VALUES ('324', 'Europe/Brussels');
+INSERT INTO `timezones` VALUES ('325', 'Europe/Bucharest');
+INSERT INTO `timezones` VALUES ('326', 'Europe/Budapest');
+INSERT INTO `timezones` VALUES ('327', 'Europe/Busingen');
+INSERT INTO `timezones` VALUES ('328', 'Europe/Chisinau');
+INSERT INTO `timezones` VALUES ('329', 'Europe/Copenhagen');
+INSERT INTO `timezones` VALUES ('330', 'Europe/Dublin');
+INSERT INTO `timezones` VALUES ('331', 'Europe/Gibraltar');
+INSERT INTO `timezones` VALUES ('332', 'Europe/Guernsey');
+INSERT INTO `timezones` VALUES ('333', 'Europe/Helsinki');
+INSERT INTO `timezones` VALUES ('334', 'Europe/Isle_of_Man');
+INSERT INTO `timezones` VALUES ('335', 'Europe/Istanbul');
+INSERT INTO `timezones` VALUES ('336', 'Europe/Jersey');
+INSERT INTO `timezones` VALUES ('337', 'Europe/Kaliningrad');
+INSERT INTO `timezones` VALUES ('338', 'Europe/Kiev');
+INSERT INTO `timezones` VALUES ('339', 'Europe/Kirov');
+INSERT INTO `timezones` VALUES ('340', 'Europe/Lisbon');
+INSERT INTO `timezones` VALUES ('341', 'Europe/Ljubljana');
+INSERT INTO `timezones` VALUES ('342', 'Europe/London');
+INSERT INTO `timezones` VALUES ('343', 'Europe/Luxembourg');
+INSERT INTO `timezones` VALUES ('344', 'Europe/Madrid');
+INSERT INTO `timezones` VALUES ('345', 'Europe/Malta');
+INSERT INTO `timezones` VALUES ('346', 'Europe/Mariehamn');
+INSERT INTO `timezones` VALUES ('347', 'Europe/Minsk');
+INSERT INTO `timezones` VALUES ('348', 'Europe/Monaco');
+INSERT INTO `timezones` VALUES ('349', 'Europe/Moscow');
+INSERT INTO `timezones` VALUES ('350', 'Europe/Oslo');
+INSERT INTO `timezones` VALUES ('351', 'Europe/Paris');
+INSERT INTO `timezones` VALUES ('352', 'Europe/Podgorica');
+INSERT INTO `timezones` VALUES ('353', 'Europe/Prague');
+INSERT INTO `timezones` VALUES ('354', 'Europe/Riga');
+INSERT INTO `timezones` VALUES ('355', 'Europe/Rome');
+INSERT INTO `timezones` VALUES ('356', 'Europe/Samara');
+INSERT INTO `timezones` VALUES ('357', 'Europe/San_Marino');
+INSERT INTO `timezones` VALUES ('358', 'Europe/Sarajevo');
+INSERT INTO `timezones` VALUES ('359', 'Europe/Saratov');
+INSERT INTO `timezones` VALUES ('360', 'Europe/Simferopol');
+INSERT INTO `timezones` VALUES ('361', 'Europe/Skopje');
+INSERT INTO `timezones` VALUES ('362', 'Europe/Sofia');
+INSERT INTO `timezones` VALUES ('363', 'Europe/Stockholm');
+INSERT INTO `timezones` VALUES ('364', 'Europe/Tallinn');
+INSERT INTO `timezones` VALUES ('365', 'Europe/Tirane');
+INSERT INTO `timezones` VALUES ('366', 'Europe/Ulyanovsk');
+INSERT INTO `timezones` VALUES ('367', 'Europe/Uzhgorod');
+INSERT INTO `timezones` VALUES ('368', 'Europe/Vaduz');
+INSERT INTO `timezones` VALUES ('369', 'Europe/Vatican');
+INSERT INTO `timezones` VALUES ('370', 'Europe/Vienna');
+INSERT INTO `timezones` VALUES ('371', 'Europe/Vilnius');
+INSERT INTO `timezones` VALUES ('372', 'Europe/Volgograd');
+INSERT INTO `timezones` VALUES ('373', 'Europe/Warsaw');
+INSERT INTO `timezones` VALUES ('374', 'Europe/Zagreb');
+INSERT INTO `timezones` VALUES ('375', 'Europe/Zaporozhye');
+INSERT INTO `timezones` VALUES ('376', 'Europe/Zurich');
+INSERT INTO `timezones` VALUES ('377', 'Indian/Antananarivo');
+INSERT INTO `timezones` VALUES ('378', 'Indian/Chagos');
+INSERT INTO `timezones` VALUES ('379', 'Indian/Christmas');
+INSERT INTO `timezones` VALUES ('380', 'Indian/Cocos');
+INSERT INTO `timezones` VALUES ('381', 'Indian/Comoro');
+INSERT INTO `timezones` VALUES ('382', 'Indian/Kerguelen');
+INSERT INTO `timezones` VALUES ('383', 'Indian/Mahe');
+INSERT INTO `timezones` VALUES ('384', 'Indian/Maldives');
+INSERT INTO `timezones` VALUES ('385', 'Indian/Mauritius');
+INSERT INTO `timezones` VALUES ('386', 'Indian/Mayotte');
+INSERT INTO `timezones` VALUES ('387', 'Indian/Reunion');
+INSERT INTO `timezones` VALUES ('388', 'Pacific/Apia');
+INSERT INTO `timezones` VALUES ('389', 'Pacific/Auckland');
+INSERT INTO `timezones` VALUES ('390', 'Pacific/Bougainville');
+INSERT INTO `timezones` VALUES ('391', 'Pacific/Chatham');
+INSERT INTO `timezones` VALUES ('392', 'Pacific/Chuuk');
+INSERT INTO `timezones` VALUES ('393', 'Pacific/Easter');
+INSERT INTO `timezones` VALUES ('394', 'Pacific/Efate');
+INSERT INTO `timezones` VALUES ('395', 'Pacific/Fakaofo');
+INSERT INTO `timezones` VALUES ('396', 'Pacific/Fiji');
+INSERT INTO `timezones` VALUES ('397', 'Pacific/Funafuti');
+INSERT INTO `timezones` VALUES ('398', 'Pacific/Galapagos');
+INSERT INTO `timezones` VALUES ('399', 'Pacific/Gambier');
+INSERT INTO `timezones` VALUES ('400', 'Pacific/Guadalcanal');
+INSERT INTO `timezones` VALUES ('401', 'Pacific/Guam');
+INSERT INTO `timezones` VALUES ('402', 'Pacific/Honolulu');
+INSERT INTO `timezones` VALUES ('403', 'Pacific/Kanton');
+INSERT INTO `timezones` VALUES ('404', 'Pacific/Kiritimati');
+INSERT INTO `timezones` VALUES ('405', 'Pacific/Kosrae');
+INSERT INTO `timezones` VALUES ('406', 'Pacific/Kwajalein');
+INSERT INTO `timezones` VALUES ('407', 'Indian/Kerguelen');
+INSERT INTO `timezones` VALUES ('408', 'Indian/Mahe');
+INSERT INTO `timezones` VALUES ('409', 'Indian/Maldives');
+INSERT INTO `timezones` VALUES ('410', 'Indian/Mauritius');
+INSERT INTO `timezones` VALUES ('411', 'Indian/Mayotte');
+INSERT INTO `timezones` VALUES ('412', 'Indian/Reunion');
+INSERT INTO `timezones` VALUES ('413', 'Pacific/Apia');
+INSERT INTO `timezones` VALUES ('414', 'Pacific/Auckland');
+INSERT INTO `timezones` VALUES ('415', 'Pacific/Bougainville');
+INSERT INTO `timezones` VALUES ('416', 'Pacific/Chatham');
+INSERT INTO `timezones` VALUES ('417', 'Pacific/Chuuk');
+INSERT INTO `timezones` VALUES ('418', 'Pacific/Easter');
+INSERT INTO `timezones` VALUES ('419', 'Pacific/Efate');
+INSERT INTO `timezones` VALUES ('420', 'Pacific/Fakaofo');
+INSERT INTO `timezones` VALUES ('421', 'Pacific/Fiji');
+INSERT INTO `timezones` VALUES ('422', 'Pacific/Funafuti');
+INSERT INTO `timezones` VALUES ('423', 'Pacific/Galapagos');
+INSERT INTO `timezones` VALUES ('424', 'Pacific/Gambier');
+INSERT INTO `timezones` VALUES ('425', 'Pacific/Guadalcanal');
+INSERT INTO `timezones` VALUES ('426', 'Pacific/Guam');
+INSERT INTO `timezones` VALUES ('427', 'Pacific/Honolulu');
+INSERT INTO `timezones` VALUES ('428', 'Pacific/Kanton');
+INSERT INTO `timezones` VALUES ('429', 'Pacific/Kiritimati');
+INSERT INTO `timezones` VALUES ('430', 'Pacific/Kosrae');
+INSERT INTO `timezones` VALUES ('431', 'Pacific/Kwajalein');
+INSERT INTO `timezones` VALUES ('432', 'Pacific/Majuro');
+INSERT INTO `timezones` VALUES ('433', 'Pacific/Marquesas');
+INSERT INTO `timezones` VALUES ('434', 'Pacific/Midway');
+INSERT INTO `timezones` VALUES ('435', 'Pacific/Nauru');
+INSERT INTO `timezones` VALUES ('436', 'Pacific/Niue');
+INSERT INTO `timezones` VALUES ('437', 'Pacific/Norfolk');
+INSERT INTO `timezones` VALUES ('438', 'Pacific/Noumea');
+INSERT INTO `timezones` VALUES ('439', 'Pacific/Pago_Pago');
+INSERT INTO `timezones` VALUES ('440', 'Pacific/Palau');
+INSERT INTO `timezones` VALUES ('441', 'Pacific/Pitcairn');
+INSERT INTO `timezones` VALUES ('442', 'Pacific/Pohnpei');
+INSERT INTO `timezones` VALUES ('443', 'Pacific/Port_Moresby');
+INSERT INTO `timezones` VALUES ('444', 'Pacific/Rarotonga');
+INSERT INTO `timezones` VALUES ('445', 'Pacific/Saipan');
+INSERT INTO `timezones` VALUES ('446', 'Pacific/Tahiti');
+INSERT INTO `timezones` VALUES ('447', 'Pacific/Tarawa');
+INSERT INTO `timezones` VALUES ('448', 'Pacific/Tongatapu');
+INSERT INTO `timezones` VALUES ('449', 'Pacific/Wake');
+INSERT INTO `timezones` VALUES ('450', 'Pacific/Wallis');
+INSERT INTO `timezones` VALUES ('451', 'UTC');
+
+
+-- ----------------------------
+-- Table structure for `dmarc_domains`
+-- ----------------------------
+DROP TABLE IF EXISTS `dmarc_domains`;
+CREATE TABLE `dmarc_domains` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `domain` varchar(255) DEFAULT NULL,
+  `note` varchar(255) DEFAULT NULL,
+  `type` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=64 DEFAULT CHARSET=utf8mb4;
+
+-- ----------------------------
+-- Records of dmarc_domains
+-- ----------------------------
+
+-- ----------------------------
 -- Table structure for `ad_import_temp`
 -- ----------------------------
 DROP TABLE IF EXISTS `ad_import_temp`;
@@ -35,6 +516,8 @@ CREATE TABLE `ad_import_temp` (
 -- ----------------------------
 -- Records of ad_import_temp
 -- ----------------------------
+
+
 
 -- ----------------------------
 -- Table structure for `ad_integration`
@@ -205,12 +688,12 @@ CREATE TABLE `ca_settings` (
   `ca_djigzo_id` int(11) DEFAULT NULL,
   `ca_djigzo_subject` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=45 DEFAULT CHARSET=latin1;
+) ENGINE=MyISAM AUTO_INCREMENT=46 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of ca_settings
 -- ----------------------------
-INSERT INTO `ca_settings` VALUES ('44', '1825', '2023-12-03', '4096', null, 'Hermes SEG Root CA', null, null, null, 'Hermes SEG', 'IT', 'Delaware', 'US', null, '2', '1', 'HermesSEGRootCA', '488', 'CN=Hermes SEG Root CA, OU=Hermes SEG, O=IT, ST=Delaware, C=US');
+
 
 -- ----------------------------
 -- Table structure for `captcha_list`
@@ -413,13 +896,7 @@ CREATE TABLE `clients` (
 -- ----------------------------
 -- Records of clients
 -- ----------------------------
-INSERT INTO `clients` VALUES ('1', '82.76.154.20', 'REJECT');
-INSERT INTO `clients` VALUES ('7', '82.76', 'REJECT');
-INSERT INTO `clients` VALUES ('8', '84.122', 'REJECT');
-INSERT INTO `clients` VALUES ('9', '95.76', 'REJECT');
-INSERT INTO `clients` VALUES ('10', '77.49', 'REJECT');
-INSERT INTO `clients` VALUES ('11', 'registrar-servers.com', 'REJECT');
-INSERT INTO `clients` VALUES ('12', 'rotary.org', 'ACCEPT');
+
 
 -- ----------------------------
 -- Table structure for `command`
@@ -436,55 +913,6 @@ CREATE TABLE `command` (
 -- Records of command
 -- ----------------------------
 
--- ----------------------------
--- Table structure for `configuration`
--- ----------------------------
-DROP TABLE IF EXISTS `configuration`;
-CREATE TABLE `configuration` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `conf` varchar(255) DEFAULT NULL,
-  `name` varchar(255) DEFAULT NULL,
-  `value` varchar(255) DEFAULT NULL,
-  `module` varchar(255) DEFAULT NULL,
-  `default_value` varchar(255) DEFAULT NULL,
-  `default2` int(11) DEFAULT NULL,
-  `order1` int(11) DEFAULT NULL,
-  `order2` int(11) DEFAULT NULL,
-  `parent` int(11) DEFAULT NULL,
-  `parent2` int(11) DEFAULT NULL,
-  `description` varchar(255) DEFAULT NULL,
-  `enabled` int(11) DEFAULT NULL,
-  `editable` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`)
-) ENGINE=MyISAM AUTO_INCREMENT=26 DEFAULT CHARSET=latin1;
-
--- ----------------------------
--- Records of configuration
--- ----------------------------
-INSERT INTO `configuration` VALUES ('1', 'main.cf', 'message_size_limit', '52428800', 'postfix', '10485760', '1', '1', null, null, null, 'Message size limit in megabytes (MB)', '1', '1');
-INSERT INTO `configuration` VALUES ('2', 'main.cf', 'myorigin', 'deeztek.com', 'postfix', 'domain.tld', '1', '1', null, '2', null, 'Your domain name (domain.tld)', '1', '1');
-INSERT INTO `configuration` VALUES ('3', 'main.cf', 'myhostname', 'smtp.deeztek.com', 'postfix', 'hermes.domain.tld', '1', '1', null, '2', null, 'Your server name (host.domain.tld)', '1', '1');
-INSERT INTO `configuration` VALUES ('4', 'main.cf', 'mynetworks', '127.0.0.1', 'postfix', '127.0.0.1', '1', '1', '1', '2', null, null, '1', '2');
-INSERT INTO `configuration` VALUES ('5', 'main.cf', 'smtpd_helo_required', 'yes', 'postfix', 'yes', '1', '1', null, null, null, 'Require helo command for incoming connections', '1', '1');
-INSERT INTO `configuration` VALUES ('6', 'main.cf', 'smtpd_sender_restrictions', 'check_sender_access mysql:/etc/postfix/mysql-senders.cf', 'postfix', 'check_sender_access mysql:/etc/postfix/mysql-senders.cf', '1', '1', null, null, null, 'Check email senders access list', '1', '2');
-INSERT INTO `configuration` VALUES ('7', 'main.cf', 'mynetworks', '192.168.10.0/24', 'postfix', '', '2', '1', '2', null, null, null, '1', '1');
-INSERT INTO `configuration` VALUES ('8', 'main.cf', 'mynetworks', '74.92.146.137', 'postfix', null, '2', '1', '3', null, null, null, '1', '1');
-INSERT INTO `configuration` VALUES ('9', 'main.cf', 'mynetworks', '24.154.92.8', 'postfix', null, '2', '1', '4', null, null, null, '1', '1');
-INSERT INTO `configuration` VALUES ('10', 'main.cf', 'mynetworks', '173.8.28.13', 'postfix', null, '2', '1', '5', null, null, null, '1', '1');
-INSERT INTO `configuration` VALUES ('11', 'main.cf', 'mynetworks', '71.248.99.112', 'postfix', null, '2', '1', '6', null, null, null, '1', '1');
-INSERT INTO `configuration` VALUES ('12', 'main.cf', 'smtpd_sender_restrictions', 'reject_non_fqdn_sender', 'postfix', 'reject_non_fqdn_sender', '1', '2', '2', null, null, 'Reject email senders without fully qualified domain names (FQDN)', '1', '1');
-INSERT INTO `configuration` VALUES ('13', 'main.cf', 'smtpd_sender_restrictions', 'reject_unknown_sender_domain', 'postfix', 'reject_unknown_sender_domain', '1', '3', '3', null, null, 'Reject email senders with invalid domain names', '1', '1');
-INSERT INTO `configuration` VALUES ('14', 'main.cf', 'smtpd_recipient_restrictions', 'permit_mynetworks', 'postfix', 'permit_mynetworks', '1', '1', '1', null, null, 'Permit hosts appearing in My Networks list to send email', '1', '2');
-INSERT INTO `configuration` VALUES ('15', 'main.cf', 'smtpd_recipient_restrictions', 'reject_unauth_destination', 'postfix', 'reject_unauth_destination', '1', '2', '2', null, null, 'Reject email going to invalid destinations', '1', '2');
-INSERT INTO `configuration` VALUES ('16', 'main.cf', 'smtpd_recipient_restrictions', 'reject_unauth_pipelining', 'postfix', 'reject_unauth_pipelining', '1', '4', '4', null, null, 'Reject pipelined email', '1', '1');
-INSERT INTO `configuration` VALUES ('17', 'main.cf', 'smtpd_recipient_restrictions', 'check_policy_service unix:private/policy-spf', 'postfix', 'smtpd_recipient_restrictions', '2', '3', '5', null, null, 'Enable sender policy framework (SPF)', '1', '1');
-INSERT INTO `configuration` VALUES ('18', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client zombie.dnsbl.sorbs.net', 'postfix', 'reject_rbl_client zombie.dnsbl.sorbs.net', '2', '5', '6', null, null, 'Enable sorbs blacklist', '2', '1');
-INSERT INTO `configuration` VALUES ('19', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client sbl.spamhaus.org', 'postfix', 'reject_rbl_client sbl.spamhaus.org', '2', '5', '7', null, null, 'Enable spamhaus blacklist', '1', '1');
-INSERT INTO `configuration` VALUES ('20', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client blackholes.mail-abuse.org', 'postfix', 'reject_rbl_client blackholes.mail-abuse.org', '2', '5', '8', null, null, 'Enable mail-abuse.org blacklist', '2', '1');
-INSERT INTO `configuration` VALUES ('21', 'main.cf', 'smtpd_recipient_restrictions', 'check_policy_service inet:127.0.0.1:10023', 'postfix', 'smtpd_recipient_restrictions', '2', '6', '9', null, null, 'Enable greylisting (5 Minute Delay)', '1', '1');
-INSERT INTO `configuration` VALUES ('22', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client bl.spamcop.net', 'postfix', 'reject_rbl_client bl.spamcop.net', '2', '5', '10', null, null, 'Enable spamcop blacklist', '1', '1');
-INSERT INTO `configuration` VALUES ('23', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client cbl.abuseat.org', 'postfix', 'reject_rbl_client cbl.abuseat.org', '2', '5', '11', null, null, 'Enable abuseat.org blacklist', '1', '1');
-INSERT INTO `configuration` VALUES ('24', 'main.cf', 'smtpd_recipient_restrictions', 'reject_rbl_client dnsbl.njabl.org', 'postfix', 'reject_rbl_client dnsbl.njabl.org', '2', '5', '12', null, null, 'Enable njabl.org blacklist', '1', '1');
 
 -- ----------------------------
 -- Table structure for `crontab_entries`
@@ -536,16 +964,13 @@ CREATE TABLE `dkim_sign` (
   `private` varchar(255) DEFAULT NULL,
   `enabled` int(11) DEFAULT NULL,
   `generated` int(11) DEFAULT NULL,
+  `selector` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=207 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of dkim_sign
 -- ----------------------------
-INSERT INTO `dkim_sign` VALUES ('200', 'deeztek.com', '1', 'deeztek.com.dkim.txt', 'deeztek.com.dkim.private', '1', '1');
-INSERT INTO `dkim_sign` VALUES ('202', 'mydirectmail.net', '1', 'mydirectmail.net.dkim.txt', 'mydirectmail.net.dkim.private', '1', '1');
-INSERT INTO `dkim_sign` VALUES ('203', 'eickelberger.org', '1', 'eickelberger.org.dkim.txt', 'eickelberger.org.dkim.private', '1', '1');
-INSERT INTO `dkim_sign` VALUES ('204', 'excoffee.com', '1', 'excoffee.com.dkim.txt', 'excoffee.com.dkim.private', '1', '1');
 
 -- ----------------------------
 -- Table structure for `dkim_trusted_hosts`
@@ -738,12 +1163,7 @@ CREATE TABLE `fetchmail` (
 -- ----------------------------
 -- Records of fetchmail
 -- ----------------------------
-INSERT INTO `fetchmail` VALUES ('2', 'mail.google.com', 'auto', null, 'ru2n4m', 'ddfasdfasdfasdf', '', 'no', 'yes', 'no', null, 'yes', 'auto');
-INSERT INTO `fetchmail` VALUES ('3', 'mail.google.com', 'auto', null, 'ru2n4m', 'ddfasdfasdfasdf', '', 'no', 'yes', 'no', null, 'yes', 'auto');
-INSERT INTO `fetchmail` VALUES ('4', 'mail.google.com', 'auto', null, 'ru2n4m', 'ddfasdfasdfasdf', 'administrator@firstmd.org', 'no', 'yes', 'no', null, 'yes', 'auto');
-INSERT INTO `fetchmail` VALUES ('5', 'mail.google.com', 'auto', null, 'ru2n4m', 'ddfasdfasdfasdf', 'dino.edwards@mydirectmail.net', 'no', 'yes', 'no', null, 'yes', 'auto');
-INSERT INTO `fetchmail` VALUES ('6', 'mail.google.com', 'POP3', null, 'ru2n4m', 'ddfasdfasdfasdf', 'administrator@firstmd.org', 'no', 'yes', 'no', null, 'yes', 'TLS1');
-INSERT INTO `fetchmail` VALUES ('7', 'mail.google.com', 'IMAP', null, 'ru2n4m', 'ddfasdfasdfasdf', 'administrator@firstmd.org', 'yes', 'no', 'no', null, 'yes', 'SSL3');
+
 
 -- ----------------------------
 -- Table structure for `file_rule_components`
@@ -1160,12 +1580,12 @@ CREATE TABLE `malware_feeds` (
 -- ----------------------------
 -- Records of malware_feeds
 -- ----------------------------
-INSERT INTO `malware_feeds` VALUES ('1', 'sanesecurity', 'yes', null, null, null, null, '2', null, null, null);
-INSERT INTO `malware_feeds` VALUES ('2', 'securiteinfo', 'yes', '4', 'e7fe28d465808e0ce4278955d8e0a5bed43f76bae9d6bb24a6f6b9b685696e10b92af719c7adc07aa1ac2cc0dafa6638a0cc0d37688904075c8446781be5bb5f', null, null, '2', null, 'no', null);
-INSERT INTO `malware_feeds` VALUES ('3', 'linuxmalwaredetect', 'yes', '8', null, null, null, '2', null, null, null);
-INSERT INTO `malware_feeds` VALUES ('4', 'yararules', 'yes', '1', null, null, null, '2', null, null, null);
-INSERT INTO `malware_feeds` VALUES ('5', 'malwarepatrol', 'yes', '2', '106261422496', '15', 'clamav_ext', '2', 'no', null, null);
-INSERT INTO `malware_feeds` VALUES ('6', 'urlhaus', 'yes', '0', null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('1', 'sanesecurity', 'no', null, null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('2', 'securiteinfo', 'no', '4', null, null, null, '2', null, 'no', null);
+INSERT INTO `malware_feeds` VALUES ('3', 'linuxmalwaredetect', 'no', '8', null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('4', 'yararules', 'no', '1', null, null, null, '2', null, null, null);
+INSERT INTO `malware_feeds` VALUES ('5', 'malwarepatrol', 'no', '2', null, '15', 'clamav_basic', '2', 'no', null, null);
+INSERT INTO `malware_feeds` VALUES ('6', 'urlhaus', 'no', '0', null, null, null, '2', null, null, null);
 
 -- ----------------------------
 -- Table structure for `message_rules`
@@ -1370,7 +1790,6 @@ INSERT INTO `parameters` VALUES ('28', 'network_mode', null, null, null, null, '
 INSERT INTO `parameters` VALUES ('30', 'smtpd_banner', null, null, null, null, null, 'postfix', null, null, '2', 'main.cf', null, null, '2', null, '2', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('66', 'reject_invalid_hostname', null, null, null, null, 'Reject Invalid Hostname', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '4', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('37', 'check_client_access mysql:/etc/postfix/mysql-rbl_override.cf', null, null, null, null, 'Enable RBL Override List', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '11', '2', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('220', 'dnsbl.sorbs.net*2', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '18', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('40', 'check_client_access mysql:/etc/postfix/mysql-clients.cf', null, null, null, null, 'Enable Allowed/Denied Clients List', 'postfix', null, null, '1', 'main.cf', null, '29', '1', '1', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('67', 'check_sender_access mysql:/etc/postfix/mysql-senders.cf', null, null, null, null, 'Enable Sender Access', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '3', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('68', 'reject_non_fqdn_sender', null, null, null, null, 'Reject non FQDN Sender', 'postfix', null, null, '1', 'main.cf', null, '6', '1', '6', '1', '1', 'NONE', null, null);
@@ -1380,14 +1799,9 @@ INSERT INTO `parameters` VALUES ('76', 'permit_dnswl_client list.dnswl.org=127.[
 INSERT INTO `parameters` VALUES ('77', 'permit_dnswl_client list.dnswl.org=127.[0..255].[0..255].1', '1', null, '-3', '2', null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '12', '2', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('78', 'permit_dnswl_client list.dnswl.org=127.[0..255].[0..255].[2..255]', '1', null, '-4', '2', null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '12', '2', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('79', 'postscreen_dnsbl_sites', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('88', 'bl.spameatingmonkey.net*2', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '3', '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('94', 'list.dnswl.org=127.[0..255].[0..255].0*-2', null, null, '-2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '9', '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('95', 'list.dnswl.org=127.[0..255].[0..255].1*-3', null, null, '-3', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '10', '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('96', 'list.dnswl.org=127.[0..255].[0..255].[2..255]*-4', null, null, '-4', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '11', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('131', 'server_subnet', null, null, null, null, null, 'network', null, null, '1', 'network', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('114', '3', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '113', '1', '1', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('130', '192.168.10.246', null, null, null, null, null, 'network', null, null, '1', 'network', null, '129', '2', '1', '1', '1', null, null, null);
-INSERT INTO `parameters` VALUES ('209', 'psbl.surriel.com', null, null, '1', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '17', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('113', 'postscreen_dnsbl_threshold', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('208', 'reject_rbl_client psbl.surriel.com', null, null, '1', null, null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '13', '2', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('129', 'server_ip', null, null, null, null, null, 'network', null, null, '1', 'network', null, null, '2', null, '1', '1', null, null, null);
@@ -1395,10 +1809,7 @@ INSERT INTO `parameters` VALUES ('132', '255.255.255.0', null, null, null, null,
 INSERT INTO `parameters` VALUES ('187', 'postscreen_bare_newline_enable', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('186', 'postscreen_non_smtp_command_enable', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('219', 'reject_rbl_client dnsbl.sorbs.net', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '13', '2', '1', 'NONE', null, null);
-INSERT INTO `parameters` VALUES ('175', 'bl.spamcop.net*2', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '14', '1', '1', 'NONE', null, null);
-INSERT INTO `parameters` VALUES ('181', 'wl.mailspike.net*-2', null, null, '-2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '16', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('174', 'reject_rbl_client bl.spamcop.net', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '6', '1', '13', '2', '1', 'NONE', null, null);
-INSERT INTO `parameters` VALUES ('230', 'bl.mailspike.net*2', null, null, '2', null, null, 'postfix', null, null, '1', 'main.cf', null, '79', '1', '21', '1', '1', 'NONE', null, null);
 INSERT INTO `parameters` VALUES ('185', 'postscreen_pipelining_enable', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('188', 'no', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '185', '1', '1', '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('189', 'no', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '186', '1', '1', '1', '1', null, null, null);
@@ -1428,6 +1839,40 @@ INSERT INTO `parameters` VALUES ('319', '5d', null, null, null, null, null, 'pos
 INSERT INTO `parameters` VALUES ('320', 'maximal_queue_lifetime', null, null, null, null, null, 'postfix', null, '5d', null, 'main.cf', null, null, '2', null, '1', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('351', 'inet:127.0.0.1:54321', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '348', '1', '2', '2', '1', null, null, null);
 INSERT INTO `parameters` VALUES ('353', 'inet:127.0.0.1:54321', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '349', '1', '2', '2', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('360', 'smtp_tls_security_level', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('361', '', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '360', '1', '1', '1', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('368', 'smtp_tls_security_level', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, null, '2', null, '1', '1', null, null, null);
+INSERT INTO `parameters` VALUES ('369', 'may', null, null, null, null, null, 'postfix', null, null, '1', 'main.cf', null, '368', '1', null, '1', '1', null, null, null);
+-- ----------------------------
+-- RBL Parameters
+-- ----------------------------
+INSERT INTO `parameters` VALUES (427, 'zen.spamhaus.org=127.0.0.[4..7]*6', NULL, NULL, 6, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 25, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (428, 'zen.spamhaus.org=127.0.0.3*4', NULL, NULL, 4, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 26, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (426, 'zen.spamhaus.org=127.0.0.[10;11]*8', NULL, NULL, 8, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 24, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (425, 'dnsbl.sorbs.net=127.0.0.9*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 23, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (424, 'dnsbl.sorbs.net=127.0.0.6*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 22, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (423, 'dnsbl.sorbs.net=127.0.0.8*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 21, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (422, 'dnsbl.sorbs.net=127.0.0.7*3', NULL, NULL, 3, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 20, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (421, 'dnsbl.sorbs.net=127.0.0.5*6', NULL, NULL, 6, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 19, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (419, 'bl.mailspike.net=127.0.0.[10;11;12]*4', NULL, NULL, 4, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 17, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (420, 'dnsbl.sorbs.net=127.0.0.10*8', NULL, NULL, 8, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 18, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (415, 'backscatter.spameatingmonkey.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 13, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (416, 'bl.spameatingmonkey.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 14, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (417, 'b.barracudacentral.org=127.0.0.2*7', NULL, NULL, 7, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 15, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (418, 'bl.mailspike.net=127.0.0.2*5', NULL, NULL, 5, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 16, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (414, 'hostkarma.junkemailfilter.com=127.0.1.2*1', NULL, NULL, 1, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 12, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (411, 'bl.suomispam.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 9, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (412, 'hostkarma.junkemailfilter.com=127.0.0.2*3', NULL, NULL, 3, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 10, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (413, 'hostkarma.junkemailfilter.com=127.0.0.4*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 11, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (410, 'bl.spamcop.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 8, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (409, 'ix.dnsbl.manitu.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 7, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (408, 'list.dnswl.org=127.0.[0..255].3*-8', NULL, NULL, -8, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 6, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (407, 'list.dnswl.org=127.0.[0..255].2*-6', NULL, NULL, -6, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 5, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (406, 'list.dnswl.org=127.0.[0..255].1*-4', NULL, NULL, -4, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 4, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (405, 'list.dnswl.org=127.0.[0..255].0*-2', NULL, NULL, -2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 3, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (404, 'hostkarma.junkemailfilter.com=127.0.0.1*-2', NULL, NULL, -2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 2, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (403, 'wl.mailspike.net=127.0.0.[18;19;20]*-2', NULL, NULL, -2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 1, 1, 1, 'insert', NULL, NULL);
+INSERT INTO `parameters` VALUES (429, 'zen.spamhaus.org=127.0.0.2*3', NULL, NULL, 3, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, 79, 1, 27, 1, 1, 'insert', NULL, NULL);
 
 -- ----------------------------
 -- Table structure for `parameters_temp`
@@ -1526,8 +1971,6 @@ INSERT INTO `parameters2` VALUES ('49', 'DetectPUA', 'false', 'clamav', '1', '1'
 INSERT INTO `parameters2` VALUES ('50', 'HeuristicScanPrecedence', 'false', 'clamav', '1', '1');
 INSERT INTO `parameters2` VALUES ('51', 'OLE2BlockMacros', 'false', 'clamav', '1', '1');
 INSERT INTO `parameters2` VALUES ('52', 'ScanPDF', 'true', 'clamav', '1', '1');
-INSERT INTO `parameters2` VALUES ('53', 'system_log_retention', '30', 'systemlog', '1', '1');
-INSERT INTO `parameters2` VALUES ('57', 'system_log_retention', '30', 'systemlog', '1', '1');
 INSERT INTO `parameters2` VALUES ('59', 'default_action', 'accept', 'dkim', '1', '1');
 INSERT INTO `parameters2` VALUES ('60', 'dkim_enable', 'no', 'dkim', '1', '1');
 INSERT INTO `parameters2` VALUES ('61', 'body_canonicalization', 'relaxed', 'dkim', '1', '1');
@@ -1583,6 +2026,7 @@ INSERT INTO `parameters2` VALUES ('133', 'console.dhparam', 'disable', 'console'
 INSERT INTO `parameters2` VALUES ('134', 'console.hsts', 'disable', 'console', '1', '2');
 INSERT INTO `parameters2` VALUES ('135', 'console.ssl_stapling', 'disable', 'console', '1', '2');
 INSERT INTO `parameters2` VALUES ('136', 'console.ssl_stapling_verify', 'disable', 'console', '1', '2');
+INSERT INTO `parameters2` VALUES ('137', 'HoldQuarantinedMessages', 'false', 'dmarc', '1', '1');
 
 -- ----------------------------
 -- Table structure for `system_certificates`
@@ -1734,8 +2178,7 @@ INSERT INTO `policy2` VALUES ('2', 'Antispam & Antivirus', 'N', 'N', 'N', 'N', '
 INSERT INTO `policy2` VALUES ('3', 'Antispam Only', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'N', 'Y', 'N', 'Y', 'N', null, '999', '999', '999');
 INSERT INTO `policy2` VALUES ('4', 'Antivirus Only', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'N', 'Y', 'Y', 'N', 'Y', 'N', 'N', null, '999', '999', '999');
 INSERT INTO `policy2` VALUES ('7', 'Default', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'Y', 'Y', 'Y', 'Y', 'Y', null, '-999', '2', '5');
-INSERT INTO `policy2` VALUES ('9', 'Dino Edwards', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'N', 'Y', 'N', 'Y', 'Y', 'Y', 'tina@getwithme.com', '-999', '1.6', '5');
-INSERT INTO `policy2` VALUES ('10', 'Xerox Bad Headers', 'N', 'N', 'N', 'Y', 'N', 'N', 'N', 'Y', 'Y', 'Y', 'Y', 'N', 'Y', null, '-999', '2', '5');
+
 
 -- ----------------------------
 -- Table structure for `postfix_queue`
@@ -1857,7 +2300,7 @@ CREATE TABLE `rbl_override` (
 -- ----------------------------
 -- Records of rbl_override
 -- ----------------------------
-INSERT INTO `rbl_override` VALUES ('22', '209.17.115.61', 'OK');
+
 
 -- ----------------------------
 -- Table structure for `recipient_certificates`
@@ -2017,7 +2460,7 @@ CREATE TABLE `restore_jobs` (
 -- ----------------------------
 -- Records of restore_jobs
 -- ----------------------------
-INSERT INTO `restore_jobs` VALUES ('72', null, null, null, null, null, null, null, null, null, null, null, null, null, null, '', null, null, null, null);
+
 
 -- ----------------------------
 -- Table structure for `salt`
@@ -2032,11 +2475,7 @@ CREATE TABLE `salt` (
 -- ----------------------------
 -- Records of salt
 -- ----------------------------
-INSERT INTO `salt` VALUES ('13638', '2nDe8fJr');
-INSERT INTO `salt` VALUES ('13639', '9QgJewsb');
-INSERT INTO `salt` VALUES ('13640', 'gv3lE7hS');
-INSERT INTO `salt` VALUES ('13641', 'NwCMTzLY');
-INSERT INTO `salt` VALUES ('13825', '4!GsjCPzqV');
+
 
 -- ----------------------------
 -- Table structure for `searches`
@@ -2237,9 +2676,11 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '220203');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '220410');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
+INSERT INTO `system_settings` VALUES ('75', 'daily_update_check', '2');
+INSERT INTO `system_settings` VALUES ('76', 'timezone', 'America/New_York');
 
 -- ----------------------------
 -- Table structure for `system_updates`
@@ -2272,6 +2713,7 @@ INSERT INTO `system_updates` VALUES ('43', '18.04', '211009', '1', '2021-10-09 0
 INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 00:00:00', '13');
 INSERT INTO `system_updates` VALUES ('45', '18.04', '211207', '1', '2022-01-14 00:00:00', '14');
 INSERT INTO `system_updates` VALUES ('46', '18.04', '220203', '1', '2022-04-02 00:00:00', '15');
+INSERT INTO `system_updates` VALUES ('47', '18.04', '220410', '1', '2022-04-10 00:00:00', '16');
 
 
 -- ----------------------------
@@ -2416,13 +2858,16 @@ CREATE TABLE `transport` (
   `method` varchar(255) DEFAULT NULL,
   `port` float DEFAULT NULL,
   `mx` varchar(255) DEFAULT NULL,
+  `authentication` varchar(255) DEFAULT NULL,
+  `authentication_username` varchar(255) DEFAULT NULL,
+  `authentication_password` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM AUTO_INCREMENT=367 DEFAULT CHARSET=latin1;
 
 -- ----------------------------
 -- Records of transport
 -- ----------------------------
-INSERT INTO `transport` VALUES ('366', 'domain.tld', 'smtp:[192.168.0.100]:25', '192.168.0.100', 'smtp', '25', 'NO');
+INSERT INTO `transport` VALUES ('366', 'domain.tld', 'smtp:[192.168.0.100]:25', '192.168.0.100', 'smtp', '25', 'NO', 'NO', '', '');
 
 -- ----------------------------
 -- Table structure for `transport_temp`

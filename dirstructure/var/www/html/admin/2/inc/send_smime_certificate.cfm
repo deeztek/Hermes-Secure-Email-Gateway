@@ -37,12 +37,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelse>
 
 <!--- SEND THE PFX FILE E-MAIL --->       
-<cfmail from="#getsettings.value#" to="#getencryptiondetails.recipient#" server="localhost" subject="Your PFX Certificate File" port="10026">
-*** Please do not reply to this email. This email account is not monitored ***
+<cfmail from="#getsettings.value#" to="#getencryptiondetails.recipient#" server="localhost" subject="[Hermes SEG] Your PFX Certificate File" port="10026" type="html">
+
+  <div align="center">
+
+    <b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
+        
+       <h2>Your PFX Certificate File</h2>
 
 Your PFX Certificate File is attached to this e-mail. 
 
-Please follow the link below which contains detailed instructions on how to install the certificate and configure Outlook to send S/MIME encrypted email:
+Please <a href="https://docs.deeztek.com/books/hosted/page/how-to-sendreceive-encrypted-email-from-microsoft-outlook">click here</a> for detailed instructions on how to install the certificate and configure Outlook to send S/MIME encrypted email or click the link below:<br><br>
 
 https://docs.deeztek.com/books/hosted/page/how-to-sendreceive-encrypted-email-from-microsoft-outlook
 

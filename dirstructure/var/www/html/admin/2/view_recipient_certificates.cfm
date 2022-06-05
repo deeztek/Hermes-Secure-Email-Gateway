@@ -30,6 +30,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
+
 
 <!--- Sort Table Script  --->
 <script>
@@ -608,7 +613,7 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
     </div>
   </div>
 </div>
-<!--- DELETE CERTIFICATE MODAL HTML ENDS HERE --->
+<!--- SEND CERTIFICATE MODAL HTML ENDS HERE --->
 
 
 <!--- DELETE CERTIFICATE MODAL HTML STARTS HERE --->

@@ -30,6 +30,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfinclude template="./inc/html_head.cfm" />
 
+     <!-- Preloader -->
+     <div class="preloader flex-column justify-content-center align-items-center">
+      <img src="/dist/img/hermes_preloader.gif" alt="Loading" >
+      </div>
+
 
 <!--- Sort Table Script  --->
 <script>
@@ -2633,7 +2638,7 @@ file = "#FiletoDelete#">
   });
     </script>
 
-<!--- DELETE KEYRING PASSWORD MODAL SCRIPT ENDS HERE  --->
+<!--- DELETE KEYRING MODAL SCRIPT ENDS HERE  --->
 
 <!--- VIEW KEYRING PASSWORD MODAL SCRIPT STARTS HERE  --->
 <script>

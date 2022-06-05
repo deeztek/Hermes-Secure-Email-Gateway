@@ -93,6 +93,70 @@ select max(id) as maxid from system_users
   <cflocation url="../edit_system_user.cfm?id=#stResult.GENERATED_KEY#" addtoken="no">
   </cfoutput>
 
+<cfelseif #theType# is "domain">
+
+  <cfquery name="getmaxid" datasource="hermes">
+  select max(id) as maxid from domains
+  </cfquery>
+  
+  <cfif #getmaxid.maxid# is "">
+  
+  <cfset nextid=1>
+      
+  <cfelse>
+          
+  <cfset nextid=#getmaxid.maxid# + 1>
+      
+  <!--- /CFIF getmaxid.maxid is "" --->
+  </cfif>      
+ 
+  <cfquery name="add" datasource="hermes" result="transResult">
+    insert into transport
+    (domain,
+    transport,
+    destination,
+    method,
+    port,
+    mx,
+    authentication
+    ) 
+    values 
+    ('#nextid#_domain.tld', 
+    'smtp:[smtp.#nextid#_domain.tld]:25',
+    'smtp.#nextid#_domain.tld',
+    'smtp',
+    '25',
+    'NO',
+    'NO')
+    </cfquery>
+    
+    
+    <cfquery name="insert_senders_domain" datasource="hermes" result="sendersResult">
+    insert into senders
+    (sender, action) 
+    values 
+    ('#nextid#_domain.tld', 'OK')
+    </cfquery>
+    
+    <cfquery name="insert_recipipients_domain" datasource="hermes" result="recResult">
+    insert into recipients
+    (recipient, domain, status) 
+    values 
+    ('@#nextid#_domain.tld', '1', 'OK')
+    </cfquery>
+    
+    <cfquery name="insert_hermes_domain" datasource="hermes" result="domainResult">
+    insert into domains
+    (domain, transport_id, senders_id, recipients_id, action_taken) 
+    values 
+    ('#nextid#_domain.tld', '#transResult.GENERATED_KEY#', '#sendersResult.GENERATED_KEY#', '#recResult.GENERATED_KEY#', 'OK')
+    </cfquery>
+    
+    <cfoutput>
+    <cflocation url="../edit_domain.cfm?id=#domainResult.GENERATED_KEY#" addtoken="no">
+    </cfoutput>
+  
+
 
 <!--- /CFIF #thetype# is --->
 </cfif>
