@@ -60,7 +60,7 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 ![Screenshot](2021_12_02_19_48_49.png)
 ## Installation
 
-Hermes SEG can be easily installed in your existing Ubuntu 18.04 server machine by utilizing the **ubuntu_hermes_1804_install.sh** script. The script requires that you have a fully updated Ubuntu 18.04 server installation and that you have a /mnt/data directory for database and email archive storage. **You must have at least 8 GB of RAM and 4 CPUs**.
+Hermes SEG can be easily installed in your existing **Ubuntu 18.04 LTS** or **Ubuntu 20.04 LTS** server machine by utilizing the **ubuntu_hermes_1804_install.sh** script. The script requires that you have a fully updated Ubuntu 18.04 server installation and that you have a /mnt/data directory for database and email archive storage. **You must have at least 8 GB of RAM and 4 CPUs**.
 
 **Required Information**
 
