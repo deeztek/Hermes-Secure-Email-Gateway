@@ -83,6 +83,17 @@ RED=`tput setaf 1`
 GREEN=`tput setaf 2`
 RESET=`tput sgr0`
 
+#Set Tomcat Parameters for Ubuntu Version
+string=`lsb_release -d`
+if [[ $string == *"Ubuntu 18.04"* ]]; then
+  TOMCATVERSION="tomcat8"
+  TOMCATUSER="tomcat8"
+elif [[ $string == *"Ubuntu 20.04"* ]]; then
+  TOMCATVERSION="tomcat9"
+  TOMCATUSER="tomcat"
+fi
+
+
 #Script Debug Set Variables. Do not enable unless you are troubleshooting
 #MYSQL_ROOT_PASSWORD=password
 #MYSQL_HERMES_USERNAME=hermes
@@ -863,7 +874,7 @@ start_spinner 'Installing Apache Tomcat...'
 sleep 1
 
 #Install Tomcat
-/usr/bin/apt-get install tomcat8 -y >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+/usr/bin/apt-get install $TOMCATVERSION -y >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
@@ -873,16 +884,16 @@ start_spinner 'Configuring Apache Tomcat for Ciphermail...'
 sleep 1
 
 #Configure Apache Tomcat for ciphermail
-/bin/cp /etc/default/tomcat8 /etc/default/tomcat8.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Ddjigzo-web.home=/usr/share/djigzo-web -Ddjigzo.home=/usr/share/djigzo\"" | sudo tee -a /etc/default/tomcat8 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Djava.awt.headless=true -Xmx256M\"" | sudo tee -a /etc/default/tomcat8 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo.war\" />" | sudo tee /etc/tomcat8/Catalina/localhost/ciphermail.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo-portal.war\" />" | sudo tee /etc/tomcat8/Catalina/localhost/web.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp /etc/tomcat8/server.xml /etc/tomcat8/server.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/cp /usr/share/djigzo-web/conf/tomcat/server.xml /etc/tomcat8/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/sed -i 's/unpackWARs="false"/unpackWARs="true"/' /etc/tomcat8/server.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/chown tomcat8:djigzo /usr/share/djigzo-web/ssl/sslCertificate.p12 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/systemctl restart tomcat8 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+/bin/cp /etc/default/$TOMCATVERSION /etc/default/$TOMCATVERSION.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Ddjigzo-web.home=/usr/share/djigzo-web -Ddjigzo.home=/usr/share/djigzo\"" | sudo tee -a /etc/default/$TOMCATVERSION >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/echo "JAVA_OPTS=\"\$JAVA_OPTS -Djava.awt.headless=true -Xmx256M\"" | sudo tee -a /etc/default/$TOMCATVERSION >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo.war\" />" | sudo tee /etc/$TOMCATVERSION/Catalina/localhost/ciphermail.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/echo "<Context docBase=\"/usr/share/djigzo-web/djigzo-portal.war\" />" | sudo tee /etc/$TOMCATVERSION/Catalina/localhost/web.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/cp /etc/$TOMCATVERSION/server.xml /etc/$TOMCATVERSION/server.ORIGINAL >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/cp /usr/share/djigzo-web/conf/tomcat/server.xml /etc/$TOMCATVERSION/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/sed -i 's/unpackWARs="false"/unpackWARs="true"/' /etc/$TOMCATVERSION/server.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/chown $TOMCATUSER:djigzo /usr/share/djigzo-web/ssl/sslCertificate.p12 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
+/bin/systemctl restart $TOMCATVERSION >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
@@ -927,7 +938,7 @@ sleep 1
 /bin/cp $SCRIPTPATH/dirstructure/opt/hermes/conf_files/hibernate.mysql.connection.HERMES /usr/share/djigzo/conf/database/hibernate.mysql.connection.xml >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
 /bin/sed -i -e "s|DJIGZO-USERNAME|$MYSQL_CIPHERMAIL_USERNAME|g" "/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml" >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
 /bin/sed -i -e "s|DJIGZO-PASSWORD|$MYSQL_CIPHERMAIL_PASSWORD|g" "/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml" >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/bin/systemctl restart djigzo && /bin/systemctl restart tomcat8 >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+/bin/systemctl restart djigzo && /bin/systemctl restart $TOMCATVERSION >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 

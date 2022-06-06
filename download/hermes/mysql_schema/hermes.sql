@@ -2188,7 +2188,7 @@ CREATE TABLE `postfix_queue` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `trans_id` varchar(255) DEFAULT NULL,
   `msg_id` varchar(255) DEFAULT NULL,
-  `on_hold` varchar(255) DEFAULT NULL,
+  `queue_type` varchar(255) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=latin1;
 
