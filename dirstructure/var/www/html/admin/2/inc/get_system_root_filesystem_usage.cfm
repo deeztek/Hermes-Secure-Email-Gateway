@@ -40,10 +40,23 @@ timeout="10" />
           </cftry>
     
 
-<cfset rootdevice = reReplace( rootdevice, "Filesystem", "", "all" )>
-<cfset rootdevice = reReplace( rootdevice, "[\r\n]\s*([\r\n]|\Z)", "#chr(13)##chr(10)#", "all" )>
-<cfset rootdevice = reReplace( rootdevice, "/dev/", "\/dev\/", "all" )>
-<cfset rootdevice=#TRIM(rootdevice)#>
+          <cfif #rootdevice# contains 'mapper'>
+
+            <cfset rootdevice = reReplace( rootdevice, "Filesystem", "", "all" )>
+            <cfset rootdevice = reReplace( rootdevice, "[\r\n]\s*([\r\n]|\Z)", "#chr(13)##chr(10)#", "all" )>
+            <cfset rootdevice = reReplace( rootdevice, "/dev/mapper/ubuntu--vg-ubuntu--lv", "\/dev\/mapper\/ubuntu--vg-ubuntu--lv", "all" )>
+            <cfset rootdevice=#TRIM(rootdevice)#>
+            
+            <cfelse>
+            
+            <cfset rootdevice = reReplace( rootdevice, "Filesystem", "", "all" )>
+            <cfset rootdevice = reReplace( rootdevice, "[\r\n]\s*([\r\n]|\Z)", "#chr(13)##chr(10)#", "all" )>
+            <cfset rootdevice = reReplace( rootdevice, "/dev/", "\/dev\/", "all" )>
+            <cfset rootdevice=#TRIM(rootdevice)#>
+            
+            <!--- /CFIF #rootdevice# contains 'mapper' --->
+            </cfif>
+            
 
   <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
     select random_letter as random from captcha_list_all2 order by RAND() limit 8
