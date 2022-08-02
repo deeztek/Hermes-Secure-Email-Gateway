@@ -16,6 +16,8 @@ echo "[`date +%m/%d/%Y-%H:%M`] Installing new version of get_system_root_filesys
 
 rm /var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm
 
+rm /var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm.*
+
 rm -rf /var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm/
 
 wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/8c8278b171a6568664ccffaf884c3c2454524def/dirstructure/var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm -P /var/www/html/admin/2/inc/
