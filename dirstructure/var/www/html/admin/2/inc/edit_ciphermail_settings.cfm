@@ -18,34 +18,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="get_subjectenable" datasource="#datasource#">
+<cfquery name="get_subjectenable" datasource="hermes">
   select property, value from encryption_settings where property='user.subjectTriggerEnabled'
   </cfquery>
   
-  <cfquery name="get_subject_trigger" datasource="#datasource#">
+  <cfquery name="get_subject_trigger" datasource="hermes">
   select property, value from encryption_settings where property='user.subjectTrigger'
   </cfquery>
   
-  <cfquery name="get_removesubjecttrigger" datasource="#datasource#">
+  <cfquery name="get_removesubjecttrigger" datasource="hermes">
   select property, value from encryption_settings where property='user.subjectTriggerRemovePattern'
   </cfquery>
   
-  <cfquery name="get_portal_url" datasource="#datasource#">
+  <cfquery name="get_portal_url" datasource="hermes">
   select value2 from parameters2 where parameter='console.host' and module='console'
   </cfquery>
   
-  <cfquery name="get_pdfreply_sender" datasource="#datasource#">
+  <cfquery name="get_pdfreply_sender" datasource="hermes">
   select property, value from encryption_settings where property='user.pdf.replySender'
   </cfquery>
   
-  <cfquery name="get_serverkeyword" datasource="#datasource#">
+  <cfquery name="get_serverkeyword" datasource="hermes">
   select property, value from encryption_settings where property='user.serverSecret'
   </cfquery>
 
 <cfif #get_serverkeyword.value# is "">
 
-<cfset theServerKeyword = #get_serverkeyword.value#>
-    
+<!--- GENERATE SERVER KEYWORD --->
+<cfinclude template="generate_ciphermail_server_secret.cfm">
+
 <cfelse>
     
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="hermeskey">
@@ -56,14 +57,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!-- /CFIF #get_serverkeyword.value# is ""  -->
 </cfif>
 
-  <cfquery name="get_clientkeyword" datasource="#datasource#">
+  <cfquery name="get_clientkeyword" datasource="hermes">
   select property, value from encryption_settings where property='user.clientSecret'
   </cfquery>
 
 <cfif #get_clientkeyword.value# is "">
 
-<cfset theClientKeyword = #get_clientkeyword.value#>
-    
+<!--- GENERATE CLIENT KEYWORD --->
+<cfinclude template="generate_ciphermail_client_secret.cfm">
+
 <cfelse>
     
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="hermeskey">
@@ -74,14 +76,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!-- /CFIF #get_clientkeyword.value# is ""  -->
 </cfif>
   
-<cfquery name="get_mailkeyword" datasource="#datasource#">
+<cfquery name="get_mailkeyword" datasource="hermes">
 select property, value from encryption_settings where property='user.systemMailSecret'
 </cfquery>
   
 <cfif #get_mailkeyword.value# is "">
 
-<cfset theMailKeyword = #get_mailkeyword.value#>
-    
+  <!--- GENERATE MAIL KEYWORD --->
+<cfinclude template="generate_ciphermail_mail_secret.cfm">
+
 <cfelse>
     
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="hermeskey">
@@ -92,24 +95,24 @@ select property, value from encryption_settings where property='user.systemMailS
 <!-- /CFIF #get_mailkeyword.value# is ""  -->
 </cfif>
 
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
+  <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
     select random_letter as random from captcha_list_all2 order by RAND() limit 8
     </cfquery>
     
-    <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
+    <cfquery name="inserttrans" datasource="hermes" result="stResult">
     insert into salt
     (salt)
     values
     ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
     </cfquery>
     
-    <cfquery name="gettrans" datasource="#datasource#">
+    <cfquery name="gettrans" datasource="hermes">
     select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
     </cfquery>
     
     <cfset customtrans3=#gettrans.customtrans2#>
     
-    <cfquery name="deletetrans" datasource="#datasource#">
+    <cfquery name="deletetrans" datasource="hermes">
     delete from salt where id='#stResult.GENERATED_KEY#'
     </cfquery>
     
