@@ -813,7 +813,7 @@ sleep 1
 stop_spinner $?
 
 #Set Ciphermail download variables
-CIPHERMAIL_DOWNLOAD_ADDRESS=https://www.deeztek.com/downloads/ciphermail
+CIPHERMAIL_DOWNLOAD_ADDRESS=https://github.com/deeztek/Hermes-Secure-Email-Gateway/raw/master/download/ciphermail
 CIPHERMAIL_BACKEND=djigzo_4.6.2-0_all.deb
 CIPHERMAIL_WEB=djigzo-web_4.6.2-0_all.deb
 
