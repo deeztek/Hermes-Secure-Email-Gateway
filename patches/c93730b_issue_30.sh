@@ -22,7 +22,7 @@ rm /var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm.*
 
 rm -rf /var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm/
 
-wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/8c8278b171a6568664ccffaf884c3c2454524def/dirstructure/var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm -P /var/www/html/admin/2/inc/
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/dirstructure/var/www/html/admin/2/inc/get_system_root_filesystem_usage.cfm -P /var/www/html/admin/2/inc/
 
 ERR=$?
 if [ $ERR != 0 ]; then
@@ -41,7 +41,7 @@ rm /var/www/html/admin/2/inc/get_system_data_filesystem_usage.cfm.*
 
 rm -rf /var/www/html/admin/2/inc/get_system_data_filesystem_usage.cfm/
 
-wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/8c8278b171a6568664ccffaf884c3c2454524def/dirstructure/var/www/html/admin/2/inc/get_system_data_filesystem_usage.cfm -P /var/www/html/admin/2/inc/
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/dirstructure/var/www/html/admin/2/inc/get_system_data_filesystem_usage.cfm -P /var/www/html/admin/2/inc/
 
 ERR=$?
 if [ $ERR != 0 ]; then
