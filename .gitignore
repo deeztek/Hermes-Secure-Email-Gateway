@@ -18,3 +18,4 @@ dos2unix.exe
 *.OLD
 *.ffs_db
 ubuntu_hermes_install.BACKUP
+ubuntu_hermes_install.sh

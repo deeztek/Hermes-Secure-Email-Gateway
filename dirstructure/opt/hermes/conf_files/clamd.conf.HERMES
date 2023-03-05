@@ -69,6 +69,11 @@ LogFileMaxSize 0
 Bytecode true
 BytecodeSecurity TrustSigned
 BytecodeTimeout 60000
+ExcludePUA PUA.Win.Packer
+ExcludePUA PUA.Win.Trojan.Packed
+ExcludePUA PUA.Win.Trojan.Molebox
+ExcludePUA PUA.Win.Packer.Upx
+ExcludePUA PUA.Doc.Packed
 #HERMES CONFIGURATION BELOW
 Scan-Mail
 Scan-Archive

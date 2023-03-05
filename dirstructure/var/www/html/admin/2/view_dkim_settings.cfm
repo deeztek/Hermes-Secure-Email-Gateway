@@ -2130,10 +2130,9 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
   <cfset session.m = 12>
 
   <cfinclude template="./inc/dkim_generate_hosts.cfm">
-  
   <cfinclude template="./inc/dkim_generate_domains.cfm">
-
   <cfinclude template="./inc/restart_opendkim.cfm">
+  <cfinclude template="./inc/restart_opendmarc.cfm">
 
 <cflocation url="view_dkim_settings.cfm" addtoken="no">
 
@@ -2210,6 +2209,7 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
 
 <cfinclude template="./inc/dkim_generate_domains.cfm">
 <cfinclude template="./inc/restart_opendkim.cfm">
+<cfinclude template="./inc/restart_opendmarc.cfm">
 
 <cflocation url="view_dkim_settings.cfm" addtoken="no">
 
@@ -2279,6 +2279,7 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
 
 <cfinclude template="./inc/dkim_generate_hosts.cfm">
 <cfinclude template="./inc/restart_opendkim.cfm">
+<cfinclude template="./inc/restart_opendmarc.cfm">
 
 <cflocation url="view_dkim_settings.cfm" addtoken="no">
 
@@ -2448,6 +2449,7 @@ select id, entry from dkim_bypass where id = <cfqueryparam value = #form.id# CFS
 
 <cfinclude template="./inc/dkim_generate_domains.cfm">
 <cfinclude template="./inc/restart_opendkim.cfm">
+<cfinclude template="./inc/restart_opendmarc.cfm">
 
 <cfset session.m=15>
 
@@ -2623,6 +2625,7 @@ select id, host from dkim_trusted_hosts where id = <cfqueryparam value = #form.i
 
 <cfinclude template="./inc/dkim_generate_hosts.cfm">
 <cfinclude template="./inc/restart_opendkim.cfm">
+<cfinclude template="./inc/restart_opendmarc.cfm">
 
 <cfset session.m=15>
 

@@ -1,0 +1,23 @@
+#!/bin/bash
+
+malwarefeedname=feed_name
+#feed_variables
+
+#Output to Syslog
+exec 1> >(logger -s -t $(basename $0)) 2>&1
+
+
+echo "Starting download for new ${malwarefeedname} Antivirus Signatures"
+
+feed_databases
+
+ERR=$?
+if [ $ERR != 0 ]; then
+THEERROR=$(($THEERROR+$ERR))
+echo "Error $THEERROR, occurred downloading new ${malwarefeedname} Antivirus Signatures"
+exit 1
+else
+echo "Success downloading new ${malwarefeedname} Antivirus Signatures"
+fi
+
+

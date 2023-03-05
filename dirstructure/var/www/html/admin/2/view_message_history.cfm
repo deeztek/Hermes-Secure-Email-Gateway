@@ -247,6 +247,7 @@ id="btn-back-to-top"
   <!--- /CFIF for StructKeyExists session.failureblocksender_email --->
   </cfif>
 
+ 
     <!--- DEBUG BELOW --->
   <!--- 
   
@@ -320,6 +321,19 @@ id="btn-back-to-top"
   <!--- 
   <cfoutput>Failure Allow Sender Email: #failureallowsender_email#</cfoutput><br>
   --->
+
+
+  <cfparam name = "failureinvalidrecipient_email" default = "">
+  <cfif StructKeyExists(session, "failureinvalidrecipient_email")>
+  <cfif session.failureinvalidrecipient_email is not "">
+  <cfset failureinvalidrecipient_email = session.failureinvalidrecipient_email>
+  
+  <!--- /CFIF for session.failureinvalidrecipient_email is not "" --->
+  </cfif>
+  
+  <!--- /CFIF for StructKeyExists session.failureinvalidrecipient_email --->
+  </cfif>
+
 
     <!--- ALLOW SENDER PARAMETERS END HERE  --->
 
@@ -746,17 +760,7 @@ id="btn-back-to-top"
       
       </cfif>
 
-      <cfif #m# is "2">
-
-        <div class="alert alert-danger alert-dismissible">
-          <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-          <cfoutput>Unable to Block Sender because Recipient was not found</cfoutput>
-        </div>
-
-        <cfset session.m = 0>
-      
-      </cfif>
+     
 
 <!--- BLOCK SENDER ERROR CODES START HERE --->
 
@@ -786,7 +790,7 @@ id="btn-back-to-top"
     <!--- /CFIF successblocksender --->
   </cfif>
 
-
+<cfif #failureblocksender_email# is not "">
         <div class="alert alert-danger alert-dismissible">
           <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
           <!---
@@ -796,13 +800,32 @@ id="btn-back-to-top"
           <cfoutput>#failureblocksender_email#</cfoutput>
         </div>
 
+       <!--- /CFIF #failureblocksender_email# is not "" --->
+      </cfif>
+
+<cfif #failureinvalidrecipient_email# is not "">
+        <div class="alert alert-danger alert-dismissible">
+          <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+          <!---
+          <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+          --->
+          <cfoutput><strong>The following #failureblocksender# senders could not be blocked to Virtual Recipients:</strong></cfoutput><br>
+          <cfoutput>#failureinvalidrecipient_email#</cfoutput>
+        </div>
+
+<!--- /CFIF #failureinvalidrecipient_email# is not "" --->
+      </cfif>
+
+
         <cfset session.m = 0>
         <cfset session.failureblocksender = 0>
         <cfset session.failureblocksender_email = "">
+        <cfset session.failureinvalidrecipient_email = "">
         <cfset session.successblocksender = 0>
         <cfset session.successblocksender_email = "">
+       
 
-      <cfelseif #failureblocksender# is "0">
+<cfelseif #failureblocksender# is "0">
         
 <cfif #m# is "3">
   <div class="alert alert-success alert-dismissible">
@@ -814,7 +837,7 @@ id="btn-back-to-top"
   <!--- /CFIF #m# is "3" --->
 </cfif>
 
-  <cfif #successblocksender# is not "0">
+<cfif #successblocksender# is not "0">
 
     <div class="alert alert-success alert-dismissible">
       <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
@@ -831,13 +854,16 @@ id="btn-back-to-top"
   <cfset session.m = 0>
   <cfset session.failureblocksender = 0>
   <cfset session.failureblocksender_email = "">
+  <cfset session.failureinvalidrecipient_email = "">
   <cfset session.successblocksender = 0>
   <cfset session.successblocksender_email = "">
 
   <!--- /CFIF #failureblocksender# is/is not "0" --->
 </cfif>
 
-    <!--- BLOCK SENDER ERROR CODES END HERE --->
+<!--- BLOCK SENDER ERROR CODES END HERE --->
+
+
 
     <!--- ALLOW SENDER ERROR CODES START HERE --->
 
@@ -867,7 +893,7 @@ id="btn-back-to-top"
       <!--- /CFIF successallowsender --->
     </cfif>
   
-  
+    <cfif #failureallowsender_email# is not "">
           <div class="alert alert-danger alert-dismissible">
             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
             <!---
@@ -876,10 +902,27 @@ id="btn-back-to-top"
             <cfoutput><strong>The following #failureallowsender# senders already existed and they were NOT allowed:</strong></cfoutput><br>
             <cfoutput>#failureallowsender_email#</cfoutput>
           </div>
+
+              <!--- /CFIF #failureallowsender_email# is not "" --->
+            </cfif>
+
+          <cfif #failureinvalidrecipient_email# is not "">
+            <div class="alert alert-danger alert-dismissible">
+              <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+              <!---
+              <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+              --->
+              <cfoutput><strong>The following #failureallowsender# senders could not be allowed to Virtual Recipients:</strong></cfoutput><br>
+              <cfoutput>#failureinvalidrecipient_email#</cfoutput>
+            </div>
+    
+    <!--- /CFIF #failureinvalidrecipient_email# is not "" --->
+          </cfif>
   
           <cfset session.m = 0>
           <cfset session.failureallowsender = 0>
           <cfset session.failureallowsender_email = "">
+          <cfset session.failureinvalidrecipient_email = "">
           <cfset session.successallowsender = 0>
           <cfset session.successallowsender_email = "">
   
@@ -912,6 +955,7 @@ id="btn-back-to-top"
     <cfset session.m = 0>
     <cfset session.failureallowsender = 0>
     <cfset session.failureallowsender_email = "">
+    <cfset session.failureinvalidrecipient_email = "">
     <cfset session.successallowsender = 0>
     <cfset session.successallowsender_email = "">
   
@@ -1368,7 +1412,7 @@ id="btn-back-to-top"
         <cfif #getemail.recordcount# GTE 1>
 
           <cfset theMailId = #getemail.mail_id#>
-   
+          <cfset theSecretId = #getemail.secret_id#>
 
           <cfinclude template="./inc/messages_block_sender.cfm">
 
@@ -1378,7 +1422,7 @@ id="btn-back-to-top"
           </cfoutput>
         
 
-          <!--- /CFIF #getrecipient.recordcount# --->
+          <!--- /CFIF #getemail.recordcount# --->
         </cfif>
       
          
@@ -1438,6 +1482,7 @@ id="btn-back-to-top"
   <cfif #getemail.recordcount# GTE 1>
 
     <cfset theMailId = #getemail.mail_id#>
+    <cfset theSecretId = #getemail.secret_id#>
 
 
     <cfinclude template="./inc/messages_allow_sender.cfm">
@@ -1457,6 +1502,7 @@ id="btn-back-to-top"
 
 
 <cfset session.m = 4>
+
 
 <cfoutput>
 <cflocation url="view_message_history.cfm?startdate=#startdate#&enddate=#enddate#&limit=#limit#" addtoken="no">
@@ -1509,6 +1555,7 @@ id="btn-back-to-top"
   <cfif #getemail.recordcount# GTE 1>
 
     <cfset theMailId = #getemail.mail_id#>
+    <cfset theSecretId = #getemail.secret_id#>
 
 
     <cfinclude template="./inc/messages_release_message.cfm">
@@ -1580,6 +1627,7 @@ id="btn-back-to-top"
   <cfif #getemail.recordcount# GTE 1>
 
     <cfset theMailId = #getemail.mail_id#>
+    <cfset theSecretId = #getemail.secret_id#>
 
 
     <cfinclude template="./inc/messages_train_ham.cfm">
@@ -1664,6 +1712,7 @@ id="btn-back-to-top"
   <cfif #getemail.recordcount# GTE 1>
 
     <cfset theMailId = #getemail.mail_id#>
+    <cfset theSecretId = #getemail.secret_id#>
 
 
     <cfinclude template="./inc/messages_train_spam.cfm">
@@ -1749,6 +1798,7 @@ id="btn-back-to-top"
   <cfif #getemail.recordcount# GTE 1>
 
     <cfset theMailId = #getemail.mail_id#>
+    <cfset theSecretId = #getemail.secret_id#>
 
 
     <cfinclude template="./inc/messages_forget_bayes.cfm">

@@ -43,6 +43,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- GET AUTHELIA SETTINGS  --->
 <cfinclude template="get_authelia_settings.cfm">
 
+
+
 <!--- GENERATE AUTHELIA CONFIGURATION.YML STARTS HERE --->
 
 <cfquery name = "getconsolemode" datasource="hermes">
@@ -199,6 +201,59 @@ output = "#REReplace("#authelia#","hermes_regulation_find_time","#regulation_fin
 file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
 output = "#REReplace("#authelia#","hermes_regulation_ban_time","#regulation_ban_time.value2#","ALL")#" addnewline="no">
 
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_duo_disable","#duo_disable.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_duo_hostname","#duo_hostname.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_duo_integration_key","#duo_integration_key.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_duo_secret_key","#duo_secret_key.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_duo_self_enrollment","#duo_self_enrollment.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_storage_encryption_key","#storage_encryption_key.value2#","ALL")#" addnewline="no">
+
+<!--- NOT USED YET 
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_storage_mysql_username","#mysqlusernamehermes#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_storage_mysql_password","#mysqlpasswordhermes#","ALL")#" addnewline="no">
+
+--->
+
+
 <!--- Backup Authelia configuration.yml --->
 <cffile action = "copy" source = "/etc/authelia/configuration.yml" 
 destination = "/etc/authelia/configuration.HERMES">
@@ -207,12 +262,6 @@ destination = "/etc/authelia/configuration.HERMES">
 <cffile action = "move" source = "/opt/hermes/tmp/#customtrans3#_configuration.yml" 
 destination = "/etc/authelia/configuration.yml">
 
-<cfinclude template="restart_authelia.cfm">
 
-<!--- SLEEP 5 SECONDS WAITING FOR AUTHELIA TO RESTART --->
-<cfscript> 
-    thread = CreateObject("java", "java.lang.Thread"); 
-    thread.sleep(10000); 
-    </cfscript> 
 
 

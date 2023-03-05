@@ -2008,7 +2008,7 @@ INSERT INTO `parameters2` VALUES ('92', 'session.secret', '', 'authelia', '1', '
 INSERT INTO `parameters2` VALUES ('93', 'session.expiration', '3600', 'authelia', '1', '1');
 INSERT INTO `parameters2` VALUES ('94', 'session.inactivity', '3600', 'authelia', '1', '1');
 INSERT INTO `parameters2` VALUES ('95', 'session.domain', null, 'authelia', '1', '1');
-INSERT INTO `parameters2` VALUES ('96', 'notifier.smtp.host', '[127.0.0.1]', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('96', 'notifier.smtp.host', '127.0.0.1', 'authelia', '1', '1');
 INSERT INTO `parameters2` VALUES ('97', 'notifier.smtp.port', '10026', 'authelia', '1', '1');
 INSERT INTO `parameters2` VALUES ('98', 'notifier.smtp.sender', 'no-reply@domain.tld', 'authelia', '1', '1');
 INSERT INTO `parameters2` VALUES ('99', 'notifier.smtp.subject', '[Hermes SEG] {title}', 'authelia', '1', '1');
@@ -2027,6 +2027,12 @@ INSERT INTO `parameters2` VALUES ('134', 'console.hsts', 'disable', 'console', '
 INSERT INTO `parameters2` VALUES ('135', 'console.ssl_stapling', 'disable', 'console', '1', '2');
 INSERT INTO `parameters2` VALUES ('136', 'console.ssl_stapling_verify', 'disable', 'console', '1', '2');
 INSERT INTO `parameters2` VALUES ('137', 'HoldQuarantinedMessages', 'false', 'dmarc', '1', '1');
+INSERT INTO `parameters2` VALUES ('138', 'storage.encryption_key', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('139', 'duo.disable', 'true', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('140', 'duo.hostname', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('141', 'duo.integration_key', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('142', 'duo.secret_key', '', 'authelia', '1', '1');
+INSERT INTO `parameters2` VALUES ('143', 'duo.self_enrollment', 'true', 'authelia', '1', '1');
 
 -- ----------------------------
 -- Table structure for `system_certificates`
@@ -2676,7 +2682,7 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '220410');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '221211');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('75', 'daily_update_check', '2');
@@ -2714,6 +2720,7 @@ INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 0
 INSERT INTO `system_updates` VALUES ('45', '18.04', '211207', '1', '2022-01-14 00:00:00', '14');
 INSERT INTO `system_updates` VALUES ('46', '18.04', '220203', '1', '2022-04-02 00:00:00', '15');
 INSERT INTO `system_updates` VALUES ('47', '18.04', '220410', '1', '2022-04-10 00:00:00', '16');
+INSERT INTO `system_updates` VALUES ('48', '18.04', '221211', '1', '2022-12-11 00:00:00', '17');
 
 
 -- ----------------------------
