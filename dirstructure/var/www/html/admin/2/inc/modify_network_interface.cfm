@@ -110,5 +110,5 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     file = "/opt/hermes/tmp/#customtrans3#50-cloud-init.yaml.HERMES.#show_network_mode#"
     output = "#REReplace("#interfaces#","THE-INTERFACE","#THEINTERFACE#","ALL")#">
 
-<!--- /CFIF #show_network_mode## is --->
+<!--- /CFIF #show_network_mode# is --->
 </cfif>

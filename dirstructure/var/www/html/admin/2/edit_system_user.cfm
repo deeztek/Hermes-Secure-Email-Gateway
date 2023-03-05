@@ -229,6 +229,8 @@ select id, username, password, email, first_name, last_name, system, access_cont
 
 <cfparam name = "checkHibp" default = "YES"> 
 
+
+
 <!--- DEBUG --->
 <!---
 <cfoutput>Step: #step#<br>
@@ -752,14 +754,17 @@ where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
     </cfif>
 
 <cfquery name="getuser" datasource="hermes">
-SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# CFSQLType = "CF_SQL_INTEGER"> and system <> '1' and id <> '#session.userid#'
+SELECT  id, username, system from system_users where id = <cfqueryparam value = #theUser# CFSQLType = "CF_SQL_INTEGER"> and system <> '1' and id <> '#session.userid#'
 </cfquery>
 
-  <cfif #getuser.recordcount# GTE 1>
+<cfif #getuser.recordcount# GTE 1>
 
-  <cfquery name="delete" datasource="hermes">
-  delete from system_users where id = <cfqueryparam value = #theUser# CFSQLType = "CF_SQL_INTEGER">
-  </cfquery>
+<cfset theUsername="#getuser.username#">
+<cfset theUserid="#getuser.id#">
+
+<cfinclude template="./inc/delete_system_user.cfm">
+
+<cfinclude template="./inc/delete_system_user_devices.cfm">
   
   <cfinclude template="./inc/generate_authelia_users_database.cfm">
 
@@ -784,8 +789,67 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
-<!--- /CFIF #getconnection.recordcount# GTE 1 --->
+<!--- /CFIF #getuser.recordcount# GTE 1 --->
+</cfif>
+
+<cfelseif #action# is "deleteuserdevices">
+
+  <cfif NOT StructKeyExists(form, "user")>
+
+    <cfset m="Delete System User: form.user does not exist">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+
+    <cfelseif StructKeyExists(form, "user")>
+    
+    <cfif #form.user# is "">
+    <cfset m="Delete System User: form.user blank">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+    
+    <cfelseif #form.user# is not "">
+    <cfset theUser = "#form.user#">
+
+    <!--- /CFIF form.user is/is not "" --->
     </cfif>
+
+    <!--- /CFIF StructKeyExists(form, "user") --->
+    </cfif>
+
+<cfquery name="getuser" datasource="hermes">
+SELECT  id, username, system from system_users where username = <cfqueryparam value = #theUser# CFSQLType = "cf_sql_varchar">
+</cfquery>
+
+<cfif #getuser.recordcount# GTE 1>
+
+<cfset theUsername="#getuser.username#">
+<cfset theUserid="#getuser.id#">
+
+<cfinclude template="./inc/delete_system_user_devices.cfm">
+
+<cfset session.m=15>
+
+<!--- SLEEP 5 SECONDS WAITING FOR AUTHELIA TO RESTART --->
+<cfscript> 
+  thread = CreateObject("java", "java.lang.Thread"); 
+  thread.sleep(5000); 
+  </cfscript> 
+
+<cfoutput>
+<cflocation url="edit_system_user.cfm?id=#theID#" addtoken="no">
+</cfoutput>
+
+
+
+<cfelse>
+
+  <cfset m="Delete System User: getuser.recordcount LT 1">
+  <cfinclude template="./inc/error.cfm">
+  <cfabort>
+
+<!--- /CFIF #getuser.recordcount# GTE 1 --->
+</cfif>
+ 
  
 
 <!--- /CFIF #action# --->
@@ -964,6 +1028,19 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
 </cfif>
 
+<cfif #m# is "15">
+
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>System User 2FA devices were deleted successfully</cfoutput> 
+      
+  </div>
+  
+  <cfset session.m = 0>
+  
+  </cfif>
+
 
 
   
@@ -1004,6 +1081,14 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
 <!--- BACK TO SYSTEM USERS CONNECTIONS BUTTON ENDS HERE --->
 
+<!--- DELETE USER 2FA DEVICES BUTTON STARTS HERE --->
+
+<cfoutput>
+  <!-- Delete User devices Button-->
+  <a href="##delete_devices_modal"  class="btn btn-danger" role="button" data-toggle="modal" data-user="#getuser.username#"><i class="fa fa-mobile"></i>&nbsp;&nbsp;Delete 2FA Devices</a>
+  </cfoutput>
+<!--- DELETE USER 2FA DEVICES BUTTON STARTS HERE --->
+
 
 <!--- DELETE USER BUTTON STARTS HERE --->
 
@@ -1023,6 +1108,8 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
 
 <!--- DELETE USER BUTTON ENDS HERE --->
+
+
 
 </p>
 
@@ -1044,7 +1131,7 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
       </div>
         
       <div class="modal-body">
-        <p>Are you sure you send to delete this System User? This action is irreversible!</p>
+        <p>Are you sure you send to delete this user? This action is irreversible! If you click <strong>Yes</strong>, the user and any Two Factor TOTP and Security Keys will be deleted. If the user has any Duo Devices, they must be manually deleted from the Duo Control Panel.</p>
 
       </div>
       <div class="modal-footer">
@@ -1067,6 +1154,43 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 <!--- DELETE USER MODAL HTML ENDS HERE --->
 
 
+<!--- DELETE USER DEVICES MODAL HTML STARTS HERE --->
+   
+
+<div class="modal fade" id="delete_devices_modal" tabindex="-1" role="dialog" aria-labelledby="deleteUserDevicesModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header alert-danger">
+        <!---
+        <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+        --->
+          <h4 class="modal-title">Delete 2FA Devices </h4>
+      </div>
+        
+      <div class="modal-body">
+        <p>Are you sure you send to delete this user's 2FA Devices? This action is irreversible! If you click <strong>Yes</strong>, all user 2FA TOTP and Security Keys will be deleted. If the user has any Duo Devices, they must be manually deleted from the Duo Control Panel.</p>
+
+      </div>
+      <div class="modal-footer">
+        <form name="delete_user" method="post">
+
+          <input type="hidden" name="action" value="deleteuserdevices">
+          <input type="hidden" name="user" value=""/>
+
+          
+          <input type="submit" class="btn btn-danger" name="" value="Yes" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+
+          
+          
+            </form>
+        <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!--- DELETE USER DEVICES MODAL HTML ENDS HERE --->
+
+
 
 
 <!-- EDIT SYSTEM USER FORM STARTS HERE -->
@@ -1079,9 +1203,16 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
     <div class="box-body">
        
-      <cfoutput>
+    
       <div class="form-group">
         <label for="username"><strong>Username</strong></label>
+
+        <div class="alert alert-warning">
+          <h5><i class="icon fas fa-exclamation-triangle"></i> Warning!</h5>
+          <p>If the System User has 2FA Devices enrolled in the system (TOTP, Security Keys, Duo) <strong>DO NOT</strong> change the username unless you first <strong>delete all the user's 2FA devices</strong> by clicking the <strong>Delete 2FA Devices</strong> button above or the user will not be able to login with the new username. Please note that Duo devices must be manually removed from the Duo Control panel.</p>
+          </div>
+
+          <cfoutput>
         <input type="text" class="form-control" name="username" value="#theUsername#" id="username" placeholder="Username">
       </div>
       </cfoutput>
@@ -1114,7 +1245,7 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
           
                   <div class="alert alert-warning">
                     <h5><i class="icon fas fa-exclamation-triangle"></i> Warning!</h5>
-                    <p>Before setting <strong>Access Control Policy</strong> to <strong>Two Factor</strong> ensure you first read the <a href="##" onClick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide-v2/page/system-users#bkmrk-access-control-polic', '_blank')">Access Control Policy Documentation</a> ,ensure e-mail delivery works as expected, the e-mail addresses for this System User is correct and you have an authenticator app such as <a href="##" onClick="window.open('https://freeotp.github.io', '_blank')">FreeOTP</a>, <a href="##" onClick="window.open('https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2', '_blank')">Google Authenticator</a>, <a href="##" onClick="window.open('https://authy.com/download/', '_blank')">Authy</a> etc installed on your mobile device</p>
+                    <p>Before setting <strong>Access Control Policy</strong> to <strong>Two Factor</strong> ensure you first read the <a href="##" onClick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide-v2/page/system-users#bkmrk-access-control-polic', '_blank')">Access Control Policy Documentation</a>, ensure e-mail delivery works as expected and the e-mail addresses for this System User is correct.</p>
                     </div>
               
                   <select class="form-control" name="access_control" data-placeholder="access_control" style="width: 100%;"  id="access_control">
@@ -1147,6 +1278,8 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
         </select>   
 
       </div>
+
+
 
 
 
@@ -1220,6 +1353,8 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
 
 
+
+
 <!--- <p class="help-block">Help Block Text</p> --->
 
 
@@ -1260,6 +1395,8 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
 
 
 </body>
+
+
 <!--- SCRIPT TO SHOW/HIDE SET USER PASSWORD SCRIPT STARTS HERE  --->
 <script>
 
@@ -1276,14 +1413,25 @@ SELECT  id, system from system_users where id = <cfqueryparam value = #theUser# 
    <!--- SCRIPT TO SHOW/HIDE SET USER PASSWORD SCRIPT ENDS HERE  --->
 
 
-     <!--- DELETE CONNECTION MODAL SCRIPT STARTS HERE  --->
+
+
+     <!--- DELETE USER MODAL SCRIPT STARTS HERE  --->
 <script>
   $('#delete_modal').on('show.bs.modal', function(e) {
       var user = $(e.relatedTarget).data('user');
       $(e.currentTarget).find('input[name="user"]').val(user);
   });
     </script>
-<!--- DELETE CONNECTION MODAL SCRIPT ENDS HERE  --->
+<!--- DELETE USER MODAL SCRIPT ENDS HERE  --->
+
+     <!--- DELETE USER 2FA DEVICES MODAL SCRIPT STARTS HERE  --->
+     <script>
+      $('#delete_devices_modal').on('show.bs.modal', function(e) {
+          var user = $(e.relatedTarget).data('user');
+          $(e.currentTarget).find('input[name="user"]').val(user);
+      });
+        </script>
+    <!--- DELETE USER 2FA DEVICES MODAL SCRIPT ENDS HERE  --->
 
  
 

@@ -40,7 +40,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- /CFIF for StructKeyExists session.successallowsender_email --->
   </cfif>
 
-  <cfoutput>Success Block Sender: #successallowsender#</cfoutput><br>
+  <cfoutput>Success Allow Sender: #successallowsender#</cfoutput><br>
   
   <cfparam name = "failureallowsender" default = "0">
   <cfif StructKeyExists(session, "failureallowsender")>
@@ -53,7 +53,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- /CFIF for StructKeyExists session.failureallowsender --->
   </cfif>
 
-  <cfoutput>Failure Block Sender: #failureallowsender#</cfoutput><br>
+  <cfoutput>Failure Allow Sender: #failureallowsender#</cfoutput><br>
   
   <cfparam name = "failureallowsender_email" default = "">
   <cfif StructKeyExists(session, "failureallowsender_email")>
@@ -66,10 +66,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- /CFIF for StructKeyExists session.failureallowsender_email --->
   </cfif>
   
-  <cfoutput>Failure Block Sender Email: #failureallowsender_email#</cfoutput><br>
+  <cfoutput>Failure Allow Sender Email: #failureallowsender_email#</cfoutput><br>
+
+
+  <cfparam name = "failureinvalidrecipient_email" default = "0">
+  <cfif StructKeyExists(session, "failureinvalidrecipient_email")>
+  <cfif session.failureinvalidrecipient_email is not "">
+  <cfset failureinvalidrecipient_email = session.failureinvalidrecipient_email>
+  
+  <!--- /CFIF for session.failureinvalidrecipient is not "" --->
+  </cfif>
+  
+  <!--- /CFIF for StructKeyExists session.failureinvalidrecipient --->
+  </cfif>
+
+  <cfoutput>Failure Invalid Recipient Email: #failureinvalidrecipient_email#</cfoutput><br>
 
 <cfquery name="getrid" datasource="hermes">
-    SELECT rid from msgrcpt where mail_id like binary '#getemail.mail_id#'
+    SELECT rid from msgrcpt where mail_id like binary '#theMailId#'
     </cfquery>
     
     <cfquery name="gettoaddr" datasource="hermes">
@@ -86,7 +100,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset recipient = #getrecipientid.id#>
 
     <cfquery name="getsenderid" datasource="hermes">
-        SELECT sid from msgs where mail_id like binary '#getemail.mail_id#' and secret_id like binary '#getemail.secret_id#'
+        SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
         </cfquery>
         
         <cfquery name="getsenderemail" datasource="hermes">
@@ -170,16 +184,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfif>
         
 
-    <cfelse>
+    <cfelseif #getrecipientid.recordcount# LT 1>
     
 
-    <cfoutput>
-    <cfset session.m = 2>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
-    </cfoutput>
-    <cfabort>
+        <cfquery name="getsenderid" datasource="hermes">
+            SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
+            </cfquery>
+            
+            <cfquery name="getsenderemail" datasource="hermes">
+            SELECT email from maddr where id='#getsenderid.sid#'
+            </cfquery>
+            
+            <cfset sender="#getsenderemail.email#">
+
+<cfset session.failureallowsender=#failureallowsender#+1>
+<cfset session.failureinvalidrecipient_email= failureinvalidrecipient_email & "#sender# <br>">
      
-    <!--- /CFIF #gerecipient.recordcount# --->
+    <!--- /CFIF #getrecipientid.recordcount# LT 1 --->
     </cfif>
     
     

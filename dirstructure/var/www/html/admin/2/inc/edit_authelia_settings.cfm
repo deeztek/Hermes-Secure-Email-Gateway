@@ -27,6 +27,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
     <!--- /CFIF StructKeyExists(form, "jwt_secret") --->
     </cfif>
+
+    <cfif NOT StructKeyExists(form, "storage_encryption_key")>
+
+      <cfset m="Edit Authentication Settings: form.storage_encryption_key does not exist">
+      <cfinclude template="error.cfm">
+      <cfabort>
+    
+      <!--- /CFIF StructKeyExists(form, "storage_encryption_key") --->
+      </cfif>
   
     
 <!--- ACCESS CONTROL NO LONGER A GLOBAL SETTING BUT SET ON A PER USER BASIS  --->
@@ -66,7 +75,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
     <cfelse>
       
-      <cfset m="Edit Authentication Settings: form.authentication_backend_disable_reset_passwordy is not true or false">
+      <cfset m="Edit Authentication Settings: form.authentication_backend_disable_reset_password is not true or false">
       <cfinclude template="error.cfm">
       <cfabort>
   
@@ -216,6 +225,82 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               
     <!--- /CFIF StructKeyExists(form, "log_format") --->
     </cfif>
+
+
+    <cfif NOT StructKeyExists(form, "duo_disable")>
+      
+      <cfset m="Edit Authentication Settings: form.duo_disable does not exist">
+      <cfinclude template="error.cfm">
+      <cfabort>
+  
+      <cfif #form.duo_disable# is "true" OR #form.duo_disable# is "false">
+  
+      <cfelse>
+  
+        <cfset m="Edit Authentication Settings: form.duo_disable is not true or false">
+        <cfinclude template="error.cfm">
+        <cfabort>
+  
+     <!--- /CFIF #form.duo_disable# is "true" OR #form.duo_disable# is "false" --->
+    </cfif>
+    
+              
+    <!--- /CFIF StructKeyExists(form, "duo_disable") --->
+    </cfif>
+
+
+  <cfif #form.duo_disable# is "false">
+
+  <cfif NOT StructKeyExists(form, "duo_hostname")>
+      
+  <cfset m="Edit Authentication Settings: form.duo_hostname does not exist when form.duo_disable is false">
+  <cfinclude template="error.cfm">
+  <cfabort>
+
+    <!--- /CFIF StructKeyExists(form, "duo_hostname") --->
+  </cfif>
+
+  <cfif NOT StructKeyExists(form, "duo_integration_key")>
+      
+    <cfset m="Edit Authentication Settings: form.integration_key does not exist when form.duo_disable is false">
+    <cfinclude template="error.cfm">
+    <cfabort>
+  
+      <!--- /CFIF StructKeyExists(form, "duo_integration_key") --->
+    </cfif>
+
+    <cfif NOT StructKeyExists(form, "duo_secret_key")>
+      
+      <cfset m="Edit Authentication Settings: form.duo_secret_key does not exist when form.duo_disable is false">
+      <cfinclude template="error.cfm">
+      <cfabort>
+    
+        <!--- /CFIF StructKeyExists(form, "duo_secret_key") --->
+      </cfif>
+
+      <cfif NOT StructKeyExists(form, "duo_self_enrollment")>
+      
+        <cfset m="Edit Authentication Settings: form.duo_self_enrollment does not exist when form.duo_disable is false">
+        <cfinclude template="error.cfm">
+        <cfabort>
+
+        <cfif #form.duo_self_enrollment# is "true" OR #form.duo_self_enrollment# is "false">
+  
+        <cfelse>
+    
+          <cfset m="Edit Authentication Settings: form.duo_self_enrollment is not true or false">
+          <cfinclude template="error.cfm">
+          <cfabort>
+    
+       <!--- /CFIF #form.duo_self_enrollment# is "true" OR #form.duo_self_enrollment# is "false" --->
+      </cfif>
+      
+          <!--- /CFIF StructKeyExists(form, "duo_self_enrollment") --->
+        </cfif>
+
+
+  <!--- /CFIF #form.duo_disable# is "false" --->
+    </cfif>
     
   
     <!--- VALIDATE FORM INPUTS ENDS HERE --->
@@ -242,8 +327,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
   <cfelse>
   
-  <!--- CODE TO ENFORCE 12 CHARACTER LENGTH --->
-  <cfif NOT ( len(form.jwt_secret) GTE 12)>
+  <!--- CODE TO ENFORCE 24 CHARACTER LENGTH --->
+  <cfif NOT ( len(form.jwt_secret) GTE 24)>
   <cfset step=0>
   <cfset session.m=3>
           
@@ -257,34 +342,71 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   update parameters2 set value2='#form.jwt_secret#', applied='2' where parameter='jwt_secret'
   </cfquery>
   
-  <cfset step=2>
+  <cfset step=1.5>
   
   <!--- /CFIF  #form.jwt_secret# is ""  --->
   </cfif>
   
-  <!--- /CFIF  NOT ( len(form.jwt_secret) GTE 12  --->
+  <!--- /CFIF  NOT ( len(form.jwt_secret) GTE 24  --->
   </cfif>
     
   <!--- /CFIF REFind("[^A-Za-z0-9]",form.jwt_secret) gt 0  --->
   </cfif>
+
+  <cfif #step# is "1.5">
+
+
+    <cfif #form.storage_encryption_key# is "">
   
-  <!---
-  <cfif #step# is "1">
+      <cfset step=0>
+      <cfset session.m=31>
+      
+      <cfoutput>
+      <cflocation url="#cgi.http_referer#" addtoken="no">
+      </cfoutput>
+    
+    <cfelse>
+    
+    <cfif REFind("[^A-Za-z0-9]",form.storage_encryption_key) gt 0>
+    
+      <cfset step=0>
+      <cfset session.m=32>
+      
+      <cfoutput>
+      <cflocation url="#cgi.http_referer#" addtoken="no">
+      </cfoutput>
+    
+    <cfelse>
+    
+    <!--- CODE TO ENFORCE 24 CHARACTER LENGTH --->
+    <cfif NOT ( len(form.storage_encryption_key) GTE 24)>
+    <cfset step=0>
+    <cfset session.m=33>
+            
+    <cfoutput>
+    <cflocation url="#cgi.http_referer#" addtoken="no">
+    </cfoutput>
+    
+    <cfelse>
+    
+    <cfquery name="update" datasource="hermes">
+    update parameters2 set value2='#form.storage_encryption_key#', applied='2' where parameter='storage.encryption_key'
+    </cfquery>
+    
+    <cfset step=2>
+    
+    <!--- /CFIF  #form.storage_encryption_key# is ""  --->
+    </cfif>
+    
+    <!--- /CFIF  NOT ( len(form.storage_encryption_key) GTE 24  --->
+    </cfif>
+      
+    <!--- /CFIF REFind("[^A-Za-z0-9]",form.storage_encryption_key) gt 0  --->
+    </cfif>
   
-  <!--- UPDATE ACCESS CONTROL POLICY AND RESET PASSWORD FUNCTION DROP-DOWN FIELDS --->
-  <cfquery name="update" datasource="hermes">
-  update parameters2 set value2='#form.access_control_rules_policy#', applied='2' where parameter='access_control.rules.policy'
-  </cfquery>
-  
-  <cfquery name="update" datasource="hermes">
-  update parameters2 set value2='#form.authentication_backend_disable_reset_password#', applied='2' where parameter='authentication_backend.disable_reset_password'
-  </cfquery>
-  
-  <cfset step=2>
-  
-  <!--- /CFIF step is 1 --->
+
+  <!--- /CFIF step is 1.5 --->
   </cfif>
---->
   
   <cfif #step# is "2">
   
@@ -649,7 +771,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                     
                                     <cfset step=11>
                                     
-                                    <!--- /CFIF REFind("^A-Za-z0-9\_\-\[\]\.]",regulation_max_retries) gt 0>  --->
+                                    <!--- /CFIF REFind("^0-9\_\-\[\]\.]",regulation_max_retries) gt 0>  --->
                                     </cfif>
                                 
                                        <!--- /CFIF #form.regulation_max_retries# is "" --->
@@ -689,7 +811,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                           
                                           <cfset step=12>
                                           
-                                          <!--- /CFIF REFind("^A-Za-z0-9\_\-\[\]\.]",regulation_find_time) gt 0>  --->
+                                          <!--- /CFIF REFind("^0-9\_\-\[\]\.]",regulation_find_time) gt 0>  --->
                                           </cfif>
                                       
                                              <!--- /CFIF #form.regulation_find_time# is "" --->
@@ -750,12 +872,170 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                                   update parameters2 set value2='#form.log_format#', applied='2' where parameter='log.format'
                                                   </cfquery>
                                                   
-                                                  <cfset step=14>
+                                                  <cfset step=13.1>
                                                   
                                                   <!--- /CFIF step is 13 --->
                                                   </cfif>
+
+                                                  <cfif #step# is "13.1">
   
-                                                  <cfif step is "14">
+                                                    <!--- UPDATE DUO DISABLE --->
+                                                    <cfquery name="update" datasource="hermes">
+                                                    update parameters2 set value2='#form.duo_disable#', applied='2' where parameter='duo.disable'
+                                                    </cfquery>
+                                                    
+                                                                                                  
+                                                    <cfset step=14>
+                                                    
+                                                    <!--- /CFIF step is 13.1 --->
+                                                    </cfif>
+
+                                          <cfif #form.duo_disable# is "false">
+
+                                                  <cfif #step# is "14">
+
+                                                    <cfif #form.duo_hostname# is "">
+                                              
+                                                      <cfset step=0>
+                                                      <cfset session.m=34>
+                                                      
+                                                      <cfoutput>
+                                                      <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                      </cfoutput>
+                                                    
+                                                    <cfelse>
+                                                    
+                                                    <cfoutput>
+                                                    <cfset tempemail = "bob@#form.duo_hostname#">
+                                                  </cfoutput>
+
+                                                    <cfif not IsValid("email", tempemail)>
+                                                    
+                                                    <cfset step=0>
+                                                    <cfset session.m=35>
+                                                    
+                                                    <cfoutput>
+                                                    <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                    </cfoutput>
+                                                    
+                                                    <cfelse>
+                                                    
+                                                    <!--- UPDATE FIELD --->
+                                                    <cfquery name="update" datasource="hermes">
+                                                      update parameters2 set value2='#form.duo_hostname#', applied='2' where parameter='duo.hostname'
+                                                      </cfquery>
+                                                    
+                                                    <cfset step=15>
+                                                    
+                                                    <!--- /CFIF #form.duo_hostname# is "" --->
+                                                    </cfif>
+
+                                                        <!--- /CFIF IsValid("email", tempemail) --->
+                                                      </cfif>
+                                                    
+                                                                                            
+                                                    <!--- /CFIF step 14 --->
+                                                    </cfif>
+
+                                                    <cfif #step# is "15">
+  
+                                                      <cfif #form.duo_integration_key# is "">
+                                                        
+                                                        <cfset step=0>
+                                                        <cfset session.m=36>
+                                                        
+                                                        <cfoutput>
+                                                        <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                        </cfoutput>
+                                                      
+                                                      <cfelse>
+                                                      
+                                                          <cfif REFind("[^A-Za-z0-9]",form.duo_integration_key) gt 0>
+                                                          
+                                                          <cfset step=0>
+                                                          <cfset session.m=37>
+                                                          
+                                                          <cfoutput>
+                                                          <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                          </cfoutput>
+                                                          
+                                                          <cfelse>
+                                                      
+                                                          <cfquery name="update" datasource="hermes">
+                                                          update parameters2 set value2='#form.duo_integration_key#', applied='2' where parameter='duo.integration_key'
+                                                          </cfquery>
+                                                          
+                                                          <cfset step=16>
+                                                          
+                                                          <!--- /CFIF REFind("^A-Za-z0-9]",form.duo_integration_key) gt 0>  --->
+                                                          </cfif>
+                                                      
+                                                             <!--- /CFIF #form.duo_integration_key# is "" --->
+                                                            </cfif>
+                                                          
+                                                          <!--- /CFIF step is 15 --->
+                                                          </cfif>
+
+                                                          <cfif #step# is "16">
+  
+                                                            <cfif #form.duo_secret_key# is "">
+                                                              
+                                                              <cfset step=0>
+                                                              <cfset session.m=38>
+                                                              
+                                                              <cfoutput>
+                                                              <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                              </cfoutput>
+                                                            
+                                                            <cfelse>
+                                                            
+                                                                <cfif REFind("[^A-Za-z0-9]",form.duo_secret_key) gt 0>
+                                                                
+                                                                <cfset step=0>
+                                                                <cfset session.m=39>
+                                                                
+                                                                <cfoutput>
+                                                                <cflocation url="#cgi.http_referer#" addtoken="no">
+                                                                </cfoutput>
+                                                                
+                                                                <cfelse>
+                                                            
+                                                                <cfquery name="update" datasource="hermes">
+                                                                update parameters2 set value2='#form.duo_secret_key#', applied='2' where parameter='duo.secret_key'
+                                                                </cfquery>
+                                                                
+                                                                <cfset step=17>
+                                                                
+                                                                <!--- /CFIF REFind("^A-Za-z0-9]",form.duo_secret_key) gt 0>  --->
+                                                                </cfif>
+                                                            
+                                                                   <!--- /CFIF #form.duo_secret_key# is "" --->
+                                                                  </cfif>
+                                                                
+                                                                <!--- /CFIF step is 16 --->
+                                                                </cfif>
+
+                                                                <cfif #step# is "17">
+  
+                                                                  <!--- UPDATE DUO SELF ENROLLMENT --->
+                                                                  <cfquery name="update" datasource="hermes">
+                                                                  update parameters2 set value2='#form.duo_self_enrollment#', applied='2' where parameter='duo.self_enrollment'
+                                                                  </cfquery>
+                                                                  
+                                                                                                                
+                                                                  <cfset step=18>
+                                                                  
+                                                                  <!--- /CFIF step is 17 --->
+                                                                  </cfif>
+
+                                                                <cfelseif #form.duo_disable# is "true">
+
+                                                                  <cfset step=18>
+
+                                                                 <!--- /CFIF form.duo_disable is "false/true" --->
+                                                                </cfif>
+  
+                                                  <cfif step is "18">
   
                                                     <cfquery name = "updateauthentication" datasource="hermes">
                                                     update parameters2 set
@@ -764,6 +1044,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                                     </cfquery>
                                                     
                                                     <cfinclude template="generate_authelia_configuration.cfm">
+
+                                                    <cfinclude template="restart_authelia.cfm">
+
+<!--- SLEEP 5 SECONDS WAITING FOR AUTHELIA TO RESTART --->
+<cfscript> 
+    thread = CreateObject("java", "java.lang.Thread"); 
+    thread.sleep(10000); 
+    </cfscript> 
                                                     
                                                     <cfset session.m=27>
                                                     

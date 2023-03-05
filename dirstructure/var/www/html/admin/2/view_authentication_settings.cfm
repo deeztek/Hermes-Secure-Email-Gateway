@@ -141,6 +141,10 @@ a, a:hover{
 <!--- /CFIF StructKeyExists(form, "action")> --->
 </cfif>
 
+<cfinclude template="./inc/get_authelia_settings.cfm">
+
+
+
 <!--- DEBUG --->
 <!---
 <cfoutput>
@@ -148,7 +152,7 @@ Action: #action#<br>
 </cfoutput>
 --->
 
-<cfinclude template="./inc/get_authelia_settings.cfm">
+
 
 <cfif #action# is "edit">
 
@@ -163,7 +167,7 @@ Action: #action#<br>
 
 <cfelseif #action# is "generatesessionsecret">
   <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 20
+  select random_letter as random from captcha_list_all2 order by RAND() limit 32
   </cfquery>
   
   <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
@@ -198,7 +202,7 @@ update parameters2 set value2='#SessionSecret#' where parameter = 'session.secre
 
 <cfelseif #action# is "generatejwtsecret">
   <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 20
+  select random_letter as random from captcha_list_all2 order by RAND() limit 32
   </cfquery>
   
   <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
@@ -223,6 +227,39 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
 </cfquery>
 
 <cfset session.m=28>
+
+<cfoutput>
+  <cflocation url="view_authentication_settings.cfm" addtoken="no">
+  </cfoutput>  
+
+
+<cfelseif #action# is "generatestorageencryptionkey">
+  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
+  select random_letter as random from captcha_list_all2 order by RAND() limit 32
+  </cfquery>
+  
+  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
+  insert into salt
+  (salt)
+  values
+  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
+  </cfquery>
+  
+  <cfquery name="gettrans" datasource="#datasource#">
+  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
+  </cfquery>
+  
+  <cfquery name="deletetrans" datasource="#datasource#">
+  delete from salt where id='#stResult.GENERATED_KEY#'
+  </cfquery>
+
+<cfset StorageEncryptionKey=#trim(gettrans.customtrans2)#>
+
+<cfquery name="updateStorageSecret" datasource="hermes">
+update parameters2 set value2='#StorageEncryptionKey#' where parameter = 'storage.encryption_key' and module='authelia'
+</cfquery>
+
+<cfset session.m=30>
 
 <cfoutput>
   <cflocation url="view_authentication_settings.cfm" addtoken="no">
@@ -268,7 +305,7 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
     <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The JWT Secret field should be at least 12 characters for best security</cfoutput>
+    <cfoutput>The JWT Secret field should be at least 24 characters for best security</cfoutput>
   </div>
 
   <cfset session.m = 0>
@@ -332,7 +369,7 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
     <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Session Secret field should be at least 12 characters for best security</cfoutput>
+    <cfoutput>The Session Secret field should be at least 24 characters for best security</cfoutput>
   </div>
 
   <cfset session.m = 0>
@@ -599,6 +636,133 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
       
       </cfif>
 
+      <cfif #m# is "30">
+
+        <div class="alert alert-warning alert-dismissible">
+          <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+          <h4><i class="icon fa fa-check"></i> Success!</h4>
+          <cfoutput>The Storage Encryption key was generated successfully. You must click the <strong>Submit</strong> button on the bottom of the page to save the settings. You will be logged off while the system saves the settings.</cfoutput> 
+            
+        </div>
+        
+        <cfset session.m = 0>
+        
+        </cfif>
+
+        <cfif #m# is "31">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Storage Enryption Key field cannot be blank</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+        <cfif #m# is "32">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>You have entered an invalid Storage Encryption Key. Storage Encryption Key can only contain upper/lower case letters (A-Z, a-z) and numbers (0-9)</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+        <cfif #m# is "33">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Storage Encrytion Key field should be at least 24 characters for best security</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+
+        <cfif #m# is "34">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Duo Hostname field cannot be blank</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+        <cfif #m# is "35">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Duo Hostname field is not a valid FQDN</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+
+        <cfif #m# is "36">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Duo Integration Key field cannot be blank</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+
+        <cfif #m# is "37">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>You have entered an invalid Duo Integration Key. Duo Integration Key can only contain upper/lower case letters (A-Z, a-z) and numbers (0-9)</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+
+
+        <cfif #m# is "38">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>The Duo Secret Key Key field cannot be blank</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
+
+        <cfif #m# is "39">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>You have entered an invalid Duo Secret Key. Duo Secret Key can only contain upper/lower case letters (A-Z, a-z) and numbers (0-9)</cfoutput>
+          </div>
+        
+          <cfset session.m = 0>
+        
+        </cfif>
+
 
 <!--- ERROR MESSAGES END HERE --->
 
@@ -667,6 +831,39 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
 <!--- GENERATE SESSION SECRET MODAL HTML HTML ENDS HERE --->
 
 
+<!--- GENERATE STORAGE ENCRYPTION KEY MODAL HTML STARTS HERE --->
+
+<div class="modal fade" id="generatestorage_modal" tabindex="-1" role="dialog" aria-labelledby="generateStorageModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+<div class="modal-header alert-danger">
+  <!---
+  <button type="button" class="close" data-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
+  --->
+    <h4 class="modal-title">Generate Storage Encryption key</h4>
+</div>
+  
+<div class="modal-body">
+  <p>Are you sure you send to generate a new Storage Encryption Key? </p>
+
+</div>
+<div class="modal-footer">
+  <form name="GenerateStorageEncryptionKey" method="post">
+
+    <input type="hidden" name="action" value="generatestorageencryptionkey">
+    <input type="submit" value="Yes" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+
+   
+    
+</form>
+  <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>
+</div>
+    </div>
+  </div>
+</div>
+<!--- GENERATE STORAGE ENCRYPIPTION KEY MODAL HTML ENDS HERE --->
+
+
 
 <!-- EDIT ADMIN AUTHENTICATION FORM STARTS HERE -->
 
@@ -683,7 +880,7 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
       <div class="form-group">
         <label for="jwt_secret"><strong>JWT Secret</strong></label>
         <div class="input-group">
-        <input type="text" class="form-control" name="jwt_secret" value="#jwt_secret.value2#" id="jwt_secret" placeholder="JWT Secret" maxLength="20">
+        <input type="text" class="form-control" name="jwt_secret" value="#jwt_secret.value2#" id="jwt_secret" placeholder="JWT Secret" maxLength="64">
 
         <!-- GENERATE JWT SECRET BUTTON -->
 <a href="##generatejwt_modal"  class="btn btn-secondary" role="button" data-toggle="modal"><i class="fas fa-sync"></i></a>
@@ -694,6 +891,30 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
 
       </div>
       </cfoutput>
+
+
+   
+        <div class="form-group">
+          <label for="storage_encryption_key"><strong>Storage Encryption Key</strong></label>
+
+          <div class="alert alert-warning">
+            <h5><i class="icon fas fa-exclamation-triangle"></i> Warning!</h5>
+            <p><strong>DO NOT generate a new Storage Encryption Key unless it has been compromised. </strong> Generating a new Storage Encryption Key will break system authentication and will remove all user 2FA devices.  If you must generate a new Storage Encryption Key, make sure you follow the <a href="##" onClick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide-v2/page/system-users#bkmrk-access-control-polic', '_blank')">How to Generate a new Storage Encryption Key Documentation.</a> </p>
+            </div>
+            <cfoutput>
+
+          <div class="input-group">
+          <input type="text" class="form-control" name="storage_encryption_key" value="#storage_encryption_key.value2#" id="storage_encryption_key" placeholder="JWT Secret" maxLength="64">
+  
+          <!-- GENERATE STORAGE ENCRYPTION KEY BUTTON -->
+  <a href="##generatestorage_modal"  class="btn btn-secondary" role="button" data-toggle="modal"><i class="fas fa-sync"></i></a>
+  <!--- GENERATE STORAGE ENCRYPTION KEY ENDS HERE --->
+  
+  <!--- /div class="input-group" --->
+  </div> 
+  
+        </div>
+        </cfoutput>
 
       <!---
       <div class="form-group">
@@ -750,11 +971,11 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
                   <div class="form-group">
                     <label for="session_name"><strong>Session Secret</strong></label>
                     <div class="input-group">
-                    <input type="text" class="form-control" name="session_secret" value="#session_secret.value2#" id="session_secret" placeholder="Session Secret" maxLength="20">
+                    <input type="text" class="form-control" name="session_secret" value="#session_secret.value2#" id="session_secret" placeholder="Session Secret" maxLength="64">
 
 <!-- GENERATE SESSION SECRET BUTTON -->
 <a href="##generatesession_modal"  class="btn btn-secondary" role="button" data-toggle="modal"><i class="fas fa-sync"></i></a>
-<!--- GENERATE SESSION CERTIFICATE ENDS HERE --->
+<!--- GENERATE SESSION SECRET BUTTON ENDS HERE --->
 
 <!--- /div class="input-group" --->
 </div>  
@@ -893,7 +1114,134 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
               </div> 
       
 
+                <!--- For the Duo Push field below the Duo Push variable in Authelia is set to disable:true for DISABLED and disable:false for ENABLED --->
 
+                <div class="form-group">
+                  <label><strong>Duo Security</strong></label>
+              
+                  <select class="form-control" name="duo_disable" data-placeholder="duo_disable" style="width: 100%;"  id="setDuo">
+
+                    <cfif #duo_disable.value2# is "true">                           
+                      <option value="true" selected>Disable</option>
+                      <option value="false">Enable</option>
+                    <cfelseif #duo_disable.value2# is "false">
+                      <option value="false" selected>Enable</option>
+                      <option value="true">Disable</option></option>
+                    </cfif>
+                      </select>   
+              
+                    </div>
+
+   
+
+                <cfif #duo_disable.value2# is "true">
+
+                       
+
+                  <div class="form-group" id="DuoDisable" style="display:none;">
+            
+                    <cfoutput>
+                        <div class="form-group" id="duo_hostname">
+                          <label for="duo_hostname"><strong>Duo Hostname</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_hostname" value="#duo_hostname.value2#" id="duo_hostname" placeholder="Enter the Duo Hostname" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput>  
+
+ <cfoutput>
+                        <div class="form-group" id="duo_integration_key">
+                          <label for="duo_integration_key"><strong>Duo Integration Key</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_integration_key" value="#duo_integration_key.value2#" id="duo_integration_key" placeholder="Enter the Duo Integration Key" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput> 
+
+<cfoutput>
+                        <div class="form-group" id="duo_secret_key">
+                          <label for="duo_secret_key"><strong>Duo Secret Key</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_secret_key" value="#duo_secret_key.value2#" id="duo_secret_key" placeholder="Enter the Duo Secret Key" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput>   
+
+                      
+                   <div class="form-group" id="duo_self_enrollment">
+                        <label><strong>Duo Self Enrollment</strong></label>
+                   
+                        <select class="form-control select2" name="duo_self_enrollment" data-placeholder="duo_self_enrollment" style="width: 100%;">
+                        
+                      <cfif #duo_self_enrollment.value2# is "false">                         
+                          <option value="false" selected>Disable</option>
+                          <option value="true">Enable</option>
+                        <cfelseif #duo_self_enrollment.value2# is "true">
+                          <option value="true" selected>Enable</option>
+                          <option value="false">Disable</option>
+                        </cfif>
+                          </select>  
+
+                      </div>
+
+                          <!--- /DIV  <div class="form-group" id="DuoDisable"> --->            
+                          </div>
+
+
+                    <cfelseif #duo_disable.value2# is "false">
+
+                      <div class="form-group" id="DuoDisable">
+                    
+                      <cfoutput>
+                        <div class="form-group" id="duo_hostname">
+                          <label for="duo_hostname"><strong>Duo Hostname</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_hostname" value="#duo_hostname.value2#" id="duo_hostname" placeholder="Enter the Duo Hostname" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput>  
+
+ <cfoutput>
+                        <div class="form-group" id="duo_integration_key">
+                          <label for="duo_integration_key"><strong>Duo Integration Key</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_integration_key" value="#duo_integration_key.value2#" id="duo_integration_key" placeholder="Enter the Duo Integration Key" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput> 
+
+<cfoutput>
+                        <div class="form-group" id="duo_secret_key">
+                          <label for="duo_secret_key"><strong>Duo Secret Key</strong></label>
+                          <div class="input-group">
+                          <input type="text" class="form-control" name="duo_secret_key" value="#duo_secret_key.value2#" id="duo_secret_key" placeholder="Enter the Duo Secret Key" maxLength="64">
+                                                        </div>
+                        </div>
+                        </cfoutput>   
+
+                      
+                   <div class="form-group" id="duo_self_enrollment">
+                        <label><strong>Duo Self Enrollment</strong></label>
+                   
+                        <select class="form-control select2" name="duo_self_enrollment" data-placeholder="duo_self_enrollment" style="width: 100%;">
+                        
+                      <cfif #duo_self_enrollment.value2# is "false">                         
+                          <option value="false" selected>Disable</option>
+                          <option value="true">Enable</option>
+                        <cfelseif #duo_self_enrollment.value2# is "true">
+                          <option value="true" selected>Enable</option>
+                          <option value="false">Disable</option>
+                        </cfif>
+                          </select>  
+
+                      </div>
+
+                         <!--- /DIV  <div class="form-group" id="DuoDisable"> --->            
+                         </div>
+
+
+          <!--- /CFIF for #DuoDisable# is true or false --->
+        </cfif>
 
 <!--- <p class="help-block">Help Block Text</p> --->
 
@@ -936,7 +1284,20 @@ update parameters2 set value2='#JwtSecret#' where parameter = 'jwt_secret' and m
 </body>
 
 
- 
+    <!--- SCRIPT TO SHOW/HIDE DUO SECURITY SCRIPT STARTS HERE  --->
+<script>
+
+  $('#setDuo').on('change',function(){
+    if( $(this).val()==="false"){
+    $("#DuoDisable").show()
+    }
+    else{
+    $("#DuoDisable").hide()
+    }
+  });
+  
+  </script>
+   <!--- SCRIPT TO SHOW/HIDE DUO SECURITY ENDS HERE  --->
 
 
 

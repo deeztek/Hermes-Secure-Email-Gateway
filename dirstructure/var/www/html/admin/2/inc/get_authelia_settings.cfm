@@ -96,3 +96,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     select value2 from parameters2 where module = 'authelia' and parameter = 'log.format'
     </cfquery>
     
+    <cfquery name="duo_disable" datasource="hermes">
+    select value2 from parameters2 where module = 'authelia' and parameter = 'duo.disable'
+    </cfquery>
+
+<cfquery name="duo_hostname" datasource="hermes">
+  select value2 from parameters2 where module = 'authelia' and parameter = 'duo.hostname'
+  </cfquery>
+
+<cfquery name="duo_integration_key" datasource="hermes">
+  select value2 from parameters2 where module = 'authelia' and parameter = 'duo.integration_key'
+  </cfquery>
+      
+<cfquery name="duo_secret_key" datasource="hermes">
+select value2 from parameters2 where module = 'authelia' and parameter = 'duo.secret_key'
+</cfquery>
+
+<cfquery name="duo_self_enrollment" datasource="hermes">
+  select value2 from parameters2 where module = 'authelia' and parameter = 'duo.self_enrollment'
+  </cfquery>
+
+<cfquery name="storage_encryption_key" datasource="hermes">
+  select value2 from parameters2 where module = 'authelia' and parameter = 'storage.encryption_key'
+  </cfquery>
+
+<!--- GET DATABASE CREDENTIALS FROM /OPT/HERMES/CREDS STARTS HERE - NOT USED YET 
+<cffile action="read" file="/opt/hermes/creds/hermes_username" variable="mysqlusernamehermes">
+<cffile action="read" file="/opt/hermes/creds/hermes_password" variable="mysqlpasswordhermes">
+--->
