@@ -163,6 +163,13 @@ done
 #Set Default username for MySQL root
 MYSQL_ROOT_USERNAME=root
 
+#Create Authelia Random Strings
+JWTSECRET=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1`
+SESSIONSECRET=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1`
+APIKEY=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1`
+STORAGEKEY=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1`
+
+
 # BAT / CMD goto function
 function goto
 {
@@ -1310,17 +1317,6 @@ cp $SCRIPTPATH/download/etc/cron.d/* /etc/cron.d/ >> $SCRIPTPATH/install_log-$TI
 
 stop_spinner $?
 
-#CREATE JWTSECRET RANDOM STRING
-echo "[`date +%m/%d/%Y-%H:%M`] Creating JWT Secret Random String" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Creating JWT Secret Random String...'
-sleep 1
-
-JWTSECRET=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1` >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
-
-
 echo "[`date +%m/%d/%Y-%H:%M`] Updating JWT Secret Random String in Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 start_spinner 'Updating JWT Secret Random String in Database...'
@@ -1330,18 +1326,6 @@ sleep 1
 mysql -h localhost -u $MYSQL_HERMES_USERNAME -p$MYSQL_HERMES_PASSWORD -e "use hermes; update parameters2 set value2 = '$JWTSECRET' where parameter = 'jwt_secret' and module='authelia'" >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
-
-
-echo "[`date +%m/%d/%Y-%H:%M`] Creating Session Secret Random String" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Creating Session Secret Random String...'
-sleep 1
-
-#CREATE SESSIONSECRET RANDOM STRING
-SESSIONSECRET=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1` >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
-
 
 echo "[`date +%m/%d/%Y-%H:%M`] Updating Session Secret Random String in Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
@@ -1353,17 +1337,6 @@ mysql -h localhost -u $MYSQL_HERMES_USERNAME -p$MYSQL_HERMES_PASSWORD -e "use he
 
 stop_spinner $?
 
-
-echo "[`date +%m/%d/%Y-%H:%M`] Creating API Key Random String" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Creating API Key Random String...'
-sleep 1
-
-#CREATE API KEY RANDOM STRING
-APIKEY=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1` >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
-
 echo "[`date +%m/%d/%Y-%H:%M`] Updating API Key Random String in Database" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
 start_spinner 'Updating API Key Random String in Database...'
@@ -1371,16 +1344,6 @@ sleep 1
 
 #UPDATE API KEY IN DATABASE
 mysql -h localhost -u $MYSQL_HERMES_USERNAME -p$MYSQL_HERMES_PASSWORD -e "use hermes; update api_tokens set token = '$APIKEY' where ip = '127.0.0.1' and system='1'" >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
-
-stop_spinner $?
-
-echo "[`date +%m/%d/%Y-%H:%M`] Creating Storage Encryption Key Random String" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
-
-start_spinner 'Creating Storage Encryption Key Random String...'
-sleep 1
-
-#CREATE STORAGE ENCRYPTION KEY
-STORAGEKEY=`/bin/cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w ${1:-32} | head -n 1` >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
