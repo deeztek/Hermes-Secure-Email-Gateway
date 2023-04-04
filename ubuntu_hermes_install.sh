@@ -196,7 +196,7 @@ then
 
 goto "start"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_ROOT_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_ROOT_PASSWORD"
 
 then
         echo "${RED}MySQL(MariaDB) root user password cannot contain any special characters or spaces ${RESET}"
@@ -221,7 +221,7 @@ then
 
 goto "step2"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_HERMES_USERNAME"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_HERMES_USERNAME"
 
 then
         echo "${RED}MySQL(MariaDB) Hermes SEG user username cannot contain any special characters or spaces ${RESET}"
@@ -246,7 +246,7 @@ then
 
 goto "step3"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_HERMES_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_HERMES_PASSWORD"
 
 then
         echo "${RED}MySQL(MariaDB) Hermes SEG user password cannot contain any special characters or spaces ${RESET}"
@@ -271,7 +271,7 @@ then
 
 goto "step4"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_SYSLOG_USERNAME"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_SYSLOG_USERNAME"
 
 then
         echo "${RED}MySQL(MariaDB) Syslog username cannot contain any special characters or spaces ${RESET}"
@@ -295,7 +295,7 @@ then
 
 goto "step5"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_SYSLOG_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_SYSLOG_PASSWORD"
 
 then
         echo "${RED}MySQL(MariaDB) Syslog user password cannot contain any special characters or spaces ${RESET}"
@@ -321,7 +321,7 @@ then
 
 goto "step6"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_USERNAME"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_USERNAME"
 
 then
         echo "${RED}MySQL(MariaDB) Ciphermail username cannot contain any special characters or spaces ${RESET}"
@@ -347,7 +347,7 @@ then
 
 goto "step7"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_PASSWORD"
 
 then
         echo "${RED}MySQL(MariaDB) Ciphermail user password cannot contain any special characters or spaces ${RESET}"
@@ -372,7 +372,7 @@ then
 
 goto "step8"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_OPENDMARC_USERNAME"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_OPENDMARC_USERNAME"
 
 then
         echo "${RED}MySQL(MariaDB) Opendmarc username cannot contain any special characters or spaces ${RESET}"
@@ -397,7 +397,7 @@ then
 
 goto "step9"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$MYSQL_OPENDMARC_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_OPENDMARC_PASSWORD"
 
 then
         echo "${RED}ySQL(MariaDB) Opendmarc user password cannot contain any special characters or spaces ${RESET}"
@@ -423,7 +423,7 @@ then
 
 goto "step10"
 
-elif egrep -q "[~\^@#$%&*-=+\'\"\ ]" <<< "$LUCEE_ADMIN_PASSWORD"
+elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$LUCEE_ADMIN_PASSWORD"
 
 then
         echo "${RED}Lucee Server and Web Administrator password cannot contain any special characters or spaces ${RESET}"
