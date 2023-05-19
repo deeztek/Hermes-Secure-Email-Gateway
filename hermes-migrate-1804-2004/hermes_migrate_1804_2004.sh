@@ -92,13 +92,11 @@ start_spinner 'Configuring Apache Tomcat for Ciphermail...'
 sleep 1
 
 #Configure Apache Tomcat for ciphermail
-wget https://../$TOMCATVERSION -P /etc/default/$TOMCATVERSION
-wget https://../ciphermail.xml -P /etc/$TOMCATVERSION/Catalina/localhost/ciphermail.xml
-wget https://../web.xml -P /etc/$TOMCATVERSION/Catalina/localhost/web.xml
-wget https://../server.xml -P /etc/$TOMCATVERSION/server.xml
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/hermes-migrate-1804-2004/$TOMCATVERSION -P /etc/default/$TOMCATVERSION
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/hermes-migrate-1804-2004/ciphermail.xml -P /etc/$TOMCATVERSION/Catalina/localhost/ciphermail.xml
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/hermes-migrate-1804-2004/web.xml -P /etc/$TOMCATVERSION/Catalina/localhost/web.xml
+wget https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/master/hermes-migrate-1804-2004/server.xml -P /etc/$TOMCATVERSION/server.xml
 chown $TOMCATUSER:djigzo /usr/share/djigzo-web/ssl/sslCertificate.p12
 systemctl restart $TOMCATVERSION
-
-
 
 stop_spinner $?
