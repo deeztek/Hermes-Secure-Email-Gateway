@@ -1,0 +1,25 @@
+# The home directory of the Java development kit (JDK). You need at least
+# JDK version 8. If JAVA_HOME is not set, some common directories for
+# OpenJDK and the Oracle JDK are tried.
+#JAVA_HOME=/usr/lib/jvm/java-8-openjdk
+
+# You may pass JVM startup parameters to Java here. If you run Tomcat with
+# Java 8 instead of 9 or newer, add "-XX:+UseG1GC" to select a suitable GC.
+# If unset, the default options will be: -Djava.awt.headless=true
+JAVA_OPTS="-Djava.awt.headless=true"
+
+# To enable remote debugging uncomment the following line.
+# You will then be able to use a Java debugger on port 8000.
+#JAVA_OPTS="${JAVA_OPTS} -agentlib:jdwp=transport=dt_socket,address=8000,server=y,suspend=n"
+
+# Java compiler to use for translating JavaServer Pages (JSPs). You can use all
+# compilers that are accepted by Ant's build.compiler property.
+#JSP_COMPILER=javac
+
+# Enable the Java security manager? (true/false, default: false)
+#SECURITY_MANAGER=true
+
+# Whether to compress logfiles older than today's
+#LOGFILE_COMPRESS=1
+JAVA_OPTS="$JAVA_OPTS -Ddjigzo-web.home=/usr/share/djigzo-web -Ddjigzo.home=/usr/share/djigzo"
+JAVA_OPTS="$JAVA_OPTS -Djava.awt.headless=true -Xmx256M"
