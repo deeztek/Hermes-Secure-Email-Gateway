@@ -51,6 +51,7 @@ else
 echo "${GREEN}Completed Installing Spinner Prerequisite ${RESET}"
 fi
 
+PS3='This script will attempt to install various packages and migrate various settings for a Hermes SEG installation that was successfully upgraded from Ubuntu 18.04 to Ubuntu 20.04 using the do-release-upgrade command. Ensure that you have a fresh and valid backup of your machine before proceeding. This script is offered with absolutely no warrranty or guarantee of any kind. We cannot be held liable for any damage that may occur to your system. Do you agree with the terms of this script?: '
 
 options=("Yes - I agree" "No - I do not agree")
 select opt in "${options[@]}"
