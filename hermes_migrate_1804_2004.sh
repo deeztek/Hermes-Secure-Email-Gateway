@@ -24,6 +24,10 @@ TIMESTAMP=`date +%m-%d-%Y-%H%M`
 TOMCATVERSION="tomcat9"
 TOMCATUSER="tomcat"
 
+THEVERSION="20.04"
+HERMES_SQL_USERNAME=`cat /opt/hermes/creds/hermes_username`
+HERMES_SQL_PASSWORD=`cat /opt/hermes/creds/hermes_password`
+
 
 echo "Installing Boxes Prerequisite if necessary"
 #Install boxes
@@ -50,6 +54,14 @@ exit 1
 else
 echo "${GREEN}Completed Installing Spinner Prerequisite ${RESET}"
 fi
+
+source "$(pwd)/spinner.sh"
+
+# test success
+start_spinner 'sleeping for 2 secs...'
+sleep 2
+stop_spinner $?
+
 
 PS3='This script will attempt to install various packages and migrate various settings for a Hermes SEG installation that was successfully upgraded from Ubuntu 18.04 to Ubuntu 20.04 using the do-release-upgrade command. Ensure that you have a fresh and valid backup of your machine before proceeding. This script is offered with absolutely no warrranty or guarantee of any kind. We cannot be held liable for any damage that may occur to your system. Do you agree with the terms of this script?: '
 
@@ -108,7 +120,16 @@ sleep 1
 
 #Delete Tomcat8
 rm -rf /etc/tomcat8 >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1  && \
-rm -rf /etc/default/tomcat8 >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
+rm -rf /etc/default/tomcat8.ORIGINAL >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
+
+stop_spinner $?
+
+start_spinner 'Updating Hermes SEG Version...'
+sleep 1
+
+#UPDATE VERSION
+echo "[`date +%m/%d/%Y-%H:%M`] Updating Hermes SEG Version" >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
+mysql -h localhost -u $HERMES_SQL_USERNAME -p$HERMES_SQL_PASSWORD -e "use hermes; update system_settings set value = '$THEVERSION' where parameter = 'version_no'" 
 
 stop_spinner $?
 

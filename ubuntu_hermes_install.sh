@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#The script below assumes you have a fully installed and updated Ubuntu 18.04 LTS/20.04 LTS (Recommended) server and you have created /mnt/data as outlined below. 
+#The script below assumes you have a fully installed and updated Ubuntu 20.04 LTS server and you have created /mnt/data as outlined below. 
 #The Configure /mnt/data partition directions below assumes you have a 250GB secondary drive which you will partition, format and mount as /mnt/data. Technically a secondary drive for the /mnt/data directory is not a requirement but it's highly recommended for performance reasons. If you don't wish to use a secondary drive for the /mnt/data directory, simply create a /mnt/data directory in your system and run this script.
 
 #Configure /mnt/data partition
@@ -69,6 +69,13 @@ if [ ! -d "/mnt/data" ]; then
 #      exit 1
 #   fi
 
+#Ensure Ubuntu 20.04
+string=`lsb_release -d`
+if [[ $string == *"Ubuntu 18.04"* ]]; then
+      echo "You must be running Ubuntu 20.04 LTS before attempting to install Hermes SEG, Exiting..."
+      exit 1
+fi
+
 #Set the script path
 SCRIPTPATH=$(pwd)
 
@@ -86,15 +93,9 @@ RED=`tput setaf 1`
 GREEN=`tput setaf 2`
 RESET=`tput sgr0`
 
-#Set Tomcat Parameters for Ubuntu Version
-string=`lsb_release -d`
-if [[ $string == *"Ubuntu 18.04"* ]]; then
-  TOMCATVERSION="tomcat8"
-  TOMCATUSER="tomcat8"
-elif [[ $string == *"Ubuntu 20.04"* ]]; then
-  TOMCATVERSION="tomcat9"
-  TOMCATUSER="tomcat"
-fi
+#Set Tomcat Version
+TOMCATVERSION="tomcat9"
+TOMCATUSER="tomcat"
 
 
 #Script Debug Set Variables. Do not enable unless you are troubleshooting
