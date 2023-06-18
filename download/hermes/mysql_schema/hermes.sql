@@ -2657,7 +2657,7 @@ INSERT INTO `system_settings` VALUES ('2', 'postmaster', 'postmaster@domain.tld'
 INSERT INTO `system_settings` VALUES ('3', 'pdf_sender', null);
 INSERT INTO `system_settings` VALUES ('4', 'portal_url', null);
 INSERT INTO `system_settings` VALUES ('25', 'certificate_file', null);
-INSERT INTO `system_settings` VALUES ('7', 'version_no', '18.04');
+INSERT INTO `system_settings` VALUES ('7', 'version_no', '20.04');
 INSERT INTO `system_settings` VALUES ('8', 'admin_email', 'someone@otherdomain.tld');
 INSERT INTO `system_settings` VALUES ('9', 'company', '');
 INSERT INTO `system_settings` VALUES ('10', 'address', '');
@@ -2687,6 +2687,7 @@ INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('75', 'daily_update_check', '2');
 INSERT INTO `system_settings` VALUES ('76', 'timezone', 'America/New_York');
+INSERT INTO `system_settings` VALUES ('77', 'telemetry', '1');
 
 -- ----------------------------
 -- Table structure for `system_updates`
@@ -2720,7 +2721,7 @@ INSERT INTO `system_updates` VALUES ('44', '18.04', '211019', '1', '2021-11-15 0
 INSERT INTO `system_updates` VALUES ('45', '18.04', '211207', '1', '2022-01-14 00:00:00', '14');
 INSERT INTO `system_updates` VALUES ('46', '18.04', '220203', '1', '2022-04-02 00:00:00', '15');
 INSERT INTO `system_updates` VALUES ('47', '18.04', '220410', '1', '2022-04-10 00:00:00', '16');
-INSERT INTO `system_updates` VALUES ('48', '18.04', '221211', '1', '2022-12-11 00:00:00', '17');
+INSERT INTO `system_updates` VALUES ('48', '20.04', '221211', '1', '2023-06-11 00:00:00', '17');
 
 
 -- ----------------------------

@@ -604,6 +604,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <!--- GET PARAMETERS FROM PARAMETERS2 TABLE BELOW --->
 
             <cfinclude template="./inc/get_network_parameters.cfm" />
+            <cfinclude template="./inc/get_console_settings.cfm" />
                
             <cfquery name="update" datasource="hermes">
             update parameters2 set applied='1' where module='network'
@@ -625,6 +626,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset ServerName="#server_name.value2#">
             <cfset ServerDomain="#server_domain.value2#">
             <cfset ServerSubnet="#server_subnet.value2#">
+            <cfset ConsoleHost="#console_host.value2#">
             
             <!--- GET PARAMETERS FROM PARAMETERS2 TABLE ABOVE --->
             

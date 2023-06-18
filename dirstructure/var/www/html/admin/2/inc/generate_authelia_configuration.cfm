@@ -262,6 +262,9 @@ destination = "/etc/authelia/configuration.HERMES">
 <cffile action = "move" source = "/opt/hermes/tmp/#customtrans3#_configuration.yml" 
 destination = "/etc/authelia/configuration.yml">
 
+<!--- Restart Authelia --->   
+<cfinclude template="restart_authelia.cfm">
+
 
 
 

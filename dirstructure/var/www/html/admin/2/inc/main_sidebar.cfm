@@ -133,14 +133,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </a>
               </li>
 
-
-              <li class="nav-item">
-                <a href="/admin/system_backup.cfm" class="nav-link">
-                  <i class="fas fa-upload nav-icon"></i>
-                  <p>System Backup</p>
-                </a>
-              </li>
-
               
               <li class="nav-item">
                 <a href="view_system_certificates.cfm" class="nav-link">
@@ -150,13 +142,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </li>
 
               
-              <li class="nav-item">
-                <a href="/admin/system_restore.cfm" class="nav-link">
-                  <i class="fas fa-download nav-icon"></i>
-                  <p>System Restore</p>
-                </a>
-              </li>
-
                             
               <li class="nav-item">
                 <a href="view_system_settings.cfm" class="nav-link">
@@ -173,7 +158,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </li>
 
               <li class="nav-item">
-                <a href="/admin/system_update.cfm" class="nav-link">
+                <a href="view_system_updates.cfm" class="nav-link">
                   <i class="fas fa-code nav-icon"></i>
                   <p>System Update</p>
                 </a>
