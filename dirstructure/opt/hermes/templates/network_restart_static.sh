@@ -4,17 +4,18 @@
 #Replace /etc/network/interfaces
 /bin/mv /opt/hermes/tmp/THE-TRANSACTIONTHE-INT-FILE.HERMES.static THE-NETWORK-FILE
 
+#No longer Neeeded handled by /inc/modify_hosts.cfm template
 #Backup /etc/hosts
-/bin/cp /etc/hosts /etc/hosts.HERMES.BACKUP
+#/bin/cp /etc/hosts /etc/hosts.HERMES.BACKUP
 
 #Replace /etc/hosts
-/bin/mv /opt/hermes/tmp/THE-TRANSACTIONhosts /etc/hosts
+#/bin/mv /opt/hermes/tmp/THE-TRANSACTIONhosts /etc/hosts
 
 #Backup /etc/mailname
-/bin/cp /etc/mailname /etc/mailname.HERMES.BACKUP
+#/bin/cp /etc/mailname /etc/mailname.HERMES.BACKUP
 
 #Replace /etc/mailname
-/bin/mv /opt/hermes/tmp/THE-TRANSACTIONmailname /etc/mailname
+#/bin/mv /opt/hermes/tmp/THE-TRANSACTIONmailname /etc/mailname
 
 #Set hostname
 /usr/bin/hostnamectl set-hostname SERVER-NAME

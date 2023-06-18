@@ -140,19 +140,19 @@
         where token like binary '#theToken#'
         </CFQUERY>
 
+<cfoutput>Authorized</cfoutput><br>
+        <cfoutput>Redirect: http://127.0.0.1:8888#theUrl#</cfoutput><br>   
 
+    
 
 <cfexecute name="/usr/bin/curl"
-arguments="-X 'POST' -k 'http://127.0.0.1:8888/#theUrl#' -H 'accept: */*' -H 'X-Token: #theToken#' -H 'X-Verify-Token: #VerifyToken#'"
+arguments="-X 'POST' -k 'http://127.0.0.1:8888#theUrl#' -H 'accept: */*' -H 'X-Token: #theToken#' -H 'X-Verify-Token: #VerifyToken#'"
 variable="curlresult"
 timeout="10" />
 
         
-        <!---
-        <cfoutput>Redirect: #theUrl#</cfoutput><br>       
-        --->
-     
-        <cfoutput>Authorized</cfoutput>
+
+
         <cfoutput>#curlresult#</cfoutput>
            
         <cfelse>

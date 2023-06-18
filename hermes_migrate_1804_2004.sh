@@ -124,6 +124,14 @@ rm -rf /etc/default/tomcat8.ORIGINAL >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2
 
 stop_spinner $?
 
+start_spinner 'Installing Netplan...'
+sleep 1
+
+##TRY NETPLAN INSTALL IN CASE IT'S MISSING FROM UBUNTU 18.04 TO UBUNTU 20.04 UPGRADE
+apt-get install netplan.io -y >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
+
+stop_spinner $?
+
 start_spinner 'Updating Hermes SEG Version...'
 sleep 1
 
