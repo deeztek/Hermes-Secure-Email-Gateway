@@ -132,6 +132,28 @@ apt-get install netplan.io -y >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
+start_spinner 'Installing Snap (If Necessary. This may fail if already installed)...'
+sleep 1
+
+##TRY SNAP INSTALL IN CASE IT'S MISSING FROM UBUNTU 18.04 TO UBUNTU 20.04 UPGRADE
+apt-get install snapd -y >> $SCRIPTPATH/migrate_log-$TIMESTAMP.log 2>&1
+
+stop_spinner $?
+
+start_spinner 'Outputting Certbot System Timers (Ensure snap.certbot.renew.service and snap.certbot.renew.timer are present)...'
+sleep 1
+
+ls -l  /etc/systemd/system/ | grep certbot | boxes -d stone -p a2v1
+
+stop_spinner $?
+
+start_spinner 'Outputting Certbot Renew Timer (Ensure loaded active waiting appears below)...'
+sleep 1
+
+systemctl list-units | grep certbot.renew | boxes -d stone -p a2v1
+
+stop_spinner $?
+
 start_spinner 'Updating Hermes SEG Version...'
 sleep 1
 
