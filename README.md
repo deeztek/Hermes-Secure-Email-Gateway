@@ -1,7 +1,11 @@
 <h1 align="center"> Hermes Secure Email Gateway </h1> <br>
 <p align="center">
   <a href="https://www.deeztek.com/products/hermes-secure-email-gateway/">
+<<<<<<< HEAD
     <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://imgur.com/mPsIP6E.png" width="auto">
+=======
+    <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://i.imgur.com/XYN1OLa.png" width="auto">
+>>>>>>> parent of 0747cdf... Update README.md
   </a>
 </p>
 
