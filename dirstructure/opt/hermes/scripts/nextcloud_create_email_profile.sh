@@ -1,0 +1,1 @@
+docker exec -u www-data nextcloud /var/www/html/occ mail:account:create THE-USERNAME "FULL-NAME" THE-EMAIL mail.hosting.deeztek.com 993 ssl dino.edwards@mydirectmail.net Tit3p4m20987? mail.hosting.deeztek.com 587 tls dino.edwards@mydirectmail.net Tit3p4m20987? password
