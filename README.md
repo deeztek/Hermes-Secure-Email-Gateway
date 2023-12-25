@@ -1,6 +1,6 @@
 <h1 align="center"> Hermes Secure Email Gateway </h1> <br>
 <p align="center">
-  <a href="https://www.deeztek.com/products/hermes-secure-email-gateway/">
+  <a href="https://www.hermesseg.io">
     <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://imgur.com/Qfzv1iZ.png" width="auto">
 
   </a>
@@ -62,6 +62,8 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 ## Installation
 
 Hermes SEG can be easily installed in your existing **Ubuntu 20.04 LTS Server** machine by utilizing the **ubuntu_hermes_install.sh** script. The script requires that you have a fully updated Ubuntu installation and that you have a /mnt/data directory for database and email archive storage. **You must have at least 8 GB of RAM and 4 CPUs**.
+
+*** Plese note that Hermes SEG will NOT run in a LXC Environment ***
 
 **Required Information**
 
