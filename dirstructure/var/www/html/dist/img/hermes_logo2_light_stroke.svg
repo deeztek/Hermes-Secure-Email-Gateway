@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="575"
+   height="375"
+   viewBox="0 0 152.13541 99.218749"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
+   sodipodi:docname="hermes_logo2_light_stroke.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="0.73139029"
+     inkscape:cx="396.50513"
+     inkscape:cy="451.87912"
+     inkscape:window-width="1289"
+     inkscape:window-height="981"
+     inkscape:window-x="1368"
+     inkscape:window-y="29"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="layer1" />
+  <defs
+     id="defs1">
+    <linearGradient
+       id="linearGradient1"
+       inkscape:collect="always">
+      <stop
+         style="stop-color:#bababa;stop-opacity:1;"
+         offset="0"
+         id="stop1" />
+      <stop
+         style="stop-color:#bababa;stop-opacity:0;"
+         offset="1"
+         id="stop2" />
+    </linearGradient>
+    <radialGradient
+       inkscape:collect="always"
+       xlink:href="#linearGradient1"
+       id="radialGradient2"
+       cx="47.114304"
+       cy="100.53455"
+       fx="47.114304"
+       fy="100.53455"
+       r="46.484489"
+       gradientTransform="matrix(1,0,0,0.29705567,0,70.670191)"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <path
+       fill="#feda75"
+       d="m 107.45913,71.45612 c -2.39889,-0.87497 -5.23393,-2.22516 -8.013053,-2.98184 -8.11742,-2.20477 -16.2013,-2.46175 -24.51443,-1.87436 q -1.74278,0.12442 -3.707363,0.3916 c -4.663561,0.63634 -8.227396,1.41749 -12.326183,2.28023 q -1.804286,0.37936 -3.638396,0.89129 -5.457592,1.51743 -10.958055,2.84111 -1.893755,0.45482 -3.671946,0.67306 -3.94408,0.48337 -7.910528,0.70976 C 28.132039,74.65008 23.662326,73.85261 19.334277,72.25359 12.486194,69.72045 6.5849803,63.96481 3.8226333,56.57751 1.1777153,49.50839 2.3650403,40.83413 9.3380103,37.37095 14.78442,34.66445 21.882273,36.56532 26.717316,40.10396 c 2.424974,1.77442 3.81733,2.77789 6.33923,3.57332 q 5.284248,1.66428 10.753024,2.28227 3.405404,0.38343 12.909595,0.81379 1.673807,0.0755 3.720409,0.22027 4.87045,0.34468 11.794963,0.66081 3.16868,0.14481 6.80148,0.9688 4.74185,1.07485 10.41193,3.78339 5.37371,2.56577 10.31686,6.01058 c 3.657043,2.54946 6.876053,6.57964 9.138863,10.59349 0.70643,1.25434 0.13607,3.02264 -1.44454,2.44544 z"
+       id="path7"
+       style="stroke-width:0.194977" />
+    <path
+       fill="#feda75"
+       d="m 107.45913,71.45612 c -2.39889,-0.87497 -5.23393,-2.22516 -8.013053,-2.98184 -8.11742,-2.20477 -16.2013,-2.46175 -24.51443,-1.87436 q -1.74278,0.12442 -3.707363,0.3916 c -4.663561,0.63634 -8.227396,1.41749 -12.326183,2.28023 q -1.804286,0.37936 -3.638396,0.89129 -5.457592,1.51743 -10.958055,2.84111 -1.893755,0.45482 -3.671946,0.67306 -3.94408,0.48337 -7.910528,0.70976 C 28.132039,74.65008 23.662326,73.85261 19.334277,72.25359 12.486194,69.72045 6.5849803,63.96481 3.8226333,56.57751 1.1777153,49.50839 2.3650403,40.83413 9.3380103,37.37095 14.78442,34.66445 21.882273,36.56532 26.717316,40.10396 c 2.424974,1.77442 3.81733,2.77789 6.33923,3.57332 q 5.284248,1.66428 10.753024,2.28227 3.405404,0.38343 12.909595,0.81379 1.673807,0.0755 3.720409,0.22027 4.87045,0.34468 11.794963,0.66081 3.16868,0.14481 6.80148,0.9688 4.74185,1.07485 10.41193,3.78339 5.37371,2.56577 10.31686,6.01058 c 3.657043,2.54946 6.876053,6.57964 9.138863,10.59349 0.70643,1.25434 0.13607,3.02264 -1.44454,2.44544 z"
+       id="path7-5"
+       style="stroke-width:0.5;stroke:#808080;stroke-opacity:1;opacity:0.2;stroke-dasharray:none" />
+    <path
+       fill="#feda75"
+       d="m 5.0344723,1.698797 c 3.20648,1.730928 6.9089027,3.995388 10.6943597,5.822791 11.058221,5.333833 22.604408,9.303639 34.71249,12.796491 q 2.538714,0.731371 5.435473,1.467956 c 6.87696,1.747067 12.213391,2.878034 18.341042,4.203456 q 2.69728,0.583745 5.47391,1.089708 8.26055,1.509615 16.52938,3.173463 2.84662,0.573468 5.462043,1.256508 5.80088,1.51544 11.56317,3.21928 c 6.66436,1.96957 12.86807,4.61821 18.64752,7.75525 9.14371,4.96572 16.0397,11.71797 17.97584,18.12734 1.85492,6.13402 -2.23917,11.58153 -13.21294,10.70799 -8.57182,-0.68128 -18.24854,-5.3265 -24.22264,-10.04399 -2.99635,-2.36578 -4.72103,-3.71351 -8.12617,-5.44706 Q 97.172377,52.19725 89.483587,49.20422 84.695407,47.34142 71.155861,42.58535 68.771282,41.74798 65.870068,40.68774 58.965866,38.16455 49.102012,34.69761 44.588323,33.11103 39.594607,30.83662 33.076234,27.868314 25.673638,23.333746 18.657624,19.037019 12.502326,14.333759 C 7.9487703,10.85356 4.4323043,6.553864 2.2854253,2.713976 1.6155603,1.514345 2.9219623,0.55784195 5.0344723,1.698797 Z"
+       id="path7-4"
+       style="fill:#ffeab5;fill-opacity:0.52631599;stroke-width:0.5;stroke:#808080;stroke-opacity:1;stroke-dasharray:none;opacity:0.2" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:30.6623px;font-family:Anton;-inkscape-font-specification:'Anton, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#c5c5c5;fill-opacity:1;stroke:#808080;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1;opacity:0.2"
+       x="-0.024488697"
+       y="113.58998"
+       id="text11"
+       transform="scale(1.1539735,0.86657103)"><tspan
+         sodipodi:role="line"
+         id="tspan11"
+         x="-0.024488697"
+         y="113.58998"
+         style="fill:#c5c5c5;fill-opacity:1;stroke:#808080;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1">Hermes</tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:29.9299px;font-family:Anton;-inkscape-font-specification:'Anton, Normal';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;fill:#fafafa;fill-opacity:1;stroke:#808080;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:0.94999999;opacity:0.5"
+       x="107.6963"
+       y="101.34144"
+       id="text12"
+       transform="scale(1.0244731,0.97611153)"><tspan
+         sodipodi:role="line"
+         id="tspan12"
+         x="107.6963"
+         y="101.34144"
+         style="stroke-width:0.5;fill:#fafafa;fill-opacity:1;stroke:#808080;stroke-opacity:0.94999999;stroke-dasharray:none">SEG</tspan></text>
+  </g>
+</svg>

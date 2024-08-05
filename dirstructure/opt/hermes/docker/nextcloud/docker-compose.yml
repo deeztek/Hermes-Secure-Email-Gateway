@@ -45,14 +45,14 @@ HermesSEG_nextcloud_redis:
       - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
 #=== EMAIL SETTINGS BELOW DO NOT SEEM TO WORK UNDER DOCKER ===
 #=== THEY ARE LEFT FOR REFERENCE ONLY. DO NOT CONFIGURE ON THIS FILE BUT RATHER CONFIGURE IN THE NEXTCLOUD BASIC SETTINS OF THE WEB GUI
-      #- SMTP_HOST=${SMTP_HOST}
-      #- SMTP_SECURE=${SMTP_SECURE}
-      #- SMTP_PORT=${SMTP_PORT}
-      #- SMTP_AUTHTYPE=${SMTP_AUTHTYPE}
-      #- SMTP_NAME=${SMTP_NAME}
-      #- SMTP_PASSWORD=${SMTP_PASSWORD}
-      #- MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-      #- MAIL_DOMAIN=${MAIL_DOMAIN}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_AUTHTYPE=${SMTP_AUTHTYPE}
+      - SMTP_NAME=${SMTP_NAME}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
       - OVERWRITEPROTOCOL=https
       #- APACHE_DISABLE_REWRITE_IP=1
 #Uncomment and set to Traefik IP range
@@ -63,38 +63,6 @@ HermesSEG_nextcloud_redis:
       - HermesSEG_nextcloud_redis
       - HermesSEG_nextcloud_db
     restart: unless-stopped
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.cloud-SITENAME.entrypoints=http"
-      - "traefik.http.routers.cloud-SITENAME.rule=Host(`${HOST}.${DOMAIN}`)"
-      - "traefik.http.routers.cloud-SITENAME.middlewares=cloud-https-redirect-SITENAME"
-      - "traefik.http.routers.cloud-secure-SITENAME.middlewares=cloud-SITENAME"
-      - "traefik.http.routers.cloud-dav-SITENAME.middlewares=cloud-dav-SITENAME"
-      - "traefik.http.routers.cloud-secure-SITENAME.entrypoints=https"
-      - "traefik.http.routers.cloud-secure-SITENAME.rule=Host(`${HOST}.${DOMAIN}`)"
-      - "traefik.http.routers.cloud-secure-SITENAME.tls=true"
-#      - "traefik.http.routers.cloud-secure-SITENAME.tls.certresolver=le"
-      - "traefik.http.routers.cloud-secure-SITENAME.service=cloud-SITENAME"
-      - "traefik.http.services.cloud-SITENAME.loadbalancer.server.port=80"
-      - "traefik.docker.network=hermesexternal"
-
-# MIddleware definitions
-      - "traefik.http.middlewares.cloud-https-redirect-SITENAME.redirectscheme.scheme=https"
-
-# Middleware cloud adds additional headers:
-      - "traefik.http.middlewares.cloud-SITENAME.headers.customFrameOptionsValue=SAMEORIGIN"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.framedeny=true"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.sslredirect=true"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.STSIncludeSubdomains=true"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.STSPreload=true"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.stsSeconds=315360000"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.forceSTSHeader=true"
-      - "traefik.http.middlewares.cloud-SITENAME.headers.sslProxyHeaders.X-Forwarded-Proto=https"
-# Middleware cloud-dav replaces .well-known paths for caldav and carddav with proper nextcloud path
-      - "traefik.http.middlewares.cloud-dav-SITENAME.redirectregex.regex=https://(.*)/.well-known/(card|cal)dav"
-      - "traefik.http.middlewares.cloud-dav-SITENAME.redirectregex.replacement=https://(.*)/.well-known/(card|cal)dav"
-      - "traefik.http.middlewares.cloud-webdav-SITENAME.replacepathregex.replacement=/remote.php/dav/"
-      - "traefik.http.middlewares.cloud-dav-SITENAME.redirectregex.permanent=true"
 
 volumes:
 

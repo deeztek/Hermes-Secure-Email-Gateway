@@ -29,7 +29,7 @@
         "sessionCookieHTTPOnly":true,
         "openbrowser":false,
         "debug":true,
-        "cfengine":"lucee@5.2.9+31",
+        "cfengine":"lucee@5.2.9+031",
         "serverHomeDirectory":"/opt/CommandBox/web-contexts/wwwroot-hermesseg"
     }
 }

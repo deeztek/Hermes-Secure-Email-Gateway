@@ -51,6 +51,8 @@
 # bayes_ignore_header X-Spam-Flag
 # bayes_ignore_header X-Spam-Status
 
+#Load DKIM Plugin
+loadplugin Mail::SpamAssassin::Plugin::DKIM
 
 #   Some shortcircuiting, if the plugin is enabled
 # 

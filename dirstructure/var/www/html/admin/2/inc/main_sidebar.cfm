@@ -23,9 +23,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <aside class="main-sidebar sidebar-dark-primary elevation-4">
     <!-- Brand Logo -->
     <a href="preloader_index.cfm" class="brand-link">
-      <img src="/dist/img/hermes_logo.png" alt="Hermes SEG" class="brand-image " style="opacity: .8">
+      <img src="/dist/img/hermes_logo_new_orange2.png" alt="Hermes SEG" class="brand-image " style="opacity: .8">
     
-      <span class="brand-text ">SEG Admin</span>
+      <span class="brand-text ">Admin Console</span>
     
     </a>
 

@@ -74,6 +74,9 @@ string=`lsb_release -d`
 if [[ $string == *"Ubuntu 18.04"* ]]; then
       echo "You must be running Ubuntu 20.04 LTS before attempting to install Hermes SEG, Exiting..."
       exit 1
+elif [[ $string == *"Ubuntu 22.04"* ]]; then
+      echo "You must be running Ubuntu 20.04 LTS before attempting to install Hermes SEG, Exiting..."
+      exit 1
 fi
 
 #Set the script path

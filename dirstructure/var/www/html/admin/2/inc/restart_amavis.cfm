@@ -1,6 +1,5 @@
-<!DOCTYPE html>
 
-  <!---
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
@@ -19,25 +18,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<html lang="en">
 
+
+<cftry>
   
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Welcome</title>
 
+    <cfexecute name = "/bin/systemctl restart amavis"
+    timeout = "10"
+    outputfile ="/dev/null">
+    </cfexecute>
 
-</head>
-<body>
- 
-
+    <cfcatch type="any">
                 
-<!--- REDIRECT TO /ADMIN/2/INDEX.CFM --->
-<cflocation url="/admin/2/preloader_index.cfm" addtoken="no">
-
-</body>
-
-</html>
-
-
+    <cfset m="Restart Amavis: There was an error re-starting Amavis">
+    <cfinclude template="error.cfm">
+    <cfabort>   
+                
+    </cfcatch>
+    </cftry>

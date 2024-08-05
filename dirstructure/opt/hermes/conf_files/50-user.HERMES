@@ -117,6 +117,22 @@ qr'^MAIL-UNDECIPHERABLE$', # recheck full mail if it contains undecipherables
 qr'^(ASCII(?! cpio)|text|uuencoded|xxencoded|binhex)'i,
 ));
 
+#=== DKIM CONFIG BELOW ===
+$enable_dkim_verification = enable-dkim-verification;
+$enable_dkim_signing = enable-dkim-signing;
+
+DKIM-KEYS-GO-HERE
+
+@dkim_signature_options_bysender_maps = (
+  {
+    '.' => {
+      ttl => 30*24*3600,
+      c => 'relaxed/simple'
+    }
+  }
+);
+
+
 #=== BANNED FILE CONFIGURATION BELOW ===
 $banned_filename_re = new_RE(
 # qr'^UNDECIPHERABLE$',  # is or contains any undecipherable components
