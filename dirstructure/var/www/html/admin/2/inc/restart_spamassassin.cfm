@@ -1,6 +1,5 @@
-<!DOCTYPE html>
 
-  <!---
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
@@ -19,25 +18,41 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<html lang="en">
 
+<cftry>
   
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Welcome</title>
 
+    <cfexecute name = "/usr/bin/spamassassin --lint"
+    timeout = "10"
+    variable="salint">
+    </cfexecute>
 
-</head>
-<body>
- 
+    <cfcatch type="any">
+    
+    <cfoutput>    
+    <cfset m="Test Spamassassin: Error #salint# while testing Spamassassin Configuration ">
+    </cfoutput>
 
+    <cfinclude template="error.cfm">
+    <cfabort>   
                 
-<!--- REDIRECT TO /ADMIN/2/INDEX.CFM --->
-<cflocation url="/admin/2/preloader_index.cfm" addtoken="no">
-
-</body>
-
-</html>
+    </cfcatch>
+    </cftry>
 
 
+<cftry>
+  
+
+    <cfexecute name = "/bin/systemctl restart spamassassin"
+    timeout = "10"
+    outputfile ="/dev/null">
+    </cfexecute>
+
+    <cfcatch type="any">
+                
+    <cfset m="Restart Spamassassin: There was an error restarting Spamassassin">
+    <cfinclude template="error.cfm">
+    <cfabort>   
+                
+    </cfcatch>
+    </cftry>

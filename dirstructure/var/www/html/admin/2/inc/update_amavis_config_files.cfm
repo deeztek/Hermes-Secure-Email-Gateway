@@ -38,6 +38,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     select parameter, value from spam_settings where parameter='final_bad_header_destiny' and active = '1'
     </cfquery>
 
+<cfquery name="get_enable_dkim_verification" datasource="hermes">
+    select parameter, value from spam_settings where parameter='enable_dkim_verification' and active = '1'
+    </cfquery>
+
+<cfquery name="get_enable_dkim_signing" datasource="hermes">
+    select parameter, value from spam_settings where parameter='enable_dkim_signing' and active = '1'
+    </cfquery>
+
 <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
     select random_letter as random from captcha_list_all2 order by RAND() limit 8
     </cfquery>
@@ -115,6 +123,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cffile action = "write"
       file = "/opt/hermes/tmp/#amaviscustomtrans#50-user"
       output = "#REReplace("#user#","final-bad-header-destiny","#get_final_bad_header_destiny.value#","ALL")#">
+
+      <cffile action="read" file="/opt/hermes/tmp/#amaviscustomtrans#50-user" variable="user">
+
+      <cffile action = "write"
+      file = "/opt/hermes/tmp/#amaviscustomtrans#50-user"
+      output = "#REReplace("#user#","enable-dkim-verification","#get_enable_dkim_verification.value#","ALL")#">
+
+      <cffile action="read" file="/opt/hermes/tmp/#amaviscustomtrans#50-user" variable="user">
+
+      <cffile action = "write"
+      file = "/opt/hermes/tmp/#amaviscustomtrans#50-user"
+      output = "#REReplace("#user#","enable-dkim-signing","#get_enable_dkim_signing.value#","ALL")#">
       
   <!--- INSERT HERMES MYSQL DATABASE USERNAME AND PASSWORD BELOW --->    
       
@@ -260,8 +280,45 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
   <!--- INSERT AMAVIS FILE RULES ABOVE --->
 
+  <!--- INSERT DKIM KEYS BELOW --->
+
+<cfquery name="getdkimkeys" datasource="hermes">
+SELECT domain, private, enabled, selector from dkim_sign where enabled = '1'
+</cfquery>
+
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#amaviscustomtrans#_amavis_dkim_keys"
+output = "">
+
+<cfloop query="getdkimkeys">
+
+<cffile action = "append"
+file = "/opt/hermes/tmp/#amaviscustomtrans#_amavis_dkim_keys"
+output = "dkim_key('#domain#', '#selector#', '/opt/hermes/dkim/keys/#selector#_#domain#.dkim.private');"
+addNewLine = "yes">
+
+</cfloop>
+
+<cffile action="read" file="/opt/hermes/tmp/#amaviscustomtrans#_amavis_dkim_keys" variable="theKeys">
+
+<cffile action="read" file="/opt/hermes/tmp/#amaviscustomtrans#50-user" variable="user">
+   
+  <cffile action = "write"
+      file = "/opt/hermes/tmp/#amaviscustomtrans#50-user"
+      output = "#REReplace("#user#","DKIM-KEYS-GO-HERE","#theKeys#","ALL")#">
+  
+<!--- DISABLE BELOW FOR DEBUG --->
+<!---
+  <cfif FileExists("/opt/hermes/tmp/#amaviscustomtrans#_amavis_dkim_keys")>
+  <cffile action="delete" file="/opt/hermes/tmp/#amaviscustomtrans#_amavis_dkim_keys">
+  </cfif>
+--->
+
+  <!--- INSERT DKIM KEYS ABOVE --->
+
   <!--- MAKE BACKUP /ETC/AMAVIS/CONF.D/50-USER --->
   <cffile action="copy" source = "/etc/amavis/conf.d/50-user" destination = "/etc/amavis/conf.d/50-user.HERMES.BACKUP">
 
-    <!--- COPY /opt/hermes/tmp/#amaviscustomtrans#50-user to /etc/amavis/conf.d/50-user --->
+    <!--- MOVE /opt/hermes/tmp/#amaviscustomtrans#50-user to /etc/amavis/conf.d/50-user --->
     <cffile action="move" source = "/opt/hermes/tmp/#amaviscustomtrans#50-user" destination = "/etc/amavis/conf.d/50-user">
