@@ -183,6 +183,9 @@ Post your questions at:
 Chat with us on Matrix:
 [https://matrix.to/#/#hermesseg:matrix.org](https://matrix.to/#/#hermesseg:matrix.org)
 
+Chat with us on Telegram:
+[https://t.me/HermesSEG](https://t.me/HermesSEG)
+
 ## Bugs
 
 Bugs can be posted on Github Issues at:
