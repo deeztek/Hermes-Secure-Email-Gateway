@@ -10,7 +10,7 @@ filename.txt
 compile.cfm
 *.bat
 create_hermes_update_readme.txt
-rename_compiled_files.ps1
+*.ps1
 syncfiles.log
 /synclogs/
 dos2unix.exe

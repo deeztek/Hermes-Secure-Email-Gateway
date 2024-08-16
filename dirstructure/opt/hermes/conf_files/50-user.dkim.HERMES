@@ -57,15 +57,6 @@ $policy_bank{'MYNETS'} = {  # mail originating from @mynetworks
    spam_quarantine_cutoff_level_maps => [15],
 };
 
-#DKIM CUSTOMIZATIONS
-$enable_dkim_verification = 1;
-$enable_dkim_signing = 1;
-dkim_key('domain.tld', 'domain.tld', '/etc/mail/domain.tld.key.pem');
-dkim_key('domain2.tld', 'domain2.tld', '/etc/mail/domain2.tld.key.pem');
-@dkim_signature_options_bysender_maps = (
-    { '.' => { ttl => 21*24*3600, c => 'relaxed/simple' } } );
-
-#END DKIM CUSTOMIZATIONS
 
 #This policy serves to persuade Postfix to convert mail to 7-bit before submitting to Amavis
 $interface_policy{'10021'} = 'DISABLE8BITMIME';

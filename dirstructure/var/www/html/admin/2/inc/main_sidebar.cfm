@@ -163,6 +163,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   <p>System Update</p>
                 </a>
               </li>
+
+              <li class="nav-item">
+                <a href="view_system_backup.cfm" class="nav-link">
+                  <i class="fas fa-archive nav-icon"></i>
+                  <p>Backup/Restore</p>
+                </a>
+              </li>
            
               <li class="nav-item">
                 <a href="view_system_users.cfm" class="nav-link">
