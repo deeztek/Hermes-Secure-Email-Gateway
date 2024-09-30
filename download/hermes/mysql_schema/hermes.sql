@@ -581,74 +581,6 @@ CREATE TABLE `amavis_sender_bypass` (
 -- ----------------------------
 
 -- ----------------------------
--- Table structure for `archive_jobs`
--- ----------------------------
-DROP TABLE IF EXISTS `archive_jobs`;
-CREATE TABLE `archive_jobs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `entry_name` varchar(255) DEFAULT NULL,
-  `share` varchar(255) DEFAULT NULL,
-  `domain` varchar(255) DEFAULT NULL,
-  `server` varchar(255) DEFAULT NULL,
-  `directory` varchar(255) DEFAULT NULL,
-  `mysqlusername` varchar(255) DEFAULT NULL,
-  `mysqlpassword` varchar(255) DEFAULT NULL,
-  `customtrans` varchar(255) DEFAULT NULL,
-  `startdate` timestamp NULL DEFAULT NULL,
-  `enddate` timestamp NULL DEFAULT NULL,
-  `jobstartdate` timestamp NULL DEFAULT NULL,
-  `jobenddate` timestamp NULL DEFAULT NULL,
-  `status` varchar(255) NOT NULL DEFAULT '',
-  `pid` varchar(255) DEFAULT NULL,
-  `archive_date` date DEFAULT NULL,
-  `archive_interval` int(11) DEFAULT NULL,
-  `username` varchar(255) DEFAULT NULL,
-  `password` varchar(255) DEFAULT NULL,
-  `notification` varchar(255) DEFAULT NULL,
-  `scheduled_interval` varchar(255) DEFAULT NULL,
-  `initial_count` int(11) DEFAULT NULL,
-  `retention` int(11) DEFAULT NULL,
-  `snapshot` varchar(255) DEFAULT NULL,
-  `smbversion` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=96 DEFAULT CHARSET=latin1;
-
--- ----------------------------
--- Records of archive_jobs
--- ----------------------------
-
--- ----------------------------
--- Table structure for `backup_jobs`
--- ----------------------------
-DROP TABLE IF EXISTS `backup_jobs`;
-CREATE TABLE `backup_jobs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `entry_name` varchar(255) DEFAULT NULL,
-  `server` varchar(255) DEFAULT NULL,
-  `domain` varchar(255) DEFAULT NULL,
-  `share` varchar(255) DEFAULT NULL,
-  `username` varchar(255) DEFAULT NULL,
-  `password` varchar(255) DEFAULT NULL,
-  `mysql_username` varchar(255) DEFAULT NULL,
-  `mysql_password` varchar(255) DEFAULT NULL,
-  `scheduled` int(11) DEFAULT NULL,
-  `scheduled_interval` varchar(255) DEFAULT NULL,
-  `directory` varchar(255) DEFAULT NULL,
-  `startdate` timestamp NULL DEFAULT NULL,
-  `notification` varchar(255) DEFAULT NULL,
-  `retention` int(11) DEFAULT NULL,
-  `status` varchar(255) NOT NULL DEFAULT '',
-  `archive` varchar(255) DEFAULT NULL,
-  `encrypt` varchar(255) DEFAULT NULL,
-  `smbversion` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=124 DEFAULT CHARSET=latin1;
-
--- ----------------------------
--- Records of backup_jobs
--- ----------------------------
-
--- ----------------------------
 -- Table structure for `body_temp`
 -- ----------------------------
 DROP TABLE IF EXISTS `body_temp`;
@@ -2436,39 +2368,6 @@ CREATE TABLE `recipients_temp` (
 -- ----------------------------
 
 -- ----------------------------
--- Table structure for `restore_jobs`
--- ----------------------------
-DROP TABLE IF EXISTS `restore_jobs`;
-CREATE TABLE `restore_jobs` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `file_name` varchar(255) DEFAULT NULL,
-  `server` varchar(255) DEFAULT NULL,
-  `domain` varchar(255) DEFAULT NULL,
-  `share` varchar(255) DEFAULT NULL,
-  `username` varchar(255) DEFAULT NULL,
-  `password` varchar(255) DEFAULT NULL,
-  `mysqlusername` varchar(255) DEFAULT NULL,
-  `mysqlpassword` varchar(255) DEFAULT NULL,
-  `scheduled` int(11) DEFAULT NULL,
-  `scheduled_interval` varchar(255) DEFAULT NULL,
-  `directory` varchar(255) DEFAULT NULL,
-  `startdate` timestamp NULL DEFAULT NULL,
-  `notification` varchar(255) DEFAULT NULL,
-  `retention` int(11) DEFAULT NULL,
-  `status` varchar(255) NOT NULL DEFAULT '',
-  `archive` varchar(255) DEFAULT NULL,
-  `encrypt` varchar(255) DEFAULT NULL,
-  `restoreprevious` varchar(255) DEFAULT NULL,
-  `smbversion` varchar(255) DEFAULT NULL,
-  PRIMARY KEY (`id`,`status`)
-) ENGINE=MyISAM AUTO_INCREMENT=78 DEFAULT CHARSET=latin1;
-
--- ----------------------------
--- Records of restore_jobs
--- ----------------------------
-
-
--- ----------------------------
 -- Table structure for `salt`
 -- ----------------------------
 DROP TABLE IF EXISTS `salt`;
@@ -2682,7 +2581,7 @@ INSERT INTO `system_settings` VALUES ('68', 'mysql_password_djigzo', '');
 INSERT INTO `system_settings` VALUES ('69', 'mysql_username_syslog', '');
 INSERT INTO `system_settings` VALUES ('70', 'mysql_password_syslog', '');
 INSERT INTO `system_settings` VALUES ('71', 'archive_interval', '180');
-INSERT INTO `system_settings` VALUES ('72', 'build_no', '231130');
+INSERT INTO `system_settings` VALUES ('72', 'build_no', '240815');
 INSERT INTO `system_settings` VALUES ('73', 'mysql_username_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('74', 'mysql_password_opendmarc', '');
 INSERT INTO `system_settings` VALUES ('75', 'daily_update_check', '2');
@@ -2723,7 +2622,7 @@ INSERT INTO `system_updates` VALUES ('46', '18.04', '220203', '1', '2022-04-02 0
 INSERT INTO `system_updates` VALUES ('47', '18.04', '220410', '1', '2022-04-10 00:00:00', '16');
 INSERT INTO `system_updates` VALUES ('48', '20.04', '221211', '1', '2023-06-11 00:00:00', '17');
 INSERT INTO `system_updates` VALUES ('49', '20.04', '231130', '1', '2023-11-30 00:00:00', '18');
-
+INSERT INTO `system_updates` VALUES ('50', '20.04', '240815', '1', '2024-09-21 00:00:00', '19');
 -- ----------------------------
 -- Table structure for `system_users`
 -- ----------------------------

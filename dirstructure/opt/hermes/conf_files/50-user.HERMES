@@ -110,13 +110,48 @@ $sql_select_white_black_list =
 #  . ' ORDER BY mailaddr.priority DESC';
 
 #$sql_select_policy = 'SELECT domain FROM domains WHERE CONCAT("@",domain) IN (%k)';
-#=== CLAMAV-UNOFFICIAL-SIGS CONFIGURATION ===
+
+#=== FANGFRISCH UNOFFICIAL SIGNATURES CONFIGURATION ===
 @keep_decoded_original_maps = (new_RE(
 qr'^MAIL$', # retain full original message for virus checking
 qr'^MAIL-UNDECIPHERABLE$', # recheck full mail if it contains undecipherables
 qr'^(ASCII(?! cpio)|text|uuencoded|xxencoded|binhex)'i,
+# qr'^Zip archive data',     # don't trust Archive::Zip
 ));
 
+@virus_name_to_spam_score_maps =
+   (new_RE(  # the order matters!
+     [ qr'^TwinWave\.'                                      => undef ],# keep as infected
+     [ qr'^MiscreantPunch\.'                                => undef ],# keep as infected
+     [ qr'^Structured\.(SSN|CreditCardNumber)\b'            => 2.0 ],
+     [ qr'^(Heuristics\.)?Phishing\.'                       => 2.0 ],
+     [ qr'^(Email|HTML)\.Phishing\.(?!.*Sanesecurity)'      => 10.0 ],
+     [ qr'^Sanesecurity\.(Malware|Badmacro|Foxhole|Rogue|Trojan)\.' => undef ],# keep as infected
+     [ qr'^Sanesecurity\.Phishing\.'                        => 6.0 ],
+     [ qr'^Sanesecurity\.Blurl\.'                           => 4.0 ],
+     [ qr'^Sanesecurity\.Jurlbl\.'                          => 2.0 ],
+     [ qr'^Sanesecurity\.Spam\.'                            => 2.0 ],
+     [ qr'^Sanesecurity\.SpamL\.'                           => 2.0 ],
+     [ qr'^Sanesecurity\.Junk\.'                            => 4.0 ],
+     [ qr'^Sanesecurity\.Scam4\.'                           => 2.0 ],
+     [ qr'^Sanesecurity\.'                                  => 0.1 ],
+     [ qr'^Sanesecurity.TestSig_'                           => 0   ],
+     [ qr'^Email\.Spam\.Bounce(\.[^., ]*)*\.Sanesecurity\.' => 0   ],
+     [ qr'^BofhlandMW\.'                                    => undef ],# keep as infected
+     [ qr'^Bofhland\.Malware\.'                             => undef ],# keep as infected
+     [ qr'^Bofhland\.'                                      => 2.0 ],
+     [ qr'^winnow.malware\.'                                => undef ],# keep as infected
+     [ qr'^winnow\_'                                        => 2.0 ],
+     [ qr'^PhishTank\.Phishing\.'                           => 6.0 ],
+     [ qr'^Porcupine\.Malware\.'                            => undef ],# keep as infected
+     [ qr'^Porcupine\.'                                     => 2.0 ],
+     [ qr'^Email\.Spammail\b'                               => 2.0 ],
+     [ qr'^Safebrowsing\.'                                  => 2.0 ],
+     [ qr'^winnow\.(phish|spam)\.'                          => 2.0 ],
+     [ qr'^SecuriteInfo.com\.Phish'                         => 6.0 ],
+     [ qr'^SecuriteInfo.com\.Spam'                          => 2.0 ],
+     [ qr'^MBL_'                                            => 4.0 ],
+   ));
 
 #=== BANNED FILE CONFIGURATION BELOW ===
 $banned_filename_re = new_RE(

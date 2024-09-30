@@ -49,7 +49,7 @@ server:
 
   ## Set the path on disk to Authelia assets.
   ## Useful to allow overriding of specific static assets.
-  # asset_path: /config/assets/
+  asset_path: /var/www/html/dist/img/
 
   ## Enables the pprof endpoint.
   enable_pprof: false

@@ -71,12 +71,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </li>
 
       <li class="nav-item">
-        <a class="nav-link" onclick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway')" role="button" title="GitHub"><i class="fab fa-github fa-lg"></i>
+        <a class="nav-link" onclick="window.open('https://t.me/HermesSEG')" role="button" title="Telegram Channel"><i class="fab fa-telegram fa-lg"></i>
           </a>
       </li>
 
       <li class="nav-item">
-        <a class="nav-link" onclick="window.open('https://gitlab.deeztek.com/dedwards/hermes-seg-18.04')" role="button" title="GitLab"><i class="fab fa-gitlab fa-lg"></i>
+        <a class="nav-link" onclick="window.open('https://matrix.to/#/#hermesseg:matrix.org')" role="button" title="Matrix Channel"><i class="fas fa-comments fa-lg"></i>
+          </a>
+      </li>
+
+      <li class="nav-item">
+        <a class="nav-link" onclick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway')" role="button" title="GitHub"><i class="fab fa-github fa-lg"></i>
+          </a>
+      </li>
+
+   
+      &nbsp;
+      &nbsp;
+
+      <li class="nav-item">
+        <a class="nav-link" href="/admin/logout.cfm" role="button" title="Logout"><i class="fa fa-sign-out-alt fa-lg"></i>
           </a>
       </li>
 

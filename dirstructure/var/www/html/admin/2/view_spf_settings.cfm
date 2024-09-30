@@ -529,16 +529,10 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
 </p>
 </span>
 
+
+
 <div class="card col-sm-8">
   
-  <!---
-  <div class="card-header border-1">
-
-    <h3 class="card-title"><strong>SPF Settings Settings</strong></h3>
-
-  <!--- class="card-header border-1" --->
-</div>
---->
 
 <form name="spfsettings" method="post">
 
@@ -2160,7 +2154,7 @@ customtrans: <cfoutput>#customtrans3#</cfoutput>
         <tfoot>
           <tr>
       
-            <th><input type="checkbox" id="selectAll" value="selectAll"></th>
+            <th></th>
             <th>Edit</th>    
       <th>Entry</th>
 

@@ -164,19 +164,6 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <cfelseif #logoncount# LTE 5>
 
-<cfquery name="checkrestore" datasource="hermes">
-select status from restore_jobs where status='running'
-</cfquery>
-
-<cfif #checkrestore.recordcount# GTE 1>
-<CFSET session.reason = 6>
-
-<cfoutput>
-  <cflocation url="/user-auth/?uid=#url.uid#&dest=#url.dest#&mid=#mid#&sid=#sid#" addtoken="no"/>
-  </cfoutput>
-
-<!--- /CFIF #checkrestore.recordcount# GTE 1 --->
-</cfif>
 
 <CFSET SESSION.LOGGEDIN = FALSE>
 

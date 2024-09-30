@@ -128,8 +128,8 @@ fi
 #If Commandbox has Lucee 5.2.9 goto upgrade
 File="/var/www/html/server.json"
 if grep -q lucee@5.3.5 "$File"; then
-  echo "Commandbox with Lucee 5.3.5 Found. Nothing to do. Exiting...."
-  exit 1
+  echo "Commandbox with Lucee 5.3.5 Found. Proceeding with upgrade regardless...."
+  goto "upgrade"
 else
    echo "Commandbox with Lucee 5.2.9 Found. Proceeding with upgrade..."
    goto "upgrade"
