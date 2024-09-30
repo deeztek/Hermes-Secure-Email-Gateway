@@ -192,253 +192,132 @@ goto "start"
 
 read -p "Enter MySQL(MariaDB) root user password you wish to use (must not contain special characters or spaces): "  MYSQL_ROOT_PASSWORD
 
-if [ -z "$MYSQL_ROOT_PASSWORD" ]
-
-then
-
-      echo "${RED}MySQL(MariaDB) root user password cannot be empty ${RESET}"
-
-goto "start"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_ROOT_PASSWORD"
-
-then
-        echo "${RED}MySQL(MariaDB) root user password cannot contain any special characters or spaces ${RESET}"
-
-goto "start"
-
-else
-
-goto "step2"
-
-fi
+   if [[ $MYSQL_ROOT_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step2"
+   else
+       echo "${RED}MySQL(MariaDB) root user password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "start"
+   fi
 
 : step2
 
 read -p "Enter MySQL(MariaDB) Hermes SEG user username you wish to use (Example: hermes): "  MYSQL_HERMES_USERNAME
 
-if [ -z "$MYSQL_HERMES_USERNAME" ]
+   if [[ $MYSQL_HERMES_USERNAME =~ ^[[:alnum:]]+$ ]];then
+      goto "step3"
+   else
+       echo "${RED}MySQL(MariaDB) Hermes SEG user username cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step2"
+   fi
 
-then
-
-      echo "${RED}MySQL(MariaDB) Hermes SEG user username cannot be empty ${RESET}"
-
-goto "step2"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_HERMES_USERNAME"
-
-then
-        echo "${RED}MySQL(MariaDB) Hermes SEG user username cannot contain any special characters or spaces ${RESET}"
-
-goto "step2"
-
-else
-
-goto "step3"
-
-fi
 
 : step3
 
 read -p "Enter MySQL(MariaDB) Hermes SEG user password you wish to use (must not contain special characters or spaces): "  MYSQL_HERMES_PASSWORD
 
-if [ -z "$MYSQL_HERMES_PASSWORD" ]
+   if [[ $MYSQL_HERMES_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step4"
+   else
+       echo "${RED}MySQL(MariaDB) Hermes SEG user password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step3"
+   fi
 
-then
 
-      echo "${RED}MySQL(MariaDB) Hermes SEG user password cannot be empty ${RESET}"
-
-goto "step3"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_HERMES_PASSWORD"
-
-then
-        echo "${RED}MySQL(MariaDB) Hermes SEG user password cannot contain any special characters or spaces ${RESET}"
-
-goto "step3"
-
-else
-
-goto "step4"
-
-fi
 
 : step4
 
+
 read -p "Enter MySQL(MariaDB) Syslog username you wish to use (Example: rsyslog): "  MYSQL_SYSLOG_USERNAME
 
-if [ -z "$MYSQL_SYSLOG_USERNAME" ]
+   if [[ $MYSQL_SYSLOG_USERNAME =~ ^[[:alnum:]]+$ ]];then
+      goto "step5"
+   else
+       echo "${RED}MySQL(MariaDB) Syslog username cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step4"
+   fi
 
-then
 
-      echo "${RED}MySQL(MariaDB) Syslog username cannot be empty ${RESET}"
-
-goto "step4"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_SYSLOG_USERNAME"
-
-then
-        echo "${RED}MySQL(MariaDB) Syslog username cannot contain any special characters or spaces ${RESET}"
-
-goto "step4"
-
-else
-
-goto "step5"
-
-fi
 
 : step5
 read -p "Enter MySQL(MariaDB) Syslog user password you wish to use (must not contain special characters or spaces): "  MYSQL_SYSLOG_PASSWORD
 
-if [ -z "$MYSQL_SYSLOG_PASSWORD" ]
 
-then
+   if [[ $MYSQL_SYSLOG_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step6"
+   else
+       echo "${RED}MySQL(MariaDB) Syslog user password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step5"
+   fi
 
-      echo "${RED}MySQL(MariaDB) Syslog user password cannot be empty ${RESET}"
 
-goto "step5"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_SYSLOG_PASSWORD"
-
-then
-        echo "${RED}MySQL(MariaDB) Syslog user password cannot contain any special characters or spaces ${RESET}"
-
-goto "step5"
-
-else
-
-goto "step6"
-
-fi
 
 
 : step6
 
 read -p "Enter MySQL(MariaDB) Ciphermail username you wish to use (Example: ciphermail): "  MYSQL_CIPHERMAIL_USERNAME
 
-if [ -z "$MYSQL_CIPHERMAIL_USERNAME" ]
 
-then
+   if [[ $MYSQL_CIPHERMAIL_USERNAME =~ ^[[:alnum:]]+$ ]];then
+      goto "step7"
+   else
+       echo "${RED}MySQL(MariaDB) Ciphermail username cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step6"
+   fi
 
-      echo "${RED}MySQL(MariaDB) Ciphermail username cannot be empty ${RESET}"
 
-goto "step6"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_USERNAME"
-
-then
-        echo "${RED}MySQL(MariaDB) Ciphermail username cannot contain any special characters or spaces ${RESET}"
-
-goto "step6"
-
-else
-
-goto "step7"
-
-fi
 
 
 : step7
 
 read -p "Enter MySQL(MariaDB) Ciphermail user password you wish to use (must not contain special characters or spaces): "  MYSQL_CIPHERMAIL_PASSWORD
 
-if [ -z "$MYSQL_CIPHERMAIL_PASSWORD" ]
 
-then
+   if [[ $MYSQL_CIPHERMAIL_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step8"
+   else
+       echo "${RED}MySQL(MariaDB) Ciphermail user password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step7"
+   fi
 
-      echo "${RED}MySQL(MariaDB) Ciphermail user password cannot be empty ${RESET}"
-
-goto "step7"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_CIPHERMAIL_PASSWORD"
-
-then
-        echo "${RED}MySQL(MariaDB) Ciphermail user password cannot contain any special characters or spaces ${RESET}"
-
-goto "step7"
-
-else
-
-goto "step8"
-
-fi
 
 
 : step8
 read -p "Enter MySQL(MariaDB) Opendmarc username you wish to use (Example: opendmarc): "  MYSQL_OPENDMARC_USERNAME
 
-if [ -z "$MYSQL_OPENDMARC_USERNAME" ]
+   if [[ $MYSQL_OPENDMARC_USERNAME =~ ^[[:alnum:]]+$ ]];then
+      goto "step9"
+   else
+       echo "${RED}MySQL(MariaDB) Opendmarc username cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step8"
+   fi
 
-then
 
-      echo "${RED}MySQL(MariaDB) Opendmarc username cannot be empty ${RESET}"
-
-goto "step8"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_OPENDMARC_USERNAME"
-
-then
-        echo "${RED}MySQL(MariaDB) Opendmarc username cannot contain any special characters or spaces ${RESET}"
-
-goto "step8"
-
-else
-
-goto "step9"
-
-fi
 
 
 : step9
 read -p "Enter MySQL(MariaDB) Opendmarc user password you wish to use (must not contain special characters or spaces): "  MYSQL_OPENDMARC_PASSWORD
 
-if [ -z "$MYSQL_OPENDMARC_PASSWORD" ]
+   if [[ $MYSQL_OPENDMARC_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step10"
+   else
+       echo "${RED}MySQL(MariaDB) Opendmarc user password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step9"
+   fi
 
-then
-
-      echo "${RED}ySQL(MariaDB) Opendmarc user password cannot be empty ${RESET}"
-
-goto "step9"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$MYSQL_OPENDMARC_PASSWORD"
-
-then
-        echo "${RED}ySQL(MariaDB) Opendmarc user password cannot contain any special characters or spaces ${RESET}"
-
-goto "step9"
-
-else
-
-goto "step10"
-
-fi
 
 
 : step10
 
 read -p "Enter Lucee Server and Web Administrator password you wish to use (must not contain special characters or spaces): "  LUCEE_ADMIN_PASSWORD
 
-if [ -z "$LUCEE_ADMIN_PASSWORD" ]
+   if [[ $LUCEE_ADMIN_PASSWORD =~ ^[[:alnum:]]+$ ]];then
+      goto "step11"
+   else
+       echo "${RED}MySQL(MariaDB) Lucee Server and Web Administrator password cannot be empty or contain any special characters or spaces ${RESET}"
+   goto "step10"
+   fi
 
-then
 
-      echo "${RED}Lucee Server and Web Administrator password cannot be empty ${RESET}"
-
-goto "step10"
-
-elif egrep -q "[~\^\@\#\$\%\&\*\-\=\+\'\"\ ]" <<< "$LUCEE_ADMIN_PASSWORD"
-
-then
-        echo "${RED}Lucee Server and Web Administrator password cannot contain any special characters or spaces ${RESET}"
-
-goto "step10"
-
-else
-
-goto "step11"
-
-fi
 
 : step11
 
@@ -905,33 +784,46 @@ systemctl start clamav-daemon >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
-echo "[`date +%m/%d/%Y-%H:%M`] Removing any existing clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] Installing Python 3.11" >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log
 
-start_spinner 'Removing any existing clamav-unofficial-sigs...'
+start_spinner 'Installing Python 3.11...'
 sleep 1
 
-#Remove any existing clamav-unofficial-sigs
-apt-get purge -y clamav-unofficial-sigs >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+#INSTALL PYTHON 3.11
+apt-get update >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+apt-get install software-properties-common -y >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+add-apt-repository ppa:deadsnakes/ppa -y >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+apt-get install python3.11 -y >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+apt-get install python3.11-venv -y >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+wget https://bootstrap.pypa.io/get-pip.py >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
+python3.11 get-pip.py >> /opt/hermes/tmp/update_log_$THEBUILD-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 
-echo "[`date +%m/%d/%Y-%H:%M`] Installing and configuring extremeshok clamav-unofficial-sigs" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
+echo "[`date +%m/%d/%Y-%H:%M`] Installing and configuring Fangfrisch" >> $SCRIPTPATH/install_log-$TIMESTAMP.log
 
-start_spinner 'Installing and configuring extremeshok clamav-unofficial-sigs...'
+start_spinner 'Installing and configuring Fangfrisch...'
 sleep 1
 
-#Install and configure extremeshok clamav-unofficial-sigs
-mkdir -p /usr/local/sbin/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/clamav-unofficial-sigs.sh -O /usr/local/sbin/clamav-unofficial-sigs.sh >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-mkdir -p /etc/clamav-unofficial-sigs/ >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/master.conf -O /etc/clamav-unofficial-sigs/master.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/user.conf -O /etc/clamav-unofficial-sigs/user.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-wget https://raw.githubusercontent.com/extremeshok/clamav-unofficial-sigs/master/config/os/os.ubuntu.conf -O /etc/clamav-unofficial-sigs/os.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-chmod +x /usr/local/sbin/clamav-unofficial-sigs.sh >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/local/sbin/clamav-unofficial-sigs.sh --install-logrotate >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/local/sbin/clamav-unofficial-sigs.sh --install-man >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/local/sbin/clamav-unofficial-sigs.sh --install-cron >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1 && \
-/usr/local/sbin/clamav-unofficial-sigs.sh --force >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+#INSTALL FANGFRISCH
+mkdir -m 0770 -p /var/lib/fangfrisch >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+mkdir -m 0770 -p /var/lib/fangfrisch/signatures >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+mkdir -p /etc/fangfrisch >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+cp $SCRIPTPATH/download/etc/fangfrisch/fangfrisch.conf /etc/fangfrisch/fangfrisch.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+cp $SCRIPTPATH/download/usr/local/bin/setup-clamav-sigs /usr/local/bin/setup-clamav-sigs >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+chmod +x /usr/local/bin/setup-clamav-sigs >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+chown root:clamav /etc/fangfrisch/fangfrisch.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+chmod 640 /etc/fangfrisch/fangfrisch.conf >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+cp $SCRIPTPATH/download/etc/systemd/system/fangfrisch.service /etc/systemd/system/fangfrisch.service >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+cp $SCRIPTPATH/download/etc/systemd/system/fangfrisch.timer /etc/systemd/system/fangfrisch.timer >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+systemctl enable --now fangfrisch.timer >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+cd /var/lib/fangfrisch >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+python3.11 -m venv venv >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+source venv/bin/activate >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+pip3.11 install fangfrisch >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+chgrp -R clamav /var/lib/fangfrisch >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+sudo -u clamav -- /var/lib/fangfrisch/venv/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf initdb >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
+sudo -u clamav -- /var/lib/fangfrisch/venv/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh >> $SCRIPTPATH/install_log-$TIMESTAMP.log 2>&1
 
 stop_spinner $?
 

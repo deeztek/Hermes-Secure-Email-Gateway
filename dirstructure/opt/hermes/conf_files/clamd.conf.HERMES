@@ -32,7 +32,6 @@ MaxHTMLNoTags 2M
 MaxScriptNormalize 5M
 MaxZipTypeRcg 1M
 ScanSWF true
-DetectBrokenExecutables false
 ExitOnOOM false
 LeaveTemporaryFiles false
 IdleTimeout 30
@@ -44,7 +43,6 @@ CommandReadTimeout 5
 SendBufTimeout 200
 MaxQueue 100
 ExtendedDetectionInfo true
-ScanOnAccess false
 AllowAllMatchScan true
 ForceToDisk false
 DisableCertCheck false
@@ -75,20 +73,5 @@ ExcludePUA PUA.Win.Trojan.Molebox
 ExcludePUA PUA.Win.Packer.Upx
 ExcludePUA PUA.Doc.Packed
 #HERMES CONFIGURATION BELOW
-Scan-Mail
-Scan-Archive
-Archive-BlockEncrypted
-Scan-PE
-Scan-OLE2
-OLE2-BlockMacros
-Scan-PDF
-Scan-HTML
-Algorithmic-Detection
-Scan-ELF
-Phishing-Signatures
-Phishing-ScanURLs
-Phishing-AlwaysBlockSSLMismatch
-Phishing-AlwaysBlockCloak
-Detect-PUA
-HeuristicScan-Precedence
+HERMES_ANTIVIRUS_SETTINGS_GO_HERE
 #HERMES CONFIGURATION ABOVE

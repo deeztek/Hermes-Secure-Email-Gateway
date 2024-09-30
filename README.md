@@ -1,8 +1,7 @@
 <h1 align="center"> Hermes Secure Email Gateway </h1> <br>
 <p align="center">
-  <a href="https://www.hermesseg.io">
+  <a href="https://www.deeztek.com/products/hermes-secure-email-gateway/">
     <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://imgur.com/Qfzv1iZ.png" width="auto">
-
   </a>
 </p>
 
@@ -23,11 +22,7 @@
 
 ## About
 
-Hermes Secure Email Gateway is a Free Open Source Ubuntu Server based Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. It features the latest email authentication techniques such as SPF (Sender Policy Framework), DKIM (DomainKeys Identified Mail) and DMARC (Domain-based Message Authentication, Reporting and Conformance) in order to combat email spoofing, phishing, scams, email compromise attacks and spam.
-
-Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and CipherMail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization.
-
-It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
+Hermes Secure Email Gateway is a Free Open Source Email Gateway that provides Spam, Virus and Malware protection, full in-transit and at-rest email encryption as well as email archiving. Hermes Secure Email Gateway combines Open Source technologies such as Postfix, Apache SpamAssassin, ClamAV, Amavisd-new and Ciphermail under one unified web based Web GUI for easy administration and management of your incoming and ougoing email for your organization. It can be deployed to protect your in-house email solution as well as cloud email solutions such as Google Mail and Microsoft Office 365.
 
 ## Features
 
@@ -62,8 +57,6 @@ It can be deployed to protect your in-house email solution as well as cloud emai
 ## Installation
 
 Hermes SEG can be easily installed in your existing **Ubuntu 20.04 LTS Server** machine by utilizing the **ubuntu_hermes_install.sh** script. The script requires that you have a fully updated Ubuntu installation and that you have a /mnt/data directory for database and email archive storage. **You must have at least 8 GB of RAM and 4 CPUs**.
-
-*** Plese note that Hermes SEG will NOT run in a LXC Environment ***
 
 **Required Information**
 
@@ -146,18 +139,17 @@ tmpfs           395M     0  395M   0% /run/user/1000
 ```
 
 Reboot and ensure /mnt/data gets mounted automatically
-
-**Quick script install and run instructions**
+## Quick script install and run instructions ##
 
 Git clone the Hermes SEG repository:
 
-`sudo git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git`
+`sudo git clone https://gitlab.deeztek.com/dedwards/hermes-seg-18.04.git`
 
-This will clone the repository and create a Hermes-Secure-Email-Gateway directory in the directory you ran the git clone command from.
+This will clone the repository and create a **hermes-seg-18.04** directory in the directory you ran the git clone command from.
 
-Change to the **Hermes-Secure-Email-Gateway** directory:
+Change to the hermes-seg-18.04 directory:
 
-`cd Hermes-Secure-Email-Gateway/`
+`cd hermes-seg-18.04/`
 
 Make script executable:
 
@@ -169,11 +161,11 @@ Run the script as root:
 
 ## Getting Started Guide
 
-Ensure you follow the [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly and correctly. 
+Check out our [Getting Started Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started) to get your Hermes SEG installation configured quickly.
 
 ## Documentation
 
-Check out the [Hermes SEG Administrator](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User](https://docs.deeztek.com/books/hermes-seg-user-guide) guides
+Check out the [Hermes SEG Administrator Guide](https://docs.deeztek.com/books/hermes-seg-administrator-guide) and [Hermes SEG User Guide](hhttps://docs.deeztek.com/books/hermes-seg-user-guide)
 
 ## Support
 
@@ -183,13 +175,9 @@ Post your questions at:
 Chat with us on Matrix:
 [https://matrix.to/#/#hermesseg:matrix.org](https://matrix.to/#/#hermesseg:matrix.org)
 
-Chat with us on Telegram:
-[https://t.me/HermesSEG](https://t.me/HermesSEG)
-
 ## Bugs
 
-Bugs can be posted on Github Issues at:
+Bugs can be posted on our Github Issues at:
 
-[https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues)
-
+[https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/issues](https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/issues)
 

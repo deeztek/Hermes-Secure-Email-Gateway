@@ -1,0 +1,12 @@
+[Unit]
+Description=Download Fangfrisch unofficial clamav virus definition files
+Requires=fangfrisch.service
+
+[Timer]
+Unit=fangfrisch.service
+Persistent=true
+OnUnitActiveSec=10min
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

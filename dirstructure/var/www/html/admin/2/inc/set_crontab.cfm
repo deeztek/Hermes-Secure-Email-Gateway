@@ -91,71 +91,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!--- /CFIF #get_FailureReports.value2# is "true" --->    
     </cfif>   
     
-    
-    <!--- GET ALL BACKUP JOBS --->
-    <cfquery name="getbackupjobs" datasource="hermes">
-    select entry_name, scheduled, startdate, scheduled_interval from backup_jobs 
-    </cfquery>
-    
-    <!--- DELETE EXISTING /ETC/CRON.D/ BACKUP JOBS --->
-    <cfloop query="getbackupjobs">
-    <cfset FiletoDelete="/etc/cron.d/hermes_backupjob_#entry_name#">
-    <cfif fileExists(FiletoDelete)> 
-    <cffile action="delete" 
-    file = "#FiletoDelete#">
-    </cfif>
-    </cfloop>
-        
-    <!--- CREATE /ETC/CRON.D/ BACKUP JOBS --->
-    <cfloop query="getbackupjobs">
-    <cfset timeHour="#timeformat(startdate, "H")#">
-    <cfset timeMinute="#timeformat(startdate, "m")#">
-    <cffile action = "write"
-        file = "/etc/cron.d/hermes_backupjob_#entry_name#"
-        output = "#timeMinute# #timeHour# * * * root /usr/bin/curl --silent http://localhost:8888/schedule/#entry_name#_backup_task.cfm &>/dev/null#chr(10)#"
-        addNewLine = "yes">
-    
-    <!--- CONVERT TO UNIX --->
-    <cfexecute name = "/usr/bin/dos2unix"
-    timeout = "240"
-    arguments="/etc/cron.d/hermes_backupjob_#entry_name#">
-    </cfexecute>
-    
-    </cfloop>
-    
-    
-    <!--- GET ALL ARCHIVE JOBS --->
-    <cfquery name="getarchivejobs" datasource="hermes">
-    select entry_name, startdate, scheduled_interval from archive_jobs
-    </cfquery>
-    
-    <!--- DELETE EXISTING /ETC/CRON.D/ ARCHIVE JOBS --->
-    <cfloop query="getarchivejobs">
-    <cfset FiletoDelete="/etc/cron.d/hermes_archivejob_#entry_name#">
-    <cfif fileExists(FiletoDelete)> 
-    <cffile action="delete" 
-    file = "#FiletoDelete#">
-    </cfif>
-    </cfloop>
-        
-    <!--- CREATE /ETC/CRON.D/ ARCHIVE JOBS --->
-    <cfloop query="getarchivejobs">
-    <cfset timeHour="#timeformat(startdate, "H")#">
-    <cfset timeMinute="#timeformat(startdate, "m")#">
-    <cffile action = "write"
-        file = "/etc/cron.d/hermes_archivejob_#entry_name#"
-        output = "#timeMinute# #timeHour# * * * root /usr/bin/curl --silent http://localhost:8888/schedule/#entry_name#_archive_task.cfm &>/dev/null#chr(10)#"
-        addNewLine = "yes">
-    
-    <!--- CONVERT TO UNIX --->
-    <cfexecute name = "/usr/bin/dos2unix"
-    timeout = "240"
-    arguments="/etc/cron.d/hermes_archivejob_#entry_name#">
-    </cfexecute>
-    
-    </cfloop>
-    
-
+      
     <!--- GET DAILY UPDATE CHECK --->
     <cfquery name="get_update_check" datasource="hermes">
         select value from system_settings where parameter='daily_update_check'

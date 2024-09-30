@@ -178,17 +178,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </a>
               </li>
 
-        
-
-
-              <li class="nav-item">
-                <a href="/admin/email_archive.cfm" class="nav-link">
-                  <i class="fas fa-file-archive nav-icon"></i>
-                  <p>Email Archive</p>
-                </a>
-              </li>
-
-    
+      
 
               <li class="nav-item">
                 <a href="/admin/system_restart.cfm" class="nav-link">
@@ -334,25 +324,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         </li>
 
                         <li class="nav-item">
-                          <a href="/admin/antivirus_settings.cfm" class="nav-link">
+                          <a href="/admin/2/view_antivirus_settings.cfm" class="nav-link">
                             <i class="fas fa-virus nav-icon"></i>
                             <p>Antivirus Settings</p>
                           </a>
                         </li>
 
-                        <li class="nav-item">
-                          <a href="/admin/antivirus_signature_feeds.cfm" class="nav-link">
-                            <i class="fas fa-virus nav-icon"></i>
-                            <p>Antivirus Signature Feeds</p>
-                          </a>
-                        </li>
-
-                        <li class="nav-item">
-                          <a href="/admin/antivirus_signature_bypass.cfm" class="nav-link">
-                            <i class="fas fa-virus nav-icon"></i>
-                            <p>Antivirus Signature Bypass</p>
-                          </a>
-                        </li>
 
                         <li class="nav-item">
                           <a href="/admin/spam_settings.cfm" class="nav-link">
@@ -489,6 +466,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
 
            <!--- LOGOUT STARTS HERE --->
+           <!---
       <li class="nav-item">
         <a href="/admin/logout.cfm" class="nav-link">
           <i class="fas fa-sign-out-alt nav-icon"></i>
@@ -497,7 +475,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </p>
         </a>
       </li>
-
+    --->
        <!--- LOGOUT ENDS HERE --->
 
 
