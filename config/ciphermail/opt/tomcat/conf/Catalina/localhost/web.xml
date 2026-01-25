@@ -1,0 +1,7 @@
+<Context docBase="/usr/share/djigzo-web/djigzo-portal.war" />
+
+<init-param>
+    <param-name>hstsEnabled</param-name>
+    <param-value>false</param-value>
+ </init-param>
+

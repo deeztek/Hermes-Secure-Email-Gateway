@@ -1,0 +1,1 @@
+*/10 * * * * clamav /usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh &>/dev/null

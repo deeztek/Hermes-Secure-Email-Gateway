@@ -1,0 +1,118 @@
+# This is a basic configuration that can easily be adapted to suit a standard
+# installation. For more advanced options, see openmarc.conf(5) and/or
+# /usr/share/doc/opendmarc/examples/opendmarc.conf.sample.
+
+##  AuthservID (string)
+##  	defaults to MTA name
+##
+##  Sets the "authserv-id" to use when generating the Authentication-Results:
+##  header field after verifying a message.  If the string "HOSTNAME" is
+##  provided, the name of the host running the filter (as returned by the
+##  gethostname(3) function) will be used.  
+#
+# AuthservID name
+
+##  FailureReports { true | false }
+##  	default "false"
+##
+##  Enables generation of failure reports when the DMARC test fails and the
+##  purported sender of the message has requested such reports.  Reports are
+##  formatted per RFC6591.
+# 
+FailureReports FAILURE-REPORTS
+
+##  PidFile path
+##  	default (none)
+##
+##  Specifies the path to a file that should be created at process start
+##  containing the process ID.
+#
+PidFile /var/run/opendmarc/opendmarc.pid
+
+##  PublicSuffixList path
+##  	default (none)
+##
+##  Specifies the path to a file that contains top-level domains (TLDs) that
+##  will be used to compute the Organizational Domain for a given domain name,
+##  as described in the DMARC specification.  If not provided, the filter will
+##  not be able to determine the Organizational Domain and only the presented
+##  domain will be evaluated.
+#
+PublicSuffixList /usr/share/publicsuffix
+
+##  RejectFailures { true | false }
+##  	default "false"
+##
+##  If set, messages will be rejected if they fail the DMARC evaluation, or
+##  temp-failed if evaluation could not be completed.  By default, no message
+##  will be rejected or temp-failed regardless of the outcome of the DMARC
+##  evaluation of the message.  Instead, an Authentication-Results header
+##  field will be added.
+#
+RejectFailures REJECT-FAILURES
+
+##  Socket socketspec
+##  	default (none)
+##
+##  Specifies the socket that should be established by the filter to receive
+##  connections from sendmail(8) in order to provide service.  socketspec is
+##  in one of two forms: local:path, which creates a UNIX domain socket at
+##  the specified path, or inet:port[@host] or inet6:port[@host] which creates
+##  a TCP socket on the specified port for the appropriate protocol family.
+##  If the host is not given as either a hostname or an IP address, the
+##  socket will be listening on all interfaces.  This option is mandatory
+##  either in the configuration file or on the command line.  If an IP
+##  address is used, it must be enclosed in square brackets.
+#
+#Socket local:/var/run/opendmarc/opendmarc.sock
+Socket inet:54321@localhost
+
+##  Syslog { true | false }
+##  	default "false"
+##
+##  Log via calls to syslog(3) any interesting activity.
+#
+Syslog true
+
+##  SyslogFacility facility-name
+##  	default "mail"
+##
+##  Log via calls to syslog(3) using the named facility.  The facility names
+##  are the same as the ones allowed in syslog.conf(5).
+#
+# SyslogFacility mail
+
+##  TrustedAuthservIDs string
+##  	default HOSTNAME
+##
+##  Specifies one or more "authserv-id" values to trust as relaying true
+##  upstream DKIM and SPF results.  The default is to use the name of
+##  the MTA processing the message.  To specify a list, separate each entry
+##  with a comma.  The key word "HOSTNAME" will be replaced by the name of
+##  the host running the filter as reported by the gethostname(3) function.
+#
+# TrustedAuthservIDs HOSTNAME
+
+##  UMask mask
+##  	default (none)
+##
+##  Requests a specific permissions mask to be used for file creation.  This
+##  only really applies to creation of the socket when Socket specifies a
+##  UNIX domain socket, and to the HistoryFile and PidFile (if any); temporary
+##  files are normally created by the mkstemp(3) function that enforces a
+##  specific file mode on creation regardless of the process umask.  See
+##  umask(2) for more information.
+#
+UMask 0002
+
+##  UserID user[:group]
+##  	default (none)
+##
+##  Attempts to become the specified userid before starting operations.
+##  The process will be assigned all of the groups and primary group ID of
+##  the named userid unless an alternate group is specified.
+#
+UserID opendmarc
+
+IgnoreHosts /opt/hermes/dkim/TrustedHosts
+HistoryFile /var/run/opendmarc/opendmarc.dat

@@ -1,0 +1,15 @@
+<!--
+    The SMTP client settings used to inject mail back into Postfix
+
+    Note: if you change this port from the default (10026) you should also change the content_filter
+    setting in the Postfix main.cf config file.
+-->
+
+<!-- Although normally multiple addresses are implemented through proper -->
+<!-- DNS configuration, the RemoteDelivery mail does allow specifying -->
+<!-- multiple gateway elements, each of which may also have a port -->
+<!-- e.g., mygateway:2525 -->
+<!-- the gatewayPort element is used as a default -->
+<gateway> hermes_postfix_dkim </gateway>
+<gatewayPort> 10026 </gatewayPort>
+

@@ -1,0 +1,16 @@
+dn: olcOverlay={THE_OVERLAY_INDEX}remoteauth,olcDatabase={THE_MDB_INDEX}mdb,cn=config
+changetype: modify
+replace: olcRemoteAuthDNAttribute
+olcRemoteAuthDNAttribute: THE_DN_ATTRIBUTE
+-
+replace: olcRemoteAuthDomainAttribute
+olcRemoteAuthDomainAttribute: THE_DOMAIN_ATTRIBUTE
+-
+replace: olcRemoteAuthDefaultDomain
+olcRemoteAuthDefaultDomain: THE_DEFAULT_DOMAIN
+-
+replace: olcRemoteAuthTLS
+olcRemoteAuthTLS: starttls=THE_STARTTLS tls_reqcert=THE_TLS_REQCERT
+-
+replace: olcRemoteAuthRetryCount
+olcRemoteAuthRetryCount: THE_RETRY_COUNT

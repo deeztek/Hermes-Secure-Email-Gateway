@@ -1,0 +1,6 @@
+
+# Tell that Argon2 is an allowed hash method
+dn: olcDatabase={-1}frontend,cn=config
+changetype: modify
+add: olcPasswordHash
+olcPasswordHash: {ARGON2}

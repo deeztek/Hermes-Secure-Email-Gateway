@@ -1,0 +1,7 @@
+dn: ou=users,DC=hermes,DC=local
+objectClass: organizationalUnit
+ou: users
+
+dn: ou=groups,DC=hermes,DC=local
+objectClass: organizationalUnit
+ou: groups

@@ -1,0 +1,143 @@
+#!/bin/bash
+set -euo pipefail
+
+###############################################################################
+#0. Read secrets and environment variables
+###############################################################################
+LDAP_ADMIN_PASS=$(cat /run/secrets/LDAP_ADMIN_PASSWORD)
+LDAP_USER_PASS=$(cat /run/secrets/LDAP_USER_PASSWORD)
+LDAP_DOMAIN=${LDAP_DOMAIN:-hermes.local}
+LDAP_ADMIN_USERNAME=${LDAP_ADMIN_USERNAME:-hermes-ldap-admin}
+LDAP_USER_USERNAME=${LDAP_USER_USERNAME:-hermes-ldap-user}
+LDAP_ENABLE_ARGON2=${LDAP_ENABLE_ARGON2:-true}
+
+REAL_SUFFIX="dc=$(echo "$LDAP_DOMAIN" | sed 's/\./,dc=/g')"
+REAL_ADMIN_DN="cn=${LDAP_ADMIN_USERNAME},$REAL_SUFFIX"
+REAL_USER_DN="cn=${LDAP_USER_USERNAME},$REAL_SUFFIX"
+
+###############################################################################
+#1. Substitute environment variables into the slapd.conf template
+###############################################################################
+sed \
+    -e "s|PLACEHOLDER_DOMAIN|${LDAP_DOMAIN}|g" \
+    -e "s|PLACEHOLDER_SUFFIX|${REAL_SUFFIX}|g" \
+    -e "s|PLACEHOLDER_ADMIN_DN|${REAL_ADMIN_DN}|g" \
+    /template-slapd.conf > /tmp/slapd.conf
+
+###############################################################################
+#2. Prepare runtime directories & cleanup
+###############################################################################
+mkdir -p /etc/ldap/slapd.d /var/lib/ldap /var/run/slapd
+chown -R root:root /etc/ldap/slapd.d /var/lib/ldap /var/run/slapd
+chmod 0777 /var/run/slapd
+chmod 700 /var/lib/ldap
+
+pkill slapd 2>/dev/null || true
+rm -f /var/run/slapd/slapd.pid /var/run/slapd/slapd.args
+
+###############################################################################
+#3. Remove and freshly generate slapd.d to avoid placeholder leftovers
+###############################################################################
+rm -rf /etc/ldap/slapd.d
+mkdir -p /etc/ldap/slapd.d
+/usr/local/sbin/slaptest -f /tmp/slapd.conf -F /etc/ldap/slapd.d -n 0
+
+###############################################################################
+#4. Print config summary
+###############################################################################
+echo "Initializing OpenLDAP for domain: $LDAP_DOMAIN"
+echo "Suffix: $REAL_SUFFIX"
+echo "Admin DN: $REAL_ADMIN_DN"
+
+###############################################################################
+#5. Start temporary slapd for configuration update
+###############################################################################
+LDAPI_URI="ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi"
+echo "Starting temporary slapd to configure database..."
+/usr/local/libexec/slapd \
+  -F /etc/ldap/slapd.d \
+  -h "ldap:/// $LDAPI_URI" \
+  -u root -g root -d 256 &
+SLAPD_PID=$!
+
+# Wait for LDAPI socket
+for i in {1..60}; do
+  if [ -S /var/run/slapd/ldapi ]; then
+    echo "LDAPI socket active after $i seconds."
+    break
+  fi
+  echo "Waiting for LDAPI socket ($i)..."
+  sleep 1
+done
+
+chmod 0777 /var/run/slapd/ldapi 2>/dev/null || true
+
+# Wait for slapd to respond
+for i in {1..20}; do
+  if ldapwhoami -Y EXTERNAL -H "$LDAPI_URI" &>/dev/null; then
+    echo "Verified LDAPI EXTERNAL bind."
+    break
+  fi
+  echo "Waiting for slapd readiness ($i)..."
+  sleep 1
+done
+
+###############################################################################
+#6. Compute Argon2 hash and update cn=config
+###############################################################################
+HASHED_ADMIN_PW=$(/usr/local/sbin/slappasswd -o module-load=argon2.so -h {ARGON2} -s "$LDAP_ADMIN_PASS")
+
+cat <<EOF | ldapmodify -Y EXTERNAL -H "$LDAPI_URI"
+dn: olcDatabase={1}mdb,cn=config
+changetype: modify
+replace: olcSuffix
+olcSuffix: $REAL_SUFFIX
+replace: olcRootDN
+olcRootDN: $REAL_ADMIN_DN
+replace: olcRootPW
+olcRootPW: $HASHED_ADMIN_PW
+EOF
+
+echo "Configuration updated: olcSuffix, olcRootDN, olcRootPW set."
+
+###############################################################################
+#7. Create hermes-ldap-user if not present
+###############################################################################
+EXISTS=$(ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "$REAL_SUFFIX" "(uid=${LDAP_USER_USERNAME})" dn 2>/dev/null || true)
+if [ -z "$EXISTS" ]; then
+USER_DN="cn=${LDAP_USER_USERNAME},${REAL_SUFFIX}"
+USER_PASSWORD_HASH=$(/usr/local/sbin/slappasswd -o module-load=argon2.so -h {ARGON2} -s "$LDAP_USER_PASS")
+cat <<LDIF | ldapadd -Y EXTERNAL -H "$LDAPI_URI"
+dn: $USER_DN
+objectClass: inetOrgPerson
+cn: Hermes User
+sn: User
+uid: ${LDAP_USER_USERNAME}
+userPassword: ${USER_PASSWORD_HASH}
+mail: hermes-user@example.local
+LDIF
+echo "Created user ${LDAP_USER_USERNAME} under ${REAL_SUFFIX}."
+else
+echo "User ${LDAP_USER_USERNAME} already exists; skipping creation."
+fi
+
+###############################################################################
+#8. Graceful shutdown of temporary slapd
+###############################################################################
+echo "Stopping temporary slapd gracefully..."
+kill -INT "$TMP_SLAPD_PID" 2>/dev/null || true
+sleep 3
+pkill slapd 2>/dev/null || true
+rm -f /var/run/slapd/slapd.pid /var/run/slapd/slapd.args
+
+###############################################################################
+#9. Start final slapd
+###############################################################################
+echo "Starting slapd in foreground as main service..."
+exec /usr/local/libexec/slapd \
+  -F /etc/ldap/slapd.d \
+  -h "ldap:/// $LDAPI_URI" \
+  -u root -g root -d 256
+
+
+

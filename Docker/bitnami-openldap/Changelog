@@ -1,0 +1,24 @@
+Schema2ldif changelog
+=========================
+
+* Schema2ldif 1.3
+
+[Feature] Bugs #5478: We should have a generic tool ldap-schema-manager
+
+* Schema2ldif 1.2
+
+[Fix] Bugs #4572: update and correct BSD license
+[Fix] Bugs #4573: refresh the manpage that have a wrong version number
+[Fix] Bugs #4574: refresh copyright date on schema2ldif
+
+* Schema2ldif 1.1
+
+[Fix] Bugs #2831: create a changelog for schema2ldif
+
+* Schema2ldif 1.0
+
+[Fix] Bugs #2282: cn inside schema conversion should not have .schema behind schema name
+[Fix] Bugs #2337: nova_openldap schema failed insertion
+[Fix] Bugs #2368: Doesn't work for schac.schema
+[Fix] Wishlist #2283: A license should be chosen for the tool
+

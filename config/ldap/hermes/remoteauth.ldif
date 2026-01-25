@@ -1,0 +1,13 @@
+dn: olcOverlay={1}remoteauth,olcDatabase={2}mdb,cn=config
+objectClass: olcOverlayConfig
+objectClass: olcRemoteAuthCfg
+olcOverlay: {1}remoteauth
+olcRemoteAuthDNAttribute: seeAlso
+olcRemoteAuthDomainAttribute: associatedDomain
+#olcRemoteAuthDefaultRealm: deeztek
+olcRemoteAuthDefaultDomain: deeztek
+#olcRemoteAuthMapping: deeztek file:///usr/local/openldap/etc/openldap/deeztek.list
+olcRemoteAuthMapping: deeztek homedc01.deeztek.com
+olcRemoteAuthTLS: starttls=no tls_reqcert=never
+olcRemoteAuthRetryCount: 3
+

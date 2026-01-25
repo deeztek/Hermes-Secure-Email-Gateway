@@ -1,0 +1,8 @@
+dn: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+objectClass: inetOrgPerson
+givenName: THE_FIRSTNAME
+sn: THE_LASTNAME
+displayName: THE_FIRSTNAME THE_LASTNAME
+userPassword: THE_PASSWORD
+mail: THE_EMAIL
+uid: THE_USERNAME

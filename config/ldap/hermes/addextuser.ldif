@@ -1,0 +1,13 @@
+dn: cn=dino.edwards@mydirectmail.net,ou=users,dc=hermes,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+objectClass: domainRelatedObject
+associatedDomain: deeztek
+seeAlso: CN=Dino Edwards,OU=Guacamole Users,DC=deeztek,DC=com
+givenName: Dino
+sn: Edwards
+displayName: Dino Edwards
+mail: dino.edwards@mydirectmail.net
+uid: dino.edwards@mydirectmail.net

@@ -1,0 +1,9 @@
+dn: cn=admins,ou=groups,dc=hermes,dc=local
+changetype: modify
+add: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+
+dn: cn=THE_ACCESS_CONTROL,ou=groups,dc=hermes,dc=local
+changetype: modify
+add: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local

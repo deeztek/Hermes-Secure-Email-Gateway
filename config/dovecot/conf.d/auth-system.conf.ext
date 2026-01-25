@@ -1,0 +1,8 @@
+passdb {
+    driver = ldap
+    args = /etc/dovecot/dovecot-ldap-user.conf
+}
+userdb {
+    driver = sql
+    args = /etc/dovecot/dovecot-sql-user.conf
+}

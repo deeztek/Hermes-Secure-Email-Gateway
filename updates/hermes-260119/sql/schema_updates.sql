@@ -1,0 +1,279 @@
+-- Hermes SEG Schema Updates - 2026-01-19
+-- LDAP User Management Integration & Parameters Table Updates
+--
+-- Run this script against the hermes database:
+-- docker exec -i hermes_db_server mysql -u root hermes < /path/to/schema_updates.sql
+
+-- ============================================================================
+-- SYSTEM_USERS TABLE: Add ldap_synced column
+-- This tracks whether a user has been synchronized to LDAP
+-- 0 = not synced, 1 = synced to LDAP
+-- ============================================================================
+
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS ldap_synced TINYINT(1) NOT NULL DEFAULT 0;
+
+-- Mark all existing users as not synced (they will need to be synced to LDAP)
+UPDATE system_users SET ldap_synced = 0 WHERE ldap_synced IS NULL;
+
+-- ============================================================================
+-- SYSTEM_USERS TABLE: Add auth_type and remoteauth_domain columns
+-- auth_type: 'local' for local authentication, 'remote' for RemoteAuth (Pro only)
+-- remoteauth_domain: The domain name for remote authentication (references remoteauth_mappings)
+-- ============================================================================
+
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS auth_type VARCHAR(10) NOT NULL DEFAULT 'local';
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS remoteauth_domain VARCHAR(255) NULL;
+
+-- Set existing users to local authentication
+UPDATE system_users SET auth_type = 'local' WHERE auth_type IS NULL OR auth_type = '';
+
+-- ============================================================================
+-- PARAMETERS TABLE: Schema modifications and data updates
+-- ============================================================================
+
+-- 1) Add new parent_name column (text)
+ALTER TABLE parameters
+  ADD COLUMN parent_name VARCHAR(255) NULL AFTER parent;
+
+-- 2) Change parent from INT to TEXT
+ALTER TABLE parameters
+  MODIFY parent VARCHAR(255) NULL;
+
+-- 3) Change order1 from INT to DECIMAL (allows values like 1.1)
+ALTER TABLE parameters
+  MODIFY order1 DECIMAL(7,3) NULL;
+
+-- 4) Insert the new permit_sasl_authenticated row
+--    Let MySQL auto-assign id; parent is '6' (now text)
+INSERT INTO parameters (
+    parameter, whitelist, blacklist, weight,
+    smtpd_recipient_restrictions,
+    name, module, priority, default_value, editable, conf_file,
+    description, parent, child, order1, enabled, applied, action,
+    network_entry, note
+)
+VALUES (
+    'permit_sasl_authenticated',
+    NULL, NULL, NULL,
+    NULL,
+    'Allow SASL Authenticated Users', 'postfix', NULL, NULL, 1, 'main.cf',
+    NULL, '6', 1, 1.1, 1, 1, NULL,
+    NULL, NULL
+);
+
+-- 5) Remove all rows that belong to the 'network' module
+DELETE FROM parameters
+WHERE module = 'network';
+
+-- 6) For child rows, fill parent_name from the parent's parameter
+UPDATE parameters AS c
+JOIN parameters AS p
+  ON CAST(c.parent AS UNSIGNED) = p.id
+SET c.parent_name = p.parameter
+WHERE c.child = 1
+  AND c.parent IS NOT NULL;
+
+-- ============================================================================
+-- REMOTEAUTH TABLES: Remote Authentication Configuration
+-- Allows pass-through authentication to external AD/LDAP servers
+-- ============================================================================
+
+-- Domain-to-server mappings for remote authentication
+CREATE TABLE IF NOT EXISTS remoteauth_mappings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    domain_name VARCHAR(255) NOT NULL,         -- Domain name (e.g., 'deeztek')
+    server_address VARCHAR(255) NOT NULL,      -- Server hostname/IP (e.g., 'homedc01.deeztek.com')
+    server_port INT DEFAULT 389,               -- LDAP port (389 or 636)
+    remote_dn_pattern VARCHAR(500) NULL,       -- Remote DN pattern (e.g., 'cn={firstname} {lastname},ou=Users,dc=deeztek,dc=com')
+    tls_starttls VARCHAR(10) DEFAULT 'no',     -- Use STARTTLS (yes/no)
+    tls_reqcert VARCHAR(20) DEFAULT 'never',   -- TLS cert requirement (never/allow/try/demand)
+    ca_cert_file VARCHAR(255) NULL,            -- CA certificate filename (stored in /opt/hermes/certs/remoteauth/)
+    retry_count INT DEFAULT 3,                 -- Number of auth retry attempts
+    description VARCHAR(500) NULL,             -- Optional description
+    enabled TINYINT(1) DEFAULT 1,              -- Enable/disable this mapping
+    ldap_synced TINYINT(1) DEFAULT 0,          -- 0=not synced, 1=synced to LDAP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY unique_domain (domain_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Add remote_dn_pattern column if table already exists (for upgrades)
+ALTER TABLE remoteauth_mappings ADD COLUMN IF NOT EXISTS remote_dn_pattern VARCHAR(500) NULL AFTER server_port;
+
+-- Add ca_cert_file column for TLS certificate path (for upgrades)
+ALTER TABLE remoteauth_mappings ADD COLUMN IF NOT EXISTS ca_cert_file VARCHAR(255) NULL AFTER tls_reqcert;
+
+-- Global settings for RemoteAuth overlay
+CREATE TABLE IF NOT EXISTS remoteauth_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_name VARCHAR(100) NOT NULL UNIQUE,
+    setting_value VARCHAR(500) NOT NULL,
+    description VARCHAR(500) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert default settings (only if table is empty)
+-- Note: OpenLDAP remoteauth is a SINGLETON overlay - only ONE overlay allowed per database
+-- TLS settings are GLOBAL for all domain mappings (olcRemoteAuthTLS is SINGLE-VALUE)
+-- Domain mappings are added as multi-valued olcRemoteAuthMapping attributes on the single overlay
+INSERT INTO remoteauth_settings (setting_name, setting_value, description)
+SELECT * FROM (
+    SELECT 'enabled' AS setting_name, '0' AS setting_value, 'Master enable/disable for RemoteAuth overlay' AS description
+    UNION ALL SELECT 'ldap_synced', '0', 'Whether settings have been synced to LDAP'
+    UNION ALL SELECT 'tls_starttls', 'no', 'Global STARTTLS setting (yes/no) - applies to all domain mappings'
+    UNION ALL SELECT 'tls_reqcert', 'never', 'Global TLS certificate requirement (never/allow/try/demand)'
+    UNION ALL SELECT 'ca_cert_file', '', 'Global CA certificate filename (stored in /opt/hermes/certs/remoteauth/)'
+    UNION ALL SELECT 'retry_count', '3', 'Global retry count for authentication attempts'
+) AS tmp
+WHERE NOT EXISTS (SELECT 1 FROM remoteauth_settings LIMIT 1);
+
+-- Add global TLS settings for existing installations (migration)
+INSERT IGNORE INTO remoteauth_settings (setting_name, setting_value, description) VALUES
+    ('tls_starttls', 'no', 'Global STARTTLS setting (yes/no) - applies to all domain mappings'),
+    ('tls_reqcert', 'never', 'Global TLS certificate requirement (never/allow/try/demand)'),
+    ('ca_cert_file', '', 'Global CA certificate filename (stored in /opt/hermes/certs/remoteauth/)'),
+    ('retry_count', '3', 'Global retry count for authentication attempts');
+
+-- ============================================================================
+-- MSGS TABLE: Add index on time_iso for improved query performance
+-- The time_iso column is heavily used in:
+--   - Message history queries (WHERE time_iso BETWEEN ... AND ...)
+--   - Quarantine reports (date range filtering)
+--   - Message cleanup jobs (WHERE time_iso < ...)
+--   - ORDER BY time_iso DESC (sorting by date)
+-- ============================================================================
+
+-- Create index on time_iso (will fail silently if index already exists)
+-- Note: Run this manually if it fails: CREATE INDEX idx_msgs_time_iso ON msgs(time_iso);
+CREATE INDEX IF NOT EXISTS idx_msgs_time_iso ON msgs(time_iso);
+
+-- ============================================================================
+-- INTRUSION PREVENTION TABLES: Fail2ban Management GUI
+-- Allows administrators to manage fail2ban settings via web interface
+-- ============================================================================
+
+-- Global settings for Intrusion Prevention
+CREATE TABLE IF NOT EXISTS intrusion_prevention_settings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    setting_name VARCHAR(100) NOT NULL UNIQUE,
+    setting_value VARCHAR(500) NOT NULL,
+    description VARCHAR(500) NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Insert default settings (only if table is empty)
+INSERT INTO intrusion_prevention_settings (setting_name, setting_value, description)
+SELECT * FROM (
+    SELECT 'enabled' AS setting_name, '1' AS setting_value, 'Master enable/disable for Intrusion Prevention' AS description
+    UNION ALL SELECT 'config_synced', '1', 'Whether jail config has been synced to fail2ban'
+) AS tmp
+WHERE NOT EXISTS (SELECT 1 FROM intrusion_prevention_settings LIMIT 1);
+
+-- Jail configurations (pre-populated with existing jails)
+CREATE TABLE IF NOT EXISTS intrusion_prevention_jails (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    jail_name VARCHAR(100) NOT NULL UNIQUE,
+    display_name VARCHAR(100) NOT NULL,
+    description VARCHAR(500) NULL,
+    filter_name VARCHAR(100) NOT NULL,
+    action_name VARCHAR(100) NOT NULL,
+    logpath VARCHAR(500) NOT NULL,
+    port VARCHAR(100) NULL,
+    maxretry INT DEFAULT 5,
+    findtime INT DEFAULT 86400,
+    bantime INT DEFAULT 1800,
+    enabled TINYINT(1) DEFAULT 1,
+    config_synced TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Pre-populate with existing jails (Option A - edit only, no add/delete)
+-- Actions use iptables for blocking + API call for database logging
+INSERT INTO intrusion_prevention_jails (jail_name, display_name, description, filter_name, action_name, logpath, port, maxretry, findtime, bantime, enabled)
+SELECT * FROM (
+    SELECT 'dovecot' AS jail_name, 'Mail Server (Dovecot)' AS display_name, 'Protects against brute force attacks on mail server authentication' AS description, 'dovecot' AS filter_name, 'hermes-iptables-dovecot' AS action_name, '/remotelogs/dovecot/dovecot-info.log' AS logpath, NULL AS port, 5 AS maxretry, 86400 AS findtime, 1800 AS bantime, 1 AS enabled
+    UNION ALL SELECT 'authelia', 'SSO Portal (Authelia)', 'Protects against brute force attacks on Single Sign-On portal', 'authelia-auth', 'hermes-iptables-authelia', '/remotelogs/authelia/authelia.log', 'http,https,9091', 5, 86400, 1800, 1
+) AS tmp
+WHERE NOT EXISTS (SELECT 1 FROM intrusion_prevention_jails LIMIT 1);
+
+-- Update action names for existing installations (migration from UFW to iptables)
+UPDATE intrusion_prevention_jails SET action_name = 'hermes-iptables-dovecot' WHERE jail_name = 'dovecot' AND action_name = 'hermes-dovecot-action';
+UPDATE intrusion_prevention_jails SET action_name = 'hermes-iptables-authelia' WHERE jail_name = 'authelia' AND action_name = 'hermes-authelia-action';
+
+-- IP Whitelist (ignoreip entries)
+CREATE TABLE IF NOT EXISTS intrusion_prevention_whitelist (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    ip_cidr VARCHAR(50) NOT NULL UNIQUE,
+    description VARCHAR(500) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Pre-populate with default whitelist from jail.local
+INSERT INTO intrusion_prevention_whitelist (ip_cidr, description)
+SELECT * FROM (
+    SELECT '127.0.0.1/8' AS ip_cidr, 'Localhost IPv4' AS description
+    UNION ALL SELECT '::1', 'Localhost IPv6'
+    UNION ALL SELECT '172.16.0.0/12', 'Docker internal network'
+) AS tmp
+WHERE NOT EXISTS (SELECT 1 FROM intrusion_prevention_whitelist LIMIT 1);
+
+-- ============================================================================
+-- FAIL2BAN_IPS TABLE: Add jail column for tracking which jail banned the IP
+-- ============================================================================
+
+ALTER TABLE fail2ban_ips ADD COLUMN IF NOT EXISTS jail VARCHAR(100) NULL AFTER ban_source;
+
+-- ============================================================================
+-- API_TOKENS TABLE: Update Fail2ban token IP for network_mode: host
+-- With fail2ban using network_mode: host, API calls come from Docker gateway IP
+-- ============================================================================
+
+UPDATE api_tokens SET ip = '172.16.32.1' WHERE name = 'Fail2ban' AND ip = '172.16.32.102';
+
+-- ============================================================================
+-- SMTP SNI PARAMETER: tls_server_sni_maps for Postfix SNI support
+-- This parameter is dynamically enabled/disabled based on validated certificates
+-- ============================================================================
+
+-- Insert parent parameter for tls_server_sni_maps (disabled by default)
+INSERT INTO parameters (
+    parameter, whitelist, blacklist, weight,
+    smtpd_recipient_restrictions,
+    name, module, priority, default_value, editable, conf_file,
+    description, parent, child, order1, enabled, applied, action,
+    network_entry, note
+)
+SELECT
+    'tls_server_sni_maps',
+    NULL, NULL, NULL,
+    NULL,
+    'TLS Server SNI Maps', 'postfix', NULL, NULL, 0, 'main.cf',
+    'Server Name Indication certificate mappings', NULL, 0, NULL, 0, 1, NULL,
+    NULL, NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters WHERE parameter = 'tls_server_sni_maps' AND child = 0
+);
+
+-- Get the ID of the parent we just inserted and insert child parameter
+INSERT INTO parameters (
+    parameter, whitelist, blacklist, weight,
+    smtpd_recipient_restrictions,
+    name, module, priority, default_value, editable, conf_file,
+    description, parent, parent_name, child, order1, enabled, applied, action,
+    network_entry, note
+)
+SELECT
+    'hash:/etc/postfix/sni_maps',
+    NULL, NULL, NULL,
+    NULL,
+    'SNI Maps File', 'postfix', NULL, NULL, 0, 'main.cf',
+    NULL,
+    (SELECT id FROM parameters WHERE parameter = 'tls_server_sni_maps' AND child = 0 LIMIT 1),
+    'tls_server_sni_maps',
+    1, 1, 0, 1, NULL,
+    NULL, NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters WHERE parameter = 'hash:/etc/postfix/sni_maps' AND child = 1
+);
+

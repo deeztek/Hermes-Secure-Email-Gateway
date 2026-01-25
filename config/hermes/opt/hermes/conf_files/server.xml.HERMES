@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Note 1:
+  
+  Default Tomcat 6 configuration file for Djigzo. Tomcat 6 in combination with Firefox sometimes fails with
+  ssl_error_internal_error_alert. As a workaround try to set sslProtocol to SSL.
+  
+  see for example:
+  
+  http://old.nabble.com/FireFox-v3.0.1-of-Windows-uses-SSLv2-Record-Layer-even-when-SSLv2-is-disabled-td19239646.html
+  http://markmail.org/thread/x6d77hsmklm3d3uh
+  http://markmail.org/thread/meymo5jjzwmctuql 
+  
+  Note 2:
+  
+  In Tomcat 6 < 6.0.30 there is a bug with the NIO connector (see (https://issues.apache.org/bugzilla/show_bug.cgi?id=50072)
+  This seems to be problematic when Firefox 10 is used because it sometimes results in access denied when posting data.   
+  
+  For Tomcat >= 6.0.30 you can use the org.apache.coyote.http11.Http11NioProtocol instead of the HTTP/1.1 protocol.
+ -->
+<Server>
+    <Service name="Catalina">
+   <Connector port="8888" protocol="HTTP/1.1"
+               connectionTimeout="20000"
+               URIEncoding="UTF-8"
+               redirectPort="8445" />
+ 
+        <Engine name="Catalina" defaultHost="localhost">
+            <Host name="localhost" appBase="webapps" unpackWARs="false"/> 
+        </Engine>
+    </Service>
+</Server>

@@ -1,0 +1,247 @@
+#!/bin/bash -e
+# This is a mockup of a script to produce a snakeoil cert
+# The aim is to have a debconfisable ssl-certificate script
+
+# shellcheck source=/dev/null disable=SC1091
+. /usr/share/debconf/confmodule
+db_version 2.0
+db_capb backup
+
+progname=$(basename "${0}")
+
+usage() {
+    cat <<EOF
+Usage: ${progname} [options] <template> <output>
+       ${progname} [options] generate-default-snakeoil
+
+Options:
+       -h,--help                 This usage text
+       -f,--force-overwrite      Overwrite existing .pem and .key files
+       -n,--no-overwrite         Never overwrite existing snakeoil .pem and
+                                 .key files, even if algorithms are out of date
+       -x,--expiration-days <N>  Override default expiration time
+EOF
+    exit "${1}";
+}
+
+ask_via_debconf() {
+    RET=""
+    if db_settitle make-ssl-cert/title ; then
+	: # OK
+    else
+	echo "Debconf failed with error code $? $RET" >&2
+	echo "Maybe your debconf database is corrupt." >&2
+	echo "Try re-installing ssl-cert." >&2
+    fi
+
+    RET=""
+    while [ "x$RET" = "x" ]; do
+	db_fset make-ssl-cert/hostname seen false
+	db_input high make-ssl-cert/hostname || true
+	db_go
+	db_get make-ssl-cert/hostname
+    done
+
+    db_get make-ssl-cert/hostname
+    HostName="$RET"
+    db_fset make-ssl-cert/hostname seen false
+
+    db_fset make-ssl-cert/altname seen false
+    db_input high make-ssl-cert/altname || true
+    db_go
+    db_get make-ssl-cert/altname
+    AddAltName="$RET"
+    db_fset make-ssl-cert/altname seen false
+    SubjectAltName="DNS:$HostName"
+    [ -z "$AddAltName" ] || SubjectAltName="$SubjectAltName,$AddAltName"
+}
+
+make_snakeoil() {
+    if ! HostName="$(hostname -f)" ; then
+	HostName="$(hostname)"
+	echo "make-ssl-cert: Could not get FQDN, using '$HostName'".
+	echo "make-ssl-cert: You may want to fix your /etc/hosts and/or DNS setup and run"
+	echo "make-ssl-cert: 'make-ssl-cert generate-default-snakeoil --force-overwrite'"
+	echo "make-ssl-cert: again."
+    fi
+    SubjectAltName="DNS:$HostName"
+    if [ ${#HostName} -gt 64 ] ; then
+	# The certificate's common name cannot be longer than 64 chars.
+	# Use the short name instead.
+	HostName="$(hostname)"
+    fi
+}
+
+create_temporary_cnf() {
+    sed -e s#@HostName@#"$HostName"# -e s#@SubjectAltName@#"$SubjectAltName"# "${template}" > "${TMPFILE}"
+}
+
+create_hash_link() {
+    local file="$1"
+    local cryptfile filename i
+    filename=$(basename "$file")
+    cryptfile=$(dirname "$file")/$(openssl x509 -hash -noout -in "$file")
+    i=0
+    while [ -L "${cryptfile}.$i" ] ; do
+	if [ "$(readlink "${cryptfile}.$i")" = "$filename" ] ; then
+	    return 0
+	fi
+	i=$(( i + 1 ))
+    done
+    ln -sf "$filename" "${cryptfile}.$i"
+}
+
+check_min_algo() {
+    local file="$1"
+    local bits
+    if ! openssl x509 -text -in "$file" | grep -q 'Signature Algorithm:.*sha256' ; then
+	echo "Signature algorithm of $file is not sha256. Recreating." >&2
+	return 1
+    fi
+    bits=$(openssl x509 -text -in "$file" |grep -o "Public-Key: \\(.*\\)")
+    # value: "Public-Key: (2048 bit)"
+    bits="${bits##*\(}"
+    bits="${bits% bit\)}"
+    case "$bits" in
+	[0-9][0-9][0-9][0-9])
+	    ;;
+	*)
+	    echo "WARNING: Cannot determine RSA key length" >&2
+	    return 0
+	    ;;
+    esac
+    if [ "$bits" -lt 2048 ] ; then
+	echo "RSA key length of $file is $bits. Recreating with 2048 bits" >&2
+	return 1
+    fi
+    return 0
+}
+
+# Process arguments
+subcommand=
+template=
+opt_force_overwrite="false"
+opt_no_overwrite="false"
+opt_expiration_days="3650"
+
+# Transform long options to short ones
+newargs=()
+for arg in "${@}"; do
+    case "${arg}" in
+	--help)            newargs+=(-h)     ;;
+	--force-overwrite)
+	    # Move to front so that we accept --force-overwrite at the end, for
+	    # compatibility with 1.0.x.
+	    newargs=("-f" "${newargs[@]}")   ;;
+	--no-overwrite)    newargs+=(-n)     ;;
+	--expiration-days) newargs+=(-x)     ;;
+	--*)
+	    printf "Unrecognized option %s\n\n" "${arg}"
+	    usage 1
+	    ;;
+	*)                 newargs+=("$arg") ;;
+    esac
+done
+set -- "${newargs[@]}"
+
+# Parse short options
+while getopts "hfnx:" opt "${@}"; do
+    case "${opt}" in
+	h) usage 0                                ;;
+	f) opt_force_overwrite="true"             ;;
+	n) opt_no_overwrite="true"                ;;
+	x) opt_expiration_days="${OPTARG}"        ;;
+	*)
+	    printf "Unrecognized option %s\n\n" "-${opt}"
+	    usage 1
+	    ;;
+    esac
+done
+shift "$((OPTIND - 1))"
+
+if $opt_force_overwrite && $opt_no_overwrite ; then
+	usage 1
+fi
+
+# Parse subcommand
+if [ "${1}" = "generate-default-snakeoil" ]; then
+    subcommand="${1}"
+else
+    subcommand="manual"
+    template="${1}"
+fi
+
+# Takes two arguments, the base layout and the output cert.
+if [ "${subcommand}" = "manual" ]; then
+    output="${2}"
+    [ -n "${template}" ] || usage 1
+    [ -n "${output}" ]   || usage 1
+
+    # be anal in manual mode.
+    if [ ! -f "${template}" ]; then
+	printf "Could not open template file: %s!\n" "${template}";
+	exit 1;
+    fi
+    if [ -f "${output}" ] && [ "${opt_force_overwrite}" != "true" ]; then
+	printf "%s file already exists!\n" "${output}";
+	exit 1;
+    fi
+    ask_via_debconf
+elif [ "${subcommand}" = "generate-default-snakeoil" ]; then
+    template="/usr/share/ssl-cert/ssleay.cnf"
+    if [ -f "/etc/ssl/certs/ssl-cert-snakeoil.pem" ] && [ -f "/etc/ssl/private/ssl-cert-snakeoil.key" ]; then
+	if "${opt_no_overwrite}" ; then
+	    exit 0
+	fi
+	if ! "${opt_force_overwrite}" ; then
+	    if check_min_algo "/etc/ssl/certs/ssl-cert-snakeoil.pem" ; then
+		exit 0
+	    fi
+	fi
+    fi
+    make_snakeoil
+else
+    usage 1
+fi
+
+# # should be a less common char
+# problem is that openssl virtually accepts everything and we need to
+# sacrifice one char.
+
+TMPFILE="$(mktemp)" || exit 1
+TMPOUT="$(mktemp)"  || exit 1
+
+trap 'rm -f ${TMPFILE} ${TMPOUT}' EXIT
+
+create_temporary_cnf
+
+# create the certificate.
+
+umask 077
+
+if [ "${subcommand}" = "manual" ]; then
+    if ! openssl req -config "${TMPFILE}" -new -x509 -days "${opt_expiration_days}" -nodes -sha256 \
+	-out "${output}" -keyout "${output}" > "${TMPOUT}" 2>&1
+    then
+	echo "Could not create certificate. Openssl output was:" >&2
+	cat "${TMPOUT}" >&2
+	exit 1
+    fi
+    chmod 600 "${output}"
+    create_hash_link "${output}"
+elif [ "${subcommand}" = "generate-default-snakeoil" ]; then
+    if ! openssl req -config "${TMPFILE}" -new -x509 -days "${opt_expiration_days}" -nodes -sha256 \
+	-out /etc/ssl/certs/ssl-cert-snakeoil.pem \
+	-keyout /etc/ssl/private/ssl-cert-snakeoil.key > "${TMPOUT}" 2>&1
+    then
+	echo "Could not create certificate. Openssl output was:" >&2
+	cat "${TMPOUT}" >&2
+	exit 1
+    fi
+    chmod 644 /etc/ssl/certs/ssl-cert-snakeoil.pem
+    chmod 640 /etc/ssl/private/ssl-cert-snakeoil.key
+    chown root:ssl-cert /etc/ssl/private/ssl-cert-snakeoil.key
+    create_hash_link /etc/ssl/certs/ssl-cert-snakeoil.pem
+else
+    usage 1
+fi

@@ -1,0 +1,2 @@
+$shlib_directory/postfix-mysql.so:f:root:-:755
+$manpage_directory/man5/mysql_table.5.gz:f:root:-:644

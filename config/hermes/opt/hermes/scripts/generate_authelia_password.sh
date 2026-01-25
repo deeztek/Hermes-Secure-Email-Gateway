@@ -1,0 +1,1 @@
+/usr/bin/authelia hash-password THE_PASSWORD | sed 's/Password hash: //g'

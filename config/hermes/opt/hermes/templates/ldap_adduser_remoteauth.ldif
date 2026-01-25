@@ -1,0 +1,10 @@
+dn: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+objectClass: inetOrgPerson
+objectClass: domainRelatedObject
+givenName: THE_FIRSTNAME
+sn: THE_LASTNAME
+displayName: THE_FIRSTNAME THE_LASTNAME
+mail: THE_EMAIL
+uid: THE_USERNAME
+seeAlso: THE_SEEALSO
+associatedDomain: THE_DOMAIN

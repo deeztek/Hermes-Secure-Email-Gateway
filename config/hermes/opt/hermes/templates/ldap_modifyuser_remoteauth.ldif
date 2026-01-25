@@ -1,0 +1,19 @@
+dn: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+changetype: modify
+replace: givenName
+givenName: THE_FIRSTNAME
+-
+replace: sn
+sn: THE_LASTNAME
+-
+replace: displayName
+displayName: THE_FIRSTNAME THE_LASTNAME
+-
+replace: mail
+mail: THE_EMAIL
+-
+replace: seeAlso
+seeAlso: THE_SEEALSO
+-
+replace: associatedDomain
+associatedDomain: THE_DOMAIN

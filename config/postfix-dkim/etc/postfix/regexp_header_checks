@@ -1,0 +1,3 @@
+#/^To: bob@here.com/ FILTER smtp:smtp.arelay.com
+#/^To: robert@mydirectmail.org/ FILTER relay:[192.168.10.242]
+#/^From: no-reply@scms.psc.gov/ FILTER relay:[192.168.10.242]

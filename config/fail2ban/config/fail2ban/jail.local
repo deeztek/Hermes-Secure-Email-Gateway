@@ -1,0 +1,30 @@
+[DEFAULT]
+
+# Prevents banning LAN subnets
+ignoreip    = 127.0.0.1/8 ::1
+              172.16.0.0/12
+
+# Default action uses iptables for blocking
+# The hermes-iptables-* actions extend this to also log to the database
+banaction = iptables-allports
+
+[dovecot]
+# Mail server authentication protection
+enabled = true
+logpath = /remotelogs/dovecot/dovecot-info.log
+filter = dovecot
+action  = hermes-iptables-dovecot
+maxretry = 5
+findtime = 1d
+bantime = 1800
+
+[authelia]
+# SSO portal authentication protection
+enabled = true
+port = http,https,9091
+filter = authelia-auth
+logpath = /remotelogs/authelia/authelia.log
+maxretry = 5
+findtime = 1d
+bantime = 1800
+action = hermes-iptables-authelia

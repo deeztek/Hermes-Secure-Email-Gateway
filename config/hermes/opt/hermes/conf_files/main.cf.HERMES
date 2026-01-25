@@ -1,0 +1,82 @@
+queue_directory = /var/spool/postfix
+command_directory = /usr/sbin
+bounce_queue_lifetime = 5d
+maximal_queue_lifetime = 30d
+data_directory = /var/lib/postfix
+mail_owner = postfix
+unknown_local_recipient_reject_code = 550
+debug_peer_level = 2
+debugger_command =
+         PATH=/bin:/usr/bin:/usr/local/bin:/usr/X11R6/bin
+         ddd $daemon_directory/$process_name $process_id & sleep 5
+myorigin = domain.tld
+myhostname = hermes.domain.tld
+mynetworks = 
+message_size_limit = 78643200
+local_transport = ERROR: No local mail delivery is allowed
+mydestination =
+local_recipient_maps =
+virtual_alias_maps = mysql:/etc/postfix/mysql-virtual.cf
+virtual_mailbox_domains = mysql:/etc/postfix/mysql-virtual-mailbox-domains.cf
+virtual_mailbox_maps = mysql:/etc/postfix/mysql-virtual-mailbox.cf
+relay_recipient_maps= mysql:/etc/postfix/mysql-recipients.cf
+transport_maps = hash:/etc/postfix/transport
+relay_domains = mysql:/etc/postfix/mysql-domains.cf
+recipient_delimiter =
+smtpd_helo_required = yes
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain
+smtpd_data_restrictions = reject_unauth_pipelining
+header_checks = regexp:/etc/postfix/regexp_header_checks
+body_checks = pcre:/etc/postfix/body_checks
+content_filter = amavis:[127.0.0.1]:10021
+receive_override_options = no_address_mappings
+smtpd_banner = $myhostname HERMES Secure Email Gateway ESMTP
+policy-spf_time_limit = 3600s
+
+#TLS Policy
+smtp_tls_policy_maps = hash:/etc/postfix/tls_policy
+smtp_tls_note_starttls_offer = yes
+
+# TLS parameters
+smtpd_tls_cert_file = /opt/hermes/ssl/hermes-tls.cer
+smtpd_tls_key_file = /opt/hermes/ssl/hermes-tls.key
+smtpd_tls_CAfile = /opt/hermes/ssl/hermes-tls.root.cer
+
+#smtpd_use_tls=yes
+smtpd_tls_security_level = 
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+smtpd_tls_loglevel = 1
+
+#SASL
+smtpd_tls_auth_only = yes
+smtpd_sasl_security_options = noanonymous
+smtpd_sasl_tls_security_options = noanonymous
+
+# DOVECOT
+smtpd_sasl_type = dovecot
+smtpd_sasl_path = inet:hermes_dovecot:9587
+smtpd_sasl_auth_enable = yes
+
+postscreen_access_list = permit_mynetworks, cidr:/etc/postfix/postscreen_access.cidr 
+postscreen_blacklist_action = enforce
+postscreen_dnsbl_action = enforce
+postscreen_greet_action = enforce
+postscreen_dnsbl_threshold = 3
+postscreen_pipelining_enable = no
+postscreen_non_smtp_command_enable = no
+postscreen_bare_newline_action = enforce
+postscreen_bare_newline_enable = no
+smtp_sasl_password_maps = hash:/etc/postfix/relay_passwd
+relayhost = 
+smtp_sasl_auth_enable = no
+smtpd_relay_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain, check_policy_service unix:private/policy-spf
+milter_protocol = 2
+milter_default_action = accept
+sender_bcc_maps = hash:/etc/postfix/bcc_maps
+smtpd_milters = 
+non_smtpd_milters = 
+smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/amavis_senderbypass
+
+postscreen_dnsbl_sites = wl.mailspike.net=127.0.0.[18;19;20]*-2, hostkarma.junkemailfilter.com=127.0.0.1*-2, list.dnswl.org=127.0.[0..255].0*-2, list.dnswl.org=127.0.[0..255].1*-4, list.dnswl.org=127.0.[0..255].2*-6, list.dnswl.org=127.0.[0..255].3*-8, ix.dnsbl.manitu.net*2, bl.spamcop.net*2, bl.suomispam.net*2, hostkarma.junkemailfilter.com=127.0.0.2*3, hostkarma.junkemailfilter.com=127.0.0.4*2, hostkarma.junkemailfilter.com=127.0.1.2*1, backscatter.spameatingmonkey.net*2, bl.spameatingmonkey.net*2, b.barracudacentral.org=127.0.0.2*7, bl.mailspike.net=127.0.0.2*5, bl.mailspike.net=127.0.0.[10;11;12]*4, dnsbl.sorbs.net=127.0.0.10*8, dnsbl.sorbs.net=127.0.0.5*6, dnsbl.sorbs.net=127.0.0.7*3, dnsbl.sorbs.net=127.0.0.8*2, dnsbl.sorbs.net=127.0.0.6*2, dnsbl.sorbs.net=127.0.0.9*2, zen.spamhaus.org=127.0.0.[10;11]*8, zen.spamhaus.org=127.0.0.[4..7]*6, zen.spamhaus.org=127.0.0.3*4, zen.spamhaus.org=127.0.0.2*3
+

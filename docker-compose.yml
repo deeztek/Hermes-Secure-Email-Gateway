@@ -1,0 +1,777 @@
+secrets:
+
+  LDAP_ADMIN_PASSWORD:
+    file: ./config/hermes/opt/hermes/keys/ldap_admin_password_file
+
+  LDAP_USER_PASSWORD:
+    file: ./config/hermes/opt/hermes/keys/ldap_user_password_file
+
+  AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET:
+    file: ./config/hermes/opt/hermes/keys/authelia_identity_validation_reset_password_jwt_secret_file
+
+  AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET:
+    file: ./config/hermes/opt/hermes/keys/authelia_identity_providers_oidc_hmac_secret_file
+
+  AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS:
+    file: ./config/hermes/opt/hermes/keys/authelia_identity_providers_oidc_jwks_file
+
+  AUTHELIA_IDENTITY_PROVIDERS_OIDC_CLIENTS_SECRET_DIGEST:
+    file: ./config/hermes/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_digest_file
+
+  AUTHELIA_IDENTITY_PROVIDERS_OIDC_CLIENTS_SECRET_PLAIN:
+    file: ./config/hermes/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file
+
+  AUTHELIA_DUO_API_INTEGRATION_KEY:
+    file: ./config/hermes/opt/hermes/keys/authelia_duo_api_integration_key_file
+
+  AUTHELIA_DUO_API_SECRET_KEY:
+    file: ./config/hermes/opt/hermes/keys/authelia_duo_api_secret_key_file
+
+  AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD:
+    #file: ./config/hermes/opt/hermes/keys/ldap_admin_password_file
+    file: ./config/hermes/opt/hermes/keys/ldap_user_password_file
+
+  AUTHELIA_SESSION_SECRET:
+    file: ./config/hermes/opt/hermes/keys/authelia_session_secret_file
+
+  AUTHELIA_SESSION_REDIS_PASSWORD:
+    file: ./config/hermes/opt/hermes/keys/authelia_session_redis_password_file
+
+  AUTHELIA_STORAGE_ENCRYPTION_KEY:
+    file: ./config/hermes/opt/hermes/keys/authelia_storage_encryption_key_file
+
+networks:
+  hermes_net_ext:
+    ipam:
+      driver: default
+      config:
+        - subnet: ${IPV4SUBNET}.0/24
+ 
+
+services:
+  hermes_db_server:
+    image: linuxserver/mariadb
+    container_name: hermes_db_server
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
+
+    environment:
+      - PUID=$PUID
+      - PGID=$GUID
+      #- MYSQL_ROOT_PASSWORD=$MYSQLROOTPASSWORD
+      - TZ=$TIMEZONE
+      #- MYSQL_DATABASE=USER_DB_NAME #optional
+      #- MYSQL_USER=MYSQL_USER #optional
+      #- MYSQL_PASSWORD=DATABASE_PASSWORD #optional
+      #- REMOTE_SQL=http://URL1/your.sql,https://URL2/your.sql #optional
+    volumes:
+      - db_data:/config
+      - ./config/hermes/opt/hermes:/opt/hermes
+    ports:
+      - 3306:3306
+    restart: always
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.104
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+
+
+  hermes_ofelia:
+    image: 'mcuadros/ofelia:latest'
+    container_name: hermes_ofelia
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
+
+    environment:
+      - "TZ=$TIMEZONE"
+    volumes:
+      # the ofelia config file
+      - ./config/ofelia:/etc/ofelia
+      # your docker reg credentials
+      #- /home/centos/.docker/config.json:/root/.docker/config.json
+      # the docker socket so ofelia can docker run ...
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    restart: unless-stopped
+    depends_on:
+      - hermes_commandbox
+
+  hermes_nginx:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx:latest
+    container_name: hermes_nginx
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=$TIMEZONE
+    volumes:
+      - ./config/nginx/etc/nginx/nginx.conf:/etc/nginx/nginx.conf
+      #- ./config/nginx/etc/nginx/sites-available/hermes.conf:/etc/nginx/sites-enabled/hermes.conf
+      #- ./config/nginx/etc/nginx/sites-available/hermes-ssl.conf:/etc/nginx/sites-enabled/hermes-ssl.conf
+      - ./config/nginx/etc/nginx/sites-available:/etc/nginx/sites-available
+      - ./config/nginx/etc/nginx/sites-enabled:/etc/nginx/sites-enabled
+      - ./config/nginx/etc/nginx/snippets:/etc/nginx/snippets
+      - ./config/hermes/var/www/html:/var/www/html
+      - ./config/hermes/opt/hermes/ssl:/opt/hermes/ssl
+      - ./config/certbot/conf:/etc/letsencrypt
+      #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/fullchain.pem:/etc/letsencrypt/live/${HERMES_HOSTNAME}/fullchain.pem
+      #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/privkey.pem:/etc/letsencrypt/live/${HERMES_HOSTNAME}/privkey.pem
+      #- ./config/certbot/conf/:/etc/nginx/ssl/:ro
+      - nginx_logs:/var/log
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.106
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - hermes_authelia
+      - hermes_ciphermail
+      - hermes_commandbox
+    restart: always
+
+
+  hermes_nginx_auth:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx-auth:latest
+    container_name: hermes_nginx_auth
+    secrets:
+      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.114
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+    expose:
+      - 9000
+    depends_on:
+      - hermes_ldap
+      - hermes_nginx
+      - hermes_commandbox
+    restart: always
+    environment:
+      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE=/run/secrets/AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
+
+
+  hermes_authelia:
+    image: authelia/authelia:4.38.0
+    container_name: hermes_authelia
+    secrets:
+      - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET
+      - AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET
+      - AUTHELIA_IDENTITY_PROVIDERS_OIDC_JWKS
+      - AUTHELIA_IDENTITY_PROVIDERS_OIDC_CLIENTS_SECRET_DIGEST
+      - AUTHELIA_DUO_API_INTEGRATION_KEY
+      - AUTHELIA_DUO_API_SECRET_KEY
+      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
+      - AUTHELIA_SESSION_SECRET
+      - AUTHELIA_SESSION_REDIS_PASSWORD
+      - AUTHELIA_STORAGE_ENCRYPTION_KEY
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
+    volumes:
+      - ./config/authelia:/config
+      - ./config/hermes/var/www/html/dist/img:/var/www/html/dist/img
+      - ./config/hermes/opt/hermes/keys:/keys
+      - authelia_logs:/logs
+      - authelia_db:/db
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.108
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+
+    expose:
+      - 9091
+    restart: always
+    environment:
+      - TZ=${TIMEZONE}
+      - X_AUTHELIA_CONFIG_FILTERS=template #Enable Authelia template file filter https://www.authelia.com/configuration/methods/files/#file-filters
+      - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET_FILE=/run/secrets/AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET
+      - AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET_FILE=/run/secrets/AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET
+      - AUTHELIA_DUO_API_INTEGRATION_KEY_FILE=/run/secrets/AUTHELIA_DUO_API_INTEGRATION_KEY
+      - AUTHELIA_DUO_API_SECRET_KEY_FILE=/run/secrets/AUTHELIA_DUO_API_SECRET_KEY
+      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE=/run/secrets/AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
+      - AUTHELIA_SESSION_SECRET_FILE=/run/secrets/AUTHELIA_SESSION_SECRET
+      - AUTHELIA_SESSION_REDIS_PASSWORD_FILE=/run/secrets/AUTHELIA_SESSION_REDIS_PASSWORD
+      - AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE=/run/secrets/AUTHELIA_STORAGE_ENCRYPTION_KEY
+      - LDAP_USER_USERNAME=${LDAP_USER_USERNAME}
+      - LDAP_BASE_DN=${LDAP_BASE_DN}
+    depends_on:
+      - hermes_postfix_dkim
+      - hermes_ldap
+
+
+  hermes_authelia_redis:
+    image: 'bitnami/redis:latest'
+    container_name: hermes_authelia_redis
+    secrets:
+      - AUTHELIA_SESSION_REDIS_PASSWORD
+    logging:
+      options:
+        max-size: 10m
+    volumes:
+      - authelia_redis:/var/lib/redis
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.109
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+    expose:
+      - 6379
+    restart: always
+    environment:
+      - TZ=${TIMEZONE}
+      - REDIS_PASSWORD_FILE=/run/secrets/AUTHELIA_SESSION_REDIS_PASSWORD
+
+
+  hermes_commandbox:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-commandbox:latest
+    container_name: hermes_commandbox
+    logging:
+      options:
+        max-size: 10m
+    environment:
+      TZ: ${TIMEZONE}
+      CFADMIN_PASSWORD: ${CFADMIN_PASSWORD}
+      #HERMES_HOSTNAME: ${HERMES_HOSTNAME}
+      #HOST_IP: ${HOST_IP}
+      CONSOLE_HOST: ${CONSOLE_HOST}
+      #url_rewrites: "true"
+    volumes:
+      - ./docker-compose.yml:/opt/hermes-seg-container-gl/docker-compose.yml
+      - ./.env:/opt/hermes-seg-container-gl/.env
+      - /var/run/docker.sock:/var/run/docker.sock #Access Docker Unix socket
+      - ./config/hermes/var/www/html:/var/www/html #Application Directory
+      - commandbox_serverhome:/serverhome #Server Home Directory
+      - amavis_data:/mnt/data/amavis #Amavis Data
+      - dovecot_mail:/mnt/data/vmail:ro #Dovecot Vmail Data (read-only for monitoring)
+      - nextcloud:/mnt/data/nextcloud #Nextcloud Data
+      - ./config/ciphermail/usr/share:/usr/share #Ciphermail
+      - ./config/hermes/opt/hermes:/opt/hermes
+      - ./config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt:/serverhome/WEB-INF/lucee-server/context/password.txt
+      - ./config/certbot/conf:/etc/letsencrypt
+      - ./config/ofelia:/etc/ofelia
+      - ./config/authelia:/etc/authelia
+      - ./config/nginx/etc/nginx:/etc/nginx
+      - ./config/postfix-dkim/etc/postfix:/etc/postfix
+      - ./config/postfix-dkim/etc/opendkim.conf:/etc/opendkim.conf
+      - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
+      - ./config/ldap:/ldap
+      - /proc:/host/proc:ro #Host /proc for system resource monitoring
+      - /:/host/root:ro #Host root filesystem for disk usage monitoring
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.113
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+    ports:
+      - 8888:8888
+    restart: always
+    privileged: true
+    expose:
+      - 8888
+
+  hermes_postfix_dkim:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-postfix-dkim:latest
+    container_name: hermes_postfix_dkim
+    #build:
+      #context: .
+      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 10026:10026
+      - 25:25
+      - 587:587
+      - 8891:8891
+  
+    restart: unless-stopped
+    depends_on:
+      - hermes_db_server
+
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.110
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      - ./config/postfix-dkim/etc/postfix:/etc/postfix
+      - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
+      - ./config/postfix-dkim/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
+      - ./config/certbot/conf:/etc/letsencrypt
+      - ./config/postfix-dkim/etc/opendkim.conf:/etc/opendkim.conf
+      - ./config/hermes/opt/hermes:/opt/hermes
+      - postfix_dkim_logs:/var/log
+      - postfix_dkim_queue:/var/spool/postfix
+    environment:
+      - TZ=${TIMEZONE}
+
+  hermes_dmarc:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-dmarc:latest
+    container_name: hermes_dmarc
+    #build:
+      #context: .
+      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 54321:54321
+
+    restart: unless-stopped
+    depends_on:
+      - hermes_postfix_dkim
+
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.111
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      - ./config/opendmarc/etc/opendmarc:/etc/opendmarc
+      - ./config/opendmarc/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
+      - ./config/hermes/opt/hermes:/opt/hermes:ro
+      - dmarc_logs:/var/log
+    environment:
+      - TZ=${TIMEZONE}
+
+
+ 
+  hermes_mail_filter:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-mail-filter:latest
+    container_name: hermes_mail_filter
+    #build:
+      #context: .
+      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 10021:10021
+      - 10030:10030
+    restart: unless-stopped
+    depends_on:
+      - hermes_db_server
+
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.105
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      - ./config/mail_filter/etc/amavis/black.lst:/etc/amavis/black.lst
+      - ./config/mail_filter/etc/amavis/white.lst:/etc/amavis/white.lst
+      - ./config/mail_filter/etc/amavis/mynetworks:/etc/amavis/mynetworks
+      - ./config/mail_filter/etc/amavis/conf.d/50-user:/etc/amavis/conf.d/50-user
+      - ./config/mail_filter/etc/amavis/conf.d/15-content_filter_mode:/etc/amavis/conf.d/15-content_filter_mode
+      - ./config/postfix-dkim/etc/postfix/relay_domains:/etc/postfix/relay_domains
+      - ./config/mail_filter/etc/spamassassin/local.cf:/etc/spamassassin/local.cf
+      - ./config/mail_filter/sa-bayes:/sa-bayes
+      - ./config/mail_filter/etc/clamav/clamd.conf:/etc/clamav/clamd.conf
+      - ./config/mail_filter/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
+      - ./config/mail_filter/usr/local/bin/setup-clamav-sigs:/usr/local/bin/setup-clamav-sigs
+      - ./config/common/etc/mailname:/etc/mailname
+      - ./config/hermes/opt/hermes/sa-bayes:/opt/hermes/sa-bayes
+      - mail_filter_logs:/var/log
+      - mail_filter_data_amavis:/var/lib/amavis
+      - mail_filter_data_clamav:/var/lib/clamav
+      - mail_filter_data_fangfrisch:/var/lib/fangfrisch
+      - amavis_data:/mnt/data/amavis
+
+    environment:
+      - TZ=${TIMEZONE}
+
+  hermes_ciphermail:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-ciphermail:latest
+    container_name: hermes_ciphermail
+    privileged: true
+    #build:
+      #context: .
+      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 2525:25
+      - 10025:10025
+      - 8443:8443    
+
+    restart: unless-stopped
+    depends_on:
+      - hermes_postfix_dkim
+
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.112
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      #- ./config/ciphermail/etc/default/tomcat10:/etc/default/tomcat10
+      - ./config/ciphermail/usr/share/djigzo/conf/james/SAR-INF/smtp_transport_config.xml:/usr/share/djigzo/conf/james/SAR-INF/smtp_transport_config.xml
+      #- ./config/ciphermail/usr/share/djigzo/conf/james/SAR-INF/smtp_server_config.xml:/usr/share/djigzo/conf/james/SAR-INF/smtp_server_config.xml
+      - ./config/ciphermail/usr/share/djigzo/conf/james/SAR-INF/config.xml:/usr/share/djigzo/conf/james/SAR-INF/config.xml
+      - ./config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml:/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml
+      - ./config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml:/usr/share/djigzo/conf/database/hibernate.cfg.xml
+      #- ./config/ciphermail/usr/share/djigzo/wrapper/wrapper-additional-parameters.conf:/usr/share/djigzo/wrapper/wrapper-additional-parameters.conf
+      #- ./config/ciphermail/opt/tomcat/conf/server.xml:/opt/tomcat/conf/server.xml
+      #- ./config/ciphermail/opt/tomcat/conf/Catalina/localhost/ciphermail.xml:/opt/tomcat/conf/Catalina/localhost/ciphermail.xml
+      #- ./config/ciphermail/opt/tomcat/conf/Catalina/localhost/web.xml:/opt/tomcat/conf/Catalina/localhost/web.xml
+      - ./config/hermes/opt/hermes:/opt/hermes
+    environment:
+      - TZ=${TIMEZONE}
+
+
+  hermes_fail2ban:
+    image: lscr.io/linuxserver/fail2ban:latest
+    container_name: hermes_fail2ban
+    build:
+      context: .
+      dockerfile: ./dockerfiles/fail2ban/Dockerfile
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    # Host networking required for iptables to work on host's network stack
+    network_mode: host
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TIMEZONE}
+      - VERBOSITY=-vv #optional
+    volumes:
+      - ./config/fail2ban/config:/config
+      - ./config/fail2ban/scripts:/scripts
+      - dovecot_logs:/remotelogs/dovecot:ro
+      - authelia_logs:/remotelogs/authelia:ro
+      - ./config/hermes/opt/hermes:/opt/hermes:ro
+    restart: always
+    # Note: networks and extra_hosts removed - not compatible with network_mode: host
+
+  hermes_nextcloud_redis:
+    image: redis
+    container_name: hermes_nextcloud_redis
+    logging:
+      options:
+        max-size: 10m
+    volumes:
+      - nextcloud_redis:/var/lib/redis
+    command: redis-server --requirepass $NEXTCLOUD_REDIS_PASSWORD
+    restart: always
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.115
+    expose:
+      - 6379
+
+
+  hermes_nextcloud:
+    image: nextcloud:${NCVERSION}
+    container_name: hermes_nextcloud
+    build:
+      context: .
+      dockerfile: ./dockerfiles/nextcloud/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 8081:80
+    volumes:
+      - nextcloud:/var/www/html
+      - /var/www/html/dist/img:/img
+    environment:
+      - TZ=${TIMEZONE}
+      - MYSQL_HOST=${MYSQL_HOST}
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - REDIS_HOST=hermes_nextcloud_redis
+      - REDIS_HOST_PASSWORD=${NEXTCLOUD_REDIS_PASSWORD}
+      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
+      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
+      - OVERWRITEWEBROOT=/nc
+      - OVERWRITEPROTOCOL=https
+      #- APACHE_DISABLE_REWRITE_IP=1
+      - TRUSTED_PROXIES=${TRUSTED_PROXIES}
+      - SMTP_HOST=${SMTP_HOST}
+      - SMTP_PORT=${SMTP_PORT}
+      - SMTP_SECURE=${SMTP_SECURE}
+      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
+      - MAIL_DOMAIN=${MAIL_DOMAIN}
+    depends_on:
+      - hermes_nextcloud_redis
+      - hermes_db_server
+    restart: unless-stopped
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.101
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+
+
+  hermes_dovecot:
+    image: dovecot/dovecot:${DOVECOTVERSION}
+    container_name: hermes_dovecot
+    build:
+      context: .
+      dockerfile: ./dockerfiles/dovecot/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+    ports:
+      - 993:993
+      - 995:995
+      - 143:143
+      - 110:110
+      - 24:24
+      - 4190:4190
+      - 9587:9587
+    depends_on:
+      - hermes_db_server
+      - hermes_ldap
+    restart: unless-stopped
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.100
+
+    extra_hosts:
+    - "host.docker.internal:host-gateway"
+    - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      - ./config/dovecot/conf.d:/etc/dovecot/conf.d
+      - ./config/dovecot/conf:/etc/dovecot
+      - ./config/dovecot/scripts:/scripts
+      - ./config/certbot/conf:/etc/letsencrypt
+      - ./config/hermes/opt/hermes/ssl:/opt/hermes/ssl
+      - /opt/hermes/keys/ecprivkey.pem:/keys/ecprivkey.pem
+      - /opt/hermes/keys/ecpubkey.pem:/keys/ecpubkey.pem
+      - /opt/hermes/creds/hermes_username:/opt/hermes/creds/hermes_username
+      - /opt/hermes/creds/hermes_password:/opt/hermes/creds/hermes_password
+      - dovecot_mail:/srv/mail  
+      - dovecot_logs:/logs
+      #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/fullchain.pem:/certs/fullchain.pem
+      #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/privkey.pem:/certs/privkey.pem
+    environment:
+      - TZ=${TIMEZONE}
+
+
+  hermes_ldap:
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-openldap:latest
+    container_name: hermes_ldap
+    #entrypoint: ["sleep", "infinity"]
+    secrets:
+      - LDAP_ADMIN_PASSWORD
+      - LDAP_USER_PASSWORD
+    environment:
+      LDAP_DOMAIN: ${LDAP_DOMAIN}
+      LDAP_ADMIN_USERNAME: ${LDAP_ADMIN_USERNAME}
+      LDAP_USER_USERNAME: ${LDAP_USER_USERNAME}
+      LDAP_GROUPS: ${LDAP_GROUPS}
+      LDAP_LOG_LEVEL: ${LDAP_LOG_LEVEL}
+    volumes:
+      - ldap_data:/var/lib/ldap
+      - ldap_logs:/var/log
+      - ./config/ldap/hermes:/custom
+      - ./config/hermes/opt/hermes/tmp:/opt/hermes/tmp
+      - ./config/ldap/etc/rsyslog.d/slapd.conf:/etc/rsyslog.d/slapd.conf
+      - ./config/ldap/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
+      - ./config/ldap/etc/ldap/slapd.d:/etc/ldap/slapd.d
+    ports:
+      - "389:389"
+      - "636:636"
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.120
+    restart: always
+
+
+volumes:
+
+  amavis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/amavis
+
+  db_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/dbase
+
+  nextcloud_redis:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/nextcloud/redis
+
+  nextcloud:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/nextcloud/app
+
+  dovecot_mail:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/dovecot/vmail
+
+  authelia_redis:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/authelia/redis
+
+
+  dovecot_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/dovecot/logs
+
+  authelia_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/authelia/logs
+
+  authelia_db:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/authelia/db
+
+  nginx_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/nginx/logs
+
+
+  commandbox_serverhome:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/commandbox/serverhome
+
+
+  openldap_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/openldap
+
+ 
+  ldap_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/ldap/data
+
+  ldap_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/ldap/logs
+
+
+  postfix_dkim_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/postfix_dkim/logs
+
+  postfix_dkim_queue:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/postfix_dkim/queue
+
+  dmarc_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/dmarc/logs
+
+  mail_filter_logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/mail_filter/logs
+
+  mail_filter_data_amavis:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/mail_filter/data/amavis
+
+  mail_filter_data_clamav:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/mail_filter/data/clamav
+ 
+  mail_filter_data_fangfrisch:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/mail_filter/data/fangfrisch
+
+
+
+
+
+
+
