@@ -413,10 +413,10 @@ update mailbox_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_
 <!--- /CFIF #requestacme# is "1" --->
 </cfif>
 
-<!--- /CFLOOP query = "getvalidatedip" --->
-</cfloop>
-
 <!--- /CFIF #create_validated_hash.recordcount# GTE 1 --->
 </cfif>
+
+<!--- /CFLOOP query = "getvalidatedip" --->
+</cfloop>
 
 
