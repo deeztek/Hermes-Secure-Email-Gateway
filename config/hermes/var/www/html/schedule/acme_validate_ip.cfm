@@ -8,6 +8,13 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
+<!--- Include retention policy functions (lightweight, no cleanup operations) --->
+<cfinclude template="retention_policy_functions.cfm">
+
+<cfif NOT isRetentionEnabled()>
+    <cfoutput>Advanced retention policies require valid configuration (Status: #getRetentionStatus()#). Exiting...</cfoutput><br>
+    <cfabort>
+</cfif>
 
 <cfparam name = "requestacme" default = "0">
 
@@ -15,7 +22,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset timenow="#TimeFormat(now(), "HH:mm:ss")#">
 
   <cfquery name="getsubdomains" datasource="hermes">
-select id, acme_certificate, mailbox_domain, subdomain, ip from acme_sans
+select id, certificate, mailbox_domain, subdomain, ip from mailbox_sans
   </cfquery>
 
 
@@ -24,7 +31,7 @@ select id, acme_certificate, mailbox_domain, subdomain, ip from acme_sans
 <cfloop query="getsubdomains">
 
 <!--- GENERATE CUSTOMTRANS --->
-<cfinclude template="generate_customtrans.cfm">
+<cfinclude template="../admin/2/inc/generate_customtrans.cfm">
   
 <!--- GENERATE/ENCRYPT ACTIVATEFILE WITH PUBLIC KEY STARTS HERE --->
 <cffile action = "write"
@@ -42,7 +49,7 @@ output = "#subdomain#" addnewline="no">
     <cfcatch type="any">
  
         <cfset m="/inc/acme_validate_ip.cfm: Error running /usr/bin/openssl">
-        <cfinclude template="error.cfm">
+        <cfinclude template="../admin/2/inc/error.cfm">
         <cfabort>
 
 
@@ -71,7 +78,7 @@ output = "#subdomain#" addnewline="no">
     <cfcatch type="any">
  
         <cfset m="/inc/acme_validate_ip.cfm: Error connecting to https://verify.hermesseg.io">
-        <cfinclude template="error.cfm">
+        <cfinclude template="../admin/2/inc/error.cfm">
         <cfabort>
 
 
@@ -152,7 +159,7 @@ output = "#subdomain#" addnewline="no">
     
     
         <cfset m="/inc/acme_validate_ip.cfm: Error reading server response">
-        <cfinclude template="error.cfm">
+        <cfinclude template="../admin/2/inc/error.cfm">
         <cfabort>
     
     <!-- /CFIF cfcatch.message -->
@@ -180,7 +187,7 @@ output = "#subdomain#" addnewline="no">
 
 
  <cfquery name="updateauto" datasource="hermes">
-  update acme_sans set ip_result_datetime = '#datenow# #timenow#', ip_result_msg = '#serverResponse#'
+  update mailbox_sans set ip_result_datetime = '#datenow# #timenow#', ip_result_msg = '#serverResponse#'
   where id = '#id#'
   </cfquery>
 
@@ -188,7 +195,7 @@ output = "#subdomain#" addnewline="no">
 
 
  <cfquery name="updateauto" datasource="hermes">
-  update acme_sans set ip_result_datetime = '#datenow# #timenow#', ip_result_msg = '#serverResponse#', ip = 'YES'
+  update mailbox_sans set ip_result_datetime = '#datenow# #timenow#', ip_result_msg = '#serverResponse#', ip = 'YES'
   where id = '#id#'
   </cfquery>
 
@@ -216,7 +223,7 @@ output = "#subdomain#" addnewline="no">
 
 <!--- Get all validated ip san subdomains --->
 <cfquery name="getvalidatedip" datasource="hermes">
-select distinct(acme_certificate) from acme_sans where ip = 'YES'
+select distinct(certificate) from mailbox_sans where ip = 'YES'
 </cfquery>
 
 
@@ -227,7 +234,7 @@ select distinct(acme_certificate) from acme_sans where ip = 'YES'
 
 <!--- Create validated ip subdomain hash starts here --->
 <cfquery name="create_validated_hash" datasource="hermes">
-  select subdomain from acme_sans where acme_certificate = '#acme_certificate#' and ip = 'YES' order by subdomain asc
+  select subdomain from mailbox_sans where certificate = '#certificate#' and ip = 'YES' order by subdomain asc
 </cfquery>
 
 <!--- If records exist --->
@@ -255,9 +262,9 @@ select distinct(acme_certificate) from acme_sans where ip = 'YES'
 
 <!--- Create validated ip subdomain hash ends here --->
 
-<!--- Get previous validatedip hash if it exists ---> 
+<!--- Get previous validatedip hash if it exists --->
 <cfquery name="getprevioushash" datasource="hermes">
-select acme_hash from system_certificates where id = '#acme_certificate#'
+select acme_hash from system_certificates where id = '#certificate#'
 </cfquery>
 
 <cfset oldHash = #getprevioushash.acme_hash#>
@@ -268,7 +275,7 @@ select acme_hash from system_certificates where id = '#acme_certificate#'
 <cfoutput>No SAN Domains Hash found. Creating new one and will attempt new certificate request..</cfoutput><br>
 
 <cfquery name="updatehash" datasource="hermes">
-update system_certificates set acme_hash = '#newHash#' where id = '#acme_certificate#'
+update system_certificates set acme_hash = '#newHash#' where id = '#certificate#'
 </cfquery>
 
 <!--- Since no old hash exists set requestacme=1 so that it will request new Acme cert --->
@@ -282,7 +289,7 @@ update system_certificates set acme_hash = '#newHash#' where id = '#acme_certifi
 
 <!--- Update new hash --->
 <cfquery name="updatehash" datasource="hermes">
-update system_certificates set acme_hash = '#newHash#' where id = '#acme_certificate#'
+update system_certificates set acme_hash = '#newHash#' where id = '#certificate#'
 </cfquery>
 
 <cfoutput>SAN Domains Hash changed. Will attempt new certificate request...</cfoutput><br>
@@ -305,7 +312,7 @@ update system_certificates set acme_hash = '#newHash#' where id = '#acme_certifi
 <cfoutput>The number of SANs is below 100. Proceeding with certificate request...</cfoutput><br>
 
 <!--- GENERATE CUSTOMTRANS --->
-<cfinclude template="generate_customtrans.cfm">
+<cfinclude template="../admin/2/inc/generate_customtrans.cfm">
 
   <cffile action = "write"
         file = "/opt/hermes/tmp/#customtrans3#_san_domains"
@@ -324,7 +331,7 @@ update system_certificates set acme_hash = '#newHash#' where id = '#acme_certifi
 
 <!--- GET CERTIFICATE NAME --->
 <cfquery name="getcertname" datasource="hermes">
- select domain_name from system_certificates where id = '#acme_certificate#'
+ select domain_name from system_certificates where id = '#certificate#'
 </cfquery>  
 
 
@@ -349,7 +356,7 @@ update system_certificates set acme_hash = '#newHash#' where id = '#acme_certifi
  <cfoutput>Requesting new certificate for certificate #theCertname#...</cfoutput><br>
 
 <!--- REQUEST SAN CERTIFICATE--->
-<cfinclude template="acme_request_san_certificate.cfm">
+<cfinclude template="../admin/2/inc/acme_request_san_certificate.cfm">
 
 <cfoutput>Acme Output: #acmeOutput#</cfoutput><br>
 
@@ -358,18 +365,27 @@ update system_certificates set acme_hash = '#newHash#' where id = '#acme_certifi
 <cfif FindNoCase("Successfully received certificate", acmeOutput)>
 
 <cfquery name="insertsuccess" datasource="hermes">
-update acme_sans set dns = 'YES', dns_result_msg = 'SUCCESS: Successfully Received SAN Certificate', dns_result_datetime = '#datenow# #timenow#' where acme_certificate = '#acme_certificate#'
+update mailbox_sans set dns = 'YES', dns_result_msg = 'SUCCESS: Successfully Received SAN Certificate', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#'
 </cfquery>
 
 <cfoutput>Successfully obtained certificate for #theCertname#...</cfoutput><br>
 
-<!--- RESTART NGINX--->
-<cfinclude template="restart_nginx.cfm">
+<!--- GENERATE NGINX CONFIGURATION (includes SNI configs) --->
+<cfinclude template="../admin/2/inc/generate_nginx_configuration.cfm">
+
+<!--- RESTART NGINX --->
+<cfinclude template="../admin/2/inc/restart_nginx.cfm">
+
+<!--- GENERATE SMTP SNI CONFIGURATION --->
+<cfinclude template="generate_smtp_sni.cfm">
+
+<!--- GENERATE POSTFIX CONFIGURATION (includes SMTP SNI parameter if enabled) --->
+<cfinclude template="../admin/2/inc/generate_postfix_configuration.cfm">
 
 <cfelse>
 
 <cfquery name="insertfailure" datasource="hermes">
-update acme_sans set dns_result_msg = 'ERROR: #acmeOutput#', dns_result_datetime = '#datenow# #timenow#' where acme_certificate = '#acme_certificate#' and ip = 'YES' and dns = 'NO'
+update mailbox_sans set dns_result_msg = 'ERROR: #acmeOutput#', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#' and ip = 'YES' and dns = 'NO'
 </cfquery>
 
 <cfoutput>Could not obtain certificate for #theCertname#. Error reported was: #acmeOutput#</cfoutput><br>
@@ -381,7 +397,7 @@ update acme_sans set dns_result_msg = 'ERROR: #acmeOutput#', dns_result_datetime
 <cfelse>
 
 <cfquery name="insertsanlimit" datasource="hermes">
-update acme_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_datetime = '#datenow# #timenow#' where acme_certificate = '#acme_certificate#' and ip = 'YES' and dns = 'NO'
+update mailbox_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#' and ip = 'YES' and dns = 'NO'
 </cfquery>
 
 <cfoutput>SAN limit reached for certificate #theCertname#</cfoutput><br>
