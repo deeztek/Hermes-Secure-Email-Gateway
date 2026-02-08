@@ -238,7 +238,7 @@ select distinct(certificate) from mailbox_sans where ip = 'YES'
 </cfquery>
 
 <!--- If records exist --->
-<cfif #create_validated_hash.recordcount GTE 1>
+<cfif #create_validated_hash.recordcount# GTE 1>
 
 <!--- Generate the current SAN Subdomain string out of the previous query --->
 <cfset san_list = ValueList(create_validated_hash.subdomain)>
