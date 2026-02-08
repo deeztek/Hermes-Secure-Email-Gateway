@@ -65,7 +65,7 @@ timeout="10" />
     <cfquery datasource="hermes">
         UPDATE parameters
         SET enabled = 1, applied = 2, action = 'APPLY'
-        WHERE parameter = 'tls_server_sni_maps' AND child = 0 AND module = 'postfix'
+        WHERE parameter = 'tls_server_sni_maps' AND child = 2 AND module = 'postfix'
     </cfquery>
     <cfquery datasource="hermes">
         UPDATE parameters
@@ -77,7 +77,7 @@ timeout="10" />
     <cfquery datasource="hermes">
         UPDATE parameters
         SET enabled = 0, applied = 2, action = 'APPLY'
-        WHERE parameter = 'tls_server_sni_maps' AND child = 0 AND module = 'postfix'
+        WHERE parameter = 'tls_server_sni_maps' AND child = 2 AND module = 'postfix'
     </cfquery>
     <cfquery datasource="hermes">
         UPDATE parameters
@@ -95,7 +95,7 @@ timeout="10" />
 </cfif>
 
 <cfquery name="getparents" datasource="hermes">
-  select distinct(parameter), parent_name, description, child, editable, enabled, conf_file from parameters where enabled='1' and child <> '1' and module='postfix'
+  select distinct(parameter), parent_name, description, child, editable, enabled, conf_file from parameters where enabled='1' and child = '2' and module='postfix'
   </cfquery>
 
 <!--- Create postconf script starts here --->
@@ -192,7 +192,7 @@ update parameters set applied='1', action='NONE' where applied = '2'
 
 <!--- Get mynetworks parent parameter --->
 <cfquery name="getmynetworksparent" datasource="hermes">
-select parameter, parent_name, description, child, editable, enabled, conf_file from parameters where parameter = 'mynetworks' and enabled='1' and child <> '1' and module='postfix'
+select parameter, parent_name, description, child, editable, enabled, conf_file from parameters where parameter = 'mynetworks' and enabled='1' and child = '2' and module='postfix'
 </cfquery>
 
 <!--- Get mynetworks child entries (networks and IPs) --->

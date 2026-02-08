@@ -249,13 +249,13 @@ SELECT
     NULL, NULL, NULL,
     NULL,
     'TLS Server SNI Maps', 'postfix', NULL, NULL, 0, 'main.cf',
-    'Server Name Indication certificate mappings', NULL, 0, NULL, 0, 1, NULL,
+    'Server Name Indication certificate mappings', NULL, 2, NULL, 0, 1, NULL,
     NULL, NULL
 WHERE NOT EXISTS (
-    SELECT 1 FROM parameters WHERE parameter = 'tls_server_sni_maps' AND child = 0
+    SELECT 1 FROM parameters WHERE parameter = 'tls_server_sni_maps' AND child = 2
 );
 
--- Get the ID of the parent we just inserted and insert child parameter
+-- Insert child parameter using parent_name (new schema pattern)
 INSERT INTO parameters (
     parameter, whitelist, blacklist, weight,
     smtpd_recipient_restrictions,
@@ -269,11 +269,22 @@ SELECT
     NULL,
     'SNI Maps File', 'postfix', NULL, NULL, 0, 'main.cf',
     NULL,
-    (SELECT id FROM parameters WHERE parameter = 'tls_server_sni_maps' AND child = 0 LIMIT 1),
+    NULL,
     'tls_server_sni_maps',
     1, 1, 0, 1, NULL,
     NULL, NULL
 WHERE NOT EXISTS (
     SELECT 1 FROM parameters WHERE parameter = 'hash:/etc/postfix/sni_maps' AND child = 1
+);
+
+-- ============================================================================
+-- SYSTEM_SETTINGS TABLE: Add cleanup_threshold for retention policy storage
+-- This stores encrypted configuration data for message cleanup policies
+-- ============================================================================
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'cleanup_threshold', ''
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'cleanup_threshold'
 );
 
