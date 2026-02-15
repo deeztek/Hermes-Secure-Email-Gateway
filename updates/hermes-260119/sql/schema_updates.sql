@@ -288,3 +288,14 @@ WHERE NOT EXISTS (
     SELECT 1 FROM system_settings WHERE parameter = 'cleanup_threshold'
 );
 
+-- ============================================================================
+-- SYSTEM_SETTINGS TABLE: Add template_manifest for Pro Edition tamper detection
+-- This stores encrypted manifest data for template integrity verification
+-- ============================================================================
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'template_manifest', ''
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'template_manifest'
+);
+

@@ -1,0 +1,36 @@
+#!/bin/bash
+# Hermes SEG Pre-push Hook
+# This hook runs a full gitleaks scan before pushing
+
+set -e
+
+echo "Running full secret detection scan before push..."
+
+# Check if gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo "ERROR: gitleaks is not installed."
+    echo "Push aborted. Install gitleaks first."
+    exit 1
+fi
+
+# Get the repo root directory
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# Run gitleaks on the entire repo
+if gitleaks detect --source="$REPO_ROOT" --config="$REPO_ROOT/.gitleaks.toml" --verbose; then
+    echo "No secrets detected. Proceeding with push."
+    exit 0
+else
+    echo ""
+    echo "=============================================="
+    echo "  SECRETS DETECTED - PUSH BLOCKED"
+    echo "=============================================="
+    echo ""
+    echo "The scan found potential secrets in your repository."
+    echo "Review the findings and remove secrets before pushing."
+    echo ""
+    echo "To bypass (NOT RECOMMENDED):"
+    echo "  git push --no-verify"
+    echo ""
+    exit 1
+fi

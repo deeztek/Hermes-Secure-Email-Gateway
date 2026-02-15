@@ -1,0 +1,23 @@
+{
+    "description": "Pro Edition templates for fingerprint verification. This list must be kept in sync between the manifest generator and client verifier.",
+    "templates": [
+        "schedule/retention_policy_functions.cfm",
+        "schedule/get_retention_status.cfm",
+        "schedule/acme_validate_ip.cfm",
+        "schedule/generate_smtp_sni.cfm",
+        "admin/2/inc/license_check.cfm",
+        "admin/2/inc/license_invalid.cfm",
+        "admin/2/inc/setsession.cfm",
+        "admin/2/inc/add_serial_number.cfm",
+        "admin/2/inc/manifest_verify.cfm",
+        "admin/2/view_ad_connection.cfm",
+        "admin/2/edit_ad_connection.cfm",
+        "admin/2/view_remoteauth.cfm",
+        "admin/2/edit_remoteauth_mapping.cfm",
+        "admin/2/view_intrusion_prevention.cfm",
+        "admin/2/view_console_firewall.cfm",
+        "admin/2/view_system_certificates.cfm",
+        "admin/2/view_antivirus_signature_feeds.cfm",
+        "admin/2/edit_antivirus_signature_feed.cfm"
+    ]
+}

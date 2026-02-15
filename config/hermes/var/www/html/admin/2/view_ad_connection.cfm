@@ -110,11 +110,8 @@ a, a:hover{
     <div class="content">
       <div class="container-fluid">
 
-  <!---LICENSE CHECK BELOW --->
-
-  <cfinclude template="./inc/lc2.cfm" />
-
-<!---LICENSE CHECK ABOVE --->
+  <!--- Pro Edition License Check --->
+  <cfinclude template="./inc/license_check.cfm" />
     
     <cfparam name = "errormessage" default = "0">
     

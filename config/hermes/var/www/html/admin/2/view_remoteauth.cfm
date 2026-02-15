@@ -121,8 +121,8 @@ $(document).ready(function() {
 <div class="content">
 <div class="container-fluid">
 
-<!--- LICENSE CHECK --->
-<cfinclude template="./inc/lc2.cfm" />
+<!--- Pro Edition License Check --->
+<cfinclude template="./inc/license_check.cfm" />
 
 <!--- PRO EDITION CHECK --->
 <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">

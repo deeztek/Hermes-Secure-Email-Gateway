@@ -106,11 +106,8 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
     <div class="content">
       <div class="container-fluid">
 
-  <!---LICENSE CHECK BELOW --->
-
-  <cfinclude template="./inc/lc1.cfm" />
-
-<!---LICENSE CHECK ABOVE --->
+  <!--- Pro Edition License Check --->
+  <cfinclude template="./inc/license_check.cfm" />
 
      
 <!--- CFML CODE STARTS HERE --->

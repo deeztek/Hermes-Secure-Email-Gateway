@@ -303,6 +303,35 @@ button[type="submit"].btn {
   font-size: 0.85rem;
   color: #6c757d;
 }
+
+/* System Alert Callout Banners - positioned below navbar */
+.system-alert-callouts {
+  position: fixed;
+  top: 57px; /* Below the navbar */
+  left: 250px; /* Account for sidebar width */
+  right: 0;
+  z-index: 1030;
+  transition: left 0.3s ease-in-out;
+}
+.sidebar-collapse .system-alert-callouts {
+  left: 0;
+}
+@media (max-width: 991.98px) {
+  .system-alert-callouts {
+    left: 0;
+  }
+}
+.system-alert-callouts .alert {
+  margin-bottom: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+  padding: 0.75rem 1rem;
+  font-size: 0.95rem;
+}
+.system-alert-callouts .alert + .alert {
+  border-top: 0;
+}
 </style>
 
 <!-- jQuery UI CSS -->

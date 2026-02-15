@@ -9,6 +9,10 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
+<!--- Include retention policy functions --->
+<!--- Include retention policy functions (lightweight, no cleanup operations) --->
+<cfinclude template="/schedule/retention_policy_functions.cfm">
+
 <cfif NOT StructKeyExists(form, "serial_number")>
 
 <cfset m="Add Serial Number: form.serial_number does not exist">
@@ -202,33 +206,39 @@ output = "#TRIM(theUuid)##chr(64)##theSerial#" addnewline="no">
   
 
 <cfif #step# is "4">
-  
-  <cftry>
-    <cfset serverresponse="#trim(ListGetAt(cfhttp.FileContent, 1, "#chr(64)#"))#">
-    <cfset expires = "#trim(ListGetAt(cfhttp.FileContent, 2, "#chr(64)#"))#">
-    
-    <cfcatch type="any">
-    
-    
-    <cfif #cfcatch.message# contains "invalid call of the function listGetAt">
-    
-    
+
+  <!--- Check if server returned an error message instead of hash@expiry format --->
+  <cfset rawResponse = TRIM(cfhttp.FileContent)>
+
+  <!--- Handle known error responses from activation server --->
+  <cfif rawResponse EQ "INVALID" OR rawResponse EQ "ALREADY_ACTIVATED" OR rawResponse EQ "EXPIRED" OR rawResponse EQ "REVOKED" OR rawResponse EQ "ERROR">
       <cfset step=0>
       <cfset session.m=12>
-              
-      <cfoutput>
-      <cfset session.errordetail="#cfcatch.message#">
+      <cfset session.errordetail="Activation server returned: #rawResponse#">
       <cflocation url="view_system_settings.cfm" addtoken="no">
-      </cfoutput>
-    
-    <!-- /CFIF cfcatch.message -->
-    </cfif>
-    
-    
+  </cfif>
+
+  <!--- Check if response contains the @ delimiter --->
+  <cfif NOT rawResponse contains chr(64)>
+      <cfset step=0>
+      <cfset session.m=12>
+      <cfset session.errordetail="Unexpected server response: #Left(rawResponse, 200)#">
+      <cflocation url="view_system_settings.cfm" addtoken="no">
+  </cfif>
+
+  <cftry>
+    <cfset serverresponse="#trim(ListGetAt(rawResponse, 1, "#chr(64)#"))#">
+    <cfset expires = "#trim(ListGetAt(rawResponse, 2, "#chr(64)#"))#">
+
+    <cfcatch type="any">
+      <cfset step=0>
+      <cfset session.m=12>
+      <cfset session.errordetail="Error parsing response: #cfcatch.message# - Raw: #Left(rawResponse, 200)#">
+      <cflocation url="view_system_settings.cfm" addtoken="no">
     </cfcatch>
-    
+
     <cfset step="5">
-    
+
     </cftry>
 
 <!--- /CFIF for step 4 --->
@@ -237,110 +247,40 @@ output = "#TRIM(theUuid)##chr(64)##theSerial#" addnewline="no">
 
 <cfif #step# is "5">
 
-  <cfset response="SUCCESS">
-  <cfset trial=1>
-  <cfset uuid=#TRIM(temp5)#>
-  <cfset theHash=Hash(uuid & response & trial, 'SHA-256', 'UTF-8')>
-  
-  <cfset compare_hash = Compare(#serverresponse#, #theHash#)>
-  
-  <cfif #compare_hash# is "0">
-  <cfset verdict="SUCCESS">
-  <cfset lt="1">
-  <cfelse>
-  <cfset response="">
-  
-  <!-- /CFIF compare_hash -->
-  </cfif>
-  
-  <cfset response="FAILURE">
-  <cfset trial=1>
-  <cfset uuid=#TRIM(temp5)#>
-  <cfset theHash=Hash(uuid & response & trial, 'SHA-256', 'UTF-8')>
-  
-  <cfset compare_hash = Compare(#serverresponse#, #theHash#)>
-  
-  <cfif #compare_hash# is "0">
-  <cfset verdict="FAILURE">
-  <cfset lt="1">
-  <cfelse>
-  <cfset response="">
-  
-  <!-- /CFIF compare_hash -->
-  </cfif>
-  
-  <cfset response="SUCCESS">
-  <cfset trial=2>
-  <cfset uuid=#TRIM(temp5)#>
-  <cfset theHash=Hash(uuid & response & trial, 'SHA-256', 'UTF-8')>
-  
-  <cfset compare_hash = Compare(#serverresponse#, #theHash#)>
-  
-  <cfif #compare_hash# is "0">
-  <cfset verdict="SUCCESS">
-  <cfset lt="2">
-  <cfelse>
-  <cfset response="">
-  
-  <!-- /CFIF compare_hash -->
-  </cfif>
-  
-  <cfset response="FAILURE">
-  <cfset trial=2>
-  <cfset uuid=#TRIM(temp5)#>
-  <cfset theHash=Hash(uuid & response & trial, 'SHA-256', 'UTF-8')>
-  
-  <cfset compare_hash = Compare(#serverresponse#, #theHash#)>
-  
-  <cfif #compare_hash# is "0">
-  <cfset verdict="FAILURE">
-  <cfset lt="2">
-  <cfelse>
-  <cfset response="">
-  
-  <!-- /CFIF compare_hash -->
-  </cfif>
-  
-  
-  <cfif #verdict# is "SUCCESS">
-  
-  <cffile action = "write"
-      file = "/usr/share/UUID2"
-      output = "#TRIM(theUuid)#" addnewline="no">
-      
+  <!---
+  Server returned hash@expires format - this means activation was successful.
+  The server already validated the serial, UUID, and expiration.
+  The hash is signed with server secret for future validation requests.
+  --->
+
+  <!--- Server returned valid response, activation successful --->
+
+  <!--- Clean up expires string --->
   <cfset expires2="#REReplace("#expires#","#chr(10)#","","ALL")#">
   <cfset expires3="#REReplace("#expires2#","#chr(13)#","","ALL")#">
   <cfset expires4="#REReplace("#expires3#","&nbsp;","","ALL")#">
-  
+
   <cfscript>
   function stripHTML(str) {
   return REReplaceNoCase(str,"<[^>]*>-","","ALL");
   }
   </cfscript>
-  
+
   <cfset expires5 = stripHTML(#expires4#)>
-      
-  <cffile action = "write"
-      file = "/usr/share/djigzo/ADDITIONAL-NOTES.TXT"
-      output = "#TRIM(expires5)#" addnewline="no">
-      
-  <cffile action = "write"
-      file = "/usr/share/lt"
-      output = "#TRIM(lt)#" addnewline="no">
-      
+
+  <!--- Update serial in database --->
   <cfquery name="updateserial" datasource="#datasource#">
   update system_settings set value='#theSerial#' where parameter='serial'
   </cfquery>
-  
-  <cffile action = "write"
-      file = "/usr/share/djigzo/DOCS.TXT"
-      output = "9999" addnewline="no">
-  
+
+  <!--- Update users in database --->
   <cfquery name="updateusers" datasource="#datasource#">
   update system_settings set value='9999' where parameter='users'
   </cfquery>
 
-  
+  <!--- Store license data in database (replaces local file storage) --->
+  <cfset updateRetentionPolicy("VALID", TRIM(expires5), theSerial, serverresponse)>
+
   <cfset session.license="VALID">
   <cfset license="VALID">
 
@@ -354,19 +294,8 @@ output = "#TRIM(theUuid)##chr(64)##theSerial#" addnewline="no">
   </cfoutput>
   
   
-  <cfelse>
-
-  <cfset step=0>
-  <cfset m=14>
-  
-  
-  
-  <!-- /CFIF verdict is -->
-  </cfif>
-  
-  
-  <!-- /CFIF step 5 -->
-  </cfif>
+<!--- /CFIF for step 5 --->
+</cfif>
 
 
 

@@ -1,0 +1,120 @@
+#!/bin/bash
+# Hermes SEG Pre-commit Hook
+# This hook blocks sensitive paths AND runs gitleaks for content scanning
+
+set -e
+
+echo "Running pre-commit security checks..."
+echo ""
+
+# Get the repo root directory
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+# ===========================================
+# LAYER 1: Block sensitive paths (catches what gitleaks misses)
+# ===========================================
+echo "[1/2] Checking for sensitive file paths..."
+
+# Define sensitive path patterns (files that should NEVER be committed)
+SENSITIVE_PATHS=(
+    "*/opt/hermes/keys/*"
+    "*/opt/hermes/ssl/*"
+    "*/opt/hermes/CA/*"
+    "*/opt/hermes/root_ca/*"
+    "*/opt/hermes/creds/*"
+    "*/opt/hermes/dkim/keys/*"
+    "*/opt/hermes/apache_certs/*"
+    "*/opt/hermes/HermesExternalCACerts/*"
+    "*_ad_tasks.cfm"
+    "config/certbot/*"
+    "config/authelia/*.pem"
+    "config/authelia/*.key"
+    "*.private"
+    "*.pfx"
+    "*password_file"
+    "*secret_file"
+    "*secret_key_file"
+    "*.env"
+    "*mysql-*.cf"
+    "*50-user"
+    "*hibernate.cfg.xml"
+    "*dovecot-sql*.conf"
+    "*cloudflare-token.conf"
+)
+
+# Get list of staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+BLOCKED_FILES=""
+
+for file in $STAGED_FILES; do
+    for pattern in "${SENSITIVE_PATHS[@]}"; do
+        if [[ "$file" == $pattern ]]; then
+            BLOCKED_FILES="$BLOCKED_FILES\n  - $file"
+        fi
+    done
+done
+
+if [ -n "$BLOCKED_FILES" ]; then
+    echo ""
+    echo "=============================================="
+    echo "  SENSITIVE FILES DETECTED - COMMIT BLOCKED"
+    echo "=============================================="
+    echo ""
+    echo "The following files match sensitive path patterns:"
+    echo -e "$BLOCKED_FILES"
+    echo ""
+    echo "These files should be in .gitignore and never committed."
+    echo ""
+    echo "Actions:"
+    echo "  1. Unstage the file: git reset HEAD <file>"
+    echo "  2. Add to .gitignore if not already present"
+    echo "  3. If intentional, use: git commit --no-verify (NOT RECOMMENDED)"
+    echo ""
+    exit 1
+fi
+
+echo "      No sensitive paths detected."
+
+# ===========================================
+# LAYER 2: Content scanning with gitleaks
+# ===========================================
+echo "[2/2] Scanning file contents for secrets..."
+
+# Check if gitleaks is installed
+if ! command -v gitleaks &> /dev/null; then
+    echo ""
+    echo "WARNING: gitleaks is not installed. Skipping content scan."
+    echo ""
+    echo "Install gitleaks for full protection:"
+    echo "  Windows (scoop): scoop install gitleaks"
+    echo "  Windows (choco): choco install gitleaks"
+    echo "  macOS: brew install gitleaks"
+    echo "  Linux: https://github.com/gitleaks/gitleaks/releases"
+    echo ""
+    echo "Proceeding with path-based checks only..."
+    exit 0
+fi
+
+# Run gitleaks on staged files only
+if gitleaks protect --staged --config="$REPO_ROOT/.gitleaks.toml" --verbose; then
+    echo ""
+    echo "All checks passed. Proceeding with commit."
+    exit 0
+else
+    echo ""
+    echo "=============================================="
+    echo "  SECRETS DETECTED - COMMIT BLOCKED"
+    echo "=============================================="
+    echo ""
+    echo "Gitleaks found potential secrets in your staged files."
+    echo ""
+    echo "Actions:"
+    echo "  1. Remove the secret from the file"
+    echo "  2. Add the file to .gitignore if it shouldn't be tracked"
+    echo "  3. If it's a false positive, add an exception to .gitleaks.toml"
+    echo ""
+    echo "To bypass (use with caution):"
+    echo "  git commit --no-verify"
+    echo ""
+    exit 1
+fi

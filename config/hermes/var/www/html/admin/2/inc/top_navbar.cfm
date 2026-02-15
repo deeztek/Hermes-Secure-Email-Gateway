@@ -37,6 +37,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </ul>
     <!--end::Start Navbar Links-->
 
+    <!--begin::System Alerts Indicator-->
+    <cfinclude template="system_alerts.cfm">
+    <!--end::System Alerts Indicator-->
+
     <!--begin::End Navbar Links-->
     <ul class="navbar-nav ms-auto">
 
@@ -90,3 +94,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--end::Container-->
 </nav>
 <!--end::Header-->
+
+<!--- ============================================================================
+     SYSTEM ALERT CALLOUT BANNERS
+     Prominent alerts displayed below the navbar for critical issues
+     ============================================================================ --->
+<cfif StructKeyExists(request, "systemAlerts") AND ArrayLen(request.systemAlerts) GT 0>
+<div class="system-alert-callouts">
+    <cfoutput>
+    <cfloop array="#request.systemAlerts#" index="alert">
+        <!--- Only show callout for high-priority alerts (priority <= 5) --->
+        <cfif alert.priority LTE 5>
+            <div class="alert alert-#alert.type# alert-dismissible d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
+                <div class="container-fluid d-flex align-items-center">
+                    <i class="#alert.icon# fa-lg me-3"<cfif StructKeyExists(alert, "iconStyle")> style="#alert.iconStyle#"</cfif>></i>
+                    <div class="flex-grow-1">
+                        <strong>#alert.label#:</strong>
+                        <span class="ms-1">#alert.title#</span>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            </div>
+        </cfif>
+    </cfloop>
+    </cfoutput>
+</div>
+</cfif>

@@ -828,11 +828,8 @@ select id, type, friendly_name, domain_name, file_name from system_certificates
 
 <cfelseif #action# is "requestacme">
 
-  <!---LICENSE CHECK BELOW --->
-
-  <cfinclude template="./inc/lc1.cfm" />
-
-<!---LICENSE CHECK ABOVE --->
+  <!--- Pro Edition License Check --->
+  <cfinclude template="./inc/license_check.cfm" />
 
 
   <!--- VALIDATE PARAMETERS BELOW --->

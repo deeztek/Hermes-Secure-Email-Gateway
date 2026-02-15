@@ -200,9 +200,12 @@ select property, value from encryption_settings where property='user.systemMailS
             <td>#theVersion#</td>
             <td>#theBuild#</td>
 
-            <cfif #session.edition# is "Community">
+            <cfif session.license EQ "TAMPERED">
+            <td>Pro <span class="text-danger">(Templates Modified)</span></td>
+            <cfelseif session.license EQ "PENDING_VALIDATION">
+            <td>Pro <span class="text-warning">(Validation Required)</span></td>
+            <cfelseif #session.edition# is "Community">
             <td>#session.edition#&nbsp;&nbsp;<a href='view_system_settings.cfm'>ENTER SERIAL</a></td>
-
             <cfelseif #session.edition# is "Pro">
               <td>#session.edition#</td>
             <cfelse>
@@ -213,32 +216,23 @@ select property, value from encryption_settings where property='user.systemMailS
             <td>#ConsoleHost#</td>
 
 
-<cfif #session.edition# is "Pro">
-
-<cfif #session.license# is "VALID">
-
-  <td>#session.license# EXPIRES #session.licenseexpires#</td>
-
-<cfelseif #session.license# is "EXPIRED">
-
-<td>#session.license# ON #session.licenseexpires#</td>
-
-
-<cfelseif #session.license# is "VIOLATION">
-
-<td>VIOLATION</td> 
-
-<cfelseif #session.license# is "N/A">
-
-  <td>N/A</td> 
-
-<!--- /CFIF #session.license# --->
-</cfif>
-
+<cfif session.license EQ "TAMPERED">
+  <td class="text-danger">Template integrity violation</td>
+<cfelseif session.license EQ "PENDING_VALIDATION">
+  <td class="text-warning">Online validation required</td>
+<cfelseif #session.edition# is "Pro">
+  <cfif #session.license# is "VALID">
+    <td>#session.license# EXPIRES #session.licenseexpires#</td>
+  <cfelseif #session.license# is "EXPIRED">
+    <td>#session.license# ON #session.licenseexpires#</td>
+  <cfelseif #session.license# is "VIOLATION">
+    <td>VIOLATION</td>
+  <cfelseif #session.license# is "N/A">
+    <td>N/A</td>
+  <!--- /CFIF #session.license# --->
+  </cfif>
 <cfelseif #session.edition# is "Community">
-
-  <td>N/A</td> 
-
+  <td>N/A</td>
  <!--- /CFIF #session.edition# --->
 </cfif>         
 

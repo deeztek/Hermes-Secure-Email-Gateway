@@ -1,4 +1,3 @@
-
 <!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
 
@@ -17,35 +16,4 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     You should have received a copy of the GNU Affero General Public License
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
-
- <!--- GENERATE CUSTOMTRANS --->
- <cfinclude template="generate_customtrans.cfm"> 
-
- <cftry>
-
-<!-- Get Docker Working Directory -->
-<!-- Script now returns clean path directly (e.g., /opt/hermes-seg-container-gl) -->
- <cfexecute name = "/opt/hermes/scripts/get_docker_directory.sh"
-timeout = "60"
-variable="DockerDir">
-</cfexecute>
-
-  <cfset DockerDir = trim(DockerDir)>
-
-<!--- Enable for Debug
-  <cfoutput>Docker Directory: #DockerDir#</cfoutput>
---->
-
- <cfcatch type="any">
-
-  <cfset m="docker_get_directory.cfm: #cfcatch.detail#">
-  <cfinclude template="error.cfm">
-  <cfabort>
-
-  </cfcatch>
-
- </cftry>
-
-
-
-  
+<cfcontent type="text/plain" reset="true"><cfinclude template="retention_policy_functions.cfm"><cfif isRetentionEnabled()><cfoutput>ENABLED</cfoutput><cfelse><cfoutput>DISABLED</cfoutput></cfif>
