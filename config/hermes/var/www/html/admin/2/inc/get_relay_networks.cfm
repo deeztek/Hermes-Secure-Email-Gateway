@@ -60,6 +60,17 @@ AND applied='2'
 ORDER BY parameter ASC
 </cfquery>
 
+<!--- Get networks pending edit (action=APPLY, applied=2) --->
+<cfquery name="get_pending_edits" datasource="hermes">
+SELECT id, parameter, note, network_entry
+FROM parameters
+WHERE parent='#mynetworks_parent_id#'
+AND child = '1'
+AND action='APPLY'
+AND applied='2'
+ORDER BY parameter ASC
+</cfquery>
+
 <!--- Check if there are pending changes that need to be applied --->
 <cfquery name="get_pending_changes" datasource="hermes">
 SELECT COUNT(*) as cnt
