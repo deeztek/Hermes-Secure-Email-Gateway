@@ -24,15 +24,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset domainName = getdomain.domain>
 <cfset keyBits = form.dkimkey>
 
-<!--- Build the output path prefix - this becomes the "selector" for opendkim-genkey --->
-<!--- Using path as selector creates files with correct names: {path}.private and {path}.txt --->
-<cfset outputPath = "#keysDir#/#selectorName#_#domainName#.dkim">
+<!--- Build the selector string that includes domain for unique filenames --->
+<!--- Using -D for directory and modified selector creates correct file names --->
+<cfset fileSelector = "#selectorName#_#domainName#.dkim">
 
 <!--- Generate DKIM key using opendkim-genkey inside Docker container --->
-<!--- The -s parameter with full path creates files named {path}.private and {path}.txt --->
+<!--- -D specifies output directory, -s specifies selector (becomes filename prefix) --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_postfix_dkim /usr/bin/opendkim-genkey -b #keyBits# -s #outputPath# -d #domainName#"
+        arguments="exec hermes_postfix_dkim /usr/bin/opendkim-genkey -b #keyBits# -s #fileSelector# -d #domainName# -D #keysDir#"
         timeout="60"
         variable="genKeyOutput"
         errorVariable="genKeyError">
@@ -45,9 +45,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfcatch>
 </cftry>
 
-<!--- Files are created with correct names directly --->
-<cfset dstPrivate = "#outputPath#.private">
-<cfset dstPublic = "#outputPath#.txt">
+<!--- Files are created as {selector}.private and {selector}.txt in the -D directory --->
+<cfset dstPrivate = "#keysDir#/#fileSelector#.private">
+<cfset dstPublic = "#keysDir#/#fileSelector#.txt">
 
     <!--- CHECK KEY FILES EXIST --->
     <cfset PrivateFile = dstPrivate>
