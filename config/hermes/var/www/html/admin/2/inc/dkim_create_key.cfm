@@ -24,10 +24,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset domainName = getdomain.domain>
 <cfset keyBits = form.dkimkey>
 
+<!--- Build the output path prefix - this becomes the "selector" for opendkim-genkey --->
+<!--- Using path as selector creates files with correct names: {path}.private and {path}.txt --->
+<cfset outputPath = "#keysDir#/#selectorName#_#domainName#.dkim">
+
 <!--- Generate DKIM key using opendkim-genkey inside Docker container --->
+<!--- The -s parameter with full path creates files named {path}.private and {path}.txt --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_postfix_dkim /usr/bin/opendkim-genkey -b #keyBits# -s #selectorName# -d #domainName# -D #keysDir#"
+        arguments="exec hermes_postfix_dkim /usr/bin/opendkim-genkey -b #keyBits# -s #outputPath# -d #domainName#"
         timeout="60"
         variable="genKeyOutput"
         errorVariable="genKeyError">
@@ -40,40 +45,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfcatch>
 </cftry>
 
-<!--- opendkim-genkey creates files named {selector}.private and {selector}.txt --->
-<!--- Rename them to match expected naming convention: {selector}_{domain}.dkim.private/txt --->
-<cfset srcPrivate = "#keysDir#/#selectorName#.private">
-<cfset srcPublic = "#keysDir#/#selectorName#.txt">
-<cfset dstPrivate = "#keysDir#/#selectorName#_#domainName#.dkim.private">
-<cfset dstPublic = "#keysDir#/#selectorName#_#domainName#.dkim.txt">
-
-<!--- Rename private key file --->
-<cftry>
-    <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_postfix_dkim /bin/mv #srcPrivate# #dstPrivate#"
-        timeout="60">
-    </cfexecute>
-
-    <cfcatch type="any">
-        <cfset m="/inc/dkim_create_key.cfm: There was an error renaming private key file: #cfcatch.message#">
-        <cfinclude template="error.cfm">
-        <cfabort>
-    </cfcatch>
-</cftry>
-
-<!--- Rename public key file --->
-<cftry>
-    <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_postfix_dkim /bin/mv #srcPublic# #dstPublic#"
-        timeout="60">
-    </cfexecute>
-
-    <cfcatch type="any">
-        <cfset m="/inc/dkim_create_key.cfm: There was an error renaming public key file: #cfcatch.message#">
-        <cfinclude template="error.cfm">
-        <cfabort>
-    </cfcatch>
-</cftry>
+<!--- Files are created with correct names directly --->
+<cfset dstPrivate = "#outputPath#.private">
+<cfset dstPublic = "#outputPath#.txt">
 
     <!--- CHECK KEY FILES EXIST --->
     <cfset PrivateFile = dstPrivate>
