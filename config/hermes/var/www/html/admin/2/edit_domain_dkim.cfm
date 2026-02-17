@@ -304,6 +304,45 @@ select id, domain from domains where id = <cfqueryparam value = #theDomainID# CF
 </div>
 <!--- ADD DOMAIN MODAL HTML ENDS HERE --->
 
+<!--- IMPORT DKIM KEY MODAL HTML STARTS HERE --->
+<div class="modal fade" id="importdkimkey_modal" tabindex="-1" role="dialog" aria-labelledby="ImportDkimKeyModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header alert-primary">
+        <h4 class="modal-title">Import DKIM Key</h4>
+      </div>
+
+      <div class="modal-body">
+        <form name="ImportDkimKey" autocomplete="off" method="post">
+          <input type="hidden" name="action" value="Import DKIM Key">
+          <input type="hidden" name="domain_id" value=""/>
+
+          <div class="form-group">
+            <label><strong>DKIM Selector</strong></label>
+            <input type="text" name="import_selector" class="form-control" id="import_selector" placeholder="Enter a unique alpha string to use as a DKIM Selector" value="" autocomplete="off">
+          </div>
+
+          <div class="form-group">
+            <label><strong>Private Key (PEM Format)</strong></label>
+            <textarea name="import_private_key" class="form-control" id="import_private_key" rows="10" placeholder="Paste the private key in PEM format (-----BEGIN RSA PRIVATE KEY----- or -----BEGIN PRIVATE KEY-----)"></textarea>
+          </div>
+
+          <div class="alert alert-info">
+            <p><i class="icon fas fa-info-circle"></i> The public key will be automatically generated from the private key.</p>
+          </div>
+
+          <input type="submit" value="Import" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+        </form>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!--- IMPORT DKIM KEY MODAL HTML ENDS HERE --->
+
 <!--- VIEW PUBLIC KEY MODAL HTML STARTS HERE --->
    
 
@@ -913,6 +952,163 @@ select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="c
     </cfif>
 
 
+<cfelseif #action# is "Import DKIM Key">
+
+  <!--- FORM.domain_id --->
+  <cfif NOT StructKeyExists(form, "domain_id")>
+    <cfset step=0>
+    <cfset m="Import DKIM Key: form.domain_id does not exist">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+
+  <cfelseif StructKeyExists(form, "domain_id")>
+    <cfif #form.domain_id# is "">
+      <cfset step=0>
+      <cfset m="Import DKIM Key: form.domain_id is blank">
+      <cfinclude template="./inc/error.cfm">
+      <cfabort>
+
+    <cfelseif #form.domain_id# is not "">
+      <cfquery name="getdomain" datasource="hermes">
+        select id, domain from domains where id=<cfqueryparam value = #form.domain_id# CFSQLType = "CF_SQL_INTEGER">
+      </cfquery>
+
+      <cfif #getdomain.recordcount# LT 1>
+        <cfset step=0>
+        <cfset m="Import DKIM Keys: getdomain.recordcount LT 1">
+        <cfinclude template="./inc/error.cfm">
+        <cfabort>
+
+      <cfelseif #getdomain.recordcount# GTE 1>
+        <cfset step = 1>
+
+      <!--- /CFIF #domain.recordcount# --->
+      </cfif>
+
+    <!--- /CFIF #form.domain_id# is "" --->
+    </cfif>
+
+  <!--- /CFIF StructKeyExists(form, "domain_id") --->
+  </cfif>
+
+
+  <cfif #step# is "1">
+
+    <!--- FORM.import_selector --->
+    <cfif NOT StructKeyExists(form, "import_selector")>
+      <cfset step=0>
+      <cfset m="Import DKIM Key: form.import_selector does not exist">
+      <cfinclude template="./inc/error.cfm">
+      <cfabort>
+
+    <cfelseif StructKeyExists(form, "import_selector")>
+      <cfif #form.import_selector# is "">
+        <cfset session.m = 8>
+        <cfoutput>
+        <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+        </cfoutput>
+
+      <cfelseif #form.import_selector# is not "">
+        <cfif REFind("[^_a-zA-Z0-9\-\_\.]",form.import_selector) gt 0>
+          <cfset session.m = 9>
+          <cfoutput>
+          <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+          </cfoutput>
+
+        <cfelse>
+          <cfset step = 2>
+
+        <!--- /CFIF REFind --->
+        </cfif>
+
+      <!--- /CFIF #form.import_selector# is "" --->
+      </cfif>
+
+    <!--- /CFIF StructKeyExists(form, "import_selector") --->
+    </cfif>
+
+  <!--- /CFIF #step# is "1" --->
+  </cfif>
+
+
+  <cfif #step# is "2">
+
+    <!--- FORM.import_private_key --->
+    <cfif NOT StructKeyExists(form, "import_private_key")>
+      <cfset step=0>
+      <cfset m="Import DKIM Key: form.import_private_key does not exist">
+      <cfinclude template="./inc/error.cfm">
+      <cfabort>
+
+    <cfelseif StructKeyExists(form, "import_private_key")>
+      <cfif #form.import_private_key# is "">
+        <cfset session.m = 10>
+        <cfoutput>
+        <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+        </cfoutput>
+
+      <cfelseif #form.import_private_key# is not "">
+        <!--- Validate PEM format - must contain BEGIN and END markers --->
+        <cfif NOT (FindNoCase("-----BEGIN", form.import_private_key) GT 0 AND FindNoCase("-----END", form.import_private_key) GT 0 AND FindNoCase("PRIVATE KEY-----", form.import_private_key) GT 0)>
+          <cfset session.m = 11>
+          <cfoutput>
+          <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+          </cfoutput>
+
+        <cfelse>
+          <cfset step = 3>
+
+        <!--- /CFIF PEM validation --->
+        </cfif>
+
+      <!--- /CFIF #form.import_private_key# is "" --->
+      </cfif>
+
+    <!--- /CFIF StructKeyExists(form, "import_private_key") --->
+    </cfif>
+
+  <!--- /CFIF #step# is "2" --->
+  </cfif>
+
+
+  <cfif #step# is "3">
+
+    <cfquery name="checkexists" datasource="hermes">
+      select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#getdomain.domain#"> and selector = <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.import_selector#">
+    </cfquery>
+
+    <cfif #checkexists.recordcount# GTE 1>
+      <cfset session.m = 12>
+      <cfoutput>
+      <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+      </cfoutput>
+
+    <cfelseif #checkexists.recordcount# LT 1>
+
+      <!--- IMPORT KEY --->
+      <cfinclude template="./inc/dkim_import_key.cfm">
+
+      <!--- GENERATE KEYTABLE --->
+      <cfinclude template="./inc/dkim_generate_keytable.cfm">
+
+      <!--- GENERATE SIGNING TABLE --->
+      <cfinclude template="./inc/dkim_generate_signingtable.cfm">
+
+      <!--- RESTART OPENDKIM --->
+      <cfinclude template="./inc/restart_opendkim.cfm">
+
+      <cfset session.m = 13>
+      <cfoutput>
+      <cflocation url="edit_domain_dkim.cfm?id=#url.id#" addtoken="no">
+      </cfoutput>
+
+    <!--- /CFIF checkexits.recordcount --->
+    </cfif>
+
+  <!--- /CFIF #step# is "3" --->
+  </cfif>
+
+
 <!--- /CFIF #action# --->
 </cfif> 
 
@@ -1003,14 +1199,97 @@ select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="c
       <div class="alert alert-success alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
         <h4><i class="icon fa fa-check"></i> Success!</h4>
-        <cfoutput>DKIM Sign was disabled successfully</cfoutput> 
-          
+        <cfoutput>DKIM Sign was disabled successfully</cfoutput>
+
       </div>
-      
+
       <cfset session.m = 0>
-      
+
       </cfif>
 
+<cfif #m# is "8">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. The DKIM Selector field cannot be empty</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "9">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. The DKIM Selector field is invalid. The DKIM Selector field can only contain uppercase/lowercase letters (A-Z, a-z) underscores (_), dashes (-) and periods (.)</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "10">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. The Private Key field cannot be empty</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "11">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. The Private Key is not in valid PEM format. The key must contain -----BEGIN PRIVATE KEY----- or -----BEGIN RSA PRIVATE KEY----- header and footer</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "12">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. The DKIM Selector you are attempting to use already exists for this domain</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "13">
+
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>DKIM Key was imported successfully</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
+
+<cfif #m# is "14">
+
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Error importing DKIM Key. Failed to generate public key from the provided private key. Please ensure the private key is valid</cfoutput>
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
 
 
 <!-- ERROR MESSAGES ENDS HERE -->
@@ -1028,6 +1307,14 @@ select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="c
   <a href="##adddkimkey_modal"  class="btn btn-primary" role="button" data-bs-toggle="modal" data-domainid="#getdomain.id#"><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Add DKIM Key</a>
   </cfoutput>
   <!--- ADD DKIM KEY BUTTON ENDS HERE --->
+
+&nbsp;
+
+<!--- IMPORT DKIM KEY BUTTON STARTS HERE --->
+<cfoutput>
+  <a href="##importdkimkey_modal" class="btn btn-info" role="button" data-bs-toggle="modal" data-domainid="#getdomain.id#"><i class="fa fa-upload fa-lg"></i>&nbsp;&nbsp;Import DKIM Key</a>
+</cfoutput>
+<!--- IMPORT DKIM KEY BUTTON ENDS HERE --->
 
 
 
@@ -1440,6 +1727,15 @@ $('#viewPublickey_modal').on('show.bs.modal', function(e) {
     </script>
 
 <!--- ADD KEY MODAL SCRIPT ENDS HERE  --->
+
+<!--- IMPORT KEY MODAL SCRIPT STARTS HERE  --->
+<script>
+  $('#importdkimkey_modal').on('show.bs.modal', function(e) {
+      var domain_id = $(e.relatedTarget).data('domainid');
+      $(e.currentTarget).find('input[name="domain_id"]').val(domain_id);
+  });
+</script>
+<!--- IMPORT KEY MODAL SCRIPT ENDS HERE  --->
 
 
    <!--- SCRIPT TO DKIM SIGN ENABLE SCRIPT STARTS HERE  --->
