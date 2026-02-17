@@ -88,155 +88,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <!--- ===================== --->
-<!--- ACTION: ADD IP --->
+<!--- ACTION: ADD ENTRIES --->
 <!--- ===================== --->
-<cfif action is "add_ip">
-  <cfset step = 0>
+<cfif action is "add_entries">
+  <cfset entries_added = 0>
+  <cfset entries_skipped = 0>
+  <cfset entry_errors = "">
 
-  <!--- Validate IP address --->
-  <cfif NOT StructKeyExists(form, "ip_address") OR trim(form.ip_address) is "">
-    <cfset session.m = 1>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <cfif NOT REFind(ipv4_pattern, trim(form.ip_address))>
-    <cfset session.m = 2>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Validate note --->
-  <cfif NOT StructKeyExists(form, "note") OR trim(form.note) is "">
-    <cfset session.m = 3>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <cfif REFind("[^_a-zA-Z0-9\-\.]", form.note) GT 0>
-    <cfset session.m = 4>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Check if already exists --->
-  <cfquery name="checkexists" datasource="hermes">
-    SELECT id FROM parameters
-    WHERE parameter = <cfqueryparam value="#trim(form.ip_address)#" cfsqltype="cf_sql_varchar">
-    AND parent = '#mynetworks_parent_id#'
-    AND child = '1'
-  </cfquery>
-
-  <cfif checkexists.recordcount GTE 1>
-    <cfset session.m = 5>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Get max order --->
-  <cfquery name="getmaxorder" datasource="hermes">
-    SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent='#mynetworks_parent_id#' AND child='1'
-  </cfquery>
-  <cfset nextorder = getmaxorder.maximum + 1>
-
-  <!--- Insert new IP address --->
-  <cfquery name="add_ip" datasource="hermes">
-    INSERT INTO parameters (parameter, module, editable, conf_file, parent, parent_name, child, order1, enabled, applied, action, network_entry, note)
-    VALUES (
-      <cfqueryparam value="#trim(form.ip_address)#" cfsqltype="cf_sql_varchar">,
-      'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder#', '1', '2', 'insert', '0',
-      <cfqueryparam value="#trim(form.note)#" cfsqltype="cf_sql_varchar">
-    )
-  </cfquery>
-
-  <cfset session.m = 10>
-  <cflocation url="view_relay_networks.cfm" addtoken="no">
-</cfif>
-
-
-<!--- ===================== --->
-<!--- ACTION: ADD NETWORK --->
-<!--- ===================== --->
-<cfif action is "add_network">
-  <cfset step = 0>
-
-  <!--- Validate network address --->
-  <cfif NOT StructKeyExists(form, "network_address") OR trim(form.network_address) is "">
-    <cfset session.m = 6>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <cfif NOT REFind(ipv4_pattern, trim(form.network_address))>
-    <cfset session.m = 7>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Validate subnet --->
-  <cfif NOT StructKeyExists(form, "subnet") OR trim(form.subnet) is "">
-    <cfset session.m = 8>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Validate note --->
-  <cfif NOT StructKeyExists(form, "network_note") OR trim(form.network_note) is "">
-    <cfset session.m = 3>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <cfif REFind("[^_a-zA-Z0-9\-\.]", form.network_note) GT 0>
-    <cfset session.m = 4>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <cfset theNetwork = "#trim(form.network_address)#/#trim(form.subnet)#">
-
-  <!--- Check if already exists --->
-  <cfquery name="checkexists" datasource="hermes">
-    SELECT id FROM parameters
-    WHERE parameter = <cfqueryparam value="#theNetwork#" cfsqltype="cf_sql_varchar">
-    AND parent = '#mynetworks_parent_id#'
-    AND child = '1'
-  </cfquery>
-
-  <cfif checkexists.recordcount GTE 1>
-    <cfset session.m = 9>
-    <cflocation url="view_relay_networks.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Get max order --->
-  <cfquery name="getmaxorder" datasource="hermes">
-    SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent='#mynetworks_parent_id#' AND child='1'
-  </cfquery>
-  <cfset nextorder = getmaxorder.maximum + 1>
-
-  <!--- Insert new network --->
-  <cfquery name="add_network" datasource="hermes">
-    INSERT INTO parameters (parameter, module, editable, conf_file, parent, parent_name, child, order1, enabled, applied, action, network_entry, note)
-    VALUES (
-      <cfqueryparam value="#theNetwork#" cfsqltype="cf_sql_varchar">,
-      'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder#', '1', '2', 'insert', '1',
-      <cfqueryparam value="#trim(form.network_note)#" cfsqltype="cf_sql_varchar">
-    )
-  </cfquery>
-
-  <cfset session.m = 11>
-  <cflocation url="view_relay_networks.cfm" addtoken="no">
-</cfif>
-
-
-<!--- ===================== --->
-<!--- ACTION: BULK IMPORT --->
-<!--- ===================== --->
-<cfif action is "bulk_import">
-  <cfset bulk_added = 0>
-  <cfset bulk_skipped = 0>
-  <cfset bulk_errors = "">
-
-  <!--- Validate bulk_entries exists and is not empty --->
-  <cfif NOT StructKeyExists(form, "bulk_entries") OR trim(form.bulk_entries) is "">
+  <!--- Validate entries exists and is not empty --->
+  <cfif NOT StructKeyExists(form, "entries") OR trim(form.entries) is "">
     <cfset session.m = 30>
     <cflocation url="view_relay_networks.cfm" addtoken="no">
   </cfif>
 
   <!--- Normalize line endings and split into lines --->
-  <cfset bulkText = Replace(form.bulk_entries, Chr(13) & Chr(10), Chr(10), "ALL")>
-  <cfset bulkText = Replace(bulkText, Chr(13), Chr(10), "ALL")>
-  <cfset lines = ListToArray(bulkText, Chr(10))>
+  <cfset entryText = Replace(form.entries, Chr(13) & Chr(10), Chr(10), "ALL")>
+  <cfset entryText = Replace(entryText, Chr(13), Chr(10), "ALL")>
+  <cfset lines = ListToArray(entryText, Chr(10))>
 
   <cfloop array="#lines#" index="line">
     <cfset line = trim(line)>
@@ -253,15 +121,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset entryNote = trim(Mid(line, firstSpace + 1, Len(line)))>
     <cfelse>
       <!--- No space found, entire line is address with no note --->
-      <cfset bulk_skipped = bulk_skipped + 1>
-      <cfset bulk_errors = bulk_errors & "Line missing note: " & line & "<br>">
+      <cfset entries_skipped = entries_skipped + 1>
+      <cfset entry_errors = entry_errors & "Line missing note: " & line & "<br>">
       <cfcontinue>
     </cfif>
 
     <!--- Validate note --->
     <cfif entryNote is "" OR REFind("[^_a-zA-Z0-9\-\.]", entryNote) GT 0>
-      <cfset bulk_skipped = bulk_skipped + 1>
-      <cfset bulk_errors = bulk_errors & "Invalid note for: " & entryAddress & "<br>">
+      <cfset entries_skipped = entries_skipped + 1>
+      <cfset entry_errors = entry_errors & "Invalid note for: " & entryAddress & "<br>">
       <cfcontinue>
     </cfif>
 
@@ -275,15 +143,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <!--- Validate network address --->
       <cfif NOT REFind(ipv4_pattern, networkPart)>
-        <cfset bulk_skipped = bulk_skipped + 1>
-        <cfset bulk_errors = bulk_errors & "Invalid network address: " & entryAddress & "<br>">
+        <cfset entries_skipped = entries_skipped + 1>
+        <cfset entry_errors = entry_errors & "Invalid network address: " & entryAddress & "<br>">
         <cfcontinue>
       </cfif>
 
       <!--- Validate CIDR (1-32) --->
       <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
-        <cfset bulk_skipped = bulk_skipped + 1>
-        <cfset bulk_errors = bulk_errors & "Invalid CIDR mask: " & entryAddress & "<br>">
+        <cfset entries_skipped = entries_skipped + 1>
+        <cfset entry_errors = entry_errors & "Invalid CIDR mask: " & entryAddress & "<br>">
         <cfcontinue>
       </cfif>
 
@@ -293,8 +161,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelse>
       <!--- Single IP address --->
       <cfif NOT REFind(ipv4_pattern, entryAddress)>
-        <cfset bulk_skipped = bulk_skipped + 1>
-        <cfset bulk_errors = bulk_errors & "Invalid IP address: " & entryAddress & "<br>">
+        <cfset entries_skipped = entries_skipped + 1>
+        <cfset entry_errors = entry_errors & "Invalid IP address: " & entryAddress & "<br>">
         <cfcontinue>
       </cfif>
 
@@ -303,47 +171,47 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 
     <!--- Check if already exists --->
-    <cfquery name="checkexists_bulk" datasource="hermes">
+    <cfquery name="checkexists_entry" datasource="hermes">
       SELECT id FROM parameters
       WHERE parameter = <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">
       AND parent = '#mynetworks_parent_id#'
       AND child = '1'
     </cfquery>
 
-    <cfif checkexists_bulk.recordcount GTE 1>
-      <cfset bulk_skipped = bulk_skipped + 1>
-      <cfset bulk_errors = bulk_errors & "Already exists: " & theEntry & "<br>">
+    <cfif checkexists_entry.recordcount GTE 1>
+      <cfset entries_skipped = entries_skipped + 1>
+      <cfset entry_errors = entry_errors & "Already exists: " & theEntry & "<br>">
       <cfcontinue>
     </cfif>
 
     <!--- Get max order --->
-    <cfquery name="getmaxorder_bulk" datasource="hermes">
+    <cfquery name="getmaxorder_entry" datasource="hermes">
       SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent='#mynetworks_parent_id#' AND child='1'
     </cfquery>
-    <cfset nextorder_bulk = getmaxorder_bulk.maximum + 1>
+    <cfset nextorder_entry = getmaxorder_entry.maximum + 1>
 
     <!--- Insert the entry --->
-    <cfquery name="add_bulk" datasource="hermes">
+    <cfquery name="add_entry" datasource="hermes">
       INSERT INTO parameters (parameter, module, editable, conf_file, parent, parent_name, child, order1, enabled, applied, action, network_entry, note)
       VALUES (
         <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">,
-        'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder_bulk#', '1', '2', 'insert', '#isNetworkEntry#',
+        'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder_entry#', '1', '2', 'insert', '#isNetworkEntry#',
         <cfqueryparam value="#entryNote#" cfsqltype="cf_sql_varchar">
       )
     </cfquery>
 
-    <cfset bulk_added = bulk_added + 1>
+    <cfset entries_added = entries_added + 1>
 
   </cfloop>
 
   <!--- Store results in session for display --->
-  <cfset session.bulk_added = bulk_added>
-  <cfset session.bulk_skipped = bulk_skipped>
-  <cfset session.bulk_errors = bulk_errors>
+  <cfset session.entries_added = entries_added>
+  <cfset session.entries_skipped = entries_skipped>
+  <cfset session.entry_errors = entry_errors>
 
-  <cfif bulk_added GT 0>
+  <cfif entries_added GT 0>
     <cfset session.m = 31>
-  <cfelseif bulk_skipped GT 0>
+  <cfelseif entries_skipped GT 0>
     <cfset session.m = 32>
   <cfelse>
     <cfset session.m = 30>
@@ -446,117 +314,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ERROR MESSAGES START HERE --->
 
-<cfif m is "1">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address field cannot be empty</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "2">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address is not valid. Please enter a valid IPv4 address (e.g., 192.168.1.100)</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "3">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Note field cannot be empty</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "4">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Note field can only contain letters, numbers, dashes (-), underscores (_), and periods (.)</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "5">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address you are attempting to add already exists</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "6">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Network Address field cannot be empty</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "7">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Network Address is not valid. Please enter a valid IPv4 address (e.g., 192.168.1.0)</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "8">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Please select a network mask</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "9">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Network you are attempting to add already exists</cfoutput>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "10">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>IP Address added to pending list. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-      <div class="text-center">
-        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
-      </div>
-    </form>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
-<cfif m is "11">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Network added to pending list. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-      <div class="text-center">
-        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
-      </div>
-    </form>
-  </div>
-  <cfset session.m = 0>
-</cfif>
-
 <cfif m is "12">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
@@ -612,7 +369,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The bulk import field cannot be empty. Please enter at least one entry.</cfoutput>
+    <cfoutput>Please enter at least one IP address or network.</cfoutput>
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -620,14 +377,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif m is "31">
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-check"></i> Bulk Import Successful!</h4>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>
-      <strong>#session.bulk_added#</strong> entries added to pending list.
-      <cfif session.bulk_skipped GT 0>
-        <strong>#session.bulk_skipped#</strong> entries skipped.
+      <strong>#session.entries_added#</strong> <cfif session.entries_added EQ 1>entry<cfelse>entries</cfif> added to pending list.
+      <cfif session.entries_skipped GT 0>
+        <strong>#session.entries_skipped#</strong> <cfif session.entries_skipped EQ 1>entry<cfelse>entries</cfif> skipped.
         <details class="mt-2">
           <summary>View skipped entries</summary>
-          <div class="mt-1 small">#session.bulk_errors#</div>
+          <div class="mt-1 small">#session.entry_errors#</div>
         </details>
       </cfif>
       <br>You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.
@@ -640,24 +397,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </form>
   </div>
   <cfset session.m = 0>
-  <cfset session.bulk_added = 0>
-  <cfset session.bulk_skipped = 0>
-  <cfset session.bulk_errors = "">
+  <cfset session.entries_added = 0>
+  <cfset session.entries_skipped = 0>
+  <cfset session.entry_errors = "">
 </cfif>
 
 <cfif m is "32">
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-exclamation-triangle"></i> Bulk Import - All Entries Skipped</h4>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> All Entries Skipped</h4>
     <cfoutput>
-      All <strong>#session.bulk_skipped#</strong> entries were skipped due to errors:
-      <div class="mt-2 small">#session.bulk_errors#</div>
+      All <strong>#session.entries_skipped#</strong> <cfif session.entries_skipped EQ 1>entry was<cfelse>entries were</cfif> skipped due to errors:
+      <div class="mt-2 small">#session.entry_errors#</div>
     </cfoutput>
   </div>
   <cfset session.m = 0>
-  <cfset session.bulk_added = 0>
-  <cfset session.bulk_skipped = 0>
-  <cfset session.bulk_errors = "">
+  <cfset session.entries_added = 0>
+  <cfset session.entries_skipped = 0>
+  <cfset session.entry_errors = "">
 </cfif>
 
 <!--- ERROR MESSAGES END HERE --->
@@ -702,113 +459,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add Relay IP/Network</h3>
   </div>
   <div class="card-body">
-
-    <!--- Nav tabs --->
-    <ul class="nav nav-tabs" id="addTab" role="tablist">
-      <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="ip-tab" data-bs-toggle="tab" data-bs-target="#ip-pane" type="button" role="tab" aria-controls="ip-pane" aria-selected="true">
-          <i class="fas fa-desktop"></i> IP Address
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="network-tab" data-bs-toggle="tab" data-bs-target="#network-pane" type="button" role="tab" aria-controls="network-pane" aria-selected="false">
-          <i class="fas fa-network-wired"></i> Network
-        </button>
-      </li>
-      <li class="nav-item" role="presentation">
-        <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk-pane" type="button" role="tab" aria-controls="bulk-pane" aria-selected="false">
-          <i class="fas fa-list"></i> Bulk Import
-        </button>
-      </li>
-    </ul>
-
-    <!--- Tab content --->
-    <div class="tab-content mt-3" id="addTabContent">
-
-      <!--- IP Address Tab --->
-      <div class="tab-pane fade show active" id="ip-pane" role="tabpanel" aria-labelledby="ip-tab">
-        <form name="add_ip_form" method="post" autocomplete="off">
-          <input type="hidden" name="action" value="add_ip">
-          <div class="row">
-            <div class="col-md-4">
-              <label for="ip_address" class="form-label"><strong>IP Address</strong></label>
-              <input type="text" class="form-control" id="ip_address" name="ip_address" placeholder="e.g., 192.168.1.100" maxlength="45">
-            </div>
-            <div class="col-md-4">
-              <label for="note" class="form-label"><strong>Note</strong></label>
-              <input type="text" class="form-control" id="note" name="note" placeholder="e.g., Office-Printer" maxlength="255">
-              <small class="text-muted">Letters, numbers, dashes, underscores, periods only</small>
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
-                <i class="fas fa-plus"></i> Add IP
-              </button>
-            </div>
-          </div>
-        </form>
+    <form name="add_entries_form" method="post" autocomplete="off">
+      <input type="hidden" name="action" value="add_entries">
+      <div class="row">
+        <div class="col-md-8">
+          <label for="entries" class="form-label"><strong>IP Addresses and/or Networks</strong></label>
+          <textarea class="form-control" id="entries" name="entries" rows="5" placeholder="192.168.1.100 Office-Printer
+10.0.0.0/24 Server-Network"></textarea>
+          <small class="text-muted">
+            Enter one entry per line. Format: <code>IP_or_Network Note</code><br>
+            Examples: <code>192.168.1.100 My-Device</code> or <code>192.168.1.0/24 Office-LAN</code>
+          </small>
+        </div>
+        <div class="col-md-4 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
+            <i class="fas fa-plus"></i> Add Entries
+          </button>
+        </div>
       </div>
-
-      <!--- Network Tab --->
-      <div class="tab-pane fade" id="network-pane" role="tabpanel" aria-labelledby="network-tab">
-        <form name="add_network_form" method="post" autocomplete="off">
-          <input type="hidden" name="action" value="add_network">
-          <div class="row">
-            <div class="col-md-3">
-              <label for="network_address" class="form-label"><strong>Network Address</strong></label>
-              <input type="text" class="form-control" id="network_address" name="network_address" placeholder="e.g., 192.168.1.0" maxlength="45">
-            </div>
-            <div class="col-md-2">
-              <label for="subnet" class="form-label"><strong>Mask</strong></label>
-              <select class="form-select" id="subnet" name="subnet">
-                <cfoutput query="get_subnets">
-                <option value="#value3#">#mask#</option>
-                </cfoutput>
-              </select>
-            </div>
-            <div class="col-md-3">
-              <label for="network_note" class="form-label"><strong>Note</strong></label>
-              <input type="text" class="form-control" id="network_note" name="network_note" placeholder="e.g., Office-LAN" maxlength="255">
-            </div>
-            <div class="col-md-2 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
-                <i class="fas fa-plus"></i> Add Network
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      <!--- Bulk Import Tab --->
-      <div class="tab-pane fade" id="bulk-pane" role="tabpanel" aria-labelledby="bulk-tab">
-        <form name="bulk_import_form" method="post" autocomplete="off">
-          <input type="hidden" name="action" value="bulk_import">
-          <div class="row">
-            <div class="col-md-8">
-              <label for="bulk_entries" class="form-label"><strong>IP Addresses and Networks</strong></label>
-              <textarea class="form-control" id="bulk_entries" name="bulk_entries" rows="8" placeholder="Enter one entry per line. Examples:
-192.168.1.100 Office-Printer
-192.168.1.101 Scanner
-10.0.0.0/24 Server-Network
-172.16.0.0/16 VPN-Clients"></textarea>
-              <small class="text-muted">
-                Format: <code>IP_or_Network Note</code> (one per line)<br>
-                - Single IP: <code>192.168.1.100 My-Device</code><br>
-                - Network with CIDR: <code>192.168.1.0/24 Office-LAN</code><br>
-                - Note is required and can only contain letters, numbers, dashes, underscores, and periods
-              </small>
-            </div>
-            <div class="col-md-4 d-flex align-items-end">
-              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Importing...';this.form.submit();">
-                <i class="fas fa-file-import"></i> Import All
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-    </div>
-    <!--- /tab-content --->
-
+    </form>
   </div>
 </div>
 
