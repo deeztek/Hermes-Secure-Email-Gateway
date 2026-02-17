@@ -146,12 +146,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>System Users</p>
               </a>
             </li>
-            <li class="nav-item">
-              <a href="/admin/system_restart.cfm" class="nav-link">
-                <i class="nav-icon fas fa-power-off"></i>
-                <p>Reboot and Shutdown</p>
-              </a>
-            </li>
           </ul>
         </li>
         <!--- SYSTEM ENDS HERE --->
@@ -173,8 +167,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/relay_host.cfm" class="nav-link">
-                <i class="nav-icon fab fa-microsoft"></i>
+              <a href="view_relay_host.cfm" class="nav-link">
+                <i class="nav-icon fas fa-server"></i>
                 <p>Relay Host</p>
               </a>
             </li>

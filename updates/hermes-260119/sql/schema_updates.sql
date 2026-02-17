@@ -33,7 +33,7 @@ UPDATE system_users SET auth_type = 'local' WHERE auth_type IS NULL OR auth_type
 
 -- 1) Add new parent_name column (text)
 ALTER TABLE parameters
-  ADD COLUMN parent_name VARCHAR(255) NULL AFTER parent;
+  ADD COLUMN IF NOT EXISTS parent_name VARCHAR(255) NULL AFTER parent;
 
 -- 2) Change parent from INT to TEXT
 ALTER TABLE parameters
@@ -43,7 +43,7 @@ ALTER TABLE parameters
 ALTER TABLE parameters
   MODIFY order1 DECIMAL(7,3) NULL;
 
--- 4) Insert the new permit_sasl_authenticated row
+-- 4) Insert the new permit_sasl_authenticated row (if not exists)
 --    Let MySQL auto-assign id; parent is '6' (now text)
 INSERT INTO parameters (
     parameter, whitelist, blacklist, weight,
@@ -52,13 +52,15 @@ INSERT INTO parameters (
     description, parent, child, order1, enabled, applied, action,
     network_entry, note
 )
-VALUES (
+SELECT
     'permit_sasl_authenticated',
     NULL, NULL, NULL,
     NULL,
     'Allow SASL Authenticated Users', 'postfix', NULL, NULL, 1, 'main.cf',
     NULL, '6', 1, 1.1, 1, 1, NULL,
     NULL, NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters WHERE parameter = 'permit_sasl_authenticated'
 );
 
 -- 5) Remove all rows that belong to the 'network' module
@@ -278,6 +280,20 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================================
+-- SYSTEM_SETTINGS TABLE: Increase value column size for encrypted data storage
+-- The signed_fingerprint parameter stores AES-encrypted fingerprint+signature
+-- which can exceed 500 characters after encryption and Base64 encoding
+-- ============================================================================
+
+-- Only modify if column is smaller than 1024 characters
+SET @col_size = (SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_settings' AND COLUMN_NAME = 'value');
+SET @sql = IF(@col_size < 1024, 'ALTER TABLE system_settings MODIFY value VARCHAR(1024)', 'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- ============================================================================
 -- SYSTEM_SETTINGS TABLE: Add cleanup_threshold for retention policy storage
 -- This stores encrypted configuration data for message cleanup policies
 -- ============================================================================
@@ -288,14 +304,53 @@ WHERE NOT EXISTS (
     SELECT 1 FROM system_settings WHERE parameter = 'cleanup_threshold'
 );
 
+-- Note: Template fingerprint data is stored in 'signed_fingerprint' parameter
+-- (populated by storeSignedFingerprint() in manifest_verify.cfm)
+
 -- ============================================================================
--- SYSTEM_SETTINGS TABLE: Add template_manifest for Pro Edition tamper detection
--- This stores encrypted manifest data for template integrity verification
+-- PARAMETERS TABLE: Add smtp_tls_security_level for outbound relay TLS
+-- Controls TLS behavior when connecting to relay host (outbound connections)
+-- Values: may (opportunistic), encrypt (mandatory), none (disabled)
 -- ============================================================================
 
-INSERT INTO system_settings (parameter, value)
-SELECT 'template_manifest', ''
+-- Parent parameter for smtp_tls_security_level (disabled by default)
+INSERT INTO parameters (
+    parameter, whitelist, blacklist, weight,
+    smtpd_recipient_restrictions,
+    name, module, priority, default_value, editable, conf_file,
+    description, parent, child, order1, enabled, applied, action,
+    network_entry, note
+)
+SELECT
+    'smtp_tls_security_level',
+    NULL, NULL, NULL,
+    NULL,
+    'Outbound TLS Security Level', 'postfix', NULL, NULL, 0, 'main.cf',
+    'TLS security level for outbound SMTP connections to relay host', NULL, 2, NULL, 0, 1, NULL,
+    NULL, NULL
 WHERE NOT EXISTS (
-    SELECT 1 FROM system_settings WHERE parameter = 'template_manifest'
+    SELECT 1 FROM parameters WHERE parameter = 'smtp_tls_security_level' AND child = 2
+);
+
+-- Child parameter with default value 'may' (opportunistic TLS)
+INSERT INTO parameters (
+    parameter, whitelist, blacklist, weight,
+    smtpd_recipient_restrictions,
+    name, module, priority, default_value, editable, conf_file,
+    description, parent, parent_name, child, order1, enabled, applied, action,
+    network_entry, note
+)
+SELECT
+    'may',
+    NULL, NULL, NULL,
+    NULL,
+    'Opportunistic TLS', 'postfix', NULL, NULL, 0, 'main.cf',
+    NULL,
+    NULL,
+    'smtp_tls_security_level',
+    1, 1, 0, 1, NULL,
+    NULL, NULL
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters WHERE parent_name = 'smtp_tls_security_level' AND child = 1
 );
 
