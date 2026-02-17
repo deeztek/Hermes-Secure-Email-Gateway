@@ -220,6 +220,140 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <!--- ===================== --->
+<!--- ACTION: BULK IMPORT --->
+<!--- ===================== --->
+<cfif action is "bulk_import">
+  <cfset bulk_added = 0>
+  <cfset bulk_skipped = 0>
+  <cfset bulk_errors = "">
+
+  <!--- Validate bulk_entries exists and is not empty --->
+  <cfif NOT StructKeyExists(form, "bulk_entries") OR trim(form.bulk_entries) is "">
+    <cfset session.m = 30>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Normalize line endings and split into lines --->
+  <cfset bulkText = Replace(form.bulk_entries, Chr(13) & Chr(10), Chr(10), "ALL")>
+  <cfset bulkText = Replace(bulkText, Chr(13), Chr(10), "ALL")>
+  <cfset lines = ListToArray(bulkText, Chr(10))>
+
+  <cfloop array="#lines#" index="line">
+    <cfset line = trim(line)>
+
+    <!--- Skip empty lines --->
+    <cfif line is "">
+      <cfcontinue>
+    </cfif>
+
+    <!--- Parse line: first part is IP/Network, rest is note --->
+    <cfset firstSpace = Find(" ", line)>
+    <cfif firstSpace GT 0>
+      <cfset entryAddress = trim(Left(line, firstSpace - 1))>
+      <cfset entryNote = trim(Mid(line, firstSpace + 1, Len(line)))>
+    <cfelse>
+      <!--- No space found, entire line is address with no note --->
+      <cfset bulk_skipped = bulk_skipped + 1>
+      <cfset bulk_errors = bulk_errors & "Line missing note: " & line & "<br>">
+      <cfcontinue>
+    </cfif>
+
+    <!--- Validate note --->
+    <cfif entryNote is "" OR REFind("[^_a-zA-Z0-9\-\.]", entryNote) GT 0>
+      <cfset bulk_skipped = bulk_skipped + 1>
+      <cfset bulk_errors = bulk_errors & "Invalid note for: " & entryAddress & "<br>">
+      <cfcontinue>
+    </cfif>
+
+    <!--- Determine if it's a network (has /) or single IP --->
+    <cfset isNetwork = Find("/", entryAddress) GT 0>
+
+    <cfif isNetwork>
+      <!--- Parse network address and CIDR --->
+      <cfset networkPart = ListFirst(entryAddress, "/")>
+      <cfset cidrPart = ListLast(entryAddress, "/")>
+
+      <!--- Validate network address --->
+      <cfif NOT REFind(ipv4_pattern, networkPart)>
+        <cfset bulk_skipped = bulk_skipped + 1>
+        <cfset bulk_errors = bulk_errors & "Invalid network address: " & entryAddress & "<br>">
+        <cfcontinue>
+      </cfif>
+
+      <!--- Validate CIDR (1-32) --->
+      <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
+        <cfset bulk_skipped = bulk_skipped + 1>
+        <cfset bulk_errors = bulk_errors & "Invalid CIDR mask: " & entryAddress & "<br>">
+        <cfcontinue>
+      </cfif>
+
+      <cfset theEntry = entryAddress>
+      <cfset isNetworkEntry = "1">
+
+    <cfelse>
+      <!--- Single IP address --->
+      <cfif NOT REFind(ipv4_pattern, entryAddress)>
+        <cfset bulk_skipped = bulk_skipped + 1>
+        <cfset bulk_errors = bulk_errors & "Invalid IP address: " & entryAddress & "<br>">
+        <cfcontinue>
+      </cfif>
+
+      <cfset theEntry = entryAddress>
+      <cfset isNetworkEntry = "0">
+    </cfif>
+
+    <!--- Check if already exists --->
+    <cfquery name="checkexists_bulk" datasource="hermes">
+      SELECT id FROM parameters
+      WHERE parameter = <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">
+      AND parent = '#mynetworks_parent_id#'
+      AND child = '1'
+    </cfquery>
+
+    <cfif checkexists_bulk.recordcount GTE 1>
+      <cfset bulk_skipped = bulk_skipped + 1>
+      <cfset bulk_errors = bulk_errors & "Already exists: " & theEntry & "<br>">
+      <cfcontinue>
+    </cfif>
+
+    <!--- Get max order --->
+    <cfquery name="getmaxorder_bulk" datasource="hermes">
+      SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent='#mynetworks_parent_id#' AND child='1'
+    </cfquery>
+    <cfset nextorder_bulk = getmaxorder_bulk.maximum + 1>
+
+    <!--- Insert the entry --->
+    <cfquery name="add_bulk" datasource="hermes">
+      INSERT INTO parameters (parameter, module, editable, conf_file, parent, parent_name, child, order1, enabled, applied, action, network_entry, note)
+      VALUES (
+        <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">,
+        'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder_bulk#', '1', '2', 'insert', '#isNetworkEntry#',
+        <cfqueryparam value="#entryNote#" cfsqltype="cf_sql_varchar">
+      )
+    </cfquery>
+
+    <cfset bulk_added = bulk_added + 1>
+
+  </cfloop>
+
+  <!--- Store results in session for display --->
+  <cfset session.bulk_added = bulk_added>
+  <cfset session.bulk_skipped = bulk_skipped>
+  <cfset session.bulk_errors = bulk_errors>
+
+  <cfif bulk_added GT 0>
+    <cfset session.m = 31>
+  <cfelseif bulk_skipped GT 0>
+    <cfset session.m = 32>
+  <cfelse>
+    <cfset session.m = 30>
+  </cfif>
+
+  <cflocation url="view_relay_networks.cfm" addtoken="no">
+</cfif>
+
+
+<!--- ===================== --->
 <!--- ACTION: DELETE --->
 <!--- ===================== --->
 <cfif action is "delete">
@@ -394,19 +528,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cfif m is "10">
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-info-circle"></i> Ready to Apply</h4>
-    <cfoutput>IP Address added to pending list. Click <strong>Apply Settings</strong> to save changes.</cfoutput>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>IP Address added to pending list. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
   </div>
   <cfset session.m = 0>
 </cfif>
 
 <cfif m is "11">
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-info-circle"></i> Ready to Apply</h4>
-    <cfoutput>Network added to pending list. Click <strong>Apply Settings</strong> to save changes.</cfoutput>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>Network added to pending list. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -421,10 +567,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cfif m is "13">
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
-    <h4><i class="icon fa fa-info-circle"></i> Ready to Apply</h4>
-    <cfoutput>Entry marked for deletion. Click <strong>Apply Settings</strong> to save changes.</cfoutput>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>Entry marked for deletion. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -456,7 +608,74 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset session.m = 0>
 </cfif>
 
+<cfif m is "30">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>The bulk import field cannot be empty. Please enter at least one entry.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "31">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-check"></i> Bulk Import Successful!</h4>
+    <cfoutput>
+      <strong>#session.bulk_added#</strong> entries added to pending list.
+      <cfif session.bulk_skipped GT 0>
+        <strong>#session.bulk_skipped#</strong> entries skipped.
+        <details class="mt-2">
+          <summary>View skipped entries</summary>
+          <div class="mt-1 small">#session.bulk_errors#</div>
+        </details>
+      </cfif>
+      <br>You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.
+    </cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
+  </div>
+  <cfset session.m = 0>
+  <cfset session.bulk_added = 0>
+  <cfset session.bulk_skipped = 0>
+  <cfset session.bulk_errors = "">
+</cfif>
+
+<cfif m is "32">
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Bulk Import - All Entries Skipped</h4>
+    <cfoutput>
+      All <strong>#session.bulk_skipped#</strong> entries were skipped due to errors:
+      <div class="mt-2 small">#session.bulk_errors#</div>
+    </cfoutput>
+  </div>
+  <cfset session.m = 0>
+  <cfset session.bulk_added = 0>
+  <cfset session.bulk_skipped = 0>
+  <cfset session.bulk_errors = "">
+</cfif>
+
 <!--- ERROR MESSAGES END HERE --->
+
+
+<!--- PENDING CHANGES ALERT (shown when there are pending changes but no action message) --->
+<cfif m is "0" AND has_pending_changes>
+  <div class="alert alert-warning">
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Pending Changes</h4>
+    <cfoutput>You have pending changes that have not been applied. Click the <strong>Apply Settings</strong> button below to save your changes.</cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
+  </div>
+</cfif>
 
 
 <!--- INFORMATION CARD --->
@@ -494,6 +713,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <li class="nav-item" role="presentation">
         <button class="nav-link" id="network-tab" data-bs-toggle="tab" data-bs-target="#network-pane" type="button" role="tab" aria-controls="network-pane" aria-selected="false">
           <i class="fas fa-network-wired"></i> Network
+        </button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk-pane" type="button" role="tab" aria-controls="bulk-pane" aria-selected="false">
+          <i class="fas fa-list"></i> Bulk Import
         </button>
       </li>
     </ul>
@@ -548,6 +772,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="col-md-2 d-flex align-items-end">
               <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
                 <i class="fas fa-plus"></i> Add Network
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!--- Bulk Import Tab --->
+      <div class="tab-pane fade" id="bulk-pane" role="tabpanel" aria-labelledby="bulk-tab">
+        <form name="bulk_import_form" method="post" autocomplete="off">
+          <input type="hidden" name="action" value="bulk_import">
+          <div class="row">
+            <div class="col-md-8">
+              <label for="bulk_entries" class="form-label"><strong>IP Addresses and Networks</strong></label>
+              <textarea class="form-control" id="bulk_entries" name="bulk_entries" rows="8" placeholder="Enter one entry per line. Examples:
+192.168.1.100 Office-Printer
+192.168.1.101 Scanner
+10.0.0.0/24 Server-Network
+172.16.0.0/16 VPN-Clients"></textarea>
+              <small class="text-muted">
+                Format: <code>IP_or_Network Note</code> (one per line)<br>
+                - Single IP: <code>192.168.1.100 My-Device</code><br>
+                - Network with CIDR: <code>192.168.1.0/24 Office-LAN</code><br>
+                - Note is required and can only contain letters, numbers, dashes, underscores, and periods
+              </small>
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Importing...';this.form.submit();">
+                <i class="fas fa-file-import"></i> Import All
               </button>
             </div>
           </div>
@@ -681,25 +933,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 
-<!--- APPLY SETTINGS CARD --->
-<div class="card card-success card-outline mb-4">
-  <div class="card-body text-center">
-    <form method="post">
-      <input type="hidden" name="action" value="apply">
-      <cfif has_pending_changes>
-        <p class="mb-2"><strong>You have pending changes.</strong> Click the button below to apply them.</p>
-        <button type="submit" class="btn btn-success btn-lg" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying Settings...';this.form.submit();">
-          <i class="fas fa-check-circle"></i> Apply Settings
-        </button>
-      <cfelse>
-        <p class="text-muted mb-2">No pending changes to apply.</p>
-        <button type="submit" class="btn btn-secondary btn-lg" disabled>
-          <i class="fas fa-check-circle"></i> Apply Settings
-        </button>
-      </cfif>
-    </form>
-  </div>
-</div>
 
 
       </div><!-- /.container-fluid -->
