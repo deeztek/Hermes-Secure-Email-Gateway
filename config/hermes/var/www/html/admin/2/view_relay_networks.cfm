@@ -126,7 +126,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 
     <!--- Validate note if provided (skip validation if using default) --->
-    <cfif entryNote is not entryAddress AND REFind("[^_a-zA-Z0-9\-\.]", entryNote) GT 0>
+    <cfif entryNote is not entryAddress AND REFind("[^_a-zA-Z0-9\-\.\s]", entryNote) GT 0>
       <cfset entries_skipped = entries_skipped + 1>
       <cfset entry_errors = entry_errors & "Invalid note for: " & entryAddress & "<br>">
       <cfcontinue>
@@ -463,12 +463,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="row">
         <div class="col-md-8">
           <label for="entries" class="form-label"><strong>IP Addresses and/or Networks</strong></label>
-          <textarea class="form-control" id="entries" name="entries" rows="5" placeholder="192.168.1.100 Office-Printer
+          <textarea class="form-control" id="entries" name="entries" rows="5" placeholder="192.168.1.100 Office Printer
 192.168.1.101
-10.0.0.0/24 Server-Network"></textarea>
+10.0.0.0/24 Server Network"></textarea>
           <small class="text-muted">
             Enter one entry per line. Format: <code>IP_or_Network [Note]</code> (note is optional)<br>
-            Examples: <code>192.168.1.100 My-Device</code> or <code>192.168.1.0/24</code>
+            Examples: <code>192.168.1.100 My Device</code> or <code>192.168.1.0/24</code>
           </small>
         </div>
         <div class="col-md-4 d-flex align-items-end pb-4">
