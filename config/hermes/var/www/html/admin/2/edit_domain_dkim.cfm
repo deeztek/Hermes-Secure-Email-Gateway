@@ -1565,7 +1565,16 @@ select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="c
       </cfif>
 
       <cfset rightPublic = "#trim(ListGetAt(dkimpublicfile, 2, "("))#">
-      <cfset publicKey = "#trim(ListGetAt(rightPublic, 1, ")"))#">
+      <cfset publicKeyRaw = "#trim(ListGetAt(rightPublic, 1, ")"))#">
+
+      <!--- Clean up the public key for DNS entry - remove quotes, newlines, tabs, and extra spaces --->
+      <cfset publicKey = publicKeyRaw>
+      <cfset publicKey = Replace(publicKey, '"', '', 'ALL')>
+      <cfset publicKey = Replace(publicKey, Chr(10), '', 'ALL')>
+      <cfset publicKey = Replace(publicKey, Chr(13), '', 'ALL')>
+      <cfset publicKey = Replace(publicKey, Chr(9), '', 'ALL')>
+      <cfset publicKey = REReplace(publicKey, '\s+', ' ', 'ALL')>
+      <cfset publicKey = Trim(publicKey)>
       
       <!--- CHECK FOR EXISTENCE OF /OPT/HERMES/DKIM/domain.dkim.private --->
       <cfset PrivateFiletoRead="/opt/hermes/dkim/keys/#private#">
