@@ -125,12 +125,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset entryNote = line>
     </cfif>
 
-    <!--- Validate note if provided (skip validation if using default) --->
-    <cfif entryNote is not entryAddress AND REFind("[^_a-zA-Z0-9\-\.\s]", entryNote) GT 0>
-      <cfset entries_skipped = entries_skipped + 1>
-      <cfset entry_errors = entry_errors & "Invalid note for: " & entryAddress & "<br>">
-      <cfcontinue>
-    </cfif>
+    <!--- Note validation removed - cfqueryparam handles SQL injection --->
+    <!--- HTML encoding on output handles XSS --->
 
     <!--- Determine if it's a network (has /) or single IP --->
     <cfset isNetwork = Find("/", entryAddress) GT 0>
@@ -143,14 +139,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- Validate network address --->
       <cfif NOT REFind(ipv4_pattern, networkPart)>
         <cfset entries_skipped = entries_skipped + 1>
-        <cfset entry_errors = entry_errors & "Invalid network address: " & entryAddress & "<br>">
+        <cfset entry_errors = entry_errors & "Invalid network address: " & encodeForHTML(entryAddress) & "<br>">
         <cfcontinue>
       </cfif>
 
       <!--- Validate CIDR (1-32) --->
       <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
         <cfset entries_skipped = entries_skipped + 1>
-        <cfset entry_errors = entry_errors & "Invalid CIDR mask: " & entryAddress & "<br>">
+        <cfset entry_errors = entry_errors & "Invalid CIDR mask: " & encodeForHTML(entryAddress) & "<br>">
         <cfcontinue>
       </cfif>
 
@@ -161,7 +157,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- Single IP address --->
       <cfif NOT REFind(ipv4_pattern, entryAddress)>
         <cfset entries_skipped = entries_skipped + 1>
-        <cfset entry_errors = entry_errors & "Invalid IP address: " & entryAddress & "<br>">
+        <cfset entry_errors = entry_errors & "Invalid IP address: " & encodeForHTML(entryAddress) & "<br>">
         <cfcontinue>
       </cfif>
 
@@ -179,7 +175,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif checkexists_entry.recordcount GTE 1>
       <cfset entries_skipped = entries_skipped + 1>
-      <cfset entry_errors = entry_errors & "Already exists: " & theEntry & "<br>">
+      <cfset entry_errors = entry_errors & "Already exists: " & encodeForHTML(theEntry) & "<br>">
       <cfcontinue>
     </cfif>
 
@@ -502,7 +498,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfoutput query="get_pending_adds">
           <tr>
             <td><span class="badge bg-success">+ #parameter#</span></td>
-            <td>#note#</td>
+            <td>#encodeForHTML(note)#</td>
             <td><cfif network_entry is "1">Network<cfelse>IP Address</cfif></td>
           </tr>
           </cfoutput>
@@ -543,7 +539,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfoutput query="get_active_networks">
             <tr>
               <td>#parameter#</td>
-              <td>#note#</td>
+              <td>#encodeForHTML(note)#</td>
               <td><cfif network_entry is "1"><span class="badge bg-info">Network</span><cfelse><span class="badge bg-secondary">IP</span></cfif></td>
               <td>
                 <form method="post" style="display:inline;">
@@ -584,7 +580,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfoutput query="get_pending_deletes">
           <tr class="table-danger">
             <td><span class="badge bg-danger">- #parameter#</span></td>
-            <td>#note#</td>
+            <td>#encodeForHTML(note)#</td>
             <td><cfif network_entry is "1">Network<cfelse>IP Address</cfif></td>
           </tr>
           </cfoutput>
