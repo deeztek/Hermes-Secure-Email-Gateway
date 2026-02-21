@@ -37,7 +37,7 @@
 
 <cfif #url.percent# GTE 99> 
 
-    <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Quota Exceeded!!" type="HTML" server="localhost" port="10026">
+    <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Quota Exceeded!!" type="HTML" server="hermes_postfix_dkim" port="10026">
 
 
 
@@ -114,7 +114,7 @@
 
         <cfelseif #url.percent# LT 99 AND #url.percent# GTE 80>    
 
-            <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Quota Notification" type="HTML" server="localhost" port="10026">
+            <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Quota Notification" type="HTML" server="hermes_postfix_dkim" port="10026">
 
         <HTML>
            <head><title>Hermes SEG Mailbox Quota Notification</title>
@@ -191,7 +191,7 @@
 
     <cfelseif #url.percent# EQ -100>    
 
-        <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Under Quota Notification" type="HTML" server="localhost" port="10026">
+        <cfmail from="#getpostmaster.value#" to="#TRIM(url.user)#" subject="[Hermes SEG] Mailbox Under Quota Notification" type="HTML" server="hermes_postfix_dkim" port="10026">
 
     <HTML>
        <head><title>Hermes SEG Mailbox Under Quota Notification</title>

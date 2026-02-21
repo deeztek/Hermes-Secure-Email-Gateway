@@ -24,6 +24,7 @@ Use this instead of message_cleanup.cfm when you only need the functions.
         <cfset result.retentionDays = "">
         <cfset result.policyId = "">
         <cfset result.policyHash = "">
+        <cfset result.lastRemoteValidation = "">
         <cfreturn result>
     </cfif>
 
@@ -35,6 +36,8 @@ Use this instead of message_cleanup.cfm when you only need the functions.
         <cfset result.retentionDays = parts[2]>
         <cfset result.policyId = parts[3]>
         <cfset result.policyHash = parts[4]>
+        <!--- 5th field: last successful remote validation date (added for grace period tracking) --->
+        <cfset result.lastRemoteValidation = ArrayLen(parts) GTE 5 ? parts[5] : "">
         <cfset result.isValid = true>
 
         <cfcatch type="any">
@@ -43,6 +46,7 @@ Use this instead of message_cleanup.cfm when you only need the functions.
             <cfset result.retentionDays = "">
             <cfset result.policyId = "">
             <cfset result.policyHash = "">
+            <cfset result.lastRemoteValidation = "">
         </cfcatch>
     </cftry>
 
@@ -78,8 +82,14 @@ Use this instead of message_cleanup.cfm when you only need the functions.
     <cfargument name="expiry" type="string" required="true">
     <cfargument name="policyId" type="string" required="true">
     <cfargument name="policyHash" type="string" required="true">
+    <cfargument name="lastRemoteValidation" type="string" required="false" default="">
 
-    <cfset var rawData = "#arguments.status#|#arguments.expiry#|#arguments.policyId#|#arguments.policyHash#">
+    <!--- If no lastRemoteValidation provided, use today's date (for remote validation success) --->
+    <cfif Len(arguments.lastRemoteValidation) EQ 0>
+        <cfset arguments.lastRemoteValidation = DateFormat(Now(), "yyyy-mm-dd")>
+    </cfif>
+
+    <cfset var rawData = "#arguments.status#|#arguments.expiry#|#arguments.policyId#|#arguments.policyHash#|#arguments.lastRemoteValidation#">
     <cfset var encrypted = Encrypt(rawData, variables.rtk, variables.rta, "Base64")>
 
     <cfquery datasource="hermes">

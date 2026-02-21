@@ -72,14 +72,34 @@ Usage: <cfinclude template="system_alerts.cfm">
         })>
     </cfif>
 
+    <!--- Grace period expired --->
+    <cfif session.license EQ "GRACE_PERIOD_EXPIRED">
+        <cfset ArrayAppend(systemAlerts, {
+            type: "danger",
+            icon: "fas fa-wifi",
+            iconStyle: "opacity:0.5",
+            label: "Grace Period Expired",
+            title: "Offline grace period expired. Connect to internet and log in again to revalidate.",
+            priority: 3
+        })>
+    </cfif>
+
     <!--- Offline/cached validation mode (grace period) --->
     <cfif session.license EQ "VALID" AND StructKeyExists(session, "validationMode") AND session.validationMode EQ "cached">
+        <cfset offlineTitle = "Validation server unreachable. Using cached license data.">
+        <cfif StructKeyExists(session, "gracePeriodRemaining") AND IsNumeric(session.gracePeriodRemaining)>
+            <cfset offlineTitle = offlineTitle & " Pro features disabled in " & session.gracePeriodRemaining & " day">
+            <cfif session.gracePeriodRemaining NEQ 1>
+                <cfset offlineTitle = offlineTitle & "s">
+            </cfif>
+            <cfset offlineTitle = offlineTitle & ".">
+        </cfif>
         <cfset ArrayAppend(systemAlerts, {
             type: "warning",
             icon: "fas fa-wifi",
             iconStyle: "opacity:0.5",
             label: "Offline Mode",
-            title: "Validation server unreachable. Using cached license data.",
+            title: offlineTitle,
             priority: 5
         })>
     </cfif>

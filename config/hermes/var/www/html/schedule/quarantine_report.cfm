@@ -44,7 +44,7 @@ SELECT msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, m
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
-<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Quarantine Report" type="HTML" server="localhost" port="10026">
+<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Quarantine Report" type="HTML" server="hermes_postfix_dkim" port="10026">
     <HTML>
        <head><title>Hermes SEG Quarantine Report</title>
 
@@ -258,7 +258,7 @@ select id as rcptid from maddr where email='#rcptemail#'
 select parameter, value from system_settings where parameter='postmaster'
 </cfquery>
 
-<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Quarantine Report" type="HTML" server="localhost" port="10026">
+<cfmail from="#getpostmaster.value#" to="#TRIM(rcptemail)#" subject="[#rcptemail#] Hermes SEG Quarantine Report" type="HTML" server="hermes_postfix_dkim" port="10026">
     <HTML>
        <head><title>Hermes SEG Quarantine Report</title>
 

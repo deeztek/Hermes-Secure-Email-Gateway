@@ -60,7 +60,6 @@ it=s1.addItemWithImages(4,5,5,"System Backup",n,n,"",n,n,n,3,3,3,n,n,n,"system_b
 it=s1.addItemWithImages(4,5,5,"System Restore",n,n,"",n,n,n,3,3,3,n,n,n,"system_restore.cfm",n,n,n,"system_restore.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,39,n);
 it=s1.addItemWithImages(4,5,5,"Email Archive",n,n,"",n,n,n,3,3,3,n,n,n,"email_archive.cfm",n,n,n,"email_archive.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,44,n);
 it=s1.addItemWithImages(4,5,5,"System Update",n,n,"",n,n,n,3,3,3,n,n,n,"system_update.cfm",n,n,n,"system_update.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,42,n);
-it=s1.addItemWithImages(4,5,5,"System Reboot &amp; Shutdown",n,n,"",n,n,n,3,3,3,n,n,n,"system_restart.cfm",n,n,n,"system_restart.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,21,n);
 it=s0.addItemWithImages(1,2,2,"Gateway",n,n,"",n,n,n,3,3,3,0,1,1,"",n,n,n,n,n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,9,n);
 var s1=it.addSubmenu(0,0,10,2,3,0,0,3,0,1,0,n,n,100,-1,2,0,-1,1,200,200,0,0,"0,0,0",1,"0",1,0,"");
 it=s1.addItemWithImages(4,5,5,"Certificate Signing Request",n,n,"",n,n,n,3,3,3,n,n,n,"create_csr.cfm",n,n,n,"create_csr.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,41,n);

@@ -13,8 +13,9 @@ Supports offline verification using server-signed fingerprints.
 <!--- Public key for signature verification (distributed with install) --->
 <cfset variables.manifestPublicKeyPath = "/opt/hermes/ssl/manifest_verify.pub">
 
-<!--- Encryption keys for fingerprint storage --->
-<cfset variables.fpk = "H3rm3s$3G!F1ng3rpr1ntK3y2024">
+<!--- Encryption keys for fingerprint storage (derive AES-256 key from passphrase) --->
+<cfset variables.fpkPassphrase = "H3rm3s$3G!F1ng3rpr1ntK3y2024">
+<cfset variables.fpk = ToBase64(BinaryDecode(Hash(variables.fpkPassphrase, "SHA-256"), "hex"))>
 <cfset variables.fpa = "AES">
 
 <!--- Load templates list from shared config (same file used by generate_manifest scripts) --->

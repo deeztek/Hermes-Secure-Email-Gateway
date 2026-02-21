@@ -125,7 +125,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                             <cfset storeSignedFingerprint(responseFingerprint, responseSignature)>
                         </cfif>
                         <cfcatch>
-                            <!--- Fingerprint storage error - log but don't fail validation --->
+                            <!--- Silently ignore signature storage errors --->
                         </cfcatch>
                     </cftry>
                 </cfif>
@@ -181,13 +181,30 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                 <cfset offlineVerification = verifyOfflineFingerprint()>
 
                 <cfif offlineVerification.valid>
-                    <!--- Templates verified - allow Pro mode --->
-                    <cfset difference = datediff("d", datenow, currentPolicy.retentionDays)>
-                    <cfset session.license = "VALID">
-                    <cfset session.edition = "Pro">
-                    <cfset session.licensevaliddays = difference>
-                    <cfset session.licenseexpires = DateFormat(currentPolicy.retentionDays, "mm/dd/yyyy")>
-                    <cfset session.validationMode = "cached">
+                    <!--- Templates verified - check grace period (7 days from last remote validation) --->
+                    <cfset gracePeriodDays = 7>
+                    <cfset gracePeriodRemaining = gracePeriodDays>
+
+                    <cfif Len(currentPolicy.lastRemoteValidation) GT 0>
+                        <cfset daysSinceRemote = datediff("d", currentPolicy.lastRemoteValidation, datenow)>
+                        <cfset gracePeriodRemaining = gracePeriodDays - daysSinceRemote>
+                    </cfif>
+
+                    <cfif gracePeriodRemaining GT 0>
+                        <!--- Within grace period - allow Pro mode --->
+                        <cfset difference = datediff("d", datenow, currentPolicy.retentionDays)>
+                        <cfset session.license = "VALID">
+                        <cfset session.edition = "Pro">
+                        <cfset session.licensevaliddays = difference>
+                        <cfset session.licenseexpires = DateFormat(currentPolicy.retentionDays, "mm/dd/yyyy")>
+                        <cfset session.validationMode = "cached">
+                        <cfset session.gracePeriodRemaining = gracePeriodRemaining>
+                    <cfelse>
+                        <!--- Grace period expired - require online validation --->
+                        <cfset session.license = "GRACE_PERIOD_EXPIRED">
+                        <cfset session.edition = "Community">
+                        <cfset session.reason = "Offline grace period expired. Connect to internet and log in again to revalidate.">
+                    </cfif>
                 <cfelseif offlineVerification.reason EQ "No stored fingerprint">
                     <!--- No fingerprint stored - require online validation before offline mode is allowed --->
                     <cfset session.license = "PENDING_VALIDATION">

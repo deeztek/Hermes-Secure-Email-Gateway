@@ -29,24 +29,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
 
     
-<cfmail from="#getsettings.value#" to="#getemail.email#" server="localhost" subject="[Hermes SEG] User Console Password Changed" port="10026"  type="html">
-
-  <div align="center">
-
+<cfmail from="#getsettings.value#" to="#getemail.email#" server="hermes_postfix_dkim" subject="[Hermes SEG] User Console Password Changed" port="10026"  type="html">
+<div align="center" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
 <b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
 
+<img src="cid:hermeslogo" alt="Hermes SEG" style="max-height: 80px; margin-bottom: 10px;"><br>
+<h2 style="color: ##333;">User Console Password Changed</h2>
 
+<p>Someone, presumably you, has changed your Hermes SEG User Console Password.</p>
 
-<h2>User Console Password Changed </h2>
+<p>If you did initiate this change, you can safely ignore this message.</p>
 
-Someone, presumbably you, has changed the Hermes SEG User Console Password. 
+<p>If you <strong>did NOT</strong> initiate this change, please contact your Hermes SEG Administrator immediately as this may indicate an account compromise.</p>
 
-If you did initiate this change, you can safely ignore this message.<br><br>
-
-If you <strong>did NOT</strong> initiate this change, please contact your Hermes SEG Administrator asap as this may indicate an account compromise.<br><br>
-
+<p style="margin-top: 30px; color: ##6c757d; font-size: 12px;">
+This is an automated message from Hermes SEG.
+</p>
 </div>
- 
+<cfmailparam file="/var/www/html/dist/img/hermes_logo_new_orange2.png" contentid="hermeslogo" disposition="inline" />
 </cfmail>
 
     

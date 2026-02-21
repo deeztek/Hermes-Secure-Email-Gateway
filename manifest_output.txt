@@ -1,0 +1,37 @@
++ set -e
++ RED='\033[0;31m'
++ GREEN='\033[0;32m'
++ YELLOW='\033[1;33m'
++ NC='\033[0m'
++ VERSION=build-260119
++ SRC_DIR=config/hermes/var/www/html
++ OUTPUT=manifest.json
++ TEMPLATES=("schedule/retention_policy_functions.cfm" "schedule/get_retention_status.cfm" "schedule/acme_validate_ip.cfm" "schedule/generate_smtp_sni.cfm" "admin/2/inc/license_check.cfm" "admin/2/inc/license_invalid.cfm" "admin/2/inc/setsession.cfm" "admin/2/inc/add_serial_number.cfm" "admin/2/inc/manifest_verify.cfm" "admin/2/view_ad_connection.cfm" "admin/2/edit_ad_connection.cfm" "admin/2/view_remoteauth.cfm" "admin/2/edit_remoteauth_mapping.cfm" "admin/2/view_intrusion_prevention.cfm" "admin/2/view_console_firewall.cfm" "admin/2/view_system_certificates.cfm" "admin/2/view_antivirus_signature_feeds.cfm" "admin/2/edit_antivirus_signature_feed.cfm")
++ echo -e '\033[0;32mGenerating manifest for version: build-260119\033[0m'
+[0;32mGenerating manifest for version: build-260119[0m
++ echo 'Source directory: config/hermes/var/www/html'
+Source directory: config/hermes/var/www/html
++ echo ''
+
++ '[' '!' -d config/hermes/var/www/html ']'
++ echo '{'
++ echo '  "version": "build-260119",'
+++ date -u +%Y-%m-%dT%H:%M:%SZ
++ echo '  "generated": "2026-02-15T10:51:37Z",'
++ echo '  "algorithm": "SHA-256",'
++ echo '  "templates": {'
++ FIRST=true
++ FOUND=0
++ MISSING=0
++ for template in "${TEMPLATES[@]}"
++ filepath=config/hermes/var/www/html/schedule/retention_policy_functions.cfm
++ '[' -f config/hermes/var/www/html/schedule/retention_policy_functions.cfm ']'
+++ sha256sum config/hermes/var/www/html/schedule/retention_policy_functions.cfm
+++ awk '{print tolower($1)}'
++ hash=7737db8fcf2f49fb4327a46a900f86ef622d44639d3e6f4b92f5a769ed22ff8c
++ '[' true = true ']'
++ FIRST=false
++ printf '    "%s": "%s"' schedule/retention_policy_functions.cfm 7737db8fcf2f49fb4327a46a900f86ef622d44639d3e6f4b92f5a769ed22ff8c
++ echo -e '  \033[0;32m[OK]\033[0m schedule/retention_policy_functions.cfm'
+  [0;32m[OK][0m schedule/retention_policy_functions.cfm
++ (( FOUND++ ))

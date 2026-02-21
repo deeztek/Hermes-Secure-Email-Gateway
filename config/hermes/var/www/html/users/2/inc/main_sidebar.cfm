@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -56,6 +56,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Change Password</strong></p>
           </a>
         </li>
+
+        <cfif #session.theGroups# contains "mailboxes">
+        <li class="nav-item">
+          <a href="user_settings.cfm" class="nav-link">
+            <i class="nav-icon fas fa-cog"></i>
+            <p><strong>Account Settings</strong></p>
+          </a>
+        </li>
+        </cfif>
 
         <li class="nav-item">
           <a href="view_message_history.cfm" class="nav-link">

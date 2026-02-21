@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
   <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -69,7 +69,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!-- Main content -->
     <div class="content">
       <div class="container-fluid">
-
 
 
 

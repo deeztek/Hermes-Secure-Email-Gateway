@@ -58,7 +58,8 @@ ntp:
 authentication_backend:
   password_reset:
     disable: false
-    custom_url: ""
+    # Custom URL for password reset - uses Hermes SEG custom password reset flow
+    custom_url: "https://hermes_access_control_domain/user-auth/forgot_password.cfm"
   refresh_interval: 5m
 
   ldap:

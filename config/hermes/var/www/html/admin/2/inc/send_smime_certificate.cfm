@@ -37,7 +37,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelse>
 
 <!--- SEND THE PFX FILE E-MAIL --->       
-<cfmail from="#getsettings.value#" to="#getencryptiondetails.recipient#" server="localhost" subject="[Hermes SEG] Your PFX Certificate File" port="10026" type="html">
+<cfmail from="#getsettings.value#" to="#getencryptiondetails.recipient#" server="hermes_postfix_dkim" subject="[Hermes SEG] Your PFX Certificate File" port="10026" type="html">
 
   <div align="center">
 

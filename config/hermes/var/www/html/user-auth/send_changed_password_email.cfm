@@ -29,7 +29,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
 
     
-<cfmail from="#getsettings.value#" to="#getemail.email#" server="localhost" subject="[Hermes SEG] User Console Password Changed" port="10026"  type="html">
+<cfmail from="#getsettings.value#" to="#getemail.email#" server="hermes_postfix_dkim" subject="[Hermes SEG] User Console Password Changed" port="10026"  type="html">
 
   <div align="center">
 

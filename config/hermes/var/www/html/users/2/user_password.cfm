@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
   <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -292,18 +292,38 @@ a, a:hover{
             <h4><i class="icon fa fa-check"></i> Success!</h4>
             <cfoutput>Your Password was changed successfully. Please ensure you use the new password to login from now on</cfoutput><br>
 
-       
-        
+
+
           </div>
 
           <cfset session.m = 0>
 
         </cfif>
 
+        <cfif #m# is "8">
 
-     
-        
-        
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>Your account is not configured for password changes. Please contact your system administrator.</cfoutput>
+          </div>
+
+          <cfset session.m = 0>
+
+        </cfif>
+
+        <cfif #m# is "9">
+
+          <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+            <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+            <cfoutput>There was a problem changing your password. Please try again or contact your system administrator.</cfoutput>
+          </div>
+
+          <cfset session.m = 0>
+
+        </cfif>
+
         <!--- ERROR MESSAGES END HERE --->
 
         
@@ -403,38 +423,77 @@ a, a:hover{
 
       <cfif #step# is "1">
 
-        <cfquery name="getoldpassword" datasource="hermes">
-          select password from user_settings where email = '#session.email#'
-          </cfquery>
-          
-          <cfset oldSalt="#Left(getoldpassword.password, 30)#">
-          
-          <cfloop index="hashCount" from="1" to="10000">
-          <cfset oldpasswordHash512=Hash(form.oldpassword & oldSalt, 'SHA-512', 'UTF-8') />
-          </cfloop>
-          
-          <cfset oldPassword="#oldSalt##oldpasswordHash512#" />
-          
-          
-          <cfset compare_password = Compare(#getoldpassword.password#, #oldPassword#)>
-          <cfif #compare_password# is "1">
+        <!--- GET LDAP USERNAME FOR THIS USER --->
+        <cfquery name="getLdapUsername" datasource="hermes">
+          SELECT ldap_username FROM user_settings WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
+        </cfquery>
 
+        <cfif getLdapUsername.recordcount EQ 0 OR getLdapUsername.ldap_username EQ "">
+            <!--- No LDAP username - user may not be migrated yet --->
+            <cfset step=0>
+            <cfset session.m=8>
+            <cflocation url="user_password.cfm" addtoken="no">
+        </cfif>
+
+        <cfset ldapUsername = getLdapUsername.ldap_username>
+
+        <!--- VERIFY OLD PASSWORD VIA LDAP BIND --->
+        <!--- All users are in ou=users - role is determined by group membership --->
+        <cfset ldapOU = "users">
+        <cfset ldapBindDN = "cn=#ldapUsername#,ou=#ldapOU#,dc=hermes,dc=local">
+
+        <!--- Attempt LDAP bind to verify old password using docker exec ldapwhoami --->
+        <!--- This is more reliable than cfldap direct connection --->
+        <cftry>
+            <!--- Generate unique temp filename using standard method --->
+            <cfinclude template="/admin/2/inc/generate_customtrans.cfm">
+
+            <!--- Write password to temp file to avoid shell escaping issues --->
+            <cfset tempPwdFile = "/opt/hermes/tmp/#customtrans3#_pwd.txt">
+            <cffile action="write" file="#tempPwdFile#" output="#form.oldpassword#" addNewLine="no">
+
+            <!--- Use ldapwhoami to verify password - binds and returns DN if successful --->
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec hermes_ldap ldapwhoami -x -D '#ldapBindDN#' -y /opt/hermes/tmp/#customtrans3#_pwd.txt"
+                variable="ldapWhoamiResult"
+                errorVariable="ldapWhoamiError"
+                timeout="30">
+            </cfexecute>
+
+            <!--- Cleanup temp password file --->
+            <cfif fileExists(tempPwdFile)>
+                <cffile action="delete" file="#tempPwdFile#">
+            </cfif>
+
+            <!--- Check if bind was successful --->
+            <cfif ldapWhoamiResult CONTAINS "dn:" OR ldapWhoamiResult CONTAINS ldapUsername>
+                <!--- Bind was successful - password is correct --->
+                <cfset step=2>
+            <cfelse>
+                <!--- Bind failed - check error --->
+                <cfif ldapWhoamiError CONTAINS "Invalid credentials" OR ldapWhoamiError CONTAINS "49">
+                    <cfset step=0>
+                    <cfset session.m=4>
+                    <cflocation url="user_password.cfm" addtoken="no">
+                <cfelse>
+                    <!--- Other error - show details for debugging --->
+                    <cfset step=0>
+                    <cfset session.m=9>
+                    <cflocation url="user_password.cfm" addtoken="no">
+                </cfif>
+            </cfif>
+
+        <cfcatch type="any">
+            <!--- Cleanup temp password file on error --->
+            <cfif isDefined("tempPwdFile") AND fileExists(tempPwdFile)>
+                <cffile action="delete" file="#tempPwdFile#">
+            </cfif>
+            <!--- LDAP bind failed --->
             <cfset step=0>
             <cfset session.m=4>
             <cflocation url="user_password.cfm" addtoken="no">
-        
-          <cfelseif #compare_password# is "-1">
-
-            <cfset step=0>
-          <cfset session.m=4>
-          <cflocation url="user_password.cfm" addtoken="no">
-      
-          <cfelseif #compare_password# is "0">
-
-          <cfset step=2>
-
-          <!--- /CFIF compare_password is --->
-          </cfif>
+        </cfcatch>
+        </cftry>
 
       <!--- /CFIF step 1 --->
       </cfif>
@@ -542,12 +601,23 @@ a, a:hover{
 
 <cfif #step# is "3">
 
-<cfinclude template="./inc/change_password.cfm">
-<cfinclude template="./inc/send_changed_password_email.cfm">
+<!--- Set variables required by ldap_modify_user_password.cfm --->
+<!--- ldapUsername and ldapOU are already set from step 1 --->
+<cfset newPassword = form.newpassword>
 
-<cfset step=0>
-<cfset session.m=7>
- <cflocation url="user_password.cfm" addtoken="no">
+<cfinclude template="/user-auth/inc/ldap_modify_user_password.cfm">
+
+<cfif ldapPasswordModified>
+    <cfinclude template="./inc/send_changed_password_email.cfm">
+    <cfset step=0>
+    <cfset session.m=7>
+    <cflocation url="user_password.cfm" addtoken="no">
+<cfelse>
+    <!--- LDAP password change failed --->
+    <cfset step=0>
+    <cfset session.m=9>
+    <cflocation url="user_password.cfm" addtoken="no">
+</cfif>
 
 <!--- /CFIF step is 3 --->
 </cfif>

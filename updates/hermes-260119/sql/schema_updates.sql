@@ -354,3 +354,60 @@ WHERE NOT EXISTS (
     SELECT 1 FROM parameters WHERE parent_name = 'smtp_tls_security_level' AND child = 1
 );
 
+-- ============================================================================
+-- PASSWORD RESET REQUESTS TABLE: LDAP Password Reset Flow
+-- Stores password reset requests for all user types (relay, mailbox, admin)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS password_reset_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL,
+    ldap_username VARCHAR(255) NOT NULL,
+    user_type ENUM('relay', 'mailbox', 'admin') NOT NULL,
+    token VARCHAR(64) NULL,
+    notification_method ENUM('email', 'pushover', 'admin') NOT NULL,
+    status ENUM('pending', 'completed', 'expired', 'cancelled') DEFAULT 'pending',
+    requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NULL,
+    completed_at TIMESTAMP NULL,
+    completed_by VARCHAR(255) NULL,
+    INDEX idx_prr_email (email),
+    INDEX idx_prr_token (token),
+    INDEX idx_prr_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- USER_SETTINGS TABLE: Add columns for LDAP integration and password recovery
+-- - ldap_username: Links to LDAP cn for this user
+-- - secondary_email: Backup email for password recovery (mailbox users)
+-- - pushover_user_key: Pushover API user key for notifications
+-- - pushover_enabled: Whether Pushover is enabled for this user
+-- ============================================================================
+
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ldap_username VARCHAR(255) NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email VARCHAR(255) NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_verified TINYINT(1) DEFAULT 0;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token VARCHAR(64) NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token_expires TIMESTAMP NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
+
+-- ============================================================================
+-- SYSTEM_USERS TABLE: Add Pushover settings for admin notifications
+-- Allows admins to receive push notifications for password reset requests
+-- ============================================================================
+
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) NULL;
+ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
+
+-- ============================================================================
+-- SYSTEM_SETTINGS TABLE: Add Pushover API token for system notifications
+-- This is the application API token, not the user key
+-- ============================================================================
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'pushover_api_token', ''
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'pushover_api_token'
+);
+

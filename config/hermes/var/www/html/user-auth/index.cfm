@@ -40,6 +40,9 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfoutput>#reason#</cfoutput>
 --->
 
+<!--- Initialize session.UserPassword if not set (default to 1 = password exists) --->
+<cfparam name="session.UserPassword" default="1">
+
 <cfif #session.UserPassword# is "0">
 
 <cfoutput>

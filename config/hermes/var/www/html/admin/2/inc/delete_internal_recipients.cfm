@@ -139,7 +139,28 @@ arguments="-inputformat none">
     
 <!--- /CFIF #checkdjigzo.recordcount# GTE 1 --->
 </cfif>
-    
+
+    <!--- DELETE LDAP USER FOR RECIPIENT - Must run BEFORE user_settings deletion --->
+    <cfquery name="getLdapUsername" datasource="hermes">
+        SELECT ldap_username FROM user_settings WHERE email = '#recipient#'
+    </cfquery>
+
+    <cfif getLdapUsername.recordcount GTE 1 AND getLdapUsername.ldap_username NEQ "">
+        <cfset ldapUsername = getLdapUsername.ldap_username>
+        <cfinclude template="ldap_delete_user_relay.cfm">
+    </cfif>
+
+    <!--- Cancel any pending password reset requests for this user --->
+    <cfquery name="cancelResetRequests" datasource="hermes">
+        UPDATE password_reset_requests
+        SET status = 'cancelled',
+            completed_at = NOW(),
+            completed_by = 'system'
+        WHERE email = '#recipient#'
+        AND status = 'pending'
+    </cfquery>
+    <!--- DELETE LDAP USER FOR RECIPIENT ENDS HERE --->
+
     <!-- DELETE FROM RECIPIENTS, MAILADDR AND WBLIST STARTS HERE -->
     <cfquery name="delete" datasource="hermes">
     delete from recipients where id='#delete_id#'
@@ -380,5 +401,4 @@ arguments="-inputformat none">
     <cfquery name="deletecerts" datasource="hermes">
     delete from recipient_certificates where user_id='#delete_id#'
     </cfquery>
-    
 

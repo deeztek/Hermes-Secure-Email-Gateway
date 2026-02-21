@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -58,3 +58,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--end::Container-->
 </nav>
 <!--end::Header-->
+
+<!--- SECONDARY EMAIL NAGGING BANNER FOR MAILBOX USERS --->
+<cfif session.theGroups CONTAINS "mailboxes">
+    <cfif NOT StructKeyExists(session, "secondary_email_verified") OR session.secondary_email_verified NEQ 1>
+        <div class="alert alert-warning alert-dismissible d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
+            <div class="container-fluid d-flex justify-content-center align-items-center">
+                <i class="fas fa-exclamation-triangle fa-lg me-3"></i>
+                <div>
+                    <cfif NOT StructKeyExists(session, "secondary_email") OR session.secondary_email EQ "">
+                        <strong>Set Up Password Recovery:</strong>
+                        <span class="ms-1">You have not set up a recovery email address. <a href="user_settings.cfm" class="alert-link">Click here to add one.</a></span>
+                    <cfelse>
+                        <strong>Verify Recovery Email:</strong>
+                        <span class="ms-1">Your recovery email has not been verified. <a href="user_settings.cfm" class="alert-link">Click here to resend verification.</a></span>
+                    </cfif>
+                </div>
+                <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </cfif>
+</cfif>

@@ -146,6 +146,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>System Users</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="view_password_reset_requests.cfm" class="nav-link">
+                <i class="nav-icon fas fa-key"></i>
+                <p>Password Resets</p>
+              </a>
+            </li>
           </ul>
         </li>
         <!--- SYSTEM ENDS HERE --->

@@ -205,6 +205,16 @@ textarea: #show_recipient#
 
           <!--- INSERT INTO USER_SETTINGS ENDS HERE --->
 
+    <!--- CREATE LDAP USER FOR RECIPIENT STARTS HERE --->
+    <!--- This creates an LDAP user with a random password and adds them to the relays group --->
+    <cfset recipientEmail = recipient>
+    <cfinclude template="ldap_add_user_relay.cfm">
+
+    <!--- SEND WELCOME EMAIL TO NEW RECIPIENT --->
+    <cfset recipientName = recipientEmail>
+    <cfinclude template="send_recipient_welcome_email.cfm">
+    <!--- CREATE LDAP USER FOR RECIPIENT ENDS HERE --->
+
 
     <cfset success=#success#+1>
     <cfset successrecipient="#successrecipient# #recipient#<br>">
