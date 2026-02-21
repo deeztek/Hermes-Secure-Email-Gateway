@@ -119,11 +119,7 @@ If you are unable to click on the link above, copy and paste the following addre
 
 <b>*** This link is valid for 24 hours ***</b>
 </div>
-        <cfmailparam
-        file="/opt/hermes/email/hermes_top_banner_email.png"
-        contentid="hermeslogo"
-        disposition="inline"
-        />
+<cfmailparam file="/var/www/html/dist/img/hermes_logo_new_orange2.png" contentid="hermeslogo" disposition="inline" />
     </cfmail>
 
     <!--- Update session variable --->

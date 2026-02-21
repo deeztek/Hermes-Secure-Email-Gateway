@@ -118,16 +118,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <!--- Get user settings --->
         <cfquery name="getUserSettings" datasource="hermes">
-            SELECT pushover_enabled, pushover_user_key, secondary_email, secondary_email_verified
+            SELECT pushover_enabled, pushover_user_key, pushover_api_token, secondary_email, secondary_email_verified
             FROM user_settings
             WHERE email = '#userEmail#'
         </cfquery>
 
         <cfif getUserSettings.recordcount EQ 1>
-            <cfif getUserSettings.pushover_enabled EQ 1 AND getUserSettings.pushover_user_key NEQ "">
-                <!--- Send via Pushover --->
+            <cfif getUserSettings.pushover_enabled EQ 1 AND getUserSettings.pushover_user_key NEQ "" AND getUserSettings.pushover_api_token NEQ "">
+                <!--- Send via Pushover (user has their own Pushover account) --->
                 <cfset notificationMethod = "pushover">
                 <cfset pushoverUserKey = getUserSettings.pushover_user_key>
+                <cfset pushoverApiToken = getUserSettings.pushover_api_token>
                 <cfinclude template="./inc/process_password_reset_request.cfm">
 
             <cfelseif getUserSettings.secondary_email NEQ "" AND getUserSettings.secondary_email_verified EQ 1>

@@ -390,6 +390,7 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_verified TINY
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token VARCHAR(64) NULL;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token_expires TIMESTAMP NULL;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) NULL;
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_api_token VARCHAR(64) NULL;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
 
 -- ============================================================================
@@ -401,13 +402,8 @@ ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) 
 ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
 
 -- ============================================================================
--- SYSTEM_SETTINGS TABLE: Add Pushover API token for system notifications
--- This is the application API token, not the user key
+-- NOTE: Pushover is configured per-user (user_settings.pushover_api_token)
+-- Each user creates their own Pushover application (one-time $5 fee per user)
+-- No system-wide Pushover configuration needed
 -- ============================================================================
-
-INSERT INTO system_settings (parameter, value)
-SELECT 'pushover_api_token', ''
-WHERE NOT EXISTS (
-    SELECT 1 FROM system_settings WHERE parameter = 'pushover_api_token'
-);
 
