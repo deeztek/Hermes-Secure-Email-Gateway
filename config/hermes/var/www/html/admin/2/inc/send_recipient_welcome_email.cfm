@@ -24,7 +24,7 @@ Sends a welcome email to a newly created internal recipient with instructions
 to reset their password before logging in.
 
 NOTE: This email does NOT contain a password reset link with a token.
-Instead, it instructs the user to use the "Forgot Password" link on the login page.
+Instead, it instructs the user to use the "Reset password?" link on the login page.
 
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
@@ -64,7 +64,7 @@ Requires the following variables to be set before including:
     <p><strong>To set your password:</strong></p>
     <ol style="text-align: left;">
         <li>Go to the login page: <a href="#loginUrl#">#loginUrl#</a></li>
-        <li>Click the <strong>"Forgot Password?"</strong> link</li>
+        <li>Click the <strong>"Reset password?"</strong> link</li>
         <li>Enter your email address: <strong>#recipientEmail#</strong></li>
         <li>Follow the instructions sent to your email</li>
     </ol>
