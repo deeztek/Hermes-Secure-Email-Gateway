@@ -26,7 +26,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <!--- GENERATE REPORT FOR USERS WHO HAVE CHOSEN TO RECEIVE REPORT REGARDLESS STARTS HERE--->
 
 <cfquery name="getrecipientsall" datasource="hermes">
-SELECT users.email as rcptemail, user_settings.id as customid, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'ALL' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
+SELECT users.email as rcptemail, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'ALL' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
 </cfquery>
 
 <cfloop query="getrecipientsall">
@@ -236,7 +236,7 @@ disposition="inline"
 
 
 <cfquery name="getrecipients" datasource="hermes">
-SELECT users.email as rcptemail, user_settings.id as customid, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'YES' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
+SELECT users.email as rcptemail, user_settings.report_enabled, user_settings.report_frequency from user_settings LEFT JOIN users ON users.email = user_settings.email where user_settings.report_enabled = 'YES' and user_settings.report_frequency = '#frequency#' and users.email is not NULL
 </cfquery>
 
 

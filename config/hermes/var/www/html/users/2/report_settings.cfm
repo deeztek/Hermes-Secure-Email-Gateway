@@ -138,7 +138,7 @@ a, a:hover{
 </cfif>
 
 <cfquery name="getreportsettings" datasource="hermes">
-select id, report_frequency, report_enabled from user_settings where email = '#session.email#'
+select report_frequency, report_enabled from user_settings where email = '#session.email#'
 </cfquery>
 
 <cfparam name = "report_frequency" default = "#getreportsettings.report_frequency#">
