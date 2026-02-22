@@ -101,7 +101,7 @@ Saves the secondary email and sends a verification email.
 <div align="center">
 <b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
 
-<p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p><br>
+<p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" style="max-height: 80px; width: auto;" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p><br>
 
 <h2>Verify Your Recovery Email</h2>
 

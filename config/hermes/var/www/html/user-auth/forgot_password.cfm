@@ -50,6 +50,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 </cfif>
 
+<!--- GET CAPTCHA SETTINGS --->
+<cfquery name="getCaptchaSettings" datasource="hermes">
+    SELECT parameter, value FROM system_settings
+    WHERE parameter IN ('captcha_provider', 'recaptcha_site_key', 'recaptcha_secret_key',
+                        'hcaptcha_site_key', 'hcaptcha_secret_key',
+                        'turnstile_site_key', 'turnstile_secret_key')
+</cfquery>
+
+<cfset captcha_provider = "builtin">
+<cfset recaptcha_site_key = "">
+<cfset recaptcha_secret_key = "">
+<cfset hcaptcha_site_key = "">
+<cfset hcaptcha_secret_key = "">
+<cfset turnstile_site_key = "">
+<cfset turnstile_secret_key = "">
+
+<cfloop query="getCaptchaSettings">
+    <cfswitch expression="#parameter#">
+        <cfcase value="captcha_provider"><cfset captcha_provider = value></cfcase>
+        <cfcase value="recaptcha_site_key"><cfset recaptcha_site_key = value></cfcase>
+        <cfcase value="recaptcha_secret_key"><cfset recaptcha_secret_key = value></cfcase>
+        <cfcase value="hcaptcha_site_key"><cfset hcaptcha_site_key = value></cfcase>
+        <cfcase value="hcaptcha_secret_key"><cfset hcaptcha_secret_key = value></cfcase>
+        <cfcase value="turnstile_site_key"><cfset turnstile_site_key = value></cfcase>
+        <cfcase value="turnstile_secret_key"><cfset turnstile_secret_key = value></cfcase>
+    </cfswitch>
+</cfloop>
+
 <!--- PROCESS FORM SUBMISSION --->
 <cfif action is "requestreset">
 
@@ -61,26 +89,122 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cflocation url="forgot_password.cfm" addtoken="no">
     </cfif>
 
-    <!--- VALIDATE CAPTCHA --->
-    <cfif NOT StructKeyExists(form, "captcha_answer") OR form.captcha_answer is "">
-        <!--- Clear captcha so new one is generated on redirect --->
-        <cfset StructDelete(session, "captchaQuestion")>
-        <cfset StructDelete(session, "captchaAnswer")>
-        <cfset session.reason = 9>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
+    <!--- VALIDATE CAPTCHA BASED ON PROVIDER --->
+    <cfset captchaValid = false>
 
-    <cfif NOT StructKeyExists(session, "captchaAnswer") OR NOT IsNumeric(form.captcha_answer) OR Int(form.captcha_answer) NEQ session.captchaAnswer>
-        <!--- Clear captcha so new one is generated on redirect --->
-        <cfset StructDelete(session, "captchaQuestion")>
-        <cfset StructDelete(session, "captchaAnswer")>
-        <cfset session.reason = 9>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
+    <cfswitch expression="#captcha_provider#">
 
-    <!--- CAPTCHA passed - clear it so new one is generated for next attempt --->
-    <cfset StructDelete(session, "captchaQuestion")>
-    <cfset StructDelete(session, "captchaAnswer")>
+        <!--- BUILT-IN MATH CAPTCHA --->
+        <cfcase value="builtin">
+            <cfif NOT StructKeyExists(form, "captcha_answer") OR form.captcha_answer is "">
+                <cfset StructDelete(session, "captchaQuestion")>
+                <cfset StructDelete(session, "captchaAnswer")>
+                <cfset session.reason = 9>
+                <cflocation url="forgot_password.cfm" addtoken="no">
+            </cfif>
+
+            <cfif NOT StructKeyExists(session, "captchaAnswer") OR NOT IsNumeric(form.captcha_answer) OR Int(form.captcha_answer) NEQ session.captchaAnswer>
+                <cfset StructDelete(session, "captchaQuestion")>
+                <cfset StructDelete(session, "captchaAnswer")>
+                <cfset session.reason = 9>
+                <cflocation url="forgot_password.cfm" addtoken="no">
+            </cfif>
+
+            <cfset StructDelete(session, "captchaQuestion")>
+            <cfset StructDelete(session, "captchaAnswer")>
+            <cfset captchaValid = true>
+        </cfcase>
+
+        <!--- GOOGLE RECAPTCHA V2 --->
+        <cfcase value="recaptcha">
+            <cfif NOT StructKeyExists(form, "g-recaptcha-response") OR form["g-recaptcha-response"] is "">
+                <cfset session.reason = 9>
+                <cflocation url="forgot_password.cfm" addtoken="no">
+            </cfif>
+
+            <!--- Verify with Google --->
+            <cftry>
+                <cfhttp url="https://www.google.com/recaptcha/api/siteverify" method="POST" result="recaptchaResult">
+                    <cfhttpparam type="formfield" name="secret" value="#recaptcha_secret_key#">
+                    <cfhttpparam type="formfield" name="response" value="#form['g-recaptcha-response']#">
+                </cfhttp>
+
+                <cfset recaptchaResponse = DeserializeJSON(recaptchaResult.fileContent)>
+                <cfif NOT recaptchaResponse.success>
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfif>
+                <cfset captchaValid = true>
+
+                <cfcatch type="any">
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfcatch>
+            </cftry>
+        </cfcase>
+
+        <!--- HCAPTCHA --->
+        <cfcase value="hcaptcha">
+            <cfif NOT StructKeyExists(form, "h-captcha-response") OR form["h-captcha-response"] is "">
+                <cfset session.reason = 9>
+                <cflocation url="forgot_password.cfm" addtoken="no">
+            </cfif>
+
+            <!--- Verify with hCaptcha --->
+            <cftry>
+                <cfhttp url="https://hcaptcha.com/siteverify" method="POST" result="hcaptchaResult">
+                    <cfhttpparam type="formfield" name="secret" value="#hcaptcha_secret_key#">
+                    <cfhttpparam type="formfield" name="response" value="#form['h-captcha-response']#">
+                </cfhttp>
+
+                <cfset hcaptchaResponse = DeserializeJSON(hcaptchaResult.fileContent)>
+                <cfif NOT hcaptchaResponse.success>
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfif>
+                <cfset captchaValid = true>
+
+                <cfcatch type="any">
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfcatch>
+            </cftry>
+        </cfcase>
+
+        <!--- CLOUDFLARE TURNSTILE --->
+        <cfcase value="turnstile">
+            <cfif NOT StructKeyExists(form, "cf-turnstile-response") OR form["cf-turnstile-response"] is "">
+                <cfset session.reason = 9>
+                <cflocation url="forgot_password.cfm" addtoken="no">
+            </cfif>
+
+            <!--- Verify with Cloudflare --->
+            <cftry>
+                <cfhttp url="https://challenges.cloudflare.com/turnstile/v0/siteverify" method="POST" result="turnstileResult">
+                    <cfhttpparam type="formfield" name="secret" value="#turnstile_secret_key#">
+                    <cfhttpparam type="formfield" name="response" value="#form['cf-turnstile-response']#">
+                </cfhttp>
+
+                <cfset turnstileResponse = DeserializeJSON(turnstileResult.fileContent)>
+                <cfif NOT turnstileResponse.success>
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfif>
+                <cfset captchaValid = true>
+
+                <cfcatch type="any">
+                    <cfset session.reason = 9>
+                    <cflocation url="forgot_password.cfm" addtoken="no">
+                </cfcatch>
+            </cftry>
+        </cfcase>
+
+        <!--- DEFAULT: Treat as builtin if unknown provider --->
+        <cfdefaultcase>
+            <cfset captchaValid = true>
+        </cfdefaultcase>
+
+    </cfswitch>
 
     <!--- VALIDATE EMAIL --->
     <cfif NOT StructKeyExists(form, "email") OR form.email is "">
@@ -113,37 +237,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfinclude template="./inc/process_password_reset_request.cfm">
 
     <cfelseif isMailbox>
-        <!--- MAILBOX USER: Check for Pushover or secondary email --->
+        <!--- MAILBOX USER: Check for verified secondary email --->
         <cfset userType = "mailbox">
 
         <!--- Get user settings --->
         <cfquery name="getUserSettings" datasource="hermes">
-            SELECT pushover_enabled, pushover_user_key, pushover_api_token, secondary_email, secondary_email_verified
+            SELECT secondary_email, secondary_email_verified
             FROM user_settings
             WHERE email = '#userEmail#'
         </cfquery>
 
-        <cfif getUserSettings.recordcount EQ 1>
-            <cfif getUserSettings.pushover_enabled EQ 1 AND getUserSettings.pushover_user_key NEQ "" AND getUserSettings.pushover_api_token NEQ "">
-                <!--- Send via Pushover (user has their own Pushover account) --->
-                <cfset notificationMethod = "pushover">
-                <cfset pushoverUserKey = getUserSettings.pushover_user_key>
-                <cfset pushoverApiToken = getUserSettings.pushover_api_token>
-                <cfinclude template="./inc/process_password_reset_request.cfm">
+        <cfif getUserSettings.recordcount EQ 1 AND getUserSettings.secondary_email NEQ "" AND getUserSettings.secondary_email_verified EQ 1>
+            <!--- Send to verified secondary email --->
+            <cfset notificationMethod = "email">
+            <cfset tokenRecipient = getUserSettings.secondary_email>
+            <cfinclude template="./inc/process_password_reset_request.cfm">
 
-            <cfelseif getUserSettings.secondary_email NEQ "" AND getUserSettings.secondary_email_verified EQ 1>
-                <!--- Send to secondary email --->
-                <cfset notificationMethod = "email">
-                <cfset tokenRecipient = getUserSettings.secondary_email>
-                <cfinclude template="./inc/process_password_reset_request.cfm">
-
-            <cfelse>
-                <!--- No self-service available, notify admin --->
-                <cfset notificationMethod = "admin">
-                <cfinclude template="./inc/process_password_reset_request.cfm">
-            </cfif>
         <cfelse>
-            <!--- User not in database, notify admin anyway --->
+            <!--- No self-service available, notify admin --->
             <cfset notificationMethod = "admin">
             <cfinclude template="./inc/process_password_reset_request.cfm">
         </cfif>
@@ -164,38 +275,39 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- CFML CODE ENDS HERE --->
 
-<!--- GENERATE MATH CAPTCHA WITH WORD NUMBERS --->
-<!--- Only generate new CAPTCHA if not already set or after form processing --->
-<cfif NOT StructKeyExists(session, "captchaQuestion") OR NOT StructKeyExists(session, "captchaAnswer")>
-    <cfset numberWords = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]>
-    <cfset captchaNum1 = RandRange(1, 10)>
-    <cfset captchaNum2 = RandRange(1, 10)>
-    <cfset captchaOperation = RandRange(1, 3)>
+<!--- GENERATE MATH CAPTCHA WITH WORD NUMBERS (only for builtin provider) --->
+<cfif captcha_provider EQ "builtin">
+    <cfif NOT StructKeyExists(session, "captchaQuestion") OR NOT StructKeyExists(session, "captchaAnswer")>
+        <cfset numberWords = ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"]>
+        <cfset captchaNum1 = RandRange(1, 10)>
+        <cfset captchaNum2 = RandRange(1, 10)>
+        <cfset captchaOperation = RandRange(1, 3)>
 
-    <cfswitch expression="#captchaOperation#">
-        <cfcase value="1">
-            <!--- Addition --->
-            <cfset session.captchaAnswer = captchaNum1 + captchaNum2>
-            <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# plus #numberWords[captchaNum2]#?">
-        </cfcase>
-        <cfcase value="2">
-            <!--- Subtraction (ensure positive result) --->
-            <cfif captchaNum1 LT captchaNum2>
-                <cfset temp = captchaNum1>
-                <cfset captchaNum1 = captchaNum2>
-                <cfset captchaNum2 = temp>
-            </cfif>
-            <cfset session.captchaAnswer = captchaNum1 - captchaNum2>
-            <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# minus #numberWords[captchaNum2]#?">
-        </cfcase>
-        <cfcase value="3">
-            <!--- Multiplication (use smaller numbers) --->
-            <cfset captchaNum1 = RandRange(1, 5)>
-            <cfset captchaNum2 = RandRange(1, 5)>
-            <cfset session.captchaAnswer = captchaNum1 * captchaNum2>
-            <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# times #numberWords[captchaNum2]#?">
-        </cfcase>
-    </cfswitch>
+        <cfswitch expression="#captchaOperation#">
+            <cfcase value="1">
+                <!--- Addition --->
+                <cfset session.captchaAnswer = captchaNum1 + captchaNum2>
+                <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# plus #numberWords[captchaNum2]#?">
+            </cfcase>
+            <cfcase value="2">
+                <!--- Subtraction (ensure positive result) --->
+                <cfif captchaNum1 LT captchaNum2>
+                    <cfset temp = captchaNum1>
+                    <cfset captchaNum1 = captchaNum2>
+                    <cfset captchaNum2 = temp>
+                </cfif>
+                <cfset session.captchaAnswer = captchaNum1 - captchaNum2>
+                <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# minus #numberWords[captchaNum2]#?">
+            </cfcase>
+            <cfcase value="3">
+                <!--- Multiplication (use smaller numbers) --->
+                <cfset captchaNum1 = RandRange(1, 5)>
+                <cfset captchaNum2 = RandRange(1, 5)>
+                <cfset session.captchaAnswer = captchaNum1 * captchaNum2>
+                <cfset session.captchaQuestion = "What is #numberWords[captchaNum1]# times #numberWords[captchaNum2]#?">
+            </cfcase>
+        </cfswitch>
+    </cfif>
 </cfif>
 
 <body class="hold-transition login-page">
@@ -326,20 +438,57 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     </div>
                 </div>
 
-                <!--- MATH CAPTCHA --->
-                <div class="mb-3">
-                    <cfoutput>
-                    <label class="form-label text-muted">#session.captchaQuestion#</label>
-                    </cfoutput>
-                    <div class="input-group">
-                        <input type="text" name="captcha_answer" class="form-control" placeholder="Enter your answer" maxlength="3" required autocomplete="off">
-                        <div class="input-group-append">
-                            <div class="input-group-text">
-                                <span class="fas fa-shield-alt"></span>
+                <!--- CAPTCHA WIDGET (based on configured provider) --->
+                <cfswitch expression="#captcha_provider#">
+
+                    <!--- BUILT-IN MATH CAPTCHA --->
+                    <cfcase value="builtin">
+                        <div class="mb-3">
+                            <cfoutput>
+                            <label class="form-label text-muted">#session.captchaQuestion#</label>
+                            </cfoutput>
+                            <div class="input-group">
+                                <input type="text" name="captcha_answer" class="form-control" placeholder="Enter your answer" maxlength="3" required autocomplete="off">
+                                <div class="input-group-append">
+                                    <div class="input-group-text">
+                                        <span class="fas fa-shield-alt"></span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </cfcase>
+
+                    <!--- GOOGLE RECAPTCHA V2 --->
+                    <cfcase value="recaptcha">
+                        <div class="mb-3">
+                            <cfoutput>
+                            <div class="g-recaptcha" data-sitekey="#recaptcha_site_key#"></div>
+                            </cfoutput>
+                        </div>
+                        <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+                    </cfcase>
+
+                    <!--- HCAPTCHA --->
+                    <cfcase value="hcaptcha">
+                        <div class="mb-3">
+                            <cfoutput>
+                            <div class="h-captcha" data-sitekey="#hcaptcha_site_key#"></div>
+                            </cfoutput>
+                        </div>
+                        <script src="https://js.hcaptcha.com/1/api.js" async defer></script>
+                    </cfcase>
+
+                    <!--- CLOUDFLARE TURNSTILE --->
+                    <cfcase value="turnstile">
+                        <div class="mb-3">
+                            <cfoutput>
+                            <div class="cf-turnstile" data-sitekey="#turnstile_site_key#"></div>
+                            </cfoutput>
+                        </div>
+                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+                    </cfcase>
+
+                </cfswitch>
 
                 <!--- HONEYPOT FIELD (hidden from humans, bots will fill it) --->
                 <!--- Field name intentionally obscure to avoid browser autofill --->

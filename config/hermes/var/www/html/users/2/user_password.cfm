@@ -626,67 +626,54 @@ a, a:hover{
       <!--- /CFIF #action# is --->     
     </cfif> 
     
-    <div class="alert alert-warning">
-    
-      <p><i class="icon fas fa-exclamation-triangle"></i>Enter your existing password in the <strong>Existing Password</strong> field, enter the new password in the <strong>New Password</strong> field and click the <strong>Submit</strong> button below. Click the <i class="fa fa-eye-slash" aria-hidden="true"></i> icon to show the password you've typed in order to verify accuracy. Passwords must be <strong>between 8 and 64 characters long.</strong> It's highly recommended to leave the <strong>Check against haveibeenpwned.com</strong> field set to <strong>YES</strong> in order to check your password against known data breaches.</p>
-      </div>
-  
+        <!--- CHANGE PASSWORD CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-key me-2"></i>Change Password</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-warning">
+                    <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Enter your existing password in the <strong>Existing Password</strong> field, enter the new password in the <strong>New Password</strong> field and click the <strong>Submit</strong> button below. Click the <i class="fa fa-eye-slash" aria-hidden="true"></i> icon to show the password you've typed in order to verify accuracy. Passwords must be <strong>between 8 and 64 characters long.</strong> It's highly recommended to leave the <strong>Check against haveibeenpwned.com</strong> field set to <strong>YES</strong> in order to check your password against known data breaches.</p>
+                </div>
 
-  <form action="" method="post">
+                <form action="" method="post">
+                    <input type="hidden" name="action" value="setpassword">
 
+                    <div class="mb-3" id="oldpasswordfield">
+                        <label for="oldpassword" class="form-label"><strong>Existing Password</strong></label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="oldpassword" value="" id="oldpassword" placeholder="Enter Existing Password" maxLength="64">
+                            <a href="" class="input-group-text"><i class="fa fa-eye-slash" aria-hidden="true"></i></a>
+                        </div>
+                    </div>
 
+                    <div class="mb-3" id="newpasswordfield">
+                        <label for="newpassword" class="form-label"><strong>New Password</strong></label>
+                        <div class="input-group">
+                            <input type="password" class="form-control" name="newpassword" value="" id="newpassword" placeholder="Enter New Password" maxLength="64">
+                            <a href="" class="input-group-text"><i class="fa fa-eye-slash" aria-hidden="true"></i></a>
+                        </div>
+                    </div>
 
-    <input type="hidden" name="action" value="setpassword">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Check against haveibeenpwned.com</strong></label>
+                        <select class="form-control" name="hibp" style="width: 100%;">
+                            <cfif #hibp# is "NO">
+                                <option value="NO" selected>NO</option>
+                                <option value="YES">YES (Recommended)</option>
+                            <cfelseif #hibp# is "YES">
+                                <option value="YES" selected>YES (Recommended)</option>
+                                <option value="NO">NO</option>
+                            </cfif>
+                        </select>
+                    </div>
 
-    <div class="form-group" id="UserPassword">
-
-      <cfoutput>
-        <div class="form-group" id="oldpasswordfield">
-          <label for="password"><strong>Existing Password</strong></label>
-          <div class="input-group">
-          <input type="password" class="form-control" name="oldpassword" value="" id="oldpassword" placeholder="Enter Existing Password" maxLength="64">
-          <a href=""><i class="fa fa-eye-slash" aria-hidden="true"></i></a>
+                    <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                        <i class="fas fa-save me-1"></i> Change Password
+                    </button>
+                </form>
+            </div>
         </div>
-        </div>
-        </cfoutput> 
-
-        <cfoutput>
-          <div class="form-group" id="newpasswordfield">
-            <label for="password"><strong>New Password</strong></label>
-            <div class="input-group">
-            <input type="password" class="form-control" name="newpassword" value="" id="newpassword" placeholder="Enter New Password" maxLength="64">
-            <a href=""><i class="fa fa-eye-slash" aria-hidden="true"></i></a>
-          </div>
-          </div>
-          </cfoutput> 
-
-          <label><strong>Check against haveibeenpwned.com</strong></label>
-          <!---
-             <p class="help-block">Effective only when Schedule SMTP Address Import from AD is set to Yes above</p>
-           --->
-             <select class="form-control select2" name="hibp" data-placeholder="hibp" style="width: 100%;">
-             
-           <cfif #hibp# is "NO">                         
-               <option value="NO" selected>NO</option>
-               <option value="YES">YES (Recommended)</option>
-             <cfelseif #hibp# is "YES">
-               <option value="YES" selected>YES (Recommended)</option>
-               <option value="NO">NO</option>
-             </cfif>
-               </select>  
-
-        </div>
-
-
-     
-      <div class="col-sm-4">
-
-        <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait';this.form.submit();">
-
-
-      </div>
-
-    </form>
     
     
   </div><!-- /.container-fluid -->

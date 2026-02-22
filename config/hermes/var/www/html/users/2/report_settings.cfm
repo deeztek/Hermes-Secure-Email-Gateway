@@ -252,112 +252,66 @@ select id, report_frequency, report_enabled from user_settings where email = '#s
       <!--- /CFIF #action# is --->     
     </cfif> 
     
-    <!---
-    <div class="alert alert-warning">
-    
-      <p><i class="icon fas fa-exclamation-triangle"></i>System default for Reports is Ena</p>
-      </div>
-    --->
+        <!--- QUARANTINE REPORTS CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-file-alt me-2"></i>Quarantine Reports</h3>
+            </div>
+            <div class="card-body">
+                <form action="" method="post">
+                    <input type="hidden" name="action" value="setreports">
 
-  <form action="" method="post">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Quarantine Reports</strong></label>
+                        <select class="form-control" name="reports" id="reports" style="width: 100%">
+                            <cfif #report_enabled# is "YES">
+                                <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
+                                <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
+                                <option value="NO">Disable Quarantine Reports</option>
+                            <cfelseif #report_enabled# is "ALL">
+                                <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
+                                <option value="ALL" selected="selected">Enable Report Regardless if Quarantined Messages Exist</option>
+                                <option value="NO">Disable Quarantine Reports</option>
+                            <cfelseif #report_enabled# is "NO">
+                                <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
+                                <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
+                                <option value="NO" selected="selected">Disable Quarantine Reports</option>
+                            <cfelse>
+                                <cfset m="Report Settings: report_enabled is not YES, ALL or NO">
+                                <cfinclude template="./inc/error.cfm">
+                                <cfabort>
+                            </cfif>
+                        </select>
+                    </div>
 
+                    <cfif #report_enabled# is "NO">
+                        <div class="mb-3" id="reportsfrequency" style="display:none;">
+                            <label class="form-label"><strong>Quarantine Report Frequency</strong></label>
+                            <select class="form-control" name="frequency" style="width: 100%">
+                                <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
+                                <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
+                                <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
+                                <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
+                            </select>
+                        </div>
+                    <cfelse>
+                        <div class="mb-3" id="reportsfrequency">
+                            <label class="form-label"><strong>Quarantine Report Frequency</strong></label>
+                            <select class="form-control" name="frequency" style="width: 100%">
+                                <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
+                                <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
+                                <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
+                                <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
+                            </select>
+                        </div>
+                    </cfif>
 
-
-    <input type="hidden" name="action" value="setreports">
-
-      <!--- QUARANTINE REPORTS STARTS HERE --->
-    
-     
-     <div class="form-group">
-      <label><strong>Quarantine Reports</strong></label>
-    <!---
-      <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    <select class="form-control" name="reports" data-placeholder="reports" id="reports" style="width: 100%">   
-      
-    <cfif #report_enabled# is "YES">
-    <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-    <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-    <option value="NO">Disable Quarantine Reports</option>
-
-    <cfelseif #report_enabled# is "ALL">
-
-      <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
-      <option value="ALL" selected="selected">Enable Report Regardless if Quarantined Messages Exist</option>
-      <option value="NO">Disable Quarantine Reports</option>
-
-    <cfelseif #report_enabled# is "NO">
-
-      <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
-      <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-      <option value="NO" selected="selected">Disable Quarantine Reports</option>
-
-    <cfelse>
-
-      <cfset m="Report Settings: report_enabled is not YES, ALL or NO">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-      
-<!--- /CFIF report_enabled is --->
-    </cfif>
-    
-    </select> 
-    </div>
-    
-    <cfif #report_enabled# is "NO">
-         
-              <div class="form-group" id="reportsfrequency" style="display:none;">
-                <label><strong>Quarantine Report Frequency</strong></label>
-    <!---
-                <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-
-
-    
-      <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-      <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-      <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
-      <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
-      <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
-       </select> 
-      </div>
-
-    <cfelse>
-
-      <div class="form-group" id="reportsfrequency">
-        <label><strong>Quarantine Report Frequency</strong></label>
-<!---
-        <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
---->
-
-
-
-<select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-<option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-<option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
-<option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
-<option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
-</select> 
-</div>
-
-
-
-<!--- /CFIF report_enabled is --->
-</cfif>
-
-    
-      <!--- QUARANTINE REPORTS ENDS HERE --->
-
-
-     
-      <div class="col-sm-4">
-
-        <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait';this.form.submit();">
-
-
-      </div>
-
-    </form>
+                    <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                        <i class="fas fa-save me-1"></i> Save Settings
+                    </button>
+                </form>
+            </div>
+        </div>
     
     
   </div><!-- /.container-fluid -->

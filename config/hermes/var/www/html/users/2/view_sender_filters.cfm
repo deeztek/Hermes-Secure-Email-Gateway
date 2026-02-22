@@ -616,123 +616,66 @@ a, a:hover{
 
   
 
-<form>
-    
-<span>
-  <p>       
+        <!--- SENDER FILTERS CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-filter me-2"></i>Sender Filters</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <cfoutput>
+                    <a href="##addsender_modal" class="btn btn-primary" role="button" data-bs-toggle="modal"><i class="fa fa-plus-square fa-lg me-1"></i> Add Sender</a>
+                    </cfoutput>
+                    <button type="button" id="deletesender" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i> Delete Sender(s)</button>
+                </div>
 
-    <!--- ADD SENDER BUTTON STARTS HERE --->
-<cfoutput>
-  <a href="##addsender_modal"  class="btn btn-primary" role="button" data-bs-toggle="modal" data-recipient="" data-recipientemail=""><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Add Sender</a>
-  </cfoutput>
-  <!--- ADD SENDER BUTTON ENDS HERE --->
-  &nbsp;&nbsp;
+                <div class="alert alert-warning">
+                    <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Adding a sender with an <strong>ALLOW</strong> action will only bypass the sender in the Spam filter. E-mails with banned or malware attachments will still be blocked.</p>
+                </div>
 
-<button type="button" id="deletesender" class="btn btn-danger"><i class="fas fa-trash-alt"></i>&nbsp;&nbsp;Delete Sender(s)</button>
+                <cfquery name="getmailaddrtemp" datasource="hermes">
+                    SELECT * FROM mailaddr_temp WHERE applied='1' AND receiver='#session.email#'
+                </cfquery>
 
-
-</p>
-
-<p>
-
-</p>
-</span>
-
-
-
-
-
-
-<br>
-
-<!---
-
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
-<div class="alert alert-warning">
-    
-  <p><i class="icon fas fa-exclamation-triangle"></i>Adding a sender with an <strong>ALLOW</strong> action will only bypass the sender in the Spam filter. E-mails with banned or malware attachments will still be blocked.</p>
-  </div>
-
-
-
-<cfquery name="getmailaddrtemp" datasource="hermes">
-select * from mailaddr_temp where applied='1' and receiver='#session.email#'
-  </cfquery>
-    
-    <cfif #getmailaddrtemp.recordcount# GTE 1>
-
-    
-                
-      <table class="table table-striped"  id="sortTable" style="width:100%">
-        <thead>
-          <tr>
-            <th><input type="checkbox" id="selectAll" value="selectAll"></th>
-            
-            <th>Sender</th>
-            <th>Receiver</th>
-            <th>Action</th>         
-          
-          </tr>
-        </thead>
-        <tbody>
-
-        
-
-<cfoutput query="getmailaddrtemp">
-
-
-
-        <td><input type="checkbox" name="id" value="#id#"></td>
-      
-        <td>#sender#</td>
-         <td>#receiver#</td>
-            <td>#wb#</td>
-         
-
-          </tr>
-
-        </cfoutput>
-
-        </tbody>
-        
-       
-        <tfoot>
-          <tr>
-            <th></th>
-            <th>Sender</th>
-            <th>Receiver</th>
-            <th>Action</th>  
-          </tr>
-        </tfoot>
-      
-
-      </table>
-
-    </form>
-    
- 
-    
-    <cfelseif #getmailaddrtemp.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Senders were found</strong></cfoutput>
-      </div>
-    
-      <!--- /CFIF FOR getrecipients.recordcount --->
-    </cfif>
-    
-    
-
-    <div>&nbsp;</div>
+                <cfif #getmailaddrtemp.recordcount# GTE 1>
+                    <form>
+                        <table class="table table-striped" id="sortTable" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAll" value="selectAll"></th>
+                                    <th>Sender</th>
+                                    <th>Receiver</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <cfoutput query="getmailaddrtemp">
+                                    <tr>
+                                        <td><input type="checkbox" name="id" value="#id#"></td>
+                                        <td>#sender#</td>
+                                        <td>#receiver#</td>
+                                        <td>#wb#</td>
+                                    </tr>
+                                </cfoutput>
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <th></th>
+                                    <th>Sender</th>
+                                    <th>Receiver</th>
+                                    <th>Action</th>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </form>
+                <cfelse>
+                    <div class="alert alert-info">
+                        <i class="icon fas fa-info-circle"></i>
+                        No sender filters have been configured yet. Click <strong>Add Sender</strong> to create your first filter.
+                    </div>
+                </cfif>
+            </div>
+        </div>
 
     
     

@@ -70,7 +70,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <div class="content">
       <div class="container-fluid">
 
-
+        <!--- QUICK LINKS CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-th-large me-2"></i>Quick Links</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="view_sender_filters.cfm" class="btn btn-outline-primary btn-block w-100">
+                            <i class="fas fa-filter me-2"></i>Sender Filters
+                        </a>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="report_settings.cfm" class="btn btn-outline-primary btn-block w-100">
+                            <i class="fas fa-file-alt me-2"></i>Report Settings
+                        </a>
+                    </div>
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="user_password.cfm" class="btn btn-outline-primary btn-block w-100">
+                            <i class="fas fa-key me-2"></i>Change Password
+                        </a>
+                    </div>
+                    <cfif session.theGroups CONTAINS "mailboxes">
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="user_settings.cfm" class="btn btn-outline-primary btn-block w-100">
+                            <i class="fas fa-cog me-2"></i>Account Settings
+                        </a>
+                    </div>
+                    </cfif>
+                </div>
+            </div>
+        </div>
 
       </div><!-- /.container-fluid -->
     </div>

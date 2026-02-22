@@ -170,6 +170,35 @@ a, a:hover{
 <!--- GET SYSTEM SETTINGS --->
 <cfinclude template="./inc/get_system_settings.cfm">
 
+<!--- GET CAPTCHA SETTINGS --->
+<cfquery name="getCaptchaSettings" datasource="hermes">
+    SELECT parameter, value FROM system_settings
+    WHERE parameter IN ('captcha_provider', 'recaptcha_site_key', 'recaptcha_secret_key',
+                        'hcaptcha_site_key', 'hcaptcha_secret_key',
+                        'turnstile_site_key', 'turnstile_secret_key')
+</cfquery>
+
+<!--- SET DEFAULT CAPTCHA VALUES --->
+<cfset captcha_provider = "builtin">
+<cfset recaptcha_site_key = "">
+<cfset recaptcha_secret_key = "">
+<cfset hcaptcha_site_key = "">
+<cfset hcaptcha_secret_key = "">
+<cfset turnstile_site_key = "">
+<cfset turnstile_secret_key = "">
+
+<cfloop query="getCaptchaSettings">
+    <cfswitch expression="#parameter#">
+        <cfcase value="captcha_provider"><cfset captcha_provider = value></cfcase>
+        <cfcase value="recaptcha_site_key"><cfset recaptcha_site_key = value></cfcase>
+        <cfcase value="recaptcha_secret_key"><cfset recaptcha_secret_key = value></cfcase>
+        <cfcase value="hcaptcha_site_key"><cfset hcaptcha_site_key = value></cfcase>
+        <cfcase value="hcaptcha_secret_key"><cfset hcaptcha_secret_key = value></cfcase>
+        <cfcase value="turnstile_site_key"><cfset turnstile_site_key = value></cfcase>
+        <cfcase value="turnstile_secret_key"><cfset turnstile_secret_key = value></cfcase>
+    </cfswitch>
+</cfloop>
+
 <!---
 <!--- CHECK SYSTEM UPDATE --->
 <cfinclude template="./inc/check_system_update.cfm">
@@ -197,7 +226,90 @@ a, a:hover{
 
 <cfset session.m=27>
 
-  
+<cfelseif action EQ "save_captcha">
+
+    <!--- VALIDATE CAPTCHA PROVIDER --->
+    <cfif NOT StructKeyExists(form, "captcha_provider")>
+        <cfset m = "System Settings: captcha_provider does not exist">
+        <cfinclude template="./inc/error.cfm">
+        <cfabort>
+    </cfif>
+
+    <cfset validProviders = "builtin,recaptcha,hcaptcha,turnstile">
+    <cfif NOT ListFindNoCase(validProviders, form.captcha_provider)>
+        <cfset m = "System Settings: captcha_provider is not valid">
+        <cfinclude template="./inc/error.cfm">
+        <cfabort>
+    </cfif>
+
+    <!--- Validate provider-specific keys --->
+    <cfswitch expression="#form.captcha_provider#">
+        <cfcase value="recaptcha">
+            <cfif NOT StructKeyExists(form, "recaptcha_site_key") OR Len(Trim(form.recaptcha_site_key)) EQ 0>
+                <cfset session.m = 30>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+            <cfif NOT StructKeyExists(form, "recaptcha_secret_key") OR Len(Trim(form.recaptcha_secret_key)) EQ 0>
+                <cfset session.m = 31>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+        </cfcase>
+        <cfcase value="hcaptcha">
+            <cfif NOT StructKeyExists(form, "hcaptcha_site_key") OR Len(Trim(form.hcaptcha_site_key)) EQ 0>
+                <cfset session.m = 32>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+            <cfif NOT StructKeyExists(form, "hcaptcha_secret_key") OR Len(Trim(form.hcaptcha_secret_key)) EQ 0>
+                <cfset session.m = 33>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+        </cfcase>
+        <cfcase value="turnstile">
+            <cfif NOT StructKeyExists(form, "turnstile_site_key") OR Len(Trim(form.turnstile_site_key)) EQ 0>
+                <cfset session.m = 34>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+            <cfif NOT StructKeyExists(form, "turnstile_secret_key") OR Len(Trim(form.turnstile_secret_key)) EQ 0>
+                <cfset session.m = 35>
+                <cflocation url="view_system_settings.cfm" addtoken="no">
+            </cfif>
+        </cfcase>
+    </cfswitch>
+
+    <!--- UPDATE CAPTCHA PROVIDER --->
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.captcha_provider#">
+        WHERE parameter = 'captcha_provider'
+    </cfquery>
+
+    <!--- UPDATE ALL PROVIDER KEYS (store them all regardless of selected provider) --->
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.recaptcha_site_key)#">
+        WHERE parameter = 'recaptcha_site_key'
+    </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.recaptcha_secret_key)#">
+        WHERE parameter = 'recaptcha_secret_key'
+    </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.hcaptcha_site_key)#">
+        WHERE parameter = 'hcaptcha_site_key'
+    </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.hcaptcha_secret_key)#">
+        WHERE parameter = 'hcaptcha_secret_key'
+    </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.turnstile_site_key)#">
+        WHERE parameter = 'turnstile_site_key'
+    </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Trim(form.turnstile_secret_key)#">
+        WHERE parameter = 'turnstile_secret_key'
+    </cfquery>
+
+    <cfset session.m = 29>
+    <cflocation url="view_system_settings.cfm" addtoken="no">
 
 <!--- /CFIF #action# --->
 </cfif>
@@ -420,10 +532,71 @@ a, a:hover{
   </div>
   
   <cfset session.m = 0>
-  
-  </cfif>
-  
 
+  </cfif>
+
+<cfif m EQ "29">
+    <div class="alert alert-success alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-check"></i> Success!</h4>
+        Bot Protection (CAPTCHA) settings saved successfully
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "30">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Site Key field cannot be empty when Google reCAPTCHA is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "31">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Secret Key field cannot be empty when Google reCAPTCHA is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "32">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Site Key field cannot be empty when hCaptcha is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "33">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Secret Key field cannot be empty when hCaptcha is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "34">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Site Key field cannot be empty when Cloudflare Turnstile is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
+<cfif m EQ "35">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+        The Secret Key field cannot be empty when Cloudflare Turnstile is selected
+    </div>
+    <cfset session.m = 0>
+</cfif>
 
 <!--- ERROR MESSAGES END HERE --->
 
@@ -511,134 +684,172 @@ a, a:hover{
 <!--- GENERATE DH MODAL HTML ENDS HERE --->
 
 
-<!--- SYSTEM SETTINGS FORM STARTS HERE --->
+<!--- SYSTEM SETTINGS CARD --->
+<div class="card card-outline card-primary mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-cogs me-2"></i>General Settings</h3>
+    </div>
+    <div class="card-body">
+        <form name="edit_system_settings.cfm" method="post" action="">
+            <input type="hidden" name="action" value="edit">
 
+            <div class="mb-3">
+                <label class="form-label"><strong>Postmaster E-mail Address</strong></label>
+                <cfoutput>
+                <input type="text" name="postmaster" class="postmaster form-control" id="postmaster" placeholder="Enter Postmaster E-mail Address" value="#get_postmaster.value#" autocomplete="off">
+                </cfoutput>
+            </div>
 
-<form name="edit_system_settings.cfm" method="post" action="">
+            <div class="mb-3">
+                <label class="form-label"><strong>Admin E-mail Address</strong></label>
+                <cfoutput>
+                <input type="text" name="admin_email" class="admin_email form-control" id="admin_email" placeholder="Enter Admin E-mail Address" value="#get_admin_email.value#" autocomplete="off">
+                </cfoutput>
+            </div>
 
-<input type="hidden" name="action" value="edit">
+            <div class="mb-3">
+                <label class="form-label"><strong>TimeZone</strong></label>
+                <cfoutput>
+                <input type="text" name="timezone" class="timezone form-control" id="timezone" placeholder="Start typing to search..." value="#get_timezone.value#" autocomplete="off">
+                </cfoutput>
+            </div>
 
-<!---
-<cfoutput>
-<input type="hidden" name="hermesupdate" value="#hermesupdate#">
-</cfoutput>
---->
+            <div class="mb-3">
+                <label class="form-label"><strong>Serial Number</strong></label>
+                <cfoutput>
+                <input type="text" name="serial_number" class="admin_email form-control" id="serial_number" placeholder="Serial Number" value="#get_serial.value#" autocomplete="off" readonly>
+                </cfoutput>
+            </div>
 
-    <div class="box-body">
+            <div class="mb-3">
+                <label class="form-label"><strong>Daily Update Check</strong></label>
+                <select class="form-control" name="update_check" style="width: 100%;" id="update_check">
+                    <cfif #get_update.value# is "1">
+                        <option value="1" selected>Enable (Recommended)</option>
+                        <option value="2">Disable</option>
+                    <cfelseif #get_update.value# is "2">
+                        <option value="2" selected>Disable</option>
+                        <option value="1">Enable (Recommended)</option>
+                    </cfif>
+                </select>
+            </div>
 
-      <div class="form-group">
-        <label>Postmaster E-mail Address</label>
-        <div class="input-group">
-        <cfoutput>
-        <input type="text" name="postmaster" class="postmaster form-control" id="postmaster" placeholder="Enter Postmaster E-mail Address" value="#get_postmaster.value#" autocomplete="off">
-        </cfoutput>
-        
-        <!--- /div class="input-group" --->
+            <div class="mb-3">
+                <label class="form-label"><strong>Telemetry</strong></label>
+                <div class="alert alert-warning">
+                    <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Telemetry sends anonymized data to our servers in order to improve Hermes SEG and our services. <strong>We do NOT share or sell this data!!</strong> The data is strictly used for internal purposes. We appreciate leaving it enabled. For a detailed explanation of the data we collect, please <a href="https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/system-settings" target="_blank">click here</a>.</p>
+                </div>
+                <select class="form-control" name="telemetry" style="width: 100%;" id="telemetry">
+                    <cfif #get_telemetry.value# is "1">
+                        <option value="1" selected>Enable (Recommended)</option>
+                        <option value="2">Disable</option>
+                    <cfelseif #get_telemetry.value# is "2">
+                        <option value="2" selected>Disable</option>
+                        <option value="1">Enable (Recommended)</option>
+                    </cfif>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                <i class="fas fa-save me-1"></i> Save Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+<!--- BOT PROTECTION SETTINGS CARD --->
+<div class="card card-outline card-primary mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Bot Protection (CAPTCHA)</h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-info">
+            <p class="mb-0"><i class="icon fas fa-info-circle"></i>
+            CAPTCHA protects public-facing forms (Forgot Password, etc.) from automated abuse.
+            Choose a provider below. The <strong>Built-in</strong> option uses a simple math question and requires no external service.
+            </p>
         </div>
-        
-        <!--- /div class="form-group" --->
-        </div>
 
-        <div class="form-group">
-          <label>Admin E-mail Address</label>
-          <div class="input-group">
-          <cfoutput>
-          <input type="text" name="admin_email" class="admin_email form-control" id="admin_email" placeholder="Enter Admin E-mail Address" value="#get_admin_email.value#" autocomplete="off">
-          </cfoutput>
-          
-          <!--- /div class="input-group" --->
-          </div>
-          
-          <!--- /div class="form-group" --->
-          </div>
+        <form name="captcha_settings" method="post" action="">
+            <input type="hidden" name="action" value="save_captcha">
 
+            <div class="mb-3">
+                <label class="form-label"><strong>CAPTCHA Provider</strong></label>
+                <select class="form-control" name="captcha_provider" id="captcha_provider" style="width: 100%">
+                    <option value="builtin" <cfif captcha_provider EQ "builtin">selected</cfif>>Built-in (Math Question)</option>
+                    <option value="recaptcha" <cfif captcha_provider EQ "recaptcha">selected</cfif>>Google reCAPTCHA v2</option>
+                    <option value="hcaptcha" <cfif captcha_provider EQ "hcaptcha">selected</cfif>>hCaptcha</option>
+                    <option value="turnstile" <cfif captcha_provider EQ "turnstile">selected</cfif>>Cloudflare Turnstile</option>
+                </select>
+                <div class="form-text">Select the CAPTCHA provider to use on public forms</div>
+            </div>
 
-
-                <div class="form-group">
-                  <label>TimeZone</label>
-                  <div class="input-group">
-                  <cfoutput>
-                  <input type="text" name="timezone" class="timezone form-control" id="timezone" placeholder="Start typing to search..." value="#get_timezone.value#" autocomplete="off">
-                  </cfoutput>
-                  
-                  <!--- /div class="input-group" --->
-                  </div>
-                  
-                  <!--- /div class="form-group" --->
-                  </div>
-
-                  <div class="form-group">
-                    <label>Serial Number</label>
-                    <div class="input-group">
+            <!--- GOOGLE RECAPTCHA FIELDS --->
+            <div id="recaptcha_fields" class="captcha-provider-fields" <cfif captcha_provider NEQ "recaptcha">style="display:none;"</cfif>>
+                <div class="alert alert-secondary">
+                    <small>Get your reCAPTCHA v2 keys from <a href="https://www.google.com/recaptcha/admin" target="_blank">Google reCAPTCHA Admin</a>.
+                    Choose <strong>reCAPTCHA v2 "I'm not a robot" Checkbox</strong> when creating your keys.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Site Key</strong></label>
                     <cfoutput>
-                    <input type="text" name="serial_number" class="admin_email form-control" id="serial_number" placeholder="Serial Number" value="#get_serial.value#" autocomplete="off" readonly>
+                    <input type="text" class="form-control" name="recaptcha_site_key" value="#recaptcha_site_key#" placeholder="Enter your reCAPTCHA Site Key">
                     </cfoutput>
-                    
-                    <!--- /div class="input-group" --->
-                    </div>
-                    
-                    <!--- /div class="form-group" --->
-                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Secret Key</strong></label>
+                    <cfoutput>
+                    <input type="password" class="form-control" name="recaptcha_secret_key" value="#recaptcha_secret_key#" placeholder="Enter your reCAPTCHA Secret Key">
+                    </cfoutput>
+                </div>
+            </div>
 
-                   
+            <!--- HCAPTCHA FIELDS --->
+            <div id="hcaptcha_fields" class="captcha-provider-fields" <cfif captcha_provider NEQ "hcaptcha">style="display:none;"</cfif>>
+                <div class="alert alert-secondary">
+                    <small>Get your hCaptcha keys from <a href="https://dashboard.hcaptcha.com" target="_blank">hCaptcha Dashboard</a>.
+                    hCaptcha is a privacy-focused alternative to reCAPTCHA.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Site Key</strong></label>
+                    <cfoutput>
+                    <input type="text" class="form-control" name="hcaptcha_site_key" value="#hcaptcha_site_key#" placeholder="Enter your hCaptcha Site Key">
+                    </cfoutput>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Secret Key</strong></label>
+                    <cfoutput>
+                    <input type="password" class="form-control" name="hcaptcha_secret_key" value="#hcaptcha_secret_key#" placeholder="Enter your hCaptcha Secret Key">
+                    </cfoutput>
+                </div>
+            </div>
 
+            <!--- CLOUDFLARE TURNSTILE FIELDS --->
+            <div id="turnstile_fields" class="captcha-provider-fields" <cfif captcha_provider NEQ "turnstile">style="display:none;"</cfif>>
+                <div class="alert alert-secondary">
+                    <small>Get your Turnstile keys from <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank">Cloudflare Dashboard</a>.
+                    Turnstile is a user-friendly, privacy-preserving alternative that often doesn't require user interaction.</small>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Site Key</strong></label>
+                    <cfoutput>
+                    <input type="text" class="form-control" name="turnstile_site_key" value="#turnstile_site_key#" placeholder="Enter your Turnstile Site Key">
+                    </cfoutput>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label"><strong>Secret Key</strong></label>
+                    <cfoutput>
+                    <input type="password" class="form-control" name="turnstile_secret_key" value="#turnstile_secret_key#" placeholder="Enter your Turnstile Secret Key">
+                    </cfoutput>
+                </div>
+            </div>
 
-
-      
-                        
-                    <div class="form-group">
-                      <label><strong>Daily Update Check</strong></label>
-                  
-                      <select class="form-control" name="update_check" data-placeholder="update_check" style="width: 100%;"  id="update_check">
-                        <cfif #get_update.value# is "1">                           
-                          <option value="1" selected>Enable (Recommended)</option></option>
-                          <option value="2">Disable</option>
-                        <cfelseif #get_update.value# is "2">
-                          <option value="2" selected>Disable</option></option>
-                          <option value="1">Enable (Recommended)</option>
-                        </cfif>
-                          </select>   
-                  
-                          <!--- /div class="form-group" --->
-                        </div>  
-                        
-
-
-
-                      <div class="form-group">
-                        <label><strong>Telemetry</strong></label>
-
-                        <div class="alert alert-warning">
-    
-                          <p><i class="icon fas fa-exclamation-triangle"></i>Telemetry sends anonymized data to our servers in order to improve Hermes SEG and our services. <strong>We do NOT share or sell this data!!</strong> The data is strictly used for internal purposes. We appreciate leaving it enabled. For a detailed explanation of the data we collect, please <a href="https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/system-settings" target="_blank" style="">click here </a>.</p>
-                          </div>
-
-                          
-                    
-                        <select class="form-control" name="telemetry" data-placeholder="telemetry" style="width: 100%;"  id="telemetry">
-                          <cfif #get_telemetry.value# is "1">                           
-                            <option value="1" selected>Enable (Recommended)</option></option>
-                            <option value="2">Disable</option>
-                          <cfelseif #get_telemetry.value# is "2">
-                            <option value="2" selected>Disable</option></option>
-                            <option value="1">Enable (Recommended)</option>
-                          </cfif>
-                            </select>   
-                    
-                            <!--- /div class="form-group" --->
-                          </div>  
-
-
-<!--- <p class="help-block">Help Block Text</p> --->
-
-
-<input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-
-  </form>
-
-  <div>&nbsp;</div>
-
+            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                <i class="fas fa-save me-1"></i> Save CAPTCHA Settings
+            </button>
+        </form>
+    </div>
+</div>
 
 <!-- SYSTEM SETTINGS FORM ENDS HERE -->
 
@@ -740,5 +951,23 @@ a, a:hover{
 
 </script>
 
+<!--- SCRIPT TO SHOW/HIDE CAPTCHA PROVIDER FIELDS --->
+<script>
+$('#captcha_provider').on('change', function(){
+    // Hide all provider fields
+    $('.captcha-provider-fields').hide();
+
+    // Show fields for selected provider
+    var provider = $(this).val();
+    if(provider === "recaptcha"){
+        $("#recaptcha_fields").show();
+    } else if(provider === "hcaptcha"){
+        $("#hcaptcha_fields").show();
+    } else if(provider === "turnstile"){
+        $("#turnstile_fields").show();
+    }
+    // 'builtin' doesn't need any fields
+});
+</script>
 
 </html>

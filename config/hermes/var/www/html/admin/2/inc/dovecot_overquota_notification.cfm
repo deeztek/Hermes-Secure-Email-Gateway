@@ -64,7 +64,7 @@
      <table id="Table2" border="0" cellspacing="6" cellpadding="2" width="100%" style="height: 50px;">
        <tr style="height: 75px;">
          <td style="background-color: rgb(255,255,255);">
-           <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
+           <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" style="max-height: 80px; width: auto;" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
          </td>
        </tr>
      
@@ -138,7 +138,7 @@
     <table id="Table2" border="0" cellspacing="6" cellpadding="2" width="100%" style="height: 50px;">
       <tr style="height: 75px;">
         <td style="background-color: rgb(255,255,255);">
-          <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
+          <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" style="max-height: 80px; width: auto;" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
         </td>
       </tr>
     
@@ -215,7 +215,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 <table id="Table2" border="0" cellspacing="6" cellpadding="2" width="100%" style="height: 50px;">
   <tr style="height: 75px;">
     <td style="background-color: rgb(255,255,255);">
-      <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
+      <p style="text-align: center; margin-bottom: 0px;"><img id="Picture1" src="cid:hermeslogo" style="max-height: 80px; width: auto;" vspace="0" hspace="0" align="top" border="0" alt="hermes_secure_mail_gateway" title="Hermes Secure Mail Gateway"></p>
     </td>
   </tr>
 

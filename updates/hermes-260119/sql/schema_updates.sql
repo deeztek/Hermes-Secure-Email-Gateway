@@ -380,8 +380,6 @@ CREATE TABLE IF NOT EXISTS password_reset_requests (
 -- USER_SETTINGS TABLE: Add columns for LDAP integration and password recovery
 -- - ldap_username: Links to LDAP cn for this user
 -- - secondary_email: Backup email for password recovery (mailbox users)
--- - pushover_user_key: Pushover API user key for notifications
--- - pushover_enabled: Whether Pushover is enabled for this user
 -- ============================================================================
 
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS ldap_username VARCHAR(255) NULL;
@@ -389,21 +387,58 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email VARCHAR(255) 
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_verified TINYINT(1) DEFAULT 0;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token VARCHAR(64) NULL;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token_expires TIMESTAMP NULL;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) NULL;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_api_token VARCHAR(64) NULL;
-ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
 
 -- ============================================================================
--- SYSTEM_USERS TABLE: Add Pushover settings for admin notifications
--- Allows admins to receive push notifications for password reset requests
+-- SYSTEM_SETTINGS: Pushover configuration for admin notifications
+-- System-wide config for critical alerts (mail queue issues, security events)
+-- where email delivery may fail. Uses Pushover group key to notify all admins.
 -- ============================================================================
 
-ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_user_key VARCHAR(64) NULL;
-ALTER TABLE system_users ADD COLUMN IF NOT EXISTS pushover_enabled TINYINT(1) DEFAULT 0;
+INSERT INTO system_settings (parameter, value)
+SELECT 'pushover_enabled', '0' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'pushover_enabled');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'pushover_api_token', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'pushover_api_token');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'pushover_user_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'pushover_user_key');
 
 -- ============================================================================
--- NOTE: Pushover is configured per-user (user_settings.pushover_api_token)
--- Each user creates their own Pushover application (one-time $5 fee per user)
--- No system-wide Pushover configuration needed
+-- SYSTEM_SETTINGS: CAPTCHA configuration for bot protection
+-- Used on public-facing forms (forgot password, etc.) to prevent abuse
+-- Supports multiple providers: builtin (math), recaptcha, hcaptcha, turnstile
 -- ============================================================================
+
+-- CAPTCHA Provider: 'builtin' (default), 'recaptcha', 'hcaptcha', 'turnstile'
+INSERT INTO system_settings (parameter, value)
+SELECT 'captcha_provider', 'builtin' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'captcha_provider');
+
+-- Migration: Convert old recaptcha_enabled to captcha_provider
+UPDATE system_settings SET value = 'recaptcha'
+WHERE parameter = 'captcha_provider' AND value = 'builtin'
+AND EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'recaptcha_enabled' AND value = '1');
+
+-- Clean up old recaptcha_enabled parameter after migration
+DELETE FROM system_settings WHERE parameter = 'recaptcha_enabled';
+
+-- Google reCAPTCHA v2 keys
+INSERT INTO system_settings (parameter, value)
+SELECT 'recaptcha_site_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'recaptcha_site_key');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'recaptcha_secret_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'recaptcha_secret_key');
+
+-- hCaptcha keys
+INSERT INTO system_settings (parameter, value)
+SELECT 'hcaptcha_site_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'hcaptcha_site_key');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'hcaptcha_secret_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'hcaptcha_secret_key');
+
+-- Cloudflare Turnstile keys
+INSERT INTO system_settings (parameter, value)
+SELECT 'turnstile_site_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'turnstile_site_key');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'turnstile_secret_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'turnstile_secret_key');
 

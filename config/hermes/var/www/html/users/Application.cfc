@@ -120,7 +120,7 @@ the url: https://#ConsoleHost#</cfoutput>
 </cfif>
 
   <cfquery name="getusersettings" datasource="hermes">
-  select train_bayes, download_msg, secondary_email, secondary_email_verified, pushover_enabled
+  select train_bayes, download_msg, secondary_email, secondary_email_verified
   from user_settings where email='#session.email#'
   </cfquery>
 
@@ -135,7 +135,6 @@ the url: https://#ConsoleHost#</cfoutput>
   <cfset session.download_msg = #getusersettings.download_msg#>
   <cfset session.secondary_email = getusersettings.secondary_email>
   <cfset session.secondary_email_verified = getusersettings.secondary_email_verified>
-  <cfset session.pushover_enabled = getusersettings.pushover_enabled>
 
 <!--- /CFIF #getusersettings.recordcount# --->
 </cfif>
