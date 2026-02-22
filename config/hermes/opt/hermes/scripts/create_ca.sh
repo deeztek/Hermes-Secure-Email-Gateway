@@ -1,3 +1,4 @@
+#!/bin/bash
 /bin/mkdir /opt/hermes/CA/CA-DIRECTORY
 
 /bin/mkdir /opt/hermes/CA/CA-DIRECTORY/root_ca
@@ -34,6 +35,4 @@ openssl genrsa -out ./private/cakey.pem SHOW-ENCRYPTION
 
 /bin/cat /opt/hermes/CA/CA-DIRECTORY/root_ca/certs/cacert.pem > /opt/hermes/CA/CA-DIRECTORY/root_ca/cachain.pem
 
-cd /usr/share/djigzo
-
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CertStore --import-certificates < /opt/hermes/CA/CA-DIRECTORY/root_ca/certs/cacert.pem
+cat /opt/hermes/CA/CA-DIRECTORY/root_ca/certs/cacert.pem | /usr/local/bin/docker exec -i hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CertStore --import-certificates

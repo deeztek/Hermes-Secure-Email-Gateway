@@ -1,6 +1,7 @@
+#!/bin/bash
 cd /opt/hermes/CA/CA-DIRECTORY/root_ca
 
-/usr/bin/truncate  -s 0 index.txt
+/usr/bin/truncate -s 0 index.txt
 
 /usr/bin/openssl genrsa -out private/RCPT-NAME_key.pem THE-ENCRYPTION
 
@@ -10,7 +11,4 @@ cd /opt/hermes/CA/CA-DIRECTORY/root_ca
 
 /usr/bin/openssl pkcs12 -export -out PFX/RCPT-NAME.pfx -inkey private/RCPT-NAME_key.pem -in newcerts/RCPT-NAME_cert.pem -certfile /opt/hermes/CA/CA-DIRECTORY/root_ca/cachain.pem -passout pass:THE-PASSWORD
 
-
-cd /usr/share/djigzo
-
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CertStore --import-keys < /opt/hermes/CA/CA-DIRECTORY/root_ca/PFX/RCPT-NAME.pfx --keystore-password THE-PASSWORD
+cat /opt/hermes/CA/CA-DIRECTORY/root_ca/PFX/RCPT-NAME.pfx | /usr/local/bin/docker exec -i hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CertStore --import-keys --keystore-password THE-PASSWORD

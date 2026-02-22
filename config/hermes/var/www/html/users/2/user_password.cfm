@@ -424,18 +424,29 @@ a, a:hover{
       <cfif #step# is "1">
 
         <!--- GET LDAP USERNAME FOR THIS USER --->
+        <!--- First check database, then fall back to LDAP query --->
         <cfquery name="getLdapUsername" datasource="hermes">
           SELECT ldap_username FROM user_settings WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
         </cfquery>
 
-        <cfif getLdapUsername.recordcount EQ 0 OR getLdapUsername.ldap_username EQ "">
-            <!--- No LDAP username - user may not be migrated yet --->
-            <cfset step=0>
-            <cfset session.m=8>
-            <cflocation url="user_password.cfm" addtoken="no">
-        </cfif>
+        <cfif getLdapUsername.recordcount EQ 1 AND getLdapUsername.ldap_username NEQ "">
+            <!--- Found in database --->
+            <cfset ldapUsername = getLdapUsername.ldap_username>
+        <cfelse>
+            <!--- Not in database - query LDAP directly by email --->
+            <cfset userEmail = session.email>
+            <cfinclude template="/user-auth/inc/ldap_get_user_groups.cfm">
 
-        <cfset ldapUsername = getLdapUsername.ldap_username>
+            <cfif ldapUserFound AND ldapUsername NEQ "">
+                <!--- Found in LDAP - use it --->
+                <!--- ldapUsername is already set by the include --->
+            <cfelse>
+                <!--- No LDAP user found - cannot change password --->
+                <cfset step=0>
+                <cfset session.m=8>
+                <cflocation url="user_password.cfm" addtoken="no">
+            </cfif>
+        </cfif>
 
         <!--- VERIFY OLD PASSWORD VIA LDAP BIND --->
         <!--- All users are in ou=users - role is determined by group membership --->

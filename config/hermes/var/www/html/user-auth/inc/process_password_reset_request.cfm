@@ -108,6 +108,7 @@ Requires:
             SELECT parameter, value FROM system_settings WHERE parameter='postmaster'
         </cfquery>
 
+        <cftry>
         <cfmail from="#getPostmaster.value#" to="#tokenRecipient#" server="hermes_postfix_dkim" port="10026" subject="[Hermes SEG] Password Reset Request" type="html">
 <div align="center" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
 <b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
@@ -139,6 +140,18 @@ This is an automated message from Hermes SEG.
 
         <cfset session.reason = 3>
         <cflocation url="forgot_password.cfm" addtoken="no">
+
+        <cfcatch type="any">
+            <!--- Email failed to send - update request status and show error --->
+            <cfquery datasource="hermes">
+                UPDATE password_reset_requests
+                SET status = 'failed'
+                WHERE token = '#resetToken#'
+            </cfquery>
+            <cfset session.reason = 6>
+            <cflocation url="forgot_password.cfm" addtoken="no">
+        </cfcatch>
+        </cftry>
     </cfcase>
 
     <cfcase value="pushover">

@@ -442,3 +442,22 @@ SELECT 'turnstile_site_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings 
 INSERT INTO system_settings (parameter, value)
 SELECT 'turnstile_secret_key', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'turnstile_secret_key');
 
+-- ============================================================================
+-- USER_SETTINGS TABLE: Remove obsolete columns from legacy authentication
+-- These columns are no longer used since password management moved to LDAP:
+-- - id: Legacy random string used for old password reset URLs
+-- - password: Legacy stored password (now managed in LDAP)
+-- - password_set: Legacy flag for tracking password status
+-- - reset_password_code: Legacy password reset token
+-- - reset_password_datetime: Legacy reset token timestamp
+-- - reset_password_ip: Legacy IP address tracking
+-- ============================================================================
+
+-- Drop obsolete columns (will fail silently if columns don't exist)
+ALTER TABLE user_settings DROP COLUMN IF EXISTS id;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS password;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS password_set;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_code;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_datetime;
+ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_ip;
+

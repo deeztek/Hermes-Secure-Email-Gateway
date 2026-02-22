@@ -50,33 +50,38 @@
 <cfif #checkdjigzo.recordcount# GTE 1>
 
 <!-- DELETE RECIPIENT FROM DJIGZO STARTS HERE -->
-<cffile action="read" file="/opt/hermes/scripts/delete_intrecipient.sh" variable="temp">
+<cftry>
+    <cffile action="read" file="/opt/hermes/scripts/delete_intrecipient.sh" variable="temp">
 
-<cffile action = "write"
-    file = "/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
-    output = "#REReplace("#temp#","THE-RECIPIENT","#recipient#","ALL")#" addnewline="no">
+    <cffile action = "write"
+        file = "/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
+        output = "#REReplace("#temp#","THE-RECIPIENT","#recipient#","ALL")#" addnewline="no">
 
-<cffile action="read" file="/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh" variable="temp">
+    <cffile action="read" file="/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh" variable="temp">
 
-<cfexecute name = "/bin/chmod"
-arguments="+x /opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
-timeout = "60">
-</cfexecute>
+    <cfexecute name = "/bin/chmod"
+    arguments="+x /opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
+    timeout = "60">
+    </cfexecute>
 
-<cfexecute name = "/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
-timeout = "240"
-outputfile ="/dev/null"
-arguments="-inputformat none">
-</cfexecute>
+    <cfexecute name = "/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh"
+    timeout = "240"
+    variable="djigzoDeleteResult"
+    errorVariable="djigzoDeleteError"
+    arguments="-inputformat none">
+    </cfexecute>
 
-<cfset FiletoDelete="/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh">
+    <cfset FiletoDelete="/opt/hermes/scripts/#customtrans3#_delete_intrecipient.sh">
 
-<cfif fileExists(FiletoDelete)>
-<cffile action = "delete" file = "#FiletoDelete#"> 
+    <cfif fileExists(FiletoDelete)>
+    <cffile action = "delete" file = "#FiletoDelete#">
+    </cfif>
 
-<!--- /CFIF fileExists --->
-</cfif>
-
+<cfcatch type="any">
+    <!--- Log error but continue with deletion - djigzo cleanup is non-critical --->
+    <cfset djigzoDeleteError = cfcatch.message>
+</cfcatch>
+</cftry>
 <!-- DELETE RECIPIENT FROM DJIGZO ENDS HERE -->
 
 <!-- DELETE CERTIFICATES AND KEYSTORES FROM DJIGZO STARTS HERE -->
@@ -146,8 +151,14 @@ arguments="-inputformat none">
     </cfquery>
 
     <cfif getLdapUsername.recordcount GTE 1 AND getLdapUsername.ldap_username NEQ "">
-        <cfset ldapUsername = getLdapUsername.ldap_username>
-        <cfinclude template="ldap_delete_user_relay.cfm">
+        <cftry>
+            <cfset ldapUsername = getLdapUsername.ldap_username>
+            <cfinclude template="ldap_delete_user_relay.cfm">
+        <cfcatch type="any">
+            <!--- Log error but continue with deletion - LDAP cleanup is non-critical --->
+            <cfset ldapDeleteError = cfcatch.message>
+        </cfcatch>
+        </cftry>
     </cfif>
 
     <!--- Cancel any pending password reset requests for this user --->
@@ -363,32 +374,37 @@ arguments="-inputformat none">
     <!-- DELETE PGP KEYSTORES ENDS HERE -->
     
     <!-- DELETE FROM GNUPG STARTS HERE -->
-    
-    <cffile action="read" file="/opt/hermes/scripts/delete_gpg_master_key.sh" variable="temp">
-    
-    <cffile action = "write"
-        file = "/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
-        output = "#REReplace("#temp#","THE_KEY","#pgp_fingerprint#","ALL")#" addnewline="no">
-    
-    <cfexecute name = "/bin/chmod"
-    arguments="+x /opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
-    timeout = "60">
-    </cfexecute>
-    
-    
-    <cfexecute name = "/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
-    timeout = "240"
-    variable="thekeyemail2"
-    arguments="-inputformat none">
-    </cfexecute>
-    
-    <!-- delete /opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh -->
-    <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh">
-    <cfif fileExists(FiletoDelete)> 
-    <cffile action="delete" 
-    file = "#FiletoDelete#">
-    </cfif>
-    
+    <cftry>
+        <cffile action="read" file="/opt/hermes/scripts/delete_gpg_master_key.sh" variable="temp">
+
+        <cffile action = "write"
+            file = "/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
+            output = "#REReplace("#temp#","THE_KEY","#pgp_fingerprint#","ALL")#" addnewline="no">
+
+        <cfexecute name = "/bin/chmod"
+        arguments="+x /opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
+        timeout = "60">
+        </cfexecute>
+
+        <cfexecute name = "/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh"
+        timeout = "240"
+        variable="thekeyemail2"
+        errorVariable="gpgDeleteError"
+        arguments="-inputformat none">
+        </cfexecute>
+
+        <!-- delete /opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh -->
+        <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_delete_gpg_master_key.sh">
+        <cfif fileExists(FiletoDelete)>
+        <cffile action="delete"
+        file = "#FiletoDelete#">
+        </cfif>
+
+    <cfcatch type="any">
+        <!--- Log error but continue with deletion - GPG cleanup is non-critical --->
+        <cfset gpgDeleteError = cfcatch.message>
+    </cfcatch>
+    </cftry>
     <!-- DELETE FROM GNUPG ENDS HERE -->
     
     <!-- /CFLOOP for getkeys -->

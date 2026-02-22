@@ -1,9 +1,8 @@
-cd /usr/share/djigzo
+#!/bin/bash
+/usr/local/bin/docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CLITool --set-property user.encryptMode --value allow --email THE-RECIPIENT
 
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.encryptMode --value allow --email THE-RECIPIENT
+/usr/local/bin/docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CLITool --set-property user.pdf.encryptionAllowed --value true --email THE-RECIPIENT
 
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.pdf.encryptionAllowed --value true --email THE-RECIPIENT
+/usr/local/bin/docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CLITool --set-property user.sMIMEEnabled --value false --email THE-RECIPIENT
 
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.sMIMEEnabled --value false --email THE-RECIPIENT
-
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CLITool --set-property user.pgp.enabled --value false --email THE-RECIPIENT
+/usr/local/bin/docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CLITool --set-property user.pgp.enabled --value false --email THE-RECIPIENT

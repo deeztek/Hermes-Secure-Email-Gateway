@@ -170,40 +170,16 @@ textarea: #show_recipient#
         </cfquery>
         </cfoutput>
                 
-    <!--- CREATE UNIQUE ID FOR EACH RECIPIENT STARTS HERE --->
-    <cfquery name="userrandom" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 24
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="userrandom">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as userrandom2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset userrandom3=#gettrans.userrandom2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <!--- CREATE UNIQUE ID FOR EACH RECIPIENT ENDS HERE --->
-
     <!--- INSERT INTO USER_SETTINGS STARTS HERE --->
 
     <cfquery name="insertreport" datasource="hermes">
-        insert into user_settings
-        (id, email, report_enabled, report_frequency, password_set, train_bayes, download_msg)
-        values
-        ('#userrandom3#', '#recipient#', '#show_reports#', '#show_frequency#', '0', '#show_train_bayes#', '#show_download_msg#')
-        </cfquery>
+        INSERT INTO user_settings
+        (email, report_enabled, report_frequency, train_bayes, download_msg)
+        VALUES
+        ('#recipient#', '#show_reports#', '#show_frequency#', '#show_train_bayes#', '#show_download_msg#')
+    </cfquery>
 
-          <!--- INSERT INTO USER_SETTINGS ENDS HERE --->
+    <!--- INSERT INTO USER_SETTINGS ENDS HERE --->
 
     <!--- CREATE LDAP USER FOR RECIPIENT STARTS HERE --->
     <!--- This creates an LDAP user with a random password and adds them to the relays group --->

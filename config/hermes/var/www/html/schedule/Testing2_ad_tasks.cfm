@@ -114,32 +114,11 @@ values
 <!-- /CFIF getdefaultpolicy.recordcount -->
 </cfif>
 
-<cfquery name="userrandom" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 24
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="userrandom">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as userrandom2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset userrandom3=#gettrans.userrandom2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
 <cfquery name="insertreport" datasource="#datasource#">
-insert into user_settings
-(id, email, report_enabled, report_frequency, password_set, train_bayes, download_msg)
-values
-('#userrandom3#', '#recipient#', 'YES', '24', '0', '0', '0')
+INSERT INTO user_settings
+(email, report_enabled, report_frequency, train_bayes, download_msg)
+VALUES
+('#recipient#', 'YES', '24', '0', '0')
 </cfquery>
 
 #recipient# -- DOES NOT EXIST<BR></cfoutput>

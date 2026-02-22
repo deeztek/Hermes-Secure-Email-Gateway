@@ -1,3 +1,4 @@
+#!/bin/bash
 cd /opt/hermes/CA/CA-DIRECTORY/root_ca
 
 /usr/bin/openssl genrsa -out private/bobaoltld_key.pem 2048
@@ -8,6 +9,4 @@ cd /opt/hermes/CA/CA-DIRECTORY/root_ca
 
 /usr/bin/openssl pkcs12 -export -out PFX/bobaoltld.pfx -inkey private/bobaoltld_key.pem -in newcerts/bobaoltld_cert.pem -certfile opt/hermes/CA/CA-DIRECTORY/root_ca/cachain.pem -passout pass:12345678
 
-cd /usr/share/djigzo
-
-/usr/bin/java -cp djigzo.jar mitm.application.djigzo.tools.CertStore --import-keys < /opt/hermes/CA/CA-DIRECTORY/root_ca/PFX/bobaoltld.pfx --keystore-password 12345678
+cat /opt/hermes/CA/CA-DIRECTORY/root_ca/PFX/bobaoltld.pfx | /usr/local/bin/docker exec -i hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CertStore --import-keys --keystore-password 12345678
