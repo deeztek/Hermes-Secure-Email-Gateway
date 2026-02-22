@@ -153,9 +153,55 @@ textarea{
 
 <cfif url.mid is not "">
 
-<cfquery name="checkq" datasource="hermes">
-select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#"> and msgrcpt.rid = '#session.owner#'
+<!--- CHECK IF USER IS A CATCH-ALL RECIPIENT FOR ANY DOMAIN --->
+<!--- Security: Only looks for catch-all entries that explicitly map TO this user --->
+<cfquery name="checkCatchAll" datasource="hermes">
+    SELECT virtual_address
+    FROM virtual_recipients
+    WHERE virtual_address LIKE '@%'
+    AND maps = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
 </cfquery>
+
+<cfif checkCatchAll.recordcount GTE 1>
+    <!--- User is a catch-all recipient - allow viewing catch-all messages --->
+    <cfset catchAllDomains = "">
+    <cfloop query="checkCatchAll">
+        <cfset catchAllDomains = ListAppend(catchAllDomains, "%" & checkCatchAll.virtual_address)>
+    </cfloop>
+
+    <cfquery name="checkq" datasource="hermes">
+        SELECT msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        INNER JOIN maddr ON msgrcpt.rid = maddr.id
+        WHERE msgs.mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+        AND (
+            msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+            OR (
+                (
+                    <cfset domainIndex = 0>
+                    <cfloop list="#catchAllDomains#" index="domainPattern">
+                        <cfset domainIndex = domainIndex + 1>
+                        <cfif domainIndex GT 1> OR </cfif>
+                        maddr.email LIKE <cfqueryparam value="#domainPattern#" cfsqltype="cf_sql_varchar">
+                    </cfloop>
+                )
+                AND maddr.email NOT IN (
+                    SELECT recipient FROM recipients WHERE domain IS NULL
+                )
+            )
+        )
+    </cfquery>
+<cfelse>
+    <!--- Normal query - user is not a catch-all recipient --->
+    <cfquery name="checkq" datasource="hermes">
+        SELECT msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        WHERE msgs.mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+        AND msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+    </cfquery>
+</cfif>
 
 <cfif #checkq.recordcount# GTE 1>
     

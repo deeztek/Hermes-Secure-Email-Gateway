@@ -700,9 +700,68 @@ a, a:hover{
     </cfif>
 
 
-    <cfquery name="getmsgs" datasource="hermes">
-      SELECT msgrcpt.mail_id, msgrcpt.rid, msgrcpt.ds, msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgs.archive, msgs.client_addr FROM msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.time_iso between '#startdate#' and '#enddate#' and msgrcpt.rid='#session.owner#' order by msgs.time_iso desc limit #limit#
-      </cfquery>
+    <!--- CHECK IF USER IS A CATCH-ALL RECIPIENT FOR ANY DOMAIN --->
+    <!--- Security: Only looks for catch-all entries that explicitly map TO this user --->
+    <cfquery name="checkCatchAll" datasource="hermes">
+        SELECT virtual_address
+        FROM virtual_recipients
+        WHERE virtual_address LIKE '@%'
+        AND maps = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+
+    <cfif checkCatchAll.recordcount GTE 1>
+        <!--- User is a catch-all recipient - include catch-all messages --->
+        <!--- Build list of catch-all domains (e.g., "@domain.tld" -> "%@domain.tld") --->
+        <cfset catchAllDomains = "">
+        <cfloop query="checkCatchAll">
+            <!--- virtual_address is like "@domain.tld", convert to "%@domain.tld" for LIKE --->
+            <cfset catchAllDomains = ListAppend(catchAllDomains, "%" & checkCatchAll.virtual_address)>
+        </cfloop>
+
+        <cfquery name="getmsgs" datasource="hermes">
+            SELECT DISTINCT msgrcpt.mail_id, msgrcpt.rid, msgrcpt.ds, msgs.sid, msgs.spam_level,
+                   msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content,
+                   msgs.archive, msgs.client_addr
+            FROM msgs
+            INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+            INNER JOIN maddr ON msgrcpt.rid = maddr.id
+            WHERE msgs.time_iso BETWEEN '#startdate#' AND '#enddate#'
+            AND (
+                <!--- Messages addressed directly to this user --->
+                msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+                OR (
+                    <!--- Catch-all messages: recipient matches catch-all domain pattern --->
+                    <!--- AND recipient is NOT a real user (not in user_settings) --->
+                    (
+                        <cfset domainIndex = 0>
+                        <cfloop list="#catchAllDomains#" index="domainPattern">
+                            <cfset domainIndex = domainIndex + 1>
+                            <cfif domainIndex GT 1> OR </cfif>
+                            maddr.email LIKE <cfqueryparam value="#domainPattern#" cfsqltype="cf_sql_varchar">
+                        </cfloop>
+                    )
+                    AND maddr.email NOT IN (
+                        SELECT recipient FROM recipients WHERE domain IS NULL
+                    )
+                )
+            )
+            ORDER BY msgs.time_iso DESC
+            LIMIT #limit#
+        </cfquery>
+    <cfelse>
+        <!--- Normal query - user is not a catch-all recipient --->
+        <cfquery name="getmsgs" datasource="hermes">
+            SELECT msgrcpt.mail_id, msgrcpt.rid, msgrcpt.ds, msgs.sid, msgs.spam_level,
+                   msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content,
+                   msgs.archive, msgs.client_addr
+            FROM msgs
+            INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+            WHERE msgs.time_iso BETWEEN '#startdate#' AND '#enddate#'
+            AND msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+            ORDER BY msgs.time_iso DESC
+            LIMIT #limit#
+        </cfquery>
+    </cfif>
 
   
        <!--- ERROR MESSAGES START HERE --->
@@ -1815,16 +1874,12 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
       <!--- /CFIF #action# is --->     
     </cfif> 
     
-        <!--- MESSAGE HISTORY CARD --->
+        <!--- SEARCH MESSAGES CARD --->
         <div class="card card-outline card-primary mb-4">
             <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-history me-2"></i>Message History</h3>
+                <h3 class="card-title"><i class="fas fa-search me-2"></i>Search Messages</h3>
             </div>
             <div class="card-body">
-                <div class="mb-3">
-                    <button type="button" id="messageactions" class="btn btn-primary"><i class="fa fa-edit me-1"></i> Message Actions</button>
-                </div>
-
                 <form>
                     <div class="row">
                         <div class="col-md-4 mb-3">
@@ -1919,29 +1974,28 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary mb-3" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                    <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
                         <i class="fas fa-search me-1"></i> Fetch Messages
                     </button>
                 </form>
+            </div>
+        </div>
+        <!--- END SEARCH MESSAGES CARD --->
 
-<!---
+        <!--- MESSAGE HISTORY RESULTS CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-history me-2"></i>Message History</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <button type="button" id="messageactions" class="btn btn-primary"><i class="fa fa-edit me-1"></i> Message Actions</button>
+                </div>
 
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
-
-
-    
     <cfif #getmsgs.recordcount# GTE 1>
 
-    
-                
-      <table class="table table-striped wrap"  id="sortTable" style="width:100%">
+                <div class="table-responsive">
+      <table class="table table-striped wrap" id="sortTable" style="width:100%">
         <thead>
           <tr>
             <th><input type="checkbox" id="selectAll" value="selectAll"></th>
@@ -2056,11 +2110,10 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
       
 
       </table>
+                </div><!--- END TABLE-RESPONSIVE --->
 
     </form>
-    
- 
-    
+
                 <cfelseif #getmsgs.recordcount# LT 1>
                     <div class="alert alert-info">
                         <i class="icon fas fa-info-circle"></i>
@@ -2069,7 +2122,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
                 </cfif>
             </div>
         </div>
-        <!--- END MESSAGE HISTORY CARD --->
+        <!--- END MESSAGE HISTORY RESULTS CARD --->
 
     
     

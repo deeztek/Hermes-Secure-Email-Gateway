@@ -18,7 +18,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <cfquery name="getemail" datasource="hermes">
-    select email, password, password_set, train_bayes, download_msg from user_settings where email = '#session.email#'
+    select email, train_bayes, download_msg from user_settings where email = '#session.email#'
     </cfquery>
 
 <cfif #getemail.recordcount# GTE 1>

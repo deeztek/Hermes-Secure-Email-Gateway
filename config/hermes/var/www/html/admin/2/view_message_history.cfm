@@ -1844,194 +1844,129 @@ id="btn-back-to-top"
       <!--- /CFIF #action# is --->     
     </cfif> 
     
-    <span>
-      <p>  
+        <!--- SEARCH MESSAGES CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-search me-2"></i>Search Messages</h3>
+            </div>
+            <div class="card-body">
+                <form>
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Start Date/Time</label>
+                            <div class="input-group" id="startdatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
+                                <cfoutput>
+                                <input type="text" name="startdate" value="#startdate#" class="form-control" data-td-target="##startdatetime"/>
+                                </cfoutput>
+                                <span class="input-group-text" data-td-target="#startdatetime" data-td-toggle="datetimepicker">
+                                    <i class="fa fa-calendar"></i>
+                                </span>
+                            </div>
+                        </div>
 
-            <!--- RELOAD MESSAGE HISTORY BUTTON STARTS HERE --->
-<a href="view_message_history.cfm" class="btn btn-primary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Reload Message History</a>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">End Date/Time</label>
+                            <div class="input-group" id="enddatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
+                                <cfoutput>
+                                <input type="text" name="enddate" value="#enddate#" class="form-control" data-td-target="##enddatetime"/>
+                                </cfoutput>
+                                <span class="input-group-text" data-td-target="#enddatetime" data-td-toggle="datetimepicker">
+                                    <i class="fa fa-calendar"></i>
+                                </span>
+                            </div>
+                        </div>
 
-<!--- RELOAD MESSAGE HISTORY BUTTON ENDS HERE --->
+                <script type="text/javascript">
+                    document.addEventListener('DOMContentLoaded', function() {
+                        var pickerOptions = {
+                            display: {
+                                sideBySide: true,
+                                components: {
+                                    clock: true,
+                                    seconds: true
+                                }
+                            },
+                            localization: {
+                                format: 'yyyy-MM-dd HH:mm:ss',
+                                dayViewHeaderFormat: { month: 'long', year: 'numeric' }
+                            }
+                        };
+                        new tempusDominus.TempusDominus(document.getElementById('startdatetime'), pickerOptions);
+                        new tempusDominus.TempusDominus(document.getElementById('enddatetime'), pickerOptions);
+                    });
+                </script>
 
-&nbsp;&nbsp;
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Search Results Limit</label>
+                            <select class="form-control" name="limit">
+                                <cfoutput>
+                                <option value="#limit#" selected="selected">#limit#</option>
+                                </cfoutput>
+                                <cfif #limit# is "1000">
+                                    <option value="1500">1500</option>
+                                    <option value="2500">2500</option>
+                                    <option value="5000">5000</option>
+                                    <option value="10000">10000</option>
+                                    <option value="15000">15000</option>
+                                <cfelseif #limit# is "1500">
+                                    <option value="1000">1000 (Default)</option>
+                                    <option value="2500">2500</option>
+                                    <option value="5000">5000</option>
+                                    <option value="10000">10000</option>
+                                    <option value="15000">15000</option>
+                                <cfelseif #limit# is "2500">
+                                    <option value="1000">1000 (Default)</option>
+                                    <option value="1500">1500</option>
+                                    <option value="5000">5000</option>
+                                    <option value="10000">10000</option>
+                                    <option value="15000">15000</option>
+                                <cfelseif #limit# is "5000">
+                                    <option value="1000">1000 (Default)</option>
+                                    <option value="1500">1500</option>
+                                    <option value="2500">2500</option>
+                                    <option value="10000">10000</option>
+                                    <option value="15000">15000</option>
+                                <cfelseif #limit# is "10000">
+                                    <option value="1000">1000 (Default)</option>
+                                    <option value="1500">1500</option>
+                                    <option value="2500">2500</option>
+                                    <option value="5000">5000</option>
+                                    <option value="15000">15000</option>
+                                <cfelseif #limit# is "15000">
+                                    <option value="1000">1000 (Default)</option>
+                                    <option value="1500">1500</option>
+                                    <option value="2500">2500</option>
+                                    <option value="5000">5000</option>
+                                    <option value="10000">10000</option>
+                                </cfif>
+                            </select>
+                            <div class="form-text text-warning"><i class="icon fas fa-exclamation-triangle"></i> Setting limit to 10000+ will significantly increase page load time</div>
+                        </div>
+                    </div>
 
-    <button type="button" id="messageactions" class="btn btn-primary"><i class="fa fa-edit"></i>&nbsp;&nbsp;Message Actions</button>
-    &nbsp;&nbsp;
-
-  </p>
-</span>
-
-<div class="card col-sm-8">
-    
-  <!---
-  <div class="card-header border-1">
-
-    <h3 class="card-title"><strong>Mail Queue Settings</strong></h3>
-
-  <!--- class="card-header border-1" --->
-</div>
---->
-
-<br>
-
-<form>
-
-<div class="col-sm-6">
-  <label>Start Date/Time</label>
-    <div class="form-group">
-        <div class="input-group" id="startdatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
-          <cfoutput>
-            <input type="text" name="startdate" value="#startdate#" class="form-control" data-td-target="##startdatetime"/>
-          </cfoutput>
-            <span class="input-group-text" data-td-target="#startdatetime" data-td-toggle="datetimepicker">
-                <i class="fa fa-calendar"></i>
-            </span>
+                    <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
+                        <i class="fas fa-search me-1"></i> Fetch Messages
+                    </button>
+                </form>
+            </div>
         </div>
-    </div>
-  </div>
+        <!--- END SEARCH MESSAGES CARD --->
 
-  <div class="col-sm-6">
-    <label>End Date/Time</label>
-      <div class="form-group">
-          <div class="input-group" id="enddatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
-            <cfoutput>
-              <input type="text" name="enddate" value="#enddate#" class="form-control" data-td-target="##enddatetime"/>
-            </cfoutput>
-              <span class="input-group-text" data-td-target="#enddatetime" data-td-toggle="datetimepicker">
-                  <i class="fa fa-calendar"></i>
-              </span>
-          </div>
-      </div>
-    </div>
+        <!--- MESSAGE HISTORY RESULTS CARD --->
+        <div class="card card-outline card-primary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-history me-2"></i>Message History</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <a href="view_message_history.cfm" class="btn btn-primary" role="button"><i class="fa fa-undo me-1"></i> Reload</a>
+                    <button type="button" id="messageactions" class="btn btn-primary"><i class="fa fa-edit me-1"></i> Message Actions</button>
+                </div>
 
-  <script type="text/javascript">
-    document.addEventListener('DOMContentLoaded', function() {
-      var pickerOptions = {
-        display: {
-          sideBySide: true,
-          components: {
-            clock: true,
-            seconds: true
-          }
-        },
-        localization: {
-          format: 'yyyy-MM-dd HH:mm:ss',
-          dayViewHeaderFormat: { month: 'long', year: 'numeric' }
-        }
-      };
-
-      new tempusDominus.TempusDominus(document.getElementById('startdatetime'), pickerOptions);
-      new tempusDominus.TempusDominus(document.getElementById('enddatetime'), pickerOptions);
-    });
-  </script>
-
-<div class="form-group col-sm-6">
-  <label>Search Results Limit</label>
-  <div class="alert alert-warning">
-<!---
-    <h6><i class="icon fas fa-exclamation-triangle"></i> Warning!</h6>
---->
-    <p><i class="icon fas fa-exclamation-triangle"></i>Setting Search Results Limit to 10000 or 15000 will <strong>significantly</strong> increase the page loading time </p>
-    </div>
-  <div class="input-group">
-
-    <select class="form-control" name="limit" data-placeholder="limit">   
-      <cfoutput>          
-      <option value="#limit#" selected="selected">#limit#</option>
-    </cfoutput>    
-     
-      <cfif #limit# is "1000">
-
-      <option value="1500">1500</option>
-      <option value="2500">2500</option>
-      <option value="5000">5000</option>
-      <option value="10000">10000</option>
-      <option value="15000">15000</option>
-
-      <cfelseif #limit# is "1500">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "2500">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "5000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "10000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "15000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-
-<!--- /CFIF #limit# is --->
-      </cfif>
-
-      </select> 
-
-
-  
-  <!--- /div class="input-group" --->
-  </div>
-  
-  <!--- /div class="input-group" --->
-  </div>
-
-<div class="col-sm-6">
-
-<input type="submit" class="btn btn-primary" name="" value="Fetch Messages" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-</div>
-
-<br>
-  
-</form>
-
-    <!--- div class="card"  --->  
-  </div>
-
-<br>
-
-<!---
-
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
-
-
-    
     <cfif #getmsgs.recordcount# GTE 1>
 
-    
-                
-      <table class="table table-striped wrap"  id="sortTable" style="width:100%">
+                <div class="table-responsive">
+      <table class="table table-striped wrap" id="sortTable" style="width:100%">
         <thead>
           <tr>
             <th><input type="checkbox" id="selectAll" value="selectAll"></th>
@@ -2146,28 +2081,21 @@ id="btn-back-to-top"
       
 
       </table>
+                </div><!--- END TABLE-RESPONSIVE --->
 
     </form>
-    
- 
-    
-    <cfelseif #getmsgs.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Messages were found</strong></cfoutput>
-      </div>
-    
-      <!--- /CFIF FOR getmsgs.recordcount --->
-    </cfif>
-    
-    
 
-    <div>&nbsp;</div>
+                <cfelseif #getmsgs.recordcount# LT 1>
+                    <div class="alert alert-info">
+                        <i class="icon fas fa-info-circle"></i>
+                        No messages were found for the selected date range.
+                    </div>
+                </cfif>
+            </div>
+        </div>
+        <!--- END MESSAGE HISTORY RESULTS CARD --->
 
-    
-    
+
   </div><!-- /.container-fluid -->
 </div>
 <!-- /.content -->
