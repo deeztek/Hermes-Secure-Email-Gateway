@@ -109,7 +109,14 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
   <!--- Pro Edition License Check --->
   <cfinclude template="./inc/license_check.cfm" />
 
-     
+  <!--- PRO EDITION CHECK --->
+  <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+      <cfset proFeatureName = "Antivirus Signature Feeds">
+      <cfinclude template="./inc/license_pro_required.cfm">
+      <cfabort>
+  </cfif>
+
+
 <!--- CFML CODE STARTS HERE --->
 
 

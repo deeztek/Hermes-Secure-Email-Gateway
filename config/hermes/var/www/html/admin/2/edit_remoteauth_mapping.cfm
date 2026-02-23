@@ -66,6 +66,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <div class="content">
 <div class="container-fluid">
 
+<!--- Pro Edition License Check --->
+<cfinclude template="./inc/license_check.cfm" />
+
+<!--- PRO EDITION CHECK --->
+<cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+    <cfset proFeatureName = "LDAP RemoteAuth Configuration">
+    <cfinclude template="./inc/license_pro_required.cfm">
+    <cfabort>
+</cfif>
+
 <!--- Initialize variables --->
 <cfparam name="action" default="">
 <cfparam name="url.id" default="0">

@@ -1437,12 +1437,19 @@ SELECT  id, username, system from system_users where username = <cfqueryparam va
       <small class="text-muted">Select the domain this user will authenticate against</small>
     </div>
   <cfelse>
-    <input type="hidden" name="auth_type" value="local">
+    <!--- RemoteAuth not available - show current auth type as disabled --->
+    <input type="hidden" name="auth_type" value="#theAuthType#">
     <select class="form-control" name="auth_type_display" disabled style="width: 100%;">
-      <option value="local" selected>Local</option>
+      <cfif theAuthType EQ "remote">
+        <option value="remote" selected>Remote</option>
+      <cfelse>
+        <option value="local" selected>Local</option>
+      </cfif>
     </select>
     <small class="text-muted">
-      <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+      <cfif theAuthType EQ "remote">
+        This user uses Remote Authentication. Pro License required to modify authentication settings.
+      <cfelseif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
         Remote Authentication requires Hermes SEG Pro Edition
       <cfelse>
         Remote Authentication requires RemoteAuth to be enabled with at least one domain mapping configured
@@ -1518,28 +1525,37 @@ SELECT  id, username, system from system_users where username = <cfqueryparam va
                 
                     </div>
 
+  <!--- Hide password fields for remote auth users --->
+  <cfif theAuthType NEQ "remote">
   <div class="form-group" id="setPasswordGroup">
     <label><strong>Set User Password</strong></label>
 
     <select class="form-control" name="setpassword" data-placeholder="setpassword" style="width: 100%;"  id="setUserPassword">
-      <cfif #setPassword# is "NO">                           
+      <cfif #setPassword# is "NO">
         <option value="NO" selected>NO</option>
         <option value="YES">YES</option>
       <cfelseif #setPassword# is "YES">
         <option value="YES" selected>YES</option>
         <option value="NO">NO</option>
       </cfif>
-        </select>   
+        </select>
 
       </div>
+  <cfelse>
+    <!--- Remote auth user - no local password needed --->
+    <input type="hidden" name="setpassword" value="NO">
+    <input type="hidden" name="hibp" value="NO">
+    <input type="hidden" name="password" value="">
+  </cfif>
 
 
 
 
 
+<cfif theAuthType NEQ "remote">
 <cfif #setPassword# is "NO">
 
-                       
+
 
                           <div class="form-group" id="UserPassword" style="display:none;">
                             <label><strong>Check Password Against haveibeenpwned.com</strong></label>
@@ -1604,6 +1620,8 @@ SELECT  id, username, system from system_users where username = <cfqueryparam va
 
                   <!--- /CFIF for #setpassword# is YES or NO --->
                 </cfif>
+<!--- /CFIF for theAuthType NEQ remote (password fields) --->
+</cfif>
 
 
 

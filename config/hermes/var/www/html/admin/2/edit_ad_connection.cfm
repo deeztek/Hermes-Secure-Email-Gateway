@@ -100,26 +100,15 @@ a, a:hover{
     <div class="content">
       <div class="container-fluid">
 
-      
-      <!---LICENSE CHECK BELOW --->
-      <cfif StructKeyExists(session, "license")>
-      <cfif #session.license# is "VIOLATION">
-      
-      <cfinclude template="./inc/license_invalid.cfm">
+  <!--- Pro Edition License Check --->
+  <cfinclude template="./inc/license_check.cfm" />
+
+  <!--- PRO EDITION CHECK --->
+  <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+      <cfset proFeatureName = "AD Integration">
+      <cfinclude template="./inc/license_pro_required.cfm">
       <cfabort>
-      
-      <cfelseif #session.license# is "NEW">
-      
-        <cfinclude template="./inc/license_invalid.cfm">
-        <cfabort>
-        
-        <!--- /CFIF #session.license# is  --->
-        </cfif>
-        
-        <!--- /CFIF StructKeyExists(session, "license")> --->
-        </cfif>
-        
-        <!--- LICENSE CHECK ABOVE --->
+  </cfif>
 
 <!--- CFML CODE STARTS HERE --->
 

@@ -112,7 +112,14 @@ a, a:hover{
 
   <!--- Pro Edition License Check --->
   <cfinclude template="./inc/license_check.cfm" />
-    
+
+  <!--- PRO EDITION CHECK --->
+  <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+      <cfset proFeatureName = "AD Integration">
+      <cfinclude template="./inc/license_pro_required.cfm">
+      <cfabort>
+  </cfif>
+
     <cfparam name = "errormessage" default = "0">
     
     <cfparam name = "m2" default = "0"> 

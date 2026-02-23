@@ -243,8 +243,14 @@ regulation:
   ban_time: 300
 
 storage:
-  local:
-    path: /db/db.sqlite3
+  # encryption_key is loaded via AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE environment variable
+  # (Docker secret mounted at /run/secrets/AUTHELIA_STORAGE_ENCRYPTION_KEY)
+  mysql:
+    address: 'tcp://hermes_db_server:3306'
+    database: 'authelia'
+    username: {{ secret "/keys/authelia_username" | msquote }}
+    password: {{ secret "/keys/authelia_password" | msquote }}
+    timeout: '5s'
 
 notifier:
   disable_startup_check: true

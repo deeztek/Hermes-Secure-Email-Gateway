@@ -129,6 +129,13 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
   <!--- Pro Edition License Check --->
   <cfinclude template="./inc/license_check.cfm" />
 
+  <!--- PRO EDITION CHECK --->
+  <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+      <cfset proFeatureName = "Admin Console Firewall">
+      <cfinclude template="./inc/license_pro_required.cfm">
+      <cfabort>
+  </cfif>
+
     <!--- ENABLE FOR DEBUG ONLY --->
  <!--- 
   <cfdump var="#cgi#">

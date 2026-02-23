@@ -160,16 +160,8 @@ $(document).ready(function() {
 
 <!--- PRO EDITION CHECK --->
 <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
-    <div class="alert alert-danger" style="display: inline-block; text-align: center;">
-        <i class="fa fa-exclamation-triangle fa-5x"></i>
-        <p>Intrusion Prevention is only available with a valid Hermes SEG Pro License. Please contact sales@deeztek.com to obtain a valid Hermes SEG Pro License.</p>
-    </div>
-    <cfinclude template="./inc/main_footer.cfm" />
-    </div>
-    </main>
-    </div>
-    </body>
-    </html>
+    <cfset proFeatureName = "Intrusion Prevention">
+    <cfinclude template="./inc/license_pro_required.cfm">
     <cfabort>
 </cfif>
 

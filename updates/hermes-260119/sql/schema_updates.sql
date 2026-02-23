@@ -461,3 +461,47 @@ ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_code;
 ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_datetime;
 ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_ip;
 
+-- ============================================================================
+-- AUTHELIA DATABASE: MySQL Setup for 2FA Device Storage
+-- Migrates Authelia from SQLite to MySQL for better scalability
+--
+-- IMPORTANT: Authelia auto-creates its schema tables on first startup with MySQL:
+--   - authentication_logs, duo_devices, encryption, identity_verification
+--   - migrations, totp_configurations, u2f_devices, user_preferences, webauthn_devices
+--
+-- WARNING: Migrating from SQLite to MySQL will LOSE ALL EXISTING 2FA DEVICES!
+-- Users will need to re-register their TOTP/WebAuthn devices after migration.
+-- There is no clean migration path for 2FA device data between storage backends.
+-- ============================================================================
+
+-- Create Authelia database (separate from hermes)
+CREATE DATABASE IF NOT EXISTS authelia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci;
+
+-- Create Authelia user (password should be changed and stored in secrets)
+-- Note: For production, use a strong password stored in /keys/authelia_db_password
+CREATE USER IF NOT EXISTS 'authelia'@'%' IDENTIFIED BY 'CHANGE_ME_AUTHELIA_DB_PASSWORD';
+
+-- Grant full access to authelia database
+GRANT ALL PRIVILEGES ON authelia.* TO 'authelia'@'%';
+
+-- Flush privileges to apply changes
+FLUSH PRIVILEGES;
+
+-- ============================================================================
+-- AUTHELIA CONFIGURATION NOTE:
+-- After running this script, update Authelia's configuration.yml:
+--
+-- storage:
+--   mysql:
+--     address: 'tcp://hermes_db_server:3306'
+--     database: 'authelia'
+--     username: 'authelia'
+--     password: '<use secret file or env var>'
+--     timeout: '5s'
+--
+-- Remove the SQLite configuration:
+-- storage:
+--   local:
+--     path: /db/db.sqlite3  <-- DELETE THIS SECTION
+-- ============================================================================
+
