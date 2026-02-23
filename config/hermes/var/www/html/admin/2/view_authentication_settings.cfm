@@ -1482,21 +1482,32 @@ Action: #action#<br>
 
                 <div class="form-group">
                   <label><strong>Duo Security</strong></label>
-              
+
+                  <div class="alert alert-warning">
+                    <h5><i class="icon fas fa-exclamation-triangle"></i> Important - Duo Licensing</h5>
+                    <p>Enabling Duo Security makes <strong>Duo Push notifications available to ALL users</strong> in the system, including:</p>
+                    <ul class="mb-2">
+                      <li>System Users (Admins)</li>
+                      <li>Relay Recipients</li>
+                      <li>Mailbox Users</li>
+                    </ul>
+                    <p class="mb-0">Ensure you have <strong>sufficient Duo licenses</strong> to accommodate all users who may use Duo Push for two-factor authentication before enabling this feature.</p>
+                  </div>
+
                   <select class="form-control" name="duo_disable" data-placeholder="duo_disable" style="width: 100%;"  id="setDuo">
 
-                    <cfif #duo_disable.value2# is "true">                           
+                    <cfif #duo_disable.value2# is "true">
                       <option value="true" selected>Disable</option>
                       <option value="false">Enable</option>
                     <cfelseif #duo_disable.value2# is "false">
                       <option value="false" selected>Enable</option>
                       <option value="true">Disable</option></option>
                     </cfif>
-                      </select>   
-              
+                      </select>
+
                     </div>
 
-   
+
 
                 <cfif #duo_disable.value2# is "true">
 

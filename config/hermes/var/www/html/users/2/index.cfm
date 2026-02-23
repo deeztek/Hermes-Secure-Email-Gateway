@@ -88,17 +88,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         </a>
                     </div>
                     <div class="col-md-4 col-sm-6 mb-3">
-                        <a href="user_password.cfm" class="btn btn-outline-primary btn-block w-100">
-                            <i class="fas fa-key me-2"></i>Change Password
-                        </a>
-                    </div>
-                    <cfif session.theGroups CONTAINS "mailboxes">
-                    <div class="col-md-4 col-sm-6 mb-3">
                         <a href="user_settings.cfm" class="btn btn-outline-primary btn-block w-100">
                             <i class="fas fa-cog me-2"></i>Account Settings
                         </a>
                     </div>
-                    </cfif>
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <a href="view_message_history.cfm" class="btn btn-outline-primary btn-block w-100">
+                            <i class="fas fa-history me-2"></i>Message History
+                        </a>
+                    </div>
                 </div>
             </div>
         </div>

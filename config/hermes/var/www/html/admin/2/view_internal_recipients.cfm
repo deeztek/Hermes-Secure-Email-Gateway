@@ -116,7 +116,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       });
     });
   });
-  
+
+  </script>
+
+<script>
+
+  $(document).ready(function() {
+    $("#editaccesscontrol").click(function() {
+      var editrecipient = [];
+      $.each($("input[name='id']:checked"), function() {
+        editrecipient.push($(this).val());
+      });
+      $('#editaccesscontrol_modal').modal('show').on('shown.bs.modal', function() {
+      $("#editaccesscontrolid").html('<input type="hidden" name="recipient_id" value=' + editrecipient + '>');
+      });
+    });
+  });
+
   </script>
 
 <!--- STYLE FOR EYE-SLASH STARTS HERE --->    
@@ -810,8 +826,65 @@ a, a:hover{
     </div>
     </div>
     <!--- EDIT OPTIONS MODAL HTML ENDS HERE --->
-      
-  
+
+    <!--- EDIT ACCESS CONTROL MODAL HTML STARTS HERE --->
+
+  <div class="modal fade" id="editaccesscontrol_modal" tabindex="-1" role="dialog" aria-labelledby="editAccessControlModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header alert-primary">
+            <h4 class="modal-title"><i class="fas fa-shield-alt me-2"></i>Recipient Access Control</h4>
+        </div>
+
+        <div class="modal-body">
+
+          <div class="alert alert-info">
+            <p class="mb-0"><i class="icon fas fa-info-circle"></i>Configure two-factor authentication requirements for selected recipient(s). Changes take effect on their next login.</p>
+          </div>
+
+          <form name="edit_accesscontrol" method="post" action="">
+
+            <input type="hidden" name="action" value="editaccesscontrol">
+            <div id="editaccesscontrolid"></div>
+
+            <div class="form-group mb-3">
+              <label><strong>Access Control Policy</strong></label>
+              <select class="form-control" name="access_control" data-placeholder="access_control" style="width: 100%">
+                <option value="one_factor">One Factor (Password Only)</option>
+                <option value="two_factor">Two Factor (Password + 2FA)</option>
+              </select>
+              <small class="text-muted">Two Factor requires recipients to configure TOTP, Duo Push, or WebAuthn on their next login.</small>
+            </div>
+
+            <hr>
+
+            <div class="form-group mb-3">
+              <label><strong>Delete 2FA Devices</strong></label>
+              <div class="alert alert-warning">
+                <p class="mb-2"><i class="icon fas fa-exclamation-triangle"></i>Check this box to delete all <strong>TOTP and WebAuthn</strong> devices for the selected recipient(s). They will need to re-register their 2FA devices on next login.</p>
+                <p class="mb-0"><i class="icon fas fa-info-circle"></i><strong>Note:</strong> This does <strong>not</strong> affect Duo Push enrollments. Duo Push devices are managed through the <a href="https://admin.duosecurity.com" target="_blank">Duo Admin Console</a>.</p>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="delete_2fa_devices" value="1" id="delete2faCheck">
+                <label class="form-check-label" for="delete2faCheck">
+                  Delete TOTP and WebAuthn devices for selected recipient(s)
+                </label>
+              </div>
+            </div>
+
+            <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!--- EDIT ACCESS CONTROL MODAL HTML ENDS HERE --->
+
+
       <cfif #action# is "deleterecipient">
 
         <cfif NOT StructKeyExists(form, "recipient_id")>
@@ -1217,8 +1290,110 @@ a, a:hover{
 
 <!--- /CFIF NOT/StructKeyExists(form, "recipient_id") --->
 </cfif>
-    
-      <!--- /CFIF #action# is --->     
+
+
+<cfelseif #action# is "editaccesscontrol">
+
+<!--- VALIDATE PARAMETERS --->
+<cfif NOT StructKeyExists(form, "recipient_id")>
+  <cfset session.m = 1>
+  <cflocation url="view_internal_recipients.cfm" addtoken="no">
+<cfelseif StructKeyExists(form, "recipient_id")>
+  <cfif form.recipient_id is "">
+    <cfset session.m = 1>
+    <cflocation url="view_internal_recipients.cfm" addtoken="no">
+  <cfelseif form.recipient_id is not "">
+    <cfset theCustId = form.recipient_id>
+  </cfif>
+</cfif>
+
+<!--- VALIDATE ACCESS_CONTROL PARAMETER --->
+<cfif NOT StructKeyExists(form, "access_control")>
+  <cfset m="Edit Internal Recipients: form.access_control does not exist">
+  <cfinclude template="./inc/error.cfm">
+  <cfabort>
+<cfelseif form.access_control NEQ "one_factor" AND form.access_control NEQ "two_factor">
+  <cfset m="Edit Internal Recipients: form.access_control is not one_factor or two_factor">
+  <cfinclude template="./inc/error.cfm">
+  <cfabort>
+</cfif>
+
+<!--- PROCESS EACH RECIPIENT --->
+<cfloop index="i" list="#theCustId#" delimiters=",">
+  <cfif IsValid("integer", i)>
+    <!--- GET RECIPIENT INFO --->
+    <cfquery name="getrecipient" datasource="hermes">
+      SELECT r.id, r.recipient, us.ldap_username
+      FROM recipients r
+      LEFT JOIN user_settings us ON r.recipient = us.email
+      WHERE r.id = <cfqueryparam cfsqltype="cf_sql_integer" value="#i#">
+    </cfquery>
+
+    <cfif getrecipient.recordcount GTE 1>
+      <!--- GET LDAP USERNAME FOR THIS RECIPIENT --->
+      <cfif getrecipient.ldap_username NEQ "">
+        <cfset ldapUsername = getrecipient.ldap_username>
+      <cfelse>
+        <!--- Username is the email address --->
+        <cfset ldapUsername = LCase(getrecipient.recipient)>
+      </cfif>
+
+      <!--- CHANGE ACCESS CONTROL GROUP IN LDAP --->
+      <cfset ldapNewAccessControl = form.access_control>
+      <cfif form.access_control EQ "one_factor">
+        <cfset ldapOldAccessControl = "two_factor">
+      <cfelse>
+        <cfset ldapOldAccessControl = "one_factor">
+      </cfif>
+
+      <cftry>
+        <cfinclude template="./inc/ldap_change_user_access_control.cfm">
+      <cfcatch type="any">
+        <!--- Log error but continue processing --->
+      </cfcatch>
+      </cftry>
+
+      <!--- DELETE 2FA DEVICES IF REQUESTED --->
+      <cfif StructKeyExists(form, "delete_2fa_devices") AND form.delete_2fa_devices EQ "1">
+        <cftry>
+          <!--- Read the delete devices script template --->
+          <cffile action="read" file="/opt/hermes/scripts/authelia_delete_user_device_all.sh" variable="deviceDeleteScript">
+
+          <!--- Replace placeholder with actual username --->
+          <cfset deviceDeleteScript = REReplace(deviceDeleteScript, "THE-USER", ldapUsername, "ALL")>
+
+          <!--- Generate unique temp filename --->
+          <cfinclude template="./inc/generate_customtrans.cfm">
+
+          <!--- Write the script to temp location --->
+          <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_delete_devices.sh" output="#deviceDeleteScript#">
+
+          <!--- Make it executable and run it --->
+          <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_delete_devices.sh" timeout="10"></cfexecute>
+          <cfexecute name="/opt/hermes/tmp/#customtrans3#_delete_devices.sh" timeout="60"></cfexecute>
+
+          <!--- Cleanup --->
+          <cfif fileExists("/opt/hermes/tmp/#customtrans3#_delete_devices.sh")>
+            <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_delete_devices.sh">
+          </cfif>
+        <cfcatch type="any">
+          <!--- Log error but continue processing --->
+        </cfcatch>
+        </cftry>
+      </cfif>
+
+    <!--- /CFIF getrecipient.recordcount GTE 1 --->
+    </cfif>
+  <!--- /CFIF IsValid("integer", i) --->
+  </cfif>
+</cfloop>
+
+<cfset session.m = 3>
+<cflocation url="view_internal_recipients.cfm" addtoken="no">
+
+<!--- /CFIF action is editaccesscontrol --->
+
+      <!--- /CFIF #action# is --->
     </cfif> 
     
 
@@ -1270,77 +1445,66 @@ a, a:hover{
 </cfif>
 --->
 
-<form>
-    
-<span>
-  <p>       
-
-
-<a href="add_internal_recipients.cfm" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Create Recipient(s)</a>
-&nbsp;&nbsp;
-<button type="button" id="editoptions" class="btn btn-primary"><i class="fa fa-edit"></i>&nbsp;&nbsp;Edit Options</button>
-&nbsp;&nbsp;
-<button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock"></i>&nbsp;&nbsp;Edit Encryption</button>
-&nbsp;&nbsp;
-<button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt"></i>&nbsp;&nbsp;Delete</button>
-
-</p>
-
-<p>
-
-</p>
-</span>
+<!--- INTERNAL RECIPIENTS CARD --->
+<div class="card card-outline card-primary mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-users me-2"></i>Internal Recipients</h3>
+    </div>
+    <div class="card-body">
+        <form>
+        <div class="mb-3">
+            <a href="add_internal_recipients.cfm" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg me-1"></i>Create Recipient(s)</a>
+            <button type="button" id="editoptions" class="btn btn-primary"><i class="fa fa-edit me-1"></i>Edit Options</button>
+            <button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock me-1"></i>Edit Encryption</button>
+            <button type="button" id="editaccesscontrol" class="btn btn-primary"><i class="fas fa-shield-alt me-1"></i>Access Control</button>
+            <button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i>Delete</button>
+        </div>
 
 
 
-
-
-
-<br>
-
-<!---
-
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
+<!--- QUERY LDAP FOR TWO_FACTOR GROUP MEMBERS (single query for all users) --->
+<cfset twoFactorMembers = "">
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -b 'cn=two_factor,ou=groups,dc=hermes,dc=local' -LLL member"
+        variable="twoFactorMembers"
+        errorVariable="ldapError"
+        timeout="30">
+    </cfexecute>
+<cfcatch type="any">
+    <!--- If LDAP query fails, twoFactorMembers stays empty - all users show as one_factor --->
+    <cfset twoFactorMembers = "">
+</cfcatch>
+</cftry>
 
 <cfquery name="getrecipients" datasource="hermes">
-  select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient, policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore
+  select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient, policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
   from recipients LEFT JOIN policy ON recipients.policy_id = policy.id LEFT JOIN recipient_certificates ON recipients.id = recipient_certificates.user_id  LEFT JOIN recipient_keystores ON recipients.id = recipient_keystores.user_id  LEFT JOIN user_settings ON recipients.recipient = user_settings.email where recipients.domain is NULL group by recipients.id
-  
+
   </cfquery>
     
     <cfif #getrecipients.recordcount# GTE 1>
 
-    
-                
+        <div class="table-responsive">
       <table class="table table-striped"  id="sortTable" style="width:100%">
         <thead>
           <tr>
             <th><input type="checkbox" id="selectAll" value="selectAll"></th>
-            
-            <th>SMIME Certificates</th>
-            <th>PGP Keyrings</th>
+            <th>S/MIME</th>
+            <th>PGP</th>
             <th>Recipient</th>
+            <th>2FA</th>
             <th>Policy</th>
             <th>Reports</th>
             <th>Frequency</th>
             <th>Train Bayes</th>
             <th>Download Msgs</th>
             <th>PDF Encrypt</th>
-            <th>SMIME Encrypt</th>
+            <th>S/MIME Encrypt</th>
             <th>PGP Encrypt</th>
             <th>Sign All</th>
-            <th>SMIME Certificates</th>
-            <th>PGP Keyrings</th>
-            
-          
-
+            <th>S/MIME Cert</th>
+            <th>PGP Keyring</th>
           </tr>
         </thead>
         <tbody>
@@ -1348,14 +1512,17 @@ a, a:hover{
         
 
 <cfoutput query="getrecipients">
-
-
-
-        <td><input type="checkbox" name="id" value="#id#"></td>
-        <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary" role="button"><i class="fas fa-user-shield"></i></a></td>
-        <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary" role="button"><i class="fas fa-user-lock"></i></a></td>
-        <td>#recipient#</td>
-         <td>#policy_name#</td>
+          <!--- Determine LDAP username for this recipient --->
+          <cfset recipientLdapUser = ldap_username NEQ "" ? LCase(ldap_username) : LCase(recipient)>
+          <!--- Check if user is in two_factor group (search for their DN in the member list) --->
+          <cfset isTwoFactor = twoFactorMembers CONTAINS "cn=#recipientLdapUser#,ou=users,dc=hermes,dc=local">
+          <tr>
+            <td><input type="checkbox" name="id" value="#id#"></td>
+            <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-shield"></i></a></td>
+            <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-lock"></i></a></td>
+            <td>#recipient#</td>
+            <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
+            <td>#policy_name#</td>
             <td>#report_enabled#</td>
             <td>#report_frequency#</td>
             <td>#train_bayes#</td>
@@ -1366,57 +1533,48 @@ a, a:hover{
             <td>#digital_sign#</td>
             <td>#cert#</td>
             <td>#keystore#</td>
-
-      
-
           </tr>
-
         </cfoutput>
 
         </tbody>
-        
-       
         <tfoot>
           <tr>
             <th></th>
-            <th>SMIME Certificates</th>
-            <th>PGP Keyrings</th>
+            <th>S/MIME</th>
+            <th>PGP</th>
             <th>Recipient</th>
+            <th>2FA</th>
             <th>Policy</th>
             <th>Reports</th>
             <th>Frequency</th>
             <th>Train Bayes</th>
             <th>Download Msgs</th>
             <th>PDF Encrypt</th>
-            <th>SMIME Encrypt</th>
+            <th>S/MIME Encrypt</th>
             <th>PGP Encrypt</th>
             <th>Sign All</th>
-            <th>SMIME Certificates</th>
-            <th>PGP Keyrings</th>
+            <th>S/MIME Cert</th>
+            <th>PGP Keyring</th>
           </tr>
         </tfoot>
-      
-
       </table>
+        </div><!--- /.table-responsive --->
 
-    </form>
-    
- 
-    
+        </form>
+
     <cfelseif #getrecipients.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Internal Recipients were found</strong></cfoutput>
+
+      <div class="alert alert-info">
+        <h5><i class="icon fas fa-info-circle"></i> No Recipients Found</h5>
+        <p class="mb-0">No Internal Recipients were found. Click <strong>Create Recipient(s)</strong> to add new recipients.</p>
       </div>
-    
+
       <!--- /CFIF FOR getrecipients.recordcount --->
     </cfif>
-    
-    
 
-    <div>&nbsp;</div>
+    </div><!--- /.card-body --->
+</div><!--- /.card --->
+<!--- END INTERNAL RECIPIENTS CARD --->
 
     
     

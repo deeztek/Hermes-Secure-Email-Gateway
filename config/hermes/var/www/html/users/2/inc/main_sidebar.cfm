@@ -51,20 +51,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </li>
 
         <li class="nav-item">
-          <a href="user_password.cfm" class="nav-link">
-            <i class="nav-icon fas fa-key"></i>
-            <p><strong>Change Password</strong></p>
-          </a>
-        </li>
-
-        <cfif #session.theGroups# contains "mailboxes">
-        <li class="nav-item">
           <a href="user_settings.cfm" class="nav-link">
             <i class="nav-icon fas fa-cog"></i>
             <p><strong>Account Settings</strong></p>
           </a>
         </li>
-        </cfif>
 
         <li class="nav-item">
           <a href="view_message_history.cfm" class="nav-link">
