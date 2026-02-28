@@ -1,5 +1,5 @@
 FROM ubuntu:24.04
-MAINTAINER Deeztek <support@deeztek.com>
+LABEL maintainer="Deeztek <support@deeztek.com>"
 
 EXPOSE 80 443
 

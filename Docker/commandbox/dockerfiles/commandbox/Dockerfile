@@ -1,5 +1,5 @@
 FROM ubuntu:24.04
-MAINTAINER Deeztek <support@deeztek.com>
+LABEL maintainer="Deeztek <support@deeztek.com>"
 EXPOSE 8888
 
 #Set Docker CLI version from https://download.docker.com/linux/static/stable/x86_64/
@@ -25,8 +25,13 @@ RUN apt-get update && \
 #Copy docker binary from docker:dind image on dockerhub
 COPY --from=docker:dind /usr/local/bin/docker /usr/local/bin/
 
-#Get Docker compose plugin
-RUN curl -SL https://github.com/docker/compose/releases/download/v2.39.4/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose && \
+#Get Docker compose plugin (fetches latest if COMPOSE_VERSION not specified)
+ARG COMPOSE_VERSION=""
+RUN if [ -z "$COMPOSE_VERSION" ]; then \
+        COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/'); \
+    fi && \
+    echo "Installing Docker Compose ${COMPOSE_VERSION}" && \
+    curl -SL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/bin/docker-compose && \
     chmod +x /usr/local/bin/docker-compose
 
 #download Ortussolutions sources GPG key

@@ -102,7 +102,7 @@ services:
       - hermes_commandbox
 
   hermes_nginx:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_nginx
     environment:
       - PUID=1000
@@ -136,34 +136,7 @@ services:
       - hermes_ciphermail
       - hermes_commandbox
     restart: always
-
-
-  hermes_nginx_auth:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx-auth:latest
-    container_name: hermes_nginx_auth
-    secrets:
-      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
-    logging:
-      options:
-        max-size: 10m
-        max-file: "5"
-    networks:
-      hermes_net_ext:
-              ipv4_address: ${IPV4SUBNET}.114
-    extra_hosts:
-    - "host.docker.internal:host-gateway"
-    - "${HERMES_HOSTNAME}:${HOST_IP}"
-    expose:
-      - 9000
-    depends_on:
-      - hermes_ldap
-      - hermes_nginx
-      - hermes_commandbox
-    restart: always
-    environment:
-      - AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD_FILE=/run/secrets/AUTHELIA_AUTHENTICATION_BACKEND_LDAP_PASSWORD
-
-
+ 
   hermes_authelia:
     image: authelia/authelia:4.38.0
     container_name: hermes_authelia
@@ -241,7 +214,7 @@ services:
 
 
   hermes_commandbox:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-commandbox:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_commandbox
     logging:
       options:
@@ -289,7 +262,7 @@ services:
       - 8888
 
   hermes_postfix_dkim:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-postfix-dkim:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_postfix_dkim
     #build:
       #context: .
@@ -328,7 +301,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_dmarc:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-dmarc:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dmarc
     #build:
       #context: .
@@ -362,7 +335,7 @@ services:
 
  
   hermes_mail_filter:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-mail-filter:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_mail_filter
     #build:
       #context: .
@@ -409,7 +382,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_ciphermail:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-ciphermail:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ciphermail
     privileged: true
     #build:
@@ -586,7 +559,7 @@ services:
 
 
   hermes_ldap:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-openldap:latest
+    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ldap
     #entrypoint: ["sleep", "infinity"]
     secrets:

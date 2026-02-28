@@ -135,6 +135,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   </script>
 
+<script>
+
+  $(document).ready(function() {
+    $("#editbackend").click(function() {
+      var editrecipient = [];
+      $.each($("input[name='id']:checked"), function() {
+        editrecipient.push($(this).val());
+      });
+      if(editrecipient.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+      }
+      // Redirect to edit backend page with selected IDs
+      window.location.href = 'edit_internal_recipient_backend.cfm?ids=' + editrecipient.join(',');
+    });
+  });
+
+  </script>
+
 <!--- STYLE FOR EYE-SLASH STARTS HERE --->    
 <style>
   td {
@@ -287,9 +306,27 @@ a, a:hover{
   </div>
 
 </cfif>
-      
-        
-        
+
+<!--- BACKEND SERVER UPDATE MESSAGES --->
+<cfif StructKeyExists(session, "backendMessage")>
+    <cfif session.backendMessage EQ "success_default">
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h4><i class="icon fa fa-check"></i> Success!</h4>
+            Backend server override cleared. Selected recipients will now use domain default.
+        </div>
+    <cfelseif session.backendMessage EQ "success_custom">
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h4><i class="icon fa fa-check"></i> Success!</h4>
+            Custom backend server configured for selected recipients.
+        </div>
+    </cfif>
+    <cfset StructDelete(session, "backendMessage")>
+</cfif>
+
+
+
         <!--- ERROR MESSAGES END HERE --->
 
         
@@ -1456,6 +1493,7 @@ a, a:hover{
             <a href="add_internal_recipients.cfm" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg me-1"></i>Create Recipient(s)</a>
             <button type="button" id="editoptions" class="btn btn-primary"><i class="fa fa-edit me-1"></i>Edit Options</button>
             <button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock me-1"></i>Edit Encryption</button>
+            <button type="button" id="editbackend" class="btn btn-primary"><i class="fas fa-server me-1"></i>Edit Backend</button>
             <button type="button" id="editaccesscontrol" class="btn btn-primary"><i class="fas fa-shield-alt me-1"></i>Access Control</button>
             <button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i>Delete</button>
         </div>
@@ -1478,7 +1516,9 @@ a, a:hover{
 </cftry>
 
 <cfquery name="getrecipients" datasource="hermes">
-  select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient, policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
+  select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient,
+    recipients.backend_server, recipients.backend_port, recipients.backend_tls,
+    policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
   from recipients LEFT JOIN policy ON recipients.policy_id = policy.id LEFT JOIN recipient_certificates ON recipients.id = recipient_certificates.user_id  LEFT JOIN recipient_keystores ON recipients.id = recipient_keystores.user_id  LEFT JOIN user_settings ON recipients.recipient = user_settings.email where recipients.domain is NULL group by recipients.id
 
   </cfquery>
@@ -1493,6 +1533,7 @@ a, a:hover{
             <th>S/MIME</th>
             <th>PGP</th>
             <th>Recipient</th>
+            <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
             <th>Reports</th>
@@ -1521,6 +1562,7 @@ a, a:hover{
             <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-shield"></i></a></td>
             <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-lock"></i></a></td>
             <td>#recipient#</td>
+            <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
             <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
             <td>#policy_name#</td>
             <td>#report_enabled#</td>
@@ -1543,6 +1585,7 @@ a, a:hover{
             <th>S/MIME</th>
             <th>PGP</th>
             <th>Recipient</th>
+            <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
             <th>Reports</th>

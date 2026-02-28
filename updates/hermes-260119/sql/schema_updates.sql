@@ -477,14 +477,26 @@ ALTER TABLE user_settings DROP COLUMN IF EXISTS reset_password_ip;
 -- Create Authelia database (separate from hermes)
 CREATE DATABASE IF NOT EXISTS authelia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci;
 
--- Create Authelia user (password should be changed and stored in secrets)
--- Note: For production, use a strong password stored in /keys/authelia_db_password
-CREATE USER IF NOT EXISTS 'authelia'@'%' IDENTIFIED BY 'CHANGE_ME_AUTHELIA_DB_PASSWORD';
+-- Create Authelia user only if it doesn't exist
+-- Note: Password should be changed immediately after initial setup via:
+--   ALTER USER 'authelia'@'%' IDENTIFIED BY 'your_secure_password';
+SET @authelia_user_exists = (SELECT COUNT(*) FROM mysql.user WHERE user = 'authelia' AND host = '%');
+SET @sql = IF(@authelia_user_exists = 0,
+    "CREATE USER 'authelia'@'%' IDENTIFIED BY 'CHANGE_ME_AUTHELIA_DB_PASSWORD'",
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- Grant full access to authelia database
-GRANT ALL PRIVILEGES ON authelia.* TO 'authelia'@'%';
-
--- Flush privileges to apply changes
+-- Grant privileges only if not already granted
+-- This avoids the "Access denied" error when root@% tries to re-grant on existing database
+SET @authelia_grant_exists = (SELECT COUNT(*) FROM mysql.db WHERE User = 'authelia' AND Host = '%' AND Db = 'authelia');
+SET @sql = IF(@authelia_grant_exists = 0,
+    "GRANT ALL PRIVILEGES ON authelia.* TO 'authelia'@'%'",
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 FLUSH PRIVILEGES;
 
 -- ============================================================================
@@ -504,4 +516,19 @@ FLUSH PRIVILEGES;
 --   local:
 --     path: /db/db.sqlite3  <-- DELETE THIS SECTION
 -- ============================================================================
+
+-- ============================================================================
+-- RECIPIENTS TABLE: Per-Recipient Backend Override
+-- Allows relay recipients to use a different backend server than their domain default
+-- NULL values = use domain default (via COALESCE in transport_maps query)
+-- ============================================================================
+
+ALTER TABLE recipients ADD COLUMN IF NOT EXISTS backend_server VARCHAR(255) NULL
+    COMMENT 'Override backend server (NULL = use domain default)';
+
+ALTER TABLE recipients ADD COLUMN IF NOT EXISTS backend_port INT NULL
+    COMMENT 'Override backend port (NULL = use domain default)';
+
+ALTER TABLE recipients ADD COLUMN IF NOT EXISTS backend_tls ENUM('none', 'may', 'encrypt') NULL
+    COMMENT 'Override TLS setting (NULL = use domain default)';
 

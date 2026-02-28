@@ -19,63 +19,122 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-  <!--- GENERATE CUSTOMTRANS --->
+<!--- GENERATE CUSTOMTRANS --->
 <cfinclude template="generate_customtrans.cfm">
-    
-  <!--- READ OIDC CLIENT SECRET PLAIN --->
-  <cffile action="read" file="/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file" variable="oidcclientplain">
 
-<!--- GET SERVER URL FOR OIDC_LOGIN_PROVIDER_URL --->
-<cfquery name = "getconsolehost" datasource = "hermes">
-select value2 from parameters2 where module = 'console' and parameter = 'console.host'
+<!--- READ OIDC CLIENT SECRET PLAIN --->
+<cffile action="read" file="/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file" variable="oidcclientplain">
+
+<!--- GET SERVER URL FOR OIDC_LOGIN_PROVIDER_URL AND TRUSTED DOMAIN --->
+<cfquery name="getconsolehost" datasource="hermes">
+  select value2 from parameters2 where module = 'console' and parameter = 'console.host'
 </cfquery>
+<cfset consoleHost = getconsolehost.value2>
 
-<cfset consoleHost = "#getconsolehost.value2#">
+<!--- READ .ENV FILE FOR NEXTCLOUD CREDENTIALS AND HOST IP --->
+<cffile action="read" file="/opt/hermes-seg-container-gl/.env" variable="envFile">
+<cfset ncRedisPassword = "">
+<cfset ncDbUser = "">
+<cfset ncDbPassword = "">
+<cfset ncMailDomain = "">
+<cfset ncHostIP = "">
+<cfloop list="#envFile#" delimiters="#chr(10)#" index="envLine">
+  <cfset envLine = Trim(envLine)>
+  <cfif Len(envLine) AND Left(envLine, 1) NEQ "##" AND Find("=", envLine)>
+    <cfset eqPos = Find("=", envLine)>
+    <cfset envKey = Left(envLine, eqPos - 1)>
+    <cfset envVal = Mid(envLine, eqPos + 1, Len(envLine) - eqPos)>
+    <cfswitch expression="#envKey#">
+      <cfcase value="NEXTCLOUD_REDIS_PASSWORD"><cfset ncRedisPassword = envVal></cfcase>
+      <cfcase value="MYSQL_USER"><cfset ncDbUser = envVal></cfcase>
+      <cfcase value="MYSQL_PASSWORD"><cfset ncDbPassword = envVal></cfcase>
+      <cfcase value="MAIL_DOMAIN"><cfset ncMailDomain = envVal></cfcase>
+      <cfcase value="HOST_IP"><cfset ncHostIP = envVal></cfcase>
+    </cfswitch>
+  </cfif>
+</cfloop>
+
+<!--- READ EXISTING NEXTCLOUD CONFIG TO EXTRACT INSTALLATION-SPECIFIC VALUES --->
+<cfset ncPasswordSalt = "">
+<cfset ncSecret = "">
+<cfset ncInstanceId = "">
+<cftry>
+  <cffile action="read" file="/mnt/data/nextcloud/config/config.php" variable="existingConfig">
+
+  <!--- Extract passwordsalt --->
+  <cfset saltMatch = REFind("'passwordsalt'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
+  <cfif saltMatch.pos[1] GT 0>
+    <cfset ncPasswordSalt = Mid(existingConfig, saltMatch.pos[2], saltMatch.len[2])>
+  </cfif>
+
+  <!--- Extract secret (matches 'secret' => but not 'oidc_login_client_secret') --->
+  <cfset secretMatch = REFind("'secret'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
+  <cfif secretMatch.pos[1] GT 0>
+    <cfset ncSecret = Mid(existingConfig, secretMatch.pos[2], secretMatch.len[2])>
+  </cfif>
+
+  <!--- Extract instanceid --->
+  <cfset instanceMatch = REFind("'instanceid'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
+  <cfif instanceMatch.pos[1] GT 0>
+    <cfset ncInstanceId = Mid(existingConfig, instanceMatch.pos[2], instanceMatch.len[2])>
+  </cfif>
+
+  <cfcatch type="any">
+    <!--- Existing config not found (fresh install) - values will remain empty --->
+  </cfcatch>
+</cftry>
 
 <!--- READ NEXTCLOUD CONFIG.PHP TEMPLATE --->
-    <cffile action="read" file="/opt/hermes/templates/config.php" variable="config">
-     
-  <cffile action = "write"
-  file = "/opt/hermes/tmp/#customtrans3#_config.php"
-  output = "#REReplace("#config#","OIDC_LOGIN_CLIENT_SECRET","#oidcclientplain#","ALL")#"> 
-      
-  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_config.php" variable="config">
-   
-  <cffile action = "write"
-  file = "/opt/hermes/tmp/#customtrans3#_config.php"
-  output = "#REReplace("#config#","OIDC_LOGIN_PROVIDER_URL","https://#consoleHost#","ALL")#"> 
-      
-  
- <!--- BACKUP EXISTING CONFIG.PHP FILE ---> 
-  <cffile action="copy" 
-  source = "/mnt/data/nextcloud/config/config.php"
-  destination="/mnt/data/nextcloud/config/config.HERMES">
-  
-  <!--- REPLACE EXISTING CONFIG.PHP FILE WITH NEWLY GENERATED ONE --->
-  <cffile action="move" 
-  source = "/opt/hermes/tmp/#customtrans3#_config.php"
+<cffile action="read" file="/opt/hermes/templates/config.php" variable="config">
+
+<!--- REPLACE ALL PLACEHOLDERS --->
+<!--- Credentials from .env --->
+<cfset config = Replace(config, "NEXTCLOUD_REDIS_PASSWORD", ncRedisPassword, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_DB_USER", ncDbUser, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_DB_PASSWORD", ncDbPassword, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_MAIL_DOMAIN", ncMailDomain, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_TRUSTED_DOMAIN_IP", ncHostIP, "ALL")>
+
+<!--- Domain/host from database --->
+<cfset config = Replace(config, "NEXTCLOUD_TRUSTED_DOMAIN_HOST", consoleHost, "ALL")>
+<cfset config = Replace(config, "OIDC_LOGIN_PROVIDER_URL", "https://#consoleHost#", "ALL")>
+
+<!--- OIDC client secret from key file --->
+<cfset config = Replace(config, "OIDC_LOGIN_CLIENT_SECRET", Trim(oidcclientplain), "ALL")>
+
+<!--- Installation-specific values from existing config --->
+<cfset config = Replace(config, "NEXTCLOUD_PASSWORD_SALT", ncPasswordSalt, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_SECRET", ncSecret, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_INSTANCE_ID", ncInstanceId, "ALL")>
+
+<!--- WRITE GENERATED CONFIG --->
+<cffile action="write" file="/opt/hermes/tmp/#customtrans3#_config.php" output="#config#">
+
+<!--- BACKUP EXISTING CONFIG.PHP FILE --->
+<cftry>
+  <cffile action="copy"
+    source="/mnt/data/nextcloud/config/config.php"
+    destination="/mnt/data/nextcloud/config/config.HERMES">
+  <cfcatch type="any">
+    <!--- No existing config to backup (fresh install) --->
+  </cfcatch>
+</cftry>
+
+<!--- REPLACE EXISTING CONFIG.PHP FILE WITH NEWLY GENERATED ONE --->
+<cffile action="move"
+  source="/opt/hermes/tmp/#customtrans3#_config.php"
   destination="/mnt/data/nextcloud/config/config.php">
 
 <!--- GIVE PROPER PERMISSIONS TO CONFIG.PHP --->
 <cftry>
+  <cfexecute name="/usr/local/bin/docker"
+    arguments="exec hermes_nextcloud /usr/bin/chown www-data:www-data /var/www/html/config/config.php"
+    timeout="240">
+  </cfexecute>
 
- <cfexecute name = "/usr/local/bin/docker"
- arguments="exec hermes_nextcloud /usr/bin/chown www-data:www-data /var/www/html/config/config.php"
-timeout = "240">
-</cfexecute>
-
-
- <cfcatch type="any">
-
-
+  <cfcatch type="any">
     <cfset m="Nextcloud: There was an error setting permissions to /var/www/html/config/config.php">
     <cfinclude template="error.cfm">
-    <cfabort>   
-
+    <cfabort>
   </cfcatch>
-
-
- </cftry>
-  
-  
-  
+</cftry>
