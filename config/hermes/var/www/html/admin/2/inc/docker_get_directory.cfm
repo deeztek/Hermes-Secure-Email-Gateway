@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
  <cftry>
 
 <!-- Get Docker Working Directory -->
-<!-- Script now returns clean path directly (e.g., /opt/hermes-seg-container-gl) -->
+<!-- Script now returns clean path directly (e.g., /opt/hermes-seg-docker-gl) -->
  <cfexecute name = "/opt/hermes/scripts/get_docker_directory.sh"
 timeout = "60"
 variable="DockerDir">

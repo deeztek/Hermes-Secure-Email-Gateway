@@ -7,7 +7,7 @@
 
 if [ -z "$1" ]; then
     echo "Usage: $0 /path/to/html/directory"
-    echo "Example: $0 /opt/hermes-seg-container-gl/config/hermes/var/www/html"
+    echo "Example: $0 /opt/hermes-seg-docker-gl/config/hermes/var/www/html"
     exit 1
 fi
 

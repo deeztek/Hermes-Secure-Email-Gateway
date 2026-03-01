@@ -31,26 +31,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset consoleHost = getconsolehost.value2>
 
-<!--- READ .ENV FILE FOR NEXTCLOUD CREDENTIALS AND HOST IP --->
-<cffile action="read" file="/opt/hermes-seg-container-gl/.env" variable="envFile">
-<cfset ncRedisPassword = "">
-<cfset ncDbUser = "">
-<cfset ncDbPassword = "">
-<cfset ncMailDomain = "">
+<!--- READ NEXTCLOUD CREDENTIALS FROM CREDENTIAL FILES --->
+<cffile action="read" file="/opt/hermes/creds/nextcloud_redis_password" variable="ncRedisPassword">
+<cfset ncRedisPassword = Trim(ncRedisPassword)>
+<cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncDbUser">
+<cfset ncDbUser = Trim(ncDbUser)>
+<cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPassword">
+<cfset ncDbPassword = Trim(ncDbPassword)>
+
+<!--- DERIVE MAIL DOMAIN FROM CONSOLE HOST (e.g., smtp-dev.deeztek.com → deeztek.com) --->
+<cfset ncMailDomain = ListRest(consoleHost, ".")>
+
+<!--- GET HOST IP (TODO: replace with dynamic resolution) --->
+<cfinclude template="docker_get_directory.cfm">
+<cffile action="read" file="#DockerDir#/.env" variable="envFile">
 <cfset ncHostIP = "">
 <cfloop list="#envFile#" delimiters="#chr(10)#" index="envLine">
   <cfset envLine = Trim(envLine)>
   <cfif Len(envLine) AND Left(envLine, 1) NEQ "##" AND Find("=", envLine)>
     <cfset eqPos = Find("=", envLine)>
-    <cfset envKey = Left(envLine, eqPos - 1)>
-    <cfset envVal = Mid(envLine, eqPos + 1, Len(envLine) - eqPos)>
-    <cfswitch expression="#envKey#">
-      <cfcase value="NEXTCLOUD_REDIS_PASSWORD"><cfset ncRedisPassword = envVal></cfcase>
-      <cfcase value="MYSQL_USER"><cfset ncDbUser = envVal></cfcase>
-      <cfcase value="MYSQL_PASSWORD"><cfset ncDbPassword = envVal></cfcase>
-      <cfcase value="MAIL_DOMAIN"><cfset ncMailDomain = envVal></cfcase>
-      <cfcase value="HOST_IP"><cfset ncHostIP = envVal></cfcase>
-    </cfswitch>
+    <cfif Left(envLine, eqPos - 1) EQ "HOST_IP">
+      <cfset ncHostIP = Mid(envLine, eqPos + 1, Len(envLine) - eqPos)>
+    </cfif>
   </cfif>
 </cfloop>
 
@@ -88,7 +90,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cffile action="read" file="/opt/hermes/templates/config.php" variable="config">
 
 <!--- REPLACE ALL PLACEHOLDERS --->
-<!--- Credentials from .env --->
+<!--- Credentials from credential files --->
 <cfset config = Replace(config, "NEXTCLOUD_REDIS_PASSWORD", ncRedisPassword, "ALL")>
 <cfset config = Replace(config, "NEXTCLOUD_DB_USER", ncDbUser, "ALL")>
 <cfset config = Replace(config, "NEXTCLOUD_DB_PASSWORD", ncDbPassword, "ALL")>

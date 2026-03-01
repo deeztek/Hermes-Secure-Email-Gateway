@@ -3,7 +3,7 @@
 # Usage: ./build-all.sh [version]
 # Example: ./build-all.sh v260119
 
-REGISTRY="hub.deeztek.com/dedwards/hermes-seg-container-gl"
+REGISTRY="hub.deeztek.com/dedwards/hermes-seg-docker-gl"
 VERSION="${1:-v260119}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 

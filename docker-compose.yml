@@ -40,6 +40,24 @@ secrets:
   AUTHELIA_STORAGE_ENCRYPTION_KEY:
     file: ./config/hermes/opt/hermes/keys/authelia_storage_encryption_key_file
 
+  NEXTCLOUD_MYSQL_USER:
+    file: ./config/hermes/opt/hermes/creds/nextcloud_mysql_username
+
+  NEXTCLOUD_MYSQL_PASSWORD:
+    file: ./config/hermes/opt/hermes/creds/nextcloud_mysql_password
+
+  NEXTCLOUD_REDIS_PASSWORD:
+    file: ./config/hermes/opt/hermes/creds/nextcloud_redis_password
+
+  NEXTCLOUD_ADMIN_USER:
+    file: ./config/hermes/opt/hermes/creds/nextcloud_admin_username
+
+  NEXTCLOUD_ADMIN_PASSWORD:
+    file: ./config/hermes/opt/hermes/creds/nextcloud_admin_password
+
+  CFADMIN_PASSWORD:
+    file: ./config/hermes/opt/hermes/creds/cfadmin_password
+
 networks:
   hermes_net_ext:
     ipam:
@@ -102,7 +120,7 @@ services:
       - hermes_commandbox
 
   hermes_nginx:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_nginx
     environment:
       - PUID=1000
@@ -190,15 +208,16 @@ services:
 
 
   hermes_authelia_redis:
-    image: 'bitnami/redis:latest'
+    image: redis
     container_name: hermes_authelia_redis
+    command: sh -c 'redis-server --requirepass "$$(cat /run/secrets/AUTHELIA_SESSION_REDIS_PASSWORD)"'
     secrets:
       - AUTHELIA_SESSION_REDIS_PASSWORD
     logging:
       options:
         max-size: 10m
     volumes:
-      - authelia_redis:/var/lib/redis
+      - authelia_redis:/data
     networks:
       hermes_net_ext:
               ipv4_address: ${IPV4SUBNET}.109
@@ -210,25 +229,25 @@ services:
     restart: always
     environment:
       - TZ=${TIMEZONE}
-      - REDIS_PASSWORD_FILE=/run/secrets/AUTHELIA_SESSION_REDIS_PASSWORD
 
 
   hermes_commandbox:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_commandbox
+    secrets:
+      - CFADMIN_PASSWORD
     logging:
       options:
         max-size: 10m
     environment:
       TZ: ${TIMEZONE}
-      CFADMIN_PASSWORD: ${CFADMIN_PASSWORD}
+      CFADMIN_PASSWORD_FILE: /run/secrets/CFADMIN_PASSWORD
       #HERMES_HOSTNAME: ${HERMES_HOSTNAME}
       #HOST_IP: ${HOST_IP}
       CONSOLE_HOST: ${CONSOLE_HOST}
       #url_rewrites: "true"
     volumes:
-      - ./docker-compose.yml:/opt/hermes-seg-container-gl/docker-compose.yml
-      - ./.env:/opt/hermes-seg-container-gl/.env
+      - ./.env:/opt/hermes-seg-docker-gl/.env
       - /var/run/docker.sock:/var/run/docker.sock #Access Docker Unix socket
       - ./config/hermes/var/www/html:/var/www/html #Application Directory
       - commandbox_serverhome:/serverhome #Server Home Directory
@@ -262,7 +281,7 @@ services:
       - 8888
 
   hermes_postfix_dkim:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_postfix_dkim
     #build:
       #context: .
@@ -301,7 +320,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_dmarc:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dmarc
     #build:
       #context: .
@@ -335,7 +354,7 @@ services:
 
  
   hermes_mail_filter:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_mail_filter
     #build:
       #context: .
@@ -382,7 +401,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_ciphermail:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ciphermail
     privileged: true
     #build:
@@ -472,6 +491,12 @@ services:
     build:
       context: .
       dockerfile: ./dockerfiles/nextcloud/Dockerfile
+    secrets:
+      - NEXTCLOUD_MYSQL_USER
+      - NEXTCLOUD_MYSQL_PASSWORD
+      - NEXTCLOUD_REDIS_PASSWORD
+      - NEXTCLOUD_ADMIN_USER
+      - NEXTCLOUD_ADMIN_PASSWORD
     logging:
       options:
         max-size: 10m
@@ -482,24 +507,24 @@ services:
       - /var/www/html/dist/img:/img
     environment:
       - TZ=${TIMEZONE}
-      - MYSQL_HOST=${MYSQL_HOST}
-      - MYSQL_USER=${MYSQL_USER}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
-      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_HOST=hermes_db_server:3306
+      - MYSQL_USER_FILE=/run/secrets/NEXTCLOUD_MYSQL_USER
+      - MYSQL_PASSWORD_FILE=/run/secrets/NEXTCLOUD_MYSQL_PASSWORD
+      - MYSQL_DATABASE=nextcloud
       - REDIS_HOST=hermes_nextcloud_redis
-      - REDIS_HOST_PASSWORD=${NEXTCLOUD_REDIS_PASSWORD}
-      - NEXTCLOUD_ADMIN_USER=${NEXTCLOUD_ADMIN_USER}
-      - NEXTCLOUD_ADMIN_PASSWORD=${NEXTCLOUD_ADMIN_PASSWORD}
+      - REDIS_HOST_PASSWORD_FILE=/run/secrets/NEXTCLOUD_REDIS_PASSWORD
+      - NEXTCLOUD_ADMIN_USER_FILE=/run/secrets/NEXTCLOUD_ADMIN_USER
+      - NEXTCLOUD_ADMIN_PASSWORD_FILE=/run/secrets/NEXTCLOUD_ADMIN_PASSWORD
       - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
       - OVERWRITEWEBROOT=/nc
       - OVERWRITEPROTOCOL=https
       #- APACHE_DISABLE_REWRITE_IP=1
       - TRUSTED_PROXIES=${TRUSTED_PROXIES}
-      - SMTP_HOST=${SMTP_HOST}
-      - SMTP_PORT=${SMTP_PORT}
-      - SMTP_SECURE=${SMTP_SECURE}
-      - MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
-      - MAIL_DOMAIN=${MAIL_DOMAIN}
+      - SMTP_HOST=hermes_postfix_dkim
+      - SMTP_PORT=10026
+      - SMTP_SECURE=
+      - MAIL_FROM_ADDRESS=postmaster
+      - MAIL_DOMAIN=hermes.local
     depends_on:
       - hermes_nextcloud_redis
       - hermes_db_server
@@ -559,7 +584,7 @@ services:
 
 
   hermes_ldap:
-    image: hub.deeztek.com/dedwards/hermes-seg-container-gl/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ldap
     #entrypoint: ["sleep", "infinity"]
     secrets:
