@@ -1,7 +1,6 @@
 #!/bin/bash
-/bin/cat /opt/hermes/tmp/CUSTOM-TRANS_gpg_output | awk '/gpg: key/ {print $3}' > /opt/hermes/tmp/CUSTOM-TRANS_temp.txt && mv /opt/hermes/tmp/CUSTOM-TRANS_temp.txt /opt/hermes/tmp/CUSTOM-TRANS_gpg_output
-
-THEKEYID=`cat /opt/hermes/tmp/CUSTOM-TRANS_gpg_output`
+# Read key ID from GPG output (written by create_pgp_key.sh)
+THEKEYID=$(cat /opt/hermes/tmp/CUSTOM-TRANS_gpg_output | tr -d '[:space:]')
 
 #Export Public Key
 /usr/bin/gpg --homedir /opt/hermes/.gnupg/ --export -a "$THEKEYID" > /opt/hermes/tmp/CUSTOM-TRANS_public.key

@@ -21,23 +21,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!---
 GENERATE CUSTOMTRANS
 Generates a unique random string for use in temporary filenames.
-Returns: customtrans3 - an 8 character random string
+Uses SHA1PRNG for cryptographically secure random numbers - no database queries.
+Returns: customtrans3 - a random string (default 8 characters, set _transLength before including for custom length)
 --->
 
-<cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    SELECT random_letter as random FROM captcha_list_all2 ORDER BY RAND() LIMIT 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="hermes" result="stResult">
-    INSERT INTO salt (salt) VALUES ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="hermes">
-    SELECT salt as customtrans2 FROM salt WHERE id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3 = gettrans.customtrans2>
-
-<cfquery name="deletetrans" datasource="hermes">
-    DELETE FROM salt WHERE id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfif NOT isDefined("_transLength")>
+    <cfset _transLength = 8>
+</cfif>
+<cfset _transChars = "abcdefghijklmnopqrstuvwxyz0123456789">
+<cfset customtrans3 = "">
+<cfloop from="1" to="#_transLength#" index="_transIdx">
+    <cfset customtrans3 = customtrans3 & Mid(_transChars, RandRange(1, Len(_transChars), "SHA1PRNG"), 1)>
+</cfloop>
+<cfset _transLength = 8>

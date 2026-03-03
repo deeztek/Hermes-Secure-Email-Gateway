@@ -247,15 +247,28 @@ a, a:hover{
   
     <cfparam name = "step" default = "0">
     
-    <cfparam name = "action" default = ""> 
+    <cfparam name = "action" default = "">
     <cfif IsDefined("form.action") is "True">
     <cfif form.action is not "">
     <cfset action = form.action>
-    </cfif></cfif>  
-    
-  
+    </cfif></cfif>
 
-  
+    <!--- RESET FAILED CERT QUEUE JOBS --->
+    <cfif action EQ "reset_failed_queue">
+        <cftry>
+            <cfquery datasource="hermes">
+                UPDATE cert_generation_queue
+                SET status = 'pending', error_message = NULL, started_at = NULL
+                WHERE status = 'failed'
+            </cfquery>
+            <cfset session.queueMessage = "reset_success">
+        <cfcatch type="any">
+            <cfset session.queueMessage = "reset_error">
+        </cfcatch>
+        </cftry>
+        <cflocation url="view_internal_recipients.cfm" addtoken="no">
+    </cfif>
+
         <!--- ERROR MESSAGES START HERE --->
   
         <cfif #m# is "3">
@@ -325,11 +338,66 @@ a, a:hover{
     <cfset StructDelete(session, "backendMessage")>
 </cfif>
 
+<!--- QUEUE RESET MESSAGES --->
+<cfif StructKeyExists(session, "queueMessage")>
+    <cfif session.queueMessage EQ "reset_success">
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h5><i class="icon fa fa-check"></i> Queue Reset</h5>
+            Failed jobs have been reset to pending. They will be retried on the next processing cycle.
+        </div>
+    <cfelseif session.queueMessage EQ "reset_error">
+        <div class="alert alert-danger alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h5><i class="icon fa fa-ban"></i> Error</h5>
+            Failed to reset queue jobs. Please try again.
+        </div>
+    </cfif>
+    <cfset StructDelete(session, "queueMessage")>
+</cfif>
 
+        <!--- CERT/KEYRING QUEUE STATUS BANNER --->
+        <cfquery name="getPendingQueue" datasource="hermes">
+            SELECT
+                SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status='processing' THEN 1 ELSE 0 END) as processing,
+                SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed
+            FROM cert_generation_queue
+            WHERE status IN ('pending', 'processing', 'failed')
+        </cfquery>
+
+        <cfif getPendingQueue.pending GT 0 OR getPendingQueue.processing GT 0>
+          <div class="alert alert-info alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+            <h5><i class="icon fas fa-spinner fa-spin"></i> Background Generation in Progress</h5>
+            <cfoutput>
+            <cfif getPendingQueue.pending GT 0>#getPendingQueue.pending# certificate(s)/keyring(s) pending generation</cfif>
+            <cfif getPendingQueue.pending GT 0 AND getPendingQueue.processing GT 0>, </cfif>
+            <cfif getPendingQueue.processing GT 0>#getPendingQueue.processing# currently processing</cfif>
+            </cfoutput>
+          </div>
+        </cfif>
+
+        <cfif getPendingQueue.failed GT 0>
+          <div class="alert alert-warning">
+            <div class="d-flex justify-content-between align-items-start">
+              <div>
+                <h5><i class="icon fas fa-exclamation-triangle"></i> Generation Failures</h5>
+                <cfoutput>#getPendingQueue.failed# certificate(s)/keyring(s) failed to generate.</cfoutput>
+              </div>
+              <form method="post" action="" class="ms-3">
+                <input type="hidden" name="action" value="reset_failed_queue">
+                <button type="submit" class="btn btn-sm btn-outline-dark" onclick="return confirm('Reset all failed jobs to pending? They will be retried on the next processing cycle.')">
+                  <i class="fas fa-redo me-1"></i>Retry Failed Jobs
+                </button>
+              </form>
+            </div>
+          </div>
+        </cfif>
 
         <!--- ERROR MESSAGES END HERE --->
 
-        
+
   <!--- DELETE RECIPIENT MODAL HTML STARTS HERE --->
  
 
@@ -1518,6 +1586,7 @@ a, a:hover{
 <cfquery name="getrecipients" datasource="hermes">
   select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient,
     recipients.backend_server, recipients.backend_port, recipients.backend_tls,
+    recipients.auth_type, recipients.remoteauth_domain,
     policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
   from recipients LEFT JOIN policy ON recipients.policy_id = policy.id LEFT JOIN recipient_certificates ON recipients.id = recipient_certificates.user_id  LEFT JOIN recipient_keystores ON recipients.id = recipient_keystores.user_id  LEFT JOIN user_settings ON recipients.recipient = user_settings.email where recipients.domain is NULL group by recipients.id
 
@@ -1533,6 +1602,7 @@ a, a:hover{
             <th>S/MIME</th>
             <th>PGP</th>
             <th>Recipient</th>
+            <th>Auth</th>
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
@@ -1562,6 +1632,7 @@ a, a:hover{
             <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-shield"></i></a></td>
             <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-lock"></i></a></td>
             <td>#recipient#</td>
+            <td><cfif auth_type EQ "remote"><span class="badge bg-primary" title="#remoteauth_domain#"><i class="fas fa-cloud me-1"></i>REMOTE</span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
             <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
             <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
             <td>#policy_name#</td>
@@ -1569,12 +1640,12 @@ a, a:hover{
             <td>#report_frequency#</td>
             <td>#train_bayes#</td>
             <td>#download_msg#</td>
-            <td>#pdf_enabled#</td>
-            <td>#smime_enabled#</td>
-            <td>#pgp_enabled#</td>
-            <td>#digital_sign#</td>
-            <td>#cert#</td>
-            <td>#keystore#</td>
+            <td><cfif pdf_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif smime_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif pgp_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif digital_sign EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif cert EQ "YES"><span class="badge bg-success"><i class="fas fa-certificate me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif keystore EQ "YES"><span class="badge bg-success"><i class="fas fa-key me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
           </tr>
         </cfoutput>
 
@@ -1585,6 +1656,7 @@ a, a:hover{
             <th>S/MIME</th>
             <th>PGP</th>
             <th>Recipient</th>
+            <th>Auth</th>
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>

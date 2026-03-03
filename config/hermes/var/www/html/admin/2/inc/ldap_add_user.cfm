@@ -68,6 +68,11 @@ Requires the following variables to be set before including:
     <cffile action="delete" file="#fileToDelete#">
 </cfif>
 
+<!--- RE-INITIALIZE IF CFEXECUTE UNSET THE ERROR VARIABLE (Lucee behavior with no stderr) --->
+<cfif NOT isDefined("ldapAddError")>
+    <cfset ldapAddError = "">
+</cfif>
+
 <!--- CHECK FOR ERRORS --->
 <cfif ldapAddError CONTAINS "Already exists">
     <cfset ldapUserExists = true>

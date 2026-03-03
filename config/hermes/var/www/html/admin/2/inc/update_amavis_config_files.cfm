@@ -46,26 +46,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     select parameter, value from spam_settings where parameter='enable_dkim_signing' and active = '1'
     </cfquery>
 
-<cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset amaviscustomtrans=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
+<cfinclude template="generate_customtrans.cfm">
+
+    <cfset amaviscustomtrans=#customtrans3#>
 
 <!--- GET SERVER_NAME AND SERVER_DOMAIN FROM TEMPLATE --->
 <cfinclude template="get_network_parameters.cfm" />

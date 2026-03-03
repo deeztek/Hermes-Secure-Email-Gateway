@@ -1,4 +1,5 @@
-FROM nextcloud:30.0.6
+ARG NCVERSION
+FROM nextcloud:${NCVERSION}
 
 RUN apt-get update && apt-get install -y dnsutils telnet iputils-ping
 

@@ -2,19 +2,48 @@
 # Build all Hermes SEG Docker images
 # Usage: ./build-all.sh [version]
 # Example: ./build-all.sh v260119
+#
+# IMPORTANT: On Windows, run this from Git Bash terminal (not PowerShell/cmd).
+# Running "bash" from PowerShell invokes WSL bash which has an incompatible Docker.
 
 REGISTRY="hub.deeztek.com/dedwards/hermes-seg-docker-gl"
 VERSION="${1:-v260119}"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Check Docker is available
+if ! command -v docker &>/dev/null; then
+    echo "[ERROR] Docker not found in PATH."
+    echo "        Run this script from Git Bash terminal."
+    exit 1
+fi
+
+# Check Docker version (need 17.04+ for nested registry paths)
+DOCKER_VERSION=$(docker version --format '{{.Client.Version}}' 2>/dev/null)
+DOCKER_MAJOR=$(echo "$DOCKER_VERSION" | cut -d. -f1)
+if [ -n "$DOCKER_MAJOR" ] && [ "$DOCKER_MAJOR" -lt 17 ] 2>/dev/null; then
+    echo "[ERROR] Docker $DOCKER_VERSION is too old (need 17.04+)."
+    echo "        You are likely running WSL's Docker instead of Docker Desktop."
+    echo ""
+    echo "        FIX: Run this script from Git Bash terminal, not PowerShell/cmd."
+    echo "        (PowerShell's 'bash' command opens WSL which has an old Docker)"
+    echo ""
+    echo "        Your system has multiple bash executables:"
+    which -a bash 2>/dev/null || where bash 2>/dev/null
+    exit 1
+fi
+
 echo "========================================"
 echo "Building Hermes SEG Docker Images"
 echo "Registry: $REGISTRY"
 echo "Version:  $VERSION"
+echo "Script:   $SCRIPT_DIR"
+echo "Docker:   $(docker --version 2>/dev/null)"
+echo "Path:     $(command -v docker)"
 echo "========================================"
 echo ""
 
 FAILED=()
+SUCCEEDED=()
 
 build_image() {
     local name="$1"
@@ -24,15 +53,18 @@ build_image() {
 
     echo "----------------------------------------"
     echo "Building: $name ($VERSION)"
+    echo "Tag:        $full_tag"
     echo "Dockerfile: $dockerfile"
-    echo "Context: $context"
+    echo "Context:    $context"
     echo "----------------------------------------"
 
+    echo "[RUN] docker build --no-cache -t \"$full_tag\" -f \"$dockerfile\" \"$context\""
     docker build --no-cache -t "$full_tag" -f "$dockerfile" "$context"
 
     if [ $? -eq 0 ]; then
         echo "[OK] $name built successfully"
         echo ""
+        SUCCEEDED+=("$name")
     else
         echo "[FAILED] $name build failed!"
         echo ""
@@ -41,7 +73,7 @@ build_image() {
 }
 
 # Ciphermail (requires repack-debs-nosystemd.sh to have been run first)
-if [ ! -f "$SCRIPT_DIR/ciphermail/build/djigzo_"*"-nosystemd.deb" ] 2>/dev/null; then
+if ! ls "$SCRIPT_DIR"/ciphermail/build/djigzo_*-nosystemd.deb 1>/dev/null 2>&1; then
     echo "[WARN] Ciphermail: No -nosystemd.deb files found."
     echo "       Run Docker/ciphermail/build/repack-debs-nosystemd.sh first."
     echo "       Skipping ciphermail build."
@@ -87,13 +119,20 @@ build_image "hermes-dmarc" \
 echo "========================================"
 echo "Build Summary"
 echo "========================================"
-if [ ${#FAILED[@]} -eq 0 ]; then
-    echo "All images built successfully!"
-else
-    echo "FAILED builds:"
+if [ ${#SUCCEEDED[@]} -gt 0 ]; then
+    echo "SUCCEEDED (${#SUCCEEDED[@]}):"
+    for s in "${SUCCEEDED[@]}"; do
+        echo "  - $s"
+    done
+fi
+if [ ${#FAILED[@]} -gt 0 ]; then
+    echo "FAILED (${#FAILED[@]}):"
     for f in "${FAILED[@]}"; do
         echo "  - $f"
     done
+fi
+if [ ${#FAILED[@]} -eq 0 ]; then
+    echo "All ${#SUCCEEDED[@]} images built successfully!"
 fi
 
 echo ""

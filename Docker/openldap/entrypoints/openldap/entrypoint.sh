@@ -264,7 +264,7 @@ cat <<EOF > /tmp/users-ou.ldif
 dn: $USERS_OU
 objectClass: top
 objectClass: organizationalUnit
-ou: groups
+ou: users
 EOF
 
 if ! ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "$USERS_OU" -s base dn 2>/dev/null | grep -q "dn:"; then

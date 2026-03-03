@@ -96,6 +96,11 @@ This will:
         <cffile action="delete" file="#fileToDelete#">
     </cfif>
 
+    <!--- RE-INITIALIZE IF CFEXECUTE UNSET THE ERROR VARIABLE (Lucee behavior with no stderr) --->
+    <cfif NOT isDefined("ldapDeleteError")>
+        <cfset ldapDeleteError = "">
+    </cfif>
+
     <!--- CHECK FOR LDAP ERRORS - "No such object" is OK (user doesn't exist) --->
     <cfif ldapDeleteError CONTAINS "No such object">
         <!--- User doesn't exist in LDAP, that's OK --->
@@ -119,8 +124,8 @@ This will:
         <cfset errorDetail = ldapDeleteError>
     </cfif>
 
-    <!--- "No such object" is not an error - user doesn't exist --->
-    <cfif errorDetail CONTAINS "No such object">
+    <!--- "No such object" is not an error - user doesn't exist in LDAP --->
+    <cfif errorDetail CONTAINS "No such object" OR cfcatch.detail CONTAINS "No such object" OR cfcatch.message CONTAINS "No such object">
         <!--- User doesn't exist in LDAP, that's OK --->
     <cfelse>
         <cfset m="LDAP Delete Relay User: #cfcatch.message# | Detail: #cfcatch.detail# | LDAP Error: #errorDetail#">

@@ -43,23 +43,9 @@ Generates a new verification token and resends the verification email.
 </cfif>
 
 <!--- GENERATE NEW VERIFICATION TOKEN (64 characters) --->
-<cfquery name="randomToken" datasource="hermes">
-    SELECT random_letter as random FROM captcha_list_all2 ORDER BY RAND() LIMIT 64
-</cfquery>
-
-<cfquery name="insertToken" datasource="hermes" result="stResultToken">
-    INSERT INTO salt (salt) VALUES ('<cfoutput query="randomToken">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="getToken" datasource="hermes">
-    SELECT salt as verifyToken FROM salt WHERE id='#stResultToken.GENERATED_KEY#'
-</cfquery>
-
-<cfset verifyToken = getToken.verifyToken>
-
-<cfquery name="deleteToken" datasource="hermes">
-    DELETE FROM salt WHERE id='#stResultToken.GENERATED_KEY#'
-</cfquery>
+<cfset _transLength = 64>
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
+<cfset verifyToken = customtrans3>
 
 <!--- UPDATE TOKEN IN DATABASE --->
 <cfquery datasource="hermes">

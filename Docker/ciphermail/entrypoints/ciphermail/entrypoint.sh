@@ -2,14 +2,21 @@
 
 echo "Starting Hermes SEG Ciphermail"
 
-# Create syslog and set permissions
+# Create log files and set permissions
 echo "Setting up syslog..."
-touch /var/log/syslog
-chown syslog:adm /var/log/syslog
+touch /var/log/syslog /var/log/mail.log /var/log/auth.log
+chown syslog:adm /var/log/syslog /var/log/mail.log /var/log/auth.log
 
 # Start Rsyslog
 echo "Starting Rsyslog..."
 /usr/sbin/rsyslogd
+
+# Populate Postfix chroot with DNS/name resolution files (required without systemd)
+echo "Setting up Postfix chroot..."
+cp /etc/resolv.conf /var/spool/postfix/etc/resolv.conf
+cp /etc/nsswitch.conf /var/spool/postfix/etc/nsswitch.conf
+cp /etc/services /var/spool/postfix/etc/services
+cp /etc/hosts /var/spool/postfix/etc/hosts
 
 # Start Postfix
 echo "Starting Postfix..."

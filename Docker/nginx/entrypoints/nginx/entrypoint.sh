@@ -6,7 +6,7 @@ echo "Checking if /opt/hermes/ssl has been mounted"
 
 #Check if /opt/hermes/ssl exists and if not exit
 if [ ! -d "/opt/hermes/ssl" ]; then
-      echo "/opt/hermes/ssl is nout mounted. Please mount and restart the container. Exiting for now..."
+      echo "/opt/hermes/ssl is not mounted. Please mount and restart the container. Exiting for now..."
       exit 1
 else
 

@@ -18,30 +18,7 @@
         along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
     --->
     
-    <!-- CREATE CUSTOMTRANS STARTS HERE -->
-
-    <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-        select random_letter as random from captcha_list_all2 order by RAND() limit 8
-        </cfquery>
-        
-        <cfquery name="inserttrans" datasource="hermes" result="stResult">
-        insert into salt
-        (salt)
-        values
-        ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-        </cfquery>
-        
-        <cfquery name="gettrans" datasource="hermes">
-        select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-        </cfquery>
-        
-        <cfset customtrans3=#gettrans.customtrans2#>
-        
-        <cfquery name="deletetrans" datasource="hermes">
-        delete from salt where id='#stResult.GENERATED_KEY#'
-        </cfquery>
-
-        <!-- CREATE CUSTOMTRANS ENDS HERE -->
+    <cfinclude template="generate_customtrans.cfm">
 
 <cfquery name="checkdjigzo" datasource="djigzo">
  select cm_email from cm_users where cm_email like binary '#recipient#'

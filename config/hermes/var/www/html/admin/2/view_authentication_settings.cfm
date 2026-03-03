@@ -172,26 +172,10 @@ Action: #action#<br>
 
 
 <cfelseif #action# is "generatejwtsecret">
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-<cfset JwtSecret=#trim(gettrans.customtrans2)#>
+<cfset JwtSecret=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_identity_validation_reset_password_jwt_secret_file"
@@ -206,26 +190,10 @@ Action: #action#<br>
 
 
 <cfelseif #action# is "generatesessionsecret">
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-<cfset SessionSecret=#trim(gettrans.customtrans2)#>
+<cfset SessionSecret=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_session_secret_file"
@@ -241,26 +209,10 @@ Action: #action#<br>
 
 
 <cfelseif #action# is "generateoidchmacsecret">
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-<cfset HmacSecret=#trim(gettrans.customtrans2)#>
+<cfset HmacSecret=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_identity_providers_oidc_hmac_secret_file"
@@ -277,26 +229,10 @@ Action: #action#<br>
 
 
   <cfelseif #action# is "generateredispassword">
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-<cfset RedisPassword=#trim(gettrans.customtrans2)#>
+<cfset RedisPassword=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_session_redis_password_file"
@@ -341,27 +277,10 @@ Action: #action#<br>
 
 
   <cfelseif #action# is "generateoidcclientsecret">
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-
-<cfset OidcClientSecret=#trim(gettrans.customtrans2)#>
+<cfset OidcClientSecret=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file"
@@ -403,26 +322,10 @@ Action: #action#<br>
 
 
 <cfelseif #action# is "generatestorageencryptionkey">
-  <cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-  select random_letter as random from captcha_list_all2 order by RAND() limit 64
-  </cfquery>
-  
-  <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-  insert into salt
-  (salt)
-  values
-  ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-  </cfquery>
-  
-  <cfquery name="gettrans" datasource="#datasource#">
-  select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
-  
-  <cfquery name="deletetrans" datasource="#datasource#">
-  delete from salt where id='#stResult.GENERATED_KEY#'
-  </cfquery>
+<cfset _transLength = 64>
+<cfinclude template="./inc/generate_customtrans.cfm">
 
-<cfset StorageEncryptionKey=#trim(gettrans.customtrans2)#>
+<cfset StorageEncryptionKey=#trim(customtrans3)#>
 
  <cffile action = "write"
         file = "/opt/hermes/keys/authelia_storage_encryption_key_file"

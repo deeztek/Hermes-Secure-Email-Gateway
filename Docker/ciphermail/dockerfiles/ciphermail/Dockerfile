@@ -51,6 +51,8 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu/ jammy universe" | tee /etc/apt/s
     cp /build/wrapper-additional-parameters.conf /usr/share/djigzo/wrapper/wrapper-additional-parameters.conf && \
     cp /build/smtp_server_config.xml /usr/share/djigzo/conf/james/SAR-INF/smtp_server_config.xml && \
     cp /build/smtp_transport_config.xml /usr/share/djigzo/conf/james/SAR-INF/smtp_transport_config.xml && \
+    # Fix permissions on scripts and binaries (dpkg -nosystemd repack may strip execute bit)
+    chmod +x /usr/share/djigzo/scripts/*.sh /usr/share/djigzo/wrapper/wrapper-djigzo && \
     # Cleanup build files and apt cache
     rm -rf /build && \
     apt-get clean && \

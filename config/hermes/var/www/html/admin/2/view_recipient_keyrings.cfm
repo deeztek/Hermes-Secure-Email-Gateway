@@ -1204,28 +1204,10 @@ You are attempting to import a Public Key when you have Private selected in the 
   
   <cfelseif #form.autopass# is "yes">
   
-    <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-      select random_letter as random from captcha_list_all2 order by RAND() limit 16
-      </cfquery>
-      
-      <cfquery name="inserttrans" datasource="hermes" result="stResult">
-      insert into salt
-      (salt)
-      values
-      ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-      </cfquery>
-      
-      <cfquery name="gettrans" datasource="hermes">
-      select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-      </cfquery>
-      
-      <cfset password1=#gettrans.customtrans2#>
+    <cfinclude template="./inc/generate_random_password.cfm">
+      <cfset password1 = generatedPassword>
 
       <cfset step=4>
-      
-      <cfquery name="deletetrans" datasource="hermes">
-      delete from salt where id='#stResult.GENERATED_KEY#'
-      </cfquery>
   
   
   <!--- /CFIF #form.autopass# is --->
@@ -1518,26 +1500,7 @@ You are attempting to import a Public Key when you have Private selected in the 
 
 <cfif #step# is "4">
 
-  <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset customtrans3=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
+  <cfinclude template="./inc/generate_customtrans.cfm">
    
   <cfif #form.keytype# is "public">
 
@@ -2276,15 +2239,15 @@ file = "#FiletoDelete#">
           <tr>
             <td>
 
-              <form name="DownloadPublic" method="post">
+              <form name="DownloadPublic" method="post" target="_blank">
 
                 <input type="hidden" name="action" value="downloadpublic">
                 <input type="hidden" name="keyring_id" value="#id#"/>
 
-                <button type="submit" value="" class="btn btn-secondary" onclick="this.form.submit();"><i class="fas fa-download"></i></button>
+                <button type="submit" value="" class="btn btn-secondary"><i class="fas fa-download"></i></button>
 
               </form>
-           
+
             </td>
 
             <cfif #getprivatekeyalias.cm_private_key_alias# is "">
@@ -2294,12 +2257,12 @@ file = "#FiletoDelete#">
 
             <td>
 
-              <form name="DownloadPrivate" method="post">
+              <form name="DownloadPrivate" method="post" target="_blank">
 
                 <input type="hidden" name="action" value="downloadprivate">
                 <input type="hidden" name="keyring_id" value="#id#"/>
 
-                <button type="submit" value="" class="btn btn-secondary" onclick="this.form.submit();"><i class="fas fa-arrow-circle-down"></i></button>
+                <button type="submit" value="" class="btn btn-secondary"><i class="fas fa-arrow-circle-down"></i></button>
 
               </form>
            
@@ -2395,17 +2358,15 @@ file = "#FiletoDelete#">
 
             <td>
 
-          <form name="DownloadPublic" method="post">
+          <form name="DownloadPublic" method="post" target="_blank">
 
             <input type="hidden" name="action" value="downloadpublic">
             <input type="hidden" name="keyring_id" value="#id#"/>
 
-        
-            
-            <button type="submit" value="" class="btn btn-secondary" onclick="this.form.submit();"><i class="fas fa-download"></i></button>
+            <button type="submit" value="" class="btn btn-secondary"><i class="fas fa-download"></i></button>
 
           </form>
-       
+
         </td>
 
         <cfif #getprivatekeyalias.cm_private_key_alias# is "">
@@ -2415,12 +2376,12 @@ file = "#FiletoDelete#">
 
         <td>
 
-          <form name="DownloadPrivate" method="post">
+          <form name="DownloadPrivate" method="post" target="_blank">
 
             <input type="hidden" name="action" value="downloadprivate">
             <input type="hidden" name="keyring_id" value="#id#"/>
 
-            <button type="submit" value="" class="btn btn-secondary" onclick="this.form.submit();"><i class="fas fa-arrow-circle-down"></i></button>
+            <button type="submit" value="" class="btn btn-secondary"><i class="fas fa-arrow-circle-down"></i></button>
 
           </form>
        

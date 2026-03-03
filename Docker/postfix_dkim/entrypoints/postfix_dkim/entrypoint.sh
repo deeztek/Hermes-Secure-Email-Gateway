@@ -15,8 +15,15 @@ if [ -d "/opt/hermes/dkim" ]; then
     chmod 600 /opt/hermes/dkim/keys/*.private 2>/dev/null || true
 fi
 
-echo "Starting Ryslog"
+echo "Starting Rsyslog"
 /usr/sbin/rsyslogd
+
+# Populate Postfix chroot with DNS/name resolution files (required without systemd)
+echo "Setting up Postfix chroot..."
+cp /etc/resolv.conf /var/spool/postfix/etc/resolv.conf
+cp /etc/nsswitch.conf /var/spool/postfix/etc/nsswitch.conf
+cp /etc/services /var/spool/postfix/etc/services
+cp /etc/hosts /var/spool/postfix/etc/hosts
 
 echo "Starting Postfix"
 service postfix start

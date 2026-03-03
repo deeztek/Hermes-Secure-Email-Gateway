@@ -1181,29 +1181,7 @@ select * from amavis_sender_bypass where action='add' and type='allow' and appli
 select * from amavis_sender_bypass where action='add' and type='block' and applied='2'
 </cfquery>
 
-<!-- GENERATE UNIQUE TRANSACTION NUMBER STARTS HERE -->
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<!-- GENERATE UNIQUE TRANSACTION NUMBER ENDS HERE -->
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <!-- CREATE FILEDATAALLOWPOSTFIX VARIABLE AND INSERT ADD ALLOW ENTRIES TO THAT VARIABLE -->
 <cfset FileDataAllowPostfix = "">

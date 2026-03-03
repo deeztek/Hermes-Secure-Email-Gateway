@@ -8,7 +8,7 @@ chown -R opendmarc:opendmarc /etc/opendmarc
 echo "Starting Ryslog"
 /usr/sbin/rsyslogd
 
-echo "Crating Syslog and setting permissions"
+echo "Creating Syslog and setting permissions"
 touch /var/log/syslog
 chown syslog:adm /var/log/syslog
 

@@ -1174,27 +1174,7 @@ select * from parameters where action='delete' and applied='2' and parent='#get_
 delete from parameters where applied='2' and action='delete'
 </cfquery>
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <cfquery name="getmainparams" datasource="#datasource#">
 select distinct(parameter), id, description, child, editable, enabled, conf_file from parameters where enabled='1' and child <> '1' and module='postfix'

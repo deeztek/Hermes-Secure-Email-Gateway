@@ -41,23 +41,9 @@ Returns:
 <cfset ldapEmail = recipientEmail>
 
 <!--- GENERATE RANDOM PASSWORD (24 characters) --->
-<cfquery name="randomPassword" datasource="hermes">
-    SELECT random_letter as random FROM captcha_list_all2 ORDER BY RAND() LIMIT 24
-</cfquery>
-
-<cfquery name="insertRandomPwd" datasource="hermes" result="stResultPwd">
-    INSERT INTO salt (salt) VALUES ('<cfoutput query="randomPassword">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="getRandomPwd" datasource="hermes">
-    SELECT salt as randomPwd FROM salt WHERE id='#stResultPwd.GENERATED_KEY#'
-</cfquery>
-
-<cfset generatedPassword = getRandomPwd.randomPwd>
-
-<cfquery name="deleteRandomPwd" datasource="hermes">
-    DELETE FROM salt WHERE id='#stResultPwd.GENERATED_KEY#'
-</cfquery>
+<cfset _transLength = 24>
+<cfinclude template="generate_customtrans.cfm">
+<cfset generatedPassword = customtrans3>
 
 <!--- GENERATE ARGON2 HASH FOR LDAP PASSWORD --->
 <cfset form.password = generatedPassword>

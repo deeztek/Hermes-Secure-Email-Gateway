@@ -53,28 +53,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset mysqlpasswordhermes=decrypt(get_mysql_password_hermes.value, #authkey#, #algo#, #encoding#)>
     
     <!--- VALIDATE HERMES DATABASE MYSQL CREDENTIALS BELOW --->
-    
-    <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset customtrans3=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
+
+    <cfinclude template="generate_customtrans.cfm">
+
     <cffile action="read" file="/opt/hermes/scripts/validate_mysql.sh" variable="validatemysql">
     
     <cffile action = "write"

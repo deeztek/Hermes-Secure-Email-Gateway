@@ -16,7 +16,7 @@ RUN apt-get update && \
 
 COPY config/opendmarc/etc/opendmarc/opendmarc.conf /etc/opendmarc/
 COPY config/opendmarc/etc/opendmarc/whitelist.domains /etc/opendmarc/
-COPY config/opendmarc/etc/rsyslog.d/ /etc/
+COPY config/opendmarc/etc/rsyslog.d/mysql.conf /etc/rsyslog.d/mysql.conf
 
 #Entrypoint
 COPY entrypoints/opendmarc/entrypoint.sh /

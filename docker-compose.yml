@@ -84,6 +84,12 @@ services:
       #- MYSQL_USER=MYSQL_USER #optional
       #- MYSQL_PASSWORD=DATABASE_PASSWORD #optional
       #- REMOTE_SQL=http://URL1/your.sql,https://URL2/your.sql #optional
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     volumes:
       - db_data:/config
       - ./config/hermes/opt/hermes:/opt/hermes
@@ -203,8 +209,10 @@ services:
       - LDAP_USER_USERNAME=${LDAP_USER_USERNAME}
       - LDAP_BASE_DN=${LDAP_BASE_DN}
     depends_on:
-      - hermes_postfix_dkim
-      - hermes_ldap
+      hermes_postfix_dkim:
+        condition: service_started
+      hermes_ldap:
+        condition: service_healthy
 
 
   hermes_authelia_redis:
@@ -234,6 +242,8 @@ services:
   hermes_commandbox:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_commandbox
+    cap_add:
+      - SYS_ADMIN
     secrets:
       - CFADMIN_PASSWORD
     logging:
@@ -297,7 +307,8 @@ services:
   
     restart: unless-stopped
     depends_on:
-      - hermes_db_server
+      hermes_db_server:
+        condition: service_healthy
 
     networks:
       hermes_net_ext:
@@ -367,7 +378,8 @@ services:
       - 10030:10030
     restart: unless-stopped
     depends_on:
-      - hermes_db_server
+      hermes_db_server:
+        condition: service_healthy
 
     networks:
       hermes_net_ext:
@@ -476,7 +488,9 @@ services:
         max-size: 10m
     volumes:
       - nextcloud_redis:/var/lib/redis
-    command: redis-server --requirepass $NEXTCLOUD_REDIS_PASSWORD
+    command: sh -c 'redis-server --requirepass "$$(cat /run/secrets/NEXTCLOUD_REDIS_PASSWORD)"'
+    secrets:
+      - NEXTCLOUD_REDIS_PASSWORD
     restart: always
     networks:
       hermes_net_ext:
@@ -491,6 +505,8 @@ services:
     build:
       context: .
       dockerfile: ./dockerfiles/nextcloud/Dockerfile
+      args:
+        NCVERSION: ${NCVERSION}
     secrets:
       - NEXTCLOUD_MYSQL_USER
       - NEXTCLOUD_MYSQL_PASSWORD
@@ -526,8 +542,10 @@ services:
       - MAIL_FROM_ADDRESS=postmaster
       - MAIL_DOMAIN=hermes.local
     depends_on:
-      - hermes_nextcloud_redis
-      - hermes_db_server
+      hermes_nextcloud_redis:
+        condition: service_started
+      hermes_db_server:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       hermes_net_ext:
@@ -555,8 +573,10 @@ services:
       - 4190:4190
       - 9587:9587
     depends_on:
-      - hermes_db_server
-      - hermes_ldap
+      hermes_db_server:
+        condition: service_healthy
+      hermes_ldap:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       hermes_net_ext:
@@ -596,6 +616,12 @@ services:
       LDAP_USER_USERNAME: ${LDAP_USER_USERNAME}
       LDAP_GROUPS: ${LDAP_GROUPS}
       LDAP_LOG_LEVEL: ${LDAP_LOG_LEVEL}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ldapsearch", "-x", "-H", "ldap://localhost:389", "-b", "", "-s", "base", "(objectclass=*)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_logs:/var/log

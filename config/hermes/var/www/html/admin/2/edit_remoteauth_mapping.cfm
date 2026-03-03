@@ -124,7 +124,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         WHERE id = <cfqueryparam value="#val(form.mapping_id)#" cfsqltype="cf_sql_integer">
     </cfquery>
 
-    <!--- Check if any users are assigned to this mapping --->
+    <!--- Check if any users or recipients are assigned to this mapping --->
     <cfif getMappingDomain.recordcount GT 0>
         <cfquery name="checkUsersAssigned" datasource="hermes">
             SELECT COUNT(*) AS user_count FROM system_users
@@ -132,9 +132,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             AND remoteauth_domain = <cfqueryparam value="#getMappingDomain.domain_name#" cfsqltype="cf_sql_varchar">
         </cfquery>
 
-        <cfif checkUsersAssigned.user_count GT 0>
-            <!--- Cannot delete - users are assigned --->
-            <cfset errorMessage = "Cannot delete this mapping. #checkUsersAssigned.user_count# user(s) are configured to use this domain for remote authentication. Please reassign or delete these users first.">
+        <cfquery name="checkRecipientsAssigned" datasource="hermes">
+            SELECT COUNT(*) AS recipient_count FROM recipients
+            WHERE auth_type = 'remote'
+            AND remoteauth_domain = <cfqueryparam value="#getMappingDomain.domain_name#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+
+        <cfif checkUsersAssigned.user_count GT 0 OR checkRecipientsAssigned.recipient_count GT 0>
+            <!--- Cannot delete - users/recipients are assigned --->
+            <cfset totalAssigned = checkUsersAssigned.user_count + checkRecipientsAssigned.recipient_count>
+            <cfset errorMessage = "Cannot delete this mapping. #totalAssigned# user(s)/recipient(s) are configured to use this domain for remote authentication. Please reassign or delete these users/recipients first.">
         <cfelse>
             <!--- Safe to delete --->
             <!--- Delete certificate file if exists --->
@@ -164,7 +171,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     WHERE id = <cfqueryparam value="#val(url.id)#" cfsqltype="cf_sql_integer">
 </cfquery>
 
-<!--- Get count of users assigned to this mapping --->
+<!--- Get count of users and recipients assigned to this mapping --->
 <cfset assignedUserCount = 0>
 <cfif getMapping.recordcount GT 0>
     <cfquery name="getAssignedUsers" datasource="hermes">
@@ -172,7 +179,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         WHERE auth_type = 'remote'
         AND remoteauth_domain = <cfqueryparam value="#getMapping.domain_name#" cfsqltype="cf_sql_varchar">
     </cfquery>
-    <cfset assignedUserCount = getAssignedUsers.user_count>
+    <cfquery name="getAssignedRecipients" datasource="hermes">
+        SELECT COUNT(*) AS recipient_count FROM recipients
+        WHERE auth_type = 'remote'
+        AND remoteauth_domain = <cfqueryparam value="#getMapping.domain_name#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfset assignedUserCount = getAssignedUsers.user_count + getAssignedRecipients.recipient_count>
 </cfif>
 
 <cfif getMapping.recordcount EQ 0>
@@ -195,7 +207,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <p>
     <a href="view_remoteauth.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to RemoteAuth</a>
     <cfif assignedUserCount GT 0>
-        <button type="button" class="btn btn-danger float-end" disabled title="Cannot delete - #assignedUserCount# user(s) assigned"><i class="fas fa-trash-alt"></i> Delete Mapping</button>
+        <button type="button" class="btn btn-danger float-end" disabled title="Cannot delete - #assignedUserCount# user(s)/recipient(s) assigned"><i class="fas fa-trash-alt"></i> Delete Mapping</button>
     <cfelse>
         <a href="##delete_modal" class="btn btn-danger float-end" data-bs-toggle="modal"><i class="fas fa-trash-alt"></i> Delete Mapping</a>
     </cfif>
@@ -203,8 +215,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfif assignedUserCount GT 0>
 <div class="alert alert-warning">
-    <i class="fas fa-exclamation-triangle"></i> <strong>Cannot Delete:</strong> This domain mapping has <cfoutput><strong>#assignedUserCount#</strong></cfoutput> user(s) configured to use it for remote authentication.
-    You must reassign or delete these users before deleting this mapping.
+    <i class="fas fa-exclamation-triangle"></i> <strong>Cannot Delete:</strong> This domain mapping has <cfoutput><strong>#assignedUserCount#</strong></cfoutput> user(s)/recipient(s) configured to use it for remote authentication.
+    You must reassign or delete these users/recipients before deleting this mapping.
 </div>
 </cfif>
 

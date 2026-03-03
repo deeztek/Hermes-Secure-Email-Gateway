@@ -25,26 +25,7 @@ SELECT cm_category FROM cm_properties where cm_category like '%domain:#theOrigin
 
 <cfif #checkdjigzodomain.recordcount# GTE 1>
 
-<cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset customtrans3=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
+<cfinclude template="generate_customtrans.cfm">
 
 <cffile action="read" file="/opt/hermes/scripts/delete_domain_djigzo.sh" variable="deletedomain">
            

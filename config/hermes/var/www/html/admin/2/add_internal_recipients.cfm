@@ -319,7 +319,144 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <!--- /CFIF StructKeyExists(form, "pgp_enabled") --->
 </cfif>
 
+<!--- SHOW_CA (S/MIME Certificate Authority) --->
+<cfparam name = "show_ca" default = "">
+
+<cfif StructKeyExists(form, "ca")>
+<cfif form.ca is not "">
+<cfquery name="checkca" datasource="hermes">
+  SELECT id FROM ca_settings WHERE id = <cfqueryparam value="#form.ca#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<cfif checkca.recordcount LT 1>
+<cfset m="Add Internal Recipients: invalid CA">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_ca = form.ca>
+</cfif>
+</cfif>
+</cfif>
+
+<!--- SHOW_VALIDITY (S/MIME Certificate Validity) --->
+<cfparam name = "show_validity" default = "1825">
+
+<cfif StructKeyExists(form, "validity")>
+<cfif NOT ListFind("365,730,1095,1460,1825", form.validity)>
+<cfset m="Add Internal Recipients: invalid validity period">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_validity = form.validity>
+</cfif>
+</cfif>
+
+<!--- SHOW_CERT_ENCRYPTION (S/MIME Key Length) --->
+<cfparam name = "show_cert_encryption" default = "2048">
+
+<cfif StructKeyExists(form, "cert_encryption")>
+<cfif form.cert_encryption NEQ "2048" AND form.cert_encryption NEQ "4096">
+<cfset m="Add Internal Recipients: invalid certificate key length">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_cert_encryption = form.cert_encryption>
+</cfif>
+</cfif>
+
+<!--- SHOW_CERT_ALGORITHM (S/MIME Hash Algorithm) --->
+<cfparam name = "show_cert_algorithm" default = "sha256">
+
+<cfif StructKeyExists(form, "cert_algorithm")>
+<cfif NOT ListFind("sha256,sha512", form.cert_algorithm)>
+<cfset m="Add Internal Recipients: invalid certificate hash algorithm">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_cert_algorithm = form.cert_algorithm>
+</cfif>
+</cfif>
+
+<!--- SHOW_PGP_ENCRYPTION (PGP Key Size) --->
+<cfparam name = "show_pgp_encryption" default = "2048">
+
+<cfif StructKeyExists(form, "pgp_encryption")>
+<cfif form.pgp_encryption NEQ "2048" AND form.pgp_encryption NEQ "4096">
+<cfset m="Add Internal Recipients: invalid PGP key size">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_pgp_encryption = form.pgp_encryption>
+</cfif>
+</cfif>
+
+<!--- SHOW_AUTH_TYPE --->
+<cfparam name="show_auth_type" default="local">
+
+<cfif StructKeyExists(form, "auth_type")>
+<cfif form.auth_type EQ "local" OR form.auth_type EQ "remote">
+<cfset show_auth_type = form.auth_type>
+<cfelse>
+<cfset m="Add Internal Recipients: form.auth_type is not local or remote">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+</cfif>
+</cfif>
+
+<!--- SHOW_REMOTEAUTH_DOMAIN --->
+<cfparam name="show_remoteauth_domain" default="">
+
+<cfif StructKeyExists(form, "remoteauth_domain")>
+<cfif form.remoteauth_domain is not "">
+<cfquery name="checkRemoteauthDomain" datasource="hermes">
+    SELECT id FROM remoteauth_mappings
+    WHERE domain_name = <cfqueryparam value="#form.remoteauth_domain#" cfsqltype="cf_sql_varchar">
+    AND enabled = 1
+</cfquery>
+<cfif checkRemoteauthDomain.recordcount LT 1>
+<cfset m="Add Internal Recipients: invalid RemoteAuth domain">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+<cfelse>
+<cfset show_remoteauth_domain = form.remoteauth_domain>
+</cfif>
+</cfif>
+</cfif>
+
+<!--- VALIDATE: If auth_type is remote, remoteauth_domain is required --->
+<cfif show_auth_type EQ "remote" AND show_remoteauth_domain EQ "">
+<cfset m="Add Internal Recipients: RemoteAuth domain is required when auth type is Remote">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+</cfif>
+
 <!--- VALIDATE PARAMETERS ABOVE --->
+
+<!--- CHECK IF REMOTEAUTH IS AVAILABLE (Pro edition + enabled + has compatible mappings) --->
+<cfset remoteauthAvailable = false>
+<cfset remoteauthDomains = []>
+
+<cfif isDefined("session.edition") AND session.edition EQ "Pro">
+    <!--- Check if remoteauth is enabled --->
+    <cfquery name="getRemoteauthStatus" datasource="hermes">
+        SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'enabled'
+    </cfquery>
+    <!--- Get compatible domains (exclude patterns with {firstname} or {lastname}) --->
+    <cfquery name="getRemoteauthDomains" datasource="hermes">
+        SELECT domain_name, server_address, remote_dn_pattern FROM remoteauth_mappings
+        WHERE enabled = 1
+        AND remote_dn_pattern NOT LIKE '%{firstname}%'
+        AND remote_dn_pattern NOT LIKE '%{lastname}%'
+        ORDER BY domain_name
+    </cfquery>
+
+    <cfif getRemoteauthStatus.recordcount GT 0 AND getRemoteauthStatus.setting_value EQ "1" AND getRemoteauthDomains.recordcount GT 0>
+        <cfset remoteauthAvailable = true>
+        <cfloop query="getRemoteauthDomains">
+            <cfset arrayAppend(remoteauthDomains, {domain: getRemoteauthDomains.domain_name, server: getRemoteauthDomains.server_address, pattern: getRemoteauthDomains.remote_dn_pattern})>
+        </cfloop>
+    </cfif>
+</cfif>
 
 <cfif #action# is "add">
 
@@ -464,7 +601,12 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
           <div class="form-group">
               
                 
-                  <textarea class="form-control" name="recipient" rows="10" placeholder="Enter recipient e-mail address(es) each in its own line" required></textarea>            
+                  <textarea class="form-control" name="recipient" rows="10" placeholder="Enter recipient e-mail address(es) each in its own line" required></textarea>
+                  <div class="alert alert-warning mt-2">
+                    <h5><i class="icon fas fa-clock"></i> Bulk Add Performance Notice</h5>
+                    <p class="mb-1">Adding recipients requires creating LDAP accounts and configuring encryption settings for each entry. Large batches may take several minutes to process (e.g., 25 recipients takes under 6 minutes). Please wait for the loading indicator to finish and do not close or navigate away from the page until the operation completes.</p>
+                    <p class="mb-0"><strong>Tip:</strong> Ensure you have checked the <strong>"Remember me"</strong> checkbox on the login screen before attempting large batch operations to prevent session timeout.</p>
+                  </div>
           </div>
 
            <!--- RECIPIENT POLICY STARTS HERE --->
@@ -586,12 +728,58 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <!--- DOWNLOAD MESSAGES  ENDS HERE --->
 
+<!--- AUTHENTICATION TYPE (Pro Edition + RemoteAuth Only) STARTS HERE --->
+<cfif remoteauthAvailable>
+
+<div class="form-group">
+  <label><strong>Authentication Type</strong></label>
+  <div class="alert alert-info">
+    <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
+    <p class="mb-0">Select <strong>Remote</strong> to authenticate recipients against an external AD/LDAP server. Recipients will use their existing organization credentials - no local password will be created.</p>
+  </div>
+  <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
+    <option value="local" selected>Local</option>
+    <option value="remote">Remote</option>
+  </select>
+</div>
+
+<!--- RemoteAuth Domain Selection (shown when Remote is selected) --->
+<div class="form-group mt-3" id="remoteauthDomainGroup" style="display:none;">
+  <label><strong>RemoteAuth Domain</strong></label>
+  <select class="form-control" name="remoteauth_domain" id="remoteauthDomain" style="width: 100%;">
+    <option value="">-- Select Domain --</option>
+    <cfloop array="#remoteauthDomains#" index="domainItem">
+      <cfoutput>
+      <option value="#domainItem.domain#" data-pattern="#HTMLEditFormat(domainItem.pattern)#">#domainItem.domain# (#domainItem.server#)</option>
+      </cfoutput>
+    </cfloop>
+  </select>
+  <small class="text-muted">Select the domain recipients will authenticate against</small>
+</div>
+
+<!--- DN Pattern Guidance (shown when a domain is selected) --->
+<div class="form-group mt-3" id="dnPatternGuidance" style="display:none;">
+  <div class="alert alert-secondary">
+    <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
+    <p>Selected domain uses the following DN pattern for remote authentication:</p>
+    <p><code id="dnPatternDisplay"></code></p>
+    <p class="mb-0"><small><strong>Placeholder substitution:</strong>
+    <code>{username}</code> = email local part (e.g., <em>dedwards</em>) &bull;
+    <code>{email}</code> = full email address (e.g., <em>dedwards@partner.com</em>)</small></p>
+  </div>
+</div>
+
+<cfelse>
+<!--- RemoteAuth not available - add hidden field with default value --->
+<input type="hidden" name="auth_type" value="local">
+</cfif>
+<!--- AUTHENTICATION TYPE ENDS HERE --->
 
 
-  <div class="alert alert-warning">
-    
-    <h5><i class="icon fas fa-exclamation-circle"></i> Please Note!</h5>
-    <cfoutput>Setting PDF, S/MIME or PGP Encryption below to <strong>Enable</strong> will significantly increase the amount of time it takes to add new recipient(s) </cfoutput>
+  <div class="alert alert-info">
+
+    <h5><i class="icon fas fa-info-circle"></i> Please Note!</h5>
+    <cfoutput>When S/MIME or PGP Encryption is enabled, certificates and keyrings will be generated in the background after recipients are added. You can monitor progress from the Internal Recipients page.</cfoutput>
   </div>
 
   <!--- PDF ENCRYPTION STARTS HERE --->
@@ -615,17 +803,62 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
     <div class="form-group">
       <label><strong>S/MIME Encryption</strong></label>
-    <!---
-      <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    <select class="form-control" name="smime_enabled" data-placeholder="smime_enabled" style="width: 100%">                  
+    <select class="form-control" name="smime_enabled" id="smime_enabled" data-placeholder="smime_enabled" style="width: 100%">
     <option value="2" selected="selected">Disable</option>
     <option value="1">Enable</option>
-  
-    
-    </select> 
+    </select>
     </div>
-  
+
+    <!--- SMIME OPTIONS (shown when S/MIME enabled) --->
+    <cfquery name="getdefaultca" datasource="hermes">
+      SELECT id, ca_commonname FROM ca_settings WHERE default2='1'
+    </cfquery>
+    <cfquery name="getotherca" datasource="hermes">
+      SELECT id, ca_commonname FROM ca_settings WHERE id <> '#getdefaultca.id#' ORDER BY ca_commonname ASC
+    </cfquery>
+
+    <div id="smime_options" style="display:none;">
+
+      <div class="form-group">
+        <label><strong>Certificate Authority</strong></label>
+        <select class="form-control select2" name="ca" data-placeholder="Certificate Authority" style="width: 100%;">
+          <cfoutput><option value="#getdefaultca.id#" selected="selected">#getdefaultca.ca_commonname#</option></cfoutput>
+          <cfoutput query="getotherca">
+            <option value="#id#">#ca_commonname#</option>
+          </cfoutput>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label><strong>Certificate Validity Period</strong></label>
+        <select class="form-control" name="validity" style="width: 100%;">
+          <option value="1825" selected="selected">5 Years</option>
+          <option value="1460">4 Years</option>
+          <option value="1095">3 Years</option>
+          <option value="730">2 Years</option>
+          <option value="365">1 Year</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label><strong>Certificate Key Length</strong></label>
+        <select class="form-control" name="cert_encryption" style="width: 100%;">
+          <option value="2048" selected="selected">2048-bit (Recommended)</option>
+          <option value="4096">4096-bit (High Security)</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label><strong>Certificate Hash Algorithm</strong></label>
+        <select class="form-control" name="cert_algorithm" style="width: 100%;">
+          <option value="sha256" selected="selected">SHA-256 (Recommended)</option>
+          <option value="sha512">SHA-512 (High Security)</option>
+        </select>
+      </div>
+
+    </div>
+    <!--- /SMIME OPTIONS --->
+
     <!--- SMIME ENCRYPTION ENDS HERE --->
 
     
@@ -651,17 +884,31 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
         <div class="form-group">
           <label><strong>PGP Encryption</strong></label>
-        <!---
-          <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-        --->
-        <select class="form-control" name="pgp_enabled" data-placeholder="pgp_enabled" style="width: 100%">                  
+        <select class="form-control" name="pgp_enabled" id="pgp_enabled" data-placeholder="pgp_enabled" style="width: 100%">
         <option value="2" selected="selected">Disable</option>
         <option value="1">Enable</option>
-   
-        
-        </select> 
+        </select>
         </div>
-      
+
+        <!--- PGP OPTIONS (shown when PGP enabled) --->
+        <div id="pgp_options" style="display:none;">
+
+          <div class="form-group">
+            <label><strong>PGP Key Size</strong></label>
+            <select class="form-control" name="pgp_encryption" style="width: 100%;">
+              <option value="2048" selected="selected">2048-bit (Recommended)</option>
+              <option value="4096">4096-bit (High Security)</option>
+            </select>
+          </div>
+
+          <div class="alert alert-info">
+            <i class="icon fas fa-info-circle"></i>
+            The local part of each recipient's e-mail address will be automatically used as the PGP key Real Name (e.g., "dedwards" from "dedwards@deeztek.org").
+          </div>
+
+        </div>
+        <!--- /PGP OPTIONS --->
+
         <!--- PGP ENCRYPTION ENDS HERE --->
 
       <div class="box-footer">
@@ -710,10 +957,11 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 </body>
 
-<!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
+<!--- SCRIPT TO SHOW/HIDE FORM OPTIONS  --->
 
 <script>
 
+  // Show/hide quarantine report frequency
   $('#reports').on('change',function(){
     if( $(this).val()==="NO" ){
     $("#reportsfrequency").hide()
@@ -722,9 +970,50 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
     $("#reportsfrequency").show()
     }
   });
-  
+
+  // Show/hide S/MIME options when S/MIME encryption is toggled
+  $('#smime_enabled').on('change', function() {
+    if ($(this).val() === '1') {
+      $('#smime_options').show();
+    } else {
+      $('#smime_options').hide();
+    }
+  });
+
+  // Show/hide PGP options when PGP encryption is toggled
+  $('#pgp_enabled').on('change', function() {
+    if ($(this).val() === '1') {
+      $('#pgp_options').show();
+    } else {
+      $('#pgp_options').hide();
+    }
+  });
+
+  // Show/hide RemoteAuth options when auth type is toggled
+  $('#authType').on('change', function() {
+    if ($(this).val() === 'remote') {
+      $('#remoteauthDomainGroup').show();
+    } else {
+      $('#remoteauthDomainGroup').hide();
+      $('#dnPatternGuidance').hide();
+      $('#remoteauthDomain').val('');
+    }
+  });
+
+  // Show DN pattern guidance when a domain is selected
+  $('#remoteauthDomain').on('change', function() {
+    var selected = $(this).find(':selected');
+    var pattern = selected.data('pattern');
+    if (pattern) {
+      $('#dnPatternDisplay').text(pattern);
+      $('#dnPatternGuidance').show();
+    } else {
+      $('#dnPatternGuidance').hide();
+    }
+  });
+
   </script>
 
-<!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT ENDS HERE  --->
+<!--- /SCRIPT TO SHOW/HIDE FORM OPTIONS  --->
 
 </html>

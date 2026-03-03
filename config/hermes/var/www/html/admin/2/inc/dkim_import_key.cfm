@@ -31,23 +31,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset PublicFile = "#keysDir#/#PublicFileName#">
 
 <!--- Generate a random string for temp file --->
-<cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    SELECT random_letter as random FROM captcha_list_all2 ORDER BY RAND() LIMIT 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="hermes" result="stResult">
-    INSERT INTO salt (salt) VALUES ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="hermes">
-    SELECT salt as customtrans2 FROM salt WHERE id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3 = gettrans.customtrans2>
-
-<cfquery name="deletetrans" datasource="hermes">
-    DELETE FROM salt WHERE id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="generate_customtrans.cfm">
 
 <!--- Normalize line endings in private key (Windows CRLF to Unix LF) --->
 <cfset normalizedPrivateKey = Replace(privateKeyContent, Chr(13) & Chr(10), Chr(10), "ALL")>

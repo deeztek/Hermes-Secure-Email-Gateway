@@ -518,6 +518,18 @@ FLUSH PRIVILEGES;
 -- ============================================================================
 
 -- ============================================================================
+-- RECIPIENTS TABLE: Add auth_type and remoteauth_domain columns
+-- auth_type: 'local' for local authentication, 'remote' for RemoteAuth (Pro only)
+-- remoteauth_domain: The domain name for remote authentication (references remoteauth_mappings)
+-- ============================================================================
+
+ALTER TABLE recipients ADD COLUMN IF NOT EXISTS auth_type VARCHAR(10) NOT NULL DEFAULT 'local';
+ALTER TABLE recipients ADD COLUMN IF NOT EXISTS remoteauth_domain VARCHAR(255) NULL;
+
+-- Set existing recipients to local authentication
+UPDATE recipients SET auth_type = 'local' WHERE auth_type IS NULL OR auth_type = '';
+
+-- ============================================================================
 -- RECIPIENTS TABLE: Per-Recipient Backend Override
 -- Allows relay recipients to use a different backend server than their domain default
 -- NULL values = use domain default (via COALESCE in transport_maps query)
@@ -531,4 +543,34 @@ ALTER TABLE recipients ADD COLUMN IF NOT EXISTS backend_port INT NULL
 
 ALTER TABLE recipients ADD COLUMN IF NOT EXISTS backend_tls ENUM('none', 'may', 'encrypt') NULL
     COMMENT 'Override TLS setting (NULL = use domain default)';
+
+-- ============================================================================
+-- CERT_GENERATION_QUEUE TABLE: Background S/MIME & PGP Generation
+-- Queues certificate/keyring generation jobs for bulk relay recipient creation
+-- Processed by scheduled task (process_cert_queue.cfm) in batches of 5
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS cert_generation_queue (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    recipient_id INT NOT NULL,
+    recipient_email VARCHAR(255) NOT NULL,
+    job_type ENUM('smime', 'pgp') NOT NULL,
+    status ENUM('pending', 'processing', 'completed', 'failed') NOT NULL DEFAULT 'pending',
+    -- S/MIME fields
+    ca_id INT NULL,
+    validity INT NULL,
+    encryption INT NULL,
+    algorithm VARCHAR(10) NULL,
+    -- PGP fields
+    pgp_key_length INT NULL,
+    pgp_name_real VARCHAR(255) NULL,
+    -- Common
+    password VARCHAR(255) NULL COMMENT 'Plaintext password (temporary, cleared after processing)',
+    error_message TEXT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME NULL,
+    completed_at DATETIME NULL,
+    INDEX idx_queue_status (status),
+    INDEX idx_queue_recipient (recipient_email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

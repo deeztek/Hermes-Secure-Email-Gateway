@@ -18,26 +18,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="#datasource#">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset customtrans3=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="#datasource#">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
+<cfinclude template="generate_customtrans.cfm">
     
     <cffile action="read" file="/opt/hermes/scripts/export_pgp_public_key.sh" variable="temp">
     

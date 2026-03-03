@@ -1,25 +1,6 @@
 <cfparam name = "success" default = "0">
 <cfparam name = "error" default = "0">
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <cfldap action="query"
 name="adresult"

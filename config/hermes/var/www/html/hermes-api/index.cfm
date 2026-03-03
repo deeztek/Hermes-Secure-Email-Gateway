@@ -113,26 +113,9 @@
         <cfif #compare_ip# is "0">
         
         <!--- GENERATE VERIFY TOKEN --->
-        <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-        select random_letter as random from captcha_list_all2 order by RAND() limit 32
-        </cfquery>
-            
-        <cfquery name="inserttrans" datasource="hermes" result="stResult">
-        insert into salt
-        (salt)
-        values
-        ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-        </cfquery>
-            
-        <cfquery name="gettrans" datasource="hermes">
-        select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-        </cfquery>
-            
-        <cfset VerifyToken=#gettrans.customtrans2#>
-            
-        <cfquery name="deletetrans" datasource="hermes">
-        delete from salt where id='#stResult.GENERATED_KEY#'
-        </cfquery>
+        <cfset _transLength = 32>
+        <cfinclude template="/admin/2/inc/generate_customtrans.cfm">
+        <cfset VerifyToken = customtrans3>
         
         <!--- INSERT VERIFY TOKEN IN DATABASE --->
         <CFQUERY NAME="createverifytoken" DATASOURCE="hermes">

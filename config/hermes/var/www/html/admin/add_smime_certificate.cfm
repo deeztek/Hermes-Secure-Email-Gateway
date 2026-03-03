@@ -227,27 +227,9 @@ id = <cfqueryparam value = #url.id# CFSQLType = "CF_SQL_INTEGER">
 </cfif></cfif> 
 
 <cfif #autopass# is "yes">
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 16
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset show_smime_password1=#gettrans.customtrans2#>
-<cfset show_smime_password2=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="/admin/2/inc/generate_random_password.cfm">
+<cfset show_smime_password1 = generatedPassword>
+<cfset show_smime_password2 = generatedPassword>
 </cfif>
 
 
@@ -270,29 +252,7 @@ select * from ca_settings where id='#show_ca#'
 
 <cfset rcpt_name = rereplace(getrecipientdetails.recipient, "[^A-Za-z0-9]+", "", "all")>
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-
-
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 
 <cfif #show_smime_password1# is "">

@@ -326,7 +326,7 @@ $(document).ready(function() {
         <!--- Build list of domains to check --->
         <cfset domainList = valueList(getMappingDomains.domain_name)>
 
-        <!--- Check if any users are assigned to these mappings --->
+        <!--- Check if any system users are assigned to these mappings --->
         <cfquery name="checkUsersAssigned" datasource="hermes">
             SELECT remoteauth_domain, COUNT(*) AS user_count FROM system_users
             WHERE auth_type = 'remote'
@@ -334,9 +334,29 @@ $(document).ready(function() {
             GROUP BY remoteauth_domain
         </cfquery>
 
+        <!--- Check if any recipients are assigned to these mappings --->
+        <cfquery name="checkRecipientsAssigned" datasource="hermes">
+            SELECT remoteauth_domain, COUNT(*) AS user_count FROM recipients
+            WHERE auth_type = 'remote'
+            AND remoteauth_domain IN (<cfqueryparam value="#domainList#" cfsqltype="cf_sql_varchar" list="yes">)
+            GROUP BY remoteauth_domain
+        </cfquery>
+
+        <!--- Combine blocked domains from both system users and recipients --->
+        <cfset blockedDomains = "">
         <cfif checkUsersAssigned.recordcount GT 0>
-            <!--- Some mappings have users assigned - cannot delete those --->
             <cfset blockedDomains = valueList(checkUsersAssigned.remoteauth_domain)>
+        </cfif>
+        <cfif checkRecipientsAssigned.recordcount GT 0>
+            <cfloop query="checkRecipientsAssigned">
+                <cfif NOT listFindNoCase(blockedDomains, checkRecipientsAssigned.remoteauth_domain)>
+                    <cfset blockedDomains = listAppend(blockedDomains, checkRecipientsAssigned.remoteauth_domain)>
+                </cfif>
+            </cfloop>
+        </cfif>
+
+        <cfif len(blockedDomains)>
+            <!--- Some mappings have users/recipients assigned - cannot delete those --->
             <cfset session.m = "ra_delete_blocked">
             <cfset session.blockedDomains = blockedDomains>
             <cflocation url="view_remoteauth.cfm" addtoken="no">
@@ -546,8 +566,8 @@ $(document).ready(function() {
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
         <h4><i class="icon fa fa-ban"></i> Cannot Delete!</h4>
-        <cfoutput>The following domain mapping(s) cannot be deleted because they have users assigned: <strong>#session.blockedDomains#</strong></cfoutput><br>
-        <small>You must reassign or delete these users before deleting the mapping(s).</small>
+        <cfoutput>The following domain mapping(s) cannot be deleted because they have users or recipients assigned: <strong>#session.blockedDomains#</strong></cfoutput><br>
+        <small>You must reassign or delete these users/recipients before deleting the mapping(s).</small>
     </div>
     <cfset session.m = 0>
     <cfset structDelete(session, "blockedDomains")>

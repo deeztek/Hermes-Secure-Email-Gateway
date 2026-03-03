@@ -1106,27 +1106,9 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
   
   <cfelseif #form.autopass# is "yes">
   
-    <cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-      select random_letter as random from captcha_list_all2 order by RAND() limit 16
-      </cfquery>
-      
-      <cfquery name="inserttrans" datasource="hermes" result="stResult">
-      insert into salt
-      (salt)
-      values
-      ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-      </cfquery>
-      
-      <cfquery name="gettrans" datasource="hermes">
-      select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-      </cfquery>
-      
-      <cfset password1=#gettrans.customtrans2#>
+    <cfinclude template="./inc/generate_random_password.cfm">
+      <cfset password1 = generatedPassword>
       <cfset step=6>
-      
-      <cfquery name="deletetrans" datasource="hermes">
-      delete from salt where id='#stResult.GENERATED_KEY#'
-      </cfquery>
   
   
   <!--- /CFIF #form.autopass# is --->
@@ -1631,12 +1613,12 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
           <tr>
             <td>
 
-              <form name="SendCertificate" method="post">
+              <form name="SendCertificate" method="post" target="_blank">
 
                 <input type="hidden" name="action" value="downloadcertificate">
                 <input type="hidden" name="certificate_id" value="#id#"/>
 
-                <button type="submit" value="" class="btn btn-secondary" onclick="this.form.submit();"><i class="fas fa-download"></i></button>
+                <button type="submit" value="" class="btn btn-secondary"><i class="fas fa-download"></i></button>
 
               </form>
            

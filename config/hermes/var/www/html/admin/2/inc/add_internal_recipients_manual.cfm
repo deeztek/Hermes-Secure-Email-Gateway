@@ -37,27 +37,8 @@ select policy_id, default_policy from spam_policies where default_policy='1'
 <!--- GET DEFAULT POLICY ENDS HERE --->
 
 
-<cfquery name="customtrans" datasource="hermes" result="getrandom_results">
-    select random_letter as random from captcha_list_all2 order by RAND() limit 8
-    </cfquery>
-    
-    <cfquery name="inserttrans" datasource="hermes" result="stResult">
-    insert into salt
-    (salt)
-    values
-    ('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-    </cfquery>
-    
-    <cfquery name="gettrans" datasource="hermes">
-    select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
-    <cfset customtrans3=#gettrans.customtrans2#>
-    
-    <cfquery name="deletetrans" datasource="hermes">
-    delete from salt where id='#stResult.GENERATED_KEY#'
-    </cfquery>
-    
+<cfinclude template="generate_customtrans.cfm">
+
 
 <!---
 <cffile action = "write"
@@ -164,9 +145,9 @@ textarea: #show_recipient#
         
         <cfquery name="insert" datasource="hermes">
         insert into recipients
-        (policy_id, recipient, status, configured, pdf_enabled, smime_enabled, pgp_enabled, smime_mode, digital_sign, validity, encryption, algorithm)
+        (policy_id, recipient, status, configured, pdf_enabled, smime_enabled, pgp_enabled, smime_mode, digital_sign, validity, encryption, algorithm, auth_type, remoteauth_domain)
         values
-        ('#show_policy#', '#recipient#', 'OK', '2', '#show_pdf_enabled#', '#show_smime_enabled#', '#show_pgp_enabled#', '1', '#show_sign#', '1825', '4096', 'sha512')
+        ('#show_policy#', '#recipient#', 'OK', '2', '#show_pdf_enabled#', '#show_smime_enabled#', '#show_pgp_enabled#', '1', '#show_sign#', '1825', '4096', 'sha512', <cfqueryparam value="#show_auth_type#" cfsqltype="cf_sql_varchar">, <cfif show_remoteauth_domain NEQ ""><cfqueryparam value="#show_remoteauth_domain#" cfsqltype="cf_sql_varchar"><cfelse>NULL</cfif>)
         </cfquery>
         </cfoutput>
                 
@@ -182,13 +163,23 @@ textarea: #show_recipient#
     <!--- INSERT INTO USER_SETTINGS ENDS HERE --->
 
     <!--- CREATE LDAP USER FOR RECIPIENT STARTS HERE --->
-    <!--- This creates an LDAP user with a random password and adds them to the relays group --->
     <cfset recipientEmail = recipient>
-    <cfinclude template="ldap_add_user_relay.cfm">
+    <cfif show_auth_type EQ "remote">
+        <!--- Remote Auth: creates LDAP user with seeAlso/associatedDomain, no password --->
+        <cfset remoteauthDomain = show_remoteauth_domain>
+        <cfinclude template="ldap_add_user_relay_remoteauth.cfm">
+    <cfelse>
+        <!--- Local Auth: creates LDAP user with random password, user must reset --->
+        <cfinclude template="ldap_add_user_relay.cfm">
+    </cfif>
 
     <!--- SEND WELCOME EMAIL TO NEW RECIPIENT --->
     <cfset recipientName = recipientEmail>
-    <cfinclude template="send_recipient_welcome_email.cfm">
+    <cfif show_auth_type EQ "remote">
+        <cfinclude template="send_recipient_welcome_email_remoteauth.cfm">
+    <cfelse>
+        <cfinclude template="send_recipient_welcome_email.cfm">
+    </cfif>
     <!--- CREATE LDAP USER FOR RECIPIENT ENDS HERE --->
 
 
@@ -203,7 +194,69 @@ textarea: #show_recipient#
 <cfinclude template="add_internal_recipients_djigzo.cfm">
 
 <!--- #pdf_enabled# is "1" OR #smime_enabled# is "1" OR #pgp_enabled# is "1" --->
-</cfif> 
+</cfif>
+
+<!--- QUEUE S/MIME CERTIFICATE GENERATION (background) --->
+<cfif show_smime_enabled is "1" AND StructKeyExists(form, "ca")>
+    <cfquery name="getNewRecipientId" datasource="hermes">
+        SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif getNewRecipientId.recordcount GTE 1>
+        <!--- Only queue if recipient doesn't already have a certificate --->
+        <cfquery name="existingSmimeCert" datasource="hermes">
+            SELECT id FROM recipient_certificates
+            WHERE user_id = <cfqueryparam value="#getNewRecipientId.id#" cfsqltype="cf_sql_integer">
+            LIMIT 1
+        </cfquery>
+        <cfif existingSmimeCert.recordcount LT 1>
+            <cfinclude template="generate_random_password.cfm">
+            <cfquery datasource="hermes">
+                INSERT INTO cert_generation_queue
+                (recipient_id, recipient_email, job_type, ca_id, validity, encryption, algorithm, password)
+                VALUES
+                (<cfqueryparam value="#getNewRecipientId.id#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+                 'smime',
+                 <cfqueryparam value="#form.ca#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#form.validity#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#form.cert_encryption#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#form.cert_algorithm#" cfsqltype="cf_sql_varchar">,
+                 <cfqueryparam value="#generatedPassword#" cfsqltype="cf_sql_varchar">)
+            </cfquery>
+        </cfif>
+    </cfif>
+</cfif>
+
+<!--- QUEUE PGP KEYRING GENERATION (background) --->
+<cfif show_pgp_enabled is "1">
+    <cfquery name="getNewRecipientId2" datasource="hermes">
+        SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif getNewRecipientId2.recordcount GTE 1>
+        <!--- Only queue if recipient doesn't already have a keyring --->
+        <cfquery name="existingPgpKeyring" datasource="hermes">
+            SELECT id FROM recipient_keystores
+            WHERE user_id = <cfqueryparam value="#getNewRecipientId2.id#" cfsqltype="cf_sql_integer">
+            AND master = '1'
+            LIMIT 1
+        </cfquery>
+        <cfif existingPgpKeyring.recordcount LT 1>
+            <cfinclude template="generate_random_password.cfm">
+            <cfset pgpNameReal = ListFirst(recipient, "@")>
+            <cfquery datasource="hermes">
+                INSERT INTO cert_generation_queue
+                (recipient_id, recipient_email, job_type, pgp_key_length, pgp_name_real, password)
+                VALUES
+                (<cfqueryparam value="#getNewRecipientId2.id#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+                 'pgp',
+                 <cfqueryparam value="#form.pgp_encryption#" cfsqltype="cf_sql_integer">,
+                 <cfqueryparam value="#pgpNameReal#" cfsqltype="cf_sql_varchar">,
+                 <cfqueryparam value="#generatedPassword#" cfsqltype="cf_sql_varchar">)
+            </cfquery>
+        </cfif>
+    </cfif>
+</cfif>
 
 <!--- /CFLOOP index="recipient" --->
 </cfloop>

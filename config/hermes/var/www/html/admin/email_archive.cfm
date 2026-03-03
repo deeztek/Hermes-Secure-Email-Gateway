@@ -505,26 +505,7 @@ if ( (hwndPopup_27b5 == null) || hwndPopup_27b5.closed ) {
 
 <cfif step is "11">
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <cffile action="read" file="/opt/hermes/scripts/validate_share_archive.sh" variable="validateshare">
 
@@ -630,26 +611,7 @@ arguments="-inputformat none">
 
 <cfif step is "12">
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <cffile action="read" file="/opt/hermes/scripts/validate_mysql.sh" variable="validatemysql">
 
@@ -732,26 +694,7 @@ theKey=generateSecretKey(AES, 256);
 <cfset date2="#dateformat(startdate, "yyyy-mm-dd")#">
 <cfset time2="#timeformat(starttime, "HH:mm:ss")#">
 
-<cfquery name="customtrans" datasource="#datasource#" result="getrandom_results">
-select random_letter as random from captcha_list_all2 order by RAND() limit 8
-</cfquery>
-
-<cfquery name="inserttrans" datasource="#datasource#" result="stResult">
-insert into salt
-(salt)
-values
-('<cfoutput query="customtrans">#TRIM(random)#</cfoutput>')
-</cfquery>
-
-<cfquery name="gettrans" datasource="#datasource#">
-select salt as customtrans2 from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
-
-<cfset customtrans3=#gettrans.customtrans2#>
-
-<cfquery name="deletetrans" datasource="#datasource#">
-delete from salt where id='#stResult.GENERATED_KEY#'
-</cfquery>
+<cfinclude template="/admin/2/inc/generate_customtrans.cfm">
 
 <cfif #show_directory# is "">
 <cfquery name="insertjob" datasource="#datasource#" result="adResult">
