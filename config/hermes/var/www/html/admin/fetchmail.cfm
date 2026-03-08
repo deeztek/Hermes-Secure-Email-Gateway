@@ -703,7 +703,7 @@ values ('#remote_server#', '#protocol#', '#username#', '#password#', '#local_rec
                                             </tr>
                                             <tr style="height: 14px;">
                                               <td id="Cell1101">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Internal Recipient to Deliver Fetched Email to</span></b></p>
+                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Relay Recipient to Deliver Fetched Email to</span></b></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 21px;">
@@ -724,7 +724,7 @@ select id, recipient, domain from recipients where domain is NULL order by recip
 
 
 <cfelseif #getrecipients.recordcount# LT 1>
-<p style=""text-align: center; margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);">You do not have any internal recipients added to the system...</span></i></b></p>
+<p style=""text-align: center; margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);">You do not have any relay recipients added to the system...</span></i></b></p>
 
 </cfif>
 &nbsp;</p>
@@ -967,7 +967,7 @@ select * from fetchmail order by local_recipient asc
   <tr style="height: 14px;">
     
     <td width="48" style="background-color: rgb(241,236,236);" id="Cell764">
-      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Internal Recipient</span></b></p>
+      <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Relay Recipient</span></b></p>
     </td>
     <td width="109" style="background-color: rgb(241,236,236);" id="Cell416">
       <p style="text-align: center; margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Remote Email Server</span></b></p>

@@ -845,7 +845,7 @@ values
                                             </tr>
                                             <tr valign="top" align="left">
                                               <td colspan="2" width="472" id="Text423" class="TextObject">
-                                                <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif;"><span style="font-size: 12px; color: rgb(128,128,128);">Select internal recipient from the drop-down list below</span></span></p>
+                                                <p style="margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif;"><span style="font-size: 12px; color: rgb(128,128,128);">Select relay recipient from the drop-down list below</span></span></p>
                                               </td>
                                             </tr>
                                           </table>
@@ -888,7 +888,7 @@ select id, recipient, domain from recipients where domain is NULL order by recip
 </select>
 
 <cfelseif #getrecipients.recordcount# LT 1 AND #getrecipients.recordcount# LT 1>
-<p style=""text-align: center; margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);">You do not have any internal recipients added to the system...</span></i></b></p>
+<p style=""text-align: center; margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);">You do not have any relay recipients added to the system...</span></i></b></p>
 
 </cfif>
 &nbsp;</p>

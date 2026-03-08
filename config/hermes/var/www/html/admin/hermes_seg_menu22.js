@@ -68,7 +68,7 @@ it=s1.addItemWithImages(4,5,5,"SMTP TLS Policy",n,n,"",n,n,n,3,3,3,n,n,n,"smtp_t
 it=s1.addItemWithImages(4,5,5,"Relay Host",n,n,"",n,n,n,3,3,3,n,n,n,"relay_host.cfm",n,n,n,"relay_host.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,26,n);
 it=s1.addItemWithImages(4,5,5,"Relay Domains",n,n,"",n,n,n,3,3,3,n,n,n,"relay_domains_new.cfm",n,n,n,"relay_domains_new.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,10,n);
 it=s1.addItemWithImages(4,5,5,"Relay IPs &amp; Networks",n,n,"",n,n,n,3,3,3,n,n,n,"select.cfm",n,n,n,"select.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,11,n);
-it=s1.addItemWithImages(4,5,5,"Internal Recipients",n,n,"",n,n,n,3,3,3,n,n,n,"recipients.cfm",n,n,n,"recipients.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,12,n);
+it=s1.addItemWithImages(4,5,5,"Relay Recipients",n,n,"",n,n,n,3,3,3,n,n,n,"recipients.cfm",n,n,n,"recipients.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,12,n);
 it=s1.addItemWithImages(4,5,5,"Virtual Recipients",n,n,"",n,n,n,3,3,3,n,n,n,"./virtual.cfm",n,n,n,"./virtual.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,2,n);
 it=s0.addItemWithImages(1,2,2,"Content Checks",n,n,"",n,n,n,3,3,3,0,1,1,"",n,n,n,n,n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,13,n);
 var s1=it.addSubmenu(0,0,10,2,3,0,0,3,0,1,0,n,n,100,-1,3,0,-1,1,200,200,0,0,"0,0,0",1,"0",1,0,"");
@@ -103,7 +103,7 @@ var s1=it.addSubmenu(0,0,10,2,3,0,0,3,0,1,0,n,n,100,-1,4,0,-1,1,200,200,0,0,"0,0
 it=s1.addItemWithImages(4,5,5,"Internal Certficate Authority",n,n,"",n,n,n,3,3,3,n,n,n,"ca_settings.cfm",n,n,n,"ca_settings.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,20,n);
 it=s1.addItemWithImages(4,5,5,"PGP Key Servers",n,n,"",n,n,n,3,3,3,n,n,n,"key_servers.cfm",n,n,n,"key_servers.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,47,n);
 it=s1.addItemWithImages(4,5,5,"Encryption Settings",n,n,"",n,n,n,3,3,3,n,n,n,"encryption_settings.cfm",n,n,n,"encryption_settings.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,7,n);
-it=s1.addItemWithImages(4,5,5,"Internal Recipients Encryption",n,n,"",n,n,n,3,3,3,n,n,n,"internal_encryption_users.cfm",n,n,n,"internal_encryption_users.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,0,n);
+it=s1.addItemWithImages(4,5,5,"Relay Recipients Encryption",n,n,"",n,n,n,3,3,3,n,n,n,"internal_encryption_users.cfm",n,n,n,"internal_encryption_users.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,0,n);
 it=s1.addItemWithImages(4,5,5,"External Recipients Encryption",n,n,"",n,n,n,3,3,3,n,n,n,"external_encryption_users.cfm",n,n,n,"external_encryption_users.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,22,n);
 it=s0.addItemWithImages(1,2,2,"Logout",n,n,"",n,n,n,3,3,3,n,n,n,"./logout.cfm",n,n,n,"./logout.cfm",n,130,0,2,n,n,n,n,n,n,0,0,0,0,0,n,n,n,0,0,0,23,n);
 s0.pm.buildMenu();

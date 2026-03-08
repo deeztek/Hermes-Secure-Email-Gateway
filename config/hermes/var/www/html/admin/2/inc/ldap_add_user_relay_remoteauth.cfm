@@ -20,7 +20,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 ADD RELAY USER TO LDAP WITH REMOTE AUTHENTICATION
-Creates an LDAP user for an internal recipient (relay) using RemoteAuth.
+Creates an LDAP user for an relay recipient (relay) using RemoteAuth.
 No password is set - authentication is handled by the remote AD/LDAP server
 via the OpenLDAP remoteauth overlay (seeAlso + associatedDomain).
 

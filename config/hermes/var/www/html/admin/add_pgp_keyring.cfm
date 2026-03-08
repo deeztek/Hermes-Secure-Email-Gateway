@@ -730,7 +730,7 @@ values
                                           <table id="Table185" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 39px;">
                                             <tr style="height: 14px;">
                                               <td width="595" id="Cell1029">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Internal Recipient</span></b></p>
+                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Relay Recipient</span></b></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 25px;">
@@ -1039,7 +1039,7 @@ values
                 <tr>
                   <td class="TextObject">
                     <p style="text-align: left; margin-bottom: 0px;"><cfif #type# is "1">
-<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Internal Recipients Encryption" style="height: 24px; width: 357px;">
+<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Relay Recipients Encryption" style="height: 24px; width: 357px;">
 <cfelseif #type# is "2">
 <input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to External Recipients Encryption" style="height: 24px; width: 357px;">
 </cfif>
@@ -1074,7 +1074,7 @@ values
                 <tr>
                   <td class="TextObject">
                     <p style="text-align: left; margin-bottom: 0px;"><cfif #type# is "1">
-<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Internal Recipients Encryption" style="height: 24px; width: 357px;">
+<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Relay Recipients Encryption" style="height: 24px; width: 357px;">
 <cfelseif #type# is "2">
 <input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to External Recipients Encryption" style="height: 24px; width: 357px;">
 </cfif>

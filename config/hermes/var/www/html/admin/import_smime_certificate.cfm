@@ -820,7 +820,7 @@ file = "#FiletoDelete#">
                 <tr>
                   <td class="TextObject">
                     <p style="text-align: left; margin-bottom: 0px;"><cfif #type# is "1">
-<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Internal Recipients Encryption" style="height: 24px; width: 357px;">
+<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Relay Recipients Encryption" style="height: 24px; width: 357px;">
 <cfelseif #type# is "2">
 <input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to External Recipients Encryption" style="height: 24px; width: 357px;">
 </cfif>
@@ -855,7 +855,7 @@ file = "#FiletoDelete#">
                 <tr>
                   <td class="TextObject">
                     <p style="text-align: left; margin-bottom: 0px;"><cfif #type# is "1">
-<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Internal Recipients Encryption" style="height: 24px; width: 357px;">
+<input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Relay Recipients Encryption" style="height: 24px; width: 357px;">
 <cfelseif #type# is "2">
 <input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to External Recipients Encryption" style="height: 24px; width: 357px;">
 </cfif>

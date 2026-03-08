@@ -1064,7 +1064,7 @@ select default_policy from spam_policies where policy_id='#url.id#'
                                             </tr>
                                             <tr style="height: 14px;">
                                               <td id="Cell1053">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Default Policy to be Assigned to New Internal Recipients</span></b></p>
+                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Default Policy to be Assigned to New Relay Recipients</span></b></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 42px;">

@@ -710,7 +710,7 @@ $(document).ready(function() {
     <!--- Parse overlay information - each entry separated by blank lines --->
     <!--- Example output:
     dn: olcOverlay={0}remoteauth,olcDatabase={1}mdb,cn=config
-    olcRemoteAuthMapping: deeztek ldap://homedc01.deeztek.com:389
+    olcRemoteAuthMapping: example ldap://dc01.example.com:389
     --->
     <cfset overlayDebug = overlaySearchResult>
 
@@ -980,7 +980,7 @@ $(document).ready(function() {
                     <input type="hidden" name="action" value="add_mapping">
                     <div class="mb-3">
                         <label class="form-label">Domain Name <span class="text-danger">*</span></label>
-                        <input type="text" name="domain_name" class="form-control" required placeholder="e.g., deeztek">
+                        <input type="text" name="domain_name" class="form-control" required placeholder="e.g., example">
                         <small class="text-muted">The domain identifier for this mapping (unique identifier)</small>
                     </div>
                     <div class="mb-3">

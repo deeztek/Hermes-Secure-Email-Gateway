@@ -26,7 +26,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Add Internal Recipient(s)</title>
+  <title>Hermes SEG | Add Relay Recipient(s)</title>
   
   <cfinclude template="./inc/html_head.cfm" />
 
@@ -54,7 +54,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
-            <h1 class="m-0">Add Internal Recipient(s)
+            <h1 class="m-0">Add Relay Recipient(s)
             </h1>
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
@@ -65,7 +65,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Add Internal Recipient(s)</li>
+              <li class="breadcrumb-item active">Add Relay Recipient(s)</li>
             </ol>
           </div><!-- /.col -->
         </div><!-- /.row -->
@@ -132,7 +132,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfif #checkpolicy.recordcount# LT 1>
 
-<cfset m="Add Internal Recipients: checkpolicy.recordcount LT 1">
+<cfset m="Add Relay Recipients: checkpolicy.recordcount LT 1">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -161,7 +161,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.reports is not YES, NO or ALL">
+<cfset m="Add Relay Recipients: form.reports is not YES, NO or ALL">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -178,7 +178,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
   
 <cfif NOT IsValid("integer", #form.frequency#)>
 
-<cfset m="Add Internal Recipients: form.frequency is not integer">
+<cfset m="Add Relay Recipients: form.frequency is not integer">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -204,7 +204,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.train_bayes is not 0 or 1">
+<cfset m="Add Relay Recipients: form.train_bayes is not 0 or 1">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -225,7 +225,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.download_msg is not 0 or 1">
+<cfset m="Add Relay Recipients: form.download_msg is not 0 or 1">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -246,7 +246,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.pdf_enabled is not 1 or 2">
+<cfset m="Add Relay Recipients: form.pdf_enabled is not 1 or 2">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -267,7 +267,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.smime_enabled is not 1 or 2">
+<cfset m="Add Relay Recipients: form.smime_enabled is not 1 or 2">
 <cfinclude template="./inc/error.cfm">
 <cfabort>  
 
@@ -288,7 +288,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.sign is not 1 or 2">
+<cfset m="Add Relay Recipients: form.sign is not 1 or 2">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -309,7 +309,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfelse>
 
-<cfset m="Add Internal Recipients: form.pgp_enabled is not 1 or 2">
+<cfset m="Add Relay Recipients: form.pgp_enabled is not 1 or 2">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 
@@ -329,7 +329,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 </cfquery>
 
 <cfif checkca.recordcount LT 1>
-<cfset m="Add Internal Recipients: invalid CA">
+<cfset m="Add Relay Recipients: invalid CA">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -343,7 +343,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfif StructKeyExists(form, "validity")>
 <cfif NOT ListFind("365,730,1095,1460,1825", form.validity)>
-<cfset m="Add Internal Recipients: invalid validity period">
+<cfset m="Add Relay Recipients: invalid validity period">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -356,7 +356,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfif StructKeyExists(form, "cert_encryption")>
 <cfif form.cert_encryption NEQ "2048" AND form.cert_encryption NEQ "4096">
-<cfset m="Add Internal Recipients: invalid certificate key length">
+<cfset m="Add Relay Recipients: invalid certificate key length">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -369,7 +369,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfif StructKeyExists(form, "cert_algorithm")>
 <cfif NOT ListFind("sha256,sha512", form.cert_algorithm)>
-<cfset m="Add Internal Recipients: invalid certificate hash algorithm">
+<cfset m="Add Relay Recipients: invalid certificate hash algorithm">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -382,7 +382,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <cfif StructKeyExists(form, "pgp_encryption")>
 <cfif form.pgp_encryption NEQ "2048" AND form.pgp_encryption NEQ "4096">
-<cfset m="Add Internal Recipients: invalid PGP key size">
+<cfset m="Add Relay Recipients: invalid PGP key size">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -397,7 +397,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <cfif form.auth_type EQ "local" OR form.auth_type EQ "remote">
 <cfset show_auth_type = form.auth_type>
 <cfelse>
-<cfset m="Add Internal Recipients: form.auth_type is not local or remote">
+<cfset m="Add Relay Recipients: form.auth_type is not local or remote">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 </cfif>
@@ -414,7 +414,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
     AND enabled = 1
 </cfquery>
 <cfif checkRemoteauthDomain.recordcount LT 1>
-<cfset m="Add Internal Recipients: invalid RemoteAuth domain">
+<cfset m="Add Relay Recipients: invalid RemoteAuth domain">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 <cfelse>
@@ -425,7 +425,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <!--- VALIDATE: If auth_type is remote, remoteauth_domain is required --->
 <cfif show_auth_type EQ "remote" AND show_remoteauth_domain EQ "">
-<cfset m="Add Internal Recipients: RemoteAuth domain is required when auth type is Remote">
+<cfset m="Add Relay Recipients: RemoteAuth domain is required when auth type is Remote">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
 </cfif>
@@ -435,8 +435,10 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <!--- CHECK IF REMOTEAUTH IS AVAILABLE (Pro edition + enabled + has compatible mappings) --->
 <cfset remoteauthAvailable = false>
 <cfset remoteauthDomains = []>
+<cfset remoteauthDisabledReason = "">
+<cfset isPro = isDefined("session.edition") AND session.edition EQ "Pro">
 
-<cfif isDefined("session.edition") AND session.edition EQ "Pro">
+<cfif isPro>
     <!--- Check if remoteauth is enabled --->
     <cfquery name="getRemoteauthStatus" datasource="hermes">
         SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'enabled'
@@ -450,7 +452,11 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
         ORDER BY domain_name
     </cfquery>
 
-    <cfif getRemoteauthStatus.recordcount GT 0 AND getRemoteauthStatus.setting_value EQ "1" AND getRemoteauthDomains.recordcount GT 0>
+    <cfif getRemoteauthStatus.recordcount EQ 0 OR getRemoteauthStatus.setting_value NEQ "1">
+        <cfset remoteauthDisabledReason = "RemoteAuth is not enabled. Enable it in <a href='view_remoteauth.cfm'>Remote Authentication</a> settings.">
+    <cfelseif getRemoteauthDomains.recordcount EQ 0>
+        <cfset remoteauthDisabledReason = "No compatible domain mappings found. Add a domain mapping with a <code>{username}</code> or <code>{email}</code> DN pattern in <a href='view_remoteauth.cfm'>Remote Authentication</a>.">
+    <cfelse>
         <cfset remoteauthAvailable = true>
         <cfloop query="getRemoteauthDomains">
             <cfset arrayAppend(remoteauthDomains, {domain: getRemoteauthDomains.domain_name, server: getRemoteauthDomains.server_address, pattern: getRemoteauthDomains.remote_dn_pattern})>
@@ -572,7 +578,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
   <p>       
 
 <!--- BACK TO RECIPIENTS BUTTON STARTS HERE --->
-<a href="view_internal_recipients.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Internal Recipients</a>
+<a href="view_internal_recipients.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Relay Recipients</a>
 
 <!--- BACK TO RECIPIENTS BUTTON ENDS HERE --->
 
@@ -761,16 +767,28 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <div class="form-group mt-3" id="dnPatternGuidance" style="display:none;">
   <div class="alert alert-secondary">
     <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
-    <p>Selected domain uses the following DN pattern for remote authentication:</p>
+    <p>Recipients will be authenticated against the remote server using this DN pattern:</p>
     <p><code id="dnPatternDisplay"></code></p>
-    <p class="mb-0"><small><strong>Placeholder substitution:</strong>
-    <code>{username}</code> = email local part (e.g., <em>dedwards</em>) &bull;
-    <code>{email}</code> = full email address (e.g., <em>dedwards@partner.com</em>)</small></p>
+    <p class="mb-0"><small><strong>How placeholders are resolved from the recipient's email address:</strong><br>
+    For a recipient with email <em>jsmith@example.com</em>:<br>
+    <code>{username}</code> &rarr; <em>jsmith</em> (local part extracted automatically) &rarr; DN becomes <code>cn=jsmith,...</code><br>
+    <code>{email}</code> &rarr; <em>jsmith@example.com</em> (full address used as-is) &rarr; DN becomes <code>cn=jsmith@example.com,...</code></small></p>
   </div>
 </div>
 
+<cfelseif isPro>
+<!--- Pro Edition but RemoteAuth not fully configured - show disabled toggle --->
+<div class="form-group">
+  <label><strong>Authentication Type</strong></label>
+  <select class="form-control" name="auth_type" id="authType" style="width: 100%;" disabled>
+    <option value="local" selected>Local</option>
+    <option value="remote">Remote</option>
+  </select>
+  <cfoutput><small class="text-muted">#remoteauthDisabledReason#</small></cfoutput>
+</div>
+
 <cfelse>
-<!--- RemoteAuth not available - add hidden field with default value --->
+<!--- Community Edition - no toggle --->
 <input type="hidden" name="auth_type" value="local">
 </cfif>
 <!--- AUTHENTICATION TYPE ENDS HERE --->
@@ -779,7 +797,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
   <div class="alert alert-info">
 
     <h5><i class="icon fas fa-info-circle"></i> Please Note!</h5>
-    <cfoutput>When S/MIME or PGP Encryption is enabled, certificates and keyrings will be generated in the background after recipients are added. You can monitor progress from the Internal Recipients page.</cfoutput>
+    <cfoutput>When S/MIME or PGP Encryption is enabled, certificates and keyrings will be generated in the background after recipients are added. You can monitor progress from the Relay Recipients page.</cfoutput>
   </div>
 
   <!--- PDF ENCRYPTION STARTS HERE --->
@@ -903,7 +921,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
           <div class="alert alert-info">
             <i class="icon fas fa-info-circle"></i>
-            The local part of each recipient's e-mail address will be automatically used as the PGP key Real Name (e.g., "dedwards" from "dedwards@deeztek.org").
+            The local part of each recipient's e-mail address will be automatically used as the PGP key Real Name (e.g., "jsmith" from "jsmith@example.com").
           </div>
 
         </div>

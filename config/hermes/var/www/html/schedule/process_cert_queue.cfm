@@ -248,7 +248,7 @@ function generatePassword() {
         <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
         <cfset encryptedPassword = encrypt(password, theKey, "AES", "Base64")>
 
-        <!--- Insert into recipient_certificates (internal recipients, type=1) --->
+        <!--- Insert into recipient_certificates (relay recipients, type=1) --->
         <cfquery datasource="hermes">
             INSERT INTO recipient_certificates
             (user_id, ca_id, validity, encryption, algorithm, smime_certificate_key, smime_certificate_request,
@@ -442,7 +442,7 @@ function generatePassword() {
         <!--- Build user_name in format "RealName <email>" --->
         <cfset pgpUserName = "#pgp_name_real# <#recipient_email#>">
 
-        <!--- Insert parent key into recipient_keystores (internal recipients) --->
+        <!--- Insert parent key into recipient_keystores (relay recipients) --->
         <cfquery datasource="hermes">
             INSERT INTO recipient_keystores
             (user_id, user_name, pgp_keystore_password, pgp_keystore_expiration, pgp_keystore_creation,

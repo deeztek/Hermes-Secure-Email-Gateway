@@ -26,7 +26,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Internal Recipients</title>
+  <title>Hermes SEG | Relay Recipients</title>
 
   <cfinclude template="./inc/html_head.cfm" />
 
@@ -136,7 +136,7 @@ $(document).ready(function() {
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
-            <h1 class="m-0">Internal Recipients</h1>
+            <h1 class="m-0">Relay Recipients</h1>
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
             --->
@@ -146,7 +146,7 @@ $(document).ready(function() {
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Internal Recipients</li>
+              <li class="breadcrumb-item active">Relay Recipients</li>
             </ol>
           </div><!-- /.col -->
         </div><!-- /.row -->
@@ -571,7 +571,7 @@ $(document).ready(function() {
 <!--- FORM.POLICY --->
 <cfif NOT StructKeyExists(form, "policy")>
 
-  <cfset m="Edit Internal Recipients: form.policy does not exist">
+  <cfset m="Edit Relay Recipients: form.policy does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -583,7 +583,7 @@ $(document).ready(function() {
 
 <cfif #checkpolicy.recordcount# LT 1>
 
-  <cfset m="Edit Internal Recipients: checkpolicy.recordcount LT 1">
+  <cfset m="Edit Relay Recipients: checkpolicy.recordcount LT 1">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -596,7 +596,7 @@ $(document).ready(function() {
 <!--- FORM.REPORTS --->
 <cfif NOT StructKeyExists(form, "reports")>
 
-  <cfset m="Edit Internal Recipients: form.reports does not exist">
+  <cfset m="Edit Relay Recipients: form.reports does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -606,7 +606,7 @@ $(document).ready(function() {
 
 <cfelse>
 
-  <cfset m="Edit Internal Recipients: form.reports is not YEs, NO, or ALL">
+  <cfset m="Edit Relay Recipients: form.reports is not YEs, NO, or ALL">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -619,7 +619,7 @@ $(document).ready(function() {
 <!--- FORM.FREQUENCY --->
 <cfif NOT StructKeyExists(form, "frequency")>
 
-  <cfset m="Edit Internal Recipients: form.frequency does not exist">
+  <cfset m="Edit Relay Recipients: form.frequency does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -627,7 +627,7 @@ $(document).ready(function() {
 
   <cfif NOT IsValid("integer", #form.frequency#)>
 
-  <cfset m="Edit Internal Recipients: form.frequency is not valid Integer">
+  <cfset m="Edit Relay Recipients: form.frequency is not valid Integer">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -640,7 +640,7 @@ $(document).ready(function() {
 <!--- FORM.TRAIN_BAYES --->
 <cfif NOT StructKeyExists(form, "train_bayes")>
 
-  <cfset m="Edit Internal Recipients: form.train_bayes does not exist">
+  <cfset m="Edit Relay Recipients: form.train_bayes does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -649,7 +649,7 @@ $(document).ready(function() {
 <cfif #form.train_bayes# is "0" OR #form.train_bayes# is "1">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.train_bayes is not 0 or 1">
+  <cfset m="Edit Relay Recipients: form.train_bayes is not 0 or 1">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -662,7 +662,7 @@ $(document).ready(function() {
 <!--- FORM.DOWNLOAD_MSG --->
 <cfif NOT StructKeyExists(form, "download_msg")>
 
-  <cfset m="Edit Internal Recipients: form.download_msg does not exist">
+  <cfset m="Edit Relay Recipients: form.download_msg does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -671,7 +671,7 @@ $(document).ready(function() {
 <cfif #form.download_msg# is "0" OR #form.download_msg# is "1">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.download_msg is not 0 or 1">
+  <cfset m="Edit Relay Recipients: form.download_msg is not 0 or 1">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -684,7 +684,7 @@ $(document).ready(function() {
 <!--- FORM.PDF_ENABLED --->
 <cfif NOT StructKeyExists(form, "pdf_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.pdf_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.pdf_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -693,7 +693,7 @@ $(document).ready(function() {
 <cfif #form.pdf_enabled# is "1" OR #form.pdf_enabled# is "2">
 
   <cfelse>
-  <cfset m="Edit Internal Recipients: form.pdf_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.pdf_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -706,7 +706,7 @@ $(document).ready(function() {
 <!--- FORM.SMIME_ENABLED --->
 <cfif NOT StructKeyExists(form, "smime_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.smime_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.smime_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -716,7 +716,7 @@ $(document).ready(function() {
 
 <cfelse>
 
-  <cfset m="Edit Internal Recipients: form.smime_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.smime_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -729,7 +729,7 @@ $(document).ready(function() {
 <!--- FORM.SIGN --->
 <cfif NOT StructKeyExists(form, "sign")>
 
-  <cfset m="Edit Internal Recipients: form.sign does not exist">
+  <cfset m="Edit Relay Recipients: form.sign does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -738,7 +738,7 @@ $(document).ready(function() {
 <cfif #form.sign# is "1" OR #form.sign# is "2">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.sign is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.sign is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -751,7 +751,7 @@ $(document).ready(function() {
 <!--- FORM.PGP_ENABLED --->
 <cfif NOT StructKeyExists(form, "pgp_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.pgp_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.pgp_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -760,7 +760,7 @@ $(document).ready(function() {
 <cfif #form.pgp_enabled# is "1" OR #form.pgp_enabled# is "2">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.pgp_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.pgp_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1016,7 +1016,7 @@ $(document).ready(function() {
       <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
         <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Internal Recipients were found</strong></cfoutput>
+        <cfoutput>No Relay Recipients were found</strong></cfoutput>
       </div>
     
       <!--- /CFIF FOR getrecipients.recordcount --->

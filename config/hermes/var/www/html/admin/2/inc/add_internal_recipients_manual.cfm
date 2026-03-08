@@ -127,7 +127,7 @@ textarea: #show_recipient#
 
         <cfif #checkentry.recordcount# LT 1>
         <cfset step=4>
-        <cfelseif #checkentry.recordcount# LT 1>
+        <cfelseif #checkentry.recordcount# GTE 1>
         <cfset step=0>
         <cfset errormessage=2>
         <cfset alreadyexists=#alreadyexists#+1>
@@ -185,9 +185,12 @@ textarea: #show_recipient#
 
     <cfset success=#success#+1>
     <cfset successrecipient="#successrecipient# #recipient#<br>">
-    
+
       <!--- /CFIF #step# is "4" --->
     </cfif>
+
+    <!--- ENCRYPTION AND CERTIFICATE SETUP (only for successfully added recipients) --->
+    <cfif #step# is "4">
 
 <cfif #pdf_enabled# is "1" OR #smime_enabled# is "1" OR #pgp_enabled# is "1">
 
@@ -257,6 +260,9 @@ textarea: #show_recipient#
         </cfif>
     </cfif>
 </cfif>
+
+      <!--- /CFIF #step# is "4" (encryption/cert setup) --->
+    </cfif>
 
 <!--- /CFLOOP index="recipient" --->
 </cfloop>

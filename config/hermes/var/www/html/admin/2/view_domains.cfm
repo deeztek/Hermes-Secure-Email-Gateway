@@ -188,7 +188,7 @@ id="btn-back-to-top"
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
     <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Unable to delete domain with existing Internal Recipients. Please delete the Internal Recipients and try again (Error Code: #m#)</cfoutput>
+    <cfoutput>Unable to delete domain with existing Relay Recipients. Please delete the Relay Recipients and try again (Error Code: #m#)</cfoutput>
   </div>
 
   <cfset session.m = 0>
@@ -384,7 +384,7 @@ id="btn-back-to-top"
             <th>Destination Address</th>
             <th>Destination Port</th>
             <th>Destination Use MX</th>
-            <th>Internal Recipients</th>
+            <th>Relay Recipients</th>
             <th>Virtual Recipients</th>
             <th>Postmaster Address</th>
             <th>DKIM Key(s)</th>
@@ -507,7 +507,7 @@ id="btn-back-to-top"
             <th>Destination Address</th>
             <th>Destination Port</th>
             <th>Destination Use MX</th>
-            <th>Internal Recipients</th>
+            <th>Relay Recipients</th>
             <th>Virtual Recipients</th>
             <th>Postmaster Address</th>
             <th>DKIM Signature</th>

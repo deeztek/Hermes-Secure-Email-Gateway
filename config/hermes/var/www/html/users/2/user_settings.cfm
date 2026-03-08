@@ -86,6 +86,16 @@ $(document).ready(function() {
     <cfelseif form.action EQ "remove_secondary_email">
         <cfinclude template="./inc/remove_secondary_email.cfm">
     <cfelseif form.action EQ "changepassword">
+        <!--- BLOCK PASSWORD CHANGE FOR REMOTE AUTH USERS --->
+        <cfquery name="checkUserAuthType" datasource="hermes">
+            SELECT auth_type FROM recipients WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
+        </cfquery>
+        <cfif checkUserAuthType.recordcount GT 0 AND checkUserAuthType.auth_type EQ "remote">
+            <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Not Allowed</h4>Your account uses Remote Authentication. Password changes must be made through your organization's directory service.">
+            <cfset session.pwdMessageType = "danger">
+            <cflocation url="user_settings.cfm" addtoken="no">
+        </cfif>
+
         <!--- PROCESS PASSWORD CHANGE --->
         <cfset pwdStep = 0>
         <cfparam name="form.hibp" default="YES">
@@ -397,7 +407,25 @@ $(document).ready(function() {
             <cfset session.mfaMessageType = "">
         </cfif>
 
-        <!--- CHANGE PASSWORD SECTION (ALL USERS) --->
+        <!--- CHECK IF USER IS REMOTE AUTH --->
+        <cfquery name="getUserAuthType" datasource="hermes">
+            SELECT auth_type FROM recipients WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
+        </cfquery>
+        <cfset isRemoteAuth = getUserAuthType.recordcount GT 0 AND getUserAuthType.auth_type EQ "remote">
+
+        <!--- CHANGE PASSWORD SECTION (LOCAL USERS ONLY) --->
+        <cfif isRemoteAuth>
+        <div class="card card-outline card-secondary mb-4">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-key me-2"></i>Change Password</h3>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <p class="mb-0"><i class="icon fas fa-info-circle"></i>Your account uses <strong>Remote Authentication</strong>. Password changes must be made through your organization's directory service. Please contact your IT administrator if you need to change your password.</p>
+                </div>
+            </div>
+        </div>
+        <cfelse>
         <div class="card card-outline card-primary mb-4">
             <div class="card-header">
                 <h3 class="card-title"><i class="fas fa-key me-2"></i>Change Password</h3>
@@ -440,6 +468,7 @@ $(document).ready(function() {
                 </form>
             </div>
         </div>
+        </cfif>
 
         <!--- TWO-FACTOR AUTHENTICATION SECTION (ALL USERS) --->
         <!--- Query LDAP directly for accurate 2FA status (session may be stale) --->

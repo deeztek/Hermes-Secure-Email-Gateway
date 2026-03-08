@@ -111,7 +111,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
                         <tr valign="top" align="left">
                           <td></td>
                           <td colspan="2" width="506" id="Text373" class="TextObject">
-                            <p style="margin-bottom: 0px;"><b><span style="font-size: 16px; color: rgb(0,51,153);">Edit Internal Recipient Encryption</span></b></p>
+                            <p style="margin-bottom: 0px;"><b><span style="font-size: 16px; color: rgb(0,51,153);">Edit Relay Recipient Encryption</span></b></p>
                           </td>
                           <td colspan="2"></td>
                         </tr>
@@ -625,7 +625,7 @@ arguments="start">
                                           <table id="Table138" border="0" cellspacing="0" cellpadding="0" width="100%" style="height: 137px;">
                                             <tr style="height: 14px;">
                                               <td width="595" id="Cell973">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Internal Recipient</span></b></p>
+                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px;">Relay Recipient</span></b></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 17px;">
@@ -1091,7 +1091,7 @@ arguments="start">
                                                       <table width="360" border="0" cellspacing="0" cellpadding="0">
                                                         <tr>
                                                           <td class="TextObject">
-                                                            <p style="text-align: left; margin-bottom: 0px;"><input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Internal Recipients Encryption" style="height: 24px; width: 357px;">
+                                                            <p style="text-align: left; margin-bottom: 0px;"><input type="submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();" name="FormsButton1" value="Back to Relay Recipients Encryption" style="height: 24px; width: 357px;">
 &nbsp;</p>
                                                           </td>
                                                         </tr>

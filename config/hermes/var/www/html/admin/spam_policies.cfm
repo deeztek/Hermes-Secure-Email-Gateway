@@ -385,7 +385,7 @@ select * from policy where id='#policy_id#'
 
 <cfif #m# is "7">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Policy added. Please assign internal recipients to it</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Policy added. Please assign relay recipients to it</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -410,7 +410,7 @@ select * from policy where id='#policy_id#'
 
 <cfif #m# is "11">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon">&nbsp;you cannot delete a policy that's already assigned to internal recipients. Assign internal recipients to a different policy and try again</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon">&nbsp;you cannot delete a policy that's already assigned to relay recipients. Assign relay recipients to a different policy and try again</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -429,7 +429,7 @@ select * from policy where id='#policy_id#'
 
 <cfif #m# is "13">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete the default assigned to internal recipients policy. Set another policy as the Default Policy and try again</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete the default assigned to relay recipients policy. Set another policy as the Default Policy and try again</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -857,7 +857,7 @@ select * from recipients where domain is NULL and recipient like '%#filter#%' or
                                       <td width="949" id="Text378" class="TextObject">
                                         <p style="margin-bottom: 0px;"><cfif #getaccountusers.recordcount# GTE 1>
 <cfoutput>
-<p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(128,128,128);">Displaying #StartRow# through #toRow# out of #getaccountusers.recordcount# total internal recipients</span></p>
+<p style="text-align: center; margin-bottom: 0px;"><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(128,128,128);">Displaying #StartRow# through #toRow# out of #getaccountusers.recordcount# total relay recipients</span></p>
 </cfoutput>
 <cfelse>
 </cfif>&nbsp;</p>
@@ -991,7 +991,7 @@ select * from policy where id<>'#policy_id#'
 
 <cfif #m# is "7">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Policy added. Please assign internal recipients to it</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(16,174,75);"><img id="Picture37" height="14" width="15" src="checkmark_icon.png" vspace="0" hspace="0" align="top" border="0" alt="checkmark_icon" title="checkmark_icon">&nbsp;Success!! Policy added. Please assign relay recipients to it</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -1016,7 +1016,7 @@ select * from policy where id<>'#policy_id#'
 
 <cfif #m# is "11">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete a policy that's already assigned to internal recipients. Assign internal recipients to a different policy and try again</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete a policy that's already assigned to relay recipients. Assign relay recipients to a different policy and try again</span></i></b></p>
 </cfoutput>
 </cfif>
 
@@ -1035,7 +1035,7 @@ select * from policy where id<>'#policy_id#'
 
 <cfif #m# is "13">
 <cfoutput>
-<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete the default assigned to internal recipients policy. Set another policy as the Default Policy and try again</span></i></b></p>
+<p style="margin-bottom: 0px;"><b><i><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(255,0,0);"><img id="Picture37" height="14" width="15" src="warning_icon.png" vspace="0" hspace="0" align="top" border="0" alt="warning_icon1" title="warning_icon1">&nbsp;you cannot delete the default assigned to relay recipients policy. Set another policy as the Default Policy and try again</span></i></b></p>
 </cfoutput>
 </cfif>
 

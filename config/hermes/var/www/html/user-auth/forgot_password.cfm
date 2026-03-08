@@ -228,6 +228,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cflocation url="forgot_password.cfm" addtoken="no">
     </cfif>
 
+    <!--- CHECK IF USER IS REMOTE AUTH (password managed externally) --->
+    <cfquery name="checkRemoteAuth" datasource="hermes">
+        SELECT auth_type FROM recipients WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">
+    </cfquery>
+    <cfif checkRemoteAuth.recordcount GT 0 AND checkRemoteAuth.auth_type EQ "remote">
+        <!--- Remote auth users cannot reset password here - show same generic message for security --->
+        <cfset session.reason = 3>
+        <cflocation url="forgot_password.cfm" addtoken="no">
+    </cfif>
+
     <!--- DETERMINE USER TYPE AND HANDLE ACCORDINGLY --->
     <cfif isRelay>
         <!--- RELAY USER: Send token via email --->

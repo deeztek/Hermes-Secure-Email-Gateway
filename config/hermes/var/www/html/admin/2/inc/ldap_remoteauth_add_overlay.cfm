@@ -29,7 +29,7 @@ You cannot add mappings to an existing overlay using ldapmodify add operation.
 
 Requires the following variables to be set before including:
 - remoteauthMappingsArray: Array of structs with keys: domain_name, server_address
-  e.g., [{domain_name: "deeztek", server_address: "ldap://server1:389"}, ...]
+  e.g., [{domain_name: "example", server_address: "ldap://server1:389"}, ...]
 - remoteauthDefaultDomain: Default domain (usually first domain)
 - remoteauthStarttls: 'yes' or 'no'
 - remoteauthTlsReqcert: 'never', 'allow', 'try', or 'demand'

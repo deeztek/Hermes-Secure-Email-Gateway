@@ -21,8 +21,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!---
 DELETE DOMAIN MAPPING FROM REMOTEAUTH OVERLAY
 Requires the following variables to be set before including:
-- remoteauthMappingDomain: Domain name (e.g., 'deeztek')
-- remoteauthMappingServer: Server address (e.g., 'homedc01.deeztek.com')
+- remoteauthMappingDomain: Domain name (e.g., 'example')
+- remoteauthMappingServer: Server address (e.g., 'dc01.example.com')
 
 Sets:
 - remoteauthDeleteMappingResult: Result from ldapmodify command

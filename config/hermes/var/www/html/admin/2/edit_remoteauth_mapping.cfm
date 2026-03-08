@@ -233,7 +233,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="mb-3">
                 <label class="form-label">Domain Name <span class="text-danger">*</span></label>
                 <input type="text" name="domain_name" class="form-control" value="<cfoutput>#getMapping.domain_name#</cfoutput>" required>
-                <small class="text-muted">The domain identifier for this mapping (e.g., deeztek)</small>
+                <small class="text-muted">The domain identifier for this mapping (e.g., example)</small>
             </div>
             <div class="row">
                 <div class="col-md-6">

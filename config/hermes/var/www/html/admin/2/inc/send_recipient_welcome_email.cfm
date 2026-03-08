@@ -20,7 +20,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 SEND WELCOME EMAIL TO NEW RECIPIENT
-Sends a welcome email to a newly created internal recipient with instructions
+Sends a welcome email to a newly created relay recipient with instructions
 to reset their password before logging in.
 
 NOTE: This email does NOT contain a password reset link with a token.

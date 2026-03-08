@@ -215,7 +215,7 @@ select report_frequency, report_enabled from user_settings where email = '#sessi
 <!--- FORM.FREQUENCY --->
 <cfif NOT StructKeyExists(form, "frequency")>
 
-  <cfset m="Edit Internal Recipients: form.frequency does not exist">
+  <cfset m="Edit Relay Recipients: form.frequency does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 

@@ -20,7 +20,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 SEND WELCOME EMAIL TO NEW RECIPIENT (REMOTE AUTH)
-Sends a welcome email to a newly created internal recipient that uses
+Sends a welcome email to a newly created relay recipient that uses
 Remote Authentication. Instructs the user to log in with their existing
 organization credentials (no password reset needed).
 

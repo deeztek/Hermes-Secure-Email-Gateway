@@ -25,7 +25,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Internal Recipients</title>
+  <title>Hermes SEG | Relay Recipients</title>
 
   <cfinclude template="./inc/html_head.cfm" />
 <!--- Sort Table Script Default Sort by Column 4 Desc --->
@@ -189,7 +189,7 @@ a, a:hover{
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
-            <h1 class="m-0">Internal Recipients</h1>
+            <h1 class="m-0">Relay Recipients</h1>
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
             --->
@@ -199,7 +199,7 @@ a, a:hover{
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Internal Recipients</li>
+              <li class="breadcrumb-item active">Relay Recipients</li>
             </ol>
           </div><!-- /.col -->
         </div><!-- /.row -->
@@ -1067,7 +1067,7 @@ a, a:hover{
   <!--- FORM.POLICY --->
   <cfif NOT StructKeyExists(form, "policy")>
   
-    <cfset m="Edit Internal Recipients: form.policy does not exist">
+    <cfset m="Edit Relay Recipients: form.policy does not exist">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1079,7 +1079,7 @@ a, a:hover{
   
   <cfif #checkpolicy.recordcount# LT 1>
   
-    <cfset m="Edit Internal Recipients: checkpolicy.recordcount LT 1">
+    <cfset m="Edit Relay Recipients: checkpolicy.recordcount LT 1">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1092,7 +1092,7 @@ a, a:hover{
   <!--- FORM.REPORTS --->
   <cfif NOT StructKeyExists(form, "reports")>
   
-    <cfset m="Edit Internal Recipients: form.reports does not exist">
+    <cfset m="Edit Relay Recipients: form.reports does not exist">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1102,7 +1102,7 @@ a, a:hover{
   
   <cfelse>
   
-    <cfset m="Edit Internal Recipients: form.reports is not YEs, NO, or ALL">
+    <cfset m="Edit Relay Recipients: form.reports is not YEs, NO, or ALL">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1115,7 +1115,7 @@ a, a:hover{
   <!--- FORM.FREQUENCY --->
   <cfif NOT StructKeyExists(form, "frequency")>
   
-    <cfset m="Edit Internal Recipients: form.frequency does not exist">
+    <cfset m="Edit Relay Recipients: form.frequency does not exist">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1123,7 +1123,7 @@ a, a:hover{
   
     <cfif NOT IsValid("integer", #form.frequency#)>
   
-    <cfset m="Edit Internal Recipients: form.frequency is not valid Integer">
+    <cfset m="Edit Relay Recipients: form.frequency is not valid Integer">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1136,7 +1136,7 @@ a, a:hover{
   <!--- FORM.TRAIN_BAYES --->
   <cfif NOT StructKeyExists(form, "train_bayes")>
   
-    <cfset m="Edit Internal Recipients: form.train_bayes does not exist">
+    <cfset m="Edit Relay Recipients: form.train_bayes does not exist">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1145,7 +1145,7 @@ a, a:hover{
   <cfif #form.train_bayes# is "0" OR #form.train_bayes# is "1">
   
   <cfelse>
-    <cfset m="Edit Internal Recipients: form.train_bayes is not 0 or 1">
+    <cfset m="Edit Relay Recipients: form.train_bayes is not 0 or 1">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1158,7 +1158,7 @@ a, a:hover{
   <!--- FORM.DOWNLOAD_MSG --->
   <cfif NOT StructKeyExists(form, "download_msg")>
   
-    <cfset m="Edit Internal Recipients: form.download_msg does not exist">
+    <cfset m="Edit Relay Recipients: form.download_msg does not exist">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1167,7 +1167,7 @@ a, a:hover{
   <cfif #form.download_msg# is "0" OR #form.download_msg# is "1">
   
   <cfelse>
-    <cfset m="Edit Internal Recipients: form.download_msg is not 0 or 1">
+    <cfset m="Edit Relay Recipients: form.download_msg is not 0 or 1">
     <cfinclude template="./inc/error.cfm">
     <cfabort>
   
@@ -1248,7 +1248,7 @@ a, a:hover{
 <!--- FORM.PDF_ENABLED --->
 <cfif NOT StructKeyExists(form, "pdf_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.pdf_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.pdf_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1257,7 +1257,7 @@ a, a:hover{
 <cfif #form.pdf_enabled# is "1" OR #form.pdf_enabled# is "2">
 
   <cfelse>
-  <cfset m="Edit Internal Recipients: form.pdf_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.pdf_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1270,7 +1270,7 @@ a, a:hover{
 <!--- FORM.SMIME_ENABLED --->
 <cfif NOT StructKeyExists(form, "smime_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.smime_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.smime_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1280,7 +1280,7 @@ a, a:hover{
 
 <cfelse>
 
-  <cfset m="Edit Internal Recipients: form.smime_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.smime_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1293,7 +1293,7 @@ a, a:hover{
 <!--- FORM.SIGN --->
 <cfif NOT StructKeyExists(form, "sign")>
 
-  <cfset m="Edit Internal Recipients: form.sign does not exist">
+  <cfset m="Edit Relay Recipients: form.sign does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1302,7 +1302,7 @@ a, a:hover{
 <cfif #form.sign# is "1" OR #form.sign# is "2">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.sign is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.sign is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1315,7 +1315,7 @@ a, a:hover{
 <!--- FORM.PGP_ENABLED --->
 <cfif NOT StructKeyExists(form, "pgp_enabled")>
 
-  <cfset m="Edit Internal Recipients: form.pgp_enabled does not exist">
+  <cfset m="Edit Relay Recipients: form.pgp_enabled does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1324,7 +1324,7 @@ a, a:hover{
 <cfif #form.pgp_enabled# is "1" OR #form.pgp_enabled# is "2">
 
 <cfelse>
-  <cfset m="Edit Internal Recipients: form.pgp_enabled is not 1 or 2">
+  <cfset m="Edit Relay Recipients: form.pgp_enabled is not 1 or 2">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 
@@ -1414,11 +1414,11 @@ a, a:hover{
 
 <!--- VALIDATE ACCESS_CONTROL PARAMETER --->
 <cfif NOT StructKeyExists(form, "access_control")>
-  <cfset m="Edit Internal Recipients: form.access_control does not exist">
+  <cfset m="Edit Relay Recipients: form.access_control does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 <cfelseif form.access_control NEQ "one_factor" AND form.access_control NEQ "two_factor">
-  <cfset m="Edit Internal Recipients: form.access_control is not one_factor or two_factor">
+  <cfset m="Edit Relay Recipients: form.access_control is not one_factor or two_factor">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
 </cfif>
@@ -1461,26 +1461,21 @@ a, a:hover{
       <!--- DELETE 2FA DEVICES IF REQUESTED --->
       <cfif StructKeyExists(form, "delete_2fa_devices") AND form.delete_2fa_devices EQ "1">
         <cftry>
-          <!--- Read the delete devices script template --->
-          <cffile action="read" file="/opt/hermes/scripts/authelia_delete_user_device_all.sh" variable="deviceDeleteScript">
+          <!--- Delete TOTP devices via docker exec --->
+          <cfexecute name="/usr/local/bin/docker"
+              arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /config/configuration.yml"
+              timeout="30"
+              variable="totpDeleteResult"
+              errorVariable="totpDeleteError">
+          </cfexecute>
 
-          <!--- Replace placeholder with actual username --->
-          <cfset deviceDeleteScript = REReplace(deviceDeleteScript, "THE-USER", ldapUsername, "ALL")>
-
-          <!--- Generate unique temp filename --->
-          <cfinclude template="./inc/generate_customtrans.cfm">
-
-          <!--- Write the script to temp location --->
-          <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_delete_devices.sh" output="#deviceDeleteScript#">
-
-          <!--- Make it executable and run it --->
-          <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_delete_devices.sh" timeout="10"></cfexecute>
-          <cfexecute name="/opt/hermes/tmp/#customtrans3#_delete_devices.sh" timeout="60"></cfexecute>
-
-          <!--- Cleanup --->
-          <cfif fileExists("/opt/hermes/tmp/#customtrans3#_delete_devices.sh")>
-            <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_delete_devices.sh">
-          </cfif>
+          <!--- Delete WebAuthn devices via docker exec --->
+          <cfexecute name="/usr/local/bin/docker"
+              arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --config /config/configuration.yml --all"
+              timeout="30"
+              variable="webauthnDeleteResult"
+              errorVariable="webauthnDeleteError">
+          </cfexecute>
         <cfcatch type="any">
           <!--- Log error but continue processing --->
         </cfcatch>
@@ -1550,10 +1545,10 @@ a, a:hover{
 </cfif>
 --->
 
-<!--- INTERNAL RECIPIENTS CARD --->
+<!--- RELAY RECIPIENTS CARD --->
 <div class="card card-outline card-primary mb-4">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-users me-2"></i>Internal Recipients</h3>
+        <h3 class="card-title"><i class="fas fa-users me-2"></i>Relay Recipients</h3>
     </div>
     <div class="card-body">
         <form>
@@ -1681,7 +1676,7 @@ a, a:hover{
 
       <div class="alert alert-info">
         <h5><i class="icon fas fa-info-circle"></i> No Recipients Found</h5>
-        <p class="mb-0">No Internal Recipients were found. Click <strong>Create Recipient(s)</strong> to add new recipients.</p>
+        <p class="mb-0">No Relay Recipients were found. Click <strong>Create Recipient(s)</strong> to add new recipients.</p>
       </div>
 
       <!--- /CFIF FOR getrecipients.recordcount --->
@@ -1689,7 +1684,7 @@ a, a:hover{
 
     </div><!--- /.card-body --->
 </div><!--- /.card --->
-<!--- END INTERNAL RECIPIENTS CARD --->
+<!--- END RELAY RECIPIENTS CARD --->
 
     
     

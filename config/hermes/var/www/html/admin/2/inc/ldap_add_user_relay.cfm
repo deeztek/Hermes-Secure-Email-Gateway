@@ -20,7 +20,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 ADD RELAY USER TO LDAP
-Creates an LDAP user for an internal recipient (relay) with a random password.
+Creates an LDAP user for an relay recipient (relay) with a random password.
 The user must reset their password before logging in.
 
 Requires the following variables to be set before including:

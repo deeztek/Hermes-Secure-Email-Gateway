@@ -78,7 +78,7 @@
 
           <p>
 
-            Your mailbox <b>(dedwards@deeztek.org)</b> has reached <b>100%</b> usage. You will no longer be able to send or receive e-mail until you bring the usage below 100% by deleting unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>0.02 GB</b> of storage quota. If you need additional storage please contact to your Administrator.
+            Your mailbox <b>(jsmith@example.com)</b> has reached <b>100%</b> usage. You will no longer be able to send or receive e-mail until you bring the usage below 100% by deleting unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>0.02 GB</b> of storage quota. If you need additional storage please contact to your Administrator.
 
         
      </p>

@@ -1374,7 +1374,7 @@ select distinct(rule_name) from file_rule_components where rule_name <> '#show_b
                                             </tr>
                                             <tr style="height: 14px;">
                                               <td id="Cell1053">
-                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Default Policy to be Assigned to New Internal Recipients</span></b></p>
+                                                <p style="margin-bottom: 0px;"><b><span style="font-family: Arial,Helvetica,Geneva,Sans-serif; font-size: 12px; color: rgb(51,51,51);">Default Policy to be Assigned to New Relay Recipients</span></b></p>
                                               </td>
                                             </tr>
                                             <tr style="height: 42px;">

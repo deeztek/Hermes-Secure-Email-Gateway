@@ -48,7 +48,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_internal_recipients.cfm">Internal Recipients</a></li>
+              <li class="breadcrumb-item"><a href="view_internal_recipients.cfm">Relay Recipients</a></li>
               <li class="breadcrumb-item active">Edit Backend</li>
             </ol>
           </div><!-- /.col -->

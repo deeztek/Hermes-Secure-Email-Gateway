@@ -207,7 +207,7 @@ arguments="-inputformat none">
 <!-- ENCRYPT PASSWORD -->
 <cfset encryptedPassword=encrypt(password1, #theKey#, "AES", "Base64")>
 
-<!--- IF URL.TYPE IS 1 THEN INTERNAL RECIPIENT --->
+<!--- IF URL.TYPE IS 1 THEN RELAY RECIPIENT --->
 <cfif #url.type# is "1">
 
   <cfquery name="insert" datasource="hermes">

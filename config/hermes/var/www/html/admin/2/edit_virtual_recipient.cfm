@@ -459,7 +459,7 @@ select domain from domains where domain='#form.domain#'
         <label><strong>Delivers To</strong></label>
         <div class="input-group">
         <cfoutput>
-        <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1" placeholder="Start typing to search existing Internal Recipients or enter external recipient manually" value="#getrecipient.maps#" autocomplete="off">
+        <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1" placeholder="Start typing to search existing Relay Recipients or enter external recipient manually" value="#getrecipient.maps#" autocomplete="off">
         </cfoutput>
         
         <!--- /div class="input-group" --->
