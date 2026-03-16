@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter='inet:127.0.0.1:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
   </cfquery>
   
   <cfquery name="dmarcnonsmtpd" datasource="hermes">
@@ -35,7 +35,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter='inet:127.0.0.1:54321' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:54321' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
   </cfquery>
 
 
@@ -120,7 +120,7 @@ file = "#FiletoDelete#">
   enabled='2',
   applied='1'
   where
-  parameter='inet:127.0.0.1:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
   </cfquery>
   
   <cfquery name="dmarcnonsmtpd" datasource="hermes">
@@ -128,7 +128,7 @@ file = "#FiletoDelete#">
   enabled='2',
   applied='1'
   where
-  parameter='inet:127.0.0.1:54321' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:54321' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
   </cfquery>
 
 <cfquery name="updateFailureReports" datasource="hermes">

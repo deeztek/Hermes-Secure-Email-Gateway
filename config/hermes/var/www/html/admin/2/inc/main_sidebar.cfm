@@ -223,31 +223,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
-              <a href="/admin/perimeter_configuration.cfm" class="nav-link">
+              <a href="view_perimeter_checks.cfm" class="nav-link">
                 <i class="nav-icon far fa-square"></i>
                 <p>Perimeter Checks</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/rbl.cfm" class="nav-link">
+              <a href="view_rbl_configuration.cfm" class="nav-link">
                 <i class="nav-icon fas fa-ban"></i>
                 <p>RBL Configuration</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/rbl_override.cfm" class="nav-link">
+              <a href="view_network_block_allow.cfm" class="nav-link">
                 <i class="nav-icon fas fa-network-wired"></i>
                 <p>Network Block/Allow</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/sender_bypass.cfm" class="nav-link">
+              <a href="view_sender_recipient_block_allow.cfm" class="nav-link">
                 <i class="nav-icon fab fa-connectdevelop"></i>
-                <p>Sender to Recipient Block/Allow</p>
+                <p>Sender/Recipient Rules</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/global_sender_bypass.cfm" class="nav-link">
+              <a href="view_global_sender_block_allow2.cfm" class="nav-link">
                 <i class="nav-icon fas fa-globe"></i>
                 <p>Global Sender Block/Allow</p>
               </a>
@@ -271,7 +271,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/2/view_antivirus_settings.cfm" class="nav-link">
+              <a href="view_antivirus_settings.cfm" class="nav-link">
                 <i class="nav-icon fas fa-virus"></i>
                 <p>Antivirus Settings</p>
               </a>
@@ -289,49 +289,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/initialize_pyzor.cfm" class="nav-link">
-                <i class="nav-icon fas fa-play-circle"></i>
-                <p>Initialize Pyzor</p>
+              <a href="view_antispam_maintenance.cfm" class="nav-link">
+                <i class="nav-icon fas fa-tools"></i>
+                <p>Anti-Spam Maintenance</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/initialize_razor.cfm" class="nav-link">
-                <i class="nav-icon fas fa-play-circle"></i>
-                <p>Initialize Razor</p>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="/admin/clear_bayes.cfm" class="nav-link">
-                <i class="nav-icon fas fa-database"></i>
-                <p>Clear Bayes Database</p>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="/admin/file_extensions.cfm" class="nav-link">
+              <a href="view_file_extensions.cfm" class="nav-link">
                 <i class="nav-icon far fa-file"></i>
                 <p>File Extensions</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/file_expressions.cfm" class="nav-link">
+              <a href="view_file_expressions.cfm" class="nav-link">
                 <i class="nav-icon far fa-file"></i>
                 <p>File Expressions</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/file_rules.cfm" class="nav-link">
+              <a href="view_file_rules.cfm" class="nav-link">
                 <i class="nav-icon far fa-file"></i>
                 <p>File Rules</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/message_rules.cfm" class="nav-link">
+              <a href="view_message_rules.cfm" class="nav-link">
                 <i class="nav-icon fas fa-envelope-open-text"></i>
                 <p>Message Rules</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/spam_policies.cfm" class="nav-link">
+              <a href="view_svf_policies.cfm" class="nav-link">
                 <i class="nav-icon fas fa-object-group"></i>
                 <p>SVF Policies</p>
               </a>

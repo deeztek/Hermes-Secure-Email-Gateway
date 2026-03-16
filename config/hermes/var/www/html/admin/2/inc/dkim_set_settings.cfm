@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter='inet:127.0.0.1:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
   </cfquery>
   
   <cfquery name="dkimnonsmtpd" datasource="hermes">
@@ -35,7 +35,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter='inet:127.0.0.1:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
   </cfquery>
 
 
@@ -132,7 +132,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='2',
   applied='1'
   where
-  parameter='inet:127.0.0.1:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
   </cfquery>
   
   <cfquery name="dkimnonsmtpd" datasource="hermes">
@@ -140,7 +140,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='2',
   applied='1'
   where
-  parameter='inet:127.0.0.1:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
   </cfquery>
 
 <!--- SET PARAMETERS IN ORDER TO DISABLE DMARC --->

@@ -27,7 +27,7 @@ select id from parameters where parameter='non_smtpd_milters' and child = '2'
 </cfquery>
 
 <cfquery name="get_dkim" datasource="hermes">
-select enabled from parameters where parameter='inet:127.0.0.1:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
+select enabled from parameters where parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
 </cfquery>
 
 

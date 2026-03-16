@@ -57,7 +57,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
   
   <cfquery name="get_dmarc" datasource="hermes">
-  select parameter, child, parent, enabled from parameters where parameter='inet:127.0.0.1:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  select parameter, child, parent, enabled from parameters where parameter LIKE 'inet:%:54321' and child = '1' and parent='#get_smtpd_milters_id.id#'
   </cfquery>
   
   <cfparam name = "dmarcenabled" default = "#get_dmarc.enabled#"> 
