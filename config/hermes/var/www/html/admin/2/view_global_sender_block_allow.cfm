@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -21,1270 +21,444 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <html lang="en">
 
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Global Sender Block/Allow</title>
 
   <cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script  --->
-<script>
-$(document).ready(function() {
-    $('#sortTable').DataTable( {
-dom: 'Blfrtip',
-  buttons: [
-'copy', 'csv', 'excel', 'pdf', 'print'
-  ],
-  lengthMenu: [
-[ 10, 25, 50, -1 ],
-[ '10 rows', '25 rows', '50 rows', 'Show all' ]
-
-    ],
-  "order": [[ 2, "asc" ]]
-    } );
-} );
-  </script>
-
-
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-<!--- ADJUST DATATABLE FONT SIZES --->
-<style>
-  th { font-size: 16px; }
-td { font-size: 16px; }
-</style>
-
-
-<!--- TEXT AREA STYLE ---> 
-<style>
-  textarea{
-border:1px solid #999999;
-width:100%;
-margin:5px 0;
-padding:3px;
-  }
-  .textareacontainer{
-padding-right: 8px; /* 1 + 3 + 3 + 1 */
-  }
-    </style>
-
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW STARTS HERE --->  
-<style>
-  .alert a {
-    color: #fff;
-    text-decoration: none;
-}
-</style>
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW ENDS HERE --->  
 
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
 
-
-
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
-<div class="container-fluid">
-  <div class="row mb-2">
-    <div class="col-sm-6">
-<cfoutput>
-<h1 class="m-0">Global Sender Block/Allow</h1>
-<!---
-<h2 class="m-0">Group Member: #session.thegroups#</h2>
---->
-    </cfoutput>
-
-    </div><!-- /.col -->
-    <div class="col-sm-6">
-<ol class="breadcrumb float-sm-end">
-  <li class="breadcrumb-item"><a href="#">Home</a></li>
-  <li class="breadcrumb-item active">Global Sender Block/Allow</li>
-</ol>
-    </div><!-- /.col -->
-  </div><!-- /.row -->
-</div><!-- /.container-fluid -->
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">Global Sender Block/Allow</h1>
+          </div>
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-end">
+              <li class="breadcrumb-item"><a href="#">Home</a></li>
+              <li class="breadcrumb-item active">Global Sender Block/Allow</li>
+            </ol>
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
     <div class="content">
-<div class="container-fluid">
+      <div class="container-fluid">
 
-    <!--- ENABLE FOR DEBUG ONLY --->
- <!--- 
-  <cfdump var="#cgi#">
- 
-  <cfoutput>
- #cgi.http_referer#
-</cfoutput>
-    --->
-    
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
-  <cfset m = session.m>
+<cfparam name="m" default="0">
+<cfif StructKeyExists(session, "m")>
+  <cfif session.m is not ""><cfset m = session.m></cfif>
+</cfif>
 
-  <!--- ENABLE FOR DEBUG BELOW --->
-  <!---
-  <cfoutput>#session.m#</cfoutput>
-  --->
-
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-
-
-<cfparam name = "step" default = "0">
-    
-<cfparam name = "action" default = ""> 
+<cfparam name="action" default="">
+<cfif StructKeyExists(url, "action")>
+  <cfif url.action is not ""><cfset action = url.action></cfif>
+</cfif>
 <cfif StructKeyExists(form, "action")>
-<cfif form.action is not "">
-<cfset action = form.action>
-
-<!--- /CFIF form.action is not "" --->
+  <cfif form.action is not ""><cfset action = form.action></cfif>
 </cfif>
 
-<!--- /CFIF for StructKeyExists --->
-</cfif>  
+<!--- GET DATA --->
+<cfinclude template="./inc/get_global_sender_block_allow.cfm">
 
-<!--- GET SMTP TLS SETTINGS TO BE USED AS FORM INPUTS BELOW --->
-<cfinclude template="./inc/get_smtp_tls_settings.cfm">
-
-<!--- GET SMTP TLS POLICIES TO BE USED AS FORM INPUTS BELOW --->
-<cfinclude template="./inc/get_smtp_tls_policies.cfm">
-  
-  <cfparam name = "tls_mode" default = "#smtpd_tls_security_level.parameter#"> 
-  <cfif StructKeyExists(form, "tls_mode")>
-  <cfif form.tls_mode is not "">
-  <cfset tls_mode = form.tls_mode>
-  
-<!--- /CFIF form.tls_mode is --->
+<!--- ACTION HANDLERS --->
+<cfif action is "add_entries">
+  <cfinclude template="./inc/global_sender_add_entries.cfm">
+<cfelseif action is "delete" OR action is "bulk_delete">
+  <cfinclude template="./inc/global_sender_delete_entry.cfm">
+<cfelseif action is "edit_entry">
+  <cfinclude template="./inc/global_sender_edit_entry.cfm">
+<cfelseif action is "cancel_add">
+  <cfinclude template="./inc/global_sender_cancel_add.cfm">
+<cfelseif action is "cancel_delete">
+  <cfinclude template="./inc/global_sender_cancel_delete.cfm">
+<cfelseif action is "apply">
+  <cfinclude template="./inc/global_sender_apply.cfm">
 </cfif>
 
-<!--- StructKeyExists(form, "tls_mode") --->
-  </cfif>
+<!--- Refresh data after actions --->
+<cfinclude template="./inc/get_global_sender_block_allow.cfm">
+<cfset session.m = "">
 
-  <cfparam name = "smtpCertificate" default = "#smtpd_tls_certificate.value2#"> 
-
-
-<!--- ERROR MESSAGES START HERE --->
-
-<cfif #m# is "1">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The SMTP TLS Certificate cannot be blank when the SMTP TLS Mode is set to Opportunistic TLS or Mandatory TLS (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "2">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The SMTP TLS Certificate you entered is not valid (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "3">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You cannot select the system-self-signed Certificate for SMTP TLS (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-
-<cfif #m# is "4">
-  
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You entered an invalid domain (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "5">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Domain you are attempting to add already exists (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "6">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Domain you are attempting to edit already exists (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-  
-<cfif #m# is "34">
+<!--- ALERTS --->
+<cfif m is 1>
   <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Domain was deleted successfully.</cfoutput><br><br>
-
-
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Entries Added</h4>
+    <cfif StructKeyExists(session, "entries_added")>
+      <p><cfoutput>#session.entries_added#</cfoutput> entries staged for addition.</p>
+      <cfset session.entries_added = "">
+    </cfif>
+    <cfif StructKeyExists(session, "entries_skipped") AND session.entries_skipped GT 0>
+      <p><cfoutput>#session.entries_skipped#</cfoutput> entries skipped.</p>
+      <cfset session.entries_skipped = "">
+    </cfif>
+    <cfif StructKeyExists(session, "entry_errors") AND session.entry_errors is not "">
+      <p><cfoutput>#session.entry_errors#</cfoutput></p>
+      <cfset session.entry_errors = "">
+    </cfif>
+    <p>Click <strong>Apply Settings</strong> to activate.</p>
   </div>
-
-  <cfset session.m = 0>
-  
 </cfif>
-
-
-<cfif #m# is "35">
+<cfif m is 2>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Marked for Deletion</h4>
+    <p>Click <strong>Apply Settings</strong> to confirm.</p>
+  </div>
+</cfif>
+<cfif m is 3>
   <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The SMTP TLS Mode was set successfully.</cfoutput><br><br>
-
-
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Settings Applied</h4>
+    <p>Global sender block/allow configuration applied. Postfix reloaded and Amavis restarted.</p>
   </div>
-
-  <cfset session.m = 0>
-  
+</cfif>
+<cfif m is 4>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Apply Failed</h4>
+    <p>An error occurred while applying settings. Check container logs for details.</p>
+  </div>
+</cfif>
+<cfif m is 5>
+  <div class="alert alert-info alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-edit"></i> Entry Updated</h4>
+    <p>Click <strong>Apply Settings</strong> to activate.</p>
+  </div>
+</cfif>
+<cfif m is 6>
+  <div class="alert alert-info alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-undo"></i> Pending Additions Cancelled</h4>
+  </div>
+</cfif>
+<cfif m is 7>
+  <div class="alert alert-info alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-undo"></i> Pending Deletions Cancelled</h4>
+  </div>
+</cfif>
+<cfif m is 30>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    <p>Please enter at least one email address or domain.</p>
+  </div>
 </cfif>
 
-<cfif #m# is "36">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Global Sender Block/Allow was Disabled successfully.</cfoutput><br><br>
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-  
-<cfif #m# is "37">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Domain was added successfully</cfoutput><br><br>
-
-
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "38">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Global Sender Block/Allow Settings applied successfully.</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "39">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Domain was edited successfully</cfoutput><br><br>
-
-
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-
-<!--- ERROR MESSAGES END HERE --->
-
-
-<!--- ADD DOMAIN MODAL HTML STARTS HERE --->
-
-<div class="modal fade" id="adddomain_modal" tabindex="-1" role="dialog" aria-labelledby="AddDomainModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-primary">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Add SMTP TLS Policy Domain </h4>
+<!--- WARNING CALLOUT --->
+<div class="callout callout-danger mb-4">
+  <h5><i class="fas fa-exclamation-triangle"></i> Use Extreme Caution</h5>
+  <p class="mb-1">
+    Any <strong>Allow</strong> entries will bypass <strong>ALL</strong> filter checks including Spam, Virus, and Banned File checks
+    for <strong>ALL</strong> recipients in your system. Do not use if at all possible. A Global Sender Block/Allow entry takes
+    precedence over any Sender to Recipient Block/Allow entries.
+  </p>
+  <p class="mb-0">
+    To match an entire domain <strong>and all of its subdomains</strong>, enter a leading dot (e.g., <code>.example.com</code>).
+    This is a powerful rule &mdash; use it with extreme care, as it will affect <strong>every</strong> email from
+    <code>example.com</code>, <code>sub.example.com</code>, etc. for all recipients.
+    To match only a single domain (no subdomains), enter it without a leading dot (e.g., <code>example.com</code>).
+  </p>
 </div>
-  
-<div class="modal-body">
 
-  <form name="AddDomain" autocomplete="off" method="post">
+<!--- PENDING CHANGES --->
+<cfif has_pending_changes>
+  <cfif get_pending_adds.recordCount GT 0>
+    <div class="card card-warning card-outline mb-4">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Additions (<cfoutput>#get_pending_adds.recordCount#</cfoutput>)</h3>
+      </div>
+      <div class="card-body">
+        <cfoutput query="get_pending_adds">
+          <span class="badge <cfif type is 'allow'>bg-success<cfelse>bg-danger</cfif> me-1">+ #encodeForHTML(sender)# (#type#)</span>
+        </cfoutput>
+        <div class="mt-3">
+          <form method="post" class="d-inline">
+            <input type="hidden" name="action" value="cancel_add">
+            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Additions</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </cfif>
+  <cfif get_pending_deletes.recordCount GT 0>
+    <div class="card card-danger card-outline mb-4">
+      <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Deletions (<cfoutput>#get_pending_deletes.recordCount#</cfoutput>)</h3>
+      </div>
+      <div class="card-body">
+        <cfoutput query="get_pending_deletes">
+          <span class="badge bg-danger me-1">- #encodeForHTML(sender)#</span>
+        </cfoutput>
+        <div class="mt-3">
+          <form method="post" class="d-inline">
+            <input type="hidden" name="action" value="cancel_delete">
+            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Deletions</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </cfif>
+  <div class="mb-4">
+    <form method="post" class="d-inline">
+      <input type="hidden" name="action" value="apply">
+      <button type="submit" class="btn btn-danger btn-lg"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
+        <i class="fas fa-check-circle"></i> Apply Settings
+      </button>
+    </form>
+  </div>
+</cfif>
 
-    <input type="hidden" name="action" value="adddomain">
-
-  
-
-
-    <cfoutput>
-      <div class="form-group">
-        <label for="domain"><strong>Domain</strong></label>
-        <div class="alert alert-warning">
-   
-          <p><i class="icon fas fa-exclamation-triangle"></i>Adding a "." in front of the domain will encompass the domain and all subdomains Ex: .domain.tld</p>
+<!-- ADD ENTRIES CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add Sender Entries</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" autocomplete="off" id="addForm">
+      <input type="hidden" name="action" value="add_entries">
+      <div class="row">
+        <div class="col-md-6">
+          <label for="entries" class="form-label"><strong>Email Addresses and/or Domains</strong></label>
+          <textarea class="form-control" id="entries" name="entries" rows="5"
+            placeholder="user@example.com
+example.com
+.example.com"></textarea>
+          <small class="text-muted">
+            One entry per line. Enter an email address (e.g., <code>user@example.com</code>), a domain (e.g., <code>example.com</code>),
+            or a leading-dot domain (e.g., <code>.example.com</code>) to match the domain and all its subdomains.
+          </small>
+          <div id="domainWarning" class="alert alert-warning mt-2 d-none">
+            <i class="fas fa-exclamation-triangle"></i>
+            <strong>Warning:</strong> You are adding one or more full domains. This will <span id="domainWarningAction">block</span>
+            all email from the entire domain(s) for all recipients.
           </div>
-        <input type="text" class="form-control" name="domain" value="" id="Domain" placeholder="Domain" maxLength="64">
-      </div>
-      </cfoutput>
-
-            
-
-            <cfoutput>
-              <div class="form-group">
-                <label><strong>Note</strong></label>
-                <input type="text" class="form-control" name="domain_note" value="" id="domain_note" placeholder="Enter Note" maxLength="255">
-              </div>
-              </cfoutput>
-
-    <div>&nbsp;</div>
-
-    <input type="submit" value="Submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  </form>
-
-</div>
-
-
-<div class="modal-footer">
- 
-<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
-
-</div>
-    </div>
-  </div>
-</div>
-<!--- ADD DOMAIN MODAL HTML ENDS HERE --->
-
-
-
-<!--- DELETE DOMAIN MODAL HTML STARTS HERE --->
-   
-
-<div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="deleteCertificateModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-danger">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Delete Domain </h4>
-</div>
-  
-<div class="modal-body">
-  <p>Are you sure you send to delete this Domain from the SMTP TLS Policy? This action is irreversible! </p>
-
-</div>
-<div class="modal-footer">
-  <form name="DeleteDomain" method="post">
-
-    <input type="hidden" name="action" value="Delete Domain">
-    <input type="hidden" name="delete_id" value=""/>
-    <input type="submit" value="Yes" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-   
-    
-</form>
-  <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No</button>
-</div>
-    </div>
-  </div>
-</div>
-<!--- DELETE DOMAIN MODAL HTML ENDS HERE --->
-
-
-<!--- EDIT DOMAIN MODAL HTML STARTS HERE --->
-
-<div class="modal fade" id="editdomain_modal" tabindex="-1" role="dialog" aria-labelledby="editDomainModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-primary">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Edit Domain</h4>
-</div>
-  
-<div class="modal-body">
-
-
-  <form name="EditDomain" autocomplete="off" method="post">
-
-    <input type="hidden" name="action" value="editdomain">
-    <input type="hidden" name="data_id" value=""/>
-
-    <cfoutput>
-      <div class="form-group">
-        <label for="username"><strong>Domain</strong></label>
-        <div class="alert alert-warning">
-   
-          <p><i class="icon fas fa-exclamation-triangle"></i>Adding a "." in front of the domain will encompass the domain and all subdomains Ex: .domain.tld</p>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label"><strong>Action</strong></label>
+          <div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="entry_type" id="type_block" value="block" checked>
+              <label class="form-check-label" for="type_block"><i class="fas fa-ban text-danger"></i> Block</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="entry_type" id="type_allow" value="allow">
+              <label class="form-check-label" for="type_allow"><i class="fas fa-check text-success"></i> Allow (bypass ALL filters)</label>
+            </div>
           </div>
-        <input type="text" class="form-control" name="domain" value="" id="domain" placeholder="Domain" maxLength="20">
+        </div>
+        <div class="col-md-3 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
+            <i class="fas fa-plus"></i> Add Entries
+          </button>
+        </div>
       </div>
-      </cfoutput>
-
-      
-            
-
-            <cfoutput>
-              <div class="form-group">
-                <label><strong>Note</strong></label>
-                <input type="text" class="form-control" name="note" value="" id="note" placeholder="Enter Note" maxLength="255">
-              </div>
-              </cfoutput>
-
-    <div>&nbsp;</div>
-
-    <input type="submit" value="Submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  </form>
-
+    </form>
+  </div>
 </div>
 
+<!-- ENTRIES TABLE -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-envelope"></i> Global Sender Entries</h3>
+  </div>
+  <div class="card-body">
+    <form id="bulkDeleteForm" method="post">
+      <input type="hidden" name="action" value="bulk_delete">
+      <input type="hidden" name="selected_ids" id="selectedIds" value="">
 
-<div class="modal-footer">
- 
-<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
+      <div class="mb-2">
+        <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteBtn" disabled
+          onclick="submitBulkDelete();">
+          <i class="fas fa-trash"></i> Delete Selected
+        </button>
+      </div>
 
+      <table id="senderTable" class="table table-bordered table-hover table-striped">
+        <thead>
+          <tr>
+            <th style="width: 5%"><input type="checkbox" id="selectAll"></th>
+            <th style="width: 40%">Sender</th>
+            <th style="width: 15%">Format</th>
+            <th style="width: 15%">Action</th>
+            <th style="width: 25%">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <cfoutput query="get_active_all">
+            <tr>
+              <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
+              <td>#encodeForHTML(sender)#</td>
+              <td>
+                <cfif REFind("[@]", sender) GT 0>
+                  <span class="badge bg-info">Email</span>
+                <cfelseif Left(sender, 1) is ".">
+                  <span class="badge bg-warning">Domain + Subdomains</span>
+                <cfelse>
+                  <span class="badge bg-secondary">Domain</span>
+                </cfif>
+              </td>
+              <td>
+                <cfif type is "allow">
+                  <span class="badge bg-success">Allow</span>
+                <cfelse>
+                  <span class="badge bg-danger">Block</span>
+                </cfif>
+              </td>
+              <td>
+                <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(sender)#', '#encodeForJavaScript(type)#');" title="Edit">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="deleteSingle('#id#', '#encodeForJavaScript(sender)#');" title="Delete">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </td>
+            </tr>
+          </cfoutput>
+        </tbody>
+      </table>
+    </form>
+  </div>
 </div>
+
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="edit_entry">
+        <input type="hidden" name="edit_id" id="edit_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Sender Entry</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label for="edit_sender" class="form-label"><strong>Sender (Email or Domain)</strong></label>
+            <input type="text" class="form-control" id="edit_sender" name="edit_sender" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Action</strong></label>
+            <select class="form-select" name="edit_type" id="edit_type">
+              <option value="block">Block</option>
+              <option value="allow">Allow</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
-<!--- EDIT DOMAIN MODAL HTML ENDS HERE --->
 
-<!--- ACTIONS START HERE --->
-
-<cfif #action# is "editdomain">
-
-
-  <!--- VALIDATE PARAMETERS BELOW --->
-
-  <!--- FORM.data_id --->
-  <cfif NOT StructKeyExists(form, "data_id")>
-
-    <cfset step=0>
-    <cfset m="Edit SMTP TLS Policy Domain: form.data_id does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif StructKeyExists(form, "data_id")>
-
-      <cfif #form.data_id# is "">
-
-        
-    <cfset step=0>
-    <cfset m="Edit SMTP TLS Policy Domain: form.data_id is blank">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif #form.data_id# is not "">
-
-      <cfquery name="getdomain" datasource="hermes">
-        select * from tls_policies where id=<cfqueryparam value = #form.data_id# CFSQLType = "CF_SQL_INTEGER">
-        </cfquery>
-        
-
-    <cfif #getdomain.recordcount# LT 1>
-
-    <cfset step=0>
-    <cfset m="Edit SMTP TLS Policy Domain: getdomain.recordcount LT 1">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-  <!--- /CFIF  #getdomain.recordcount# LT 1 --->
-  </cfif>
-
-
-    <!--- /CFIF   #form.data_id# is "" --->
-    </cfif>
-
-    <!--- /CFIF  StructKeyExists(form, "data_id") --->
-    </cfif>
-
-<!--- FORM.domain --->
-  
-<cfif NOT StructKeyExists(form, "domain")>
-  
-  <cfset m="Edit SMTP TLS Policy Domain: form.domain does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-  
-  <cfelseif StructKeyExists(form, "domain")>
-
-<!--- CHECK IF FORM.DOMAIN CONTAINS A (.) IN FRONT --->
-
-<cfif #trim(left(form.domain, 1))# EQ "."> 
-
-<cfset testDomain = "bob@subdomain#form.domain#">
-
-<cfelse>
-
-<cfset testDomain = "bob@#form.domain#">
-
-<!--- /CFIF #trim(left(form.domain, 1))# EQ "." --->
-</cfif>
-
-<cfif NOT IsValid("email", #testDomain#)>
-            
-<cfset step=0>
-<cfset session.m=4>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-<cfelse>
-  
-<cfquery name="checkexists" datasource="hermes">
-select domain from tls_policies where domain like <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.domain#"> and id <> <cfqueryparam cfsqltype="cf_sql_integer" value="#form.data_id#">
-</cfquery>
-
-<cfif #checkexists.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=6>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-<cfelse>
-
-<cfquery name="editdomain" datasource="hermes">
-update tls_policies
-set
-domain = '#form.domain#',
-description = '#note#'
-where id=<cfqueryparam value = #form.data_id# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-<!--- GENERATE TLS POLICY --->
-<cfinclude template="./inc/generate_tls_policy.cfm">
-
-<!--- RESTART POSTFIX --->
-<cfinclude template="./inc/restart_postfix.cfm">
-
-
-<cfset step=0>
-<cfset session.m=39>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-</cfif>
-
-
-
-
-<!--- /CFIF IsValid("email", #testDomain#) --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "domain") --->  
-</cfif>
-
-<!--- FORM.DOMAIN --->
-  
-
-
-<cfelseif #action# is "adddomain">
-
-
-
-  <!--- VALIDATE PARAMETERS BELOW --->
-
-<!--- FORM.domain --->
-  
-  <cfif NOT StructKeyExists(form, "domain")>
-  
-  <cfset m="Add SMTP TLS Policy Domain: form.domain does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-  
-  <cfelseif StructKeyExists(form, "domain")>
-
-<!--- CHECK IF FORM.DOMAIN CONTAINS A (.) IN FRONT --->
-
-<cfif #trim(left(form.domain, 1))# EQ "."> 
-
-<cfset testDomain = "bob@subdomain#form.domain#">
-
-<cfelse>
-
-<cfset testDomain = "bob@#form.domain#">
-
-<!--- /CFIF #trim(left(form.domain, 1))# EQ "." --->
-</cfif>
-
-<cfif NOT IsValid("email", #testDomain#)>
-            
-<cfset step=0>
-<cfset session.m=4>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-<cfelse>
-  
-<cfquery name="checkexists" datasource="hermes">
-select domain from tls_policies where domain like <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.domain#">
-</cfquery>
-
-<cfif #checkexists.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=5>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-<cfelse>
-
-<cfquery name="adddomain" datasource="hermes">
-insert into tls_policies
-(domain, method, description, applied, action)
-values 
-('#form.domain#', 'encrypt', '#form.domain_note#', '1', 'add')
-</cfquery>
-
-<!--- GENERATE TLS POLICY --->
-<cfinclude template="./inc/generate_tls_policy.cfm">
-
-<!--- RESTART POSTFIX --->
-<cfinclude template="./inc/restart_postfix.cfm">
-
-
-<cfset step=0>
-<cfset session.m=37>
-          
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>
-
-</cfif>
-
-
-
-
-<!--- /CFIF IsValid("email", #testDomain#) --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "domain") --->  
-</cfif>
-
-<!--- FORM.DOMAIN --->
-  
-<cfelseif #action# is "deletedomain">
-
-   <!--- FORM.data_id --->
-   <cfif NOT StructKeyExists(form, "data_id")>
-
-    <cfset step=0>
-    <cfset m="Delete SMTP TLS Policy Domain: form.data_id does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif StructKeyExists(form, "data_id")>
-
-      <cfif #form.data_id# is "">
-
-        
-    <cfset step=0>
-    <cfset m="Delete SMTP TLS Policy Domain: form.data_id is blank">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif #form.data_id# is not "">
-
-      <cfquery name="getdomain" datasource="hermes">
-        select * from tls_policies where id=<cfqueryparam value = #form.data_id# CFSQLType = "CF_SQL_INTEGER">
-        </cfquery>
-        
-
-    <cfif #getdomain.recordcount# LT 1>
-
-    <cfset step=0>
-    <cfset m="Delete SMTP TLS Policy Domain: getdomain.recordcount LT 1">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-  <!--- /CFIF  #getdomain.recordcount# LT 1 --->
-  </cfif>
-
-
-    <!--- /CFIF   #form.data_id# is "" --->
-    </cfif>
-
-    <!--- /CFIF  StructKeyExists(form, "data_id") --->
-    </cfif>
-
-
-
-    <cfquery name="deletedomain" datasource="hermes">
-    delete from tls_policies
-    where id = <cfqueryparam value = #form.data_id# CFSQLType = "CF_SQL_INTEGER">
-    </cfquery>
-
-    <!--- GENERATE TLS POLICY --->
-<cfinclude template="./inc/generate_tls_policy.cfm">
-
-<!--- RESTART POSTFIX --->
-<cfinclude template="./inc/restart_postfix.cfm">
-    
-    <cfset session.m = 34>
-    <cfoutput>
-    <cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-    </cfoutput>
-
-  
-
-<cfelseif #action# is "setmode">
-
-<!--- EDIT SMTP TLS SETTINGS --->
-<cfinclude template="./inc/edit_smtp_tls_settings.cfm">
-
-<!--- GENERATE POSTFIX CONFIGURATION --->
-<cfinclude template="./inc/generate_postfix_configuration.cfm">
-
-<!--- RESTART POSTFIX --->
-<cfinclude template="./inc/restart_postfix.cfm">
-
-<cfset session.m = 35>
-
-<cfoutput>
-<cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
-</cfoutput>   
- 
- <!--- /CFIF FOR ACTION ---> 
-</cfif>
-
-  <!--- ACTIONS END HERE --->
-
-
-<span>
-  <p> 
-
-
-<!--- ADD IP BUTTON STARTS HERE --->
-<cfoutput>
-<a href="##adddomain_modal"  class="btn btn-primary" role="button" data-bs-toggle="modal" data-recipient="" data-recipientemail=""><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Add Domain</a>
-</cfoutput>
-<!--- ADD IP BUTTON ENDS HERE --->
-
-</p>
-
-
-</span>
-
-
-
-<div class="card col-sm-8">
-
-<form name="SetTlsMode" method="post">
-
-  <input type="hidden" name="action" value="setmode">
-
-  <cfoutput>
-    <input type="hidden" name="certificateno_1" class="certificateno form-control" id="certificateno_1" value="#smtpCertificate#">
-    </cfoutput>
-
-  <div class="col-sm-6">
-
-   <div class="form-group">
-            <label><strong>SMTP TLS Mode</strong></label>
-              
-            <select class="form-control" name="tlsmode" style="width: 100%;" id="tlsmode">
-
-      
-              <cfif #tls_mode# is "">
-               
-                <option value="" selected>Disabled</option>
-                <option value="may">Opportunistic TLS (Recommended)</option>
-                <option value="encrypt">Mandatory TLS (NOT Recommended for Internet Facing Servers)</option>
-
-              <cfelseif #tls_mode# is "may">
-
-                <option value="">Disabled</option>
-                <option value="may" selected>Opportunistic TLS (Recommended)</option>
-                <option value="encrypt">Mandatory TLS (NOT Recommended for Internet Facing Servers)</option>
-
-              <cfelseif #tls_mode# is "encrypt">
-
-                <option value="">Disabled</option>
-                <option value="may">Opportunistic TLS (Recommended)</option>
-                <option value="encrypt" selected>Mandatory TLS (NOT Recommended for Internet Facing Servers)</option>
-
-              <cfelse>
-
-                <cfset step=0>
-                <cfset m="Global Sender Block/Allow: tls_mode is not empty, may or encrypt">
-                <cfinclude template="./inc/error.cfm">
-                <cfabort>
-
-              <!--- /CFIF #tls_mode# is --->
-              </cfif>
-             
-                </select>   
-
-              <!--- /DIV class="form-group" --->
-              </div>
-
-              <cfif #tls_mode# is "">
-
-              <div class="form-group" id="tlscertificate" style="display:none;">
-
-                <div class="alert alert-warning">
-             
-                  <p><i class="icon fas fa-exclamation-triangle"></i>Do <strong>NOT</strong> select the <strong>system-self-signed</strong> Certificate</p>
-                  </div>
-
-                <label>SMTP TLS Certificate</label>
-                <div class="input-group">
-                <cfoutput>
-                <input type="text" name="certificate_1" class="certificate form-control" id="certificate_1" placeholder="Start typing to search..." value="#getcertdetails.friendly_name#" autocomplete="off">
-                </cfoutput>
-                
-                <!--- /div class="input-group" --->
-                </div>
-                
-
-           
-                  <label>Certificate Subject</label>
-                  <div class="input-group">
-                  <cfoutput>
-                  <input type="text" name="subject_1" class="subject form-control" id="subject_1" value="#getcertdetails.subject#" readonly>
-                  </cfoutput>
-                  
-       
-                  <!--- /div class="input-group" --->
-                </div>
-                       
-       
-                  <label>Certificate Issuer</label>
-                  <div class="input-group">
-                  <cfoutput>
-                  <input type="text" name="issuer_1" class="issuer form-control" id="issuer_1" value="#getcertdetails.issuer#" readonly>
-                  </cfoutput>
-                  
-       
-                     <!--- /div class="input-group" --->
-                    </div>
-                  
-
-               
-                        <label>Certificate Serial</label>
-                        <div class="input-group">
-                        <cfoutput>
-                        <input type="text" name="serial_1" class="serial form-control" id="serial_1" value="#getcertdetails.serial#" readonly>
-                        </cfoutput>
-                        
-                        <!--- /div class="input-group" --->
-                        </div>
-         
-                  <label>Certificate Type</label>
-                  <div class="input-group">
-                  <cfoutput>
-                  <input type="text" name="type_1" class="type form-control" id="type_1" value="#getcertdetails.type#" readonly>
-                  </cfoutput>
-                  
-                  <!--- /div class="input-group" --->
-                  </div>
-                  
-                  <!--- /div class="form-group" id="tlscertificate" --->
-                  </div>
-
-  <cfelse>
-
-    <div class="form-group" id="tlscertificate">
-
-      <div class="alert alert-warning">
-     
-        <p><i class="icon fas fa-exclamation-triangle"></i>Do <strong>NOT</strong> select the <strong>system-self-signed</strong> Certificate</p>
-        </div>
-
-      <label>SMTP TLS Certificate</label>
-      <div class="input-group">
-      <cfoutput>
-      <input type="text" name="certificate_1" class="certificate form-control" id="certificate_1" placeholder="Start typing to search..." value="#getcertdetails.friendly_name#" autocomplete="off">
-      </cfoutput>
-      
-      <!--- /div class="input-group" --->
-      </div>
-
-
-        <label>Certificate Subject</label>
-        <div class="input-group">
-        <cfoutput>
-        <input type="text" name="subject_1" class="subject form-control" id="subject_1" value="#getcertdetails.subject#" readonly>
-        </cfoutput>
-        
-        <!--- /div class="input-group" --->
-        </div>
-        
-
-
-        
-
-        <label>Certificate Issuer</label>
-        <div class="input-group">
-        <cfoutput>
-        <input type="text" name="issuer_1" class="issuer form-control" id="issuer_1" value="#getcertdetails.issuer#" readonly>
-        </cfoutput>
-        
-        <!--- /div class="input-group" --->
-        </div>
-            
-
-   
-              <label>Certificate Serial</label>
-              <div class="input-group">
-              <cfoutput>
-              <input type="text" name="serial_1" class="serial form-control" id="serial_1" value="#getcertdetails.serial#" readonly>
-              </cfoutput>
-              
-              <!--- /div class="input-group" --->
-              </div>
-
-
-
-        <label>Certificate Type</label>
-        <div class="input-group">
-        <cfoutput>
-        <input type="text" name="type_1" class="type form-control" id="type_1" value="#getcertdetails.type#" readonly>
-        </cfoutput>
-        
-        <!--- /div class="input-group" --->
-        </div>
-        
-    <!--- /div class="form-group" id="tlscertificate" --->
-        </div>
-
-
-
-<!--- /CFIF #tls_mode# is --->
-</cfif>
-  
-    
-  <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
+<form id="deleteForm" method="post" style="display:none;">
+  <input type="hidden" name="action" value="delete">
+  <input type="hidden" name="delete_id" id="delete_id" value="">
 </form>
 
-  <!--- /div class="col-sm-6" --->
-  </div>
-    
-<br>
+<script>
+$(document).ready(function() {
+  $('#senderTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
+    order: [[1, 'asc']],
+    columnDefs: [
+      { orderable: false, targets: [0, 4] },
+      { searchable: false, targets: [0, 4] }
+    ]
+  });
 
-    <!--- div class="card"  --->  
-  </div>
+  var selectedIds = new Set();
+  $('#selectAll').on('change', function() {
+    var checked = this.checked;
+    $('.row-checkbox:visible').each(function() {
+      this.checked = checked;
+      if (checked) selectedIds.add(this.value); else selectedIds.delete(this.value);
+    });
+    $('#bulkDeleteBtn').prop('disabled', selectedIds.size === 0);
+  });
+  $(document).on('change', '.row-checkbox', function() {
+    if (this.checked) selectedIds.add(this.value); else selectedIds.delete(this.value);
+    $('#bulkDeleteBtn').prop('disabled', selectedIds.size === 0);
+  });
+  window.submitBulkDelete = function() {
+    if (selectedIds.size === 0) return;
+    if (!confirm('Delete ' + selectedIds.size + ' selected entries?')) return;
+    $('#selectedIds').val(Array.from(selectedIds).join(','));
+    $('#bulkDeleteForm').submit();
+  };
 
+  // Domain warning detection on textarea input
+  $('#entries').on('input', function() {
+    var text = $(this).val();
+    var lines = text.split(/\r?\n/);
+    var hasDomain = false;
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (line !== '' && line.indexOf('@') === -1) {
+        hasDomain = true;
+        break;
+      }
+    }
+    if (hasDomain) {
+      var actionType = $('input[name="entry_type"]:checked').val();
+      $('#domainWarningAction').text(actionType === 'allow' ? 'allow (bypass all filters for)' : 'block');
+      $('#domainWarning').removeClass('d-none');
+    } else {
+      $('#domainWarning').addClass('d-none');
+    }
+  });
 
+  // Update domain warning text when action radio changes
+  $('input[name="entry_type"]').on('change', function() {
+    if (!$('#domainWarning').hasClass('d-none')) {
+      var actionType = $(this).val();
+      $('#domainWarningAction').text(actionType === 'allow' ? 'allow (bypass all filters for)' : 'block');
+    }
+  });
+});
 
+function openEditModal(id, sender, type) {
+  document.getElementById('edit_id').value = id;
+  document.getElementById('edit_sender').value = sender;
+  document.getElementById('edit_type').value = type;
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
 
-  <div class="alert alert-warning">
+function deleteSingle(id, name) {
+  if (!confirm('Delete "' + name + '"?')) return;
+  document.getElementById('delete_id').value = id;
+  document.getElementById('deleteForm').submit();
+}
+</script>
 
-    <p><i class="icon fas fa-exclamation-triangle"></i>Encryption for the domains listed below will not be in effect unless the <strong>SMTP TLS Mode</strong> is set to <strong>Opportunistic TLS</strong> and you have selected a valid <strong>SMTP TLS Certificate</strong> above </p>
+      </div>
     </div>
+  </main>
 
-<cfif #getpolicies.recordcount# GTE 1>
-        
-<table class="table table-striped"  id="sortTable" style="width:100%">
-  <thead>
-    <tr>
-      <th>Edit</th>    
-      <th>Delete</th>
-      <th>Domain</th>
-      <th>Encyption Mode</th>
-      <th>Note</th>
+  <cfinclude template="./inc/main_footer.cfm" />
 
-    </tr>
-  </thead>
-  <tbody>
-
-   
-<cfloop query="getpolicies">
-
-  
-  <cfoutput>
-   
-    
-    <tr>
-
-
-      <td>
-
-        <button a href="##editdomain_modal"  type="button" id="delete" class="btn btn-secondary" data-bs-toggle="modal" data-id="#id#" data-domain="#domain#" data-note="#description#"><i class="fas fa-edit"></i></button>
-
-      </td>
-
-      <td>
-
-        <button a href="##delete_modal"  type="button" id="delete" class="btn btn-danger" data-bs-toggle="modal" data-id="#id#"><i class="fas fa-trash-alt"></i></button>
-
-      </td>
-
-
-
-<td>#domain#</td>
-
-<td>
-  <cfif #method# is "encrypt">
-MANDATORY
-  <cfelse>
-  N/A
-  </cfif>
-  
-  </td>
-
-
-<td>#description#</td>
-
-
-
-
-    </cfoutput>
-
-
-
-  </tr>
-
-
-  </cfloop>
-  </tbody>
-  
-  <tfoot>
-    <tr>
-    
-      <th>Edit</th>    
-      <th>Delete</th>
-      <th>Domain</th>
-      <th>Encyption Mode</th>
-      <th>Note</th>
-
-    </tr>
-  </tfoot>
- 
-</table>
-    
-    
-    <cfelseif #getpolicies.recordcount# LT 1>
-    
-<div class="alert alert-danger alert-dismissible">
-  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-  <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-  <cfoutput>No SMTP TLS Policies were found</strong></cfoutput>
 </div>
-    
-<!--- /CFIF FOR getpolicies.recordcount --->
-    </cfif>
-    
-    
-   
-    
-  </div><!-- /.container-fluid -->
-</div>
-<!-- /.content -->
-</div>
-</main><!-- replaced content-wrapper -->
-
-
-<cfinclude template="./inc/main_footer.cfm" />
-
-<!-- ./wrapper -->
-
-
 
 </body>
-
-<!--- EDIT IP MODAL SCRIPT STARTS HERE  --->
-<script>
-  $('#editdomain_modal').on('show.bs.modal', function(e) {
-var data_id = $(e.relatedTarget).data('id');
-$(e.currentTarget).find('input[name="data_id"]').val(data_id);
-
-var domain = $(e.relatedTarget).data('domain');
-$(e.currentTarget).find('input[name="domain"]').val(domain);
-
-var note = $(e.relatedTarget).data('note');
-$(e.currentTarget).find('input[name="note"]').val(note);
-
-
-  });
-
-</script>
-
-<!--- EDIT IP MODAL SCRIPT ENDS HERE  --->
-
-<!--- DELETE IP MODAL SCRIPT STARTS HERE  --->
-<script>
-  $('#delete_modal').on('show.bs.modal', function(e) {
-var data_id = $(e.relatedTarget).data('id');
-$(e.currentTarget).find('input[name="data_id"]').val(data_id);
-  });
-    </script>
-
-<!--- DELETE IP MODAL SCRIPT ENDS HERE  --->
-
-
-<!--- SCRIPT TO SHOW/HIDE CERTIFICATE SCRIPT STARTS HERE  --->
-<script>
-
-  $('#tlsmode').on('change',function(){
-    if( $(this).val()===""){
-    $("#tlscertificate").hide()
-    }
-    else{
-    $("#tlscertificate").show()
-    }
-  });
-  
-  </script>
-
-  
-<!--- SCRIPT TO SHOW/HIDE CERTIFICATE SCRIPT ENDS HERE  --->
-
- <!--- SCRIPT TO GET CERTIFICATES BELOW --->
-
-<script type="text/javascript">
-  $(document).ready(function(){
-
-      $(document).on('keydown', '.certificate', function() {
-          
-          var id = this.id;
-          var splitid = id.split('_');
-          var index = splitid[1];
-
-          $( '#'+id ).autocomplete({
-              source: function( request, response ) {
-                  $.ajax({
-                      url: "./inc/getcertificates.cfm",
-                      type: 'post',
-                      dataType: "json",
-                      data: {
-                          search: request.term,request:1
-                      },
-                      success: function( data ) {
-                          response( data );
-                      }
-                  });
-              },
-              select: function (event, ui) {
-                  $(this).val(ui.item.label); // display the selected text
-                  var id = ui.item.value; // selected id to input
-
-                  // AJAX
-                  $.ajax({
-                      url: './inc/getcertificates.cfm',
-                      type: 'post',
-                      data: {id:id,request:2},
-                      dataType: 'json',
-                      success:function(response){
-                          
-                          var len = response.length;
-
-                          if(len > 0){
-                              var certificate_no = response[0]['id'];
-                              var type = response[0]['type'];
-                              var subject = response[0]['subject'];
-                              var issuer = response[0]['issuer'];
-                              var serial = response[0]['serial'];
-                              var fingerprint = response[0]['fingerprint'];
-                              var certstart = response[0]['certstart'];
-                              var certend = response[0]['certend'];
-                              var friendlyname = response[0]['friendly_name'];
-                  
-                              document.getElementById('certificateno_'+index).value = certificate_no;
-                              document.getElementById('type_'+index).value = type;
-                              document.getElementById('subject_'+index).value = subject;
-                              document.getElementById('issuer_'+index).value = issuer;
-                              document.getElementById('serial_'+index).value = serial;
-                              document.getElementById('fingerprint_'+index).value = fingerprint;
-                              document.getElementById('certstart_'+index).value = certstart;
-                              document.getElementById('certend_'+index).value = certend;
-                              document.getElementById('friendlyname_'+index).value = friendlyname;
-             
-                        
-                              
-                          }
-                          
-                      }
-                  });
-
-                  return false;
-              }
-          });
-      });
-      
-      
-
-  });
-
-</script>
-
-
-
-
 </html>

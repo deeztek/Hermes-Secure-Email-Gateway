@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -22,71 +22,41 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfif StructKeyExists(session, "successblocksender")>
   <cfif session.successblocksender is not "">
   <cfset successblocksender = session.successblocksender>
-  
-  <!--- /CFIF for session.successblocksender is not "" --->
   </cfif>
-  
-  <!--- /CFIF for StructKeyExists session.successblocksender --->
   </cfif>
 
   <cfparam name = "successblocksender_email" default = "">
   <cfif StructKeyExists(session, "successblocksender_email")>
   <cfif session.successblocksender_email is not "">
   <cfset successblocksender_email = session.successblocksender_email>
-  
-  <!--- /CFIF for session.successblocksender_email is not "" --->
   </cfif>
-  
-  <!--- /CFIF for StructKeyExists session.successblocksender_email --->
   </cfif>
 
-  <cfoutput>Success Block Sender: #successblocksender#</cfoutput><br>
-  
   <cfparam name = "failureblocksender" default = "0">
   <cfif StructKeyExists(session, "failureblocksender")>
   <cfif session.failureblocksender is not "">
   <cfset failureblocksender = session.failureblocksender>
-  
-  <!--- /CFIF for session.failureblocksender is not "" --->
   </cfif>
-  
-  <!--- /CFIF for StructKeyExists session.failureblocksender --->
   </cfif>
 
-  <cfoutput>Failure Block Sender: #failureblocksender#</cfoutput><br>
-  
   <cfparam name = "failureblocksender_email" default = "">
   <cfif StructKeyExists(session, "failureblocksender_email")>
   <cfif session.failureblocksender_email is not "">
   <cfset failureblocksender_email = session.failureblocksender_email>
-  
-  <!--- /CFIF for session.failureblocksender_email is not "" --->
   </cfif>
-  
-  <!--- /CFIF for StructKeyExists session.failureblocksender_email --->
   </cfif>
-  
-  <cfoutput>Failure Block Sender Email: #failureblocksender_email#</cfoutput><br>
-
 
   <cfparam name = "failureinvalidrecipient_email" default = "0">
   <cfif StructKeyExists(session, "failureinvalidrecipient_email")>
   <cfif session.failureinvalidrecipient_email is not "">
   <cfset failureinvalidrecipient_email = session.failureinvalidrecipient_email>
-  
-  <!--- /CFIF for session.failureinvalidrecipient is not "" --->
   </cfif>
-  
-  <!--- /CFIF for StructKeyExists session.failureinvalidrecipient --->
   </cfif>
-
-  <cfoutput>Failure Invalid Recipient Email: #failureinvalidrecipient_email#</cfoutput><br>
-  
 
 <cfquery name="getrid" datasource="hermes">
-    SELECT rid from msgrcpt where mail_id like binary '#theMailId#' 
+    SELECT rid from msgrcpt where mail_id like binary '#theMailId#'
     </cfquery>
-    
+
     <cfquery name="gettoaddr" datasource="hermes">
     SELECT email as toAddress FROM maddr where id = <cfqueryparam value = #getrid.rid# CFSQLType = "CF_SQL_INTEGER">
     </cfquery>
@@ -95,115 +65,78 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     select id, recipient from recipients where recipient = '#gettoaddr.toAddress#'
     </cfquery>
 
-    
-    <cfif #getrecipientid.recordcount# GTE 1>
-    
-    <cfset recipient = #getrecipientid.id#>
+
+    <cfif getrecipientid.recordcount GTE 1>
+
+    <cfset recipient = getrecipientid.id>
 
     <cfquery name="getsenderid" datasource="hermes">
         SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
         </cfquery>
-        
+
         <cfquery name="getsenderemail" datasource="hermes">
         SELECT email from maddr where id='#getsenderid.sid#'
         </cfquery>
-        
+
         <cfset sender="#getsenderemail.email#">
-        
-        <cfquery name="checkexists" datasource="hermes">
-        SELECT receiver, sender from mailaddr_temp where receiver='#gettoaddr.toAddress#' and sender='#sender#'
-        </cfquery>
-        
-        <cfif #checkexists.recordcount# LT 1>
-        
-        
+
+        <!--- Resolve or create mailaddr entry for sender --->
         <cfquery name="checksenderemail" datasource="hermes">
-        select id, email from mailaddr where email='#sender#'
+        select id from mailaddr where email='#sender#'
         </cfquery>
-        
-        
-        
-        <cfif #checksenderemail.recordcount# LT 1>
-        
-        
-        <cfquery name="insertsender" datasource="hermes" result="stSender">
-        insert into mailaddr
-        (email)
-        values
-        ('#sender#')
-        </cfquery>
-        
-        <cfquery name="add" datasource="hermes" result="stResult">
-        insert into mailaddr_temp
-        (recipient_id, mailaddr_id, sender, wb, action, receiver, applied)
-        values
-        ('#recipient#', '#stSender.GENERATED_KEY#', '#sender#', 'BLOCK', 'insert', '#gettoaddr.toAddress#', '1')
-        </cfquery>
-        
-        <cfquery name="insertwb" datasource="hermes">
-        insert into wblist
-        (rid, sid, wb)
-        values
-        ('#recipient#', '#stSender.GENERATED_KEY#', 'B')
-        </cfquery>
-        
-        <cfset session.successblocksender=#successblocksender#+1>
-        <cfset session.successblocksender_email= successblocksender_email & "#sender# <br>">
-        
-        
-        <cfelseif #checksenderemail.recordcount# GTE 1>
-        
-        
-        <cfquery name="add" datasource="hermes" result="stResult">
-        insert into mailaddr_temp
-        (recipient_id, mailaddr_id, sender, wb, action, receiver, applied)
-        values
-        ('#recipient#', '#checksenderemail.id#', '#sender#', 'BLOCK', 'insert', '#gettoaddr.toAddress#', '1')
-        </cfquery>
-        
-        <cfquery name="insertwb" datasource="hermes">
-        insert into wblist
-        (rid, sid, wb)
-        values
-        ('#recipient#', '#checksenderemail.id#', 'B')
-        </cfquery>
-        
-        <cfset session.successblocksender=#successblocksender#+1>
-        <cfset session.successblocksender_email= successblocksender_email & "#sender# <br>">
-        
-            <!--- /CFIF #checksenderemail.recordcount# --->
+
+        <cfif checksenderemail.recordcount LT 1>
+          <cfquery name="insertsender" datasource="hermes" result="stSender">
+          insert into mailaddr (email) values ('#sender#')
+          </cfquery>
+          <cfset senderMailaddrId = stSender.GENERATED_KEY>
+        <cfelse>
+          <cfset senderMailaddrId = checksenderemail.id>
         </cfif>
-        
-        
-        
-        <cfelseif #checkexists.recordcount# GTE 1>
-    
+
+        <!--- Check for duplicate in wblist --->
+        <cfquery name="checkexists" datasource="hermes">
+        SELECT rid FROM wblist
+        WHERE rid=<cfqueryparam value="#recipient#" cfsqltype="cf_sql_integer">
+          AND sid=<cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
+        </cfquery>
+
+        <cfif checkexists.recordcount LT 1>
+
+        <cfquery name="insertwb" datasource="hermes">
+        insert into wblist (rid, sid, wb)
+        values (
+          <cfqueryparam value="#recipient#" cfsqltype="cf_sql_integer">,
+          <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
+          'B'
+        )
+        </cfquery>
+
+        <cfset session.successblocksender=#successblocksender#+1>
+        <cfset session.successblocksender_email= successblocksender_email & "#sender# <br>">
+
+        <cfelseif checkexists.recordcount GTE 1>
+
         <cfset session.failureblocksender=#failureblocksender#+1>
         <cfset session.failureblocksender_email= failureblocksender_email & "#sender# <br>">
-        
-        <!--- /CFIF #checkexists.recordcount# --->
-        </cfif>
-        
 
-    <cfelseif #getrecipientid.recordcount# LT 1>
+        </cfif>
+
+    <cfelseif getrecipientid.recordcount LT 1>
 
         <cfquery name="getsenderid" datasource="hermes">
             SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
             </cfquery>
-            
+
             <cfquery name="getsenderemail" datasource="hermes">
             SELECT email from maddr where id='#getsenderid.sid#'
             </cfquery>
-            
+
             <cfset sender="#getsenderemail.email#">
 
 <cfset session.failureblocksender=#failureblocksender#+1>
 <cfset session.failureinvalidrecipient_email= failureinvalidrecipient_email & "#sender# <br>">
-    
-     
-    <!--- /CFIF #getrecipientid.recordcount# --->
-    </cfif>
-    
-    
 
-    
+    </cfif>
+
+

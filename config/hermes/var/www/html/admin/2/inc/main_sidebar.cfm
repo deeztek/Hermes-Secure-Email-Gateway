@@ -63,12 +63,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
-              <a href="view_ad_connection.cfm" class="nav-link">
-                <i class="nav-icon fab fa-microsoft"></i>
-                <p>AD Integration</p>
-              </a>
-            </li>
-            <li class="nav-item">
               <a href="view_remoteauth.cfm" class="nav-link">
                 <i class="nav-icon fas fa-server"></i>
                 <p>LDAP RemoteAuth</p>
@@ -247,7 +241,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="view_global_sender_block_allow2.cfm" class="nav-link">
+              <a href="view_global_sender_block_allow.cfm" class="nav-link">
                 <i class="nav-icon fas fa-globe"></i>
                 <p>Global Sender Block/Allow</p>
               </a>
@@ -277,21 +271,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/spam_settings.cfm" class="nav-link">
+              <a href="view_antispam_maintenance.cfm" class="nav-link">
                 <i class="nav-icon fas fa-shield-virus"></i>
-                <p>Antispam Settings</p>
+                <p>Anti-Spam Settings</p>
               </a>
             </li>
             <li class="nav-item">
               <a href="/admin/spam_filter_tests.cfm" class="nav-link">
-                <i class="nav-icon fas fa-shield-virus"></i>
-                <p>Antispam Filter Tests</p>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="view_antispam_maintenance.cfm" class="nav-link">
-                <i class="nav-icon fas fa-tools"></i>
-                <p>Anti-Spam Maintenance</p>
+                <i class="nav-icon fas fa-flask"></i>
+                <p>Anti-Spam Filter Tests</p>
               </a>
             </li>
             <li class="nav-item">

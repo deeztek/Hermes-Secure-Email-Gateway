@@ -574,3 +574,39 @@ CREATE TABLE IF NOT EXISTS cert_generation_queue (
     INDEX idx_queue_recipient (recipient_email)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================================================
+-- DROP rbl_override TABLE (legacy, never activated)
+-- The rbl_override table was intended for a MySQL-based check_client_access
+-- override at the smtpd level. This was superseded by postscreen_access.cidr
+-- (managed via Network Block/Allow) which handles the same function at the
+-- postscreen level. The check_client_access directive was never enabled in
+-- main.cf and the table is no longer referenced by any active code.
+-- ============================================================================
+DROP TABLE IF EXISTS rbl_override;
+
+-- ============================================================================
+-- DROP AD Integration tables (feature removed)
+-- The Active Directory integration feature (scheduled LDAP sync to import
+-- recipients from AD) has been removed. The scheduled task infrastructure
+-- used legacy direct daemon calls incompatible with Docker, relied on a
+-- deprecated license count model, and the users table rebuild pattern
+-- (stop services, DROP users, CREATE LIKE recipients, INSERT SELECT, ALTER
+-- RENAME column, restart services) was disruptive and unnecessary.
+-- The users table was a derived copy of recipients with 'recipient' renamed
+-- to 'email' for Amavis compatibility; Amavis now queries recipients directly.
+-- ============================================================================
+DROP TABLE IF EXISTS ad_integration;
+DROP TABLE IF EXISTS ad_import_temp;
+DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS mailaddr_temp;
+
+-- ============================================================================
+-- CLEANUP orphaned mailaddr entries
+-- mailaddr stores sender addresses for wblist (block/allow) rules. Over time,
+-- entries accumulate that are no longer referenced by any wblist row (e.g. after
+-- rules are deleted). This removes those orphans. Going forward, the delete
+-- action handler cleans up orphans automatically after each deletion.
+-- ============================================================================
+DELETE FROM mailaddr
+WHERE id NOT IN (SELECT DISTINCT sid FROM wblist);
+

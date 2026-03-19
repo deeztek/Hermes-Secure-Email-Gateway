@@ -162,10 +162,6 @@
     delete from wblist where rid='#delete_id#'
     </cfquery>
     
-    <cfquery name="mailaddr_temp" datasource="hermes">
-    delete from mailaddr_temp where recipient_id='#delete_id#'
-    </cfquery>
-    
     <cfquery name="deletereport" datasource="hermes">
     delete from user_settings where email='#recipient#'
     </cfquery>

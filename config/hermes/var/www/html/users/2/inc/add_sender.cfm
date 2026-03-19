@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -19,91 +19,53 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
   <cfquery name="getrecipientid" datasource="hermes">
-    select id, recipient from recipients where recipient='#session.email#'
-    </cfquery>
+    SELECT id FROM recipients WHERE recipient=<cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+  </cfquery>
 
-    <cfif #getrecipientid.recordcount# GTE 1>
+  <cfif getrecipientid.recordcount LT 1>
+    <cfset m="/inc/add_sender.cfm: Unable to get recipient id from recipients">
+    <cfinclude template="error.cfm">
+    <cfabort>
+  </cfif>
 
-    <cfset recipient = #getrecipientid.id#>
+  <cfset recipient = getrecipientid.id>
 
-    <cfelse>
+  <!--- Resolve or create mailaddr entry for sender --->
+  <cfquery name="checksenderemail" datasource="hermes">
+    SELECT id FROM mailaddr WHERE email=<cfqueryparam value="#theSender#" cfsqltype="cf_sql_varchar">
+  </cfquery>
 
-      <cfset m="/inc/add_sender.cfm: Unable to get recipient id from recipients">
-      <cfinclude template="error.cfm">
-      <cfabort>
-
-  <!--- /CFIF #getrecipientid.recordcount# --->
-    </cfif>
-
-    <cfquery name="checkexists" datasource="hermes">
-    SELECT receiver, sender from mailaddr_temp where receiver='#session.email#' and sender='#theSender#'
-    </cfquery>
-
-    <cfif #checkexists.recordcount# LT 1>
-    
-    <cfquery name="checksenderemail" datasource="hermes">
-    select id, email from mailaddr where email='#theSender#'
-    </cfquery>
-    
-    <cfif #checksenderemail.recordcount# LT 1>
-    
+  <cfif checksenderemail.recordcount LT 1>
     <cfquery name="insertsender" datasource="hermes" result="stSender">
-    insert into mailaddr
-    (email)
-    values
-    ('#theSender#')
+      INSERT INTO mailaddr (email) VALUES (<cfqueryparam value="#theSender#" cfsqltype="cf_sql_varchar">)
     </cfquery>
+    <cfset senderMailaddrId = stSender.GENERATED_KEY>
+  <cfelse>
+    <cfset senderMailaddrId = checksenderemail.id>
+  </cfif>
 
-    <cfquery name="add" datasource="hermes" result="stResult">
-    insert into mailaddr_temp
-    (recipient_id, mailaddr_id, sender, wb, action, receiver, applied)
-    values
-    ('#recipient#', '#stSender.GENERATED_KEY#', '#theSender#', '#theTypeText#', 'insert', '#session.email#', '1')
-    </cfquery>
-    
-    <cfquery name="insertwb" datasource="hermes">
-    insert into wblist
-    (rid, sid, wb)
-    values
-    ('#recipient#', '#stSender.GENERATED_KEY#', '#theType#')
-    </cfquery>
+  <!--- Check for duplicate in wblist --->
+  <cfquery name="checkexists" datasource="hermes">
+    SELECT rid FROM wblist
+    WHERE rid=<cfqueryparam value="#recipient#" cfsqltype="cf_sql_integer">
+      AND sid=<cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
+  </cfquery>
 
+  <cfif checkexists.recordcount GTE 1>
     <cfset step=0>
-    <cfset session.m = 4>
+    <cfset session.m = 5>
     <cflocation url="view_sender_filters.cfm" addtoken="no">
+  </cfif>
 
+  <cfquery datasource="hermes">
+    INSERT INTO wblist (rid, sid, wb)
+    VALUES (
+      <cfqueryparam value="#recipient#" cfsqltype="cf_sql_integer">,
+      <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
+      <cfqueryparam value="#theType#" cfsqltype="cf_sql_varchar">
+    )
+  </cfquery>
 
-    <cfelseif #checksenderemail.recordcount# GTE 1>
-
-    <cfquery name="add" datasource="hermes" result="stResult">
-    insert into mailaddr_temp
-    (recipient_id, mailaddr_id, sender, wb, action, receiver, applied)
-    values
-    ('#recipient#', '#checksenderemail.id#', '#theSender#', '#theTypeText#', 'insert', '#session.email#', '1')
-    </cfquery>
-    
-    <cfquery name="insertwb" datasource="hermes">
-    insert into wblist
-    (rid, sid, wb)
-    values
-    ('#recipient#', '#checksenderemail.id#', '#theType#')
-    </cfquery>
-    
-    <cfset step=0>
-    <cfset session.m = 4>
-    <cflocation url="view_sender_filters.cfm" addtoken="no">
-    
-    <!--- /CFIF #checksenderemail.recordcount# --->
-    </cfif>
-    
-    
-    
-    <cfelseif #checkexists.recordcount# GTE 1>
-
-      <cfset step=0>
-      <cfset session.m = 5>
-      <cflocation url="view_sender_filters.cfm" addtoken="no">
-    
-    <!--- /CFIF #checkexists.recordcount# --->
-    </cfif>
-    
+  <cfset step=0>
+  <cfset session.m = 4>
+  <cflocation url="view_sender_filters.cfm" addtoken="no">

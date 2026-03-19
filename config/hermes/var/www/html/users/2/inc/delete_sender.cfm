@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -18,10 +18,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="deletewb" datasource="hermes">
-    delete from wblist where rid = '#getid.recipient_id#' and sid = '#getid.mailaddr_id#'
-    </cfquery>
-    
-    <cfquery name="delete" datasource="hermes">
-    delete from mailaddr_temp where id = <cfqueryparam value = #i# CFSQLType = "CF_SQL_INTEGER">
-    </cfquery>
+<!--- theRid and theSid are set by the caller (view_sender_filters.cfm delete loop) --->
+<cfquery datasource="hermes">
+  DELETE FROM wblist
+  WHERE rid=<cfqueryparam value="#theRid#" cfsqltype="cf_sql_integer">
+    AND sid=<cfqueryparam value="#theSid#" cfsqltype="cf_sql_integer">
+</cfquery>

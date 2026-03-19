@@ -387,66 +387,38 @@ a, a:hover{
   
       <cfif #action# is "deletesender">
 
-        <cfif NOT StructKeyExists(form, "sender_id")>
+        <cfif NOT StructKeyExists(form, "sender_id") OR form.sender_id is "">
 
-        <cfset session.m = 6>
-        <cflocation url="view_sender_filters.cfm" addtoken="no">
-      
+          <cfset session.m = 6>
+          <cflocation url="view_sender_filters.cfm" addtoken="no">
 
-          <cfelseif StructKeyExists(form, "sender_id")>
+        <cfelse>
 
-          <cfif #form.sender_id# is "">
-
-            <cfset step=0>
-            <cfset session.m = 6>
-            <cflocation url="view_sender_filters.cfm" addtoken="no">
-              
-          <!---
-          <cfinclude template="./inc/error.cfm">
-          <cfabort>
-          --->
-
-          <cfelseif #form.sender_id# is not "">     
-            
+          <!--- Look up this user's recipient id once for security check --->
           <cfquery name="getrecipientid" datasource="hermes">
-          select id, recipient from recipients where recipient='#session.email#'
+            SELECT id FROM recipients WHERE recipient=<cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
           </cfquery>
-          
-          <cfset recipient = #getrecipientid.id#>
+          <cfset recipient = getrecipientid.id>
 
-<cfloop index="i" list="#form.sender_id#" delimiters=",">
+          <!--- Each entry in the list is a "rid:sid" pair --->
+          <cfloop index="entry" list="#form.sender_id#" delimiters=",">
+            <cfset theRid = ListFirst(entry, ":")>
+            <cfset theSid = ListLast(entry, ":")>
+            <!--- Only delete if both parts are integers AND rid belongs to this user --->
+            <cfif IsValid("integer", theRid) AND IsValid("integer", theSid) AND theRid EQ recipient>
+              <cfinclude template="./inc/delete_sender.cfm">
+            </cfif>
+          </cfloop>
 
-      <cfif IsValid("integer", #i#)>
+          <!--- Remove orphaned mailaddr entries no longer referenced by any wblist row --->
+          <cfquery datasource="hermes">
+            DELETE FROM mailaddr WHERE id NOT IN (SELECT DISTINCT sid FROM wblist)
+          </cfquery>
 
-        <cfquery name="getid" datasource="hermes">
-        select recipient_id, mailaddr_id from mailaddr_temp where id = <cfqueryparam value = #i# CFSQLType = "CF_SQL_INTEGER"> and recipient_id = '#recipient#'
-        </cfquery>
+          <cfset session.m = 6>
+          <cflocation url="view_sender_filters.cfm" addtoken="no">
 
-        <cfif #getid.recordcount# GTE 1>
-
-
-          <cfinclude template="./inc/delete_sender.cfm">
-
-          <!--- /CFIF #getrecipient.recordcount# --->
         </cfif>
-      
-          <!--- /CFIF IsValid("integer", #i#) --->
-        </cfif>
-      
-        
-        </cfloop>
-
-        <cfset step=0>
-        <cfset session.m = 6>
-        <cflocation url="view_sender_filters.cfm" addtoken="no">
- 
-
-<!--- /CFIF #form.sender_id# is/is not "" --->
-</cfif>
-
-
-<!--- /CFIF NOT/StructKeyExists(form, "sender_id") --->
-</cfif>
 
 
 <cfelseif #action# is "addsender">
@@ -633,11 +605,16 @@ a, a:hover{
                     <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Adding a sender with an <strong>ALLOW</strong> action will only bypass the sender in the Spam filter. E-mails with banned or malware attachments will still be blocked.</p>
                 </div>
 
-                <cfquery name="getmailaddrtemp" datasource="hermes">
-                    SELECT * FROM mailaddr_temp WHERE applied='1' AND receiver='#session.email#'
+                <cfquery name="getSenderFilters" datasource="hermes">
+                    SELECT w.rid, w.sid, w.wb, m.email AS sender, r.recipient AS receiver
+                    FROM wblist w
+                    JOIN mailaddr m ON m.id = w.sid
+                    JOIN recipients r ON r.id = w.rid
+                    WHERE r.recipient = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+                    ORDER BY m.email ASC
                 </cfquery>
 
-                <cfif #getmailaddrtemp.recordcount# GTE 1>
+                <cfif getSenderFilters.recordcount GTE 1>
                     <form>
                         <table class="table table-striped" id="sortTable" style="width:100%">
                             <thead>
@@ -649,12 +626,18 @@ a, a:hover{
                                 </tr>
                             </thead>
                             <tbody>
-                                <cfoutput query="getmailaddrtemp">
+                                <cfoutput query="getSenderFilters">
                                     <tr>
-                                        <td><input type="checkbox" name="id" value="#id#"></td>
-                                        <td>#sender#</td>
-                                        <td>#receiver#</td>
-                                        <td>#wb#</td>
+                                        <td><input type="checkbox" name="id" value="#rid#:#sid#"></td>
+                                        <td>#encodeForHTML(sender)#</td>
+                                        <td>#encodeForHTML(receiver)#</td>
+                                        <td>
+                                            <cfif wb is "W">
+                                                <span class="badge bg-success">Allow</span>
+                                            <cfelse>
+                                                <span class="badge bg-danger">Block</span>
+                                            </cfif>
+                                        </td>
                                     </tr>
                                 </cfoutput>
                             </tbody>
