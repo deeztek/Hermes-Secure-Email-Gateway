@@ -22,7 +22,7 @@
 # Edit these variables for your DEV server, or set as environment variables
 DEV_HOST="192.168.50.145"                     # DEV server hostname or IP (e.g., 10.0.0.5)
 DEV_USER="dedwards"                 # SSH username
-DEV_KEY="$HOME/.ssh/id_rsa"       # SSH private key path
+DEV_KEY="$HOME/.ssh/id_ed25519"   # SSH private key path
 REMOTE_BASE="/opt/hermes-seg-container-gl/config/hermes/var/www/html"               # Prefix prepended to remote paths (usually empty)
                                              # e.g., if files go to /var/www/html/ on DEV,
                                              # leave empty since the local path already maps

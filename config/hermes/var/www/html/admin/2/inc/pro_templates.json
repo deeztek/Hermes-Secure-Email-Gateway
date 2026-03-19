@@ -10,8 +10,6 @@
         "admin/2/inc/setsession.cfm",
         "admin/2/inc/add_serial_number.cfm",
         "admin/2/inc/manifest_verify.cfm",
-        "admin/2/view_ad_connection.cfm",
-        "admin/2/edit_ad_connection.cfm",
         "admin/2/view_remoteauth.cfm",
         "admin/2/edit_remoteauth_mapping.cfm",
         "admin/2/view_intrusion_prevention.cfm",

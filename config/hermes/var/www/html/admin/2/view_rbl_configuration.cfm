@@ -1,3 +1,13 @@
+<!--- Early intercept: AJAX JSON requests must return before any HTML output --->
+<cfparam name="action" default="">
+<cfif StructKeyExists(url, "action")>
+  <cfif url.action is not ""><cfset action = url.action></cfif>
+</cfif>
+<cfif action is "test_entry">
+  <cfinclude template="./inc/get_rbl_configuration.cfm">
+  <cfinclude template="./inc/rbl_test_entry.cfm">
+</cfif>
+
 <!DOCTYPE html>
 
 <!---
@@ -82,14 +92,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/rbl_delete_entry.cfm">
 <cfelseif action is "edit_entry">
   <cfinclude template="./inc/rbl_edit_entry.cfm">
-<cfelseif action is "apply">
-  <cfinclude template="./inc/rbl_apply_settings.cfm">
-<cfelseif action is "cancel_add" OR action is "cancel_delete">
-  <cfinclude template="./inc/rbl_cancel_changes.cfm">
 </cfif>
-
-<!--- Refresh data after actions --->
-<cfinclude template="./inc/get_rbl_configuration.cfm">
 
 <!--- Clear session message --->
 <cfset session.m = "">
@@ -99,47 +102,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Entry Added</h4>
-    <p>RBL entry has been staged. Click <strong>Apply Settings</strong> to activate.</p>
+    <p>RBL entry has been added and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
 <cfif m is 2>
-  <div class="alert alert-warning alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-exclamation-triangle"></i> Entry Marked for Deletion</h4>
-    <p>Entry marked for deletion. Click <strong>Apply Settings</strong> to confirm.</p>
-  </div>
-</cfif>
-<cfif m is 3>
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Settings Applied</h4>
-    <p>RBL configuration has been applied and Postfix reloaded successfully.</p>
+    <h4><i class="icon fa fa-check"></i> Entry Deleted</h4>
+    <p>RBL entry has been deleted and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
 <cfif m is 4>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Apply Failed</h4>
-    <p>An error occurred while applying the configuration.</p>
+    <h4><i class="icon fa fa-ban"></i> Configuration Error</h4>
+    <p>An error occurred while applying the Postfix configuration.</p>
   </div>
 </cfif>
 <cfif m is 5>
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-edit"></i> Entry Updated</h4>
-    <p>Entry has been updated. Click <strong>Apply Settings</strong> to activate changes.</p>
-  </div>
-</cfif>
-<cfif m is 6>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Additions Cancelled</h4>
-  </div>
-</cfif>
-<cfif m is 7>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Deletions Cancelled</h4>
+    <h4><i class="icon fa fa-check"></i> Entry Updated</h4>
+    <p>RBL entry has been updated and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
 <cfif m is 10>
@@ -164,56 +148,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
-<!--- PENDING CHANGES CARDS --->
-<cfif has_pending_changes>
-  <cfif get_pending_adds.recordCount GT 0>
-    <div class="card card-warning card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Additions (<cfoutput>#get_pending_adds.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_adds">
-          <span class="badge bg-success me-1">+ #encodeForHTML(parameter)# (w:#weight#)</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_add">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Additions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-  <cfif get_pending_deletes.recordCount GT 0>
-    <div class="card card-danger card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Deletions (<cfoutput>#get_pending_deletes.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_deletes">
-          <span class="badge bg-danger me-1">- #encodeForHTML(parameter)#</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_delete">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Deletions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-
-  <div class="mb-4">
-    <form method="post" class="d-inline">
-      <input type="hidden" name="action" value="apply">
-      <button type="submit" class="btn btn-danger btn-lg"
-        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
-        <i class="fas fa-check-circle"></i> Apply Settings
-      </button>
-    </form>
-  </div>
-</cfif>
-
 <!-- ADD ENTRY CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
@@ -224,14 +158,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <h5><i class="fas fa-info-circle"></i> Block Lists vs Allow Lists</h5>
       <p class="mb-1"><strong>Block List (DNSBL):</strong> DNS-based blacklists that identify known spam sources (e.g., <code>zen.spamhaus.org</code>, <code>bl.spamcop.net</code>). Matches add to the spam score.</p>
       <p class="mb-1"><strong>Allow List (DNSWL):</strong> DNS-based whitelists that identify trusted senders (e.g., <code>list.dnswl.org</code>). Matches subtract from the spam score.</p>
-      <p class="mb-0"><strong>Weight:</strong> Controls how much each list contributes to the overall DNSBL score. The combined score is compared against the DNSBL Threshold configured in Perimeter Checks.</p>
+      <p class="mb-1"><strong>Weight:</strong> Controls how much each list contributes to the overall DNSBL score. The combined score is compared against the DNSBL Threshold configured in Perimeter Checks.</p>
+      <p class="mb-0"><strong>Return Code Filtering:</strong> Postfix supports filtering by DNS return code using <code>hostname=127.x.x.x</code> syntax (e.g., <code>bl.mailspike.net=127.0.0.[10;11;12]</code>). This restricts matches to specific return codes published by the list.</p>
     </div>
     <form method="post" autocomplete="off">
       <input type="hidden" name="action" value="add_entry">
       <div class="row">
         <div class="col-md-4">
           <label for="rbl_host" class="form-label"><strong>RBL Hostname</strong></label>
-          <input type="text" class="form-control" id="rbl_host" name="rbl_host" placeholder="zen.spamhaus.org" required>
+          <input type="text" class="form-control" id="rbl_host" name="rbl_host" placeholder="zen.spamhaus.org or bl.mailspike.net=127.0.0.[10;11;12]" required>
         </div>
         <div class="col-md-3">
           <label class="form-label"><strong>Type</strong></label>
@@ -268,25 +203,40 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-list"></i> RBL Entries</h3>
   </div>
   <div class="card-body">
+    <div class="callout callout-warning mb-3">
+      <h5><i class="fas fa-exclamation-triangle"></i> Warning on RBL Tests</h5>
+      <p class="mb-1">The <i class="fas fa-vial"></i> test performs a live DNS probe against each RBL zone using the same DNS resolver as Postfix. <span class="badge bg-success">Green</span> means the zone has an active SOA record &mdash; the authoritative nameservers are responding. <span class="badge bg-danger">Red</span> means the zone is unreachable, has no SOA, or does not exist. Note: many DNSBL providers block data center IP ranges from live data queries, so green only confirms zone infrastructure &mdash; not that the list is actively publishing data.</p>
+      <p class="mb-1">A dead or misconfigured <strong>Block List</strong> that returns wildcard matches will add to the DNSBL score for every connecting IP, potentially blocking all legitimate inbound mail.</p>
+      <p class="mb-0">A dead or misconfigured <strong>Allow List (DNSWL)</strong> that returns wildcard matches will subtract from the DNSBL score for every connecting IP, potentially allowing spam through that would otherwise be blocked.</p>
+    </div>
     <form id="bulkDeleteForm" method="post">
       <input type="hidden" name="action" value="bulk_delete">
       <input type="hidden" name="selected_ids" id="selectedIds" value="">
 
-      <div class="mb-2">
+      <div class="mb-2 d-flex gap-2 align-items-center flex-wrap">
         <button type="button" class="btn btn-sm btn-danger" id="bulkDeleteBtn" disabled
           onclick="submitBulkDelete();">
           <i class="fas fa-trash"></i> Delete Selected
         </button>
+        <button type="button" class="btn btn-sm btn-info" onclick="testAll();">
+          <i class="fas fa-vial"></i> Test All
+        </button>
+        <span class="ms-2 text-muted small">
+          <i class="fas fa-vial"></i> Test results:
+          <span class="badge bg-success ms-1"><i class="fas fa-check-circle"></i> Zone Active</span> SOA found, zone is responding &nbsp;
+          <span class="badge bg-danger ms-1"><i class="fas fa-times-circle"></i> Error</span> Zone dead or unreachable
+        </span>
       </div>
 
       <table id="rblTable" class="table table-bordered table-hover table-striped">
         <thead>
           <tr>
             <th style="width: 5%"><input type="checkbox" id="selectAll"></th>
-            <th style="width: 40%">Hostname</th>
-            <th style="width: 15%">Type</th>
-            <th style="width: 15%">Weight</th>
-            <th style="width: 25%">Actions</th>
+            <th style="width: 35%">Hostname</th>
+            <th style="width: 10%">Type</th>
+            <th style="width: 10%">Weight</th>
+            <th style="width: 20%">Status</th>
+            <th style="width: 20%">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -310,7 +260,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </cfif>
               </td>
               <td>#Abs(weight)#</td>
+              <td><span id="status-#id#" class="badge bg-secondary">Not Tested</span></td>
               <td>
+                <button type="button" class="btn btn-sm btn-info test-btn" onclick="testEntry('#id#');" title="Test DNS">
+                  <i class="fas fa-vial"></i>
+                </button>
                 <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(displayHost)#', '#weight#');" title="Edit">
                   <i class="fas fa-edit"></i>
                 </button>
@@ -339,13 +293,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
         <div class="modal-body">
           <div class="mb-3">
+            <label class="form-label"><strong>List Type</strong></label>
+            <div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="edit_type" id="edit_type_block" value="block" checked onchange="updateEditWeightHelp()">
+                <label class="form-check-label" for="edit_type_block">Block List</label>
+              </div>
+              <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="edit_type" id="edit_type_allow" value="allow" onchange="updateEditWeightHelp()">
+                <label class="form-check-label" for="edit_type_allow">Allow List (DNSWL)</label>
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
             <label for="edit_host" class="form-label"><strong>RBL Hostname</strong></label>
             <input type="text" class="form-control" id="edit_host" name="edit_host" required>
           </div>
           <div class="mb-3">
             <label for="edit_weight" class="form-label"><strong>Weight</strong></label>
-            <input type="number" class="form-control" id="edit_weight" name="edit_weight" required>
-            <small class="text-muted">Positive = Block List, Negative = Allow List</small>
+            <input type="number" class="form-control" id="edit_weight" name="edit_weight" min="1" step="1" required>
+            <small class="text-muted" id="editWeightHelp">Points added to the DNSBL score per match</small>
           </div>
         </div>
         <div class="modal-footer">
@@ -372,8 +339,8 @@ $(document).ready(function() {
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[1, 'asc']],
     columnDefs: [
-      { orderable: false, targets: [0, 4] },
-      { searchable: false, targets: [0, 4] }
+      { orderable: false, targets: [0, 4, 5] },
+      { searchable: false, targets: [0, 4, 5] }
     ]
   });
 
@@ -401,10 +368,24 @@ $(document).ready(function() {
   };
 });
 
+function updateEditWeightHelp() {
+  var isAllow = document.getElementById('edit_type_allow').checked;
+  document.getElementById('editWeightHelp').textContent = isAllow
+    ? 'Points subtracted from the DNSBL score per match'
+    : 'Points added to the DNSBL score per match';
+}
+
 function openEditModal(id, host, weight) {
   document.getElementById('edit_id').value = id;
   document.getElementById('edit_host').value = host;
-  document.getElementById('edit_weight').value = weight;
+  var w = parseInt(weight, 10);
+  document.getElementById('edit_weight').value = Math.abs(w);
+  if (w < 0) {
+    document.getElementById('edit_type_allow').checked = true;
+  } else {
+    document.getElementById('edit_type_block').checked = true;
+  }
+  updateEditWeightHelp();
   var modal = new bootstrap.Modal(document.getElementById('editModal'));
   modal.show();
 }
@@ -413,6 +394,36 @@ function deleteSingle(id, name) {
   if (!confirm('Are you sure you want to delete "' + name + '"?')) return;
   document.getElementById('delete_id').value = id;
   document.getElementById('deleteForm').submit();
+}
+
+function testEntry(id) {
+  var badge = document.getElementById('status-' + id);
+  badge.className = 'badge bg-secondary';
+  badge.title = '';
+  badge.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
+  fetch('view_rbl_configuration.cfm?action=test_entry&id=' + id)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.status === 'ok') {
+        badge.className = 'badge bg-success';
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> Zone Active';
+        badge.title = data.message;
+      } else {
+        badge.className = 'badge bg-danger';
+        badge.innerHTML = '<i class="fas fa-times-circle"></i> ' + (data.status === 'timeout' ? 'Unreachable' : 'Error');
+        badge.title = data.message;
+      }
+    })
+    .catch(function() {
+      badge.className = 'badge bg-danger';
+      badge.innerHTML = '<i class="fas fa-times-circle"></i> Request failed';
+    });
+}
+
+function testAll() {
+  document.querySelectorAll('.test-btn').forEach(function(btn) {
+    btn.click();
+  });
 }
 
 $('input[name="rbl_type"]').on('change', function() {

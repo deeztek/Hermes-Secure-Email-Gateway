@@ -9,11 +9,11 @@ Clears the SpamAssassin Bayes learned spam/ham database.
       arguments="exec hermes_mail_filter /usr/bin/sa-learn --clear"
       timeout="60" variable="bayesResult" errorVariable="bayesError" />
 
-  <cfset session.m = 5>
+  <cfset session.m = 15>
   <cfset session.cmdOutput = bayesResult>
 
   <cfcatch type="any">
-    <cfset session.m = 6>
+    <cfset session.m = 16>
     <cfset session.cmdOutput = cfcatch.message>
   </cfcatch>
 </cftry>

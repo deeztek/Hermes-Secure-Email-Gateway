@@ -1,39 +1,15 @@
 <!---
 Hermes Secure Email Gateway - Sender/Recipient Block/Allow Data Include
-Queries the mailaddr_temp table for sender-to-recipient block/allow mappings.
+Queries wblist joined with mailaddr and recipients for all active entries
+(both admin-managed and user-trained entries).
 --->
 
-<!--- Active entries (applied, no pending action) --->
 <cfquery name="get_active_all" datasource="hermes">
-  SELECT id, recipient_id, mailaddr_id, sender, wb, receiver
-  FROM mailaddr_temp
-  WHERE applied = <cfqueryparam value="1" cfsqltype="cf_sql_varchar">
-    AND action = <cfqueryparam value="NONE" cfsqltype="cf_sql_varchar">
-  ORDER BY sender ASC
+  SELECT w.rid, w.sid, w.wb,
+         m.email AS sender,
+         r.recipient AS receiver
+  FROM wblist w
+  JOIN mailaddr m ON m.id = w.sid
+  JOIN recipients r ON r.id = w.rid
+  ORDER BY m.email ASC
 </cfquery>
-
-<!--- Pending additions --->
-<cfquery name="get_pending_adds" datasource="hermes">
-  SELECT id, recipient_id, mailaddr_id, sender, wb, receiver
-  FROM mailaddr_temp
-  WHERE applied = <cfqueryparam value="2" cfsqltype="cf_sql_varchar">
-    AND action = <cfqueryparam value="insert" cfsqltype="cf_sql_varchar">
-  ORDER BY sender ASC
-</cfquery>
-
-<!--- Pending deletions --->
-<cfquery name="get_pending_deletes" datasource="hermes">
-  SELECT id, recipient_id, mailaddr_id, sender, wb, receiver
-  FROM mailaddr_temp
-  WHERE applied = <cfqueryparam value="2" cfsqltype="cf_sql_varchar">
-    AND action = <cfqueryparam value="delete" cfsqltype="cf_sql_varchar">
-  ORDER BY sender ASC
-</cfquery>
-
-<!--- Count of pending changes --->
-<cfquery name="get_pending_changes" datasource="hermes">
-  SELECT COUNT(*) as cnt FROM mailaddr_temp
-  WHERE applied = <cfqueryparam value="2" cfsqltype="cf_sql_varchar">
-</cfquery>
-
-<cfset has_pending_changes = get_pending_changes.cnt GT 0>

@@ -90,13 +90,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- SET FORM DEFAULTS FROM DATABASE VALUES --->
 <cfparam name="show_relay_enabled" default="#relayhost_enabled#">
-<cfif StructKeyExists(form, "relay_enabled")>
-  <cfset show_relay_enabled = form.relay_enabled>
+<cfif action is "save">
+  <cfset show_relay_enabled = StructKeyExists(form, "relay_enabled") ? "1" : "0">
 </cfif>
 
 <cfparam name="show_relay_authenticate" default="#relayhost_authenticate#">
-<cfif StructKeyExists(form, "relay_authenticate")>
-  <cfset show_relay_authenticate = form.relay_authenticate>
+<cfif action is "save">
+  <cfset show_relay_authenticate = StructKeyExists(form, "relay_authenticate") ? "1" : "0">
 </cfif>
 
 <cfparam name="show_relayhost" default="#relayhost_hostname#">
@@ -185,7 +185,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 
     <!--- If authentication required, validate username and password --->
-    <cfif form.relay_authenticate is "1">
+    <cfif StructKeyExists(form, "relay_authenticate") AND form.relay_authenticate is "1">
       <cfif trim(form.relayhost_username) is "">
         <cfset session.m = 5>
         <cflocation url="view_relay_host.cfm" addtoken="no">
@@ -307,23 +307,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- RELAY HOST ENABLED/DISABLED --->
       <div class="row mb-3">
         <div class="col-md-6">
-          <label class="form-label"><strong>Relay Host Status</strong></label>
-          <div class="form-check">
+          <div class="form-check form-switch">
             <cfoutput>
-            <input class="form-check-input" type="radio" name="relay_enabled" id="relay_enabled_1" value="1" <cfif show_relay_enabled is "1">checked</cfif> onchange="toggleRelayFields()">
-            <label class="form-check-label" for="relay_enabled_1">
-              <strong>Enabled</strong> - Route outbound mail through a relay host
-            </label>
+            <input class="form-check-input" type="checkbox" name="relay_enabled" id="relay_enabled" value="1"
+              <cfif show_relay_enabled is "1">checked</cfif> onchange="toggleRelayFields()">
+            <label class="form-check-label" for="relay_enabled"><strong>Enable Relay Host</strong></label>
             </cfoutput>
           </div>
-          <div class="form-check">
-            <cfoutput>
-            <input class="form-check-input" type="radio" name="relay_enabled" id="relay_enabled_0" value="0" <cfif show_relay_enabled is "0">checked</cfif> onchange="toggleRelayFields()">
-            <label class="form-check-label" for="relay_enabled_0">
-              <strong>Disabled</strong> (Default) - Deliver mail directly to the Internet
-            </label>
-            </cfoutput>
-          </div>
+          <small class="text-muted ms-4">Route outbound mail through a relay host instead of delivering directly to the Internet</small>
         </div>
       </div>
 
@@ -332,23 +323,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- RELAY HOST AUTHENTICATION --->
       <div id="authSection" class="row mb-3" <cfif show_relay_enabled is "0">style="display:none;"</cfif>>
         <div class="col-md-6">
-          <label class="form-label"><strong>Relay Host Authentication</strong></label>
-          <div class="form-check">
+          <div class="form-check form-switch">
             <cfoutput>
-            <input class="form-check-input" type="radio" name="relay_authenticate" id="relay_authenticate_1" value="1" <cfif show_relay_authenticate is "1">checked</cfif> <cfif show_relay_enabled is "0">disabled</cfif> onchange="toggleAuthFields()">
-            <label class="form-check-label" for="relay_authenticate_1">
-              <strong>Required</strong> - Relay host requires username and password
-            </label>
+            <input class="form-check-input" type="checkbox" name="relay_authenticate" id="relay_authenticate" value="1"
+              <cfif show_relay_authenticate is "1">checked</cfif> <cfif show_relay_enabled is "0">disabled</cfif> onchange="toggleAuthFields()">
+            <label class="form-check-label" for="relay_authenticate"><strong>Relay Host Requires Authentication</strong></label>
             </cfoutput>
           </div>
-          <div class="form-check">
-            <cfoutput>
-            <input class="form-check-input" type="radio" name="relay_authenticate" id="relay_authenticate_0" value="0" <cfif show_relay_authenticate is "0">checked</cfif> <cfif show_relay_enabled is "0">disabled</cfif> onchange="toggleAuthFields()">
-            <label class="form-check-label" for="relay_authenticate_0">
-              <strong>Not Required</strong> (Default) - Relay host does not require authentication
-            </label>
-            </cfoutput>
-          </div>
+          <small class="text-muted ms-4">Enable if the relay host requires a username and password</small>
         </div>
       </div>
 
@@ -463,55 +445,46 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- JAVASCRIPT FOR FORM TOGGLE --->
 <script>
 function toggleRelayFields() {
-  var relayEnabled = document.querySelector('input[name="relay_enabled"]:checked').value;
+  var relayEnabled = document.getElementById('relay_enabled').checked;
   var relayFields = document.getElementById('relayFields');
   var authSection = document.getElementById('authSection');
   var authHr = document.getElementById('authHr');
-  var relayhostInput = document.getElementById('relayhost');
-  var relayportInput = document.getElementById('relayhost_port');
-  var tlsModeSelect = document.getElementById('relayhost_tls_mode');
-  var authRadios = document.querySelectorAll('input[name="relay_authenticate"]');
+  var authToggle = document.getElementById('relay_authenticate');
 
-  if (relayEnabled === '1') {
+  if (relayEnabled) {
     relayFields.style.display = 'block';
     authSection.style.display = 'block';
     authHr.style.display = 'block';
-    relayhostInput.disabled = false;
-    relayportInput.disabled = false;
-    tlsModeSelect.disabled = false;
-    authRadios.forEach(function(radio) {
-      radio.disabled = false;
-    });
+    document.getElementById('relayhost').disabled = false;
+    document.getElementById('relayhost_port').disabled = false;
+    document.getElementById('relayhost_tls_mode').disabled = false;
+    authToggle.disabled = false;
     toggleAuthFields();
   } else {
     relayFields.style.display = 'none';
     authSection.style.display = 'none';
     authHr.style.display = 'none';
-    relayhostInput.disabled = true;
-    relayportInput.disabled = true;
-    tlsModeSelect.disabled = true;
-    authRadios.forEach(function(radio) {
-      radio.disabled = true;
-    });
+    document.getElementById('relayhost').disabled = true;
+    document.getElementById('relayhost_port').disabled = true;
+    document.getElementById('relayhost_tls_mode').disabled = true;
+    authToggle.disabled = true;
     document.getElementById('relayhost_username').disabled = true;
     document.getElementById('relayhost_password').disabled = true;
   }
 }
 
 function toggleAuthFields() {
-  var authRequired = document.querySelector('input[name="relay_authenticate"]:checked').value;
+  var authRequired = document.getElementById('relay_authenticate').checked;
   var authFields = document.getElementById('authFields');
-  var usernameInput = document.getElementById('relayhost_username');
-  var passwordInput = document.getElementById('relayhost_password');
 
-  if (authRequired === '1') {
+  if (authRequired) {
     authFields.style.display = 'block';
-    usernameInput.disabled = false;
-    passwordInput.disabled = false;
+    document.getElementById('relayhost_username').disabled = false;
+    document.getElementById('relayhost_password').disabled = false;
   } else {
     authFields.style.display = 'none';
-    usernameInput.disabled = true;
-    passwordInput.disabled = true;
+    document.getElementById('relayhost_username').disabled = true;
+    document.getElementById('relayhost_password').disabled = true;
   }
 }
 

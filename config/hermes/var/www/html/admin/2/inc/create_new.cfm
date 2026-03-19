@@ -32,40 +32,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
     </cfif>
 
-<cfif #theType# is "adconnection">
-
-
-<cfquery name="getmaxid" datasource="hermes">
-select max(id) as maxid from ad_integration
-</cfquery>
-
-<cfif #getmaxid.maxid# is "">
-
-<cfset nextid=1>
-
-<cfelse>
-
-<cfset nextid=#getmaxid.maxid# + 1>
-
-<!--- /CFIF getmaxid.maxid is "" --->
-</cfif>      
-     
-
-  <cfquery name="insertconnection" datasource="hermes" result="stResult">
-    insert into ad_integration
-    (entry_name, objectclass, scheduled)
-    values 
-    ('AdConnection_#nextid#', 'user', '2')
-    </cfquery>  
-
-
-
-<cfoutput>
-<cflocation url="../edit_ad_connection.cfm?id=#stResult.GENERATED_KEY#" addtoken="no">
-</cfoutput>
-
-
-<cfelseif #theType# is "systemuser">
+<cfif #theType# is "systemuser">
 
 <cfquery name="getmaxid" datasource="hermes">
 select max(id) as maxid from system_users

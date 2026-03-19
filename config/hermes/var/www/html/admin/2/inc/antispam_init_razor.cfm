@@ -10,15 +10,15 @@ Deletes existing identity, creates new config, and registers with Razor network.
       timeout="30" variable="razorResult" errorVariable="razorError" />
 
   <cfif FindNoCase("Register successful", razorResult) OR FindNoCase("created", razorResult)>
-    <cfset session.m = 3>
+    <cfset session.m = 13>
     <cfset session.cmdOutput = razorResult>
   <cfelse>
-    <cfset session.m = 4>
+    <cfset session.m = 14>
     <cfset session.cmdOutput = razorResult & " " & razorError>
   </cfif>
 
   <cfcatch type="any">
-    <cfset session.m = 4>
+    <cfset session.m = 14>
     <cfset session.cmdOutput = cfcatch.message>
   </cfcatch>
 </cftry>

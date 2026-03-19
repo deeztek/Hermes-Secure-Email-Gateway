@@ -39,7 +39,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
 </cfquery>
 
 <!--- Check if relay host is enabled or disabled --->
-<cfif form.relay_enabled is "1">
+<cfif StructKeyExists(form, "relay_enabled") AND form.relay_enabled is "1">
     <!--- RELAY HOST ENABLED --->
 
     <!--- Enable relayhost parent parameter --->
@@ -112,7 +112,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
     </cfif>
 
     <!--- Check if authentication is required --->
-    <cfif form.relay_authenticate is "1">
+    <cfif StructKeyExists(form, "relay_authenticate") AND form.relay_authenticate is "1">
         <!--- AUTHENTICATION REQUIRED --->
 
         <!--- Enable smtp_sasl_auth_enable parent parameter --->

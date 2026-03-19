@@ -92,10 +92,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/network_delete_entry.cfm">
 <cfelseif action is "edit_entry">
   <cfinclude template="./inc/network_edit_entry.cfm">
-<cfelseif action is "apply">
-  <cfinclude template="./inc/network_apply_settings.cfm">
-<cfelseif action is "cancel_add" OR action is "cancel_delete">
-  <cfinclude template="./inc/network_cancel_changes.cfm">
 </cfif>
 
 <!--- Refresh data --->
@@ -108,7 +104,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Entries Added</h4>
     <cfif StructKeyExists(session, "entries_added")>
-      <p><cfoutput>#session.entries_added#</cfoutput> entries staged for addition.</p>
+      <p><cfoutput>#session.entries_added#</cfoutput> entries added and Postfix configuration applied.</p>
       <cfset session.entries_added = "">
     </cfif>
     <cfif StructKeyExists(session, "entries_skipped") AND session.entries_skipped GT 0>
@@ -119,46 +115,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <p><cfoutput>#session.entry_errors#</cfoutput></p>
       <cfset session.entry_errors = "">
     </cfif>
-    <p>Click <strong>Apply Settings</strong> to activate.</p>
   </div>
 </cfif>
 <cfif m is 2>
-  <div class="alert alert-warning alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-exclamation-triangle"></i> Marked for Deletion</h4>
-    <p>Click <strong>Apply Settings</strong> to confirm.</p>
-  </div>
-</cfif>
-<cfif m is 3>
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Settings Applied</h4>
-    <p>Network block/allow configuration applied and Postfix reloaded.</p>
+    <h4><i class="icon fa fa-check"></i> Entry Deleted</h4>
+    <p>Entry deleted and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
 <cfif m is 4>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Apply Failed</h4>
+    <h4><i class="icon fa fa-ban"></i> Configuration Error</h4>
+    <p>An error occurred while applying the Postfix configuration.</p>
   </div>
 </cfif>
 <cfif m is 5>
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-edit"></i> Entry Updated</h4>
-    <p>Click <strong>Apply Settings</strong> to activate.</p>
-  </div>
-</cfif>
-<cfif m is 6>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Additions Cancelled</h4>
-  </div>
-</cfif>
-<cfif m is 7>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Deletions Cancelled</h4>
+    <h4><i class="icon fa fa-check"></i> Entry Updated</h4>
+    <p>Entry updated and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
 <cfif m is 30>
@@ -169,61 +146,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
-<!--- PENDING CHANGES --->
-<cfif has_pending_changes>
-  <cfif get_pending_adds.recordCount GT 0>
-    <div class="card card-warning card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Additions (<cfoutput>#get_pending_adds.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_adds">
-          <span class="badge bg-success me-1">+ #encodeForHTML(sender)# (#action#)</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_add">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Additions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-  <cfif get_pending_deletes.recordCount GT 0>
-    <div class="card card-danger card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Deletions (<cfoutput>#get_pending_deletes.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_deletes">
-          <span class="badge bg-danger me-1">- #encodeForHTML(sender)#</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_delete">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Deletions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-  <div class="mb-4">
-    <form method="post" class="d-inline">
-      <input type="hidden" name="action" value="apply">
-      <button type="submit" class="btn btn-danger btn-lg"
-        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
-        <i class="fas fa-check-circle"></i> Apply Settings
-      </button>
-    </form>
-  </div>
-</cfif>
-
 <!-- ADD ENTRIES CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add IP/Network</h3>
   </div>
   <div class="card-body">
+    <div class="callout callout-info mb-4">
+      <h5><i class="fas fa-info-circle"></i> About Network Block/Allow</h5>
+      <p class="mb-1">Entries here are evaluated by Postfix <strong>before</strong> any RBL/DNSBL checks run. This makes them useful as an <strong>RBL override</strong> — adding a trusted IP or network with <strong>Allow</strong> causes Postfix to skip all spam and DNSBL scoring for that sender entirely.</p>
+      <p class="mb-2"><strong>When to add an Allow entry:</strong></p>
+      <ul class="mb-2">
+        <li>A trusted mail server or partner whose IP appears on RBL lists (e.g. a shared hosting provider)</li>
+        <li>Your own internal mail servers or relay hosts that send through this gateway</li>
+        <li>A known-good sender being incorrectly blocked due to RBL false positives</li>
+      </ul>
+      <p class="mb-2"><strong>When to add a Block entry:</strong></p>
+      <ul class="mb-0">
+        <li>A known-bad IP or network that you want rejected outright before any other checks</li>
+        <li>A persistent spam source not covered by your current RBL lists</li>
+      </ul>
+    </div>
     <form method="post" autocomplete="off">
       <input type="hidden" name="action" value="add_entries">
       <div class="row">

@@ -1,7 +1,7 @@
 
 <!---
 Hermes Secure Email Gateway - Network Block/Allow Add Entries Action Handler
-Parses multi-line textarea input, validates IPs/CIDR networks, and inserts entries.
+Parses multi-line textarea input, validates IPs/CIDR networks, inserts entries, and applies immediately.
 Expects: form.entries, form.entry_action
 Requires: get_network_block_allow.cfm, normalizeIP function, ipv4_pattern
 --->
@@ -78,7 +78,7 @@ Requires: get_network_block_allow.cfm, normalizeIP function, ipv4_pattern
     VALUES (
       <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">,
       <cfqueryparam value="#entryAction#" cfsqltype="cf_sql_varchar">,
-      'insert', '2',
+      'NONE', '1',
       <cfqueryparam value="#entryNote#" cfsqltype="cf_sql_varchar">
     )
   </cfquery>
@@ -88,5 +88,18 @@ Requires: get_network_block_allow.cfm, normalizeIP function, ipv4_pattern
 <cfset session.entries_added = entries_added>
 <cfset session.entries_skipped = entries_skipped>
 <cfset session.entry_errors = entry_errors>
-<cfset session.m = 1>
+
+<cfif entries_added GT 0>
+  <!--- Immediately generate and apply Postfix configuration --->
+  <cftry>
+    <cfinclude template="generate_postscreen_access.cfm">
+    <cfset session.m = 1>
+    <cfcatch type="any">
+      <cfset session.m = 4>
+    </cfcatch>
+  </cftry>
+<cfelse>
+  <cfset session.m = 1>
+</cfif>
+
 <cflocation url="view_network_block_allow.cfm" addtoken="no">

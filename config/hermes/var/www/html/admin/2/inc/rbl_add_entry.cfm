@@ -19,9 +19,14 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <cfset rblType = "block">
 <cfif StructKeyExists(form, "rbl_type")><cfset rblType = form.rbl_type></cfif>
 
-<!--- Validate hostname format --->
-<cfset temp_email = "test@" & rblHost>
-<cfif NOT IsValid("email", temp_email)>
+<!--- Validate hostname portion only (strip optional Postfix return-code filter: hostname=127.x.x.x) --->
+<cfset eqPos = Find("=", rblHost)>
+<cfif eqPos GT 0>
+  <cfset hostPart = Left(rblHost, eqPos - 1)>
+<cfelse>
+  <cfset hostPart = rblHost>
+</cfif>
+<cfif NOT IsValid("email", "test@" & hostPart)>
   <cfset session.m = 11>
   <cflocation url="view_rbl_configuration.cfm" addtoken="no">
 </cfif>
@@ -54,18 +59,26 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 </cfif>
 
 <cfquery datasource="hermes">
-  INSERT INTO parameters (parameter, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
+  INSERT INTO parameters (parameter, parent_name, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
   VALUES (
     <cfqueryparam value="#paramValue#" cfsqltype="cf_sql_varchar">,
+    'postscreen_dnsbl_sites',
     'postfix', '1', 'main.cf',
     <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">,
     '1',
     <cfqueryparam value="#nextOrder#" cfsqltype="cf_sql_integer">,
     '1',
     <cfqueryparam value="#actualWeight#" cfsqltype="cf_sql_integer">,
-    '2', 'insert'
+    '1', 'NONE'
   )
 </cfquery>
 
-<cfset session.m = 1>
+<!--- Immediately generate and apply Postfix configuration --->
+<cftry>
+  <cfinclude template="generate_postfix_configuration.cfm">
+  <cfset session.m = 1>
+  <cfcatch type="any">
+    <cfset session.m = 4>
+  </cfcatch>
+</cftry>
 <cflocation url="view_rbl_configuration.cfm" addtoken="no">

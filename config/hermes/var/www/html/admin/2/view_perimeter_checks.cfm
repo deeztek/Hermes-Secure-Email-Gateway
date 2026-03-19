@@ -140,50 +140,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <cfoutput>
       <div class="row mb-3">
-        <div class="col-md-6">
-          <label class="form-label"><strong>Pipelining Detection</strong></label>
-          <div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_pipelining" id="pipelining_yes" value="yes" <cfif get_postscreen_pipelining.parameter is "yes">checked</cfif>>
-              <label class="form-check-label" for="pipelining_yes">Enabled</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_pipelining" id="pipelining_no" value="no" <cfif get_postscreen_pipelining.parameter is "no">checked</cfif>>
-              <label class="form-check-label" for="pipelining_no">Disabled</label>
-            </div>
+        <div class="col-md-4 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="postscreen_pipelining" id="postscreen_pipelining" value="yes"
+              <cfif get_postscreen_pipelining.parameter is "yes">checked</cfif>>
+            <label class="form-check-label" for="postscreen_pipelining"><strong>Pipelining Detection</strong></label>
           </div>
-          <small class="text-muted">Detect SMTP command pipelining before the server greeting</small>
+          <small class="text-muted ms-4">Detect SMTP command pipelining before the server greeting</small>
         </div>
-        <div class="col-md-6">
-          <label class="form-label"><strong>Non-SMTP Command Detection</strong></label>
-          <div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_non_smtp" id="nonsmtp_yes" value="yes" <cfif get_postscreen_non_smtp.parameter is "yes">checked</cfif>>
-              <label class="form-check-label" for="nonsmtp_yes">Enabled</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_non_smtp" id="nonsmtp_no" value="no" <cfif get_postscreen_non_smtp.parameter is "no">checked</cfif>>
-              <label class="form-check-label" for="nonsmtp_no">Disabled</label>
-            </div>
+        <div class="col-md-4 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="postscreen_non_smtp" id="postscreen_non_smtp" value="yes"
+              <cfif get_postscreen_non_smtp.parameter is "yes">checked</cfif>>
+            <label class="form-check-label" for="postscreen_non_smtp"><strong>Non-SMTP Command Detection</strong></label>
           </div>
-          <small class="text-muted">Detect non-SMTP commands in the SMTP session</small>
+          <small class="text-muted ms-4">Detect non-SMTP commands in the SMTP session</small>
         </div>
-      </div>
-
-      <div class="row mb-3">
-        <div class="col-md-6">
-          <label class="form-label"><strong>Bare Newline Detection</strong></label>
-          <div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_bare_newline" id="bare_yes" value="yes" <cfif get_postscreen_bare_newline.parameter is "yes">checked</cfif>>
-              <label class="form-check-label" for="bare_yes">Enabled</label>
-            </div>
-            <div class="form-check form-check-inline">
-              <input class="form-check-input" type="radio" name="postscreen_bare_newline" id="bare_no" value="no" <cfif get_postscreen_bare_newline.parameter is "no">checked</cfif>>
-              <label class="form-check-label" for="bare_no">Disabled</label>
-            </div>
+        <div class="col-md-4 mb-3">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" name="postscreen_bare_newline" id="postscreen_bare_newline" value="yes"
+              <cfif get_postscreen_bare_newline.parameter is "yes">checked</cfif>>
+            <label class="form-check-label" for="postscreen_bare_newline"><strong>Bare Newline Detection</strong></label>
           </div>
-          <small class="text-muted">Detect bare newline characters (not preceded by carriage return)</small>
+          <small class="text-muted ms-4">Detect bare newline characters (not preceded by carriage return)</small>
         </div>
       </div>
       </cfoutput>
@@ -223,11 +202,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <div class="row mb-3">
         <div class="col-md-6">
-          <div class="form-check mb-2">
+          <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" name="helo_required" id="helo_required" value="1" <cfif get_helo_required.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="helo_required"><strong>Require HELO/EHLO</strong></label>
-            <br><small class="text-muted">Require clients to send a HELO or EHLO command before sending mail</small>
           </div>
+          <small class="text-muted ms-4">Require clients to send a HELO or EHLO command before sending mail</small>
         </div>
       </div>
 
@@ -248,39 +227,39 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <div class="row">
         <div class="col-md-6">
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_unauth_destination" id="reject_unauth_destination" value="1" <cfif get_reject_unauth_destination.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_unauth_destination"><strong>Reject Unauthorized Destination</strong></label>
             <br><small class="text-muted">Reject mail to domains this server does not relay for</small>
           </div>
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_unauth_pipelining" id="reject_unauth_pipelining" value="1" <cfif get_reject_unauth_pipelining.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_unauth_pipelining"><strong>Reject Unauthorized Pipelining</strong></label>
             <br><small class="text-muted">Reject mail from clients that pipeline commands without permission</small>
           </div>
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_invalid_hostname" id="reject_invalid_hostname" value="1" <cfif get_reject_invalid_hostname.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_invalid_hostname"><strong>Reject Invalid Hostname</strong></label>
             <br><small class="text-muted">Reject mail from clients with invalid HELO/EHLO hostname</small>
           </div>
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_non_fqdn_sender" id="reject_non_fqdn_sender" value="1" <cfif get_reject_non_fqdn_sender.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_non_fqdn_sender"><strong>Reject Non-FQDN Sender</strong></label>
             <br><small class="text-muted">Reject mail from senders with non-fully-qualified domain names</small>
           </div>
         </div>
         <div class="col-md-6">
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_unknown_sender_domain" id="reject_unknown_sender_domain" value="1" <cfif get_reject_unknown_sender_domain.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_unknown_sender_domain"><strong>Reject Unknown Sender Domain</strong></label>
             <br><small class="text-muted">Reject mail from senders whose domain has no DNS A or MX record</small>
           </div>
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_non_fqdn_recipient" id="reject_non_fqdn_recipient" value="1" <cfif get_reject_non_fqdn_recipient.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_non_fqdn_recipient"><strong>Reject Non-FQDN Recipient</strong></label>
             <br><small class="text-muted">Reject mail to recipients with non-fully-qualified domain names</small>
           </div>
-          <div class="form-check mb-3">
+          <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" name="reject_unknown_recipient_domain" id="reject_unknown_recipient_domain" value="1" <cfif get_reject_unknown_recipient_domain.enabled is "1">checked</cfif>>
             <label class="form-check-label" for="reject_unknown_recipient_domain"><strong>Reject Unknown Recipient Domain</strong></label>
             <br><small class="text-muted">Reject mail to recipients whose domain has no DNS A or MX record</small>
