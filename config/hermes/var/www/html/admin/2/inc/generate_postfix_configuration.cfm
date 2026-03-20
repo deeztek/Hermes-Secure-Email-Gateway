@@ -159,21 +159,11 @@ timeout = "60">
 
 
 <!--- RUN POSTFIX CONFIG SCRIPT IN DOCKER CONTAINER --->
-<cftry>
-
-<cfexecute name = "/usr/local/bin/docker"
-arguments="exec hermes_postfix_dkim /bin/bash /opt/hermes/tmp/#customtrans3#_postconf.sh"
-timeout = "240">
-</cfexecute>
-
-<cfcatch type="any">
-
-<cfset m="Generate Postfix Configuration: There was an error running /opt/hermes/tmp/#customtrans3#_postconf.sh. Error was #cfcatch.message#">
-<cfinclude template="error.cfm">
-<cfabort>
-
-</cfcatch>
-</cftry>
+<cfexecute name="/usr/local/bin/docker"
+  arguments="exec hermes_postfix_dkim /bin/bash /opt/hermes/tmp/#customtrans3#_postconf.sh"
+  timeout="240"
+  variable="postconfOutput"
+  errorVariable="postconfError" />
 
 <!--- Delete postconf script --->
 <cfif FileExists("/opt/hermes/tmp/#customtrans3#_postconf.sh")>

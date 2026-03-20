@@ -274,6 +274,7 @@ services:
       - ./config/postfix-dkim/etc/postfix:/etc/postfix
       - ./config/postfix-dkim/etc/opendkim.conf:/etc/opendkim.conf
       - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
+      - ./config/opendmarc/etc/opendmarc:/etc/opendmarc
       - ./config/mail_filter/etc/amavis:/etc/amavis #Amavis config (mynetworks, white/black lists)
       - ./config/ldap:/ldap
       - /proc:/host/proc:ro #Host /proc for system resource monitoring
