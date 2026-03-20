@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Global Sender Block/Allow</title>
+  <title>Hermes SEG | Global Sender Rules</title>
 
   <cfinclude template="./inc/html_head.cfm" />
 
@@ -40,12 +40,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Global Sender Block/Allow</h1>
+            <h1 class="m-0">Global Sender Rules</h1>
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Global Sender Block/Allow</li>
+              <li class="breadcrumb-item active">Global Sender Rules</li>
             </ol>
           </div>
         </div>
@@ -78,12 +78,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/global_sender_delete_entry.cfm">
 <cfelseif action is "edit_entry">
   <cfinclude template="./inc/global_sender_edit_entry.cfm">
-<cfelseif action is "cancel_add">
-  <cfinclude template="./inc/global_sender_cancel_add.cfm">
-<cfelseif action is "cancel_delete">
-  <cfinclude template="./inc/global_sender_cancel_delete.cfm">
-<cfelseif action is "apply">
-  <cfinclude template="./inc/global_sender_apply.cfm">
 </cfif>
 
 <!--- Refresh data after actions --->
@@ -92,36 +86,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ALERTS --->
 <cfif m is 1>
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Entries Added</h4>
-    <cfif StructKeyExists(session, "entries_added")>
-      <p><cfoutput>#session.entries_added#</cfoutput> entries staged for addition.</p>
-      <cfset session.entries_added = "">
-    </cfif>
-    <cfif StructKeyExists(session, "entries_skipped") AND session.entries_skipped GT 0>
-      <p><cfoutput>#session.entries_skipped#</cfoutput> entries skipped.</p>
-      <cfset session.entries_skipped = "">
-    </cfif>
-    <cfif StructKeyExists(session, "entry_errors") AND session.entry_errors is not "">
-      <p><cfoutput>#session.entry_errors#</cfoutput></p>
-      <cfset session.entry_errors = "">
-    </cfif>
-    <p>Click <strong>Apply Settings</strong> to activate.</p>
-  </div>
+  <cfif StructKeyExists(session, "entries_added") AND session.entries_added GT 0>
+    <div class="alert alert-success alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Success</h4>
+      <cfoutput>The following #session.entries_added# entries were added successfully:</cfoutput><br>
+      <cfoutput>#session.success_list#</cfoutput>
+      <p class="mb-0 mt-2">Settings applied. Postfix reloaded and Amavis restarted.</p>
+    </div>
+  </cfif>
+  <cfif StructKeyExists(session, "invalid_list") AND session.invalid_list is not "">
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-ban"></i> Invalid Entries</h4>
+      The following entries had invalid email address(es) or domain(s):<br>
+      <cfoutput>#session.invalid_list#</cfoutput>
+    </div>
+  </cfif>
+  <cfif StructKeyExists(session, "duplicate_list") AND session.duplicate_list is not "">
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-ban"></i> Duplicate Entries</h4>
+      The following entries already exist:<br>
+      <cfoutput>#session.duplicate_list#</cfoutput>
+    </div>
+  </cfif>
+  <cfset session.entries_added = "">
+  <cfset session.entries_skipped = "">
+  <cfset session.success_list = "">
+  <cfset session.invalid_list = "">
+  <cfset session.duplicate_list = "">
 </cfif>
 <cfif m is 2>
-  <div class="alert alert-warning alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-exclamation-triangle"></i> Marked for Deletion</h4>
-    <p>Click <strong>Apply Settings</strong> to confirm.</p>
-  </div>
-</cfif>
-<cfif m is 3>
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Settings Applied</h4>
-    <p>Global sender block/allow configuration applied. Postfix reloaded and Amavis restarted.</p>
+    <h4><i class="icon fa fa-check"></i> Entry Deleted</h4>
+    <p>Settings applied. Postfix reloaded and Amavis restarted.</p>
   </div>
 </cfif>
 <cfif m is 4>
@@ -132,22 +132,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 <cfif m is 5>
-  <div class="alert alert-info alert-dismissible">
+  <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-edit"></i> Entry Updated</h4>
-    <p>Click <strong>Apply Settings</strong> to activate.</p>
-  </div>
-</cfif>
-<cfif m is 6>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Additions Cancelled</h4>
-  </div>
-</cfif>
-<cfif m is 7>
-  <div class="alert alert-info alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-undo"></i> Pending Deletions Cancelled</h4>
+    <h4><i class="icon fa fa-check"></i> Entry Updated</h4>
+    <p>Settings applied. Postfix reloaded and Amavis restarted.</p>
   </div>
 </cfif>
 <cfif m is 30>
@@ -159,69 +147,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- WARNING CALLOUT --->
-<div class="callout callout-danger mb-4">
+<div class="callout callout-warning mb-4">
   <h5><i class="fas fa-exclamation-triangle"></i> Use Extreme Caution</h5>
   <p class="mb-1">
     Any <strong>Allow</strong> entries will bypass <strong>ALL</strong> filter checks including Spam, Virus, and Banned File checks
-    for <strong>ALL</strong> recipients in your system. Do not use if at all possible. A Global Sender Block/Allow entry takes
-    precedence over any Sender to Recipient Block/Allow entries.
+    for <strong>ALL</strong> recipients in your system. Do not use if at all possible. A Global Sender Rules entry takes
+    precedence over any Sender/Recipient Rules entries.
   </p>
   <p class="mb-0">
-    To match an entire domain <strong>and all of its subdomains</strong>, enter a leading dot (e.g., <code>.example.com</code>).
-    This is a powerful rule &mdash; use it with extreme care, as it will affect <strong>every</strong> email from
-    <code>example.com</code>, <code>sub.example.com</code>, etc. for all recipients.
-    To match only a single domain (no subdomains), enter it without a leading dot (e.g., <code>example.com</code>).
+    <code>@example.com</code> &mdash; matches all senders from <code>example.com</code> only (exact domain).<br>
+    <code>.example.com</code> &mdash; matches <code>example.com</code> <strong>and all subdomains</strong>
+    (<code>sub.example.com</code>, <code>mail.sub.example.com</code>, etc.).<br>
+    <code>user@example.com</code> &mdash; matches a single sender address.
   </p>
 </div>
-
-<!--- PENDING CHANGES --->
-<cfif has_pending_changes>
-  <cfif get_pending_adds.recordCount GT 0>
-    <div class="card card-warning card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Additions (<cfoutput>#get_pending_adds.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_adds">
-          <span class="badge <cfif type is 'allow'>bg-success<cfelse>bg-danger</cfif> me-1">+ #encodeForHTML(sender)# (#type#)</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_add">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Additions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-  <cfif get_pending_deletes.recordCount GT 0>
-    <div class="card card-danger card-outline mb-4">
-      <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-clock"></i> Pending Deletions (<cfoutput>#get_pending_deletes.recordCount#</cfoutput>)</h3>
-      </div>
-      <div class="card-body">
-        <cfoutput query="get_pending_deletes">
-          <span class="badge bg-danger me-1">- #encodeForHTML(sender)#</span>
-        </cfoutput>
-        <div class="mt-3">
-          <form method="post" class="d-inline">
-            <input type="hidden" name="action" value="cancel_delete">
-            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-undo"></i> Cancel Deletions</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  </cfif>
-  <div class="mb-4">
-    <form method="post" class="d-inline">
-      <input type="hidden" name="action" value="apply">
-      <button type="submit" class="btn btn-danger btn-lg"
-        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
-        <i class="fas fa-check-circle"></i> Apply Settings
-      </button>
-    </form>
-  </div>
-</cfif>
 
 <!-- ADD ENTRIES CARD -->
 <div class="card card-primary card-outline mb-4">
@@ -305,10 +244,12 @@ example.com
               <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
               <td>#encodeForHTML(sender)#</td>
               <td>
-                <cfif REFind("[@]", sender) GT 0>
-                  <span class="badge bg-info">Email</span>
+                <cfif Left(sender, 1) is "@">
+                  <span class="badge bg-secondary">Domain</span>
                 <cfelseif Left(sender, 1) is ".">
                   <span class="badge bg-warning">Domain + Subdomains</span>
+                <cfelseif REFind("[@]", sender) GT 0>
+                  <span class="badge bg-info">Email</span>
                 <cfelse>
                   <span class="badge bg-secondary">Domain</span>
                 </cfif>

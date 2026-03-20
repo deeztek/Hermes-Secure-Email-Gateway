@@ -1,144 +1,74 @@
-
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
-
-This file is part of Hermes Secure Email Gateway Community Edition.
-
-    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+Hermes Secure Email Gateway - Edit Virtual Recipient Action Handler
+Updates an existing virtual recipient entry with full address and delivery target.
+Expects: form.edit_id (integer), form.edit_address (virtual address), form.edit_forwards (delivery address)
 --->
 
-<cfparam name = "step" default = "0"> 
+<cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)>
+  <cfset editAddress = LCase(trim(form.edit_address))>
+  <cfset editForwards = LCase(trim(form.edit_forwards))>
+  <cfset editId = form.edit_id>
 
-<!--- ENABLE BELOW FOR DEBUG ONLY --->
-<!---
-<cfoutput>
-Form: #form.local_part#<br>
-</cfoutput>
---->
+  <!--- Validate virtual address --->
+  <cfif editAddress is "">
+    <cfset session.m = 10>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
 
-<cfif #form.local_part# is not "">
-<cfset step=1>
-<cfelseif #form.local_part# is "">
-<cfset step=2>
+  <!--- Validate delivers to --->
+  <cfif editForwards is "">
+    <cfset session.m = 11>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
+  <cfif NOT IsValid("email", editForwards)>
+    <cfset session.m = 12>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
 
-<!--- /CFIF #form.local_part# is/is not "" --->
+  <!--- Validate format: catch-all or full email --->
+  <cfset isCatchAll = Left(editAddress, 1) is "@" AND Len(editAddress) GT 1>
+  <cfif NOT isCatchAll AND NOT IsValid("email", editAddress)>
+    <cfset session.m = 10>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Extract and validate domain --->
+  <cfif isCatchAll>
+    <cfset editDomain = Mid(editAddress, 2, Len(editAddress))>
+  <cfelse>
+    <cfset editDomain = ListLast(editAddress, "@")>
+  </cfif>
+
+  <cfquery name="checkDomain" datasource="hermes">
+    SELECT domain FROM domains
+    WHERE domain = <cfqueryparam value="#editDomain#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkDomain.recordcount LT 1>
+    <cfset session.m = 13>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Check for duplicates (exclude current record) --->
+  <cfquery name="checkEntry" datasource="hermes">
+    SELECT id FROM virtual_recipients
+    WHERE virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">
+      AND maps = <cfqueryparam value="#editForwards#" cfsqltype="cf_sql_varchar">
+      AND id <> <cfqueryparam value="#editId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfif checkEntry.recordcount GTE 1>
+    <cfset session.m = 14>
+    <cflocation url="view_virtual_recipients.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Update --->
+  <cfquery datasource="hermes">
+    UPDATE virtual_recipients
+    SET virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">,
+        maps = <cfqueryparam value="#editForwards#" cfsqltype="cf_sql_varchar">,
+        system = '2'
+    WHERE id = <cfqueryparam value="#editId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <cfset session.m = 3>
 </cfif>
-
-<cfif #step# is "1">
-
-
-
-<cfoutput>
-<cfset local_part = #LCase(local_part)#>
-<cfset local_part = #trim(local_part)#>
-<cfset recipient = "#local_part#@#form.domain#">
-
-<cfset forwards = #LCase(form.forwards_1)#>
-<cfset forwards = #trim(forwards)#>
-
-
-
-<!--- ENABLE BELOW FOR DEBUG ONLY --->
-<!---
-Recipient: #theRecipient#<br>
---->
-</cfoutput>
-
-
-<cfif IsValid("email", recipient)>
-
-<cfoutput>
-<cfquery name="checkentry" datasource="hermes">
-select virtual_address, maps from virtual_recipients where virtual_address = '#recipient#' and maps = '#forwards#' and id <> <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-</cfoutput>
-
-<cfif #checkentry.recordcount# LT 1>
-
-<cfquery name="editvirtual" datasource="hermes">
-update virtual_recipients 
-set virtual_address = '#recipient#',
-maps = '#forwards#', 
-system = '2'
-where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-        
-<cfset session.m=1>
-  
-
-<cfelseif #checkentry.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=5>
-
-
-<!--- /CFIF #checkentry.recordcount# --->
-</cfif>
-
-
-<cfelseif NOT IsValid("email", recipient)>
-
-<cfset step=0>
-<cfset session.m=4>
-
-<!--- /CFIF IsValid("email", recipient) --->
-</cfif>
-        
-
-
-<!--- /CFIF #step# is "1" --->
-</cfif>
-
-<cfif #step# is "2">
-
-<cfoutput>
-
-<cfset forwards = #LCase(form.forwards_1)#>
-<cfset forwards = #trim(forwards)#>
-
-</cfoutput>
-
-<cfoutput>
-<cfquery name="checkentry" datasource="hermes">
-select virtual_address, maps from virtual_recipients where virtual_address = '@#form.domain#' and maps = '#forwards#' and id <> <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-</cfoutput>
-        
-<cfif #checkentry.recordcount# LT 1>
-        
-<cfquery name="editvirtual" datasource="hermes">
-update virtual_recipients 
-set virtual_address = '@#form.domain#',
-maps = '#forwards#', 
-system = '2'
-where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-<cfset session.m=1>
-        
-<cfelseif #checkentry.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=5>
-
-        
-<!--- /CFIF #checkentry.recordcount# --->
-</cfif>
-
-        
-<!--- /CFIF #step# is "2" --->
-</cfif>
-
-
+<cflocation url="view_virtual_recipients.cfm" addtoken="no">

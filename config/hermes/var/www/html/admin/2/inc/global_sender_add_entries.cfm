@@ -1,6 +1,7 @@
 <!---
-Hermes Secure Email Gateway - Global Sender Block/Allow Add Entries Action Handler
-Validates and stages one or more sender email addresses or domains for addition.
+Hermes Secure Email Gateway - Global Sender Rules Add Entries Action Handler
+Validates and inserts one or more sender email addresses or domains, then immediately
+writes config files and reloads Postfix/Amavis.
 Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
 --->
 
@@ -11,7 +12,9 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
 
 <cfset entries_added = 0>
 <cfset entries_skipped = 0>
-<cfset entry_errors = "">
+<cfset success_list = "">
+<cfset invalid_list = "">
+<cfset duplicate_list = "">
 
 <cfset entryType = "block">
 <cfif StructKeyExists(form, "entry_type") AND form.entry_type is "allow">
@@ -26,27 +29,36 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
   <cfset line = trim(line)>
   <cfif line is ""><cfcontinue></cfif>
 
-  <!--- Validate: must be a valid email address, domain, or .domain (leading dot for root-domain match) --->
-  <cfset isEmail = REFind("[@]", line) GT 0>
+  <!--- Validate: must be a valid email address, @domain, .domain, or bare domain --->
+  <cfset isAtDomain = Left(line, 1) is "@" AND Len(line) GT 1>
   <cfset isDotDomain = Left(line, 1) is ".">
+  <cfset isEmail = NOT isAtDomain AND REFind("[@]", line) GT 0>
 
   <cfif isEmail>
     <cfif NOT IsValid("email", line)>
       <cfset entries_skipped = entries_skipped + 1>
-      <cfset entry_errors = entry_errors & "Invalid email: " & encodeForHTML(line) & "<br>">
+      <cfset invalid_list = invalid_list & encodeForHTML(line) & "<br>">
+      <cfcontinue>
+    </cfif>
+  <cfelseif isAtDomain>
+    <!--- @domain.com pattern: validate the domain part --->
+    <cfset testDomain = Mid(line, 2, Len(line))>
+    <cfif NOT IsValid("email", "test@" & testDomain)>
+      <cfset entries_skipped = entries_skipped + 1>
+      <cfset invalid_list = invalid_list & encodeForHTML(line) & "<br>">
       <cfcontinue>
     </cfif>
   <cfelseif isDotDomain>
     <cfset testDomain = Mid(line, 2, Len(line))>
     <cfif NOT IsValid("email", "test@" & testDomain)>
       <cfset entries_skipped = entries_skipped + 1>
-      <cfset entry_errors = entry_errors & "Invalid domain: " & encodeForHTML(line) & "<br>">
+      <cfset invalid_list = invalid_list & encodeForHTML(line) & "<br>">
       <cfcontinue>
     </cfif>
   <cfelse>
     <cfif NOT IsValid("email", "test@" & line)>
       <cfset entries_skipped = entries_skipped + 1>
-      <cfset entry_errors = entry_errors & "Invalid domain: " & encodeForHTML(line) & "<br>">
+      <cfset invalid_list = invalid_list & encodeForHTML(line) & "<br>">
       <cfcontinue>
     </cfif>
   </cfif>
@@ -58,7 +70,7 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
   </cfquery>
   <cfif checkDup.cnt GT 0>
     <cfset entries_skipped = entries_skipped + 1>
-    <cfset entry_errors = entry_errors & "Duplicate: " & encodeForHTML(line) & "<br>">
+    <cfset duplicate_list = duplicate_list & encodeForHTML(line) & "<br>">
     <cfcontinue>
   </cfif>
 
@@ -67,16 +79,25 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
     VALUES (
       <cfqueryparam value="#line#" cfsqltype="cf_sql_varchar">,
       <cfqueryparam value="FILTER amavis:[127.0.0.1]:10030" cfsqltype="cf_sql_varchar">,
-      'add',
+      'NONE',
       <cfqueryparam value="#entryType#" cfsqltype="cf_sql_varchar">,
-      '2'
+      '1'
     )
   </cfquery>
   <cfset entries_added = entries_added + 1>
+  <cfset success_list = success_list & encodeForHTML(line) & "<br>">
 </cfloop>
 
 <cfset session.entries_added = entries_added>
 <cfset session.entries_skipped = entries_skipped>
-<cfset session.entry_errors = entry_errors>
+<cfset session.success_list = success_list>
+<cfset session.invalid_list = invalid_list>
+<cfset session.duplicate_list = duplicate_list>
+
+<!--- Write config files and reload services if entries were added --->
+<cfif entries_added GT 0>
+  <cfinclude template="./global_sender_write_and_reload.cfm">
+</cfif>
+
 <cfset session.m = 1>
 <cflocation url="view_global_sender_block_allow.cfm" addtoken="no">

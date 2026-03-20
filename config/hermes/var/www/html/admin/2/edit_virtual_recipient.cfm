@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -21,559 +21,276 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <html lang="en">
 
-
- 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Edit Virtual Recipient</title>
-  
   <cfinclude template="./inc/html_head.cfm" />
-
 </head>
 
-
-
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
-
-
-
 <div class="app-wrapper">
-
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-         
-            <h1 class="m-0">Edit Virtual Recipient
-            </h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-      
-            
-          </div><!-- /.col -->
+            <h1 class="m-0">Edit Virtual Recipient</h1>
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Edit Virtual Recipient</li>
+              <li class="breadcrumb-item"><a href="view_virtual_recipients.cfm">Virtual Recipients</a></li>
+              <li class="breadcrumb-item active">Edit</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-
-<!-- CFML CODE STARTS HERE -->
-
-<cfparam name = "step" default = "0"> 
-
-<cfparam name = "step" default = "0"> 
-
-<cfparam name = "m" default = "0">
-<cfif StructKeyExists(session, "m")>
-<cfif session.m is not "">
-<cfset m = session.m>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>#session.m#</cfoutput>
---->
-
-<!--- /CFIF for session.m is not "" --->
-</cfif>
-
-<!--- /CFIF for StructKeyExists session.m --->
-</cfif>
-
-<!---
-<cfoutput>session M: #m#</cfoutput>
---->
-
-
-<cfparam name = "action" default = ""> 
-<cfif StructKeyExists(url, "action")>
-<cfif url.action is not "">
-<cfset action = url.action>
-</cfif>
-</cfif> 
-
-<cfparam name = "theID" default = ""> 
-<cfif StructKeyExists(url, "id")>
-<cfif url.id is not "">
-<cfif IsValid("integer", url.id)>
-<cfset theID = url.id>
+<!--- Validate URL ID parameter --->
+<cfparam name="theID" default="">
+<cfif StructKeyExists(url, "id") AND IsValid("integer", url.id)>
+  <cfset theID = url.id>
 <cfelse>
-<cfset m="Edit Virtual Recipient: url.id not valid interger">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<!--- /CFIF isValid("integer", form.id) --->
-</cfif>
-
-<cfelseif url.id is "">
-  <cfset m="Edit Virtual Recipient: url.id is blank">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<!--- /CFIF url.id is "" --->
-</cfif>
-
-<cfelseif NOT StructKeyExists(url, "id")>
-<cfset m="Edit Virtual Recipient: url.id does not exist">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<!--- /CFIF StructKeyExists(url, "id") --->
-</cfif> 
-
-<cfquery name="getrecipient" datasource="hermes">
-select virtual_address, maps from virtual_recipients where id = <cfqueryparam value = #theID# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-<cfif #getrecipient.recordcount# LT 1>
-
-<cfset m="Edit Virtual Recipient: getrecipient.recordcount LT 1">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<cfelse>
-
-<cfset theLocalpart = #ListGetAt(getrecipient.virtual_address, 1, "@", "true")#>
-<cfset theDomainpart = #ListGetAt(getrecipient.virtual_address, 2, "@", "true")#>
-
-<!--- /CFIF getrecipient.recordcount --->
-</cfif>
-
-
-
-<cfif #action# is "edit">
-
-<!--- VALIDATE PARAMETERS BELOW --->
-<cfif NOT StructKeyExists(form, "domain")>
-
-  <cfset m="Edit Virtual Recipient: form.domain does not exist">
+  <cfset m = "Edit Virtual Recipient: invalid or missing ID">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
-
-<cfelseif StructKeyExists(form, "domain")>
-
-<cfif #form.domain# is "">
-
-<cfset m="Edit Virtual Recipient: form.domain is empty">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<cfelse>
-
-<cfset step=1>
- 
-<!--- /CFIF #form.domain# is --->
 </cfif>
 
-<!--- /CFIF StructKeyExists(form, "domain") --->
+<!--- Get current recipient data --->
+<cfquery name="getrecipient" datasource="hermes">
+  SELECT id, virtual_address, maps FROM virtual_recipients
+  WHERE id = <cfqueryparam value="#theID#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<cfif getrecipient.recordcount LT 1>
+  <cfset m = "Edit Virtual Recipient: record not found">
+  <cfinclude template="./inc/error.cfm">
+  <cfabort>
 </cfif>
 
-<cfif #step# is "1">
-
-
-<cfset tempemail = "bob@#form.domain#">
-
-
-<cfif IsValid("email", tempemail)>
-
-<cfset step=2>
-
-<cfelse>
-
-<cfset m="Edit Virtual Recipient: form.domain is invalid domain #tempemail#">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<!--- /CFIF IsValid("email", tempemail) --->
+<cfparam name="m" default="0">
+<cfif StructKeyExists(session, "m") AND session.m is not "">
+  <cfset m = session.m>
 </cfif>
 
-<!--- /CFIF for step is "1" --->
+<cfparam name="action" default="">
+<cfif StructKeyExists(url, "action") AND url.action is not "">
+  <cfset action = url.action>
 </cfif>
 
-<cfif #step# is "2">
+<!--- EDIT ACTION HANDLER --->
+<cfif StructKeyExists(form, "action") AND form.action is "edit">
+  <!--- Validate virtual address --->
+  <cfset editAddress = LCase(trim(form.virtual_address))>
+  <cfset editForwards = LCase(trim(form.forwards_1))>
 
-  <cfif NOT StructKeyExists(form, "local_part")>
-
-    <cfset m="Edit Virtual Recipient: form.local_part does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-  
-  <cfelseif StructKeyExists(form, "local_part")>
-  
- 
-  <cfset step=3>
-   
-  <!--- /CFIF StructKeyExists(form, "local_part") --->
+  <cfif editAddress is "">
+    <cfset session.m = 4>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
   </cfif>
 
-<!--- /CFIF for step is "2" --->
+  <cfif editForwards is "">
+    <cfset session.m = 2>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
+  </cfif>
+
+  <cfif NOT IsValid("email", editForwards)>
+    <cfset session.m = 3>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
+  </cfif>
+
+  <!--- Validate format: catch-all or full email --->
+  <cfset isCatchAll = Left(editAddress, 1) is "@" AND Len(editAddress) GT 1>
+  <cfif NOT isCatchAll AND NOT IsValid("email", editAddress)>
+    <cfset session.m = 4>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
+  </cfif>
+
+  <!--- Extract and validate domain --->
+  <cfif isCatchAll>
+    <cfset editDomain = Mid(editAddress, 2, Len(editAddress))>
+  <cfelse>
+    <cfset editDomain = ListLast(editAddress, "@")>
+  </cfif>
+
+  <cfquery name="checkDomain" datasource="hermes">
+    SELECT domain FROM domains
+    WHERE domain = <cfqueryparam value="#editDomain#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkDomain.recordcount LT 1>
+    <cfset session.m = 6>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
+  </cfif>
+
+  <!--- Check for duplicates (exclude current record) --->
+  <cfquery name="checkEntry" datasource="hermes">
+    SELECT id FROM virtual_recipients
+    WHERE virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">
+      AND maps = <cfqueryparam value="#editForwards#" cfsqltype="cf_sql_varchar">
+      AND id <> <cfqueryparam value="#theID#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfif checkEntry.recordcount GTE 1>
+    <cfset session.m = 5>
+    <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
+  </cfif>
+
+  <!--- Update --->
+  <cfquery datasource="hermes">
+    UPDATE virtual_recipients
+    SET virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">,
+        maps = <cfqueryparam value="#editForwards#" cfsqltype="cf_sql_varchar">,
+        system = '2'
+    WHERE id = <cfqueryparam value="#theID#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <cfset session.m = 1>
+  <cfoutput><cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no"></cfoutput>
 </cfif>
 
-
-<cfif #step# is "3">
-
-<cfif NOT StructKeyExists(form, "forwards_1")>
-
-  <cfset m="Edit Virtual Recipient: form.forwards_1 does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "forwards_1")>
-
-<cfif #form.forwards_1# is "">
-
-<cfset step=0>
-<cfset session.m=2>
-
-<cfoutput>
-<cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no">
-</cfoutput>
-
-<cfelse>
-
-<cfif IsValid("email", form.forwards_1)>
-
-<cfset step=4>
-
-<cfelse>
-
-<cfset step=0>
-<cfset session.m=3>
-
-<cfoutput>
-<cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF IsValid("email", form.forwards_1) --->
-</cfif>
-
- 
-<!--- /CFIF #form.domain# is --->
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "domain") --->
-</cfif>
-
-<!--- /CFIF for step is "3" --->
-</cfif>
-
-
-<cfif #step# is "4">
-
-<cfquery name="checkdomain" datasource="hermes">
-select domain from domains where domain='#form.domain#'
+<!--- Re-fetch after potential update --->
+<cfquery name="getrecipient" datasource="hermes">
+  SELECT id, virtual_address, maps FROM virtual_recipients
+  WHERE id = <cfqueryparam value="#theID#" cfsqltype="cf_sql_integer">
 </cfquery>
-    
-<cfif #checkdomain.recordcount# GTE 1>
 
-<cfinclude template="./inc/editvirtualrecipient.cfm">
+<cfset session.m = "">
 
-<cfoutput>
-<cflocation url="edit_virtual_recipient.cfm?id=#theID#" addtoken="no">
-</cfoutput>
-
-<cfelseif #checkdomain.recordcount# LT 1>
-
-<cfset m="Edit Virtual Recipient: form.domain is does not exist">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-        
-<!--- /CFIF #checkdomain.recordcount# --->
-</cfif>
-
-<!--- /CFIF for step is "4" --->
-</cfif>
-
-
-<!--- VALIDATE PARAMETERS ABOVE --->
-
-
-<!--- /CFIF #action# --->
-</cfif> 
-
-
-
-
-<!-- ERROR MESSAGES STARTS HERE -->
-
-
-
-
-<cfif #m# is "1"> 
-
+<!--- ALERTS --->
+<cfif m is "1">
   <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Success!</h4>
-    <cfoutput>Recipient was edited successfully</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Recipient edited successfully.
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
-
-<cfif #m# is "2"> 
-
+<cfif m is "2">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Delivers To field cannot be empty</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Delivers To field cannot be empty.
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
-
-<cfif #m# is "3"> 
-
+<cfif m is "3">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The Delivers To field must be a valid e-mail address</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Delivers To field must be a valid email address.
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
- 
-<cfif #m# is "4"> 
-
+<cfif m is "4">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You have entered an invalid Local-Part. Local-Part is the part before the <strong>@</strong> symbol of an e-mail address NOT an actual e-mail address</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Virtual Address must be a valid email address or catch-all pattern (e.g., <code>@example.com</code>).
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
-
-<cfif #m# is "5"> 
-
+<cfif m is "5">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The recipient you are attempting to edit already exists</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The recipient you are attempting to save already exists.
   </div>
-
-  <cfset session.m = 0>
-
+</cfif>
+<cfif m is "6">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The domain is not configured in the system.
+  </div>
 </cfif>
 
+<!-- EDIT RECIPIENT CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-edit"></i> Edit Virtual Recipient</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="edit">
 
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="virtual_address" class="form-label"><strong>Virtual Address</strong></label>
+            <cfoutput>
+            <input type="text" class="form-control" id="virtual_address" name="virtual_address"
+              value="#encodeForHTML(getrecipient.virtual_address)#" required>
+            </cfoutput>
+            <small class="text-muted">
+              Full email address (e.g., <code>user@example.com</code>) or catch-all pattern (e.g., <code>@example.com</code>).
+            </small>
+          </div>
+        </div>
 
-
-<!-- ERROR MESSAGES ENDS HERE -->
-
-<span>
-  <p>       
-
-<!--- BACK TO RECIPIENTS BUTTON STARTS HERE --->
-<a href="view_virtual_recipients.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Virtual Recipients</a>
-
-<!--- BACK TO RECIPIENTS BUTTON ENDS HERE --->
-
-
-
-
-
-</p>
-
-
-</span>
-
-
-<!-- ADD RECIPIENT FORM STARTS HERE -->
-
-
-<!-- form start -->
-
-  <form name="add_virtual_recipients" method="post" action="">
-  <input type="hidden" name="action" value="edit">
-    <div class="box-body">
-       
- 
-        <div class="form-horizontal">
-
-     
-              
-                
-            <div class="form-group">
-              <label><strong>Local-Part</strong></label>
-              <div class="input-group">
-              <cfoutput>
-              <input type="text" name="local_part" class="local_part form-control" id="local_part" placeholder="Enter the local-part (part before the @ symbol of an e-mail address or leave empty to forward entire domain" value="#theLocalpart#" autocomplete="off">
-              </cfoutput>
-              
-              <!--- /div class="input-group" --->
-              </div>
-              
-              <!--- /div class="form-group" --->
-              </div>
-
-
-          <cfquery name="getdomains" datasource="hermes">
-            select id, domain from domains where domain <> '#theDomainpart#' order by domain asc
-            </cfquery>
-
-                    <div class="form-group">
-                      <label><strong>@Domain</strong></label>
-                      <select class="form-control select2" name="domain" data-placeholder="Domain"
-                              style="width: 100%;">
-                      <cfoutput>
-                      <option value="#theDomainpart#" selected>#theDomainpart#</option>
-                     </cfoutput>
-                        <cfoutput query="getdomains">
-                        <option value="#domain#">#domain#</option>
-                        
-                          </cfoutput>
-                          </select>
-
-
-                       
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label for="forwards_1" class="form-label"><strong>Delivers To</strong></label>
+            <cfoutput>
+            <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1"
+              placeholder="Start typing to search existing Relay Recipients or enter external address"
+              value="#encodeForHTML(getrecipient.maps)#" autocomplete="off">
+            </cfoutput>
+            <small class="text-muted">
+              Start typing to search existing Relay Recipients or enter any valid email address.
+            </small>
+          </div>
+        </div>
       </div>
 
-
-
-      <div class="form-group">
-        <label><strong>Delivers To</strong></label>
-        <div class="input-group">
-        <cfoutput>
-        <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1" placeholder="Start typing to search existing Relay Recipients or enter external recipient manually" value="#getrecipient.maps#" autocomplete="off">
-        </cfoutput>
-        
-        <!--- /div class="input-group" --->
-        </div>
-        
-        <!--- /div class="form-group" --->
-        </div>
-
-
- 
-
-      <div class="box-footer">
-        <!--- <p class="help-block">Help Block Text</p> --->
-       
-        <!---
-              <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Submit</button>
-        --->
-        
-              <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  
-
-            </div>      
-
-  
-
-    
-  </form>
-
-  <div>&nbsp;</div>
-
-
-<!-- ADD RECIPIENT FORM ENDS HERE -->
-
-</div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary"
+          onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+          <i class="fas fa-save"></i> Save Changes
+        </button>
+        <a href="view_virtual_recipients.cfm" class="btn btn-secondary">
+          <i class="fas fa-arrow-left"></i> Back to Virtual Recipients
+        </a>
+      </div>
+    </form>
+  </div>
 </div>
 
-<div id="loader"></div>
+      </div>
+    </div>
+  </main>
 
-</div><!-- /.container-fluid -->
+  <cfinclude template="./inc/main_footer.cfm" />
+
 </div>
-<!-- /.content -->
-</div>
-</main><!-- replaced content-wrapper -->
 
-
-<cfinclude template="./inc/main_footer.cfm" />
-
-
-
-<!-- ./wrapper -->
-
-
-  
-
-</body>
-
-<!--- SCRIPT TO GET RECIPIENTS BELOW --->
-
-<script type="text/javascript">
-  $(document).ready(function(){
-
-      $(document).on('keydown', '.forwards', function() {
-          
-          var id = this.id;
-          var splitid = id.split('_');
-          var index = splitid[1];
-
-          $( '#'+id ).autocomplete({
-              source: function( request, response ) {
-                  $.ajax({
-                      url: "./inc/getintrecipients.cfm",
-                      type: 'post',
-                      dataType: "json",
-                      data: {
-                          search: request.term,request:1
-                      },
-                      success: function( data ) {
-                          response( data );
-                      }
-                  });
-              },
-              select: function (event, ui) {
-                  $(this).val(ui.item.label); // display the selected text
-                  var id = ui.item.value; // selected id to input
-
-                  // AJAX
-                  $.ajax({
-                      url: './inc/getintrecipients.cfm',
-                      type: 'post',
-                      data: {id:id,request:2},
-                      dataType: 'json',
-                      success:function(response){
-                          
-                          var len = response.length;
-
-                          if(len > 0){
-                              var recipient_no = response[0]['id'];
-                              document.getElementById('certificateno_'+index).value = recipient_no;
-                              
-                          }
-                          
-                      }
-                  });
-
-                  return false;
-              }
-          });
-      });
-      
-      
-
+<script>
+$(document).ready(function(){
+  $(document).on('keydown', '.forwards', function() {
+    var id = this.id;
+    $('#' + id).autocomplete({
+      source: function(request, response) {
+        $.ajax({
+          url: "./inc/getintrecipients.cfm",
+          type: 'post',
+          dataType: "json",
+          data: { search: request.term, request: 1 },
+          success: function(data) {
+            response(data);
+          }
+        });
+      },
+      select: function(event, ui) {
+        $(this).val(ui.item.label);
+        return false;
+      }
+    });
   });
-
+});
 </script>
 
+</body>
 </html>

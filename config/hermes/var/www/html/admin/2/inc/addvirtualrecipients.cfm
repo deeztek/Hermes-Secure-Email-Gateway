@@ -1,147 +1,75 @@
-
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
-
-This file is part of Hermes Secure Email Gateway Community Edition.
-
-    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
-
-    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+Hermes Secure Email Gateway - Add Virtual Recipients Action Handler
+Validates and inserts one or more virtual recipient entries.
+Accepts full email addresses (user@domain.com) or catch-all patterns (@domain.com).
+Validates domain part against the domains table.
+Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
 --->
 
-<cfparam name = "step" default = "0"> 
+<cfset forwards = LCase(trim(form.forwards_1))>
 
-<!--- ENABLE BELOW FOR DEBUG ONLY --->
-<!---
-<cfoutput>
-Form: #form.local_part#<br>
-</cfoutput>
---->
+<cfloop index="entry" list="#form.addresses#" delimiters="#chr(10)#">
+  <cfset entry = LCase(trim(entry))>
+  <cfif entry is ""><cfcontinue></cfif>
 
-<cfif #form.local_part# is not "">
-<cfset step=1>
-<cfelseif #form.local_part# is "">
-<cfset step=2>
+  <!--- Determine if catch-all (@domain) or full email --->
+  <cfset isCatchAll = Left(entry, 1) is "@" AND Len(entry) GT 1>
 
-<!--- /CFIF #form.local_part# is/is not "" --->
-</cfif>
+  <cfif isCatchAll>
+    <!--- Extract domain from @domain pattern --->
+    <cfset entryDomain = Mid(entry, 2, Len(entry))>
+    <cfset virtualAddress = entry>
+  <cfelseif REFind("[@]", entry) GT 0>
+    <!--- Full email address --->
+    <cfset entryDomain = ListLast(entry, "@")>
+    <cfset virtualAddress = entry>
+  <cfelse>
+    <!--- No @ sign — invalid --->
+    <cfset invalidemail = invalidemail + 1>
+    <cfset invalidemailrecipient = invalidemailrecipient & " " & encodeForHTML(entry) & "<br>">
+    <cfcontinue>
+  </cfif>
 
-<cfif #step# is "1">
+  <!--- Validate format: catch-all or valid email --->
+  <cfif NOT isCatchAll AND NOT IsValid("email", entry)>
+    <cfset invalidemail = invalidemail + 1>
+    <cfset invalidemailrecipient = invalidemailrecipient & " " & encodeForHTML(entry) & "<br>">
+    <cfcontinue>
+  </cfif>
 
-<cfloop index="local_part" list="#form.local_part#" delimiters="#chr(10)#">
+  <!--- Validate domain exists in the system --->
+  <cfquery name="checkDomain" datasource="hermes">
+    SELECT domain FROM domains
+    WHERE domain = <cfqueryparam value="#entryDomain#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkDomain.recordcount LT 1>
+    <cfset invaliddomain = invaliddomain + 1>
+    <cfset invaliddomainrecipient = invaliddomainrecipient & " " & encodeForHTML(entry) & " (domain: " & encodeForHTML(entryDomain) & ")<br>">
+    <cfcontinue>
+  </cfif>
 
-<cfoutput>
-<cfset local_part = #LCase(local_part)#>
-<cfset local_part = #trim(local_part)#>
-<cfset recipient = "#local_part#@#form.domain#">
+  <!--- Check for duplicates --->
+  <cfquery name="checkEntry" datasource="hermes">
+    SELECT virtual_address FROM virtual_recipients
+    WHERE virtual_address = <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">
+      AND maps = <cfqueryparam value="#forwards#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkEntry.recordcount GTE 1>
+    <cfset alreadyexists = alreadyexists + 1>
+    <cfset alreadyexistsrecipient = alreadyexistsrecipient & " " & encodeForHTML(virtualAddress) & " --> " & encodeForHTML(forwards) & "<br>">
+    <cfcontinue>
+  </cfif>
 
-<cfset forwards = #LCase(form.forwards_1)#>
-<cfset forwards = #trim(forwards)#>
+  <!--- Insert --->
+  <cfquery datasource="hermes">
+    INSERT INTO virtual_recipients (virtual_address, maps, system)
+    VALUES (
+      <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#forwards#" cfsqltype="cf_sql_varchar">,
+      '2'
+    )
+  </cfquery>
 
-
-
-<!--- ENABLE BELOW FOR DEBUG ONLY --->
-<!---
-Recipient: #theRecipient#<br>
---->
-</cfoutput>
-
-
-<cfif IsValid("email", recipient)>
-
-<cfoutput>
-<cfquery name="checkentry" datasource="hermes">
-select virtual_address, maps from virtual_recipients where virtual_address = '#recipient#' and maps = '#forwards#'
-</cfquery>
-</cfoutput>
-
-<cfif #checkentry.recordcount# LT 1>
-
-<cfquery name="insertvirtual" datasource="hermes">
-insert into virtual_recipients 
-(virtual_address, maps, system)
-values
-('#recipient#', '#forwards#', '2')
-</cfquery>
-        
-<cfset success=#success#+1>
-<cfset successrecipient="#successrecipient# #recipient# --> #forwards#<br>">      
-
-<cfelseif #checkentry.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset errormessage=3>
-<cfset alreadyexists=#alreadyexists#+1>
-<cfset alreadyexistsrecipient="#alreadyexistsrecipient# #recipient# --> #forwards#<br>">
-
-<!--- /CFIF #checkentry.recordcount# --->
-</cfif>
-
-
-<cfelseif NOT IsValid("email", recipient)>
-<cfset step=0>
-<cfset errormessage=3>
-<cfset invalidemail=#invalidemail#+1>
-<cfset invalidemailrecipient="#invalidemailrecipient# #recipient#<br>">
-
-<!--- /CFIF IsValid("email", recipient) --->
-</cfif>
-        
-
-<!--- /CFLOOP index="recipient" --->
+  <cfset success = success + 1>
+  <cfset successrecipient = successrecipient & " " & encodeForHTML(virtualAddress) & " --> " & encodeForHTML(forwards) & "<br>">
 </cfloop>
-
-<!--- /CFIF #step# is "1" --->
-</cfif>
-
-<cfif #step# is "2">
-
-<cfoutput>
-
-<cfset forwards = #LCase(form.forwards_1)#>
-<cfset forwards = #trim(forwards)#>
-
-</cfoutput>
-
-<cfoutput>
-<cfquery name="checkentry" datasource="hermes">
-select virtual_address, maps from virtual_recipients where virtual_address = '@#form.domain#' and maps = '#forwards#'
-</cfquery>
-</cfoutput>
-        
-<cfif #checkentry.recordcount# LT 1>
-        
-<cfquery name="insertvirtual" datasource="hermes">
-insert into virtual_recipients 
-(virtual_address, maps, system)
-values
-('@#form.domain#', '#forwards#', '2')
-</cfquery>       
-
-
-<cfset success=#success#+1>
-<cfset successrecipient="#successrecipient# @#form.domain# --> #forwards#<br>">
-        
-<cfelseif #checkentry.recordcount# LT 1>
-<cfset step=0>
-<cfset errormessage=3>
-<cfset alreadyexists=#alreadyexists#+1>
-<cfset alreadyexistsrecipient="#alreadyexistsrecipient# @#form.domain# --> #forwards#<br>">
-        
-<!--- /CFIF #checkentry.recordcount# --->
-</cfif>
-
-        
-<!--- /CFIF #step# is "2" --->
-</cfif>
-
-

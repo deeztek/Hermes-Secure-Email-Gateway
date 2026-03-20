@@ -1,18 +1,9 @@
 <!---
-Hermes Secure Email Gateway - Global Sender Block/Allow Apply Settings Handler
-Commits all pending changes: deletes staged-for-deletion entries, marks the rest as applied,
-then writes Postfix amavis_senderbypass and Amavis white.lst/black.lst config files and reloads services.
+Hermes Secure Email Gateway - Global Sender Write Config and Reload Services
+Writes Postfix amavis_senderbypass, Amavis white.lst/black.lst from active entries,
+then runs postmap, reloads Postfix, and force-reloads Amavis.
+Sets session.applySuccess = true/false.
 --->
-
-<!--- Commit pending deletions --->
-<cfquery datasource="hermes">
-  DELETE FROM amavis_sender_bypass WHERE action = 'delete' AND applied = '2'
-</cfquery>
-
-<!--- Mark all remaining staged entries as applied --->
-<cfquery datasource="hermes">
-  UPDATE amavis_sender_bypass SET action = 'NONE', applied = '1' WHERE applied = '2'
-</cfquery>
 
 <cftry>
   <!--- Get all allow entries --->
@@ -79,9 +70,8 @@ then writes Postfix amavis_senderbypass and Amavis white.lst/black.lst config fi
     arguments="exec hermes_mail_filter /etc/init.d/amavis force-reload"
     timeout="60" />
 
-  <cfset session.m = 3>
+  <cfset session.applySuccess = true>
   <cfcatch type="any">
-    <cfset session.m = 4>
+    <cfset session.applySuccess = false>
   </cfcatch>
 </cftry>
-<cflocation url="view_global_sender_block_allow.cfm" addtoken="no">

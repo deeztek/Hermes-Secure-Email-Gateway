@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Anti-Spam Settings</title>
+  <title>Hermes SEG | Antispam Settings</title>
   <cfinclude template="./inc/html_head.cfm" />
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
@@ -38,12 +38,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Anti-Spam Settings</h1>
+            <h1 class="m-0">Antispam Settings</h1>
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Anti-Spam Settings</li>
+              <li class="breadcrumb-item active">Antispam Settings</li>
             </ol>
           </div>
         </div>

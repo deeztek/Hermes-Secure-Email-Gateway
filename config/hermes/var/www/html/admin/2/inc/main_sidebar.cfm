@@ -243,7 +243,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="view_global_sender_block_allow.cfm" class="nav-link">
                 <i class="nav-icon fas fa-globe"></i>
-                <p>Global Sender Block/Allow</p>
+                <p>Global Sender Rules</p>
               </a>
             </li>
             <li class="nav-item">
@@ -273,7 +273,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="view_antispam_maintenance.cfm" class="nav-link">
                 <i class="nav-icon fas fa-shield-virus"></i>
-                <p>Anti-Spam Settings</p>
+                <p>Antispam Settings</p>
               </a>
             </li>
             <li class="nav-item">
