@@ -356,7 +356,7 @@ RejectFailures REJECT-FAILURES
 ##  socket will be listening on all interfaces.  This option is mandatory
 ##  either in the configuration file or on the command line.  If an IP
 ##  address is used, it must be enclosed in square brackets.
-Socket inet:54321@localhost
+Socket inet:54321@0.0.0.0
 
 
 ##  SoftwareHeader { true | false }

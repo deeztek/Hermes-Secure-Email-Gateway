@@ -86,12 +86,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
        
 <cfinclude template="dmarc_generate_reports_script.cfm">
 
-<!--- Enable DMARC report job in Ofelia --->
-<cfquery datasource="hermes">
-  UPDATE ofelia_jobs SET active = '1' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
-</cfquery>
-<cfinclude template="ofelia_generate_config.cfm">
-
 <cfinclude template="restart_opendmarc.cfm">
 
 
