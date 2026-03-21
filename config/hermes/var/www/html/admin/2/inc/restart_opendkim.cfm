@@ -60,7 +60,18 @@ timeout = "240">
 
  </cftry>
 
-<!--- Restart Postfix DKIM --->
-<cfinclude template="restart_postfix.cfm">
+<!--- Restart OpenDKIM service inside the container (not the whole container) --->
+<cftry>
+<cfexecute name="/usr/local/bin/docker"
+  arguments="exec hermes_postfix_dkim service opendkim restart"
+  timeout="240"
+  variable="dkimOutput"
+  errorVariable="dkimError" />
+<cfcatch type="any">
+  <cfset m="Restart OpenDKIM: There was an error restarting OpenDKIM service. Error was #cfcatch.message#">
+  <cfinclude template="error.cfm">
+  <cfabort>
+</cfcatch>
+</cftry>
 
       

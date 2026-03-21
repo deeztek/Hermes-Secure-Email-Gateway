@@ -25,58 +25,45 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | System Notifications</title>
-
   <cfinclude template="./inc/html_head.cfm" />
-
-<style>
-  td {
-   word-break: break-all;
-  }
-</style>
-
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
             <h1 class="m-0">System Notifications</h1>
-          </div><!-- /.col -->
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item active">System Notifications</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-<!--- CFML CODE STARTS HERE --->
-
 <cfparam name="m" default="0">
-<cfif StructKeyExists(session, "m")>
-    <cfif session.m is not "">
-        <cfset m = session.m>
-    </cfif>
+<cfif StructKeyExists(session, "m") AND session.m is not "">
+  <cfset m = session.m>
 </cfif>
 
 <cfparam name="action" default="">
-<cfif StructKeyExists(form, "action")>
-    <cfset action = form.action>
+<cfif StructKeyExists(form, "form_action")>
+  <cfset action = form.form_action>
+<cfelseif StructKeyExists(form, "action")>
+  <cfset action = form.action>
 </cfif>
 
 <!--- GET CURRENT PUSHOVER SETTINGS --->
@@ -85,7 +72,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     WHERE parameter IN ('pushover_enabled', 'pushover_api_token', 'pushover_user_key')
 </cfquery>
 
-<!--- SET DEFAULT VALUES --->
 <cfset pushover_enabled = "0">
 <cfset pushover_api_token = "">
 <cfset pushover_user_key = "">
@@ -99,6 +85,50 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset pushover_user_key = value>
     </cfif>
 </cfloop>
+
+<!--- TOGGLE NOTIFICATION --->
+<cfif action EQ "toggle_notification">
+
+    <cfif NOT StructKeyExists(form, "notification_id") OR NOT isValid("integer", form.notification_id)>
+        <cfset session.m = 20>
+        <cflocation url="view_system_notifications.cfm" addtoken="no">
+    </cfif>
+
+    <!--- Toggle enabled state in SQL --->
+    <cfquery datasource="hermes">
+        UPDATE pushover_notifications SET enabled = CASE WHEN enabled = 1 THEN 2 ELSE 1 END
+        WHERE id = <cfqueryparam value="#form.notification_id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+
+    <!--- Read back the new state and ofelia job name --->
+    <cfquery name="getNotif" datasource="hermes">
+        SELECT enabled AS notif_enabled, ofelia_job_name FROM pushover_notifications
+        WHERE id = <cfqueryparam value="#form.notification_id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+
+    <!--- Sync Ofelia job (only activate if Pushover is also enabled) --->
+    <cfif pushover_enabled EQ "1" AND getNotif.notif_enabled EQ 1>
+      <cfquery datasource="hermes">
+        UPDATE ofelia_jobs SET active = '1'
+        WHERE job_name = <cfqueryparam value="#getNotif.ofelia_job_name#" cfsqltype="cf_sql_varchar">
+      </cfquery>
+    <cfelse>
+      <cfquery datasource="hermes">
+        UPDATE ofelia_jobs SET active = '2'
+        WHERE job_name = <cfqueryparam value="#getNotif.ofelia_job_name#" cfsqltype="cf_sql_varchar">
+      </cfquery>
+    </cfif>
+
+    <cftry>
+      <cfinclude template="./inc/ofelia_generate_config.cfm">
+      <cfcatch type="any">
+        <!--- Ofelia config generation failed, continue anyway --->
+      </cfcatch>
+    </cftry>
+
+    <cfset session.m = 9>
+    <cflocation url="view_system_notifications.cfm" addtoken="no">
+</cfif>
 
 <!--- PROCESS FORM SUBMISSION --->
 <cfif action EQ "save_pushover">
@@ -128,13 +158,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cflocation url="view_system_notifications.cfm" addtoken="no">
         </cfif>
 
-        <!--- Validate API token format (30 characters, alphanumeric) --->
         <cfif NOT REFind("^[a-zA-Z0-9]{30}$", Trim(form.pushover_api_token))>
             <cfset session.m = 4>
             <cflocation url="view_system_notifications.cfm" addtoken="no">
         </cfif>
 
-        <!--- Validate User/Group key format (30 characters, alphanumeric) --->
         <cfif NOT REFind("^[a-zA-Z0-9]{30}$", Trim(form.pushover_user_key))>
             <cfset session.m = 5>
             <cflocation url="view_system_notifications.cfm" addtoken="no">
@@ -157,19 +185,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         WHERE parameter = 'pushover_user_key'
     </cfquery>
 
+    <!--- Sync Ofelia jobs: enable jobs for enabled notifications, disable all if Pushover off --->
+    <cfif form.pushover_enabled EQ "1">
+      <!--- Enable Ofelia jobs only for individually enabled notifications --->
+      <cfquery datasource="hermes">
+        UPDATE ofelia_jobs SET active = '1'
+        WHERE type = 'pushover'
+          AND job_name IN (SELECT ofelia_job_name FROM pushover_notifications WHERE enabled = '1')
+      </cfquery>
+      <cfquery datasource="hermes">
+        UPDATE ofelia_jobs SET active = '2'
+        WHERE type = 'pushover'
+          AND job_name NOT IN (SELECT ofelia_job_name FROM pushover_notifications WHERE enabled = '1')
+      </cfquery>
+    <cfelse>
+      <!--- Pushover disabled — disable all pushover Ofelia jobs --->
+      <cfquery datasource="hermes">
+        UPDATE ofelia_jobs SET active = '2' WHERE type = 'pushover'
+      </cfquery>
+    </cfif>
+    <cfinclude template="./inc/ofelia_generate_config.cfm">
+
     <cfset session.m = 1>
     <cflocation url="view_system_notifications.cfm" addtoken="no">
 
 <!--- TEST PUSHOVER --->
 <cfelseif action EQ "test_pushover">
 
-    <!--- Get current settings --->
     <cfif pushover_enabled NEQ "1" OR Len(Trim(pushover_api_token)) EQ 0 OR Len(Trim(pushover_user_key)) EQ 0>
         <cfset session.m = 6>
         <cflocation url="view_system_notifications.cfm" addtoken="no">
     </cfif>
 
-    <!--- Send test notification --->
     <cftry>
         <cfhttp url="https://api.pushover.net/1/messages.json" method="POST" result="pushoverResult">
             <cfhttpparam type="formfield" name="token" value="#pushover_api_token#">
@@ -197,187 +244,250 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </cfif>
 
-<!--- CFML CODE ENDS HERE --->
+<!--- Re-read pushover_enabled after save actions --->
+<cfquery name="getPushoverEnabled" datasource="hermes">
+    SELECT value FROM system_settings WHERE parameter = 'pushover_enabled'
+</cfquery>
+<cfset pushover_enabled = getPushoverEnabled.value>
 
-<!--- ERROR/SUCCESS MESSAGES START HERE --->
+<!--- Get available notifications --->
+<cfquery name="getNotifications" datasource="hermes">
+    SELECT id, name, display_name, description, ofelia_job_name, enabled AS is_enabled, category
+    FROM pushover_notifications ORDER BY category, display_name
+</cfquery>
 
+<cfset session.m = "">
+
+<!--- ALERTS --->
 <cfif m EQ "1">
-    <div class="alert alert-success alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-check"></i> Success!</h4>
-        Pushover settings saved successfully
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Pushover settings saved successfully.
+  </div>
 </cfif>
-
 <cfif m EQ "2">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        The API Token field cannot be empty when Pushover is enabled
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The API Token field cannot be empty when Pushover is enabled.
+  </div>
 </cfif>
-
 <cfif m EQ "3">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        The User/Group Key field cannot be empty when Pushover is enabled
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The User/Group Key field cannot be empty when Pushover is enabled.
+  </div>
 </cfif>
-
 <cfif m EQ "4">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        The API Token format is invalid. It should be 30 alphanumeric characters.
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The API Token format is invalid. It should be 30 alphanumeric characters.
+  </div>
 </cfif>
-
 <cfif m EQ "5">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        The User/Group Key format is invalid. It should be 30 alphanumeric characters.
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The User/Group Key format is invalid. It should be 30 alphanumeric characters.
+  </div>
 </cfif>
-
 <cfif m EQ "6">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        Pushover must be enabled and configured before sending a test notification. Please save your settings first.
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Pushover must be enabled and configured before sending a test notification.
+  </div>
 </cfif>
-
 <cfif m EQ "7">
-    <div class="alert alert-success alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-check"></i> Success!</h4>
-        Test notification sent successfully! Check your Pushover app.
-    </div>
-    <cfset session.m = 0>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Test notification sent successfully! Check your Pushover app.
+  </div>
 </cfif>
-
 <cfif m EQ "8">
-    <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>Failed to send test notification. Error: #session.errordetail#</cfoutput>
-    </div>
-    <cfset session.m = 0>
-    <cfset session.errordetail = "">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    <cfif StructKeyExists(session, "errordetail") AND session.errordetail is not "">
+      <cfoutput>Failed to send test notification. Error: #encodeForHTML(session.errordetail)#</cfoutput>
+      <cfset session.errordetail = "">
+    <cfelse>
+      Failed to send test notification.
+    </cfif>
+  </div>
+</cfif>
+<cfif m EQ "9">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Notification setting updated.
+  </div>
+</cfif>
+<cfif m EQ "20">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Missing required form fields.
+  </div>
 </cfif>
 
-<!--- ERROR/SUCCESS MESSAGES END HERE --->
-
-<!--- PUSHOVER SETTINGS CARD --->
-<div class="card card-outline card-primary mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-bell me-2"></i>Pushover Notifications</h3>
+<!-- PUSHOVER SETTINGS CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-bell"></i> Pushover Settings</h3>
+  </div>
+  <div class="card-body">
+    <div class="callout callout-info mb-3">
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i>
+        Pushover enables push notifications to your mobile device for critical system alerts (e.g., mail queue issues, security events)
+        where email delivery may fail. Create a free account at <a href="https://pushover.net" target="_blank">pushover.net</a>
+        and create an application to get your API Token. Use a <strong>Group Key</strong> instead of a User Key to notify multiple administrators.
+      </p>
     </div>
-    <div class="card-body">
-        <div class="alert alert-info">
-            <p class="mb-0"><i class="icon fas fa-info-circle"></i>
-            Pushover enables push notifications to your mobile device for critical system alerts (e.g., mail queue issues, security events)
-            where email delivery may fail. Create a free account at <a href="https://pushover.net" target="_blank">pushover.net</a>
-            and create an application to get your API Token. Use a <strong>Group Key</strong> instead of a User Key to notify multiple administrators.
-            </p>
+
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="save_pushover">
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label"><strong>Pushover Notifications</strong></label>
+            <select class="form-select" name="pushover_enabled" id="pushover_enabled">
+              <option value="1" <cfif pushover_enabled EQ "1">selected</cfif>>Enabled</option>
+              <option value="0" <cfif pushover_enabled EQ "0">selected</cfif>>Disabled</option>
+            </select>
+          </div>
         </div>
+      </div>
 
-        <form name="pushover_settings" method="post" action="">
-            <input type="hidden" name="action" value="save_pushover">
-
+      <div id="pushover_fields" <cfif pushover_enabled EQ "0">style="display:none;"</cfif>>
+        <div class="row">
+          <div class="col-md-6">
             <div class="mb-3">
-                <label class="form-label"><strong>Pushover Notifications</strong></label>
-                <select class="form-control" name="pushover_enabled" id="pushover_enabled" style="width: 100%">
-                    <cfif pushover_enabled EQ "1">
-                        <option value="1" selected>Enabled</option>
-                        <option value="0">Disabled</option>
-                    <cfelse>
-                        <option value="0" selected>Disabled</option>
-                        <option value="1">Enabled</option>
-                    </cfif>
-                </select>
+              <label class="form-label"><strong>API Token (Application Token)</strong></label>
+              <cfoutput>
+              <input type="text" class="form-control" name="pushover_api_token" value="#encodeForHTMLAttribute(pushover_api_token)#" placeholder="Enter your Pushover API Token" maxlength="30">
+              </cfoutput>
+              <div class="form-text">The API Token from your Pushover application (30 characters)</div>
             </div>
-
-            <cfif pushover_enabled EQ "0">
-            <div class="mb-3" id="pushover_fields" style="display:none;">
-            <cfelse>
-            <div class="mb-3" id="pushover_fields">
-            </cfif>
-                <div class="mb-3">
-                    <label class="form-label"><strong>API Token (Application Token)</strong></label>
-                    <cfoutput>
-                    <input type="text" class="form-control" name="pushover_api_token" value="#pushover_api_token#" placeholder="Enter your Pushover API Token" maxlength="30">
-                    </cfoutput>
-                    <div class="form-text">The API Token from your Pushover application (30 characters)</div>
-                </div>
-
-                <div class="mb-3">
-                    <label class="form-label"><strong>User/Group Key</strong></label>
-                    <cfoutput>
-                    <input type="text" class="form-control" name="pushover_user_key" value="#pushover_user_key#" placeholder="Enter your Pushover User or Group Key" maxlength="30">
-                    </cfoutput>
-                    <div class="form-text">Your User Key or a Group Key to notify multiple administrators (30 characters)</div>
-                </div>
+          </div>
+          <div class="col-md-6">
+            <div class="mb-3">
+              <label class="form-label"><strong>User/Group Key</strong></label>
+              <cfoutput>
+              <input type="text" class="form-control" name="pushover_user_key" value="#encodeForHTMLAttribute(pushover_user_key)#" placeholder="Enter your Pushover User or Group Key" maxlength="30">
+              </cfoutput>
+              <div class="form-text">Your User Key or a Group Key to notify multiple administrators (30 characters)</div>
             </div>
+          </div>
+        </div>
+      </div>
 
-            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
-                <i class="fas fa-save me-1"></i> Save Settings
-            </button>
-        </form>
+      <button type="submit" class="btn btn-primary"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+        <i class="fas fa-save"></i> Save Settings
+      </button>
+    </form>
 
-        <cfif pushover_enabled EQ "1" AND Len(Trim(pushover_api_token)) GT 0 AND Len(Trim(pushover_user_key)) GT 0>
-        <hr>
-        <form name="test_pushover" method="post" action="">
-            <input type="hidden" name="action" value="test_pushover">
-            <button type="submit" class="btn btn-secondary" onclick="this.disabled=true;this.innerHTML='Sending...';this.form.submit();">
-                <i class="fas fa-paper-plane me-1"></i> Send Test Notification
-            </button>
-        </form>
-        </cfif>
-    </div>
+    <cfif pushover_enabled EQ "1" AND Len(Trim(pushover_api_token)) GT 0 AND Len(Trim(pushover_user_key)) GT 0>
+    <hr>
+    <form method="post">
+      <input type="hidden" name="action" value="test_pushover">
+      <button type="submit" class="btn btn-secondary"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Sending...';this.form.submit();">
+        <i class="fas fa-paper-plane"></i> Send Test Notification
+      </button>
+    </form>
+    </cfif>
+  </div>
 </div>
 
-<!--- FUTURE: NOTIFICATION TYPES CARD (placeholder for ofelia_config.ini integration) --->
-<!---
-<div class="card card-outline card-secondary mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-list-check me-2"></i>Notification Types</h3>
-    </div>
-    <div class="card-body">
-        <p class="text-muted">Future feature: Enable/disable specific notification types and configure their schedules.</p>
-    </div>
-</div>
---->
+<!-- AVAILABLE NOTIFICATIONS CARD (only visible when Pushover is enabled) -->
+<cfif pushover_enabled EQ "1">
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-list-check"></i> Available Notifications</h3>
+  </div>
+  <div class="card-body">
 
-      </div><!-- /.container-fluid -->
+    <cfif getNotifications.recordcount EQ 0>
+      <p class="text-muted">No notifications available.</p>
+    <cfelse>
+      <cfoutput query="getNotifications">
+        <div class="d-flex align-items-start justify-content-between py-3 <cfif getNotifications.currentRow LT getNotifications.recordcount>border-bottom</cfif>">
+          <div class="d-flex align-items-start">
+            <div class="me-3 mt-1">
+              <span style="font-size:1.5rem; cursor:pointer;" onclick="toggleNotification(#getNotifications.id#, this);">
+                <cfif getNotifications.is_enabled IS "1">
+                  <i class="fas fa-toggle-on text-success"></i>
+                <cfelse>
+                  <i class="fas fa-toggle-off text-secondary"></i>
+                </cfif>
+              </span>
+            </div>
+            <div>
+              <strong>#encodeForHTML(getNotifications.display_name)#</strong>
+              <cfif Len(Trim(getNotifications.description))>
+                <br><small class="text-muted">#encodeForHTML(getNotifications.description)#</small>
+              </cfif>
+            </div>
+          </div>
+        </div>
+      </cfoutput>
+    </cfif>
+
+  </div>
+</div>
+</cfif>
+
+      </div>
     </div>
-    <!-- /.content -->
   </main>
 
-<cfinclude template="./inc/main_footer.cfm" />
+  <cfinclude template="./inc/main_footer.cfm" />
 
 </div>
-<!-- ./wrapper -->
 
-</body>
-
-<!--- SCRIPT TO SHOW/HIDE PUSHOVER FIELDS --->
 <script>
-$('#pushover_enabled').on('change', function(){
-    if($(this).val() === "1"){
-        $("#pushover_fields").show();
-    } else {
-        $("#pushover_fields").hide();
-    }
+$('#pushover_enabled').on('change', function() {
+  if ($(this).val() === '1') {
+    $('#pushover_fields').slideDown();
+  } else {
+    $('#pushover_fields').slideUp();
+  }
 });
+
+var _toggleSubmitting = false;
+function toggleNotification(notifId, el) {
+  if (_toggleSubmitting) return;
+  _toggleSubmitting = true;
+  if (el) el.style.opacity = '0.5';
+
+  var f = document.createElement('form');
+  f.method = 'POST';
+  f.setAttribute('action', 'view_system_notifications.cfm');
+  f.style.display = 'none';
+
+  var a = document.createElement('input');
+  a.type = 'hidden';
+  a.name = 'form_action';
+  a.value = 'toggle_notification';
+  f.appendChild(a);
+
+  var n = document.createElement('input');
+  n.type = 'hidden';
+  n.name = 'notification_id';
+  n.value = notifId;
+  f.appendChild(n);
+
+  document.body.appendChild(f);
+  f.submit();
+}
 </script>
 
+</body>
 </html>

@@ -120,9 +120,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfinclude template="restart_opendkim.cfm">
 
-<cfinclude template="restart_postfix.cfm">
-
-
 
 
 <cfelseif #dkimenabled# is "2">
@@ -153,8 +150,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfinclude template="restart_opendkim.cfm">
 
-<cfinclude template="restart_postfix.cfm">
-  
   <!--- /CFIF for #dkimenabled# is --->
   </cfif>
   

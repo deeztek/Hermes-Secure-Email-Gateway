@@ -106,5 +106,9 @@ timeout = "60">
   <!--- CREATE DMARC_REPORT_SCRIPT.SH FILE ABOVE --->
   
 
-  <cfinclude template="set_crontab.cfm">
+  <!--- Enable DMARC report job in Ofelia --->
+  <cfquery datasource="hermes">
+    UPDATE ofelia_jobs SET active = '1' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+  </cfquery>
+  <cfinclude template="ofelia_generate_config.cfm">
   

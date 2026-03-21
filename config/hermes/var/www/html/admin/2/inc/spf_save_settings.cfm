@@ -101,8 +101,11 @@ Expects: form.spfenabled, and when enabled: form.debuglevel, form.testonly,
     <cffile action="delete" file="#FiletoDelete#">
   </cfif>
 
-  <!--- Update crontab --->
-  <cfinclude template="./set_crontab.cfm">
+  <!--- Disable DMARC report job in Ofelia --->
+  <cfquery datasource="hermes">
+    UPDATE ofelia_jobs SET active = '2' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+  </cfquery>
+  <cfinclude template="./ofelia_generate_config.cfm">
 
   <!--- Generate DMARC config file --->
   <cfset form.failurereports = "false">

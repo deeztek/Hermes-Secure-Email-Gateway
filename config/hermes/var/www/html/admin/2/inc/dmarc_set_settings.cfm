@@ -86,29 +86,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
        
 <cfinclude template="dmarc_generate_reports_script.cfm">
 
+<!--- Enable DMARC report job in Ofelia --->
+<cfquery datasource="hermes">
+  UPDATE ofelia_jobs SET active = '1' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+</cfquery>
+<cfinclude template="ofelia_generate_config.cfm">
+
 <cfinclude template="restart_opendmarc.cfm">
 
-<cfinclude template="restart_postfix.cfm">
 
 
 <cfelseif #form.failurereports# is "false">
 
   <!--- CHECK FOR EXISTENCE OF /OPT/HERMES/SCHEDULE/DMARC_REPORT_SCRIPT.SH AND DELETE IT --->
 <cfset FiletoDelete="/opt/hermes/schedule/dmarc_report_script.sh">
-<cfif fileExists(FiletoDelete)> 
-<cffile action="delete" 
+<cfif fileExists(FiletoDelete)>
+<cffile action="delete"
 file = "#FiletoDelete#">
 
 <!--- /CFIF FiletoDelete --->
 </cfif>
 
-<cfinclude template="set_crontab.cfm">
+<!--- Disable DMARC report job in Ofelia --->
+<cfquery datasource="hermes">
+  UPDATE ofelia_jobs SET active = '2' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+</cfquery>
+<cfinclude template="ofelia_generate_config.cfm">
 
 <cfinclude template="dmarc_generate_config_file.cfm">
-       
+
 <cfinclude template="restart_opendmarc.cfm">
 
-<cfinclude template="restart_postfix.cfm">
 
 <!--- /CFIF #form.failurereports# is --->
 </cfif>
@@ -148,13 +156,16 @@ file = "#FiletoDelete#">
 <!--- /CFIF FiletoDelete --->
 </cfif>
 
-<cfinclude template="set_crontab.cfm">
+<!--- Disable DMARC report job in Ofelia --->
+<cfquery datasource="hermes">
+  UPDATE ofelia_jobs SET active = '2' WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+</cfquery>
+<cfinclude template="ofelia_generate_config.cfm">
 
 <cfinclude template="dmarc_generate_config_file.cfm">
-       
+
 <cfinclude template="restart_opendmarc.cfm">
 
-<cfinclude template="restart_postfix.cfm">
   
   <!--- /CFIF for #dmarcenabled# is --->
   </cfif>

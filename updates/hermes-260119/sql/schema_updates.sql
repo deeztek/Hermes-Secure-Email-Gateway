@@ -610,3 +610,52 @@ DROP TABLE IF EXISTS mailaddr_temp;
 DELETE FROM mailaddr
 WHERE id NOT IN (SELECT DISTINCT sid FROM wblist);
 
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Add DMARC report and update check scheduled jobs
+-- These were previously managed via /etc/cron.d/ (set_crontab.cfm) which
+-- doesn't work in Docker. Now managed through Ofelia like all other jobs.
+-- active: 1 = enabled, 2 = disabled
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-dmarc-report"]', '0 30 02 * * *', '/opt/hermes/schedule/dmarc_report_script.sh', 'hermes_commandbox', '2', 'dmarc'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-dmarc-report"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-update-check"]', '0 30 04 * * *', '/opt/hermes/schedule/update_check.sh', 'hermes_commandbox', '1', 'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-update-check"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-health-check-mailqueue"]', '@every 15m', '/usr/bin/curl --silent http://localhost:8888/schedule/health_check_mailqueue.cfm', 'hermes_commandbox', '2', 'pushover'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-health-check-mailqueue"]'
+);
+
+-- ============================================================================
+-- PUSHOVER_NOTIFICATIONS TABLE: Registry of available Pushover notifications
+-- Each notification links to an ofelia_jobs entry for scheduling.
+-- enabled: 1 = on, 2 = off
+-- category: grouping for UI display (health, security, reports, etc.)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS pushover_notifications (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    display_name VARCHAR(255) NOT NULL,
+    description TEXT,
+    ofelia_job_name VARCHAR(255),
+    enabled TINYINT(3) NOT NULL DEFAULT 2,
+    category VARCHAR(50) NOT NULL DEFAULT 'health'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed initial notification: Mail Queue Health Check
+INSERT INTO pushover_notifications (name, display_name, description, ofelia_job_name, enabled, category)
+SELECT 'mailqueue_check', 'Mail Queue Health Check', 'Monitors the Postfix mail queue and sends a Pushover alert when the queue size exceeds the configured threshold. Runs every 15 minutes.', '[job-exec "hermes-health-check-mailqueue"]', '2', 'health'
+WHERE NOT EXISTS (
+    SELECT 1 FROM pushover_notifications WHERE name = 'mailqueue_check'
+);
+

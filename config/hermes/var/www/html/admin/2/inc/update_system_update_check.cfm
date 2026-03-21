@@ -17,7 +17,17 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 update system_settings set value='#form.update_check#' where parameter='daily_update_check'
 </cfquery>
 
-<cfinclude template="set_crontab.cfm">
+<!--- Enable/disable update check job in Ofelia --->
+<cfif form.update_check is "1">
+  <cfquery datasource="hermes">
+    UPDATE ofelia_jobs SET active = '1' WHERE job_name = '[job-exec "hermes-update-check"]'
+  </cfquery>
+<cfelse>
+  <cfquery datasource="hermes">
+    UPDATE ofelia_jobs SET active = '2' WHERE job_name = '[job-exec "hermes-update-check"]'
+  </cfquery>
+</cfif>
+<cfinclude template="ofelia_generate_config.cfm">
 
 
 

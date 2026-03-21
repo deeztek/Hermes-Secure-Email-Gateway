@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -18,74 +18,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
+<!--- CONFIGURE OPENDKIM.CONF FILE --->
 
-<cfinclude template="generate_customtrans.cfm">
-
-<!--- CONFIGURE OPENDKIM.CONF FILE BELOW --->
-
+<!--- Read template and perform all replacements in memory --->
 <cffile action="read" file="/opt/hermes/conf_files/opendkim.conf.HERMES" variable="dkimfile">
 
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","HEADER-CANONICALIZATION","#form.headers_canonicalization#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
+<cfset dkimfile = REReplace(dkimfile, "HEADER-CANONICALIZATION", form.headers_canonicalization, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "BODY-CANONICALIZATION", form.body_canonicalization, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "DEFAULT-ACTION", form.default_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "BADSIGNATURE-ACTION", form.badsignature_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "DNSERROR-ACTION", form.dnserror_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "INTERNALERROR-ACTION", form.internalerror_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "NOSIGNATURE-ACTION", form.nosignature_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "SECURITY-ACTION", form.security_action, "ALL")>
+<cfset dkimfile = REReplace(dkimfile, "SIGNATURE-ALGORITHM", form.signature_algorithm, "ALL")>
 
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","BODY-CANONICALIZATION","#form.body_canonicalization#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","DEFAULT-ACTION","#form.default_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","BADSIGNATURE-ACTION","#form.badsignature_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","DNSERROR-ACTION","#form.dnserror_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","INTERNALERROR-ACTION","#form.internalerror_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","NOSIGNATURE-ACTION","#form.nosignature_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","SECURITY-ACTION","#form.security_action#","ALL")#">
-    
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_opendkim.conf" variable="dkimfile">
-
-<cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_opendkim.conf"
-    output = "#REReplace("#dkimfile#","SIGNATURE-ALGORITHM","#form.signature_algorithm#","ALL")#">
-
-
-<!--- Backup opendkim.conf file --->
-<cffile action = "copy" source = "/etc/opendkim.conf" 
-destination = "/etc/opendkim.HERMES">
-
-<!--- Move /opt/hermes/tmp/#customtrans3#_opendkim.conf to /etc/opendkim.conf --->
-<cffile action = "move" source = "/opt/hermes/tmp/#customtrans3#_opendkim.conf" 
-destination = "/etc/opendkim.conf">
-    
-<!--- CONFIGURE OPENDKIM.CONF FILE ABOVE --->
-
-    
+<!--- Write directly to /etc/opendkim.conf (single-file bind mount — cannot copy/move, must write in place) --->
+<cffile action="write" file="/etc/opendkim.conf" output="#dkimfile#">
