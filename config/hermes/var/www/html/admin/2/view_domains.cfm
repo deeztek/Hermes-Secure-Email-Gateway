@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
-  <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -19,602 +19,636 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-
 <html lang="en">
 
-
-  <head>
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Domains</title>
-
   <cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script Default Sort by Column 4 Desc --->
-
-
-<!--- Sort Table Script  --->
-<script>
-  $(document).ready(function() {
-      $('#sortTable').DataTable( {
-        dom: 'Blfrtip',
-          buttons: [
-              'copy', 'csv', 'excel', 'pdf', 'print'
-          ],
-          stateSave: true,
-          lengthMenu: [
-            [ 25, 50, 100, -1 ],
-      [ '25 rows', '50 rows', '100 rows', 'Show all' ]
-  
-      ],
-      
-          "order": [[ 2, "asc" ]]
-      } );
-  } );
-    </script>
-
-  
-
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-
-<!--- BACK TO TOP BUTTON STYLE STARTS HERE ---> 
-<style>
-  #btn-back-to-top {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    display: none;
-  }
-  </style>
-
-  <!--- BACK TO TOP BUTTON STYLE ENDS HERE ---> 
-
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <cfoutput>
             <h1 class="m-0">Domains</h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-          </cfoutput>
-            
-          </div><!-- /.col -->
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item active">Domains</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-<!-- BACK TO TO TOP BUTTON STARTS HERE -->
-<button
-type="button"
-class="btn btn-danger btn-floating btn-lg"
-id="btn-back-to-top"
->
-<i class="fas fa-arrow-up"></i>
-</button>
- 
-<!-- BACK TO TO TOP BUTTON ENDS HERE -->
-    
-    <cfparam name = "errormessage" default = "0">
-    
-    <cfparam name = "m2" default = "0"> 
-    <cfif StructKeyExists(url, "m2")>
-    <cfif url.m2 is not "">
-    <cfset m2 = url.m2>
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
 
-    <!--- /CFIF for StructKeyExists --->
-  </cfif>
-  
-  <!--- /CFIF for url.m2 is not "" --->
-  </cfif>
-
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
+<cfif StructKeyExists(session, "m") AND session.m is not "">
   <cfset m = session.m>
-
-  <!--- ENABLE FOR DEBUG BELOW --->
-  <!---
-  <cfoutput>#session.m#</cfoutput>
-  --->
-
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-  
-    <cfparam name = "step" default = "0">
-    
-    <cfparam name = "action" default = ""> 
-    <cfif IsDefined("form.action") is "True">
-    <cfif form.action is not "">
-    <cfset action = form.action>
-    </cfif></cfif>  
-    
-  
-
-  
-<!--- ERROR MESSAGES START HERE --->
-
-<cfif #m# is "1">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Unable to delete domain with existing Relay Recipients. Please delete the Relay Recipients and try again (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
 </cfif>
 
-<cfif #m# is "2">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Unable to delete domain with existing Virtual Recipients. Please delete the virtual Recipients and try again (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
+<!--- ACTION HANDLERS --->
+<cfif action is "add_domain">
+  <cfinclude template="./inc/domain_add_action.cfm">
+<cfelseif action is "edit_domain">
+  <cfinclude template="./inc/domain_edit_action.cfm">
+<cfelseif action is "delete_domain">
+  <cfinclude template="./inc/domain_delete_action.cfm">
 </cfif>
 
-<cfif #m# is "3">
+<!--- Get all domains with transport details --->
+<cfquery name="getdomains" datasource="hermes">
+  SELECT d.id, d.domain, d.transport_id, d.senders_id, d.recipients_id,
+    t.destination, t.port, t.mx, t.method, t.authentication,
+    r.status AS recipient_status,
+    CASE WHEN tp.id IS NOT NULL THEN 'YES' ELSE 'NO' END AS tls_enforced
+  FROM domains d
+  LEFT JOIN transport t ON t.id = d.transport_id
+  LEFT JOIN recipients r ON r.id = d.recipients_id
+  LEFT JOIN tls_policies tp ON tp.domain = d.domain
+  ORDER BY d.domain ASC
+</cfquery>
 
+<cfset session.m = "">
+
+<!--- ALERTS --->
+<cfif m is "1">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Unable to delete domain with existing System Postmaster E-mail address. Please delete the System Postmaster E-mail address and try again (Error Code: #m#)</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Unable to delete domain with existing Relay Recipients. Please delete the Relay Recipients first.
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
-
-
-<cfif #m# is "4">
-
+<cfif m is "2">
   <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>Unable to delete domain with existing DKIM Key(s). Please delete the DKIM Key(s) and try again (Error Code: #m#)</cfoutput>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Unable to delete domain with existing Virtual Recipients. Please delete the Virtual Recipients first.
   </div>
-
-  <cfset session.m = 0>
-
 </cfif>
-
-<cfif #m# is "7">
+<cfif m is "3">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Unable to delete domain with existing System Postmaster E-mail address. Please change the Postmaster address first.
+  </div>
+</cfif>
+<cfif m is "4">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Unable to delete domain with existing DKIM Key(s). Please delete the DKIM Key(s) first.
+  </div>
+</cfif>
+<cfif m is "7">
   <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Domain was deleted successfully</cfoutput><br>
-
-    <cfset session.m = 0>
-
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Domain deleted successfully.
+  </div>
+</cfif>
+<cfif m is "8">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Domain added successfully.
+  </div>
+</cfif>
+<cfif m is "9">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Domain saved successfully. Postfix reloaded.
+  </div>
+</cfif>
+<cfif m is "10">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Domain Name field cannot be empty.
+  </div>
+</cfif>
+<cfif m is "11">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Domain Name is not a valid domain.
+  </div>
+</cfif>
+<cfif m is "12">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Domain Name already exists.
+  </div>
+</cfif>
+<cfif m is "13">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Destination Address field cannot be empty.
+  </div>
+</cfif>
+<cfif m is "14">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Destination Port must be a valid number.
+  </div>
+</cfif>
+<cfif m is "15">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Cannot enable Destination Authentication when Relay Host is enabled.
+  </div>
+</cfif>
+<cfif m is "16">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Destination Username cannot be empty when authentication is enabled.
+  </div>
+</cfif>
+<cfif m is "17">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Destination Password cannot be empty when authentication is enabled.
+  </div>
+</cfif>
+<cfif m is "20">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Missing required form fields.
   </div>
 </cfif>
 
+<!-- DOMAINS CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-globe"></i> Domains</h3>
+  </div>
+  <div class="card-body">
 
-
-<!--- ERROR MESSAGES END HERE --->
-
-
-        
-  <!--- DELETE RECIPIENT MODAL HTML STARTS HERE --->
- 
-
-<div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="deleteRecipientModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header alert-danger">
-        <!---
-        <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-        --->
-          <h4 class="modal-title">Delete Domains(s) </h4>
+    <!-- ADD DOMAIN FORM -->
+    <form method="post" autocomplete="off" class="mb-4" id="addDomainForm">
+      <input type="hidden" name="action" value="add_domain">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label"><strong>Domain Name</strong></label>
+            <input type="text" class="form-control" name="domain_name" placeholder="example.com" maxlength="255" required>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label"><strong>Delivery Method</strong></label>
+            <select class="form-select" name="delivery_method" id="add_delivery_method">
+              <option value="smtp" selected>SMTP (Recommended)</option>
+              <option value="discard">NONE (Discard All E-mail Silently)</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3" id="add_recipient_delivery_group">
+            <label class="form-label"><strong>Recipient Delivery</strong></label>
+            <select class="form-select" name="recipient_delivery">
+              <option value="OK" selected>ANY</option>
+              <option value="">SPECIFIED</option>
+            </select>
+          </div>
+        </div>
       </div>
-        
-      <div class="modal-body">
-        <p>Are you sure you to delete this domain? This action is irreversible!</p>
-  
+      <div class="row" id="add_destination_group">
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label"><strong>Destination Address</strong></label>
+            <input type="text" class="form-control" name="destination_address" placeholder="smtp.example.com">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Port</strong></label>
+            <input type="text" class="form-control" name="destination_port" placeholder="25" value="25">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3" id="add_mx_group">
+            <label class="form-label"><strong>MX Lookup</strong></label>
+            <select class="form-select" name="destination_mx">
+              <option value="NO" selected>NO</option>
+              <option value="YES">YES</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Auth</strong></label>
+            <select class="form-select" name="destination_authentication" id="add_destination_auth">
+              <option value="NO" selected>NO</option>
+              <option value="YES">YES</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <div class="modal-footer">
-        <form name="delete_domains" method="post" action="">
-  
-          <input type="hidden" name="action" value="deletedomain">
-          <input type="hidden" name="domain_id" value=""/>
-       
+      <div class="row" id="add_auth_fields" style="display:none;">
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label"><strong>Destination Username</strong></label>
+            <input type="text" class="form-control" name="destination_username" placeholder="username">
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <label class="form-label"><strong>Destination Password</strong></label>
+            <div class="input-group">
+              <input type="password" class="form-control" name="destination_password" id="add_password" placeholder="password">
+              <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('add_password', this);">
+                <i class="fas fa-eye-slash"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="mb-3">
+            <div class="form-check form-switch mt-4">
+              <input class="form-check-input" type="checkbox" name="enforce_tls" id="add_enforce_tls" value="1" checked>
+              <label class="form-check-label" for="add_enforce_tls"><strong>Enforce TLS</strong></label>
+            </div>
+            <small class="text-muted">Automatically adds domain to SMTP TLS Policy</small>
+          </div>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
+        <i class="fas fa-plus"></i> Add Domain
+      </button>
+    </form>
 
+    <!-- DOMAINS TABLE -->
+    <table id="domainsTable" class="table table-bordered table-hover table-striped" style="width:100%">
+      <thead>
+        <tr>
+          <th>Domain</th>
+          <th>Delivery</th>
+          <th>Destination</th>
+          <th>Port</th>
+          <th>MX</th>
+          <th>Recipients</th>
+          <th>Auth</th>
+          <th>TLS</th>
+          <th style="width: 15%">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <cfoutput query="getdomains">
+          <tr>
+            <td>#encodeForHTML(domain)#</td>
+            <td>
+              <cfif method is "discard">
+                <span class="badge bg-warning">Discard</span>
+              <cfelse>
+                <span class="badge bg-success">SMTP</span>
+              </cfif>
+            </td>
+            <td><cfif method is "discard">-<cfelse>#encodeForHTML(destination)#</cfif></td>
+            <td><cfif method is "discard">-<cfelse>#encodeForHTML(port)#</cfif></td>
+            <td><cfif method is "discard">-<cfelse>#encodeForHTML(mx)#</cfif></td>
+            <td>
+              <cfif recipient_status is "OK">
+                <span class="badge bg-info">Any</span>
+              <cfelse>
+                <span class="badge bg-secondary">Specified</span>
+              </cfif>
+            </td>
+            <td>
+              <cfif authentication is "YES">
+                <span class="badge bg-warning">YES</span>
+              <cfelse>
+                <span class="badge bg-secondary">NO</span>
+              </cfif>
+            </td>
+            <td>
+              <cfif tls_enforced is "YES">
+                <span class="badge bg-success">YES</span>
+              <cfelse>
+                <span class="badge bg-secondary">NO</span>
+              </cfif>
+            </td>
+            <td>
+              <button type="button" class="btn btn-sm btn-primary" title="Edit"
+                onclick="openEditModal(#id#);">
+                <i class="fas fa-edit"></i>
+              </button>
+              <a href="edit_domain_dkim.cfm?id=#id#" class="btn btn-sm btn-secondary" title="DKIM Keys">
+                <i class="fas fa-lock"></i>
+              </a>
+              <button type="button" class="btn btn-sm btn-danger" title="Delete"
+                onclick="openDeleteModal(#id#, '#encodeForJavaScript(domain)#');">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </td>
+          </tr>
+        </cfoutput>
+      </tbody>
+    </table>
 
-          <input type="submit" class="btn btn-danger" name="" value="Yes" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+  </div>
+</div>
 
-            </form>
-        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No</button>
       </div>
     </div>
-  </div>
-  </div>
-  <!--- DELETE RECIPIENT MODAL HTML ENDS HERE --->
-    
+  </main>
 
+  <cfinclude template="./inc/main_footer.cfm" />
 
-         
-  
-      <cfif #action# is "deletedomain">
-
-        <cfif NOT StructKeyExists(form, "domain_id")>
-
-          <cfset m="Delete Domain: form.domain_id does not exist">
-          <cfinclude template="./inc/error.cfm">
-          <cfabort>
-      
-
-          <cfelseif StructKeyExists(form, "domain_id")>
-
-          <cfif #form.domain_id# is "">
-
-            <cfset m="Delete Domain: form.domain_id is blank">
-            <cfinclude template="./inc/error.cfm">
-            <cfabort>
-
-          <cfelseif #form.domain_id# is not "">      
-
-          <cfinclude template="./inc/deletedomain.cfm">
-
-          <cfset session.m=7>
-
-          <cfoutput>
-            <cflocation url="view_domains.cfm" addtoken="no">
-            </cfoutput>
-
-        
-<!--- /CFIF #form.domain_id# is/is not "" --->
-</cfif>
-
-
-<!--- /CFIF NOT/StructKeyExists(form, "domain_id") --->
-</cfif>
-    
-<!--- /CFIF #action# is --->     
-</cfif> 
-    
-
-
-
-
-<form>
-    
-<span>
-  <p>       
-
-
-<a href="./inc/create_new.cfm?type=domain" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Create Domain</a>
-&nbsp;&nbsp;
-
-
-
-</p>
-
-<p>
-
-</p>
-</span>
-
-
-
-<br>
-
-<!---
-
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
-
-<cfquery name="getdomains" datasource="hermes">
-  select id, domain, policy_id, senders_id, recipients_id, action_taken from domains order by domain asc
-  </cfquery>
-    
-    <cfif #getdomains.recordcount# GTE 1>
-
-    
-                
-      <table class="table table-striped"  id="sortTable" style="width:100%">
-        <thead>
-          <tr>
-    
-            
-            <th>Edit</th>
-            <th>Edit DKIM</th>
-            <th>Delete</th>
-            <th>Domain</th>
-            <th>Recipient Delivery</th>
-            <th>Destination Address</th>
-            <th>Destination Port</th>
-            <th>Destination Use MX</th>
-            <th>Relay Recipients</th>
-            <th>Virtual Recipients</th>
-            <th>Postmaster Address</th>
-            <th>DKIM Key(s)</th>
-           
-          
-
-          </tr>
-        </thead>
-        <tbody>
-
-        
-
-<cfoutput query="getdomains">
-
-  <cfquery name="gettransports" datasource="hermes">
-    select domain, destination, port, mx from transport where domain='#domain#'
-    </cfquery>
-
-  <cfquery name="checkrecipients" datasource="hermes">
-    select recipient, domain from recipients where recipient like '%#domain#%' and domain is NULL
-    </cfquery>
-    
-    <cfquery name="checkvirtual" datasource="hermes">
-    select virtual_address from virtual_recipients where virtual_address like '%#domain#%'
-    </cfquery>
-    
-    <cfquery name="checkpostmaster" datasource="hermes">
-    select parameter, value from system_settings where parameter = 'postmaster' and value like '%#domain#%'
-    </cfquery>
-    
-    <cfquery name="checkdkim" datasource="hermes">
-    select domain from dkim_sign where domain like '%#domain#%'
-    </cfquery>
-
-
-         <td><a href="edit_domain.cfm?id=#id#" class="btn btn-secondary" role="button"><i class="fas fa-edit"></i></a></td>
-
-         <td><a href="edit_domain_dkim.cfm?id=#id#" class="btn btn-secondary" role="button"><i class="fas fa-lock"></i></a></td>
-
-         <td>
-
-          <button a href="##delete_modal"  type="button" id="delete" class="btn btn-danger" data-bs-toggle="modal" data-domain="#id#"><i class="fas fa-trash-alt"></i></button>
-
-        </td>
-
-        <td>#domain#</td>
-
-        <cfquery name="domainrecpolicy" datasource="hermes">
-        select recipient, status from recipients where recipient = '@#domain#'
-        </cfquery>
-
-        <cfif #domainrecpolicy.status# is "">
-        <td>SPECIFIED</td>
-        <cfelseif #domainrecpolicy.status# is "OK">
-          <td>ANY</td>
-        <cfelse>
-          <td>N/A</td>
-
-          <!--- /CFIF #domainrecpolicy.status# --->
-        </cfif>
-
-<td>#gettransports.destination#</td>  
-
-<td>#gettransports.port#</td>
-
-<td>#gettransports.mx#</td>
-        
-
-  <cfif #checkrecipients.recordcount# GTE 1>
-    <td>YES</td>
-  <cfelse>
-    <td>NO</td>
-
-   <!--- /CFIF #checkrecipients.recordcount# --->
-  </cfif>
-
-  
-  <cfif #checkvirtual.recordcount# GTE 1>
-    <td>YES</td>
-  <cfelse>
-    <td>NO</td>
-
-  <!--- /CFIF #checkvirtual.recordcount# --->
-  </cfif>
-
-  <cfif #checkpostmaster.recordcount# GTE 1>
-    <td>YES</td>
-  <cfelse>
-    <td>NO</td>
-
-  <!--- /CFIF #checkpostmaster.recordcount# --->
-  </cfif>
-
-  <cfif #checkdkim.recordcount# GTE 1>
-    <td>YES</td>
-  <cfelse>
-    <td>NO</td>
-
-  <!--- /CFIF #checkdkim.recordcount# --->
-  </cfif>
-
-
-    
-
-          </tr>
-
-        </cfoutput>
-
-        </tbody>
-        
-       
-        <tfoot>
-          <tr>
-      
-            <th>Edit</th>
-            <th>Edit DKIM</th>
-            <th>Delete</th>
-            <th>Domain</th>
-            <th>Recipient Delivery</th>
-            <th>Destination Address</th>
-            <th>Destination Port</th>
-            <th>Destination Use MX</th>
-            <th>Relay Recipients</th>
-            <th>Virtual Recipients</th>
-            <th>Postmaster Address</th>
-            <th>DKIM Signature</th>
-           
-          </tr>
-        </tfoot>
-      
-
-      </table>
-
-    </form>
-    
- 
-    
-    <cfelseif #getdomains.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Domains were found</strong></cfoutput>
-      </div>
-    
-      <!--- /CFIF FOR getdomains.recordcount --->
-    </cfif>
-    
-    
-
-    <div>&nbsp;</div>
-
-    
-    
-  </div><!-- /.container-fluid -->
 </div>
-<!-- /.content -->
+
+<!-- EDIT DOMAIN MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" autocomplete="off" id="editDomainForm">
+        <input type="hidden" name="action" value="edit_domain">
+        <input type="hidden" name="domain_id" id="edit_domain_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit Domain</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div id="editLoading" class="text-center py-4">
+            <i class="fas fa-spinner fa-spin fa-2x"></i>
+            <p class="mt-2">Loading domain settings...</p>
+          </div>
+          <div id="editFields" style="display:none;">
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label"><strong>Domain Name</strong></label>
+                  <input type="text" class="form-control" name="domain_name" id="edit_domain_name" maxlength="255">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label"><strong>Delivery Method</strong></label>
+                  <select class="form-select" name="delivery_method" id="edit_delivery_method">
+                    <option value="smtp">SMTP (Recommended)</option>
+                    <option value="discard">NONE (Discard All E-mail Silently)</option>
+                  </select>
+                </div>
+                <div class="mb-3" id="edit_recipient_delivery_group">
+                  <label class="form-label"><strong>Recipient Delivery</strong></label>
+                  <select class="form-select" name="recipient_delivery" id="edit_recipient_delivery">
+                    <option value="OK">ANY</option>
+                    <option value="">SPECIFIED</option>
+                  </select>
+                </div>
+              </div>
+              <div class="col-md-6" id="edit_destination_group">
+                <div class="mb-3">
+                  <label class="form-label"><strong>Destination Address</strong></label>
+                  <input type="text" class="form-control" name="destination_address" id="edit_destination_address" placeholder="FQDN or IP Address">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label"><strong>Destination Port</strong></label>
+                  <input type="text" class="form-control" name="destination_port" id="edit_destination_port" placeholder="25">
+                </div>
+                <div class="mb-3" id="edit_mx_group">
+                  <label class="form-label"><strong>Use MX Lookup</strong></label>
+                  <select class="form-select" name="destination_mx" id="edit_destination_mx">
+                    <option value="NO">NO</option>
+                    <option value="YES">YES</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="row" id="edit_auth_section">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label class="form-label"><strong>Destination Requires Authentication</strong></label>
+                  <select class="form-select" name="destination_authentication" id="edit_destination_auth">
+                    <option value="NO">NO</option>
+                    <option value="YES">YES</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="row" id="edit_auth_fields" style="display:none;">
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label class="form-label"><strong>Username</strong></label>
+                  <input type="text" class="form-control" name="destination_username" id="edit_destination_username">
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <label class="form-label"><strong>Password</strong></label>
+                  <div class="input-group">
+                    <input type="password" class="form-control" name="destination_password" id="edit_destination_password" placeholder="Leave blank to keep current">
+                    <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('edit_destination_password', this);">
+                      <i class="fas fa-eye-slash"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted" id="edit_password_hint"></small>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="mb-3">
+                  <div class="form-check form-switch mt-4">
+                    <input class="form-check-input" type="checkbox" name="enforce_tls" id="edit_enforce_tls" value="1">
+                    <label class="form-check-label" for="edit_enforce_tls"><strong>Enforce TLS</strong></label>
+                  </div>
+                  <small class="text-muted">Automatically adds domain to SMTP TLS Policy</small>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
-</main><!-- replaced content-wrapper -->
 
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="delete_domain">
+        <input type="hidden" name="domain_id" id="delete_domain_id" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete Domain</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete <strong id="delete_domain_name"></strong>? This action is irreversible!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
-<cfinclude template="./inc/main_footer.cfm" />
+<script>
+$(document).ready(function() {
+  $('#domainsTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
+    order: [[0, 'asc']],
+    columnDefs: [
+      { orderable: false, targets: [8] },
+      { searchable: false, targets: [8] }
+    ]
+  });
 
-<!-- ./wrapper -->
+  // Add form: delivery method toggle
+  $('#add_delivery_method').on('change', function() {
+    if ($(this).val() === 'discard') {
+      $('#add_destination_group, #add_recipient_delivery_group, #add_auth_fields').hide();
+    } else {
+      $('#add_destination_group, #add_recipient_delivery_group').show();
+    }
+  });
 
+  // Add form: auth toggle
+  $('#add_destination_auth').on('change', function() {
+    if ($(this).val() === 'YES') {
+      $('#add_auth_fields').show();
+      $('#add_mx_group').hide();
+    } else {
+      $('#add_auth_fields').hide();
+      $('#add_mx_group').show();
+    }
+  });
 
+  // Edit modal: delivery method toggle
+  $('#edit_delivery_method').on('change', function() {
+    if ($(this).val() === 'discard') {
+      $('#edit_destination_group, #edit_recipient_delivery_group, #edit_auth_section, #edit_mx_group').hide();
+    } else {
+      $('#edit_destination_group, #edit_recipient_delivery_group, #edit_auth_section, #edit_mx_group').show();
+    }
+  });
+
+  // Edit modal: auth toggle
+  $('#edit_destination_auth').on('change', function() {
+    if ($(this).val() === 'YES') {
+      $('#edit_auth_fields').show();
+      $('#edit_mx_group').hide();
+    } else {
+      $('#edit_auth_fields').hide();
+      $('#edit_mx_group').show();
+    }
+  });
+});
+
+function openEditModal(domainId) {
+  document.getElementById('edit_domain_id').value = domainId;
+  document.getElementById('editLoading').style.display = '';
+  document.getElementById('editFields').style.display = 'none';
+
+  var modal = new bootstrap.Modal(document.getElementById('editModal'));
+  modal.show();
+
+  // Fetch domain data via AJAX
+  $.ajax({
+    url: './inc/get_domain_json.cfm',
+    type: 'POST',
+    data: { id: domainId },
+    dataType: 'json',
+    success: function(data) {
+      if (data.error) {
+        alert('Error: ' + data.error);
+        return;
+      }
+      document.getElementById('edit_domain_name').value = data.domain;
+      document.getElementById('edit_delivery_method').value = data.method;
+      document.getElementById('edit_recipient_delivery').value = data.recipient_status;
+      document.getElementById('edit_destination_address').value = data.destination;
+      document.getElementById('edit_destination_port').value = data.port;
+      document.getElementById('edit_destination_mx').value = data.mx;
+      document.getElementById('edit_destination_auth').value = data.authentication;
+      document.getElementById('edit_destination_username').value = data.username || '';
+      document.getElementById('edit_destination_password').value = '';
+
+      // Show masked password hint
+      if (data.has_password && data.masked_password) {
+        document.getElementById('edit_password_hint').textContent = 'Current: ' + data.masked_password;
+      } else {
+        document.getElementById('edit_password_hint').textContent = '';
+      }
+
+      // TLS toggle
+      document.getElementById('edit_enforce_tls').checked = data.tls_enforced;
+
+      // Toggle visibility
+      if (data.method === 'discard') {
+        $('#edit_destination_group, #edit_recipient_delivery_group, #edit_auth_section, #edit_mx_group, #edit_auth_fields').hide();
+      } else {
+        $('#edit_destination_group, #edit_recipient_delivery_group, #edit_auth_section, #edit_mx_group').show();
+        if (data.authentication === 'YES') {
+          $('#edit_auth_fields').show();
+          $('#edit_mx_group').hide();
+        } else {
+          $('#edit_auth_fields').hide();
+        }
+      }
+
+      document.getElementById('editLoading').style.display = 'none';
+      document.getElementById('editFields').style.display = '';
+    },
+    error: function(xhr, status, error) {
+      document.getElementById('editLoading').innerHTML = '<div class="alert alert-danger">Failed to load domain: ' + error + '<br>' + xhr.responseText.substring(0, 500) + '</div>';
+    }
+  });
+}
+
+function togglePassword(inputId, btn) {
+  var input = document.getElementById(inputId);
+  var icon = btn.querySelector('i');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.remove('fa-eye-slash');
+    icon.classList.add('fa-eye');
+  } else {
+    input.type = 'password';
+    icon.classList.remove('fa-eye');
+    icon.classList.add('fa-eye-slash');
+  }
+}
+
+function openDeleteModal(domainId, domainName) {
+  document.getElementById('delete_domain_id').value = domainId;
+  document.getElementById('delete_domain_name').textContent = domainName;
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
 
 </body>
-
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
-   <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-
-  <script>
-
-    $('#reports').on('change',function(){
-      if( $(this).val()==="NO" ){
-      $("#reportsfrequency").hide()
-      }
-      else{
-      $("#reportsfrequency").show()
-      }
-    });
-    
-    </script>
-  
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT ENDS HERE  --->
-
- <!--- DELETE CERTIFICATE MODAL SCRIPT STARTS HERE  --->
-<script>
-  $('#delete_modal').on('show.bs.modal', function(e) {
-      var domain_id = $(e.relatedTarget).data('domain');
-      $(e.currentTarget).find('input[name="domain_id"]').val(domain_id);
-  });
-    </script>
-<!--- DELETE CERTIFICATE MODAL SCRIPT ENDS HERE  --->
-
-<!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
-
-<script>
-
-  //Get the button
-  let mybutton = document.getElementById("btn-back-to-top");
-  
-  // When the user scrolls down 20px from the top of the document, show the button
-  window.onscroll = function () {
-    scrollFunction();
-  };
-  
-  function scrollFunction() {
-    if (
-      document.body.scrollTop > 200 ||
-      document.documentElement.scrollTop > 200
-    ) {
-      mybutton.style.display = "block";
-    } else {
-      mybutton.style.display = "none";
-    }
-  }
-  // When the user clicks on the button, scroll to the top of the document
-  mybutton.addEventListener("click", backToTop);
-  
-  function backToTop() {
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
-  }
-  
-  </script>
-  
-  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
-
-
-
 </html>

@@ -119,6 +119,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset show_relayhost_password = form.relayhost_password>
 </cfif>
 
+<!--- Mask password for display: first 4 chars visible, rest masked --->
+<cfif Len(show_relayhost_password) GT 4>
+  <cfset masked_relayhost_password = Left(show_relayhost_password, 4) & RepeatString("*", Len(show_relayhost_password) - 4)>
+<cfelseif Len(show_relayhost_password) GT 0>
+  <cfset masked_relayhost_password = RepeatString("*", Len(show_relayhost_password))>
+<cfelse>
+  <cfset masked_relayhost_password = "">
+</cfif>
+
 <cfparam name="show_relayhost_tls_mode" default="#relayhost_tls_mode#">
 <cfif StructKeyExists(form, "relayhost_tls_mode")>
   <cfset show_relayhost_tls_mode = form.relayhost_tls_mode>
@@ -191,9 +200,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cflocation url="view_relay_host.cfm" addtoken="no">
       </cfif>
 
+      <!--- If password blank, keep existing encrypted password --->
       <cfif trim(form.relayhost_password) is "">
-        <cfset session.m = 6>
-        <cflocation url="view_relay_host.cfm" addtoken="no">
+        <cfquery name="getExistingRelayPwd" datasource="hermes">
+          SELECT value FROM system_settings WHERE parameter = 'relay_host_password'
+        </cfquery>
+        <cfif getExistingRelayPwd.value is "">
+          <cfset session.m = 6>
+          <cflocation url="view_relay_host.cfm" addtoken="no">
+        </cfif>
+        <!--- Use existing encrypted password — decrypt for the relay_passwd file generation --->
+        <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
+        <cfset form.relayhost_password = decrypt(getExistingRelayPwd.value, theKey, "AES", "Base64")>
       </cfif>
     </cfif>
 
@@ -395,12 +413,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <label for="relayhost_password" class="form-label"><strong>Relay Host Password</strong></label>
               <div class="input-group">
                 <cfoutput>
-                <input type="password" class="form-control" id="relayhost_password" name="relayhost_password" value="#show_relayhost_password#" maxlength="255" placeholder="Enter password" <cfif show_relay_enabled is "0" OR show_relay_authenticate is "0">disabled</cfif>>
+                <input type="password" class="form-control" id="relayhost_password" name="relayhost_password" value="" maxlength="255" placeholder="Leave blank to keep current" <cfif show_relay_enabled is "0" OR show_relay_authenticate is "0">disabled</cfif>>
                 </cfoutput>
                 <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">
-                  <i class="fas fa-eye" id="toggleIcon"></i>
+                  <i class="fas fa-eye-slash" id="toggleIcon"></i>
                 </button>
               </div>
+              <cfif masked_relayhost_password is not "">
+                <cfoutput><small class="text-muted">Current: #masked_relayhost_password#</small></cfoutput>
+              </cfif>
             </div>
           </div>
 

@@ -147,14 +147,28 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         WHERE id='#get_smtp_sasl_password_maps_id.id#'
         </cfquery>
 
-        <!--- Update username and password in parent record --->
+        <!--- Clear plaintext credentials from parameters (legacy) --->
         <cfquery name="updateuserpass" datasource="hermes">
         UPDATE parameters
         SET
-            name='#form.relayhost_username#:#form.relayhost_password#',
+            name='',
             applied='2',
             action='APPLY'
         WHERE id='#get_smtp_sasl_password_maps_id.id#'
+        </cfquery>
+
+        <!--- Encrypt and store credentials in system_settings --->
+        <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
+        <cfset encryptedRelayUsername = encrypt(form.relayhost_username, theKey, "AES", "Base64")>
+        <cfset encryptedRelayPassword = encrypt(form.relayhost_password, theKey, "AES", "Base64")>
+
+        <cfquery datasource="hermes">
+          UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encryptedRelayUsername#">
+          WHERE parameter = 'relay_host_username'
+        </cfquery>
+        <cfquery datasource="hermes">
+          UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encryptedRelayPassword#">
+          WHERE parameter = 'relay_host_password'
         </cfquery>
 
         <!--- Enable smtp_sasl_password_maps child parameter --->
@@ -168,40 +182,8 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         AND child='1'
         </cfquery>
 
-        <!--- Generate relay_passwd file --->
-        <cffile action="read" file="/opt/hermes/conf_files/relay_passwd.HERMES" variable="relaypass">
-
-        <!--- Replace placeholders with actual values --->
-        <cfset relaypass = REReplace(relaypass, "HOST-NAME", form.relayhost, "ALL")>
-        <cfset relaypass = REReplace(relaypass, "USER-NAME", form.relayhost_username, "ALL")>
-        <cfset relaypass = REReplace(relaypass, "PASS-WORD", form.relayhost_password, "ALL")>
-
-        <!--- Write relay_passwd file --->
-        <cffile action="write" file="/etc/postfix/relay_passwd" output="#relaypass#">
-
-        <!--- Change ownership of relay_passwd to root:root --->
-        <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec hermes_postfix_dkim chown root:root /etc/postfix/relay_passwd"
-            timeout="10" />
-        <cfcatch type="any">
-            <cfset m="Edit Relay Host Settings: Error changing ownership of relay_passwd: #cfcatch.message#">
-            <cfinclude template="error.cfm">
-            <cfabort>
-        </cfcatch>
-        </cftry>
-
-        <!--- Generate postmap for relay_passwd in Docker container --->
-        <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec hermes_postfix_dkim postmap /etc/postfix/relay_passwd"
-            timeout="60" />
-        <cfcatch type="any">
-            <cfset m="Edit Relay Host Settings: Error running postmap for relay_passwd: #cfcatch.message#">
-            <cfinclude template="error.cfm">
-            <cfabort>
-        </cfcatch>
-        </cftry>
+        <!--- Generate consolidated sasl_passwd (relay host + per-domain auth) --->
+        <cfinclude template="generate_sasl_password_transport.cfm">
 
     <cfelse>
         <!--- AUTHENTICATION NOT REQUIRED --->
@@ -238,7 +220,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         WHERE id='#get_smtp_sasl_password_maps_id.id#'
         </cfquery>
 
-        <!--- Clear username and password --->
+        <!--- Clear plaintext credentials from parameters (legacy) --->
         <cfquery name="clearuserpass" datasource="hermes">
         UPDATE parameters
         SET
@@ -246,6 +228,14 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
             applied='2',
             action='APPLY'
         WHERE id='#get_smtp_sasl_password_maps_id.id#'
+        </cfquery>
+
+        <!--- Clear encrypted credentials from system_settings --->
+        <cfquery datasource="hermes">
+          UPDATE system_settings SET value = '' WHERE parameter = 'relay_host_username'
+        </cfquery>
+        <cfquery datasource="hermes">
+          UPDATE system_settings SET value = '' WHERE parameter = 'relay_host_password'
         </cfquery>
 
         <!--- Disable smtp_sasl_password_maps child parameter --->
@@ -258,6 +248,9 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         WHERE parent='#get_smtp_sasl_password_maps_id.id#'
         AND child='1'
         </cfquery>
+
+        <!--- Regenerate sasl_passwd (removes relay host entry, keeps per-domain) --->
+        <cfinclude template="generate_sasl_password_transport.cfm">
 
     <!--- /CFIF form.relay_authenticate --->
     </cfif>
@@ -320,7 +313,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
     WHERE id='#get_smtp_sasl_password_maps_id.id#'
     </cfquery>
 
-    <!--- Clear and disable smtp_sasl_password_maps child --->
+    <!--- Clear plaintext credentials from parameters (legacy) --->
     <cfquery name="clearuserpass" datasource="hermes">
     UPDATE parameters
     SET
@@ -329,6 +322,14 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         applied='2',
         action='APPLY'
     WHERE id='#get_smtp_sasl_password_maps_id.id#'
+    </cfquery>
+
+    <!--- Clear encrypted credentials from system_settings --->
+    <cfquery datasource="hermes">
+      UPDATE system_settings SET value = '' WHERE parameter = 'relay_host_username'
+    </cfquery>
+    <cfquery datasource="hermes">
+      UPDATE system_settings SET value = '' WHERE parameter = 'relay_host_password'
     </cfquery>
 
     <!--- Disable smtp_sasl_password_maps child parameter --->

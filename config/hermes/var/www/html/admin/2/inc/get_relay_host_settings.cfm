@@ -62,17 +62,55 @@ SELECT parameter FROM parameters WHERE parent='#get_smtp_sasl_auth_enable.id#' A
     <cfset relayhost_authenticate = 0>
 </cfif>
 
-<!--- Get relay host username and password --->
-<cfquery name="get_relayhost_username_password" datasource="hermes">
-SELECT name FROM parameters WHERE parameter='smtp_sasl_password_maps' AND child = '2'
+<!--- Get relay host username and password (encrypted in system_settings) --->
+<cfquery name="getRelayCreds" datasource="hermes">
+  SELECT parameter, value FROM system_settings
+  WHERE parameter IN ('relay_host_username', 'relay_host_password')
 </cfquery>
 
-<cfif get_relayhost_username_password.name is not "">
-    <cfset relayhost_username = listGetAt(get_relayhost_username_password.name, 1, ":")>
-    <cfset relayhost_password = listGetAt(get_relayhost_username_password.name, 2, ":")>
-<cfelse>
-    <cfset relayhost_username = "">
-    <cfset relayhost_password = "">
+<cfset relayhost_username = "">
+<cfset relayhost_password = "">
+<cffile action="read" file="/opt/hermes/keys/hermes.key" variable="_relayKey">
+
+<cfloop query="getRelayCreds">
+  <cfif parameter EQ "relay_host_username" AND value is not "">
+    <cftry>
+      <cfset relayhost_username = decrypt(value, _relayKey, "AES", "Base64")>
+      <cfcatch><cfset relayhost_username = ""></cfcatch>
+    </cftry>
+  </cfif>
+  <cfif parameter EQ "relay_host_password" AND value is not "">
+    <cftry>
+      <cfset relayhost_password = decrypt(value, _relayKey, "AES", "Base64")>
+      <cfcatch><cfset relayhost_password = ""></cfcatch>
+    </cftry>
+  </cfif>
+</cfloop>
+
+<!--- One-time migration: if system_settings empty but parameters.name has plaintext creds, migrate them --->
+<cfif relayhost_username is "" AND relayhost_password is "">
+  <cfquery name="getLegacyCreds" datasource="hermes">
+    SELECT name FROM parameters WHERE parameter = 'smtp_sasl_password_maps' AND child = '2'
+  </cfquery>
+  <cfif getLegacyCreds.name is not "" AND ListLen(getLegacyCreds.name, ":") GTE 2>
+    <cfset relayhost_username = ListGetAt(getLegacyCreds.name, 1, ":")>
+    <cfset relayhost_password = ListGetAt(getLegacyCreds.name, 2, ":")>
+
+    <!--- Encrypt and store in system_settings --->
+    <cfquery datasource="hermes">
+      UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encrypt(relayhost_username, _relayKey, 'AES', 'Base64')#">
+      WHERE parameter = 'relay_host_username'
+    </cfquery>
+    <cfquery datasource="hermes">
+      UPDATE system_settings SET value = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encrypt(relayhost_password, _relayKey, 'AES', 'Base64')#">
+      WHERE parameter = 'relay_host_password'
+    </cfquery>
+
+    <!--- Clear plaintext from parameters --->
+    <cfquery datasource="hermes">
+      UPDATE parameters SET name = '' WHERE parameter = 'smtp_sasl_password_maps' AND child = '2'
+    </cfquery>
+  </cfif>
 </cfif>
 
 <!--- Get smtp_tls_security_level for outbound relay TLS --->

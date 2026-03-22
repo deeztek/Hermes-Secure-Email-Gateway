@@ -670,3 +670,57 @@ UPDATE parameters SET enabled = '1'
 WHERE parameter IN ('myorigin', 'myhostname')
   AND child = '2' AND module = 'postfix' AND enabled = '2';
 
+-- ============================================================================
+-- FIX: Consolidate SASL password maps to use sasl_passwd instead of relay_passwd
+-- Both relay host and per-domain transport credentials are now written to
+-- /etc/postfix/sasl_passwd by generate_sasl_password_transport.cfm
+-- ============================================================================
+
+UPDATE parameters SET parameter = 'hash:/etc/postfix/sasl_passwd'
+WHERE parent_name = 'smtp_sasl_password_maps' AND child = '1'
+  AND parameter = 'hash:/etc/postfix/relay_passwd';
+
+-- Enable smtp_sasl_password_maps and smtp_sasl_auth_enable if any domain uses auth
+-- (relay host page disables these when relay auth is off, but per-domain auth still needs them)
+UPDATE parameters p
+  JOIN (SELECT COUNT(*) AS cnt FROM transport WHERE authentication = 'YES') t ON t.cnt > 0
+SET p.enabled = '1', p.applied = '2', p.action = 'APPLY'
+WHERE p.parameter = 'smtp_sasl_password_maps' AND p.child = '2';
+
+UPDATE parameters p
+  JOIN (SELECT COUNT(*) AS cnt FROM transport WHERE authentication = 'YES') t ON t.cnt > 0
+SET p.enabled = '1', p.applied = '2', p.action = 'APPLY'
+WHERE p.parameter = 'smtp_sasl_auth_enable' AND p.child = '2';
+
+-- Fix parent_name for smtp_sasl children (may be incorrectly set to 'postfix')
+UPDATE parameters SET parent_name = 'smtp_sasl_auth_enable'
+WHERE parent = (SELECT id FROM (SELECT id FROM parameters WHERE parameter = 'smtp_sasl_auth_enable' AND child = '2') tmp)
+  AND child = '1' AND parent_name <> 'smtp_sasl_auth_enable';
+
+UPDATE parameters SET parent_name = 'smtp_sasl_password_maps'
+WHERE parent = (SELECT id FROM (SELECT id FROM parameters WHERE parameter = 'smtp_sasl_password_maps' AND child = '2') tmp)
+  AND child = '1' AND parent_name <> 'smtp_sasl_password_maps';
+
+UPDATE parameters p
+  JOIN (SELECT COUNT(*) AS cnt FROM transport WHERE authentication = 'YES') t ON t.cnt > 0
+SET p.parameter = 'yes', p.enabled = '1', p.applied = '2', p.action = 'APPLY'
+WHERE p.parent_name = 'smtp_sasl_auth_enable' AND p.child = '1';
+
+UPDATE parameters p
+  JOIN (SELECT COUNT(*) AS cnt FROM transport WHERE authentication = 'YES') t ON t.cnt > 0
+SET p.enabled = '1', p.applied = '2', p.action = 'APPLY'
+WHERE p.parent_name = 'smtp_sasl_password_maps' AND p.child = '1';
+
+-- ============================================================================
+-- SYSTEM_SETTINGS: Encrypted relay host credentials
+-- Migrates plaintext relay host credentials from parameters.name to
+-- encrypted system_settings entries. Credentials encrypted with AES
+-- using /opt/hermes/keys/hermes.key (same as per-domain transport auth).
+-- ============================================================================
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'relay_host_username', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'relay_host_username');
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'relay_host_password', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'relay_host_password');
+

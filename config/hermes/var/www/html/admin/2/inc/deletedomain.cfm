@@ -117,8 +117,16 @@ where id = <cfqueryparam value = #form.domain_id# CFSQLType = "CF_SQL_INTEGER">
 <!--- GENERATE RELAY DOMAINS STARTS HERE --->
 <cfinclude template="generate_relay_domains.cfm">
 
+<!--- DELETE TLS POLICY FOR THIS DOMAIN --->
+<cfquery datasource="hermes">
+  DELETE FROM tls_policies WHERE domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#theOriginalDomain#">
+</cfquery>
+
 <!--- GENERATE /ETC/POSTFIX/SASL_PASSWD STARTS HERE --->
 <cfinclude template="generate_sasl_password_transport.cfm">
+
+<!--- REGENERATE TLS POLICY FILE --->
+<cfinclude template="generate_tls_policy.cfm">
 
 <!--- DELETE DJIGZO DOMAIN STARTS HERE --->
 <cfinclude template="delete_domain_djigzo.cfm">
