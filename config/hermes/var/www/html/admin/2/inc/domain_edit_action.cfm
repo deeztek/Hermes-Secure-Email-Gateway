@@ -30,30 +30,8 @@ Expects: form.domain_id, form.domain_name, form.delivery_method, form.recipient_
 <cfset theSenderID = getdomain.senders_id>
 <cfset theRecipientID = getdomain.recipients_id>
 
-<!--- Validate domain name --->
-<cfif NOT StructKeyExists(form, "domain_name") OR trim(form.domain_name) is "">
-  <cfset session.m = 10>
-  <cflocation url="view_domains.cfm" addtoken="no">
-</cfif>
-
-<cfset domain_name = LCase(trim(form.domain_name))>
-
-<cfset tempemail = "bob@#domain_name#">
-<cfif NOT IsValid("email", tempemail)>
-  <cfset session.m = 11>
-  <cflocation url="view_domains.cfm" addtoken="no">
-</cfif>
-
-<!--- Check for duplicate domain name (excluding self) --->
-<cfquery name="checkdomain" datasource="hermes">
-  SELECT id FROM domains WHERE domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#domain_name#">
-    AND id <> <cfqueryparam value="#theDomainID#" cfsqltype="cf_sql_integer">
-</cfquery>
-
-<cfif checkdomain.recordcount GTE 1>
-  <cfset session.m = 12>
-  <cflocation url="view_domains.cfm" addtoken="no">
-</cfif>
+<!--- Domain name is immutable — use existing value from database --->
+<cfset domain_name = theOriginalDomain>
 
 <!--- Validate delivery method --->
 <cfparam name="form.delivery_method" default="smtp">
@@ -200,13 +178,6 @@ Expects: form.domain_id, form.domain_name, form.delivery_method, form.recipient_
   UPDATE domains SET domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#domain_name#">
   WHERE id = <cfqueryparam value="#theDomainID#" cfsqltype="cf_sql_integer">
 </cfquery>
-
-<!--- If domain name changed, update Ciphermail --->
-<cfif CompareNoCase(theOriginalDomain, domain_name) NEQ 0>
-  <cfinclude template="./delete_domain_djigzo.cfm">
-  <cfset theNewDomain = domain_name>
-  <cfinclude template="./add_domain_djigzo.cfm">
-</cfif>
 
 <!--- Auto-manage TLS policy for domains with auth --->
 <cfparam name="form.enforce_tls" default="0">

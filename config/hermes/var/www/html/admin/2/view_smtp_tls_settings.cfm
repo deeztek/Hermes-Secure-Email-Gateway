@@ -320,16 +320,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </thead>
         <tbody>
           <cfoutput query="getpolicies">
+            <cfset isAutoAdded = (description EQ "Auto-added: domain requires authentication")>
             <tr>
-              <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
+              <td><cfif isAutoAdded>&nbsp;<cfelse><input type="checkbox" class="row-checkbox" value="#id#"></cfif></td>
               <td>#encodeForHTML(domain)#</td>
               <td><cfif method is "encrypt"><span class="badge bg-success">Mandatory</span><cfelse><span class="badge bg-secondary">N/A</span></cfif></td>
-              <td>#encodeForHTML(description)#</td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary"
-                  onclick="openEditModal('#id#', '#encodeForJavaScript(domain)#', '#encodeForJavaScript(description)#');" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
+                <cfif isAutoAdded>
+                  <span class="badge bg-info">Managed by <a href="view_domains.cfm" class="text-white">Domains</a></span>
+                <cfelse>
+                  #encodeForHTML(description)#
+                </cfif>
+              </td>
+              <td>
+                <cfif isAutoAdded>
+                  &nbsp;
+                <cfelse>
+                  <button type="button" class="btn btn-sm btn-primary"
+                    onclick="openEditModal('#id#', '#encodeForJavaScript(domain)#', '#encodeForJavaScript(description)#');" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                </cfif>
               </td>
             </tr>
           </cfoutput>

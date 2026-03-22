@@ -294,7 +294,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <input class="form-check-input" type="checkbox" name="enforce_tls" id="add_enforce_tls" value="1" checked>
               <label class="form-check-label" for="add_enforce_tls"><strong>Enforce TLS</strong></label>
             </div>
-            <small class="text-muted">Automatically adds domain to SMTP TLS Policy</small>
+            <small class="text-muted">Automatically adds domain to <a href="view_smtp_tls_settings.cfm">SMTP TLS Settings &gt; TLS Policy Domains</a></small>
           </div>
         </div>
       </div>
@@ -404,7 +404,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <div class="col-md-6">
                 <div class="mb-3">
                   <label class="form-label"><strong>Domain Name</strong></label>
-                  <input type="text" class="form-control" name="domain_name" id="edit_domain_name" maxlength="255">
+                  <input type="text" class="form-control" id="edit_domain_name" maxlength="255" readonly disabled>
                 </div>
                 <div class="mb-3">
                   <label class="form-label"><strong>Delivery Method</strong></label>
@@ -475,7 +475,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <input class="form-check-input" type="checkbox" name="enforce_tls" id="edit_enforce_tls" value="1">
                     <label class="form-check-label" for="edit_enforce_tls"><strong>Enforce TLS</strong></label>
                   </div>
-                  <small class="text-muted">Automatically adds domain to SMTP TLS Policy</small>
+                  <small class="text-muted">Automatically adds domain to <a href="view_smtp_tls_settings.cfm">SMTP TLS Settings &gt; TLS Policy Domains</a></small>
                 </div>
               </div>
             </div>
