@@ -55,40 +55,9 @@ select domain, authentication, authentication_username, authentication_password 
     
     <cffile action = "write" file = "/etc/postfix/sasl_passwd" output = "#FileSasl#" addnewline="no">
 
-    <cffile action = "write"
-        file = "/opt/hermes/tmp/#customtrans3#_postmap.sh"
-        output = "/usr/sbin/postmap /etc/postfix/sasl_passwd" addnewline="no">
-
-        <cfexecute name = "/bin/chmod"
-        arguments="+x /opt/hermes/tmp/#customtrans3#_postmap.sh"
-        timeout = "60">
-        </cfexecute>
-        
-
-            <cftry>
-  
-
-                <cfexecute name = "/opt/hermes/tmp/#customtrans3#_postmap.sh"
-                timeout = "240"
-                outputfile ="/dev/null"
-                arguments="-inputformat none">
-                </cfexecute>
-                
-                                    
-                    <cfcatch type="any">
-                                
-                    <cfset m="/inc/generate_sasl_password_transport.cfm: There was an error postmapping sasl_passwd">
-                    <cfinclude template="error.cfm">
-                    <cfabort>   
-                                
-                    </cfcatch>
-                    </cftry>
-                
-                <cfif FileExists("/opt/hermes/tmp/#customtrans3#_postmap.sh")>
-        
-                <cffile
-                action = "delete"
-                file = "/opt/hermes/tmp/#customtrans3#_postmap.sh"> 
-        
-                <!--- /CFIF FileExists --->
-                </cfif>
+    <!--- Postmap sasl_passwd via Docker exec --->
+    <cfexecute name="/usr/local/bin/docker"
+      arguments="exec hermes_postfix_dkim /usr/sbin/postmap /etc/postfix/sasl_passwd"
+      timeout="240"
+      variable="postmapOutput"
+      errorVariable="postmapError" />

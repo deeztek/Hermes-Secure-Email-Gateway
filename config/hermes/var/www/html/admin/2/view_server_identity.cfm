@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
+
+This file is part of Hermes Secure Email Gateway Community Edition.
+
+    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+--->
+
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hermes SEG | Server Identity</title>
+  <cfinclude template="./inc/html_head.cfm" />
+</head>
+
+<body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
+<div class="app-wrapper">
+
+  <cfinclude template="./inc/top_navbar.cfm" />
+  <cfinclude template="./inc/main_sidebar.cfm" />
+
+  <main class="app-main">
+    <div class="content-header">
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">Server Identity</h1>
+          </div>
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-end">
+              <li class="breadcrumb-item"><a href="#">Home</a></li>
+              <li class="breadcrumb-item active">Server Identity</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="app-content">
+      <div class="container-fluid">
+
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
+
+<cfif StructKeyExists(session, "m") AND session.m is not "">
+  <cfset m = session.m>
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
+</cfif>
+
+<!--- ACTION HANDLER --->
+<cfif action is "save_settings">
+  <cfinclude template="./inc/save_server_identity.cfm">
+</cfif>
+
+<!--- Get current values from parameters table --->
+<cfquery name="getMyOrigin" datasource="hermes">
+  SELECT parameter FROM parameters
+  WHERE parent_name = 'myorigin' AND child = '1' AND module = 'postfix' AND conf_file = 'main.cf'
+</cfquery>
+
+<cfquery name="getMyHostname" datasource="hermes">
+  SELECT parameter FROM parameters
+  WHERE parent_name = 'myhostname' AND child = '1' AND module = 'postfix' AND conf_file = 'main.cf'
+</cfquery>
+
+<cfset currentDomain = getMyOrigin.parameter>
+<cfset currentHostname = getMyHostname.parameter>
+
+<cfset session.m = "">
+
+<!--- ALERTS --->
+<cfif m is "1">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Server identity settings saved successfully. Postfix reloaded.
+  </div>
+</cfif>
+<cfif m is "2">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Server Domain field cannot be empty.
+  </div>
+</cfif>
+<cfif m is "3">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Server Hostname field cannot be empty.
+  </div>
+</cfif>
+<cfif m is "4">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Server Domain is not a valid domain name.
+  </div>
+</cfif>
+<cfif m is "5">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Server Hostname is not a valid fully qualified domain name (FQDN).
+  </div>
+</cfif>
+
+<!-- SERVER IDENTITY CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-id-card"></i> Server Identity</h3>
+  </div>
+  <div class="card-body">
+    <div class="callout callout-info mb-3">
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i>
+        These settings control how your mail server identifies itself to other mail servers.
+        The <strong>Server Domain</strong> is used as the origin domain for outgoing mail (Postfix <code>myorigin</code>).
+        The <strong>Server Hostname</strong> is the FQDN used in SMTP banners and HELO/EHLO greetings (Postfix <code>myhostname</code>).
+      </p>
+    </div>
+
+    <div class="callout callout-warning mb-3">
+      <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>
+        Changing these values will immediately update the Postfix configuration and reload the mail service.
+        Ensure the hostname has a valid DNS A record and matching reverse DNS (PTR) record, or outgoing mail may be rejected by other servers.
+      </p>
+    </div>
+
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="save_settings">
+
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label"><strong>Server Domain</strong></label>
+            <cfoutput>
+            <input type="text" class="form-control" name="server_domain" value="#encodeForHTMLAttribute(currentDomain)#" placeholder="example.com">
+            </cfoutput>
+            <div class="form-text">The domain name for outgoing mail (e.g., <code>example.com</code>)</div>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label"><strong>Server Hostname (FQDN)</strong></label>
+            <cfoutput>
+            <input type="text" class="form-control" name="server_hostname" value="#encodeForHTMLAttribute(currentHostname)#" placeholder="mail.example.com">
+            </cfoutput>
+            <div class="form-text">The fully qualified domain name of this mail server (e.g., <code>mail.example.com</code>)</div>
+          </div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+        <i class="fas fa-save"></i> Save &amp; Apply Settings
+      </button>
+    </form>
+  </div>
+</div>
+
+      </div>
+    </div>
+  </main>
+
+  <cfinclude template="./inc/main_footer.cfm" />
+
+</div>
+
+</body>
+</html>

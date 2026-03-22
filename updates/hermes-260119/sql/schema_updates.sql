@@ -659,3 +659,14 @@ WHERE NOT EXISTS (
     SELECT 1 FROM pushover_notifications WHERE name = 'mailqueue_check'
 );
 
+-- ============================================================================
+-- FIX: Ensure core Postfix parameters are always enabled
+-- myorigin and myhostname must be enabled for generate_postfix_configuration.cfm
+-- to include them in the postconf script. If disabled, the template defaults
+-- (domain.tld / hermes.domain.tld) persist in main.cf after config regeneration.
+-- ============================================================================
+
+UPDATE parameters SET enabled = '1'
+WHERE parameter IN ('myorigin', 'myhostname')
+  AND child = '2' AND module = 'postfix' AND enabled = '2';
+

@@ -41,7 +41,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
       </cfif>
       
       
-      <cfset command="/bin/cp /etc/postfix/tls_policy /etc/postfix/tls_policy.HERMES.BACKUP#chr(10)#/bin/mv /opt/hermes/tmp/#customtrans3#_tls_policy /etc/postfix/tls_policy#chr(10)#/usr/sbin/postmap /etc/postfix/tls_policy">
+      <cfset command="/bin/cp /etc/postfix/tls_policy /etc/postfix/tls_policy.HERMES.BACKUP#chr(10)#/bin/mv /opt/hermes/tmp/#customtrans3#_tls_policy /etc/postfix/tls_policy#chr(10)#/usr/local/bin/docker exec hermes_postfix_dkim /usr/sbin/postmap /etc/postfix/tls_policy">
       
       <cffile action = "write" 
       file = "/opt/hermes/tmp/#customtrans3#_apply.sh" 
@@ -67,22 +67,11 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
         
       
 <!--- EXECUTE #CUSTOMTRANS3#_APPLY.SH --->
-<cftry>
-  
-  <cfexecute name = "/opt/hermes/tmp/#customtrans3#_apply.sh"
-  outputfile ="/dev/null"
+<cfexecute name="/opt/hermes/tmp/#customtrans3#_apply.sh"
   arguments="-inputformat none"
-  timeout = "120">
-  </cfexecute>
-              
-      <cfcatch type="any">
-          
-      <cfset m="Generate TLS Policy: There was an error making /opt/hermes/tmp/_apply.sh executable">
-      <cfinclude template="error.cfm">
-      <cfabort>   
-          
-      </cfcatch>
-      </cftry>
+  timeout="120"
+  variable="applyOutput"
+  errorVariable="applyError" />
     
 
 <!--- delete /opt/hermes/tmp/#customtrans3#_apply.sh file --->

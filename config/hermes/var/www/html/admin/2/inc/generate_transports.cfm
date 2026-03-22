@@ -31,40 +31,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     <cffile action = "write" file = "/etc/postfix/transport" output = "#FileData#" addnewline="no">
     
-    <cffile action = "write"
-        file = "/opt/hermes/tmp/#customtrans3#_postmap.sh"
-        output = "/usr/sbin/postmap /etc/postfix/transport" addnewline="no">
-
-        <cfexecute name = "/bin/chmod"
-        arguments="+x /opt/hermes/tmp/#customtrans3#_postmap.sh"
-        timeout = "60">
-        </cfexecute>
-        
-
-            <cftry>
-  
-
-                <cfexecute name = "/opt/hermes/tmp/#customtrans3#_postmap.sh"
-                timeout = "240"
-                outputfile ="/dev/null"
-                arguments="-inputformat none">
-                </cfexecute>
-                
-                                    
-                    <cfcatch type="any">
-                                
-                    <cfset m="/inc/generate_transports.cfm: There was an error postmapping transports">
-                    <cfinclude template="error.cfm">
-                    <cfabort>   
-                                
-                    </cfcatch>
-                    </cftry>
-                
-                <cfif FileExists("/opt/hermes/tmp/#customtrans3#_postmap.sh")>
-        
-                <cffile
-                action = "delete"
-                file = "/opt/hermes/tmp/#customtrans3#_postmap.sh"> 
-        
-                <!--- /CFIF FileExists --->
-                </cfif>
+    <!--- Postmap transport via Docker exec --->
+    <cfexecute name="/usr/local/bin/docker"
+      arguments="exec hermes_postfix_dkim /usr/sbin/postmap /etc/postfix/transport"
+      timeout="240"
+      variable="postmapOutput"
+      errorVariable="postmapError" />
