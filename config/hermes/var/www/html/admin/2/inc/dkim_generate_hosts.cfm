@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset FileHosts = FileHosts & gethosts.host & #Chr(10)#>
     </cfloop>
 
-    <cffile action = "write" file = "/opt/hermes/dkim/TrustedHosts" output = "127.0.0.1#Chr(10)#" addnewline="no">
+    <cffile action = "write" file = "/opt/hermes/dkim/TrustedHosts" output = "127.0.0.1#Chr(10)#172.16.32.0/24#Chr(10)#" addnewline="no">
 
     <cffile action = "append" file = "/opt/hermes/dkim/TrustedHosts" output = "#FileHosts#" addnewline="no">
     
