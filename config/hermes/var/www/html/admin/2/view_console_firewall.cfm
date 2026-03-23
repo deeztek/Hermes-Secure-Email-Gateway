@@ -1,7 +1,6 @@
 <!DOCTYPE html>
 
-
- <!---
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Pro Edition.
@@ -9,1346 +8,347 @@ This file is part of Hermes Secure Email Gateway Pro Edition.
 Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered under the Hermes Secure Email Gateway Pro Edition License.
 
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
-  --->
+--->
 
 <html lang="en">
-
 
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Admin Console Firewall</title>
-
   <cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script  --->
-<script>
-$(document).ready(function() {
-    $('#sortTable').DataTable( {
-dom: 'Blfrtip',
-  buttons: [
-'copy', 'csv', 'excel', 'pdf', 'print'
-  ],
-  lengthMenu: [
-[ 10, 25, 50, -1 ],
-[ '10 rows', '25 rows', '50 rows', 'Show all' ]
-
-    ],
-  "order": [[ 2, "asc" ]]
-    } );
-} );
-  </script>
-
-
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-<!--- ADJUST DATATABLE FONT SIZES --->
-<style>
-  th { font-size: 16px; }
-td { font-size: 16px; }
-</style>
-
-
-<!--- TEXT AREA STYLE ---> 
-<style>
-  textarea{
-border:1px solid #999999;
-width:100%;
-margin:5px 0;
-padding:3px;
-  }
-  .textareacontainer{
-padding-right: 8px; /* 1 + 3 + 3 + 1 */
-  }
-    </style>
-
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW STARTS HERE --->  
-<style>
-  .alert a {
-    color: #fff;
-    text-decoration: none;
-}
-</style>
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW ENDS HERE --->  
-
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
-<div class="container-fluid">
-  <div class="row mb-2">
-    <div class="col-sm-6">
-<cfoutput>
-<h1 class="m-0">Admin Console Firewall</h1>
-<!---
-<h2 class="m-0">Group Member: #session.thegroups#</h2>
---->
-    </cfoutput>
-
-    </div><!-- /.col -->
-    <div class="col-sm-6">
-<ol class="breadcrumb float-sm-end">
-  <li class="breadcrumb-item"><a href="#">Home</a></li>
-  <li class="breadcrumb-item active">Admin Console Firewall</li>
-</ol>
-    </div><!-- /.col -->
-  </div><!-- /.row -->
-</div><!-- /.container-fluid -->
+      <div class="container-fluid">
+        <div class="row mb-2">
+          <div class="col-sm-6">
+            <h1 class="m-0">Admin Console Firewall</h1>
+          </div>
+          <div class="col-sm-6">
+            <ol class="breadcrumb float-sm-end">
+              <li class="breadcrumb-item"><a href="#">Home</a></li>
+              <li class="breadcrumb-item active">Admin Console Firewall</li>
+            </ol>
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
-<div class="container-fluid">
+    <div class="app-content">
+      <div class="container-fluid">
 
-  <!--- Pro Edition License Check --->
-  <cfinclude template="./inc/license_check.cfm" />
+<!--- Pro Edition License Check --->
+<cfinclude template="./inc/license_check.cfm" />
 
-  <!--- PRO EDITION CHECK --->
-  <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
-      <cfset proFeatureName = "Admin Console Firewall">
-      <cfinclude template="./inc/license_pro_required.cfm">
-      <cfabort>
-  </cfif>
+<cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
+  <cfset proFeatureName = "Admin Console Firewall">
+  <cfinclude template="./inc/license_pro_required.cfm">
+  <cfabort>
+</cfif>
 
-    <!--- ENABLE FOR DEBUG ONLY --->
- <!--- 
-  <cfdump var="#cgi#">
- 
-  <cfoutput>
- #cgi.http_referer#
-</cfoutput>
-    --->
-    
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
+
+<cfif StructKeyExists(session, "m") AND session.m is not "">
   <cfset m = session.m>
-
-  <!--- ENABLE FOR DEBUG BELOW --->
-  <!---
-  <cfoutput>#session.m#</cfoutput>
-  --->
-
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-
-
-<cfparam name = "step" default = "0">
-    
-<cfparam name = "action" default = ""> 
-<cfif StructKeyExists(form, "action")>
-<cfif form.action is not "">
-<cfset action = form.action>
-
-<!--- /CFIF form.action is not "" --->
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
 </cfif>
 
-<!--- /CFIF for StructKeyExists --->
-</cfif>  
+<!--- ACTION HANDLER --->
+<cfif action is not "">
+  <cfinclude template="./inc/firewall_action.cfm">
+</cfif>
 
+<!--- Load data --->
 <cfquery name="checkstatus" datasource="hermes">
-select value2 from parameters2 where parameter='firewall_status' and module='firewall' and active='1'
+  SELECT value2 FROM parameters2 WHERE parameter = 'firewall_status' AND module = 'firewall' AND active = '1'
 </cfquery>
-  
-  <cfparam name = "firewall_status" default = "#checkstatus.value2#"> 
-  <cfif StructKeyExists(form, "firewall_status")>
-  <cfif form.firewall_status is not "">
-  <cfset firewall_status = form.firewall_status>
-  
-<!--- /CFIF form.firewall_status is --->
-</cfif>
-
-<!--- StructKeyExists(form, "firewall_status") --->
-  </cfif>
-
+<cfset firewall_status = checkstatus.value2>
 
 <cfquery name="getfirewallips" datasource="hermes">
-select id, ip, note, hermesadmin, ciphermailadmin, datetime from firewall
+  SELECT id, ip, note, hermesadmin, ciphermailadmin, datetime FROM firewall ORDER BY ip ASC
 </cfquery>
 
-<!--- ERROR MESSAGES START HERE --->
+<cfset session.m = "">
 
-<cfif #m# is "1">
+<!--- ALERTS --->
+<cfset _alerts = {
+  "1":{type:"danger", msg:"The IP Address you entered is invalid."},
+  "2":{type:"danger", msg:"The IP Address you are attempting to edit already exists."},
+  "3":{type:"danger", msg:"You cannot delete the IP you are accessing the system with while the firewall is enabled. Disable the firewall first."},
+  "4":{type:"danger", msg:"You cannot edit the IP Address you are accessing the system with while the firewall is enabled. Disable the firewall first."},
+  "5":{type:"danger", msg:"You cannot enable the firewall unless the IP you are accessing the system with is in the allowed list with <strong>Allow to Hermes Admin</strong> set to <strong>YES</strong>."},
+  "6":{type:"danger", msg:"The IP Address you are attempting to add already exists."},
+  "7":{type:"danger", msg:"The IP Address you are attempting to add is invalid."},
+  "20":{type:"danger", msg:"Missing required form fields."},
+  "33":{type:"success", msg:"IP Address edited and settings applied successfully."},
+  "34":{type:"success", msg:"IP Address deleted and settings applied successfully."},
+  "35":{type:"success", msg:"Admin Console Firewall enabled and settings applied successfully."},
+  "36":{type:"success", msg:"Admin Console Firewall disabled and settings applied successfully."},
+  "37":{type:"success", msg:"IP Address added and settings applied successfully."}
+}>
 
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address you entered is invalid (Error Code: #m#)</cfoutput>
+<cfif StructKeyExists(_alerts, toString(m))>
+  <cfset _a = _alerts[toString(m)]>
+  <cfoutput>
+  <div class="alert alert-#_a.type# alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <cfif _a.type is "success">
+      <h4><i class="icon fa fa-check"></i> Success</h4>
+    <cfelse>
+      <h4><i class="icon fa fa-ban"></i> Error</h4>
+    </cfif>
+    #_a.msg#
   </div>
-
-  <cfset session.m = 0>
-
+  </cfoutput>
 </cfif>
 
-<cfif #m# is "2">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address you are attempting to edit already exists (Error Code: #m#)</cfoutput>
+<!-- FIREWALL STATUS CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-shield-alt"></i> Firewall Status</h3>
   </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "3">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You cannot delete the IP that you are accessing the system with while the Admin Console Firewall is enabled. Please disable the firewall and try the operation again (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "4">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You cannot edit the IP Address that you are accessing the system with while the Console Firewall is enabled. Please disable the firewall and try the operation again (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-
-<cfif #m# is "5">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>You cannot enable the Admin Console Firewall unless the IP you are accessing the system with is in the allowed IP address list below and <strong>Allow to Hermes Admin</strong> is set to <strong>YES</strong>  (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "6">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address you are attempting to add already exists (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-<cfif #m# is "7">
-
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-    <cfoutput>The IP Address you are attempting to add is invalid (Error Code: #m#)</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-
-</cfif>
-
-
-<cfif #m# is "33">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>IP Address Edited successfully. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
-
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-                           
-      <div class="text-center">
-      <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Apply Settings</button>
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="setfirewall">
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label"><strong>Firewall Status</strong></label>
+            <select class="form-select" name="firewall_status">
+              <option value="enabled" <cfif firewall_status is "enabled">selected</cfif>>Enabled (Only Specified IP Addresses Allowed)</option>
+              <option value="disabled" <cfif firewall_status is "disabled">selected</cfif>>Disabled (All IP Addresses Allowed)</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-3 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
+            <i class="fas fa-save"></i> Save &amp; Apply
+          </button>
+        </div>
       </div>
-      </form>
-
+    </form>
   </div>
+</div>
 
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "34">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>IP Address Deleted successfully. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect.</cfoutput><br><br>
-
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-                           
-      <div class="text-center">
-      <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Apply Settings</button>
-      </div>
-      </form>
-
+<!-- ALLOWED IPs CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-list"></i> Allowed IP Addresses</h3>
   </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "35">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Admin Console Firewall was Enabled successfully. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect. </cfoutput><br><br>
-
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-                           
-      <div class="text-center">
-      <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Apply Settings</button>
-      </div>
-      </form>
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "36">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The Admin Console Firewall was Disabled successfully. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect. </cfoutput><br><br>
-
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-                           
-      <div class="text-center">
-      <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Apply Settings</button>
-      </div>
-      </form>
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "37">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>The IP Address was added successfully. You must click on the <strong>Apply Settings</strong> button below for the changes to take effect. </cfoutput><br><br>
-
-    <form action="" method="post">
-      <input type="hidden" name="action" value="apply">
-                           
-      <div class="text-center">
-      <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">Apply Settings</button>
-      </div>
-      </form>
-
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-<cfif #m# is "38">
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Admin Console Firewall Settings applied successfully.</cfoutput>
-  </div>
-
-  <cfset session.m = 0>
-  
-</cfif>
-
-
-<!--- ERROR MESSAGES END HERE --->
-
-
-
-<span>
-  <p> 
-
-
-<!--- ADD IP BUTTON STARTS HERE --->
-<cfoutput>
-<a href="##addip_modal"  class="btn btn-primary" role="button" data-bs-toggle="modal" data-recipient="" data-recipientemail=""><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Add IP Address</a>
-</cfoutput>
-<!--- ADD IP BUTTON ENDS HERE --->
-
-</p>
-
-
-</span>
-
-<div class="card col-sm-8">
   <div class="card-body">
 
-<form name="SetFirewall" method="post">
-
-  <input type="hidden" name="action" value="setfirewall">
-
-  <div class="col-sm-6">
-   <div class="form-group">
-            <label><strong>Firewall Status</strong></label>
-
-            <select class="form-control" name="firewall_status" style="width: 100%;" id="firewall_status">
-
-              <cfif #firewall_status# is "enabled">
-
-                <option value="enabled" selected>Enabled (Only Specified IP Addresses Allowed)</option>
-                <option value="disabled">Disabled (All IP Addresses Allowed)</option>
-
-              <cfelseif #firewall_status# is "disabled">
-
-                <option value="enabled">Enabled (Only Specified IP Addresses Allowed)</option>
-                <option value="disabled" selected>Disabled (All IP Addresses Allowed)</option>
-
-              <cfelse>
-
-                <cfset step=0>
-                <cfset m="Admin Console Firewall: firewall_status is not enabled or disabled">
-                <cfinclude template="./inc/error.cfm">
-                <cfabort>
-
-              <!--- /CFIF #firewall_status# is --->
-              </cfif>
-
-                </select>
-
-              </div>
+    <div class="callout callout-warning mb-3">
+      <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i> IP Addresses below are only enforced when the <strong>Firewall Status</strong> is set to <strong>Enabled</strong>. Changes are applied immediately.</p>
     </div>
 
-
-  <div class="col-sm-4">
-
-  <input type="submit" class="btn btn-primary" name="" value="Submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-  </div>
-
-  </form>
-
-  </div>
-</div>
-
-
-
-<!--- ADD IP MODAL HTML STARTS HERE --->
-
-<div class="modal fade" id="addip_modal" tabindex="-1" role="dialog" aria-labelledby="AddIpModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-primary">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Add IP Address </h4>
-</div>
-  
-<div class="modal-body">
-  <!---
-  <p>Are you sure you send to delete this Certificate? This action is irreversible! </p>
-  --->
-
-  <form name="AddIpAddress" autocomplete="off" method="post">
-
-    <input type="hidden" name="action" value="addip">
-
-    <cfoutput>
-      <div class="form-group">
-        <label for="username"><strong>IP Address</strong></label>
-        <input type="text" class="form-control" name="ip_address" value="" id="ip_address" placeholder="IP Address" maxLength="20">
+    <!-- ADD IP FORM -->
+    <form method="post" autocomplete="off" class="mb-4">
+      <input type="hidden" name="action" value="addip">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label"><strong>IP Address</strong></label>
+            <input type="text" class="form-control" name="ip_address" placeholder="192.168.1.100" maxlength="20">
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Hermes Admin</strong></label>
+            <select class="form-select" name="ip_hermesadmin">
+              <option value="yes" selected>YES</option>
+              <option value="no">NO</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Ciphermail Admin</strong></label>
+            <select class="form-select" name="ip_ciphermailadmin">
+              <option value="yes" selected>YES</option>
+              <option value="no">NO</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label"><strong>Note</strong></label>
+            <input type="text" class="form-control" name="ip_note" placeholder="Optional note" maxlength="255">
+          </div>
+        </div>
+        <div class="col-md-2 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
+            <i class="fas fa-plus"></i> Add
+          </button>
+        </div>
       </div>
-      </cfoutput>
+    </form>
 
-      
-        <div class="form-group">
-          <label><strong>Allow to Hermes Admin</strong></label>
-            
-          <select class="form-control" name="ip_hermesadmin" data-placeholder="hermesadmin" style="width: 100%;" id="hermesadmin">
-             
-              <option value="yes" selected>YES</option>
-              <option value="no">NO</option>
-           
-              </select>   
-            
-            </div>
-
-                  
-        <div class="form-group">
-          <label><strong>Allow to Ciphermail Admin</strong></label>
-            
-          <select class="form-control" name="ip_ciphermailadmin" data-placeholder="ciphermailadmin" style="width: 100%;"  id="ciphermailadmin">
-             
-              <option value="yes" selected>YES</option>
-              <option value="no">NO</option>
-           
-              </select>   
-            
-            </div>
-            
-
-            <cfoutput>
-              <div class="form-group">
-                <label><strong>Note</strong></label>
-                <input type="text" class="form-control" name="ip_note" value="" id="ip_note" placeholder="Enter Note" maxLength="255">
-              </div>
-              </cfoutput>
-
-    <div>&nbsp;</div>
-
-    <input type="submit" value="Submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  </form>
-
-</div>
-
-
-<div class="modal-footer">
- 
-<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
-
-</div>
-    </div>
-  </div>
-</div>
-<!--- ADD IP MODAL HTML ENDS HERE --->
-
-
-
-<!--- DELETE IP MODAL HTML STARTS HERE --->
-   
-
-<div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="deleteCertificateModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-danger">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Delete IP Address </h4>
-</div>
-  
-<div class="modal-body">
-  <p>Are you sure you send to delete this IP Address from the Admin Console Firewall? This action is irreversible! </p>
-
-</div>
-<div class="modal-footer">
-  <form name="DeleteIpAddress" method="post">
-
-    <input type="hidden" name="action" value="deleteip">
-    <input type="hidden" name="ip_id" value=""/>
-    <input type="submit" value="Yes" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-   
-    
-</form>
-  <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No</button>
-</div>
-    </div>
-  </div>
-</div>
-<!--- DELETE IP MODAL HTML ENDS HERE --->
-
-
-<!--- EDIT IP MODAL HTML STARTS HERE --->
-
-<div class="modal fade" id="editip_modal" tabindex="-1" role="dialog" aria-labelledby="editIpModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-primary">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Edit IP Address </h4>
-</div>
-  
-<div class="modal-body">
-  <!---
-  <p>Are you sure you send to delete this Certificate? This action is irreversible! </p>
-  --->
-
-  <form name="EditIpAddress" autocomplete="off" method="post">
-
-    <input type="hidden" name="action" value="editip">
-    <input type="hidden" name="ip_id" value=""/>
-
-    <cfoutput>
-      <div class="form-group">
-        <label for="username"><strong>IP Address</strong></label>
-        <input type="text" class="form-control" name="ip_address" value="" id="ip_address" placeholder="IP Address" maxLength="20">
+    <!-- IP TABLE -->
+    <cfif getfirewallips.recordcount GTE 1>
+      <table id="firewallTable" class="table table-bordered table-hover table-striped" style="width:100%">
+        <thead>
+          <tr>
+            <th>IP Address</th>
+            <th>Hermes Admin</th>
+            <th>Ciphermail Admin</th>
+            <th>Note</th>
+            <th style="width: 12%">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <cfoutput query="getfirewallips">
+            <tr>
+              <td>#encodeForHTML(ip)#</td>
+              <td>
+                <cfif hermesadmin is "yes"><span class="badge bg-success">YES</span>
+                <cfelse><span class="badge bg-secondary">NO</span></cfif>
+              </td>
+              <td>
+                <cfif ciphermailadmin is "yes"><span class="badge bg-success">YES</span>
+                <cfelse><span class="badge bg-secondary">NO</span></cfif>
+              </td>
+              <td>#encodeForHTML(note)#</td>
+              <td>
+                <button type="button" class="btn btn-sm btn-primary" title="Edit"
+                  onclick="openEditModal('#id#', '#encodeForJavaScript(ip)#', '#encodeForJavaScript(note)#', '#encodeForJavaScript(hermesadmin)#', '#encodeForJavaScript(ciphermailadmin)#');">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" title="Delete"
+                  onclick="openDeleteModal('#id#', '#encodeForJavaScript(ip)#');">
+                  <i class="fas fa-trash-alt"></i>
+                </button>
+              </td>
+            </tr>
+          </cfoutput>
+        </tbody>
+      </table>
+    <cfelse>
+      <div class="alert alert-info">
+        <i class="icon fa fa-info-circle"></i> No IP addresses configured.
       </div>
-      </cfoutput>
+    </cfif>
 
-      
-        <div class="form-group">
-          <label><strong>Allow to Hermes Admin</strong></label>
-            
-          <select class="form-control" name="ip_hermesadmin" data-placeholder="hermesadmin" style="width: 100%;" id="hermesadmin">
-             
-              <option value="yes" selected>YES</option>
-              <option value="no">NO</option>
-           
-              </select>   
-            
-            </div>
+  </div>
+</div>
 
-                  
-        <div class="form-group">
-          <label><strong>Allow to Ciphermail Admin</strong></label>
-            
-          <select class="form-control" name="ip_ciphermailadmin" data-placeholder="ciphermailadmin" style="width: 100%;"  id="ciphermailadmin">
-             
-              <option value="yes" selected>YES</option>
-              <option value="no">NO</option>
-           
-              </select>   
-            
-            </div>
-            
+      </div>
+    </div>
+  </main>
 
-            <cfoutput>
-              <div class="form-group">
-                <label><strong>Note</strong></label>
-                <input type="text" class="form-control" name="ip_note" value="" id="ip_note" placeholder="Enter Note" maxLength="255">
-              </div>
-              </cfoutput>
-
-    <div>&nbsp;</div>
-
-    <input type="submit" value="Submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  </form>
+  <cfinclude template="./inc/main_footer.cfm" />
 
 </div>
 
-
-<div class="modal-footer">
- 
-<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
-
-</div>
+<!-- EDIT IP MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="editip">
+        <input type="hidden" name="ip_id" id="edit_ip_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit IP Address</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label"><strong>IP Address</strong></label>
+            <input type="text" class="form-control" name="ip_address" id="edit_ip_address" maxlength="20" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Allow to Hermes Admin</strong></label>
+            <select class="form-select" name="ip_hermesadmin" id="edit_hermesadmin">
+              <option value="yes">YES</option>
+              <option value="no">NO</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Allow to Ciphermail Admin</strong></label>
+            <select class="form-select" name="ip_ciphermailadmin" id="edit_ciphermailadmin">
+              <option value="yes">YES</option>
+              <option value="no">NO</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Note</strong></label>
+            <input type="text" class="form-control" name="ip_note" id="edit_note" maxlength="255">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
-<!--- EDIT IP MODAL HTML ENDS HERE --->
 
-<!--- ACTIONS START HERE --->
-
-<cfif #action# is "editip">
-
-  <cfinclude template="./inc/validate_ip_address.cfm">
-
-  <!--- VALIDATE PARAMETERS BELOW --->
-
-  <!--- FORM.IP_ID --->
-  <cfif NOT StructKeyExists(form, "ip_id")>
-
-    <cfset step=0>
-    <cfset m="Edit Firewall IP: form.ip_id does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif StructKeyExists(form, "ip_id")>
-
-      <cfif #form.ip_id# is "">
-
-        
-    <cfset step=0>
-    <cfset m="Edit Firewall IP: form.ip_id is blank">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif #form.ip_id# is not "">
-
-      <cfquery name="getipaddress" datasource="hermes">
-        select * from firewall where id=<cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-        </cfquery>
-        
-
-    <cfif #getipaddress.recordcount# LT 1>
-
-    <cfset step=0>
-    <cfset m="Edit Firewall IP: getipaddress.recordcount LT 1">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-  <!--- /CFIF  #getipaddress.recordcount# LT 1 --->
-  </cfif>
-
-
-    <!--- /CFIF   #form.ip_id# is "" --->
-    </cfif>
-
-    <!--- /CFIF  StructKeyExists(form, "ip_id") --->
-    </cfif>
-
-
-  <!--- FORM.IP_ADDRESS --->
-  
-  <cfif NOT StructKeyExists(form, "ip_address")>
-  
-  <cfset m="Edit Firewall IP: form.ip_address does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-  
-  <cfelseif StructKeyExists(form, "ip_address")>
-
-<!--- COMPARE FORM.IP_ADDRESS AGAINST IP REGEX PATTERN FROM ABOVE  --->
-<cfif REFind(pattern,form.ip_address) GT 0>
-
-<cfquery name="checkipaddress" datasource="hermes">
-select id, ip from firewall where ip = '#form.ip_address#' and id <> <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-<cfif #checkipaddress.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=2>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF #checkipaddress.recordcount# GTE 1 --->
-</cfif>
-
-<cfelse>
-
-<cfset step=0>
-<cfset session.m=1>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF REFind(pattern,form.ip_address) GT 0 --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_address") --->  
-</cfif>
-
-<!--- FORM.IP_ADDRESS --->
-  
-
-<cfif NOT StructKeyExists(form, "ip_hermesadmin")>
-  
-  <cfset m="Edit Firewall IP: form.ip_hermesadmin does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "ip_hermesadmin")>
-
-<cfif #form.ip_hermesadmin# is "yes" OR #form.ip_hermesadmin# is "no">
-
-<cfelse>
-
-  <cfset m="Edit Firewall IP: form.hermesadmin is not yes or no">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- /CFIF #form.ip_hermesadmin# is "yes" OR #form.ip_hermesadmin# is "no" --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_hermesadmin") --->  
-</cfif>
-
-
-<cfif NOT StructKeyExists(form, "ip_ciphermailadmin")>
-  
-  <cfset m="Edit Firewall IP: form.ip_ciphermailadmin does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "ip_ciphermailadmin")>
-
-<cfif #form.ip_ciphermailadmin# is "yes" OR #form.ip_ciphermailadmin# is "no">
-
-<cfelse>
-
-  <cfset m="Edit Firewall IP: form.ciphermailadmin is not yes or no">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- /CFIF #form.ip_ciphermailadmin# is "yes" OR #form.ip_ciphermailadmin# is "no" --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_ciphermailadminadmin") --->  
-</cfif>
-
-  <!--- VALIDATE PARAMETERS ABOVE --->
-
-<!--- GET FIREWALL IP --->
-
-<cfquery name="getip" datasource="hermes">
-  select ip from firewall
-  where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-  </cfquery>
-
-<cfif #getip.recordcount# GTE 1>
-
-<cfset compare_ip = Compare(#getip.ip#, #ClientIP#)>
-
-<cfif #compare_ip# is "1" OR #compare_ip# is "-1">
-
-  <cfquery name="updateipaddress" datasource="hermes">
-    update firewall
-    set 
-    ip = '#trim(form.ip_address)#',
-    hermesadmin = '#form.ip_hermesadmin#',
-    ciphermailadmin = '#form.ip_ciphermailadmin#',
-    note = '#form.ip_note#'
-    where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-    </cfquery>
-
-    
-    <cfset session.m = 33>
-    <cfoutput>
-    <cflocation url="view_console_firewall.cfm" addtoken="no">
-    </cfoutput>
-
-  <cfelse>
-
-<cfif #firewall_status# is "enabled">
-
-    <cfset session.m = 4>
-    <cfoutput>
-    <cflocation url="view_console_firewall.cfm" addtoken="no">
-    </cfoutput>
-
-  <cfelse>
-
-    <cfquery name="updateipaddress" datasource="hermes">
-      update firewall
-      set 
-      ip = '#trim(form.ip_address)#',
-      hermesadmin = '#form.ip_hermesadmin#',
-      ciphermailadmin = '#form.ip_ciphermailadmin#',
-      note = '#form.ip_note#'
-      where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-      </cfquery>
-      
-      <cfset session.m = 33>
-      <cfoutput>
-      <cflocation url="view_console_firewall.cfm" addtoken="no">
-      </cfoutput>
-      
-<!--- /CFIF #firewall_status# is --->
-  </cfif>
-
-<!--- /CFIF #compare_ip# is "1" or #compare_ip# is "-1" --->
-  </cfif>
-
-<!--- /CFIF #getip.recordcount# GTE 1 --->
-</cfif>
-
-
-<cfelseif #action# is "addip">
-
-  <cfinclude template="./inc/validate_ip_address.cfm">
-
-  <!--- VALIDATE PARAMETERS BELOW --->
-
-<!--- FORM.IP_ADDRESS --->
-  
-  <cfif NOT StructKeyExists(form, "ip_address")>
-  
-  <cfset m="Add Firewall IP: form.ip_address does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-  
-  <cfelseif StructKeyExists(form, "ip_address")>
-
-<!--- COMPARE FORM.IP_ADDRESS AGAINST IP REGEX PATTERN FROM ABOVE  --->
-<cfif REFind(pattern,form.ip_address) GT 0>
-
-<cfquery name="checkipaddress" datasource="hermes">
-select ip from firewall where ip = '#form.ip_address#'
-</cfquery>
-
-<cfif #checkipaddress.recordcount# GTE 1>
-
-<cfset step=0>
-<cfset session.m=6>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF #checkipaddress.recordcount# GTE 1 --->
-</cfif>
-
-<cfelse>
-
-<cfset step=0>
-<cfset session.m=7>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF REFind(pattern,form.ip_address) GT 0 --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_address") --->  
-</cfif>
-
-<!--- FORM.IP_ADDRESS --->
-  
-
-<cfif NOT StructKeyExists(form, "ip_hermesadmin")>
-  
-  <cfset m="Add Firewall IP: form.ip_hermesadmin does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "ip_hermesadmin")>
-
-<cfif #form.ip_hermesadmin# is "yes" OR #form.ip_hermesadmin# is "no">
-
-<cfelse>
-
-  <cfset m="Add Firewall IP: form.hermesadmin is not yes or no">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- /CFIF #form.ip_hermesadmin# is "yes" OR #form.ip_hermesadmin# is "no" --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_hermesadmin") --->  
-</cfif>
-
-
-<cfif NOT StructKeyExists(form, "ip_ciphermailadmin")>
-  
-  <cfset m="Add Firewall IP: form.ip_ciphermailadmin does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "ip_ciphermailadmin")>
-
-<cfif #form.ip_ciphermailadmin# is "yes" OR #form.ip_ciphermailadmin# is "no">
-
-<cfelse>
-
-  <cfset m="Add Firewall IP: form.ciphermailadmin is not yes or no">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- /CFIF #form.ip_ciphermailadmin# is "yes" OR #form.ip_ciphermailadmin# is "no" --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "ip_ciphermailadminadmin") --->  
-</cfif>
-
-  <!--- VALIDATE PARAMETERS ABOVE --->
-
-
-    <cfquery name="insertipaddress" datasource="hermes">
-     insert into firewall
-     (ip, hermesadmin, ciphermailadmin, note)
-     values
-     ('#form.ip_address#', '#form.ip_hermesadmin#', '#form.ip_ciphermailadmin#', '#form.ip_note#')
-      </cfquery>
-      
-      <cfset session.m = 37>
-      <cfoutput>
-      <cflocation url="view_console_firewall.cfm" addtoken="no">
-      </cfoutput>
-
-<cfelseif #action# is "deleteip">
-
-   <!--- FORM.IP_ID --->
-   <cfif NOT StructKeyExists(form, "ip_id")>
-
-    <cfset step=0>
-    <cfset m="Delete Firewall IP: form.ip_id does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif StructKeyExists(form, "ip_id")>
-
-      <cfif #form.ip_id# is "">
-
-        
-    <cfset step=0>
-    <cfset m="Delete Firewall IP: form.ip_id is blank">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <cfelseif #form.ip_id# is not "">
-
-      <cfquery name="getipaddress" datasource="hermes">
-        select * from firewall where id=<cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-        </cfquery>
-        
-
-    <cfif #getipaddress.recordcount# LT 1>
-
-    <cfset step=0>
-    <cfset m="Delete Firewall IP: getipaddress.recordcount LT 1">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-  <!--- /CFIF  #getipaddress.recordcount# LT 1 --->
-  </cfif>
-
-
-    <!--- /CFIF   #form.ip_id# is "" --->
-    </cfif>
-
-    <!--- /CFIF  StructKeyExists(form, "ip_id") --->
-    </cfif>
-
-<!--- GET FIREWALL IP --->
-
-<cfquery name="getip" datasource="hermes">
-  select ip from firewall
-  where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-  </cfquery>
-
-<cfif #getip.recordcount# GTE 1>
-
-<cfset compare_ip = Compare(#getip.ip#, #ClientIP#)>
-
-<cfif #compare_ip# is "1" OR #compare_ip# is "-1">
-
-    <cfquery name="deleteip" datasource="hermes">
-    delete from firewall
-    where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-    </cfquery>
-    
-    <cfset session.m = 34>
-    <cfoutput>
-    <cflocation url="view_console_firewall.cfm" addtoken="no">
-    </cfoutput>
-
-  <cfelse>
-
-  <cfif #firewall_status# is "enabled">
-
-    <cfset session.m = 3>
-    <cfoutput>
-    <cflocation url="view_console_firewall.cfm" addtoken="no">
-    </cfoutput>
-
-  <cfelse>
-
-    <cfquery name="deleteip" datasource="hermes">
-      delete from firewall
-      where id = <cfqueryparam value = #form.ip_id# CFSQLType = "CF_SQL_INTEGER">
-      </cfquery>
-      
-      <cfset session.m = 34>
-      <cfoutput>
-      <cflocation url="view_console_firewall.cfm" addtoken="no">
-      </cfoutput>   
-
-  <!--- /CFIF #firewall_status# is --->
-  </cfif>
-
-<!--- /CFIF #compare_ip# is "1" or #compare_ip# is "-1" --->
-  </cfif>
-
-<!--- /CFIF #getip.recordcount# GTE 1 --->
-</cfif>
-
-<cfelseif #action# is "setfirewall">
-
-  <!--- VALIDATE PARAMETERS BELOW --->
-
-
-<cfif NOT StructKeyExists(form, "firewall_status")>
-  
-  <cfset m="Set Admin Console Firewall: form.firewall_status does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "firewall_status")>
-
-<cfif #form.firewall_status# is "enabled" OR #form.firewall_status# is "disabled">
-
-<cfelse>
-
-  <cfset m="Set Admin Console Firewall: form.firewall_status is not enabled or disabled">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- /CFIF #form.firewall_status# is "enabled" OR #form.firewall_status# is "disabled" --->  
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "firewall_status") --->  
-</cfif>
-
-
-  <!--- VALIDATE PARAMETERS ABOVE --->
-
-<cfif #form.firewall_status# is "enabled">
-
-<cfquery name="checkcurrent" datasource="hermes">
-select ip from firewall where ip='#ClientIP#' and hermesadmin = 'yes'
-</cfquery>
-
-<cfif #checkcurrent.recordcount# LT 1>
-
-<cfset step=0>
-<cfset session.m=5>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<cfelse>
-
-<cfquery name="updatestatus" datasource="hermes">
-update parameters2 set value2='#form.firewall_status#' where parameter='firewall_status' and module='firewall' and active='1'
-</cfquery>
-
-<cfset step=0>
-<cfset session.m=35>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF checkcurrent.recordcount --->
-</cfif>
-
-<cfelseif #form.firewall_status# is "disabled">
-
-<cfquery name="updatestatus" datasource="hermes">
-update parameters2 set value2='#form.firewall_status#' where parameter='firewall_status' and module='firewall' and active='1'
-</cfquery>
-
-<cfset step=0>
-<cfset session.m=36>
-  
-<cfoutput>
-<cflocation url="view_console_firewall.cfm" addtoken="no">
-</cfoutput>
-
-<!--- /CFIF #form.firewall_status# is  --->
-</cfif>
- 
-
-<cfelseif #action# is "apply">
-
-<!--- Generate Nginx Configuration --->
-<cfinclude template="./inc/generate_nginx_configuration.cfm">
-
-<cfinclude template="preload_restart_nginx.cfm">
-
-<cfset step=0>
-<cfset session.m=38>
-
-<cflocation url="preload_restart_nginx.cfm" addtoken="no">
-  
-
- <!--- /CFIF FOR ACTION ---> 
-</cfif>
-
-  <!--- ACTIONS END HERE --->
-
-  <div class="alert alert-warning">
-    
-    <p><i class="icon fas fa-exclamation-triangle"></i>The IP Addresses listed below will not be in effect unless the <strong>Firewall Status</strong> above is set to <strong>Enabled</strong> </p>
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="deleteip">
+        <input type="hidden" name="ip_id" id="delete_ip_id" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete IP Address</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete <strong id="delete_ip_display"></strong> from the firewall? This action is irreversible!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        </div>
+      </form>
     </div>
-
-
-
-<cfif #getfirewallips.recordcount# GTE 1>
-        
-<table class="table table-striped"  id="sortTable" style="width:100%">
-  <thead>
-    <tr>
-      <th>Edit</th>    
-      <th>Delete</th>
-      <th>IP Address</th>
-      <th>Allow to Hermes Admin</th>
-      <th>Allow to Ciphermail Admin</th>
-      <th>Note</th>
-
-    </tr>
-  </thead>
-  <tbody>
-
-   
-<cfloop query="getfirewallips">
-
-  
-  <cfoutput>
-   
-    
-    <tr>
-
-
-      <td>
-
-        <button a href="##editip_modal"  type="button" id="delete" class="btn btn-secondary" data-bs-toggle="modal" data-ip="#id#" data-address="#ip#" data-note="#note#" data-hermesadmin="#hermesadmin#" data-ciphermailadmin="#ciphermailadmin#"><i class="fas fa-edit"></i></button>
-
-      </td>
-
-      <td>
-
-        <button a href="##delete_modal"  type="button" id="delete" class="btn btn-danger" data-bs-toggle="modal" data-ip="#id#"><i class="fas fa-trash-alt"></i></button>
-
-      </td>
-
-
-
-
-
-<td>#ip#</td>
-
-<td>
-<cfif #hermesadmin# is "yes">
-YES
-<cfelse>
-NO
-</cfif>
-
-</td>
-
-<td>
-<cfif #ciphermailadmin# is "yes">
-  YES
-  <cfelse>
-  NO
-  </cfif>
-</td>
-
-<td>#note#</td>
-
-
-
-
-    </cfoutput>
-
-
-
-  </tr>
-
-
-  </cfloop>
-  </tbody>
-  
-  <tfoot>
-    <tr>
-    
-      <th>Edit</th>    
-      <th>Delete</th>
-      <th>IP Address</th>
-      <th>Allow to Hermes Admin</th>
-      <th>Allow to Ciphermail Admin</th>
-      <th>Note</th>
-
-    </tr>
-  </tfoot>
- 
-</table>
-    
-    
-    <cfelseif #getfirewallips.recordcount# LT 1>
-    
-<div class="alert alert-danger alert-dismissible">
-  <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-  <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-  <cfoutput>No Admin Console Firewall IPs were found</strong></cfoutput>
+  </div>
 </div>
-    
-<!--- /CFIF FOR getfirewallips.recordcount --->
-    </cfif>
-    
-    
-   
-    
-  </div><!-- /.container-fluid -->
-</div>
-<!-- /.content -->
-</div>
-</main><!-- replaced content-wrapper -->
 
+<script>
+$(document).ready(function() {
+  $('#firewallTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
+    order: [[0, 'asc']],
+    columnDefs: [
+      { orderable: false, targets: [4] },
+      { searchable: false, targets: [4] }
+    ]
+  });
+});
 
-<cfinclude template="./inc/main_footer.cfm" />
+function openEditModal(id, ip, note, hermesadmin, ciphermailadmin) {
+  document.getElementById('edit_ip_id').value = id;
+  document.getElementById('edit_ip_address').value = ip;
+  document.getElementById('edit_note').value = note;
+  document.getElementById('edit_hermesadmin').value = hermesadmin;
+  document.getElementById('edit_ciphermailadmin').value = ciphermailadmin;
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
 
-<!-- ./wrapper -->
-
-
+function openDeleteModal(id, ip) {
+  document.getElementById('delete_ip_id').value = id;
+  document.getElementById('delete_ip_display').textContent = ip;
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
+</script>
 
 </body>
-
-<!--- EDIT IP MODAL SCRIPT STARTS HERE  --->
-<script>
-  $('#editip_modal').on('show.bs.modal', function(e) {
-var ip_id = $(e.relatedTarget).data('ip');
-$(e.currentTarget).find('input[name="ip_id"]').val(ip_id);
-
-var ip_address = $(e.relatedTarget).data('address');
-$(e.currentTarget).find('input[name="ip_address"]').val(ip_address);
-
-var ip_note = $(e.relatedTarget).data('note');
-$(e.currentTarget).find('input[name="ip_note"]').val(ip_note);
-
-var ip_hermesadmin = $(e.relatedTarget).data('hermesadmin');
-$(e.currentTarget).find('input[name="ip_hermesadmin"]').val(ip_hermesadmin);
-
-var ip_ciphermailadmin = $(e.relatedTarget).data('ciphermailadmin');
-$(e.currentTarget).find('input[name="ip_ciphermailadmin"]').val(ip_ciphermailadmin);
-
-  });
-
-
-    </script>
-
-<!--- EDIT IP MODAL SCRIPT ENDS HERE  --->
-
-<!--- DELETE IP MODAL SCRIPT STARTS HERE  --->
-<script>
-  $('#delete_modal').on('show.bs.modal', function(e) {
-var ip_id = $(e.relatedTarget).data('ip');
-$(e.currentTarget).find('input[name="ip_id"]').val(ip_id);
-  });
-    </script>
-
-<!--- DELETE IP MODAL SCRIPT ENDS HERE  --->
-
-
-
 </html>

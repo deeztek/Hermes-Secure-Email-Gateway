@@ -23,11 +23,15 @@
     fetch('/index.cfm')
       .then(response => {
         if (response.ok) {
+          <cfif StructKeyExists(url, "returnUrl") AND url.returnUrl is not "">
+            <cfoutput>window.location.href = '#encodeForJavaScript(url.returnUrl)#';</cfoutput>
+          <cfelse>
           if (document.referrer) {
             window.location.href = document.referrer;
           } else {
-            window.location.href = '/';
+            window.location.href = '/admin/2/';
           }
+          </cfif>
         } else {
           setTimeout(checkServerReadyAndRedirect, 1000); // retry in 1s if not OK
         }
