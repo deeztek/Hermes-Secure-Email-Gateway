@@ -42,19 +42,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- DERIVE MAIL DOMAIN FROM CONSOLE HOST (e.g., smtp-dev.deeztek.com → deeztek.com) --->
 <cfset ncMailDomain = ListRest(consoleHost, ".")>
 
-<!--- GET HOST IP (TODO: replace with dynamic resolution) --->
-<cfinclude template="docker_get_directory.cfm">
-<cffile action="read" file="#DockerDir#/.env" variable="envFile">
-<cfset ncHostIP = "">
-<cfloop list="#envFile#" delimiters="#chr(10)#" index="envLine">
-  <cfset envLine = Trim(envLine)>
-  <cfif Len(envLine) AND Left(envLine, 1) NEQ "##" AND Find("=", envLine)>
-    <cfset eqPos = Find("=", envLine)>
-    <cfif Left(envLine, eqPos - 1) EQ "HOST_IP">
-      <cfset ncHostIP = Mid(envLine, eqPos + 1, Len(envLine) - eqPos)>
-    </cfif>
-  </cfif>
-</cfloop>
+<!--- GET HOST IP from parameters2 (legacy server_ip field, managed from Server Identity page) --->
+<cfquery name="getHostIP" datasource="hermes">
+  SELECT value2 FROM parameters2 WHERE parameter = 'server_ip' AND module = 'network'
+</cfquery>
+<cfset ncHostIP = getHostIP.value2>
 
 <!--- READ EXISTING NEXTCLOUD CONFIG TO EXTRACT INSTALLATION-SPECIFIC VALUES --->
 <cfset ncPasswordSalt = "">

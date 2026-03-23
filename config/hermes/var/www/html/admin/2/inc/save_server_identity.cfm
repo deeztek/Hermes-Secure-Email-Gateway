@@ -30,8 +30,22 @@ Expects: form.server_domain, form.server_hostname
   <cflocation url="view_server_identity.cfm" addtoken="no">
 </cfif>
 
+<!--- Validate host IP if provided --->
+<cfparam name="form.host_ip" default="">
+<cfif trim(form.host_ip) is not "" AND NOT REFind("^(\d{1,3}\.){3}\d{1,3}$", trim(form.host_ip))>
+  <cfset session.m = 6>
+  <cflocation url="view_server_identity.cfm" addtoken="no">
+</cfif>
+
 <cfset ServerDomain = trim(form.server_domain)>
 <cfset ServerName = trim(form.server_hostname)>
+<cfset HostIP = trim(form.host_ip)>
+
+<!--- Update host IP in parameters2 --->
+<cfquery datasource="hermes">
+  UPDATE parameters2 SET value2 = <cfqueryparam cfsqltype="cf_sql_varchar" value="#HostIP#">
+  WHERE parameter = 'server_ip' AND module = 'network'
+</cfquery>
 
 <!--- Ensure parent parameters are enabled --->
 <cfquery datasource="hermes">

@@ -64,11 +64,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
     <!--- /CFIF #form.authentication_backend_disable_reset_password# is "true" OR #form.authentication_backend_disable_reset_password# is "false" --->
     </cfif>
-    
+
     <!--- /CFIF StructKeyExists(form, "authentication_backend_disable_reset_password") --->
     </cfif>
-    
-    
+
+    <!--- UPDATE RESET PASSWORD SETTING --->
+    <cfquery name="update_disable_reset_password" datasource="hermes">
+      UPDATE parameters2 SET value2 = '#form.authentication_backend_disable_reset_password#', applied = '2'
+      WHERE parameter = 'authentication_backend.disable_reset_password' AND module = 'authelia'
+    </cfquery>
+
+
     <cfif NOT StructKeyExists(form, "session_name")>
     
       <cfset m="Edit Authentication Settings: form.session_name does not exist">
@@ -650,10 +656,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                                                   <cfquery name="update" datasource="hermes">
                                                                   update parameters2 set value2='#form.duo_self_enrollment#', applied='2' where parameter='duo.self_enrollment'
                                                                   </cfquery>
-                                                                  
-                                                                                                                
+
+                                                                  <!--- UPDATE DUO INTEGRATION KEY (if provided) --->
+                                                                  <cfif StructKeyExists(form, "duo_integration_key") AND trim(form.duo_integration_key) is not "">
+                                                                    <cffile action="write" file="/opt/hermes/keys/authelia_duo_api_integration_key_file"
+                                                                      output="#trim(form.duo_integration_key)#" addnewline="no">
+                                                                  </cfif>
+
+                                                                  <!--- UPDATE DUO SECRET KEY (if provided) --->
+                                                                  <cfif StructKeyExists(form, "duo_secret_key") AND trim(form.duo_secret_key) is not "">
+                                                                    <cffile action="write" file="/opt/hermes/keys/authelia_duo_api_secret_key_file"
+                                                                      output="#trim(form.duo_secret_key)#" addnewline="no">
+                                                                  </cfif>
+
                                                                   <cfset step=12>
-                                                                  
+
                                                                   <!--- /CFIF step is 11 --->
                                                                   </cfif>
 

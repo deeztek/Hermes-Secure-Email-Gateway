@@ -80,8 +80,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   WHERE parent_name = 'myhostname' AND child = '1' AND module = 'postfix' AND conf_file = 'main.cf'
 </cfquery>
 
+<cfquery name="getHostIP" datasource="hermes">
+  SELECT value2 FROM parameters2 WHERE parameter = 'server_ip' AND module = 'network'
+</cfquery>
+
 <cfset currentDomain = getMyOrigin.parameter>
 <cfset currentHostname = getMyHostname.parameter>
+<cfset currentHostIP = getHostIP.value2>
 
 <cfset session.m = "">
 
@@ -121,6 +126,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     The Server Hostname is not a valid fully qualified domain name (FQDN).
   </div>
 </cfif>
+<cfif m is "6">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    The Host IP Address is not a valid IP address.
+  </div>
+</cfif>
 
 <!-- SERVER IDENTITY CARD -->
 <div class="card card-primary card-outline mb-4">
@@ -130,9 +142,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="card-body">
     <div class="callout callout-info mb-3">
       <p class="mb-0"><i class="icon fas fa-info-circle"></i>
-        These settings control how your mail server identifies itself to other mail servers.
-        The <strong>Server Domain</strong> is used as the origin domain for outgoing mail (Postfix <code>myorigin</code>).
+        These settings control how your mail server identifies itself.
+        The <strong>Server Domain</strong> is the origin domain for outgoing mail (Postfix <code>myorigin</code>).
         The <strong>Server Hostname</strong> is the FQDN used in SMTP banners and HELO/EHLO greetings (Postfix <code>myhostname</code>).
+        The <strong>Host IP Address</strong> is the IP address used to access the admin UI and is included in Nextcloud trusted domains.
       </p>
     </div>
 
@@ -163,6 +176,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <input type="text" class="form-control" name="server_hostname" value="#encodeForHTMLAttribute(currentHostname)#" placeholder="mail.example.com">
             </cfoutput>
             <div class="form-text">The fully qualified domain name of this mail server (e.g., <code>mail.example.com</code>)</div>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="mb-3">
+            <label class="form-label"><strong>Host IP Address</strong></label>
+            <cfoutput>
+            <input type="text" class="form-control" name="host_ip" value="#encodeForHTMLAttribute(currentHostIP)#" placeholder="192.168.1.100">
+            </cfoutput>
+            <div class="form-text">The IP address used to access the admin UI (set during install)</div>
           </div>
         </div>
       </div>

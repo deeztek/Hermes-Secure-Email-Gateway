@@ -257,7 +257,7 @@ services:
       CONSOLE_HOST: ${CONSOLE_HOST}
       #url_rewrites: "true"
     volumes:
-      - ./.env:/opt/hermes-seg-docker-gl/.env
+      - ./.env:/opt/hermes/.env:ro #.env mounted read-only for install-time values
       - /var/run/docker.sock:/var/run/docker.sock #Access Docker Unix socket
       - ./config/hermes/var/www/html:/var/www/html #Application Directory
       - commandbox_serverhome:/serverhome #Server Home Directory

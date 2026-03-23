@@ -19,8 +19,8 @@ server:
     csp_template: ""
 
 log:
-  level: debug
-  format: text
+  level: hermes_log_level
+  format: hermes_log_format
 
 telemetry:
   metrics:
@@ -57,7 +57,7 @@ ntp:
 
 authentication_backend:
   password_reset:
-    disable: false
+    disable: hermes_authentication_backend_disable_reset_password
     # Custom URL for password reset - uses Hermes SEG custom password reset flow
     custom_url: "https://hermes_access_control_domain/user-auth/forgot_password.cfm"
   refresh_interval: 5m
@@ -229,8 +229,8 @@ session:
     default_redirection_url: https://hermes_access_control_domain/admin/
     name: hermes_session
     same_site: lax
-    expiration: 0
-    inactivity: 3600
+    expiration: hermes_session_expiration
+    inactivity: hermes_session_inactivity
     remember_me: 1M
   redis:
     host: hermes_authelia_redis
@@ -238,9 +238,9 @@ session:
 
 
 regulation:
-  max_retries: 5
-  find_time: 120
-  ban_time: 300
+  max_retries: hermes_regulation_max_retries
+  find_time: hermes_regulation_find_time
+  ban_time: hermes_regulation_ban_time
 
 storage:
   # encryption_key is loaded via AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE environment variable

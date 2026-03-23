@@ -67,6 +67,10 @@ WHERE NOT EXISTS (
 DELETE FROM parameters
 WHERE module = 'network';
 
+-- 5b) Clean up legacy network module in parameters2 (keep server_ip for Host IP)
+DELETE FROM parameters2
+WHERE module = 'network' AND parameter <> 'server_ip';
+
 -- 6) For child rows, fill parent_name from the parent's parameter
 UPDATE parameters AS c
 JOIN parameters AS p
@@ -723,4 +727,6 @@ SELECT 'relay_host_username', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings
 
 INSERT INTO system_settings (parameter, value)
 SELECT 'relay_host_password', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'relay_host_password');
+
+
 
