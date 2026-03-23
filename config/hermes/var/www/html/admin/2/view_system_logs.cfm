@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
-  <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -21,787 +21,294 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <html lang="en">
 
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | System Logs</title>
-
-<cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script Default Sort by Column 4 Desc --->
-
-
-<!--- Sort Table Script  --->
-<script>
-  $(document).ready(function() {
-      $('#sortTable').DataTable( {
-        dom: 'Blfrtip',
-          buttons: [
-              'copy', 'csv', 'excel', 'pdf', 'print'
-          ],
-          stateSave: true,
-          lengthMenu: [
-            [ 50, 75, 100, -1 ],
-      [ '50 rows', '75 rows', '100 rows', 'Show all' ]
-  
-      ],
-      
-          "order": [[ 0, "desc" ]]
-      } );
-  } );
-    </script>
-
-  
-
-<script>
-
-  $(document).ready(function() {
-    $("#messageactions").click(function() {
-      var messageactions = [];
-      $.each($("input[name='mail_id']:checked"), function() {
-        messageactions.push($(this).val());
-      });
-      $('#messageactions_modal').modal('show').on('shown.bs.modal', function() {
-      $("#messageactionsid").html('<input type="hidden" name="mail_id" value=' + messageactions + '>');
-      });
-    });
-  });
-  
-  </script>
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-<!--- BACK TO TOP BUTTON STYLE ---> 
-<style>
-  #btn-back-to-top {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    display: none;
-  }
-  </style>
-
+  <cfinclude template="./inc/html_head.cfm" />
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <cfoutput>
             <h1 class="m-0">System Logs</h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-          </cfoutput>
-            
-          </div><!-- /.col -->
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item active">System Logs</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-    
-<!-- Back to top button -->
-<button
-type="button"
-class="btn btn-danger btn-floating btn-lg"
-id="btn-back-to-top"
->
-<i class="fas fa-arrow-up"></i>
-</button>
-    
-    <cfparam name = "errormessage" default = "0">
-    
-    <cfparam name = "m2" default = "0"> 
-    <cfif StructKeyExists(url, "m2")>
-    <cfif url.m2 is not "">
-    <cfset m2 = url.m2>
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
 
-    <!--- /CFIF for StructKeyExists --->
-  </cfif>
-  
-  <!--- /CFIF for url.m2 is not "" --->
-  </cfif>
-
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
+<cfif StructKeyExists(session, "m") AND session.m is not "">
   <cfset m = session.m>
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
+</cfif>
 
-  <!--- ENABLE FOR DEBUG BELOW --->
-  <!---
-  <cfoutput>#session.m#</cfoutput>
-  --->
-
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-
-    <cfparam name = "step" default = "0">
-    
-    <cfparam name = "action" default = ""> 
-    <cfif IsDefined("form.action") is "True">
-    <cfif form.action is not "">
-    <cfset action = form.action>
-    </cfif></cfif>  
-    
-  <cfset defaultenddate2=#DateFormat(Now(),"yyyy-mm-dd")#>
-  <cfset defaultendtime="23:59:59">
-  <cfset defaultenddate="#defaultenddate2# #defaultendtime#">
-  <cfset defaultstartdate=#DateAdd("h", -24, defaultenddate2)#>
-  <cfset defaultstartdate=#DateFormat(defaultstartdate,"yyyy-mm-dd")#>
-  <cfset defaultstarttime="00:00:00">
-  <cfset defaultstartdate="#defaultstartdate# #defaultstarttime#">
-
-
-  <!--- DEBUG ENABLE BELOW --->
-<!---
-  <cfoutput>Startdate: #defaultstartdate#<br>
-  Enddate: #defaultenddate#</cfoutput>
- --->
-
-    <cfparam name = "startdate" default = "#defaultstartdate#"> 
-    <cfif IsDefined("url.startdate") is "True">
-    <cfif url.startdate is not "">
-    <cfif isValid("date", #url.startdate#)> 
-    <cfset startdate = url.startdate>
-    <cfelseif NOT isValid("date", #url.startdate#)>
-
-    <cfset m="System Logs: url.startdate is invalid">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <!--- /CFIF NOT isValid("date", #url.startdate#) --->
-     </cfif>
-
-     <cfelseif url.startdate is "">
-
-     <cfset m="System Logs: url.startdate is empty">
-     <cfinclude template="./inc/error.cfm">
-     <cfabort>
-
-    <!--- /CFIF url.startdate is "" --->
-    </cfif>
-
-     <!--- /CFIF IsDefined("url.startdate") --->
-    </cfif>
-    
-    <cfparam name = "enddate" default = "#defaultenddate#"> 
-    <cfif IsDefined("url.enddate") is "True">
-    <cfif url.enddate is not "">
-    <cfif isValid("date", #url.enddate#)> 
-    <cfset enddate = url.enddate>
-    <cfelseif NOT isValid("date", #url.enddate#)>
-    
-    <cfset m="System Logs: url.enddate is invalid">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <!--- /CFIF NOT isValid("date", #url.enddate#) --->
-     </cfif>
-
-    <cfelseif url.enddate is "">
-
-      <cfset m="System Logs: url.enddate is empty">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-    <!--- /CFIF url.enddate is "" --->
-    </cfif>
-
-     <!--- /CFIF IsDefined("url.enddate") --->
-    </cfif>
-    
-
-
-    <cfparam name = "limit" default = "1000">
-
-    <cfif IsDefined("url.limit") is "True">
-
-    <cfif url.limit is not "">
-
-    <cfif #url.limit# is "1000" OR #url.limit# is "1500" OR #url.limit# is "2500" OR #url.limit# is "5000" OR #url.limit# is "10000" OR #url.limit# is "15000"> 
-
-    <cfset limit = url.limit>
-
-    <cfelse>
- 
-    <cfset m="System Logs: url.limit is not 1000, 1500, 2500, 5000, 10000 or 15000">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <!--- /CFIF #url.limit# is "1000" OR #url.limit# is "1500" OR #url.limit# is "2500" OR #url.limit# is "5000" OR #url.limit# is "10000" OR #url.limit# is "15000" --->
-     </cfif>
-
-    <cfelseif #limit# is "">
-
-    <cfset m="System Logs: url.limit is empty">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-    <!--- /CFIF url.limit is "" --->
-    </cfif>
-
-     <!--- /CFIF IsDefined("url.limit") --->
-    </cfif>
-
-
-<cfquery name="getlogs" datasource="syslog">
-  select ReceivedAt, Message, SysLogTag from SystemEvents where ReceivedAt between '#startdate#' and '#enddate#' order by ReceivedAt desc limit #limit#
-  </cfquery>
-
-  
-       <!--- ERROR MESSAGES START HERE --->
-  
-       
-        
-  
-
-       <cfif #m# is "1">
-        <div class="alert alert-success alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-check"></i> Success!</h4>
-          <cfoutput>Log Retention was set successfully </cfoutput><br> 
-        </div>
-
-              
-        <cfset session.m = 0>
-      
-      </cfif>
-
-     <!--- ERROR MESSAGES START HERE --->
-
-  
-  
- <cfif #action# is "Set Log Retention">
-
-
-<cfif NOT StructKeyExists(form, "logretention")>
-    
-    
-  <cfset m="Set Log Retention: form.logretention does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-
-
-<cfelseif StructKeyExists(form, "logretention")>
-
-  <cfif #form.logretention# is "">
-
-    <cfset m="Set Log Retention: form.logretention is empty">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-<cfelseif #form.logretention# is not "">
-
-<cfif isValid("integer", form.logretention)>
-
-  <cfquery name="setlogretention" datasource="hermes">
-    update parameters2 set value2 = <cfqueryparam value = #form.logretention# CFSQLType = "CF_SQL_INTEGER"> where parameter = 'system_log_retention' and module = 'systemlog'
+<!--- ACTION: Set Log Retention --->
+<cfif action is "save_retention">
+  <cfif StructKeyExists(form, "logretention") AND isValid("integer", form.logretention)>
+    <cfquery datasource="hermes">
+      UPDATE parameters2 SET value2 = <cfqueryparam value="#form.logretention#" cfsqltype="cf_sql_integer">
+      WHERE parameter = 'system_log_retention' AND module = 'systemlog'
     </cfquery>
-
-
-<cfset session.m = 1>
-
-<cflocation url="view_system_logs.cfm" addtoken="no">
-
-
-<cfelseif NOT isValid("integer", form.id)>
-
-<cfset m="Set Log Retention: form.logretention is not valid integer">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<!--- /CFIF isValid("integer", form.logretention) --->
-</cfif>
-
-  <!--- /CFIF #form.logretention# is "" --->
-</cfif>
-
-
-<!--- /CFIF StructKeyExists(form, "logretention") --->
-</cfif>
-
-
-
-    
-      <!--- /CFIF #action# is --->     
-    </cfif> 
-    
-    <span>
-      <p>  
-
-
-    <!--- RELOAD SYSTEM LOGS BUTTON STARTS HERE --->
-<a href="view_system_logs.cfm" class="btn btn-primary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Reload System Logs</a>
-
-<!--- RELOAD SYSTEM LOGS BUTTON ENDS HERE --->
-
-&nbsp;&nbsp;
-
-  </p>
-</span>
-
-
-
-<cfquery name="getlogretention" datasource="hermes">
-  select parameter, value2, module from parameters2 where parameter = 'system_log_retention'
-  </cfquery>
-  
-  
-  <cfparam name = "logretention" default = "#getlogretention.value2#"> 
-  
-  
-  
-  <div class="card col-sm-8">
-    
-    <!---
-    <div class="card-header border-1">
-  
-      <h3 class="card-title"><strong>Mail Queue Settings</strong></h3>
-  
-    <!--- class="card-header border-1" --->
-  </div>
-  --->
-  
-  <form name="logretention" method="post">
-  <input type="hidden" name="action" value="Set Log Retention">
-  
-  <div class="col-sm-6">
-     <div class="form-group">
-
-      <br>
-      <label><strong>Log Retention</strong></label>
-              
- 
-  
-  <cfoutput>
-    
-    <cfif #logretention# is "7">
-      <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="7" selected="selected">7 Days</option>
-     <option value="15">15 Days</option>
-    <option value="30">30 Days</option>
-    <option value="60">60 Days</option>
-    <option value="90">90 Days</option>
-    <option value="120">120 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-    
-  <cfelseif #logretention# is "15">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="15" selected="selected">15 Days</option>
-     <option value="7">7 Days</option>
-    <option value="30">30 Days</option>
-    <option value="60">60 Days</option>
-    <option value="90">90 Days</option>
-    <option value="120">120 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-  <cfelseif #logretention# is "30">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="30" selected="selected">30 Days</option>
-     <option value="7">7 Days</option>
-    <option value="15">15 Days</option>
-    <option value="60">60 Days</option>
-    <option value="90">90 Days</option>
-    <option value="120">120 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-  <cfelseif #logretention# is "60">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="60" selected="selected">60 Days</option>
-     <option value="7">7 Days</option>
-    <option value="15">15 Days</option>
-    <option value="30">30 Days</option>
-    <option value="90">90 Days</option>
-    <option value="120">120 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-  <cfelseif #logretention# is "90">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="90" selected="selected">90 Days</option>
-     <option value="7">7 Days</option>
-    <option value="15">15 Days</option>
-    <option value="30">30 Days</option>
-    <option value="60">60 Days</option>
-    <option value="120">120 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-  <cfelseif #logretention# is "120">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="120" selected="selected">120 Days</option>
-     <option value="7">7 Days</option>
-    <option value="15">15 Days</option>
-    <option value="30">30 Days</option>
-    <option value="60">60 Days</option>
-    <option value="90">90 Days</option>
-    <option value="180">180 Days</option>
-    </select>
-  
-  <cfelseif #logretention# is "180">
-    <select class="form-control" name="logretention" style="width: 100%;" id="logretention">
-  <option value="180" selected="selected">180 Days</option>
-     <option value="7">7 Days</option>
-      <option value="15">15 Days</option>
-    <option value="30">30 Days</option>
-    <option value="60">60 Days</option>
-    <option value="90">90 Days</option>
-    <option value="120">120 Days</option>
-    </select>
-  
-  
+    <cfset session.m = 1>
   </cfif>
-  
-  </cfoutput>
-     
-  
-                </div>
-      </div>
-    
-    
-    <div class="col-sm-6">
-    
-    <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-    </div>
-      
-    </form>  
-    
-  <br>
-  
-    <!--- div class="card"  --->  
-  </div>
-  
-  <div class="card col-sm-8">
-    
-    <!---
-    <div class="card-header border-1">
-  
-      <h3 class="card-title"><strong>Mail Queue Settings</strong></h3>
-  
-    <!--- class="card-header border-1" --->
-  </div>
-  --->
-  
-  <br>
-  
+  <cflocation url="view_system_logs.cfm" addtoken="no">
+</cfif>
 
-<form>
+<!--- Default date range: last 24 hours --->
+<cfset defaultenddate = DateFormat(Now(), "yyyy-mm-dd") & " 23:59:59">
+<cfset defaultstartdate = DateFormat(DateAdd("h", -24, Now()), "yyyy-mm-dd") & " 00:00:00">
 
-<div class="col-sm-6">
-  <label>Start Date/Time</label>
-    <div class="form-group">
-        <div class="input-group" id="startdatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
-          <cfoutput>
-            <input type="text" name="startdate" value="#startdate#" class="form-control" data-td-target="##startdatetime"/>
-          </cfoutput>
-            <span class="input-group-text" data-td-target="#startdatetime" data-td-toggle="datetimepicker">
-                <i class="fa fa-calendar"></i>
-            </span>
-        </div>
-    </div>
+<!--- Read URL parameters with validation --->
+<cfparam name="url.startdate" default="#defaultstartdate#">
+<cfparam name="url.enddate" default="#defaultenddate#">
+<cfparam name="url.limit" default="1000">
+<cfparam name="url.facility" default="">
+
+<cfset startdate = url.startdate>
+<cfset enddate = url.enddate>
+<cfset limit = url.limit>
+<cfset facility = url.facility>
+
+<!--- Validate dates --->
+<cfif NOT isValid("date", startdate)><cfset startdate = defaultstartdate></cfif>
+<cfif NOT isValid("date", enddate)><cfset enddate = defaultenddate></cfif>
+
+<!--- Validate limit --->
+<cfset validLimits = "1000,1500,2500,5000,10000,15000">
+<cfif NOT ListFindNoCase(validLimits, limit)><cfset limit = 1000></cfif>
+
+<!--- Get distinct facilities for filter dropdown --->
+<cfquery name="getFacilities" datasource="syslog">
+  SELECT DISTINCT SUBSTRING_INDEX(SysLogTag, '[', 1) AS facility
+  FROM SystemEvents
+  WHERE ReceivedAt BETWEEN <cfqueryparam value="#startdate#" cfsqltype="cf_sql_timestamp">
+    AND <cfqueryparam value="#enddate#" cfsqltype="cf_sql_timestamp">
+  ORDER BY facility ASC
+</cfquery>
+
+<!--- Get logs with optional facility filter --->
+<cfquery name="getlogs" datasource="syslog">
+  SELECT ReceivedAt, Message, SysLogTag FROM SystemEvents
+  WHERE ReceivedAt BETWEEN <cfqueryparam value="#startdate#" cfsqltype="cf_sql_timestamp">
+    AND <cfqueryparam value="#enddate#" cfsqltype="cf_sql_timestamp">
+  <cfif facility is not "">
+    AND SysLogTag LIKE <cfqueryparam value="#facility#%" cfsqltype="cf_sql_varchar">
+  </cfif>
+  ORDER BY ReceivedAt DESC
+  LIMIT <cfqueryparam value="#limit#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<!--- Get log retention setting --->
+<cfquery name="getlogretention" datasource="hermes">
+  SELECT value2 FROM parameters2 WHERE parameter = 'system_log_retention' AND module = 'systemlog'
+</cfquery>
+<cfset logretention = getlogretention.value2>
+
+<cfset session.m = "">
+
+<!--- ALERTS --->
+<cfif m is "1">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    Log retention saved successfully.
   </div>
+</cfif>
 
-  <div class="col-sm-6">
-    <label>End Date/Time</label>
-      <div class="form-group">
-          <div class="input-group" id="enddatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
-            <cfoutput>
-              <input type="text" name="enddate" value="#enddate#" class="form-control" data-td-target="##enddatetime"/>
-            </cfoutput>
-              <span class="input-group-text" data-td-target="#enddatetime" data-td-toggle="datetimepicker">
-                  <i class="fa fa-calendar"></i>
-              </span>
+<!-- LOG RETENTION CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-cog"></i> Log Retention</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="save_retention">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label"><strong>Retention Period</strong></label>
+            <select class="form-select" name="logretention">
+              <cfloop list="7,15,30,60,90,120,180" index="d">
+                <cfoutput><option value="#d#" <cfif logretention is d>selected</cfif>>#d# Days</option></cfoutput>
+              </cfloop>
+            </select>
           </div>
+        </div>
+        <div class="col-md-3 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+            <i class="fas fa-save"></i> Save
+          </button>
+        </div>
       </div>
-    </div>
-
-  <script type="text/javascript">
-    document.addEventListener('DOMContentLoaded', function() {
-      var pickerOptions = {
-        display: {
-          sideBySide: true,
-          components: {
-            clock: true,
-            seconds: true
-          }
-        },
-        localization: {
-          format: 'yyyy-MM-dd HH:mm:ss',
-          dayViewHeaderFormat: { month: 'long', year: 'numeric' }
-        }
-      };
-
-      new tempusDominus.TempusDominus(document.getElementById('startdatetime'), pickerOptions);
-      new tempusDominus.TempusDominus(document.getElementById('enddatetime'), pickerOptions);
-    });
-  </script>
-
-<div class="form-group col-sm-6">
-  <label>Search Results Limit</label>
-  <div class="alert alert-warning">
-<!---
-    <h6><i class="icon fas fa-exclamation-triangle"></i> Warning!</h6>
---->
-    <p><i class="icon fas fa-exclamation-triangle"></i>Setting Search Results Limit to 10000 or 15000 will <strong>significantly</strong> increase the page loading time </p>
-    </div>
-  <div class="input-group">
-
-    <select class="form-control" name="limit" data-placeholder="limit">   
-      <cfoutput>          
-      <option value="#limit#" selected="selected">#limit#</option>
-    </cfoutput>    
-     
-      <cfif #limit# is "1000">
-
-      <option value="1500">1500</option>
-      <option value="2500">2500</option>
-      <option value="5000">5000</option>
-      <option value="10000">10000</option>
-      <option value="15000">15000</option>
-
-      <cfelseif #limit# is "1500">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "2500">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "5000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="10000">10000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "10000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="15000">15000</option>
-
-      <cfelseif #limit# is "15000">
-
-        <option value="1000">1000 (Default)</option>
-        <option value="1500">1500</option>
-        <option value="2500">2500</option>
-        <option value="5000">5000</option>
-        <option value="10000">10000</option>
-
-<!--- /CFIF #limit# is --->
-      </cfif>
-
-      </select> 
-
-
-  
-  <!--- /div class="input-group" --->
+    </form>
   </div>
-  
-  <!--- /div class="input-group" --->
-  </div>
-
-<div class="col-sm-6">
-
-<input type="submit" class="btn btn-primary" name="" value="Fetch Logs" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
 </div>
-  
-<br>
 
-</form>
-
-
-    <!--- div class="card"  --->  
+<!-- LOG VIEWER CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-file-alt"></i> System Logs</h3>
   </div>
+  <div class="card-body">
 
-  <br>
+    <!-- FILTER FORM -->
+    <form method="get" autocomplete="off" class="mb-4">
+      <div class="row">
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label"><strong>Start Date/Time</strong></label>
+            <div class="input-group" id="startdatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
+              <cfoutput>
+              <input type="text" name="startdate" value="#startdate#" class="form-control" data-td-target="##startdatetime"/>
+              </cfoutput>
+              <span class="input-group-text" data-td-target="#startdatetime" data-td-toggle="datetimepicker">
+                <i class="fa fa-calendar"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="mb-3">
+            <label class="form-label"><strong>End Date/Time</strong></label>
+            <div class="input-group" id="enddatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
+              <cfoutput>
+              <input type="text" name="enddate" value="#enddate#" class="form-control" data-td-target="##enddatetime"/>
+              </cfoutput>
+              <span class="input-group-text" data-td-target="#enddatetime" data-td-toggle="datetimepicker">
+                <i class="fa fa-calendar"></i>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Facility</strong></label>
+            <select class="form-select" name="facility">
+              <option value="">All Facilities</option>
+              <cfoutput query="getFacilities">
+                <cfif facility is not "">
+                  <option value="#encodeForHTMLAttribute(getFacilities.facility)#" <cfif url.facility is getFacilities.facility>selected</cfif>>#encodeForHTML(getFacilities.facility)#</option>
+                </cfif>
+              </cfoutput>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2">
+          <div class="mb-3">
+            <label class="form-label"><strong>Limit</strong></label>
+            <select class="form-select" name="limit">
+              <cfloop list="1000,1500,2500,5000,10000,15000" index="l">
+                <cfoutput><option value="#l#" <cfif limit is l>selected</cfif>>#l#</option></cfoutput>
+              </cfloop>
+            </select>
+          </div>
+        </div>
+        <div class="col-md-2 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Fetching...';this.form.submit();">
+            <i class="fas fa-search"></i> Fetch Logs
+          </button>
+        </div>
+      </div>
+      <cfif limit GTE 10000>
+        <div class="callout callout-warning mb-0">
+          <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i> High result limits (10000+) will significantly increase page loading time.</p>
+        </div>
+      </cfif>
+    </form>
 
-
-    
-    <cfif #getlogs.recordcount# GTE 1>  
-                
-      <table class="table table-striped wrap"  id="sortTable" style="width:100%">
+    <!-- LOGS TABLE -->
+    <cfif getlogs.recordcount GTE 1>
+      <table id="logsTable" class="table table-bordered table-hover table-striped" style="width:100%">
         <thead>
           <tr>
-      
             <th>Date/Time</th>
             <th>Message</th>
             <th>Facility</th>
-     
- 
-          
-
           </tr>
         </thead>
         <tbody>
-
-        
-
-<cfoutput query="getlogs">
-
-        
-           <td>#DateFormat(ReceivedAt, "mm/dd/yyyy")# #TimeFormat(ReceivedAt, "HH:mm:ss")#</td>
-
- 
-
-            <td>#Message#</td>
-
-            <td>#SysLogTag#</td>
-
-
-          
-
-          </tr>
-
-        </cfoutput>
-
+          <cfoutput query="getlogs">
+            <tr>
+              <td>#DateFormat(ReceivedAt, "mm/dd/yyyy")# #TimeFormat(ReceivedAt, "HH:mm:ss")#</td>
+              <td>#encodeForHTML(Message)#</td>
+              <td><span class="badge bg-secondary">#encodeForHTML(SysLogTag)#</span></td>
+            </tr>
+          </cfoutput>
         </tbody>
-        
-       
-        <tfoot>
-          <tr>
-            <th>Date/Time</th>
-            <th>Message</th>
-            <th>Facility</th>
-     
-
-          </tr>
-        </tfoot>
-      
-
       </table>
-
-    </form>
-    
- 
-    
-    <cfelseif #getlogs.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No Logs were found</strong></cfoutput>
+    <cfelse>
+      <div class="alert alert-info">
+        <i class="icon fa fa-info-circle"></i> No logs found for the selected date range and filter.
       </div>
-    
-      <!--- /CFIF FOR getlogs.recordcount --->
     </cfif>
-    
-    
 
-    <div>&nbsp;</div>
-
-    
-    
-  </div><!-- /.container-fluid -->
+  </div>
 </div>
-<!-- /.content -->
+
+      </div>
+    </div>
+  </main>
+
+  <cfinclude template="./inc/main_footer.cfm" />
+
 </div>
-</main><!-- replaced content-wrapper -->
-
-
-<cfinclude template="./inc/main_footer.cfm" />
-
-<!-- ./wrapper -->
-
-
-
-</body>
-
-<!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
 
 <script>
+$(document).ready(function() {
+  $('#logsTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[50, 75, 100, -1], ['50 rows', '75 rows', '100 rows', 'Show all']],
+    order: [[0, 'desc']],
+    columnDefs: [
+      { width: '180px', targets: [0] },
+      { width: '120px', targets: [2] }
+    ]
+  });
+});
 
-  //Get the button
-  let mybutton = document.getElementById("btn-back-to-top");
-  
-  // When the user scrolls down 20px from the top of the document, show the button
-  window.onscroll = function () {
-    scrollFunction();
-  };
-  
-  function scrollFunction() {
-    if (
-      document.body.scrollTop > 200 ||
-      document.documentElement.scrollTop > 200
-    ) {
-      mybutton.style.display = "block";
-    } else {
-      mybutton.style.display = "none";
+// Tempus Dominus datetime pickers
+document.addEventListener('DOMContentLoaded', function() {
+  var pickerOptions = {
+    display: {
+      sideBySide: true,
+      components: { clock: true, seconds: true }
+    },
+    localization: {
+      format: 'yyyy-MM-dd HH:mm:ss',
+      dayViewHeaderFormat: { month: 'long', year: 'numeric' }
     }
-  }
-  // When the user clicks on the button, scroll to the top of the document
-  mybutton.addEventListener("click", backToTop);
-  
-  function backToTop() {
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
-  }
-  
-  </script>
-  
-  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
+  };
 
+  new tempusDominus.TempusDominus(document.getElementById('startdatetime'), pickerOptions);
+  new tempusDominus.TempusDominus(document.getElementById('enddatetime'), pickerOptions);
+});
+</script>
 
+</body>
 </html>
