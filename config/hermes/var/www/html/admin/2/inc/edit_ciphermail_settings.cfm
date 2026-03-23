@@ -166,21 +166,10 @@ select property, value from encryption_settings where property='user.systemMailS
         </cftry>
 
 
-    <cftry>
-    
-      <cfexecute name = "/usr/local/bin/docker"
-      timeout = "240"
-      arguments="exec hermes_ciphermail /opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh">
-      </cfexecute>
-        
-        <cfcatch type="any">
-  
-        <cfset m="Edit Ciphermail Settings: There was an error executing /opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh">
-        <cfinclude template="error.cfm">
-        <cfabort>   
-  
-        </cfcatch>
-        </cftry>
+    <cfexecute name="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+      timeout="240"
+      variable="ciphermailOutput"
+      errorVariable="ciphermailError" />
 
 
 

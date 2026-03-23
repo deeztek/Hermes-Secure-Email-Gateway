@@ -69,24 +69,6 @@ output = "#REReplace("#nginx#","hermes_server_name","#console_host.value2#","ALL
 
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_hermes-ssl.conf" variable="nginx">
  
-<cfif #console_dhparam.value2# is "disable">
-
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_hermes-ssl.conf"
-output = "#REReplace("#nginx#","hermes_dhparam_file","##ssl_dhparam /opt/hermes/ssl/dhparam.pem","ALL")#" addnewline="no">
-
-<cfelseif #console_dhparam.value2# is "enable">
-
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_hermes-ssl.conf"
-output = "#REReplace("#nginx#","hermes_dhparam_file","ssl_dhparam /opt/hermes/ssl/dhparam.pem","ALL")#" addnewline="no">
-
-<!--- /CFIF #console_dhparam.value2# is --->
-</cfif>
-    
-
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_hermes-ssl.conf" variable="nginx">
- 
 <cfif #console_hsts.value2# is "disable">
 
 <cffile action = "write"
@@ -443,24 +425,6 @@ output = "#REReplace("#nginx_mailbox#","hermes_ssl_certificate","#certpath#","AL
 <cffile action = "write"
 file = "/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf"
 output = "#REReplace("#nginx_mailbox#","hermes_ssl_key","#keypath#","ALL")#" addnewline="no">
-
-<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf" variable="nginx_mailbox">
-
-<cfif #console_dhparam.value2# is "disable">
-
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf"
-output = "#REReplace("#nginx_mailbox#","hermes_dhparam_file","##ssl_dhparam /opt/hermes/ssl/dhparam.pem","ALL")#" addnewline="no">
-
-<cfelseif #console_dhparam.value2# is "enable">
-
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf"
-output = "#REReplace("#nginx_mailbox#","hermes_dhparam_file","ssl_dhparam /opt/hermes/ssl/dhparam.pem","ALL")#" addnewline="no">
-
-<!--- /CFIF #console_dhparam.value2# is --->
-</cfif>
-    
 
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf" variable="nginx_mailbox">
  
