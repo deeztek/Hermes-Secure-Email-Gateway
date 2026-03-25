@@ -43,7 +43,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
   
   </cfcatch>
@@ -69,7 +69,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="success">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
 
 <cfelse>
@@ -79,7 +79,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
 
 <!--- /CFIF FindNoCase --->
@@ -117,7 +117,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput> 
     
   </cfcatch>
@@ -164,7 +164,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -191,7 +191,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   </cfcatch>
@@ -219,7 +219,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -250,7 +250,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
         
         <cfoutput>
-        <cflocation url="#cgi.http_referer#" addtoken="no">
+        <cflocation url="view_system_certificates.cfm" addtoken="no">
         </cfoutput>
       
       </cfcatch>
@@ -279,7 +279,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
           
           <cfoutput>
-          <cflocation url="#cgi.http_referer#" addtoken="no">
+          <cflocation url="view_system_certificates.cfm" addtoken="no">
           </cfoutput>
         
         </cfcatch>
@@ -310,7 +310,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -348,7 +348,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -377,7 +377,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 
 <cfoutput>
-<cflocation url="#cgi.http_referer#" addtoken="no">
+<cflocation url="view_system_certificates.cfm" addtoken="no">
 </cfoutput>   
 
 
@@ -389,7 +389,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 
 <cfoutput>
-<cflocation url="#cgi.http_referer#" addtoken="no">
+<cflocation url="view_system_certificates.cfm" addtoken="no">
 </cfoutput>    
 
 <cfelse>
@@ -399,7 +399,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
  
 

@@ -21,7 +21,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
 
 <!--- /CFIF checkweb.recordcount --->
@@ -40,7 +40,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
 
   <!--- /CFIF checksmtp.recordcount --->
@@ -58,7 +58,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
 
   <!--- /CFIF checksmtp.recordcount --->
@@ -124,7 +124,7 @@ delete from system_certificates where id=<cfqueryparam value = #form.certificate
 <cfset session.alerttype="success">
 
 <cfoutput>
-<cflocation url="#cgi.http_referer#" addtoken="no">
+<cflocation url="view_system_certificates.cfm" addtoken="no">
 </cfoutput>
 
 <cfelseif #getcertdetails.type# is "Acme">
@@ -168,7 +168,7 @@ delete from system_certificates where id=<cfqueryparam value = #form.certificate
   
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>   
 
     
@@ -207,7 +207,7 @@ delete from system_certificates where id=<cfqueryparam value = #form.certificate
     
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>   
      
   <cfelse>
@@ -219,7 +219,7 @@ delete from system_certificates where id=<cfqueryparam value = #form.certificate
     
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>  
     
 <!--- /CFIF FindNoCase --->

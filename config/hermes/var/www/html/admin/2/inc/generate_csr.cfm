@@ -87,7 +87,7 @@ output = "#REReplace("#temp#","COMMON-NAME","#form.commonname#","ALL")#" addnewl
 <cfset session.alerttype="error">
 
   <cfoutput>
-<cflocation url="#cgi.http_referer#" addtoken="no">
+<cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
 
   <cfelseif fileExists(rar)>
@@ -101,7 +101,7 @@ output = "#REReplace("#temp#","COMMON-NAME","#form.commonname#","ALL")#" addnewl
 <cfset session.alerttype="success">
 
   <cfoutput>
-<cflocation url="#cgi.http_referer#" addtoken="no">
+<cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
 
   <!-- /CFIF FOR RAR -->

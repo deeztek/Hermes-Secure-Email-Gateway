@@ -58,7 +58,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   <cfelseif #cfcatch.detail# contains "Error loading">
@@ -68,7 +68,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   <cfelseif #cfcatch.detail# contains "unable to get local issuer certificate">
@@ -78,7 +78,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>
   
   <cfelse>
@@ -89,7 +89,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>
   
     
@@ -183,7 +183,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
     
     <cfoutput>
-    <cflocation url="#cgi.http_referer#" addtoken="no">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfoutput>
   
     
@@ -218,7 +218,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -251,7 +251,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   </cfcatch>
@@ -279,7 +279,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -310,7 +310,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
         
         <cfoutput>
-        <cflocation url="#cgi.http_referer#" addtoken="no">
+        <cflocation url="view_system_certificates.cfm" addtoken="no">
         </cfoutput>
       
       </cfcatch>
@@ -339,7 +339,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
           
           <cfoutput>
-          <cflocation url="#cgi.http_referer#" addtoken="no">
+          <cflocation url="view_system_certificates.cfm" addtoken="no">
           </cfoutput>
         
         </cfcatch>
@@ -369,7 +369,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
       
       <cfoutput>
-      <cflocation url="#cgi.http_referer#" addtoken="no">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
       </cfoutput>
     
     </cfcatch>
@@ -432,7 +432,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="success">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   <cfelseif #checkexists.recordcount# GTE 1>
@@ -443,7 +443,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype="error">
   
   <cfoutput>
-  <cflocation url="#cgi.http_referer#" addtoken="no">
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfoutput>
   
   <!--- #checkexists.recordcount# --->

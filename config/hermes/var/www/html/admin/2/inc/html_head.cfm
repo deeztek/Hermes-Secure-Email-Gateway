@@ -418,6 +418,7 @@ document.addEventListener('click', function(e) {
       !href.startsWith('javascript:') &&
       !link.getAttribute('target') &&
       !link.getAttribute('data-bs-toggle') &&
+      !link.classList.contains('no-preloader') &&
       !href.startsWith('http://') &&
       !href.startsWith('https://')) {
     const preloader = document.querySelector('.preloader');
@@ -441,8 +442,16 @@ document.addEventListener('click', function(e) {
   });
 });
 
-// Show preloader on page unload (browser navigation)
+// Track if a file download link was clicked (skip preloader for downloads)
+var _skipPreloader = false;
+document.addEventListener('click', function(e) {
+  var link = e.target.closest('a.no-preloader');
+  if (link) _skipPreloader = true;
+});
+
+// Show preloader on page unload (browser navigation) — skip for file downloads
 window.addEventListener('beforeunload', function() {
+  if (_skipPreloader) { _skipPreloader = false; return; }
   const preloader = document.querySelector('.preloader');
   if (preloader) {
     preloader.style.display = 'flex';
