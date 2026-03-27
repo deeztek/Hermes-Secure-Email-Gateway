@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 
-  <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -19,250 +19,141 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-
 <html lang="en">
 
-
-  <head>
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | System Users</title>
-
   <cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script Default Sort by Column 4 Desc --->
-
-
-<!--- Sort Table Script  --->
-<script>
-  $(document).ready(function() {
-      $('#sortTable').DataTable( {
-        dom: 'Blfrtip',
-          buttons: [
-              'copy', 'csv', 'excel', 'pdf', 'print'
-          ],
-          stateSave: true,
-          lengthMenu: [
-            [ 25, 50, 100, -1 ],
-      [ '25 rows', '50 rows', '100 rows', 'Show all' ]
-  
-      ],
-      
-          "order": [[ 2, "asc" ]]
-      } );
-  } );
-    </script>
-
-
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW STARTS HERE --->  
-<style>
-  .alert a {
-    color: #fff;
-    text-decoration: none;
-}
-</style>
-<!--- STYLE TO REMOVE UNDERLINE FROM BUTTON IN ALERT WINDOW ENDS HERE --->  
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-<!--- BACK TO TOP BUTTON STYLE STARTS HERE ---> 
-<style>
-  #btn-back-to-top {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    display: none;
-  }
-  </style>
-
-  <!--- BACK TO TOP BUTTON STYLE ENDS HERE ---> 
-
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <cfoutput>
             <h1 class="m-0">System Users</h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-          </cfoutput>
-            
-          </div><!-- /.col -->
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item active">System Users</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-<!-- BACK TO TO TOP BUTTON STARTS HERE -->
-<button
-type="button"
-class="btn btn-danger btn-floating btn-lg"
-id="btn-back-to-top"
->
-<i class="fas fa-arrow-up"></i>
-</button>
- 
-<!-- BACK TO TO TOP BUTTON ENDS HERE -->
-    
-    <cfparam name = "errormessage" default = "0">
-    
-    <cfparam name = "m2" default = "0"> 
-    <cfif StructKeyExists(url, "m2")>
-    <cfif url.m2 is not "">
-    <cfset m2 = url.m2>
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
 
-    <!--- /CFIF for StructKeyExists --->
-  </cfif>
-  
-  <!--- /CFIF for url.m2 is not "" --->
-  </cfif>
-
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
+<cfif StructKeyExists(session, "m") AND session.m is not "">
   <cfset m = session.m>
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
+</cfif>
 
-  <!--- ENABLE FOR DEBUG BELOW --->
-  <!---
-  <cfoutput>#session.m#</cfoutput>
-  --->
+<!--- ACTION ROUTING --->
+<cfif action is not "">
+  <cfinclude template="./inc/system_user_actions.cfm">
+</cfif>
 
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-  
-    <cfparam name = "step" default = "0">
-    
-    <cfparam name = "action" default = ""> 
-    <cfif IsDefined("form.action") is "True">
-    <cfif form.action is not "">
-    <cfset action = form.action>
-    </cfif></cfif>  
-
-
-
-  
-        <!--- ERROR MESSAGES START HERE --->
-  
-        
-  
-        
-<cfif #m# is "1">
-
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>System User was deleted successfully</cfoutput> 
-      
-  </div>
-  
-  <cfset session.m = 0>
-  
-  </cfif>
-
-
-       <!--- ERROR MESSAGES END HERE --->
-
-
-
-    
-<span>
-  <p>       
-
-
-<a href="./inc/create_new.cfm?type=systemuser" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Create System User</a>
-
-<!---
-<button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt"></i>&nbsp;&nbsp;Delete</button>
---->
-</p>
-
-<p>
-
-</p>
-</span>
-
-
-
-
-
-
-<br>
-
-<!---
-
-<span>
-  <p>  
-<button type="button" class="btn btn-default">Select All</button>
- <button type="button" class="btn btn-default">Clear</button>
-</p>
-</span>
---->
-
-
+<!--- Load system users --->
 <cfquery name="getsystemusers" datasource="hermes">
-  select id, username, email, first_name, last_name, access_control, system, applied, auth_type, remoteauth_domain from system_users
+  SELECT id, username, email, first_name, last_name, access_control, system, applied, auth_type, remoteauth_domain
+  FROM system_users
+</cfquery>
 
+<!--- Check RemoteAuth availability (Pro edition) --->
+<cfset remoteauthAvailable = false>
+<cfset remoteauthDomains = []>
+<cfif isDefined("session.edition") AND session.edition EQ "Pro">
+  <cfquery name="getRemoteauthStatus" datasource="hermes">
+    SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'enabled'
   </cfquery>
-    
-    <cfif #getsystemusers.recordcount# GTE 1>
+  <cfquery name="getRemoteauthDomains" datasource="hermes">
+    SELECT domain_name, server_address FROM remoteauth_mappings WHERE enabled = 1 ORDER BY domain_name
+  </cfquery>
+  <cfif getRemoteauthStatus.recordcount GT 0 AND getRemoteauthStatus.setting_value EQ "1" AND getRemoteauthDomains.recordcount GT 0>
+    <cfset remoteauthAvailable = true>
+    <cfloop query="getRemoteauthDomains">
+      <cfset arrayAppend(remoteauthDomains, {domain: getRemoteauthDomains.domain_name, server: getRemoteauthDomains.server_address})>
+    </cfloop>
+  </cfif>
+</cfif>
 
+<cfset session.m = "">
 
-                
-      <table class="table table-striped"  id="sortTable" style="width:100%">
+<!--- ALERTS (data-driven) --->
+<cfset alerts = {
+  "1":  {type:"success", msg:"System User was deleted successfully"},
+  "2":  {type:"danger",  msg:"The Username field cannot be blank"},
+  "21": {type:"danger",  msg:"You have entered an invalid Username. Usernames can only contain upper/lower case letters (A-Z, a-z), numbers (0-9), underscores (_), dashes (-), periods (.) and at signs (@)"},
+  "3":  {type:"danger",  msg:"The E-mail Address field is not a valid e-mail address"},
+  "4":  {type:"danger",  msg:"The E-mail Address field cannot be blank"},
+  "5":  {type:"danger",  msg:"You have entered an invalid First Name. First Names can only contain upper/lower case letters (A-Z, a-z), numbers (0-9), underscores (_) and dashes (-)"},
+  "6":  {type:"danger",  msg:"The First Name field cannot be blank"},
+  "8":  {type:"danger",  msg:"You have entered an invalid Last Name. Last Names can only contain upper/lower case letters (A-Z, a-z), numbers (0-9), underscores (_) and dashes (-)"},
+  "9":  {type:"danger",  msg:"The Last Name field cannot be blank"},
+  "10": {type:"danger",  msg:"The Password field cannot be blank"},
+  "11": {type:"danger",  msg:"The Password must be between 8 and 64 characters long"},
+  "12": {type:"danger",  msg:"No password has been set for this user. You must set the <strong>Set User Password</strong> field to YES in order to continue"},
+  "13": {type:"danger",  msg:"The Username you are attempting to use already exists"},
+  "14": {type:"success", msg:"System User was saved successfully"},
+  "15": {type:"success", msg:"System User 2FA devices were deleted successfully"},
+  "16": {type:"warning", msg:"This user has not yet been synchronized to LDAP. To complete the synchronization, you must set <strong>Set User Password</strong> to YES and enter a new password. The user's existing password cannot be migrated to LDAP."},
+  "17": {type:"danger",  msg:"You must select a RemoteAuth Domain when Authentication Type is set to Remote"},
+  "18": {type:"success", msg:"Remote Auth System User was saved successfully"},
+  "20": {type:"success", msg:"System User was created successfully"},
+  "99": {type:"danger",  msg:"The Password you are attempting to use has previously appeared in a data breach. Please use another password. Password was checked by <a href='https://haveibeenpwned.com/Passwords' target='_blank'>haveibeenpwned.com</a>"},
+  "100":{type:"danger",  msg:"There was a problem accessing haveibeenpwned.com to check your password against previous data breaches. Either ensure Hermes SEG has outbound Internet access over 443 to <a href='https://api.pwnedpasswords.com'>https://api.pwnedpasswords.com</a> OR set the <strong>Check Password Against haveibeenpwned.com</strong> field to NO"}
+}>
+
+<cfif structKeyExists(alerts, toString(m))>
+  <cfset a = alerts[toString(m)]>
+  <cfoutput>
+  <div class="alert alert-#a.type# alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <cfif a.type is "success"><h4><i class="icon fa fa-check"></i> Success</h4>
+    <cfelseif a.type is "warning"><h4><i class="icon fas fa-exclamation-triangle"></i> Warning</h4>
+    <cfelse><h4><i class="icon fa fa-ban"></i> Error</h4></cfif>
+    #a.msg#
+  </div>
+  </cfoutput>
+</cfif>
+
+<!-- SYSTEM USERS CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-users"></i> System Users</h3>
+  </div>
+  <div class="card-body">
+
+    <div class="mb-3">
+      <cfoutput>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##createModal">
+        <i class="fa fa-plus-square fa-lg"></i> Create System User
+      </button>
+      </cfoutput>
+    </div>
+
+    <cfif getsystemusers.recordcount GTE 1>
+      <div class="table-responsive">
+      <table id="sortTable" class="table table-bordered table-hover table-striped" style="width:100%">
         <thead>
           <tr>
-
-            <!---
-            <th><input type="checkbox" id="selectAll" value="selectAll"></th>
-            --->
-
-            <th>Edit</th>
+            <th style="width: 120px">Actions</th>
             <th>Username</th>
             <th>E-Mail</th>
             <th>First Name</th>
@@ -271,159 +162,406 @@ id="btn-back-to-top"
             <th>Auth Type</th>
             <th>Built-In</th>
             <th>Active</th>
-            
-            
-          
-
           </tr>
         </thead>
         <tbody>
-
-        
-
-<cfoutput query="getsystemusers">
-
-
-<!---
-        <td><input type="checkbox" name="id" value="#id#"></td>
---->
-        <td><a href="edit_system_user.cfm?id=#id#" class="btn btn-secondary" role="button"><i class="fas fa-edit"></i></a></td>
-
-        <td>#username#</td>
-         <td>#email#</td>
-            <td>#first_name#</td>
-            <td>#last_name#</td>
-
-            <cfif #access_control# is "one_factor">
-              <td>ONE FACTOR</td>
-            <cfelse>
-
-  <td>TWO FACTOR</td>
-            </cfif>
-
-            <cfif auth_type EQ "remote">
-              <td><span class="badge bg-info">REMOTE<cfif remoteauth_domain NEQ ""> (#remoteauth_domain#)</cfif></span></td>
-            <cfelse>
-              <td><span class="badge bg-secondary">LOCAL</span></td>
-            </cfif>
-
-            <cfif #system# is "1">
-            <td>YES</td>
-            <cfelse>
-            <td>NO</td>
-            </cfif>
-
-            <cfif #applied# is "1">
-              <td>YES</td>
-              <cfelse>
-              <td>NO</td>
-              </cfif>
-       
-     
-
-      
-
-          </tr>
-
-        </cfoutput>
-
-        </tbody>
-        
-       
-        <tfoot>
+          <cfoutput query="getsystemusers">
           <tr>
-
-            <!---
-            <th></th>
-            --->
-            <th>Edit</th>
-            <th>Username</th>
-            <th>E-Mail</th>
-            <th>First Name</th>
-            <th>Last Name</th>
-            <th>Access Control</th>
-            <th>Auth Type</th>
-            <th>Built-In</th>
-            <th>Active</th>
-            
-            
+            <td>
+              <button type="button" class="btn btn-sm btn-primary" title="Edit"
+                onclick="openEditModal(#id#, '#encodeForJavaScript(username)#', '#encodeForJavaScript(email)#', '#encodeForJavaScript(first_name)#', '#encodeForJavaScript(last_name)#', '#access_control#', '#auth_type#', '#encodeForJavaScript(remoteauth_domain)#', '#system#');">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button type="button" class="btn btn-sm btn-warning" title="Delete 2FA Devices"
+                data-bs-toggle="modal" data-bs-target="##deleteDevicesModal" data-user="#encodeForHTMLAttribute(username)#">
+                <i class="fas fa-key"></i>
+              </button>
+              <cfif system NEQ "1" AND id NEQ session.userid>
+              <button type="button" class="btn btn-sm btn-danger" title="Delete User"
+                data-bs-toggle="modal" data-bs-target="##deleteModal" data-user="#id#" data-username="#encodeForHTMLAttribute(username)#">
+                <i class="fa fa-trash"></i>
+              </button>
+              </cfif>
+            </td>
+            <td>#encodeForHTML(username)#</td>
+            <td>#encodeForHTML(email)#</td>
+            <td>#encodeForHTML(first_name)#</td>
+            <td>#encodeForHTML(last_name)#</td>
+            <td><cfif access_control is "one_factor">ONE FACTOR<cfelse>TWO FACTOR</cfif></td>
+            <td><cfif auth_type EQ "remote"><span class="badge bg-info">REMOTE<cfif remoteauth_domain NEQ ""> (#encodeForHTML(remoteauth_domain)#)</cfif></span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
+            <td><cfif system is "1">YES<cfelse>NO</cfif></td>
+            <td><cfif applied is "1">YES<cfelse>NO</cfif></td>
           </tr>
-        </tfoot>
-      
-
+          </cfoutput>
+        </tbody>
       </table>
-
-    
-    
- 
-    
-    <cfelseif #getsystemusers.recordcount# LT 1>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No System Users were found</strong></cfoutput>
       </div>
-    
-      <!--- /CFIF FOR getrecipients.recordcount --->
+    <cfelse>
+      <div class="alert alert-info">
+        <i class="icon fa fa-info-circle"></i> No System Users were found.
+      </div>
     </cfif>
-    
-    
 
-    <div>&nbsp;</div>
-
-    
-    
-  </div><!-- /.container-fluid -->
+  </div>
 </div>
-<!-- /.content -->
+
+      </div>
+    </div>
+  </main>
+
+  <cfinclude template="./inc/main_footer.cfm" />
+
 </div>
-</main><!-- replaced content-wrapper -->
 
+<!-- CREATE MODAL -->
+<div class="modal fade" id="createModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" autocomplete="off">
+        <input type="hidden" name="action" value="createuser">
+        <div class="modal-header">
+          <h5 class="modal-title">Create System User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
 
-<cfinclude template="./inc/main_footer.cfm" />
+          <cfif remoteauthAvailable>
+          <div class="mb-3">
+            <label class="form-label"><strong>Authentication Type</strong></label>
+            <select class="form-select" name="auth_type" id="createAuthType">
+              <option value="local" selected>Local</option>
+              <option value="remote">Remote</option>
+            </select>
+          </div>
+          <div class="mb-3" id="createRemoteauthGroup" style="display:none;">
+            <label class="form-label"><strong>RemoteAuth Domain</strong></label>
+            <select class="form-select" name="remoteauth_domain" id="createRemoteauthDomain">
+              <option value="">-- Select Domain --</option>
+              <cfloop array="#remoteauthDomains#" index="domainItem">
+                <cfoutput><option value="#domainItem.domain#">#domainItem.domain# (#domainItem.server#)</option></cfoutput>
+              </cfloop>
+            </select>
+            <small class="text-muted">Select the domain this user will authenticate against</small>
+          </div>
+          <cfelse>
+          <input type="hidden" name="auth_type" value="local">
+          </cfif>
 
-<!-- ./wrapper -->
+          <div class="mb-3">
+            <label class="form-label"><strong>Username</strong></label>
+            <input type="text" class="form-control" name="username" placeholder="Username">
+            <small class="form-text text-muted">Only letters, numbers, underscores, dashes, periods, and @ signs.</small>
+          </div>
+          <div class="alert alert-warning" id="createRemoteWarning" style="display:none;">
+            <i class="icon fas fa-exclamation-triangle"></i> The <strong>Username</strong> must match the user's existing account name on the remote AD/LDAP server.
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>E-Mail Address</strong></label>
+                <input type="text" class="form-control" name="email" placeholder="user@domain.tld">
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>First Name</strong></label>
+                <input type="text" class="form-control" name="first_name" placeholder="First Name">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>Last Name</strong></label>
+                <input type="text" class="form-control" name="last_name" placeholder="Last Name">
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Access Control Policy</strong></label>
+            <select class="form-select" name="access_control">
+              <option value="one_factor" selected>One Factor</option>
+              <option value="two_factor">Two Factor</option>
+            </select>
+          </div>
+          <div id="createPasswordGroup">
+            <div class="mb-3">
+              <label class="form-label"><strong>Check Password Against haveibeenpwned.com</strong></label>
+              <select class="form-select" name="hibp">
+                <option value="YES" selected>YES</option>
+                <option value="NO">NO</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label"><strong>Password</strong></label>
+              <div class="input-group">
+                <input type="password" class="form-control" name="password" placeholder="8-64 characters" maxlength="64" id="createPassword">
+                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('createPassword', this)">
+                  <i class="fa fa-eye-slash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+          <input type="hidden" name="setpassword" value="YES">
 
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Creating...';this.form.submit();">
+            Create
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
+<!-- EDIT MODAL -->
+<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" autocomplete="off">
+        <input type="hidden" name="action" value="edituser">
+        <input type="hidden" name="id" id="edit_id" value="">
+        <div class="modal-header">
+          <h5 class="modal-title">Edit System User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
 
-</body>
+          <div class="mb-3">
+            <label class="form-label"><strong>Authentication Type</strong></label>
+            <input type="text" class="form-control bg-light" id="editAuthTypeDisplay" readonly>
+            <input type="hidden" name="auth_type" id="editAuthType" value="">
+            <input type="hidden" name="remoteauth_domain" id="editRemoteauthDomain" value="">
+            <small class="form-text text-muted" id="editRemoteauthDomainDisplay" style="display:none;"></small>
+            <small class="form-text text-muted">Authentication type cannot be changed. To change, delete this user and create a new one.</small>
+          </div>
 
-<!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
+          <div class="mb-3">
+            <label class="form-label"><strong>Username</strong></label>
+            <input type="text" class="form-control bg-light" name="username" id="edit_username" readonly>
+            <small class="form-text text-muted">Username cannot be changed. To change the username, delete this user and create a new one.</small>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>E-Mail Address</strong></label>
+                <input type="text" class="form-control" name="email" id="edit_email" placeholder="user@domain.tld">
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>First Name</strong></label>
+                <input type="text" class="form-control" name="first_name" id="edit_first_name" placeholder="First Name">
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label class="form-label"><strong>Last Name</strong></label>
+                <input type="text" class="form-control" name="last_name" id="edit_last_name" placeholder="Last Name">
+              </div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Access Control Policy</strong></label>
+            <div class="alert alert-warning">
+              <i class="icon fas fa-exclamation-triangle"></i> Before setting to <strong>Two Factor</strong>, ensure e-mail delivery works and the user's e-mail address is correct. See the <a href="#" onclick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide-v2/page/system-users#bkmrk-access-control-polic', '_blank'); return false;">Access Control Policy Documentation</a>.
+            </div>
+            <select class="form-select" name="access_control" id="edit_access_control">
+              <option value="one_factor">One Factor</option>
+              <option value="two_factor">Two Factor</option>
+            </select>
+          </div>
+          <div id="editPasswordGroup">
+            <div class="mb-3">
+              <label class="form-label"><strong>Set User Password</strong></label>
+              <select class="form-select" name="setpassword" id="editSetPassword">
+                <option value="NO" selected>NO</option>
+                <option value="YES">YES</option>
+              </select>
+            </div>
+            <div id="editPasswordFields" style="display:none;">
+              <div class="mb-3">
+                <label class="form-label"><strong>Check Password Against haveibeenpwned.com</strong></label>
+                <select class="form-select" name="hibp">
+                  <option value="YES" selected>YES</option>
+                  <option value="NO">NO</option>
+                </select>
+              </div>
+              <div class="mb-3">
+                <label class="form-label"><strong>Password</strong></label>
+                <div class="input-group">
+                  <input type="password" class="form-control" name="password" placeholder="8-64 characters" maxlength="64" id="editPassword">
+                  <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('editPassword', this)">
+                    <i class="fa fa-eye-slash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+            Save Changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE USER MODAL -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="deleteuser">
+        <input type="hidden" name="user" id="delete_user_id" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete System User</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete <strong id="delete_username"></strong>? This action is irreversible!</p>
+          <p>The user and any Two Factor TOTP and Security Keys will be deleted. If the user has any Duo Devices, they must be manually deleted from the Duo Control Panel.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger"
+            onclick="this.disabled=true;this.innerHTML='Deleting...';this.form.submit();">Yes, Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE 2FA DEVICES MODAL -->
+<div class="modal fade" id="deleteDevicesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="deleteuserdevices">
+        <input type="hidden" name="user" id="delete_devices_user" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete 2FA Devices</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete all 2FA devices for <strong id="delete_devices_username"></strong>?</p>
+          <p>This action is irreversible! All TOTP and Security Keys will be deleted. Duo devices must be manually deleted from the Duo Control Panel.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger"
+            onclick="this.disabled=true;this.innerHTML='Deleting...';this.form.submit();">Yes, Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
 <script>
+$(document).ready(function() {
+  $('#sortTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
+    order: [[1, 'asc']],
+    columnDefs: [
+      { orderable: false, targets: [0] },
+      { searchable: false, targets: [0] }
+    ]
+  });
+});
 
-  //Get the button
-  let mybutton = document.getElementById("btn-back-to-top");
-  
-  // When the user scrolls down 20px from the top of the document, show the button
-  window.onscroll = function () {
-    scrollFunction();
-  };
-  
-  function scrollFunction() {
-    if (
-      document.body.scrollTop > 200 ||
-      document.documentElement.scrollTop > 200
-    ) {
-      mybutton.style.display = "block";
-    } else {
-      mybutton.style.display = "none";
-    }
+// Password visibility toggle
+function togglePassword(inputId, btn) {
+  var input = document.getElementById(inputId);
+  var icon = btn.querySelector('i');
+  if (input.type === 'password') {
+    input.type = 'text';
+    icon.classList.remove('fa-eye-slash');
+    icon.classList.add('fa-eye');
+  } else {
+    input.type = 'password';
+    icon.classList.add('fa-eye-slash');
+    icon.classList.remove('fa-eye');
   }
-  // When the user clicks on the button, scroll to the top of the document
-  mybutton.addEventListener("click", backToTop);
-  
-  function backToTop() {
-    document.body.scrollTop = 0;
-    document.documentElement.scrollTop = 0;
+}
+
+// Create modal: auth type toggle
+document.getElementById('createAuthType')?.addEventListener('change', function() {
+  var isRemote = this.value === 'remote';
+  var domainGroup = document.getElementById('createRemoteauthGroup');
+  var passwordGroup = document.getElementById('createPasswordGroup');
+  var remoteWarning = document.getElementById('createRemoteWarning');
+  if (domainGroup) domainGroup.style.display = isRemote ? '' : 'none';
+  if (passwordGroup) passwordGroup.style.display = isRemote ? 'none' : '';
+  if (remoteWarning) remoteWarning.style.display = isRemote ? '' : 'none';
+});
+
+// Edit modal: set password toggle
+document.getElementById('editSetPassword')?.addEventListener('change', function() {
+  document.getElementById('editPasswordFields').style.display = this.value === 'YES' ? '' : 'none';
+});
+
+// Open Edit Modal
+function openEditModal(id, username, email, firstName, lastName, accessControl, authType, remoteauthDomain, system) {
+  document.getElementById('edit_id').value = id;
+  document.getElementById('edit_username').value = username;
+  document.getElementById('edit_email').value = email;
+  document.getElementById('edit_first_name').value = firstName;
+  document.getElementById('edit_last_name').value = lastName;
+  document.getElementById('edit_access_control').value = accessControl;
+
+  // Auth type (read-only display)
+  var at = authType || 'local';
+  document.getElementById('editAuthType').value = at;
+  document.getElementById('editAuthTypeDisplay').value = at === 'remote' ? 'Remote' : 'Local';
+  document.getElementById('editRemoteauthDomain').value = remoteauthDomain || '';
+
+  // Show remoteauth domain info if remote
+  var domainDisplay = document.getElementById('editRemoteauthDomainDisplay');
+  if (at === 'remote' && remoteauthDomain) {
+    domainDisplay.textContent = 'RemoteAuth Domain: ' + remoteauthDomain;
+    domainDisplay.style.display = '';
+  } else {
+    domainDisplay.style.display = 'none';
   }
-  
-  </script>
-  
-  <!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
 
-    
+  // Hide password group for remote auth users
+  var passwordGroup = document.getElementById('editPasswordGroup');
+  passwordGroup.style.display = at === 'remote' ? 'none' : '';
 
+  // Reset password fields
+  document.getElementById('editSetPassword').value = 'NO';
+  document.getElementById('editPasswordFields').style.display = 'none';
+  document.getElementById('editPassword').value = '';
 
+  new bootstrap.Modal(document.getElementById('editModal')).show();
+}
+
+// Delete User modal
+document.getElementById('deleteModal')?.addEventListener('show.bs.modal', function(e) {
+  document.getElementById('delete_user_id').value = e.relatedTarget.dataset.user;
+  document.getElementById('delete_username').textContent = e.relatedTarget.dataset.username;
+});
+
+// Delete 2FA Devices modal
+document.getElementById('deleteDevicesModal')?.addEventListener('show.bs.modal', function(e) {
+  var username = e.relatedTarget.dataset.user;
+  document.getElementById('delete_devices_user').value = username;
+  document.getElementById('delete_devices_username').textContent = username;
+});
+</script>
+
+</body>
 </html>

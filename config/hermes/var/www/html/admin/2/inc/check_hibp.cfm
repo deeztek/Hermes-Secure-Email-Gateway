@@ -80,7 +80,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     
     <cfelse>
-    
+
+    <!--- Default redirect URL (caller can override by setting hibpRedirectUrl before including) --->
+    <cfparam name="hibpRedirectUrl" default="edit_system_user.cfm?id=#theID#">
+
     <cfset theHash=hash("#form.password#", "SHA", "UTF-8")>
     <!---
     <cfoutput>The Hash: #theHash#</cfoutput><br>
@@ -114,7 +117,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     
     <cfoutput>
-    <cflocation url="edit_system_user.cfm?id=#theID#" addtoken="no">
+    <cflocation url="#hibpRedirectUrl#" addtoken="no">
     </cfoutput>
     
     <cfelse>
@@ -132,7 +135,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset session.m=100>
     
     <cfoutput>
-    <cflocation url="edit_system_user.cfm?id=#theID#" addtoken="no">
+    <cflocation url="#hibpRedirectUrl#" addtoken="no">
     </cfoutput>
     
     
