@@ -21,6 +21,7 @@ server:
 log:
   level: hermes_log_level
   format: hermes_log_format
+  file_path: /logs/authelia.log
 
 telemetry:
   metrics:
@@ -41,7 +42,8 @@ webauthn:
   timeout: 60s
   display_name: HermesSEG
   attestation_conveyance_preference: indirect
-  user_verification: preferred
+  selection_criteria:
+    user_verification: preferred
 
 duo_api:
   disable: hermes_duo_disable
@@ -140,7 +142,7 @@ access_control:
       policy: deny
 
     #Deny Access to /users for admins
-    - domain: smtp-dev.deeztek.com
+    - domain: hermes_access_control_domain
       resources:
       - '^/users([/?].*)?$'
       subject:
@@ -153,17 +155,15 @@ access_control:
       resources:
       - '^/admin([/?].*)?$'
       subject:
-      - "group:two_factor"
-      - "group:admins"
+      - ["group:two_factor", "group:admins"]
       policy: two_factor
 
       #/admin one_factor
     - domain: hermes_access_control_domain
       resources:
       - '^/admin([/?].*)?$'
-      subject: 
-      - "group:one_factor"
-      - "group:admins"
+      subject:
+      - ["group:one_factor", "group:admins"]
       policy: one_factor
 
       #/users mailboxes two_factor
@@ -171,8 +171,7 @@ access_control:
       resources:
       - '^/users([/?].*)?$'
       subject:
-      - "group:two_factor"
-      - "group:mailboxes"
+      - ["group:two_factor", "group:mailboxes"]
       policy: two_factor
 
       #/users mailboxes one_factor
@@ -180,18 +179,15 @@ access_control:
       resources:
       - '^/users([/?].*)?$'
       subject:
-      - "group:one_factor"
-      - "group:mailboxes"
+      - ["group:one_factor", "group:mailboxes"]
       policy: one_factor
-
 
       #/users relays two_factor
     - domain: hermes_access_control_domain
       resources:
       - '^/users([/?].*)?$'
       subject:
-      - "group:two_factor"
-      - "group:relays"
+      - ["group:two_factor", "group:relays"]
       policy: two_factor
 
       #/users relays one_factor
@@ -199,8 +195,7 @@ access_control:
       resources:
       - '^/users([/?].*)?$'
       subject:
-      - "group:one_factor"
-      - "group:relays"
+      - ["group:one_factor", "group:relays"]
       policy: one_factor
 
       #/nc mailboxes two_factor
@@ -208,17 +203,15 @@ access_control:
       resources:
       - '^/nc([/?].*)?$'
       subject:
-      - "group:two_factor"
-      - "group:mailboxes"
+      - ["group:two_factor", "group:mailboxes"]
       policy: two_factor
 
       #/nc/mailboxes one_factor
     - domain: hermes_access_control_domain
       resources:
       - '^/nc([/?].*)?$'
-      subject: 
-      - "group:one_factor"
-      - "group:mailboxes"
+      subject:
+      - ["group:one_factor", "group:mailboxes"]
       policy: one_factor
 
 
@@ -268,11 +261,18 @@ identity_providers:
     jwks:
      - key: {{ secret "/keys/authelia_identity_providers_oidc_jwks_file" | mindent 10 "|" | msquote }}
     enable_client_debug_messages: true
+    claims_policies:
+      nextcloud:
+        id_token: ['groups', 'email', 'email_verified', 'preferred_username', 'name']
     clients:
       - client_id: 'Hermes_SEG_Webmail'
         client_secret: {{ secret "/keys/authelia_identity_providers_oidc_clients_client_secret_digest_file" }}
         public: false
         authorization_policy: 'one_factor'
+        claims_policy: 'nextcloud'
+        token_endpoint_auth_method: 'client_secret_basic'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
         redirect_uris:
           - 'https://hermes_access_control_domain/nc/apps/oidc_login/oidc'
         scopes:

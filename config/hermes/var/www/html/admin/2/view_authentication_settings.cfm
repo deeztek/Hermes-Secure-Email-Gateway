@@ -312,6 +312,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
     </div>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label"><strong>Log Retention (Days)</strong></label>
+          <cfoutput>
+          <select class="form-select" name="log_retention_days">
+            <cfloop list="7,15,30,60,90,120,180" index="d">
+              <option value="#d#" <cfif logRetentionDays is d>selected</cfif>>#d# Days</option>
+            </cfloop>
+          </select>
+          </cfoutput>
+          <small class="form-text text-muted">Number of days to keep rotated Authelia log files.</small>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 

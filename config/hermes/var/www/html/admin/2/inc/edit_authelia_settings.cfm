@@ -582,7 +582,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                                   <cfquery name="update" datasource="hermes">
                                                   update parameters2 set value2='#form.log_format#', applied='2' where parameter='log.format'
                                                   </cfquery>
-                                                  
+
+                                                  <!--- UPDATE LOG RETENTION DAYS --->
+                                                  <cfif StructKeyExists(form, "log_retention_days") AND ListFind("7,15,30,60,90,120,180", form.log_retention_days)>
+                                                    <cfquery datasource="hermes">
+                                                      UPDATE parameters2 SET value2 = <cfqueryparam value="#form.log_retention_days#" cfsqltype="cf_sql_varchar">
+                                                      WHERE module = 'authelia' AND parameter = 'log.retention_days'
+                                                    </cfquery>
+                                                  </cfif>
+
                                                   <cfset step=9>
                                                   
                                                   <!--- /CFIF step is 8 --->

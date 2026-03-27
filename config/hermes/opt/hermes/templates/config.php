@@ -94,6 +94,7 @@ $CONFIG = array (
   'oidc_login_disable_registration' => false,
   'oidc_login_redir_fallback' => false,
   'oidc_login_tls_verify' => true,
+  'oidc_login_code_challenge_method' => 'S256',
   'oidc_create_groups' => false,
   'oidc_login_webdav_enabled' => true,
   'oidc_login_password_authentication' => true,

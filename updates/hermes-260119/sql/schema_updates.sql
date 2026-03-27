@@ -750,5 +750,27 @@ DEALLOCATE PREPARE stmt;
 
 ALTER TABLE system_certificates MODIFY id INT NOT NULL AUTO_INCREMENT;
 
+-- ============================================================================
+-- PARAMETERS2: Authelia log retention (days)
+-- Controls how many days of rotated Authelia logs to keep.
+-- Used by rotate_authelia_logs.sh scheduled via Ofelia.
+-- ============================================================================
+
+INSERT INTO parameters2 (parameter, module, value2)
+SELECT 'log.retention_days', 'authelia', '30'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'log.retention_days' AND module = 'authelia');
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Add Authelia log rotation scheduled job
+-- Runs daily at 2:00 AM to rotate Authelia logs with date-stamped filenames.
+-- Requires Authelia 4.39+ for SIGHUP log file reopening.
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-authelia-log-rotate"]', '0 0 02 * * *', '/opt/hermes/schedule/rotate_authelia_logs.sh', 'hermes_commandbox', '1', 'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-authelia-log-rotate"]'
+);
+
 
 

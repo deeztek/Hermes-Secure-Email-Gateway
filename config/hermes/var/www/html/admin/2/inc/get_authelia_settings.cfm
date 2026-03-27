@@ -95,7 +95,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="log_format" datasource="hermes">
     select value2 from parameters2 where module = 'authelia' and parameter = 'log.format'
     </cfquery>
-    
+
+    <cfquery name="log_retention" datasource="hermes">
+    select value2 from parameters2 where module = 'authelia' and parameter = 'log.retention_days'
+    </cfquery>
+    <cfset logRetentionDays = log_retention.recordcount GT 0 ? log_retention.value2 : "30">
+
     <cfquery name="duo_disable" datasource="hermes">
     select value2 from parameters2 where module = 'authelia' and parameter = 'duo.disable'
     </cfquery>

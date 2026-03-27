@@ -162,7 +162,7 @@ services:
     restart: always
  
   hermes_authelia:
-    image: authelia/authelia:4.38.0
+    image: authelia/authelia:${AUTHELIAVERSION}
     container_name: hermes_authelia
     secrets:
       - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET
@@ -269,6 +269,7 @@ services:
       - ./config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt:/serverhome/WEB-INF/lucee-server/context/password.txt
       - ./config/certbot/conf:/etc/letsencrypt
       - ./config/ofelia:/etc/ofelia
+      - authelia_logs:/opt/hermes/logs/authelia
       - ./config/authelia:/etc/authelia
       - ./config/nginx/etc/nginx:/etc/nginx
       - ./config/postfix-dkim/etc/postfix:/etc/postfix
