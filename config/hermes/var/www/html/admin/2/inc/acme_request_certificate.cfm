@@ -20,7 +20,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   <cftry>
 
   <cfexecute name = "/usr/local/bin/docker"
-  arguments="run --rm --name hermes_certbot -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --email #form.email# --agree-tos --no-eff-email --dry-run -d #form.domainname#"
+  arguments="run --rm --name hermes_certbot --network host --dns 8.8.8.8 --dns 8.8.4.4 -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --email #form.email# --agree-tos --no-eff-email --dry-run -d #form.domainname#"
   outputFile="/opt/hermes/tmp/#customtrans3#_acme_output"
   timeout = "120">
   </cfexecute>
@@ -92,7 +92,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   <cftry>
   
   <cfexecute name = "/usr/local/bin/docker"
-  arguments="run --rm --name hermes_certbot -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --email #form.email# --agree-tos --no-eff-email -d #form.domainname#"
+  arguments="run --rm --name hermes_certbot --network host --dns 8.8.8.8 --dns 8.8.4.4 -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --email #form.email# --agree-tos --no-eff-email -d #form.domainname#"
   outputFile="/opt/hermes/tmp/#customtrans3#_acme_output"
   timeout = "120">
   </cfexecute>
@@ -139,231 +139,24 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <cfif FindNoCase("Successfully received certificate", acmeOutput)>
 
-<!--- PARSE CERTIFICATE DETAILS STARTS HERE --->
-
-  <!--- PARSE FINGERPRINT FROM CERTIFICATE --->
-   <cftry>
-    
-    <cfexecute name = "/usr/bin/openssl"
-    arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -fingerprint"
-    variable="fingerprint"
-    timeout = "120">
-    </cfexecute>
-  
-  <cfoutput>
-  <cfset fingerprint = REReplace("#fingerprint#","SHA1 Fingerprint=","","ALL")>
-  <cfset fingerprint = #trim(fingerprint)#>
-  </cfoutput>
-
-    <cfcatch type="any">
-    
-
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-
-      
-      <cfoutput>
-      <cflocation url="view_system_certificates.cfm" addtoken="no">
-      </cfoutput>
-    
-    </cfcatch>
-    
-    </cftry>
-  
-  <!--- PARSE SUBJECT FROM CERTIFICATE --->
-  <cftry>
-  <cfexecute name = "/usr/bin/openssl"
-  arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -subject"
-  variable="subject"
-  timeout = "120">
-  </cfexecute>
-  
-  <cfoutput>
-  <cfset subject = REReplace("#subject#","subject=","","ALL")>
-  <cfset subject = #trim(subject)#>
-  </cfoutput>
-  
-  <cfcatch type="any">
-  
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-  
-  <cfoutput>
-  <cflocation url="view_system_certificates.cfm" addtoken="no">
-  </cfoutput>
-  
-  </cfcatch>
-  
-  </cftry>
-  
-  <!--- PARSE ISSUER FROM CERTIFICATE --->
-  <cftry>
-  
-    <cfexecute name = "/usr/bin/openssl"
-    arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -issuer"
-    variable="issuer"
-    timeout = "120">
-    </cfexecute>
-  
-  <cfoutput>
-  <cfset issuer = REReplace("#issuer#","issuer=","","ALL")>
-  <cfset issuer = #trim(issuer)#>
-  </cfoutput>
-    
-    <cfcatch type="any">
-    
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-      
-      <cfoutput>
-      <cflocation url="view_system_certificates.cfm" addtoken="no">
-      </cfoutput>
-    
-    </cfcatch>
-    
-    </cftry>
-
-    <!---
-  
-    <!--- PARSE STARTDATE FROM CERTIFICATE --->
-    <cftry>
-  
-      <cfexecute name = "/usr/bin/openssl"
-      arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -startdate"
-      variable="startdate"
-      timeout = "120">
-      </cfexecute>
-  
-  
-  <cfoutput>
-  <cfset startdate = REReplace("#startdate#","notBefore=","","ALL")>
-  <cfset startdate = #trim(startdate)#>
-  </cfoutput>
-      
-      <cfcatch type="any">
-  
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-        
-        <cfoutput>
-        <cflocation url="view_system_certificates.cfm" addtoken="no">
-        </cfoutput>
-      
-      </cfcatch>
-      
-      </cftry>
-    
-   <!--- PARSE ENDDATE FROM CERTIFICATE --->
-      <cftry>
-    
-        <cfexecute name = "/usr/bin/openssl"
-        arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -enddate"
-        variable="enddate"
-        timeout = "120">
-        </cfexecute>
-  
-        <cfoutput>
-          <cfset enddate = REReplace("#enddate#","notAfter=","","ALL")>
-          <cfset enddate = #trim(enddate)#>
-          </cfoutput>
-      
-        
-        <cfcatch type="any">
-        
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-          
-          <cfoutput>
-          <cflocation url="view_system_certificates.cfm" addtoken="no">
-          </cfoutput>
-        
-        </cfcatch>
-        
-        </cftry>
-  
-      --->
-
-   <!--- PARSE SERIAL FROM CERTIFICATE --->
-   <cftry>
-    
-    <cfexecute name = "/usr/bin/openssl"
-    arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -serial"
-    variable="serial"
-    timeout = "120">
-    </cfexecute>
-  
-    <cfoutput>
-      <cfset serial = REReplace("#serial#","serial=","","ALL")>
-      <cfset serial = #trim(serial)#>
-      </cfoutput>
-  
-    
-    <cfcatch type="any">
-    
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-      
-      <cfoutput>
-      <cflocation url="view_system_certificates.cfm" addtoken="no">
-      </cfoutput>
-    
-    </cfcatch>
-    
-    </cftry>
-
-
-<!--- PARSE SAN FROM CERTIFICATE --->
-   <cftry>
-    
-    <cfexecute name = "/usr/bin/openssl"
-    arguments="x509 -in /etc/letsencrypt/live/#form.domainname#/fullchain.pem -noout -text | grep -oP '(DNS|IP Address):\s*\K[^,]+' | paste -sd ',' -"
-    variable="san"
-    timeout = "120">
-    </cfexecute>
-  
-<cfif #san# is "">
-
-<cfset san = "N/A">
-
-<cfelse>
-
-    <cfoutput>
-      <cfset san = #trim(serial)#>
-      </cfoutput>
-
-<!--- /CFIF #san# is ""--->
-</cfif>
-  
-    
-    <cfcatch type="any">
-    
-<cfset step=0>
-<cfset session.m="There was an error parsing certificate parameters">
-<cfset session.alerttype="error">
-      
-      <cfoutput>
-      <cflocation url="view_system_certificates.cfm" addtoken="no">
-      </cfoutput>
-    
-    </cfcatch>
-    
-    </cftry>
-
-
-<!--- PARSE CERTIFICATE DETAILS ENDS HERE --->
+<!--- PARSE CERTIFICATE DETAILS --->
+<cfset path = "/etc/letsencrypt/live/#form.domainname#/fullchain.pem">
+<cfinclude template="parse_certificate_details.cfm">
   
   
   <cfquery name="insertcert" datasource="hermes">
-  insert into system_certificates
-  (type, subject, issuer, serial, fingerprint, file_name, friendly_name, domain_name, san)
-  values
-  ('Acme', '#subject#', '#issuer#', '#serial#', '#fingerprint#', '#form.domainname#', '#form.certificate_name#', '#form.domainname#', '#san#')
+    INSERT INTO system_certificates
+    (type, subject, issuer, serial, fingerprint, file_name, friendly_name, domain_name, san)
+    VALUES
+    ('Acme',
+     <cfqueryparam value="#subject#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#issuer#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#serial#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#fingerprint#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#form.domainname#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#form.certificate_name#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#form.domainname#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#san#" cfsqltype="cf_sql_varchar">)
   </cfquery>
 
   <cfinclude template="acme_enable_tasks.cfm">

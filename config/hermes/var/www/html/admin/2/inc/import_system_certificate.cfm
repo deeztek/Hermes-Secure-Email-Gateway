@@ -380,10 +380,16 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   
   
   <cfquery name="insertcert" datasource="hermes">
-  insert into system_certificates
-  (type, subject, issuer, serial, fingerprint, file_name, friendly_name)
-  values
-  ('Imported', '#subject#', '#issuer#', '#serial#', '#fingerprint#', '#customtrans3#', '#form.certificate_name#')
+    INSERT INTO system_certificates
+    (type, subject, issuer, serial, fingerprint, file_name, friendly_name)
+    VALUES
+    ('Imported',
+     <cfqueryparam value="#subject#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#issuer#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#serial#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#fingerprint#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#customtrans3#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#form.certificate_name#" cfsqltype="cf_sql_varchar">)
   </cfquery>
   
   <cffile action="move" 

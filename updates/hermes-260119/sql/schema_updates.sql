@@ -728,5 +728,27 @@ SELECT 'relay_host_username', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings
 INSERT INTO system_settings (parameter, value)
 SELECT 'relay_host_password', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'relay_host_password');
 
+-- ============================================================================
+-- SYSTEM_CERTIFICATES TABLE: Add AUTO_INCREMENT to id column
+-- The id column was missing AUTO_INCREMENT, requiring manual MAX(id)+1 logic
+-- which is error-prone (NULL ids on insert without explicit id value).
+-- Safe to run multiple times: MODIFY with AUTO_INCREMENT is idempotent.
+-- ============================================================================
+
+-- Clean up any rows with NULL id (from prior inserts without explicit id)
+DELETE FROM system_certificates WHERE id IS NULL;
+
+-- Add primary key if not already set (required for AUTO_INCREMENT)
+SET @pk_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_certificates' AND CONSTRAINT_TYPE = 'PRIMARY KEY');
+SET @sql = IF(@pk_exists = 0,
+    'ALTER TABLE system_certificates ADD PRIMARY KEY (id)',
+    'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+ALTER TABLE system_certificates MODIFY id INT NOT NULL AUTO_INCREMENT;
+
 
 

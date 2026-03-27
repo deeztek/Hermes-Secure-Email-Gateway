@@ -79,6 +79,28 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfquery name="getMailCert" datasource="hermes">
   SELECT value2 FROM parameters2 WHERE parameter = 'mail.certificate' AND module = 'certificates'
 </cfquery>
+<cfquery name="getMailboxCerts" datasource="hermes">
+  SELECT DISTINCT mailbox_certificate FROM mailbox_domains WHERE mailbox_certificate IS NOT NULL
+</cfquery>
+<cfset mailboxCertList = ValueList(getMailboxCerts.mailbox_certificate)>
+<cfquery name="getAllMailboxSans" datasource="hermes">
+  SELECT certificate, subdomain, ip, ip_result_msg, ip_result_datetime, dns, dns_result_msg, dns_result_datetime
+  FROM mailbox_sans
+  ORDER BY subdomain ASC
+</cfquery>
+
+<!--- Read security settings --->
+<cfset allowCertDownload = false>
+<cfset securityConfPath = "/opt/hermes/config/security.conf">
+<cfif fileExists(securityConfPath)>
+  <cftry>
+    <cffile action="read" file="#securityConfPath#" variable="securityConf">
+    <cfif REFindNoCase("ALLOW_CERT_DOWNLOAD\s*=\s*yes", securityConf)>
+      <cfset allowCertDownload = true>
+    </cfif>
+    <cfcatch></cfcatch>
+  </cftry>
+</cfif>
 
 <!--- ALERTS --->
 <cfif alerttype is "error" AND m is not "">
@@ -124,14 +146,18 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   <div class="card-body">
 
     <div class="mb-3">
+      <cfoutput>
       <cfif isDefined("session.license") AND session.license is "VALID">
-        <cfoutput>
         <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##requestModal">
           <i class="fas fa-plus-square"></i> Request ACME Certificate
         </button>
-        </cfoutput>
+      <cfelse>
+        <span title="Pro Edition license required" data-bs-toggle="tooltip">
+        <button type="button" class="btn btn-primary" disabled>
+          <i class="fas fa-plus-square"></i> Request ACME Certificate
+        </button>
+        </span>
       </cfif>
-      <cfoutput>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##importModal">
         <i class="fas fa-upload"></i> Import Certificate
       </button>
@@ -139,6 +165,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
         <i class="fas fa-sync"></i> Generate CSR
       </button>
       </cfoutput>
+    </div>
+
+    <div class="callout callout-info mb-3">
+      <h5><i class="fas fa-info-circle"></i> Page Guide</h5>
+      <p class="mb-1">This page manages SSL/TLS certificates used by the system. Certificates can be assigned to <strong>Console</strong> (admin, user portal, Ciphermail), <strong>SMTP</strong> (mail transport), <strong>Webmail</strong> (Nextcloud webmail access), and <strong>Mailbox SAN</strong> (mailbox domain SAN certificates for autodiscover, autoconfig, etc.) services.</p>
+      <p class="mb-1">Click the <i class="fas fa-chevron-down"></i> arrow on each row to expand certificate details including Subject, Issuer, Serial, Fingerprint, and SAN entries. The expanded view also provides buttons to download the <strong>Certificate</strong>, <strong>Private Key</strong>, and <strong>CA Chain</strong> files. Certificate downloads must be enabled via <code>ALLOW_CERT_DOWNLOAD=yes</code> in <code>/opt/hermes/config/security.conf</code>. Certificates with Mailbox SANs will also display IP and DNS validation status for each subdomain.</p>
+      <p class="mb-0">Use the buttons above to <strong>Request</strong> an ACME (Let's Encrypt) certificate, <strong>Import</strong> an existing certificate, or <strong>Generate</strong> a Certificate Signing Request (CSR).</p>
     </div>
 
     <cfif getsystemcertificates.recordcount GTE 1>
@@ -151,9 +184,10 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <th>Name</th>
             <th>Type</th>
             <th>Domain</th>
-            <th>Web</th>
+            <th>Console</th>
             <th>SMTP</th>
-            <th>Mail</th>
+            <th>Webmail</th>
+            <th>Mailbox SAN</th>
             <th>Not Before</th>
             <th>Not After</th>
           </tr>
@@ -193,10 +227,50 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               <cfset san = "N/A">
             </cfif>
 
-            <tr class="cert-row" data-details="<strong>Subject:</strong> #encodeForHTMLAttribute(subject)#<br><strong>Issuer:</strong> #encodeForHTMLAttribute(issuer)#<br><strong>Serial:</strong> #encodeForHTMLAttribute(serial)#<br><strong>Fingerprint:</strong> #encodeForHTMLAttribute(fingerprint)#<br><strong>SAN(s):</strong> #encodeForHTMLAttribute(san)#">
+            <!--- Build SAN validation sub-table for this certificate --->
+            <cfset sanDetailsHtml = "">
+            <cfif getAllMailboxSans.recordcount GT 0>
+            <cfquery name="certSans" dbtype="query">
+              SELECT subdomain, ip, ip_result_msg, ip_result_datetime, dns, dns_result_msg, dns_result_datetime
+              FROM getAllMailboxSans
+              WHERE certificate = <cfqueryparam value="#getsystemcertificates.id#" cfsqltype="cf_sql_integer">
+            </cfquery>
+            </cfif>
+            <cfif getAllMailboxSans.recordcount GT 0 AND certSans.recordcount GT 0>
+              <cfset sanDetailsHtml = "<br><br><strong>Mailbox SAN Validation:</strong><table class='table table-sm table-bordered mt-2 mb-0'><thead><tr><th>Subdomain</th><th>IP</th><th>IP Result</th><th>IP Date</th><th>DNS</th><th>DNS Result</th><th>DNS Date</th></tr></thead><tbody>">
+              <cfloop query="certSans">
+                <cfset ipBadge = iif(certSans.ip is 'YES', de('bg-success'), de('bg-secondary'))>
+                <cfset dnsBadge = iif(certSans.dns is 'YES', de('bg-success'), de('bg-secondary'))>
+                <cfset ipDateFormatted = "">
+                <cfif certSans.ip_result_datetime is not "">
+                  <cftry>
+                    <cfset ipDateFormatted = DateTimeFormat(certSans.ip_result_datetime, "mm/dd/yyyy HH:nn:ss")>
+                    <cfcatch><cfset ipDateFormatted = certSans.ip_result_datetime></cfcatch>
+                  </cftry>
+                </cfif>
+                <cfset dnsDateFormatted = "">
+                <cfif certSans.dns_result_datetime is not "">
+                  <cftry>
+                    <cfset dnsDateFormatted = DateTimeFormat(certSans.dns_result_datetime, "mm/dd/yyyy HH:nn:ss")>
+                    <cfcatch><cfset dnsDateFormatted = certSans.dns_result_datetime></cfcatch>
+                  </cftry>
+                </cfif>
+                <cfset sanDetailsHtml = sanDetailsHtml & "<tr><td>#encodeForHTMLAttribute(certSans.subdomain)#</td><td><span class='badge #ipBadge#'>#encodeForHTMLAttribute(certSans.ip)#</span></td><td>#encodeForHTMLAttribute(certSans.ip_result_msg)#</td><td>#encodeForHTMLAttribute(ipDateFormatted)#</td><td><span class='badge #dnsBadge#'>#encodeForHTMLAttribute(certSans.dns)#</span></td><td>#encodeForHTMLAttribute(certSans.dns_result_msg)#</td><td>#encodeForHTMLAttribute(dnsDateFormatted)#</td></tr>">
+              </cfloop>
+              <cfset sanDetailsHtml = sanDetailsHtml & "</tbody></table>">
+            </cfif>
+
+            <!--- Build download buttons (use iframe to avoid page navigation/spinner) --->
+            <cfif allowCertDownload>
+              <cfset downloadHtml = "<br><br><strong>Downloads:</strong><br><button type='button' class='btn btn-sm btn-outline-primary me-1 mt-1' onclick=""downloadCert(#id#,'cert')""><i class='fas fa-download'></i> Certificate</button><button type='button' class='btn btn-sm btn-outline-warning me-1 mt-1' onclick=""downloadCert(#id#,'key')""><i class='fas fa-key'></i> Private Key</button><button type='button' class='btn btn-sm btn-outline-secondary mt-1' onclick=""downloadCert(#id#,'chain')""><i class='fas fa-link'></i> CA Chain</button>">
+            <cfelse>
+              <cfset downloadHtml = "<br><br><strong>Downloads:</strong><br><span title='Enable ALLOW_CERT_DOWNLOAD in /opt/hermes/config/security.conf'><button type='button' class='btn btn-sm btn-outline-primary me-1 mt-1' disabled><i class='fas fa-download'></i> Certificate</button></span><span title='Enable ALLOW_CERT_DOWNLOAD in /opt/hermes/config/security.conf'><button type='button' class='btn btn-sm btn-outline-warning me-1 mt-1' disabled><i class='fas fa-key'></i> Private Key</button></span><span title='Enable ALLOW_CERT_DOWNLOAD in /opt/hermes/config/security.conf'><button type='button' class='btn btn-sm btn-outline-secondary mt-1' disabled><i class='fas fa-link'></i> CA Chain</button></span>">
+            </cfif>
+
+            <tr class="cert-row" data-details="<strong>Subject:</strong> #encodeForHTMLAttribute(subject)#<br><strong>Issuer:</strong> #encodeForHTMLAttribute(issuer)#<br><strong>Serial:</strong> #encodeForHTMLAttribute(serial)#<br><strong>Fingerprint:</strong> #encodeForHTMLAttribute(fingerprint)#<br><strong>SAN(s):</strong> #encodeForHTMLAttribute(san)##encodeForHTMLAttribute(downloadHtml)##encodeForHTMLAttribute(sanDetailsHtml)#">
               <td>
                 <button type="button" class="btn btn-sm btn-outline-secondary toggle-details" title="Expand">
-                  <i class="fas fa-chevron-right"></i>
+                  <i class="fas fa-chevron-down"></i>
                 </button>
               </td>
               <td>
@@ -213,6 +287,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               <td><cfif getWebCert.value2 is id><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
               <td><cfif getSmtpCert.value2 is id><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
               <td><cfif getMailCert.value2 is id><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+              <td><cfif ListFind(mailboxCertList, id)><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
               <td>#encodeForHTML(thestartdate)#</td>
               <td>#encodeForHTML(theenddate)#</td>
             </tr>
@@ -277,6 +352,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <div class="mb-3">
             <label class="form-label"><strong>Certificate Name</strong></label>
             <input type="text" class="form-control" name="certificate_name" placeholder="Friendly name for this certificate">
+            <small class="form-text text-muted">Only letters, numbers, dashes, underscores, and periods are allowed.</small>
           </div>
           <div class="mb-3">
             <label class="form-label"><strong>Domain Name</strong></label>
@@ -419,12 +495,12 @@ $(document).ready(function() {
     if (row.child.isShown()) {
       row.child.hide();
       tr.removeClass('shown');
-      icon.removeClass('fa-chevron-down').addClass('fa-chevron-right');
+      icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
     } else {
       var details = tr.data('details');
       row.child('<div class="p-3 bg-light">' + details + '</div>').show();
       tr.addClass('shown');
-      icon.removeClass('fa-chevron-right').addClass('fa-chevron-down');
+      icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
     }
   });
 });
@@ -434,7 +510,12 @@ function openDeleteModal(id, name) {
   document.getElementById('delete_cert_name').textContent = name;
   new bootstrap.Modal(document.getElementById('deleteModal')).show();
 }
+
+function downloadCert(id, filetype) {
+  document.getElementById('certDownloadFrame').src = 'inc/download_certificate.cfm?id=' + id + '&filetype=' + filetype;
+}
 </script>
+<iframe id="certDownloadFrame" style="display:none;"></iframe>
 
 </body>
 </html>

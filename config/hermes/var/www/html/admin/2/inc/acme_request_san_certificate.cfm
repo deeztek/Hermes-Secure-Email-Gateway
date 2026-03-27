@@ -16,13 +16,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
   <cffile action = "write"
         file = "/opt/hermes/tmp/#customtrans3#_request_cert"
-        output = "/usr/local/bin/docker run --rm --name hermes_certbot -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --cert-name #theCertname# --expand #theSan#" addnewline="no">
+        output = "/usr/local/bin/docker run --rm --name hermes_certbot --network host --dns 8.8.8.8 --dns 8.8.4.4 -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --cert-name #theCertname# --expand #theSan#" addnewline="no">
 
 
 <cftry>
   
   <cfexecute name = "/usr/local/bin/docker"
-  arguments="run --rm --name hermes_certbot -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --cert-name #theCertname# --expand #theSan#"
+  arguments="run --rm --name hermes_certbot --network host --dns 8.8.8.8 --dns 8.8.4.4 -v #DockerDir#/config/hermes/var/www/html:/var/www/certbot -v #DockerDir#/config/certbot/conf:/etc/letsencrypt -v #DockerDir#/config/certbot/logs:/var/log certbot/certbot:latest certonly --webroot --webroot-path /var/www/certbot --cert-name #theCertname# --expand #theSan#"
   outputFile="/opt/hermes/tmp/#customtrans3#_acme_output"
   timeout = "120">
   </cfexecute>
