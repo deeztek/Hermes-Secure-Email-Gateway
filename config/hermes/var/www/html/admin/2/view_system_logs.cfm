@@ -300,6 +300,7 @@ document.addEventListener('DOMContentLoaded', function() {
       components: { clock: true, seconds: true }
     },
     localization: {
+      hourCycle: 'h23',
       format: 'yyyy-MM-dd HH:mm:ss',
       dayViewHeaderFormat: { month: 'long', year: 'numeric' }
     }
