@@ -117,9 +117,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="view_server_identity.cfm" class="nav-link">
-                <i class="nav-icon fas fa-id-card"></i>
-                <p>Server Identity</p>
+              <a href="view_server_setup.cfm" class="nav-link">
+                <i class="nav-icon fas fa-cogs"></i>
+                <p>Server Setup</p>
               </a>
             </li>
             <li class="nav-item">

@@ -42,7 +42,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- DERIVE MAIL DOMAIN FROM CONSOLE HOST (e.g., smtp-dev.deeztek.com → deeztek.com) --->
 <cfset ncMailDomain = ListRest(consoleHost, ".")>
 
-<!--- GET HOST IP from parameters2 (legacy server_ip field, managed from Server Identity page) --->
+<!--- GET HOST IP from parameters2 (managed from Server Setup page) --->
 <cfquery name="getHostIP" datasource="hermes">
   SELECT value2 FROM parameters2 WHERE parameter = 'server_ip' AND module = 'network'
 </cfquery>

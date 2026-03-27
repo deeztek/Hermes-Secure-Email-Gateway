@@ -139,7 +139,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cfoutput>
 
       <div class="callout callout-warning mb-3">
-        <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i> If you modify the <strong>Console Address</strong>, adjust your browser URL to match. This also sets the Ciphermail Portal and User Console addresses.</p>
+        <p class="mb-1"><i class="icon fas fa-exclamation-triangle"></i> If you modify the <strong>Console Address</strong>, adjust your browser URL to match. This also sets the Ciphermail Portal and User Console addresses.</p>
+        <p class="mb-0">If you set the Console Address to an IP address and later change the server IP, you must also update the Host IP Address on the <a href="view_server_setup.cfm">Server Setup</a> page to keep Nextcloud trusted domains in sync.</p>
       </div>
 
       <div class="row">

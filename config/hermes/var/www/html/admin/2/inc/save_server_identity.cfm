@@ -8,33 +8,33 @@ Expects: form.server_domain, form.server_hostname
 <!--- Validate required fields --->
 <cfif NOT StructKeyExists(form, "server_domain") OR trim(form.server_domain) is "">
   <cfset session.m = 2>
-  <cflocation url="view_server_identity.cfm" addtoken="no">
+  <cflocation url="view_server_setup.cfm" addtoken="no">
 </cfif>
 
 <cfif NOT StructKeyExists(form, "server_hostname") OR trim(form.server_hostname) is "">
   <cfset session.m = 3>
-  <cflocation url="view_server_identity.cfm" addtoken="no">
+  <cflocation url="view_server_setup.cfm" addtoken="no">
 </cfif>
 
 <!--- Validate domain format (use email trick) --->
 <cfset tempemail = "test@#trim(form.server_domain)#">
 <cfif NOT IsValid("email", tempemail)>
   <cfset session.m = 4>
-  <cflocation url="view_server_identity.cfm" addtoken="no">
+  <cflocation url="view_server_setup.cfm" addtoken="no">
 </cfif>
 
 <!--- Validate hostname format (must be FQDN) --->
 <cfset tempemail2 = "test@#trim(form.server_hostname)#">
 <cfif NOT IsValid("email", tempemail2)>
   <cfset session.m = 5>
-  <cflocation url="view_server_identity.cfm" addtoken="no">
+  <cflocation url="view_server_setup.cfm" addtoken="no">
 </cfif>
 
 <!--- Validate host IP if provided --->
 <cfparam name="form.host_ip" default="">
 <cfif trim(form.host_ip) is not "" AND NOT REFind("^(\d{1,3}\.){3}\d{1,3}$", trim(form.host_ip))>
   <cfset session.m = 6>
-  <cflocation url="view_server_identity.cfm" addtoken="no">
+  <cflocation url="view_server_setup.cfm" addtoken="no">
 </cfif>
 
 <cfset ServerDomain = trim(form.server_domain)>
@@ -68,5 +68,8 @@ Expects: form.server_domain, form.server_hostname
 <!--- Generate Postfix configuration and reload --->
 <cfinclude template="./generate_postfix_configuration.cfm">
 
+<!--- Regenerate Nextcloud configuration (Host IP is used for trusted domains) --->
+<cfinclude template="./generate_nextcloud_configuration.cfm">
+
 <cfset session.m = 1>
-<cflocation url="view_server_identity.cfm" addtoken="no">
+<cflocation url="view_server_setup.cfm" addtoken="no">

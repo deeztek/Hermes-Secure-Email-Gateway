@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Server Identity</title>
+  <title>Hermes SEG | Server Setup</title>
   <cfinclude template="./inc/html_head.cfm" />
 </head>
 
@@ -39,12 +39,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Server Identity</h1>
+            <h1 class="m-0">Server Setup</h1>
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Server Identity</li>
+              <li class="breadcrumb-item active">Server Setup</li>
             </ol>
           </div>
         </div>
@@ -95,35 +95,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success</h4>
-    Server identity settings saved successfully. Postfix reloaded.
+    Server setup settings saved successfully. Postfix reloaded and Nextcloud configuration updated.
   </div>
 </cfif>
 <cfif m is "2">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    The Server Domain field cannot be empty.
+    The Mail Server Domain field cannot be empty.
   </div>
 </cfif>
 <cfif m is "3">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    The Server Hostname field cannot be empty.
+    The Mail Server Hostname field cannot be empty.
   </div>
 </cfif>
 <cfif m is "4">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    The Server Domain is not a valid domain name.
+    The Mail Server Domain is not a valid domain name.
   </div>
 </cfif>
 <cfif m is "5">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    The Server Hostname is not a valid fully qualified domain name (FQDN).
+    The Mail Server Hostname is not a valid fully qualified domain name (FQDN).
   </div>
 </cfif>
 <cfif m is "6">
@@ -137,21 +137,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!-- SERVER IDENTITY CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-id-card"></i> Server Identity</h3>
+    <h3 class="card-title"><i class="fas fa-id-card"></i> Server Setup</h3>
   </div>
   <div class="card-body">
     <div class="callout callout-info mb-3">
-      <p class="mb-0"><i class="icon fas fa-info-circle"></i>
-        These settings control how your mail server identifies itself.
-        The <strong>Server Domain</strong> is the origin domain for outgoing mail (Postfix <code>myorigin</code>).
-        The <strong>Server Hostname</strong> is the FQDN used in SMTP banners and HELO/EHLO greetings (Postfix <code>myhostname</code>).
-        The <strong>Host IP Address</strong> is the IP address used to access the admin UI and is included in Nextcloud trusted domains.
-      </p>
+      <p class="mb-1"><i class="icon fas fa-info-circle"></i>
+        These are foundational settings typically configured during initial setup and rarely changed afterward.</p>
+      <p class="mb-1">The <strong>Mail Server Domain</strong> is the origin domain appended to unqualified sender addresses in outgoing mail (Postfix <code>myorigin</code>).</p>
+      <p class="mb-1">The <strong>Mail Server Hostname</strong> is the FQDN used in SMTP banners and HELO/EHLO greetings when communicating with other mail servers (Postfix <code>myhostname</code>). Ensure a matching TLS certificate is assigned on the <a href="view_smtp_tls_settings.cfm">SMTP TLS Settings</a> page.</p>
+      <p class="mb-0">The <strong>Host IP Address</strong> is the server's IP address, included alongside the console hostname in the Nextcloud trusted domains configuration. Changing this value does <strong>not</strong> update the Console Address on the <a href="view_console_settings.cfm">Console Settings</a> page. If the Console Address is set to an IP address instead of a FQDN, update each one independently when the server IP changes.</p>
     </div>
 
     <div class="callout callout-warning mb-3">
       <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>
-        Changing these values will immediately update the Postfix configuration and reload the mail service.
+        Changing the mail server settings will immediately update the Postfix configuration and reload the mail service. Changing the Host IP will regenerate the Nextcloud configuration.
         Ensure the hostname has a valid DNS A record and matching reverse DNS (PTR) record, or outgoing mail may be rejected by other servers.
       </p>
     </div>
@@ -162,20 +161,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="row">
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label"><strong>Server Domain</strong></label>
+            <label class="form-label"><strong>Mail Server Domain</strong></label>
             <cfoutput>
             <input type="text" class="form-control" name="server_domain" value="#encodeForHTMLAttribute(currentDomain)#" placeholder="example.com">
             </cfoutput>
-            <div class="form-text">The domain name for outgoing mail (e.g., <code>example.com</code>)</div>
+            <div class="form-text">Origin domain for outgoing mail (e.g., <code>example.com</code>)</div>
           </div>
         </div>
         <div class="col-md-6">
           <div class="mb-3">
-            <label class="form-label"><strong>Server Hostname (FQDN)</strong></label>
+            <label class="form-label"><strong>Mail Server Hostname (FQDN)</strong></label>
             <cfoutput>
             <input type="text" class="form-control" name="server_hostname" value="#encodeForHTMLAttribute(currentHostname)#" placeholder="mail.example.com">
             </cfoutput>
-            <div class="form-text">The fully qualified domain name of this mail server (e.g., <code>mail.example.com</code>)</div>
+            <div class="form-text">FQDN used in SMTP banners and HELO/EHLO (e.g., <code>mail.example.com</code>)</div>
           </div>
         </div>
       </div>
@@ -186,7 +185,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfoutput>
             <input type="text" class="form-control" name="host_ip" value="#encodeForHTMLAttribute(currentHostIP)#" placeholder="192.168.1.100">
             </cfoutput>
-            <div class="form-text">The IP address used to access the admin UI (set during install)</div>
+            <div class="form-text">Server IP address for Nextcloud trusted domains (set during install)</div>
           </div>
         </div>
       </div>
