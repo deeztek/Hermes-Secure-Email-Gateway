@@ -276,12 +276,25 @@ a, a:hover{
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
             <h4><i class="icon fa fa-check"></i> Success!</h4>
             <cfoutput>Recipient(s) edited successfully</cfoutput><br>
-
-       
-        
+            <cfif StructKeyExists(session, "smimeQueued") AND session.smimeQueued GT 0>
+              <cfoutput><i class="fas fa-certificate me-1"></i> #session.smimeQueued# S/MIME certificate(s) queued for generation<br></cfoutput>
+            </cfif>
+            <cfif StructKeyExists(session, "pgpQueued") AND session.pgpQueued GT 0>
+              <cfoutput><i class="fas fa-key me-1"></i> #session.pgpQueued# PGP keyring(s) queued for generation<br></cfoutput>
+            </cfif>
+            <cfif StructKeyExists(session, "smimeExisting") AND session.smimeExisting GT 0>
+              <cfoutput><i class="fas fa-info-circle me-1"></i> #session.smimeExisting# recipient(s) already had S/MIME certificate(s) - existing certificates kept<br></cfoutput>
+            </cfif>
+            <cfif StructKeyExists(session, "pgpExisting") AND session.pgpExisting GT 0>
+              <cfoutput><i class="fas fa-info-circle me-1"></i> #session.pgpExisting# recipient(s) already had PGP keyring(s) - existing keyrings kept<br></cfoutput>
+            </cfif>
           </div>
 
           <cfset session.m = 0>
+          <cfset session.smimeQueued = 0>
+          <cfset session.pgpQueued = 0>
+          <cfset session.smimeExisting = 0>
+          <cfset session.pgpExisting = 0>
 
         </cfif>
         
@@ -506,38 +519,18 @@ a, a:hover{
     
     
     
-     <!--- QUARANTINE REPORTS STARTS HERE --->
-    
-     
+     <!--- QUARANTINE NOTIFICATIONS STARTS HERE --->
+
      <div class="form-group">
-      <label><strong>Quarantine Reports</strong></label>
-    <!---
-      <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    <select class="form-control" name="reports" data-placeholder="reports" id="reports" style="width: 100%">                  
-    <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-    <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-    <option value="NO">Disable Quarantine Reports</option>
-    
-    </select> 
+      <label><strong>Quarantine Notifications</strong></label>
+      <p class="help-block">When enabled, users receive an email notification each time a message is quarantined, with a one-click release button.</p>
+    <select class="form-control" name="reports" style="width: 100%">
+    <option value="YES" selected="selected">Enabled</option>
+    <option value="NO">Disabled</option>
+    </select>
     </div>
-    
-         
-              <div class="form-group" id="reportsfrequency">
-                <label><strong>Quarantine Report Frequency</strong></label>
-    <!---
-                <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    
-      <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-      <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-      <option value="2">Every 2 Hours (Current Day's Quarantine Report)</option>
-      <option value="4">Every 4 Hours (Current Day's Quarantine Report)</option>
-      <option value="8">Every 8 Hours (Current Day's Quarantine Report)</option>
-       </select> 
-      </div>
-    
-      <!--- QUARANTINE REPORTS ENDS HERE --->
+
+      <!--- QUARANTINE NOTIFICATIONS ENDS HERE --->
     
     <!--- TRAIN BAYES STARTS HERE --->
     
@@ -587,75 +580,9 @@ a, a:hover{
       </div>
     --->
     
-      <!--- PDF ENCRYPTION STARTS HERE --->
-    
-      <div class="form-group">
-        <label><strong>PDF Encryption</strong></label>
-      <!---
-        <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-      --->
-      <select class="form-control" name="pdf_enabled" data-placeholder="pdf_enabled" style="width: 100%">                  
-      <option value="2" selected="selected">Disable</option>
-      <option value="1">Enable</option>
-      
-      </select> 
-      </div>
-    
-      <!--- PDF ENCRYPTION ENDS HERE --->
-    
-        <!--- SMIME ENCRYPTION STARTS HERE --->
-    
-        <div class="form-group">
-          <label><strong>S/MIME Encryption</strong></label>
-        <!---
-          <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-        --->
-        <select class="form-control" name="smime_enabled" data-placeholder="smime_enabled" style="width: 100%">                  
-        <option value="2" selected="selected">Disable</option>
-        <option value="1">Enable</option>
-        
-        </select> 
-        </div>
-      
-        <!--- SMIME ENCRYPTION ENDS HERE --->
-    
-        
-        <!--- SMIME SIGN STARTS HERE --->
-    
-        <div class="form-group">
-          <label><strong>S/MIME SIGNATURE</strong></label>
-        
-          <p class="help-block">Effective only when S/MIME Certificate present</p>
-        
-        <select class="form-control" name="sign" data-placeholder="sign" style="width: 100%">                  
-        <option value="2" selected="selected">Sign Encrypted Messages Only</option>
-        <option value="1">Sign all messages</option>
-        
-        </select> 
-        </div>
-      
-        <!--- SMIME SIGN ENDS HERE --->
-    
-    
-            <!--- PGP ENCRYPTION STARTS HERE --->
-    
-            <div class="form-group">
-              <label><strong>PGP Encryption</strong></label>
-            <!---
-              <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-            --->
-            <select class="form-control" name="pgp_enabled" data-placeholder="pgp_enabled" style="width: 100%">                  
-            <option value="2" selected="selected">Disable</option>
-            <option value="1">Enable</option>
-            
-            </select> 
-            </div>
-          
-            <!--- PGP ENCRYPTION ENDS HERE --->
-    
+      <cfinclude template="./inc/edit_encryption_form_fields.cfm">
 
-  
-            <input type="submit" class="btn btn-danger" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+            <input type="submit" class="btn btn-primary" value="Submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
   
               </form>
         </div>
@@ -695,75 +622,9 @@ a, a:hover{
             <div id="editencryptionid"></div>
          
                  
-      <!--- PDF ENCRYPTION STARTS HERE --->
-    
-      <div class="form-group">
-        <label><strong>PDF Encryption</strong></label>
-      <!---
-        <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-      --->
-      <select class="form-control" name="pdf_enabled" data-placeholder="pdf_enabled" style="width: 100%">                  
-      <option value="2" selected="selected">Disable</option>
-      <option value="1">Enable</option>
-      
-      </select> 
-      </div>
-    
-      <!--- PDF ENCRYPTION ENDS HERE --->
-    
-        <!--- SMIME ENCRYPTION STARTS HERE --->
-    
-        <div class="form-group">
-          <label><strong>S/MIME Encryption</strong></label>
-        <!---
-          <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-        --->
-        <select class="form-control" name="smime_enabled" data-placeholder="smime_enabled" style="width: 100%">                  
-        <option value="2" selected="selected">Disable</option>
-        <option value="1">Enable</option>
-        
-        </select> 
-        </div>
-      
-        <!--- SMIME ENCRYPTION ENDS HERE --->
-    
-        
-        <!--- SMIME SIGN STARTS HERE --->
-    
-        <div class="form-group">
-          <label><strong>S/MIME SIGNATURE</strong></label>
-        
-          <p class="help-block">Effective only when S/MIME Certificate present</p>
-        
-        <select class="form-control" name="sign" data-placeholder="sign" style="width: 100%">                  
-        <option value="2" selected="selected">Sign Encrypted Messages Only</option>
-        <option value="1">Sign all messages</option>
-        
-        </select> 
-        </div>
-      
-        <!--- SMIME SIGN ENDS HERE --->
-    
-    
-            <!--- PGP ENCRYPTION STARTS HERE --->
-    
-            <div class="form-group">
-              <label><strong>PGP Encryption</strong></label>
-            <!---
-              <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-            --->
-            <select class="form-control" name="pgp_enabled" data-placeholder="pgp_enabled" style="width: 100%">                  
-            <option value="2" selected="selected">Disable</option>
-            <option value="1">Enable</option>
-            
-            </select> 
-            </div>
-          
-            <!--- PGP ENCRYPTION ENDS HERE --->
-    
+      <cfinclude template="./inc/edit_encryption_form_fields.cfm">
 
-  
-            <input type="submit" class="btn btn-danger" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+            <input type="submit" class="btn btn-primary" value="Submit" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
   
               </form>
         </div>
@@ -843,38 +704,18 @@ a, a:hover{
     
     
     
-     <!--- QUARANTINE REPORTS STARTS HERE --->
-    
-     
+     <!--- QUARANTINE NOTIFICATIONS STARTS HERE --->
+
      <div class="form-group">
-      <label><strong>Quarantine Reports</strong></label>
-    <!---
-      <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    <select class="form-control" name="reports" data-placeholder="reports" id="reports" style="width: 100%">                  
-    <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-    <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-    <option value="NO">Disable Quarantine Reports</option>
-    
-    </select> 
+      <label><strong>Quarantine Notifications</strong></label>
+      <p class="help-block">When enabled, users receive an email notification each time a message is quarantined, with a one-click release button.</p>
+    <select class="form-control" name="reports" style="width: 100%">
+    <option value="YES" selected="selected">Enabled</option>
+    <option value="NO">Disabled</option>
+    </select>
     </div>
-    
-         
-              <div class="form-group" id="reportsfrequency">
-                <label><strong>Quarantine Report Frequency</strong></label>
-    <!---
-                <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    
-      <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-      <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-      <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
-      <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
-      <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
-       </select> 
-      </div>
-    
-      <!--- QUARANTINE REPORTS ENDS HERE --->
+
+      <!--- QUARANTINE NOTIFICATIONS ENDS HERE --->
     
     <!--- TRAIN BAYES STARTS HERE --->
     
@@ -1112,27 +953,6 @@ a, a:hover{
   <!--- /CFIF StructKeyExists(form, "reports") --->
   </cfif>
   
-  <!--- FORM.FREQUENCY --->
-  <cfif NOT StructKeyExists(form, "frequency")>
-  
-    <cfset m="Edit Relay Recipients: form.frequency does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-  
-  <cfelseif StructKeyExists(form, "frequency")>
-  
-    <cfif NOT IsValid("integer", #form.frequency#)>
-  
-    <cfset m="Edit Relay Recipients: form.frequency is not valid Integer">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-  
-  <!--- NOT IsValid("integer", #form.frequency#) --->
-  </cfif>
-  
-  <!--- /CFIF StructKeyExists(form, "frequency") --->
-  </cfif>
-  
   <!--- FORM.TRAIN_BAYES --->
   <cfif NOT StructKeyExists(form, "train_bayes")>
   
@@ -1334,6 +1154,13 @@ a, a:hover{
 <!--- /CFIF StructKeyExists(form, "pgp_enabled") --->
 </cfif>
 
+<!--- Default cert/key options if not submitted (hidden fields when encryption disabled) --->
+<cfif NOT StructKeyExists(form, "ca")><cfset form.ca = 1></cfif>
+<cfif NOT StructKeyExists(form, "validity")><cfset form.validity = 1825></cfif>
+<cfif NOT StructKeyExists(form, "cert_encryption")><cfset form.cert_encryption = 2048></cfif>
+<cfif NOT StructKeyExists(form, "cert_algorithm")><cfset form.cert_algorithm = "sha256"></cfif>
+<cfif NOT StructKeyExists(form, "pgp_encryption")><cfset form.pgp_encryption = 2048></cfif>
+
 <!--- FORM.RECIPIENT_ID --->
   <cfif NOT StructKeyExists(form, "recipient_id")>
 
@@ -1355,6 +1182,11 @@ a, a:hover{
 
 <!--- VALIDATE PARAMETERS ABOVE --->
 
+<cfset session.smimeQueued = 0>
+<cfset session.pgpQueued = 0>
+<cfset session.smimeExisting = 0>
+<cfset session.pgpExisting = 0>
+
 <cfloop index="i" list="#form.recipient_id#" delimiters=",">
 
 <cfif IsValid("integer", #i#)>
@@ -1369,11 +1201,77 @@ a, a:hover{
 
     <cfinclude template="./inc/edit_internal_recipients_djigzo.cfm">
 
-    
-      <cfoutput>
-      #i#<br>
-    </cfoutput>
-  
+    <!--- Queue S/MIME cert if enabling and no cert exists --->
+    <cfif form.smime_enabled EQ "1">
+        <cfquery name="existingSmimeCert" datasource="hermes">
+            SELECT id FROM recipient_certificates
+            WHERE user_id = <cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">
+            LIMIT 1
+        </cfquery>
+        <cfif existingSmimeCert.recordcount LT 1>
+            <cfquery name="existingSmimeQueue" datasource="hermes">
+                SELECT id FROM cert_generation_queue
+                WHERE recipient_id = <cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">
+                  AND job_type = 'smime' AND status IN ('pending', 'processing')
+                LIMIT 1
+            </cfquery>
+            <cfif existingSmimeQueue.recordcount LT 1>
+                <cfinclude template="./inc/generate_random_password.cfm">
+                <cfquery datasource="hermes">
+                    INSERT INTO cert_generation_queue
+                    (recipient_id, recipient_email, job_type, ca_id, validity, encryption, algorithm, password)
+                    VALUES
+                    (<cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+                     'smime',
+                     <cfqueryparam value="#form.ca#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#form.validity#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#form.cert_encryption#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#form.cert_algorithm#" cfsqltype="cf_sql_varchar">,
+                     <cfqueryparam value="#generatedPassword#" cfsqltype="cf_sql_varchar">)
+                </cfquery>
+                <cfset session.smimeQueued = session.smimeQueued + 1>
+            </cfif>
+        <cfelse>
+            <cfset session.smimeExisting = session.smimeExisting + 1>
+        </cfif>
+    </cfif>
+
+    <!--- Queue PGP keyring if enabling and no keyring exists --->
+    <cfif form.pgp_enabled EQ "1">
+        <cfquery name="existingPgpKeyring" datasource="hermes">
+            SELECT id FROM recipient_keystores
+            WHERE user_id = <cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">
+              AND master = '1'
+            LIMIT 1
+        </cfquery>
+        <cfif existingPgpKeyring.recordcount LT 1>
+            <cfquery name="existingPgpQueue" datasource="hermes">
+                SELECT id FROM cert_generation_queue
+                WHERE recipient_id = <cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">
+                  AND job_type = 'pgp' AND status IN ('pending', 'processing')
+                LIMIT 1
+            </cfquery>
+            <cfif existingPgpQueue.recordcount LT 1>
+                <cfinclude template="./inc/generate_random_password.cfm">
+                <cfset pgpNameReal = ListFirst(recipient, "@")>
+                <cfquery datasource="hermes">
+                    INSERT INTO cert_generation_queue
+                    (recipient_id, recipient_email, job_type, pgp_key_length, pgp_name_real, password)
+                    VALUES
+                    (<cfqueryparam value="#getrecipient.id#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+                     'pgp',
+                     <cfqueryparam value="#form.pgp_encryption#" cfsqltype="cf_sql_integer">,
+                     <cfqueryparam value="#pgpNameReal#" cfsqltype="cf_sql_varchar">,
+                     <cfqueryparam value="#generatedPassword#" cfsqltype="cf_sql_varchar">)
+                </cfquery>
+                <cfset session.pgpQueued = session.pgpQueued + 1>
+            </cfif>
+        <cfelse>
+            <cfset session.pgpExisting = session.pgpExisting + 1>
+        </cfif>
+    </cfif>
 
     <!--- /CFIF #getrecipient.recordcount# --->
   </cfif>
@@ -1582,7 +1480,7 @@ a, a:hover{
   select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient,
     recipients.backend_server, recipients.backend_port, recipients.backend_tls,
     recipients.auth_type, recipients.remoteauth_domain,
-    policy.policy_name, user_settings.report_enabled as report_enabled, user_settings.report_frequency as report_frequency, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
+    policy.policy_name, user_settings.report_enabled as report_enabled, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
   from recipients LEFT JOIN policy ON recipients.policy_id = policy.id LEFT JOIN recipient_certificates ON recipients.id = recipient_certificates.user_id  LEFT JOIN recipient_keystores ON recipients.id = recipient_keystores.user_id  LEFT JOIN user_settings ON recipients.recipient = user_settings.email where recipients.domain is NULL group by recipients.id
 
   </cfquery>
@@ -1601,8 +1499,7 @@ a, a:hover{
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
-            <th>Reports</th>
-            <th>Frequency</th>
+            <th>Quarantine Notifications</th>
             <th>Train Bayes</th>
             <th>Download Msgs</th>
             <th>PDF Encrypt</th>
@@ -1631,10 +1528,9 @@ a, a:hover{
             <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
             <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
             <td>#policy_name#</td>
-            <td>#report_enabled#</td>
-            <td>#report_frequency#</td>
-            <td>#train_bayes#</td>
-            <td>#download_msg#</td>
+            <td><cfif report_enabled NEQ "NO"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif train_bayes EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif download_msg EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif pdf_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif smime_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif pgp_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
@@ -1655,8 +1551,7 @@ a, a:hover{
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
-            <th>Reports</th>
-            <th>Frequency</th>
+            <th>Quarantine Notifications</th>
             <th>Train Bayes</th>
             <th>Download Msgs</th>
             <th>PDF Encrypt</th>
@@ -1702,24 +1597,6 @@ a, a:hover{
 
 
 </body>
-
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
-   <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-
-  <script>
-
-    $('#reports').on('change',function(){
-      if( $(this).val()==="NO" ){
-      $("#reportsfrequency").hide()
-      }
-      else{
-      $("#reportsfrequency").show()
-      }
-    });
-    
-    </script>
-  
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT ENDS HERE  --->
 
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE STARTS HERE --->
      <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->

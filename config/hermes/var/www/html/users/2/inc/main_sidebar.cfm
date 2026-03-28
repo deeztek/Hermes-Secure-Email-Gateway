@@ -38,8 +38,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <li class="nav-item">
           <a href="report_settings.cfm" class="nav-link">
-            <i class="nav-icon fas fa-file-invoice"></i>
-            <p><strong>Report Settings</strong></p>
+            <i class="nav-icon fas fa-bell"></i>
+            <p><strong>Notification Settings</strong></p>
           </a>
         </li>
 

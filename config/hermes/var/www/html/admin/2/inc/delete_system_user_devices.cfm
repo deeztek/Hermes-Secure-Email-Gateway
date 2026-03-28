@@ -19,66 +19,24 @@
     --->
 
 
-<!--- GENERATE CUSTOMTRANS --->
-<cfinclude template="generate_customtrans.cfm">
-    
 <!--- DELETE ALL SYSTEM USER TOTP AND WEBAUTHN DEVICES --->
-
-<cffile action="read" file="/opt/hermes/scripts/authelia_delete_user_device_all.sh" variable="delete">
-
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_authelia_delete_user_device_all.sh"
-output = "#REReplace("#delete#","THE-USER","#theUsername#","ALL")#" addnewline="no">
-
-
 <cftry>
+  <!--- Delete TOTP devices via docker exec --->
+  <cfexecute name="/usr/local/bin/docker"
+      arguments="exec hermes_authelia authelia storage user totp delete #theUsername# --config /config/configuration.yml"
+      timeout="30"
+      variable="totpDeleteResult"
+      errorVariable="totpDeleteError">
+  </cfexecute>
 
-
-    <cfexecute name = "/bin/chmod"
-    arguments="+x /opt/hermes/tmp/#customtrans3#_authelia_delete_user_device_all.sh"
-    timeout = "60">
-    </cfexecute>
-
-    <cfcatch type="any">
-
-        <!--- DEBUG --->
-      <!---
-      <cfdump var="#cfcatch#">
-        --->
-    
-      </cfcatch>
-    
-    </cftry>
-    
-
-<cftry>
-  
-    <cfexecute name = "/opt/hermes/tmp/#customtrans3#_authelia_delete_user_device_all.sh"
-    timeout = "240"
-    outputfile ="/dev/null"
-    arguments="-inputformat none">
-    </cfexecute>
-
+  <!--- Delete WebAuthn devices via docker exec --->
+  <cfexecute name="/usr/local/bin/docker"
+      arguments="exec hermes_authelia authelia storage user webauthn delete #theUsername# --config /config/configuration.yml --all"
+      timeout="30"
+      variable="webauthnDeleteResult"
+      errorVariable="webauthnDeleteError">
+  </cfexecute>
 <cfcatch type="any">
-
-    <!--- DEBUG --->
-  <!---
-  <cfdump var="#cfcatch#">
-    --->
-
-  </cfcatch>
-
+  <!--- Log error but continue processing --->
+</cfcatch>
 </cftry>
-
-  <!--- Delete File --->
-  <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_authelia_delete_user_device_all.sh">
-  <cfif fileExists(FiletoDelete)> 
-  <cffile action="delete" 
-  file = "#FiletoDelete#">
-  
-  <!--- /CFIF FiletoDelete --->
-  </cfif>
-        
-            
-    
-    

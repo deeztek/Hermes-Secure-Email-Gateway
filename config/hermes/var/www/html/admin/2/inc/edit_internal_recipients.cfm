@@ -38,7 +38,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         update user_settings 
         set 
         report_enabled = '#form.reports#',
-        report_frequency = '#form.frequency#', 
         train_bayes = '#form.train_bayes#', 
         download_msg = '#form.download_msg#'
         where email = '#recipient#'
@@ -46,16 +45,4 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
           <!--- EDIT USER_SETTINGS ENDS HERE --->
 
-<!---
-<cfif #form.pdf_enabled# is "1" OR #form.smime_enabled# is "1" OR #form.pgp_enabled# is "1">
---->
-
-<!---
-<cfinclude template="edit_internal_recipients_djigzo.cfm">
---->
-
-<!--- /CFIF pdf_enabled# is "1" OR #smime_enabled# is "1" OR #pgp_enabled# is "1" --->
-<!---
-</cfif> 
---->
 

@@ -140,5 +140,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="deletecert" datasource="hermes">
     delete from recipient_certificates where id='#form.certificate_id#'
     </cfquery>
-    
+
+    <!--- Disable S/MIME encryption if no certificates remain for this recipient --->
+    <cfquery name="remainingCerts" datasource="hermes">
+        SELECT id FROM recipient_certificates
+        WHERE user_id = <cfqueryparam value="#getcerts.user_id#" cfsqltype="cf_sql_integer">
+        LIMIT 1
+    </cfquery>
+    <cfif remainingCerts.recordcount LT 1>
+        <cfquery datasource="hermes">
+            UPDATE recipients SET smime_enabled = '2'
+            WHERE id = <cfqueryparam value="#getcerts.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <!--- Disable S/MIME in Ciphermail --->
+        <cfquery name="getRecipientEmail" datasource="hermes">
+            SELECT recipient FROM recipients WHERE id = <cfqueryparam value="#getcerts.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfif getRecipientEmail.recordcount GTE 1>
+            <cftry>
+                <cfexecute name="/usr/local/bin/docker"
+                    arguments="exec hermes_ciphermail /usr/bin/java -cp /usr/share/djigzo/lib/* mitm.application.djigzo.tools.CLITool --set-property user.sMIMEEnabled --value false --email #getRecipientEmail.recipient#"
+                    timeout="60" variable="smimeDisableResult" errorVariable="smimeDisableError">
+                </cfexecute>
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+        </cfif>
+    </cfif>
+
     <!-- DELETE FROM HERMES CERTITIFCATE STORE ENDS HERE --> 

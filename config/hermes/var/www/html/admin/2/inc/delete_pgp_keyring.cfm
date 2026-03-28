@@ -167,7 +167,34 @@ select * from external_recipients where id='#getkeys.user_id#'
     </cfif>
     
     <!-- DELETE FROM GNUPG ENDS HERE -->
-    
+
+    <!--- Disable PGP encryption if no keyrings remain for this recipient --->
+    <cfquery name="remainingKeyrings" datasource="hermes">
+        SELECT id FROM recipient_keystores
+        WHERE user_id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+          AND master = '1'
+        LIMIT 1
+    </cfquery>
+    <cfif remainingKeyrings.recordcount LT 1>
+        <cfquery datasource="hermes">
+            UPDATE recipients SET pgp_enabled = '2'
+            WHERE id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <!--- Disable PGP in Ciphermail --->
+        <cfquery name="getRecipientEmail" datasource="hermes">
+            SELECT recipient FROM recipients WHERE id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfif getRecipientEmail.recordcount GTE 1>
+            <cftry>
+                <cfexecute name="/usr/local/bin/docker"
+                    arguments="exec hermes_ciphermail /usr/bin/java -cp /usr/share/djigzo/lib/* mitm.application.djigzo.tools.CLITool --set-property user.pgp.enabled --value false --email #getRecipientEmail.recipient#"
+                    timeout="60" variable="pgpDisableResult" errorVariable="pgpDisableError">
+                </cfexecute>
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+        </cfif>
+    </cfif>
+
     <cfelseif #thekeytype# is "sub">
     
     <cfquery name="getkeystoredetails" datasource="hermes">
@@ -208,7 +235,34 @@ select * from external_recipients where id='#getkeys.user_id#'
     </cfquery>
     
     <!-- SINCE THERE IS NO WAY TO DELETE SUB KEY FROM GNUPG WITHOUT INTERACTIVE PROMPTS, WE DON'T DELETE FROM GNUPG FOR A SUB KEY -->
-    
+
+    <!--- Disable PGP encryption if no keyrings remain for this recipient --->
+    <cfquery name="remainingKeyrings2" datasource="hermes">
+        SELECT id FROM recipient_keystores
+        WHERE user_id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+          AND master = '1'
+        LIMIT 1
+    </cfquery>
+    <cfif remainingKeyrings2.recordcount LT 1>
+        <cfquery datasource="hermes">
+            UPDATE recipients SET pgp_enabled = '2'
+            WHERE id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <!--- Disable PGP in Ciphermail --->
+        <cfquery name="getRecipientEmail2" datasource="hermes">
+            SELECT recipient FROM recipients WHERE id = <cfqueryparam value="#getkeys.user_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfif getRecipientEmail2.recordcount GTE 1>
+            <cftry>
+                <cfexecute name="/usr/local/bin/docker"
+                    arguments="exec hermes_ciphermail /usr/bin/java -cp /usr/share/djigzo/lib/* mitm.application.djigzo.tools.CLITool --set-property user.pgp.enabled --value false --email #getRecipientEmail2.recipient#"
+                    timeout="60" variable="pgpDisableResult2" errorVariable="pgpDisableError2">
+                </cfexecute>
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+        </cfif>
+    </cfif>
+
     <!-- /CFIF thekeytype -->
     </cfif>
     

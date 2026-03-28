@@ -109,7 +109,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   "10": {type:"danger",  msg:"The Password field cannot be blank"},
   "11": {type:"danger",  msg:"The Password must be between 8 and 64 characters long"},
   "12": {type:"danger",  msg:"No password has been set for this user. You must set the <strong>Set User Password</strong> field to YES in order to continue"},
-  "13": {type:"danger",  msg:"The Username you are attempting to use already exists"},
+  "13": {type:"danger",  msg:"The Username you are attempting to use already exists. Usernames must be unique across all authentication types (Local and Remote). If adding a Remote Auth user whose username conflicts with an existing user, use a unique variant such as <strong>username@domain</strong> or <strong>username.domain</strong>"},
   "14": {type:"success", msg:"System User was saved successfully"},
   "15": {type:"success", msg:"System User 2FA devices were deleted successfully"},
   "16": {type:"warning", msg:"This user has not yet been synchronized to LDAP. To complete the synchronization, you must set <strong>Set User Password</strong> to YES and enter a new password. The user's existing password cannot be migrated to LDAP."},

@@ -3,6 +3,9 @@
 --
 -- Run this script against the hermes database:
 -- docker exec -i hermes_db_server mysql -u root hermes < /path/to/schema_updates.sql
+--
+-- DBeaver: Set delimiter to "//" before running (Edit > Preferences > SQL Editor > Statement Delimiter)
+-- or run each section individually.
 
 -- ============================================================================
 -- SYSTEM_USERS TABLE: Add ldap_synced column
@@ -67,9 +70,9 @@ WHERE NOT EXISTS (
 DELETE FROM parameters
 WHERE module = 'network';
 
--- 5b) Clean up legacy network module in parameters2 (keep server_ip for Host IP)
+-- 5b) Clean up legacy network module in parameters2 (keep server_ip, server_name, server_domain)
 DELETE FROM parameters2
-WHERE module = 'network' AND parameter <> 'server_ip';
+WHERE module = 'network' AND parameter NOT IN ('server_ip', 'server_name', 'server_domain');
 
 -- 6) For child rows, fill parent_name from the parent's parameter
 UPDATE parameters AS c
@@ -290,12 +293,15 @@ WHERE NOT EXISTS (
 -- ============================================================================
 
 -- Only modify if column is smaller than 1024 characters
+DELIMITER //
 SET @col_size = (SELECT CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_settings' AND COLUMN_NAME = 'value');
 SET @sql = IF(@col_size < 1024, 'ALTER TABLE system_settings MODIFY value VARCHAR(1024)', 'SELECT 1');
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+//
+DELIMITER ;
 
 -- ============================================================================
 -- SYSTEM_SETTINGS TABLE: Add cleanup_threshold for retention policy storage
@@ -484,6 +490,7 @@ CREATE DATABASE IF NOT EXISTS authelia CHARACTER SET utf8mb4 COLLATE utf8mb4_uni
 -- Create Authelia user only if it doesn't exist
 -- Note: Password should be changed immediately after initial setup via:
 --   ALTER USER 'authelia'@'%' IDENTIFIED BY 'your_secure_password';
+DELIMITER //
 SET @authelia_user_exists = (SELECT COUNT(*) FROM mysql.user WHERE user = 'authelia' AND host = '%');
 SET @sql = IF(@authelia_user_exists = 0,
     "CREATE USER 'authelia'@'%' IDENTIFIED BY 'CHANGE_ME_AUTHELIA_DB_PASSWORD'",
@@ -491,9 +498,12 @@ SET @sql = IF(@authelia_user_exists = 0,
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+//
+DELIMITER ;
 
 -- Grant privileges only if not already granted
 -- This avoids the "Access denied" error when root@% tries to re-grant on existing database
+DELIMITER //
 SET @authelia_grant_exists = (SELECT COUNT(*) FROM mysql.db WHERE User = 'authelia' AND Host = '%' AND Db = 'authelia');
 SET @sql = IF(@authelia_grant_exists = 0,
     "GRANT ALL PRIVILEGES ON authelia.* TO 'authelia'@'%'",
@@ -501,6 +511,8 @@ SET @sql = IF(@authelia_grant_exists = 0,
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+//
+DELIMITER ;
 FLUSH PRIVILEGES;
 
 -- ============================================================================
@@ -739,6 +751,7 @@ SELECT 'relay_host_password', '' WHERE NOT EXISTS (SELECT 1 FROM system_settings
 DELETE FROM system_certificates WHERE id IS NULL;
 
 -- Add primary key if not already set (required for AUTO_INCREMENT)
+DELIMITER //
 SET @pk_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
                   WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_certificates' AND CONSTRAINT_TYPE = 'PRIMARY KEY');
 SET @sql = IF(@pk_exists = 0,
@@ -747,6 +760,8 @@ SET @sql = IF(@pk_exists = 0,
 PREPARE stmt FROM @sql;
 EXECUTE stmt;
 DEALLOCATE PREPARE stmt;
+//
+DELIMITER ;
 
 ALTER TABLE system_certificates MODIFY id INT NOT NULL AUTO_INCREMENT;
 
@@ -772,5 +787,162 @@ WHERE NOT EXISTS (
     SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-authelia-log-rotate"]'
 );
 
+-- ============================================================================
+-- MSGRCPT TABLE: Add notification_sent column for near real-time quarantine
+-- notifications. Tracks whether a quarantine notification email has been sent
+-- for each quarantined message. (0=pending, 1=sent, 2=user opted out)
+-- See GitHub issue #180
+-- ============================================================================
+
+ALTER TABLE msgrcpt ADD COLUMN IF NOT EXISTS notification_sent TINYINT(3) NOT NULL DEFAULT 0;
+
+-- Composite index for quarantine notification polling query
+-- Covers: WHERE ds IN ('B','D') AND notification_sent = 0
+CREATE INDEX IF NOT EXISTS idx_msgrcpt_notify ON msgrcpt(ds, notification_sent);
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Add near real-time quarantine notification job
+-- Runs every 60s to send individual notification emails for newly quarantined
+-- messages. Replaces the batch quarantine digest reports.
+-- See GitHub issue #180
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-quarantine-notify"]',
+       '@every 60s',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_notify.cfm',
+       'hermes_commandbox',
+       '1',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-notify"]'
+);
+
+-- ============================================================================
+-- USER_SETTINGS: Migrate 'ALL' report_enabled to 'YES' for near real-time
+-- notifications. The 'ALL' option (send report even if no quarantined messages)
+-- is no longer relevant since notifications are per-message.
+-- See GitHub issue #180
+-- ============================================================================
+
+UPDATE user_settings SET report_enabled = 'YES' WHERE report_enabled = 'ALL';
+
+-- Drop obsolete report_frequency column (no longer used with per-message notifications)
+ALTER TABLE user_settings DROP COLUMN IF EXISTS report_frequency;
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Add no_overlap column for jobs that should not run
+-- concurrently (e.g., quarantine notifications every 60s).
+-- See GitHub issue #180
+-- ============================================================================
+
+ALTER TABLE ofelia_jobs ADD COLUMN IF NOT EXISTS no_overlap TINYINT(3) NOT NULL DEFAULT 0;
+
+UPDATE ofelia_jobs SET no_overlap = 1
+WHERE job_name = '[job-exec "hermes-quarantine-notify"]' AND no_overlap = 0;
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Ensure cert queue processor exists and set no_overlap
+-- Processes S/MIME certificate and PGP keyring generation queue every 60s.
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type, no_overlap)
+SELECT '[job-exec "hermes-process-cert-queue"]',
+       '@every 60s',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm',
+       'hermes_commandbox',
+       '1',
+       'system',
+       1
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-process-cert-queue"]'
+);
+
+UPDATE ofelia_jobs SET no_overlap = 1
+WHERE job_name = '[job-exec "hermes-process-cert-queue"]' AND no_overlap = 0;
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Ensure remaining core jobs exist (safety net for new installs)
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "renew-acme-certificate"]',
+       '0 05 12 * * *',
+       '/opt/hermes/schedule/renew_acme_certificate.sh',
+       'hermes_commandbox',
+       '1',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "renew-acme-certificate"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-message-cleanup"]',
+       '0 30 01 * * *',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/message_cleanup.cfm',
+       'hermes_commandbox',
+       '1',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-message-cleanup"]'
+);
+
+-- ============================================================================
+-- OFELIA_JOBS TABLE: Disable legacy quarantine report jobs
+-- (replaced by hermes-quarantine-notify, see GitHub issue #180)
+-- Inserts are for new installs that may not have these rows yet.
+-- ============================================================================
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-quarantine-report-2-hours"]',
+       '@every 2h',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=2',
+       'hermes_commandbox',
+       '2',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-2-hours"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-quarantine-report-4-hours"]',
+       '@every 4h',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=4',
+       'hermes_commandbox',
+       '2',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-4-hours"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-quarantine-report-8-hours"]',
+       '@every 8h',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=8',
+       'hermes_commandbox',
+       '2',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-8-hours"]'
+);
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-quarantine-report-daily"]',
+       '0 30 12 * * *',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report_daily.cfm',
+       'hermes_commandbox',
+       '2',
+       'system'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-daily"]'
+);
+
+-- Disable legacy quarantine report jobs for existing installs that may have them active
+UPDATE ofelia_jobs SET active = '2'
+WHERE job_name IN (
+    '[job-exec "hermes-quarantine-report-2-hours"]',
+    '[job-exec "hermes-quarantine-report-4-hours"]',
+    '[job-exec "hermes-quarantine-report-8-hours"]',
+    '[job-exec "hermes-quarantine-report-daily"]'
+) AND active = '1';
 
 

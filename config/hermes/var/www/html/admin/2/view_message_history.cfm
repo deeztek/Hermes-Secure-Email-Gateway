@@ -2111,24 +2111,6 @@ id="btn-back-to-top"
 
 </body>
 
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
-   <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-
-  <script>
-
-    $('#reports').on('change',function(){
-      if( $(this).val()==="NO" ){
-      $("#reportsfrequency").hide()
-      }
-      else{
-      $("#reportsfrequency").show()
-      }
-    });
-    
-    </script>
-  
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT ENDS HERE  --->
-
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE STARTS HERE --->
      <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
   <script>

@@ -26,28 +26,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Report Settings</title>
+  <title>Hermes SEG | Notification Settings</title>
 
   <cfinclude template="./inc/html_head.cfm" />
 
 
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
 
 </head>
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
@@ -66,7 +49,7 @@ a, a:hover{
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
-            <h1 class="m-0">Report Settings</h1>
+            <h1 class="m-0">Notification Settings</h1>
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
             --->
@@ -76,7 +59,7 @@ a, a:hover{
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item active">Report Settings</li>
+              <li class="breadcrumb-item active">Notification Settings</li>
             </ol>
           </div><!-- /.col -->
         </div><!-- /.row -->
@@ -138,10 +121,8 @@ a, a:hover{
 </cfif>
 
 <cfquery name="getreportsettings" datasource="hermes">
-select report_frequency, report_enabled from user_settings where email = '#session.email#'
+select report_enabled from user_settings where email = '#session.email#'
 </cfquery>
-
-<cfparam name = "report_frequency" default = "#getreportsettings.report_frequency#">
 
 <cfparam name = "report_enabled" default = "#getreportsettings.report_enabled#">
 
@@ -168,7 +149,7 @@ select report_frequency, report_enabled from user_settings where email = '#sessi
           <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
             <h4><i class="icon fa fa-check"></i> Success!</h4>
-            <cfoutput>Report Settings set successfully</cfoutput><br>
+            <cfoutput>Notification Settings saved successfully</cfoutput><br>
 
        
         
@@ -188,63 +169,25 @@ select report_frequency, report_enabled from user_settings where email = '#sessi
   
 <cfif #action# is "setreports">
 
-<!--- VALIDATE PARAMETERS BELOW --->
-<!--- FORM.REPORTS --->
+<!--- VALIDATE PARAMETERS --->
 <cfif NOT StructKeyExists(form, "reports")>
-  
-  <cfset m="report Settings: form.reports does not exist">
+  <cfset m="Notification Settings: form.reports does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
+</cfif>
 
-<cfelseif StructKeyExists(form, "reports")>
-
-<cfif #form.reports# is "YES" OR #form.reports# is "NO" OR #form.reports# is "ALL">
-
-<cfelse>
-
-  <cfset m="Report Recipients: form.reports is not YEs, NO, or ALL">
+<cfif NOT ListFindNoCase("YES,NO", form.reports)>
+  <cfset m="Notification Settings: invalid reports value">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
-
-<!--- #form.reports# is "YES" OR #form.reports# is "NO" OR #form.reports# is "ALL" --->
 </cfif>
 
-<!--- /CFIF StructKeyExists(form, "reports") --->
-</cfif>
-
-<!--- FORM.FREQUENCY --->
-<cfif NOT StructKeyExists(form, "frequency")>
-
-  <cfset m="Edit Relay Recipients: form.frequency does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<cfelseif StructKeyExists(form, "frequency")>
-
-  <cfif NOT IsValid("integer", #form.frequency#)>
-
-  <cfset m="Report Settings: form.frequency is not valid Integer">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- NOT IsValid("integer", #form.frequency#) --->
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "frequency") --->
-</cfif>
-
-
-<!--- EDIT USER_SETTINGS STARTS HERE --->
-
-  <cfquery name="editusersettings" datasource="hermes">
-      update user_settings 
-      set 
-      report_enabled = '#form.reports#',
-      report_frequency = '#form.frequency#'
-     where email = '#session.email#'
-      </cfquery>
-
-        <!--- EDIT USER_SETTINGS ENDS HERE --->
+<!--- SAVE SETTINGS --->
+<cfquery name="editusersettings" datasource="hermes">
+    UPDATE user_settings
+    SET report_enabled = <cfqueryparam value="#form.reports#" cfsqltype="cf_sql_varchar">
+    WHERE email = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+</cfquery>
 
         <cfset session.m = 7>
         <cflocation url="report_settings.cfm" addtoken="no">
@@ -252,59 +195,23 @@ select report_frequency, report_enabled from user_settings where email = '#sessi
       <!--- /CFIF #action# is --->     
     </cfif> 
     
-        <!--- QUARANTINE REPORTS CARD --->
+        <!--- QUARANTINE NOTIFICATIONS CARD --->
         <div class="card card-outline card-primary mb-4">
             <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-file-alt me-2"></i>Quarantine Reports</h3>
+                <h3 class="card-title"><i class="fas fa-bell me-2"></i>Quarantine Notifications</h3>
             </div>
             <div class="card-body">
+                <p>When enabled, you will receive an email notification each time a message to your address is quarantined. Each notification includes a one-click <strong>Release Message</strong> button that does not require logging in.</p>
                 <form action="" method="post">
                     <input type="hidden" name="action" value="setreports">
 
                     <div class="mb-3">
-                        <label class="form-label"><strong>Quarantine Reports</strong></label>
-                        <select class="form-control" name="reports" id="reports" style="width: 100%">
-                            <cfif #report_enabled# is "YES">
-                                <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-                                <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-                                <option value="NO">Disable Quarantine Reports</option>
-                            <cfelseif #report_enabled# is "ALL">
-                                <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
-                                <option value="ALL" selected="selected">Enable Report Regardless if Quarantined Messages Exist</option>
-                                <option value="NO">Disable Quarantine Reports</option>
-                            <cfelseif #report_enabled# is "NO">
-                                <option value="YES">Enable Report Only if Quarantined Messages Exist</option>
-                                <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-                                <option value="NO" selected="selected">Disable Quarantine Reports</option>
-                            <cfelse>
-                                <cfset m="Report Settings: report_enabled is not YES, ALL or NO">
-                                <cfinclude template="./inc/error.cfm">
-                                <cfabort>
-                            </cfif>
+                        <label class="form-label"><strong>Quarantine Notifications</strong></label>
+                        <select class="form-control" name="reports" style="width: 100%">
+                            <option value="YES" <cfif report_enabled NEQ "NO">selected</cfif>>Enabled</option>
+                            <option value="NO" <cfif report_enabled EQ "NO">selected</cfif>>Disabled</option>
                         </select>
                     </div>
-
-                    <cfif #report_enabled# is "NO">
-                        <div class="mb-3" id="reportsfrequency" style="display:none;">
-                            <label class="form-label"><strong>Quarantine Report Frequency</strong></label>
-                            <select class="form-control" name="frequency" style="width: 100%">
-                                <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-                                <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
-                                <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
-                                <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
-                            </select>
-                        </div>
-                    <cfelse>
-                        <div class="mb-3" id="reportsfrequency">
-                            <label class="form-label"><strong>Quarantine Report Frequency</strong></label>
-                            <select class="form-control" name="frequency" style="width: 100%">
-                                <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-                                <option value="2">Every 2 Hours (Previous 2 Hours Quarantine Report)</option>
-                                <option value="4">Every 4 Hours (Previous 4 Hours Quarantine Report)</option>
-                                <option value="8">Every 8 Hours (Previous 8 Hours Quarantine Report)</option>
-                            </select>
-                        </div>
-                    </cfif>
 
                     <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Please wait...';this.form.submit();">
                         <i class="fas fa-save me-1"></i> Save Settings
@@ -331,21 +238,5 @@ select report_frequency, report_enabled from user_settings where email = '#sessi
 
   
 
-   <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
-   <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-
-   <script>
-
-    $('#reports').on('change',function(){
-      if( $(this).val()==="NO" ){
-      $("#reportsfrequency").hide()
-      }
-      else{
-      $("#reportsfrequency").show()
-      }
-    });
-    
-    </script>
-    
 
 </html>

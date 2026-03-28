@@ -15,6 +15,7 @@ RUN apt-get update && \
     iputils-ping \
     rar \
     sendemail \
+    libio-socket-inet6-perl \
     haveged \
     gnupg \
     dmidecode \

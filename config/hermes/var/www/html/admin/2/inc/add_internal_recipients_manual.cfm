@@ -155,9 +155,9 @@ textarea: #show_recipient#
 
     <cfquery name="insertreport" datasource="hermes">
         INSERT INTO user_settings
-        (email, report_enabled, report_frequency, train_bayes, download_msg)
+        (email, report_enabled, train_bayes, download_msg)
         VALUES
-        ('#recipient#', '#show_reports#', '#show_frequency#', '#show_train_bayes#', '#show_download_msg#')
+        ('#recipient#', '#show_reports#', '#show_train_bayes#', '#show_download_msg#')
     </cfquery>
 
     <!--- INSERT INTO USER_SETTINGS ENDS HERE --->

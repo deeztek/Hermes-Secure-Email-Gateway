@@ -12,6 +12,7 @@ $inet_socket_bind = '0.0.0.0';
 @inet_acl = qw(127.0.0.1 172.16.32.0/24);
 $inet_socket_port = [10021, 10030];
 $forward_method = 'smtp:hermes_ciphermail:25';
+$notify_method = 'smtp:hermes_postfix_dkim:10026';
 #$inet_socket_port = 10021;
 $mydomain = 'SERVER-DOMAIN';
 $myhostname = 'SERVER-NAME.SERVER-DOMAIN';

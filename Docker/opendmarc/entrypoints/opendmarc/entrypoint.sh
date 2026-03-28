@@ -3,6 +3,7 @@
 echo "Starting Hermes SEG DMARC"
 
 echo "Setting Permissions"
+touch /etc/opendmarc/opendmarc.dat
 chown -R opendmarc:opendmarc /etc/opendmarc
 
 echo "Starting Ryslog"

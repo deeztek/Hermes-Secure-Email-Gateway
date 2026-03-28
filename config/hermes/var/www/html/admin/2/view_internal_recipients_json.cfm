@@ -336,38 +336,18 @@ $(document).ready(function() {
     
     
     
-     <!--- QUARANTINE REPORTS STARTS HERE --->
-    
-     
+     <!--- QUARANTINE NOTIFICATIONS STARTS HERE --->
+
      <div class="form-group">
-      <label><strong>Quarantine Reports</strong></label>
-    <!---
-      <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    <select class="form-control" name="reports" data-placeholder="reports" id="reports" style="width: 100%">                  
-    <option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-    <option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-    <option value="NO">Disable Quarantine Reports</option>
-    
-    </select> 
+      <label><strong>Quarantine Notifications</strong></label>
+      <p class="help-block">When enabled, users receive an email notification each time a message is quarantined, with a one-click release button.</p>
+    <select class="form-control" name="reports" style="width: 100%">
+    <option value="YES" selected="selected">Enabled</option>
+    <option value="NO">Disabled</option>
+    </select>
     </div>
-    
-         
-              <div class="form-group" id="reportsfrequency">
-                <label><strong>Quarantine Report Frequency</strong></label>
-    <!---
-                <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
-    --->
-    
-      <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-      <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-      <option value="2">Every 2 Hours (Current Day's Quarantine Report)</option>
-      <option value="4">Every 4 Hours (Current Day's Quarantine Report)</option>
-      <option value="8">Every 8 Hours (Current Day's Quarantine Report)</option>
-       </select> 
-      </div>
-    
-      <!--- QUARANTINE REPORTS ENDS HERE --->
+
+      <!--- QUARANTINE NOTIFICATIONS ENDS HERE --->
     
     <!--- TRAIN BAYES STARTS HERE --->
     
@@ -593,48 +573,17 @@ $(document).ready(function() {
 <!--- /CFIF StructKeyExists(form, "policy") --->
 </cfif>
 
-<!--- FORM.REPORTS --->
+<!--- FORM.REPORTS (Quarantine Notifications: YES or NO) --->
 <cfif NOT StructKeyExists(form, "reports")>
-
   <cfset m="Edit Relay Recipients: form.reports does not exist">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
-
-<cfelseif StructKeyExists(form, "reports")>
-
-<cfif #form.reports# is "YES" OR #form.reports# is "NO" OR #form.reports# is "ALL">
-
-<cfelse>
-
-  <cfset m="Edit Relay Recipients: form.reports is not YEs, NO, or ALL">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- #form.reports# is "YES" OR #form.reports# is "NO" OR #form.reports# is "ALL" --->
 </cfif>
 
-<!--- /CFIF StructKeyExists(form, "reports") --->
-</cfif>
-
-<!--- FORM.FREQUENCY --->
-<cfif NOT StructKeyExists(form, "frequency")>
-
-  <cfset m="Edit Relay Recipients: form.frequency does not exist">
+<cfif NOT ListFindNoCase("YES,NO", form.reports)>
+  <cfset m="Edit Relay Recipients: form.reports is not YES or NO">
   <cfinclude template="./inc/error.cfm">
   <cfabort>
-
-<cfelseif StructKeyExists(form, "frequency")>
-
-  <cfif NOT IsValid("integer", #form.frequency#)>
-
-  <cfset m="Edit Relay Recipients: form.frequency is not valid Integer">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-
-<!--- NOT IsValid("integer", #form.frequency#) --->
-</cfif>
-
-<!--- /CFIF StructKeyExists(form, "frequency") --->
 </cfif>
 
 <!--- FORM.TRAIN_BAYES --->
@@ -942,8 +891,7 @@ $(document).ready(function() {
             <th>PGP Keyrings</th>
             <th>Recipient</th>
             <th>Policy</th>
-            <th>Reports</th>
-            <th>Frequency</th>
+            <th>Quarantine Notifications</th>
             <th>Train Bayes</th>
             <th>Download Msgs</th>
             <th>PDF Encrypt</th>
@@ -991,8 +939,7 @@ $(document).ready(function() {
               <th>PGP Keyrings</th>
               <th>Recipient</th>
               <th>Policy</th>
-              <th>Quarantine Reports</th>
-              <th>Reports Frequency(Hours)</th>
+              <th>Quarantine Notifications</th>
               <th>Train Bayes</th>
               <th>Download Msg(s)</th>
               <th>PDF Encrypt</th>
@@ -1046,22 +993,5 @@ $(document).ready(function() {
 
 </body>
 
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT STARTS HERE  --->
-   <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-
-  <script>
-
-    $('#reports').on('change',function(){
-      if( $(this).val()==="NO" ){
-      $("#reportsfrequency").hide()
-      }
-      else{
-      $("#reportsfrequency").show()
-      }
-    });
-    
-    </script>
-  
-  <!--- SCRIPT TO SHOW/HIDE SCHEDULE IMPORT FREQUENCY SCRIPT ENDS HERE  --->
 
 </html>

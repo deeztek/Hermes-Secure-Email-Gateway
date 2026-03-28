@@ -21,7 +21,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <cfquery name="getofeliajobs" datasource="hermes">
- select job_name, schedule, command, container, active from ofelia_jobs where active = '1'
+ select job_name, schedule, command, container, active, no_overlap from ofelia_jobs where active = '1'
   </cfquery>
 
 <cfif #getofeliajobs.recordcount# GTE 1>
@@ -38,9 +38,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfoutput query="getofeliajobs">
 
+<cfset jobBlock = "#job_name##chr(10)#schedule = #schedule##chr(10)#container = #container##chr(10)#command = #command#">
+<cfif no_overlap EQ 1><cfset jobBlock = jobBlock & "#chr(10)#no-overlap = true"></cfif>
 <cffile action = "append"
     file = "/opt/hermes/tmp/#customtrans3#_ofelia_jobs"
-    output = "#job_name##chr(10)#schedule = #schedule##chr(10)#container = #container##chr(10)#command = #command##chr(10)##chr(10)#"
+    output = "#jobBlock##chr(10)##chr(10)#"
     addNewLine = "no">
 
 </cfoutput>

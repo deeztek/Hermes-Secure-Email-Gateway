@@ -149,48 +149,20 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <!--- /CFIF StructKeyExists(form, "policy")--->
 </cfif>
 
-<!--- SHOW_REPORTS --->
-<cfparam name = "show_reports" default = ""> 
+<!--- SHOW_REPORTS (Quarantine Notifications: YES or NO) --->
+<cfparam name = "show_reports" default = "">
 
 <cfif StructKeyExists(form, "reports")>
-
-
-<cfif #form.reports# is "YES" OR #form.reports# is "NO" OR #form.reports# is "ALL">
-
-<cfset show_reports = #form.reports#>
-
+<cfif ListFindNoCase("YES,NO", form.reports)>
+<cfset show_reports = form.reports>
 <cfelse>
-
-<cfset m="Add Relay Recipients: form.reports is not YES, NO or ALL">
+<cfset m="Add Internal Recipients: form.reports is not YES or NO">
 <cfinclude template="./inc/error.cfm">
 <cfabort>
-
-<!--- /CFIF #form.reports# is not "YES" OR #form.reports# is not "NO" OR #form.reports# is not "ALL" --->
+</cfif>
 </cfif>
 
-<!--- /CFIF StructKeyExists(form, "policy")--->
-</cfif>
 
-<!--- SHOW_FREQUENCY --->
-<cfparam name = "show_frequency" default = ""> 
-  
-<cfif StructKeyExists(form, "frequency")>
-  
-<cfif NOT IsValid("integer", #form.frequency#)>
-
-<cfset m="Add Relay Recipients: form.frequency is not integer">
-<cfinclude template="./inc/error.cfm">
-<cfabort>
-
-<cfelse>
-
-<cfset show_frequency = #form.frequency#>  
-  
-<!--- /CFIF NOT IsValid("integer", #form.frequency#) --->
-</cfif>
-  
-<!--- /CFIF StructKeyExists(form, "frequency")--->
-</cfif>
 
 
 <!--- SHOW_TRAIN_BAYES --->
@@ -658,40 +630,18 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 
 
- <!--- QUARANTINE REPORTS STARTS HERE --->
+ <!--- QUARANTINE NOTIFICATIONS STARTS HERE --->
 
- 
  <div class="form-group">
-  <label><strong>Quarantine Reports</strong></label>
-<!---
-  <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
---->
-<select class="form-control" name="reports" data-placeholder="reports" id="reports" style="width: 100%">                  
-<option value="YES" selected="selected">Enable Report Only if Quarantined Messages Exist</option>
-<option value="ALL">Enable Report Regardless if Quarantined Messages Exist</option>
-<option value="NO">Disable Quarantine Reports</option>
-
-
-</select> 
+  <label><strong>Quarantine Notifications</strong></label>
+  <p class="help-block">When enabled, users receive an email notification each time a message is quarantined, with a one-click release button.</p>
+<select class="form-control" name="reports" style="width: 100%">
+<option value="YES" selected="selected">Enabled</option>
+<option value="NO">Disabled</option>
+</select>
 </div>
 
-     
-          <div class="form-group" id="reportsfrequency">
-            <label><strong>Quarantine Report Frequency</strong></label>
-<!---
-            <p class="help-block">Effective only Quarantined Report is set to one of the <b>Enable Report</b> options above</p>
---->
-
-  <select class="form-control select2" name="frequency" data-placeholder="frequency" style="width: 100%">                  
-  <option value="24" selected="selected">Daily (Previous Day's Quarantine Report)</option>
-  <option value="2">Every 2 Hours (Current Day's Quarantine Report)</option>
-  <option value="4">Every 4 Hours (Current Day's Quarantine Report)</option>
-  <option value="8">Every 8 Hours (Current Day's Quarantine Report)</option>
- 
-   </select> 
-  </div>
-
-  <!--- QUARANTINE REPORTS ENDS HERE --->
+  <!--- QUARANTINE NOTIFICATIONS ENDS HERE --->
 
 <!--- TRAIN BAYES STARTS HERE --->
 
@@ -978,16 +928,6 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 <!--- SCRIPT TO SHOW/HIDE FORM OPTIONS  --->
 
 <script>
-
-  // Show/hide quarantine report frequency
-  $('#reports').on('change',function(){
-    if( $(this).val()==="NO" ){
-    $("#reportsfrequency").hide()
-    }
-    else{
-    $("#reportsfrequency").show()
-    }
-  });
 
   // Show/hide S/MIME options when S/MIME encryption is toggled
   $('#smime_enabled').on('change', function() {
