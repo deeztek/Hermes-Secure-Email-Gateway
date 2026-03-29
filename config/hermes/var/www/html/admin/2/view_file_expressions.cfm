@@ -113,13 +113,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfcontinue>
     </cfif>
 
+    <!--- Generate Amavis qr'' ban and allow patterns from the regex --->
+    <cfset amavisBan = "[qr'#entryPattern#'i => 1]">
+    <cfset amavisAllow = "[qr'#entryPattern#'i => 0]">
+
     <cfquery datasource="hermes">
       INSERT INTO files (file, description, type, system, allow, ban)
       VALUES (
         <cfqueryparam value="#entryPattern#" cfsqltype="cf_sql_varchar">,
         <cfqueryparam value="#entryDescription#" cfsqltype="cf_sql_varchar">,
         <cfqueryparam value="CUSTOM-EXPRESSION" cfsqltype="cf_sql_varchar">,
-        0, 0, 1
+        'NO',
+        <cfqueryparam value="#amavisAllow#" cfsqltype="cf_sql_varchar">,
+        <cfqueryparam value="#amavisBan#" cfsqltype="cf_sql_varchar">
       )
     </cfquery>
     <cfset entries_added = entries_added + 1>
@@ -156,6 +162,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       WHERE file_id = <cfqueryparam value="#form.delete_id#" cfsqltype="cf_sql_integer">
     </cfquery>
     <cfif checkFK.cnt GT 0>
+      <cfquery name="getRuleNames" datasource="hermes">
+        SELECT DISTINCT rule_name FROM file_rule_components
+        WHERE file_id = <cfqueryparam value="#form.delete_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset ruleList = "">
+      <cfloop query="getRuleNames">
+        <cfset ruleList = ListAppend(ruleList, rule_name)>
+      </cfloop>
+      <cfset session.deleteRuleNames = ruleList>
       <cfset session.m = 40>
       <cflocation url="view_file_expressions.cfm" addtoken="no">
     </cfif>
@@ -196,7 +211,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           WHERE file_id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
         </cfquery>
         <cfif checkFK.cnt GT 0>
+          <cfquery name="getBlockedFile" datasource="hermes">
+            SELECT file FROM files WHERE id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
+          </cfquery>
+          <cfquery name="getBulkRuleNames" datasource="hermes">
+            SELECT DISTINCT rule_name FROM file_rule_components
+            WHERE file_id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
+          </cfquery>
+          <cfset ruleNames = "">
+          <cfloop query="getBulkRuleNames">
+            <cfset ruleNames = ListAppend(ruleNames, rule_name)>
+          </cfloop>
           <cfset blocked_ids = ListAppend(blocked_ids, delId)>
+          <cfif NOT StructKeyExists(session, "bulk_errors")><cfset session.bulk_errors = ""></cfif>
+          <cfset session.bulk_errors = session.bulk_errors & encodeForHTML(getBlockedFile.file) & " (used in rule: <strong>" & encodeForHTML(ruleNames) & "</strong>)<br>">
           <cfcontinue>
         </cfif>
 
@@ -234,46 +262,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===================== --->
 <!--- ACTION: EDIT --->
 <!--- ===================== --->
-<cfif action is "edit_entry">
-  <cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)>
-    <cfif NOT StructKeyExists(form, "edit_pattern") OR trim(form.edit_pattern) is "">
-      <cfset session.m = 31>
-      <cflocation url="view_file_expressions.cfm" addtoken="no">
-    </cfif>
-
-    <!--- Check for duplicate pattern (excluding current record) --->
-    <cfquery name="checkDup" datasource="hermes">
-      SELECT COUNT(*) as cnt FROM files
-      WHERE file = <cfqueryparam value="#trim(form.edit_pattern)#" cfsqltype="cf_sql_varchar">
-        AND type = <cfqueryparam value="CUSTOM-EXPRESSION" cfsqltype="cf_sql_varchar">
-        AND id != <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-    </cfquery>
-    <cfif checkDup.cnt GT 0>
-      <cfset session.m = 32>
-      <cflocation url="view_file_expressions.cfm" addtoken="no">
-    </cfif>
-
-    <cfquery datasource="hermes">
-      UPDATE files
-      SET file = <cfqueryparam value="#trim(form.edit_pattern)#" cfsqltype="cf_sql_varchar">,
-          description = <cfqueryparam value="#trim(form.edit_description)#" cfsqltype="cf_sql_varchar">
-      WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-        AND type = <cfqueryparam value="CUSTOM-EXPRESSION" cfsqltype="cf_sql_varchar">
-    </cfquery>
-
-    <cftry>
-      <cfinclude template="./inc/update_amavis_config_files.cfm">
-      <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_mail_filter /etc/init.d/amavis force-reload"
-        timeout="30" />
-      <cfcatch type="any">
-      </cfcatch>
-    </cftry>
-
-    <cfset session.m = 5>
-  </cfif>
-  <cflocation url="view_file_expressions.cfm" addtoken="no">
-</cfif>
+<!--- Edit action removed - delete and re-add instead --->
 
 <!--- Refresh data --->
 <cfinclude template="./inc/get_file_expressions.cfm">
@@ -338,7 +327,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
-    <p>This expression is referenced by one or more file rules and cannot be deleted. Remove it from all file rules first.</p>
+    <p>This expression is referenced by the following File Rule(s): <cfif StructKeyExists(session, "deleteRuleNames") AND session.deleteRuleNames is not ""><strong><cfoutput>#encodeForHTML(session.deleteRuleNames)#</cfoutput></strong><cfset session.deleteRuleNames = ""><cfelse>Unknown</cfif>. Remove it from the rule(s) first, then try again.</p>
   </div>
 </cfif>
 <cfif m is 41>
@@ -349,9 +338,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <p><cfoutput>#session.deleted_count#</cfoutput> expression(s) deleted.</p>
       <cfset session.deleted_count = "">
     </cfif>
-    <cfif StructKeyExists(session, "blocked_count")>
-      <p><cfoutput>#session.blocked_count#</cfoutput> expression(s) could not be deleted because they are referenced by file rules.</p>
+    <cfif StructKeyExists(session, "blocked_count") AND session.blocked_count GT 0>
+      <p><cfoutput>#session.blocked_count#</cfoutput> expression(s) could not be deleted:</p>
+      <cfif StructKeyExists(session, "bulk_errors") AND session.bulk_errors is not "">
+        <p><cfoutput>#session.bulk_errors#</cfoutput></p>
+      </cfif>
       <cfset session.blocked_count = "">
+      <cfset session.bulk_errors = "">
     </cfif>
   </div>
 </cfif>
@@ -359,71 +352,89 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!-- REGEX HELPER -->
 <div class="card card-secondary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title">
-      <a data-bs-toggle="collapse" href="#regexHelper" role="button" aria-expanded="false" aria-controls="regexHelper">
-        <i class="fas fa-lightbulb"></i> Regex Helper
-      </a>
+    <h3 class="card-title" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#regexHelper" aria-expanded="false" aria-controls="regexHelper">
+      <i class="fas fa-lightbulb me-1"></i> Expression Helper <i class="fas fa-chevron-down ms-2 small"></i>
     </h3>
   </div>
   <div class="collapse" id="regexHelper">
     <div class="card-body">
-      <div class="row">
-        <!-- Common Patterns Dropdown -->
-        <div class="col-md-6 mb-3">
-          <label for="commonPatterns" class="form-label"><strong>Common Patterns</strong></label>
-          <select class="form-select" id="commonPatterns" onchange="applyCommonPattern(this.value);">
-            <option value="">-- Select a pattern --</option>
-            <option value="\.exe$">Files ending with .exe</option>
-            <option value="\.bat$">Files ending with .bat</option>
-            <option value="\.scr$">Files ending with .scr</option>
-            <option value="\.pif$">Files ending with .pif</option>
-            <option value="\.cmd$">Files ending with .cmd</option>
-            <option value="\.vbs$">Files ending with .vbs</option>
-            <option value="\.js$">Files ending with .js</option>
-            <option value="\.wsf$">Files ending with .wsf</option>
-            <option value="\.msi$">Files ending with .msi</option>
-            <option value="\.dll$">Files ending with .dll</option>
-            <option value="\.(exe|bat|cmd|scr|pif)$">Files ending with .exe, .bat, .cmd, .scr, or .pif</option>
-            <option value="^invoice">Files starting with "invoice"</option>
-            <option value="^payment">Files starting with "payment"</option>
-            <option value="macro">Files containing "macro"</option>
-          </select>
-        </div>
 
-        <!-- Simple Builder -->
-        <div class="col-md-6 mb-3">
-          <label class="form-label"><strong>Simple Builder</strong></label>
+      <!-- SECTION 1: Simple Builder -->
+      <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-magic me-1"></i> Build an Expression (No Regex Knowledge Required)</h5>
+      <p class="text-muted mb-2">Select a match type, enter your text, and click <strong>Build</strong> to generate the regex pattern automatically. Then click <strong>Use</strong> to copy it to the Add form below.</p>
+      <div class="row">
+        <div class="col-md-8 mb-3">
           <div class="input-group mb-2">
             <select class="form-select" id="builderMode" style="max-width: 180px;">
-              <option value="startswith">Starts with</option>
               <option value="endswith">Ends with</option>
+              <option value="startswith">Starts with</option>
               <option value="contains">Contains</option>
               <option value="exact">Exact match</option>
             </select>
             <input type="text" class="form-control" id="builderValue" placeholder="Enter text (e.g. .exe or invoice)">
-            <button type="button" class="btn btn-outline-secondary" onclick="buildPattern();">
+            <button type="button" class="btn btn-primary" onclick="buildPattern();">
               <i class="fas fa-cog"></i> Build
             </button>
           </div>
-          <div class="input-group mb-2">
-            <span class="input-group-text">Generated</span>
+          <div class="input-group">
+            <span class="input-group-text">Generated Pattern</span>
             <input type="text" class="form-control" id="builtPattern" readonly>
-            <button type="button" class="btn btn-outline-primary" onclick="useBuiltPattern();" title="Copy to Add form">
+            <button type="button" class="btn btn-success" onclick="useBuiltPattern();" title="Copy to Add form">
+              <i class="fas fa-arrow-down"></i> Use
+            </button>
+          </div>
+          <div id="buildExplanation" class="mt-1" style="display:none;"></div>
+        </div>
+      </div>
+
+      <hr>
+
+      <!-- SECTION 2: Common Patterns -->
+      <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-list me-1"></i> Quick Select Common Patterns</h5>
+      <p class="text-muted mb-2">Select a pre-built pattern and it will be copied directly to the Add form below.</p>
+      <div class="row">
+        <div class="col-md-8 mb-3">
+          <div class="input-group">
+            <select class="form-select" id="commonPatterns">
+              <option value="">-- Select a pattern --</option>
+              <optgroup label="File Extensions">
+                <option value="\.exe$">Files ending with .exe</option>
+                <option value="\.bat$">Files ending with .bat</option>
+                <option value="\.scr$">Files ending with .scr</option>
+                <option value="\.pif$">Files ending with .pif</option>
+                <option value="\.cmd$">Files ending with .cmd</option>
+                <option value="\.vbs$">Files ending with .vbs</option>
+                <option value="\.js$">Files ending with .js</option>
+                <option value="\.wsf$">Files ending with .wsf</option>
+                <option value="\.msi$">Files ending with .msi</option>
+                <option value="\.dll$">Files ending with .dll</option>
+                <option value="\.(exe|bat|cmd|scr|pif)$">Multiple: .exe, .bat, .cmd, .scr, .pif</option>
+              </optgroup>
+              <optgroup label="Filename Patterns">
+                <option value="^invoice">Filenames starting with "invoice"</option>
+                <option value="^payment">Filenames starting with "payment"</option>
+                <option value="macro">Filenames containing "macro"</option>
+              </optgroup>
+            </select>
+            <button type="button" class="btn btn-success" onclick="applyCommonPattern(document.getElementById('commonPatterns').value);">
               <i class="fas fa-arrow-down"></i> Use
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Regex Test -->
+      <hr>
+
+      <!-- SECTION 3: Test Pattern -->
+      <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-flask me-1"></i> Test a Pattern</h5>
+      <p class="text-muted mb-2">Verify your pattern works by testing it against a sample filename before adding it.</p>
       <div class="row mb-3">
-        <div class="col-md-12">
-          <label class="form-label"><strong>Test Pattern</strong></label>
+        <div class="col-md-10">
           <div class="input-group">
             <span class="input-group-text">Pattern</span>
-            <input type="text" class="form-control" id="testPattern" placeholder="Enter regex pattern (e.g. \.exe$)">
+            <input type="text" class="form-control" id="testPattern" placeholder="e.g. \.exe$">
             <span class="input-group-text">Filename</span>
-            <input type="text" class="form-control" id="testFilename" placeholder="Enter filename to test (e.g. report.exe)">
+            <input type="text" class="form-control" id="testFilename" placeholder="e.g. report.exe">
             <button type="button" class="btn btn-outline-success" onclick="testRegex();">
               <i class="fas fa-flask"></i> Test
             </button>
@@ -432,7 +443,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
 
-      <!-- Example Patterns Table -->
+      <hr>
+
+      <!-- SECTION 4: Reference -->
+      <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-book me-1"></i> Pattern Reference</h5>
       <div class="table-responsive">
         <table class="table table-sm table-bordered">
           <thead class="table-light">
@@ -550,9 +564,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <td><code>#encodeForHTML(file)#</code></td>
               <td>#encodeForHTML(description)#</td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(file)#', '#encodeForJavaScript(description)#');" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
                 <button type="button" class="btn btn-sm btn-danger" onclick="deleteSingle('#id#', '#encodeForJavaScript(file)#');" title="Delete">
                   <i class="fas fa-trash"></i>
                 </button>
@@ -566,35 +577,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </div>
 
 <!-- EDIT MODAL -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post">
-        <input type="hidden" name="action" value="edit_entry">
-        <input type="hidden" name="edit_id" id="edit_id" value="">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit File Expression</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="edit_pattern" class="form-label"><strong>Regex Pattern</strong></label>
-            <input type="text" class="form-control" id="edit_pattern" name="edit_pattern" required>
-          </div>
-          <div class="mb-3">
-            <label for="edit_description" class="form-label"><strong>Description</strong></label>
-            <input type="text" class="form-control" id="edit_description" name="edit_description">
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <form id="deleteForm" method="post" style="display:none;">
   <input type="hidden" name="action" value="delete">
   <input type="hidden" name="delete_id" id="delete_id" value="">
@@ -635,13 +617,6 @@ $(document).ready(function() {
   };
 });
 
-function openEditModal(id, pattern, description) {
-  document.getElementById('edit_id').value = id;
-  document.getElementById('edit_pattern').value = pattern;
-  document.getElementById('edit_description').value = description;
-  new bootstrap.Modal(document.getElementById('editModal')).show();
-}
-
 function deleteSingle(id, name) {
   if (!confirm('Delete expression "' + name + '"?')) return;
   document.getElementById('delete_id').value = id;
@@ -650,9 +625,12 @@ function deleteSingle(id, name) {
 
 /* Regex Helper Functions */
 function applyCommonPattern(pattern) {
-  if (!pattern) return;
-  document.getElementById('testPattern').value = pattern;
-  document.getElementById('builtPattern').value = pattern;
+  if (!pattern) { alert('Select a pattern first.'); return; }
+  var textarea = document.getElementById('entries');
+  var current = textarea.value;
+  if (current && !current.endsWith('\n')) current += '\n';
+  textarea.value = current + pattern;
+  textarea.focus();
 }
 
 function buildPattern() {
@@ -670,6 +648,16 @@ function buildPattern() {
   }
   document.getElementById('builtPattern').value = pattern;
   document.getElementById('testPattern').value = pattern;
+  // Show explanation
+  var explain = '';
+  switch (mode) {
+    case 'startswith': explain = 'Matches filenames starting with "' + value + '"'; break;
+    case 'endswith':   explain = 'Matches filenames ending with "' + value + '"'; break;
+    case 'contains':   explain = 'Matches filenames containing "' + value + '"'; break;
+    case 'exact':      explain = 'Matches filenames exactly equal to "' + value + '"'; break;
+  }
+  document.getElementById('buildExplanation').innerHTML = '<small class="text-success"><i class="fas fa-check-circle me-1"></i>' + explain + '</small>';
+  document.getElementById('buildExplanation').style.display = 'block';
 }
 
 function useBuiltPattern() {

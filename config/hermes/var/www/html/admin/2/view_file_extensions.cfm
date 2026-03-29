@@ -133,6 +133,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfcontinue>
     </cfif>
 
+    <!--- Auto-prefix description with extension --->
+    <cfset entryDesc = "(" & entryExt & ") " & entryDesc>
+
     <!--- Strip leading dot for storage --->
     <cfset theExtension = Replace(entryExt, ".", "", "ALL")>
 
@@ -208,6 +211,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
 
     <cfif checkFK.cnt GT 0>
+      <!--- Get the rule names that use this extension --->
+      <cfquery name="getRuleNames" datasource="hermes">
+        SELECT DISTINCT frc.rule_name FROM file_rule_components frc
+        WHERE frc.file_id = <cfqueryparam value="#form.delete_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset ruleList = "">
+      <cfloop query="getRuleNames">
+        <cfset ruleList = ruleList & "<strong>" & encodeForHTML(rule_name) & "</strong>, ">
+      </cfloop>
+      <cfif Len(ruleList) GT 2>
+        <cfset ruleList = Left(ruleList, Len(ruleList) - 2)>
+      </cfif>
+      <cfset session.deleteRuleNames = ruleList>
       <cfset session.m = 10>
     <cfelse>
       <!--- Verify it is a custom extension (system='NO') --->
@@ -254,13 +270,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           WHERE file_id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
         </cfquery>
         <cfif checkFK.cnt GT 0>
-          <!--- Get the extension name for error message --->
+          <!--- Get the extension name and rule names for error message --->
           <cfquery name="getExtName" datasource="hermes">
             SELECT file FROM files WHERE id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
           </cfquery>
+          <cfquery name="getBulkRuleNames" datasource="hermes">
+            SELECT DISTINCT rule_name FROM file_rule_components
+            WHERE file_id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
+          </cfquery>
           <cfset bulk_skipped = bulk_skipped + 1>
           <cfif getExtName.recordCount GT 0>
-            <cfset bulk_errors = bulk_errors & "." & encodeForHTML(getExtName.file) & " (used in a File Rule)<br>">
+            <cfset ruleNames = "">
+            <cfloop query="getBulkRuleNames">
+              <cfset ruleNames = ruleNames & encodeForHTML(rule_name) & ", ">
+            </cfloop>
+            <cfif Len(ruleNames) GT 2><cfset ruleNames = Left(ruleNames, Len(ruleNames) - 2)></cfif>
+            <cfset bulk_errors = bulk_errors & "." & encodeForHTML(getExtName.file) & " (used in rule: " & ruleNames & ")<br>">
           </cfif>
         <cfelse>
           <cfquery datasource="hermes">
@@ -291,88 +316,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cflocation url="view_file_extensions.cfm" addtoken="no">
 </cfif>
 
-<!--- ===================== --->
-<!--- ACTION: EDIT         --->
-<!--- ===================== --->
-<cfif action is "edit_entry">
-  <cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)>
-
-    <cfset editExt = trim(form.edit_extension)>
-    <cfset editDesc = trim(form.edit_description)>
-
-    <!--- Validate extension --->
-    <cfif Left(editExt, 1) is not ".">
-      <cfset session.m = 20>
-      <cflocation url="view_file_extensions.cfm" addtoken="no">
-    </cfif>
-    <cfif NOT REFind(ext_pattern, editExt)>
-      <cfset session.m = 21>
-      <cflocation url="view_file_extensions.cfm" addtoken="no">
-    </cfif>
-    <cfif editDesc is "">
-      <cfset session.m = 22>
-      <cflocation url="view_file_extensions.cfm" addtoken="no">
-    </cfif>
-
-    <cfset theExtension = Replace(editExt, ".", "", "ALL")>
-
-    <!--- Check for duplicate (different ID, same extension name) --->
-    <cfquery name="checkDupEdit" datasource="hermes">
-      SELECT COUNT(*) as cnt FROM files
-      WHERE file = <cfqueryparam value="#theExtension#" cfsqltype="cf_sql_varchar">
-        AND type IN (<cfqueryparam value="EXT,EXT-HIGH" cfsqltype="cf_sql_varchar" list="true">)
-        AND id <> <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-    </cfquery>
-    <cfif checkDupEdit.cnt GT 0>
-      <cfset session.m = 23>
-      <cflocation url="view_file_extensions.cfm" addtoken="no">
-    </cfif>
-
-    <!--- Verify it is a custom extension --->
-    <cfquery name="checkSystem" datasource="hermes">
-      SELECT system FROM files
-      WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-    </cfquery>
-    <cfif checkSystem.recordCount GT 0 AND checkSystem.system is "NO">
-
-      <!--- Regenerate allow/deny with new extension name --->
-      <cfparam name="form.edit_casesense" default="no">
-      <cfif form.edit_casesense is "yes">
-        <cffile action="read" file="/opt/hermes/scripts/file_allow_sense" variable="fileallow">
-        <cffile action="read" file="/opt/hermes/scripts/file_deny_sense" variable="filedeny">
-      <cfelse>
-        <cffile action="read" file="/opt/hermes/scripts/file_allow_insense" variable="fileallow">
-        <cffile action="read" file="/opt/hermes/scripts/file_deny_insense" variable="filedeny">
-      </cfif>
-
-      <cfset fileallow = REReplace(fileallow, "THE-EXTENSION", theExtension, "ALL")>
-      <cfset filedeny = REReplace(filedeny, "THE-EXTENSION", theExtension, "ALL")>
-
-      <cfquery datasource="hermes">
-        UPDATE files
-        SET file = <cfqueryparam value="#theExtension#" cfsqltype="cf_sql_varchar">,
-            description = <cfqueryparam value="#editDesc#" cfsqltype="cf_sql_varchar">,
-            allow = <cfqueryparam value="#fileallow#" cfsqltype="cf_sql_varchar">,
-            ban = <cfqueryparam value="#filedeny#" cfsqltype="cf_sql_varchar">
-        WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-          AND system = <cfqueryparam value="NO" cfsqltype="cf_sql_varchar">
-      </cfquery>
-
-      <cftry>
-        <cfinclude template="./inc/update_amavis_config_files.cfm">
-        <cfexecute name="/usr/local/bin/docker"
-          arguments="exec hermes_mail_filter /etc/init.d/amavis force-reload"
-          timeout="30" />
-      <cfcatch type="any"></cfcatch>
-      </cftry>
-
-      <cfset session.m = 5>
-    <cfelse>
-      <cfset session.m = 11>
-    </cfif>
-  </cfif>
-  <cflocation url="view_file_extensions.cfm" addtoken="no">
-</cfif>
 
 <!--- Refresh data after actions --->
 <cfinclude template="./inc/get_file_extensions.cfm">
@@ -382,23 +325,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ALERTS               --->
 <!--- ===================== --->
 <cfif m is 1>
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Extensions Added</h4>
-    <cfif StructKeyExists(session, "entries_added")>
-      <p><cfoutput>#session.entries_added#</cfoutput> extension(s) added successfully.</p>
-      <cfset session.entries_added = "">
-    </cfif>
-    <cfif StructKeyExists(session, "entries_skipped") AND session.entries_skipped GT 0>
-      <p><cfoutput>#session.entries_skipped#</cfoutput> extension(s) skipped.</p>
-      <cfset session.entries_skipped = "">
-    </cfif>
-    <cfif StructKeyExists(session, "entry_errors") AND session.entry_errors is not "">
-      <p><cfoutput>#session.entry_errors#</cfoutput></p>
-      <cfset session.entry_errors = "">
-    </cfif>
-    <p>Amavis configuration updated and reloaded.</p>
-  </div>
+  <cfset _addAdded = StructKeyExists(session, "entries_added") ? session.entries_added : 0>
+  <cfset _addSkipped = StructKeyExists(session, "entries_skipped") ? session.entries_skipped : 0>
+  <cfset _addErrors = StructKeyExists(session, "entry_errors") ? session.entry_errors : "">
+
+  <cfif _addAdded GT 0 AND _addSkipped EQ 0>
+    <div class="alert alert-success alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Extensions Added</h4>
+      <p><cfoutput>#_addAdded#</cfoutput> extension(s) added successfully. Amavis configuration updated and reloaded.</p>
+    </div>
+  <cfelseif _addAdded GT 0 AND _addSkipped GT 0>
+    <div class="alert alert-warning alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fas fa-exclamation-triangle"></i> Partial Add</h4>
+      <p><cfoutput>#_addAdded#</cfoutput> extension(s) added. <cfoutput>#_addSkipped#</cfoutput> extension(s) skipped:</p>
+      <cfif _addErrors is not ""><p><cfoutput>#_addErrors#</cfoutput></p></cfif>
+    </div>
+  <cfelse>
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-ban"></i> Add Failed</h4>
+      <p>No extensions were added. <cfoutput>#_addSkipped#</cfoutput> extension(s) skipped:</p>
+      <cfif _addErrors is not ""><p><cfoutput>#_addErrors#</cfoutput></p></cfif>
+    </div>
+  </cfif>
+
+  <cfset session.entries_added = "">
+  <cfset session.entries_skipped = "">
+  <cfset session.entry_errors = "">
 </cfif>
 <cfif m is 2>
   <div class="alert alert-success alert-dismissible">
@@ -407,18 +362,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <p>File extension deleted. Amavis configuration updated and reloaded.</p>
   </div>
 </cfif>
-<cfif m is 5>
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Extension Updated</h4>
-    <p>File extension updated. Amavis configuration updated and reloaded.</p>
-  </div>
-</cfif>
 <cfif m is 10>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
-    <p>This file extension is used in a File Rule. Remove it from the rule first, then try again.</p>
+    <p>This file extension is used in the following File Rule(s): <cfif StructKeyExists(session, "deleteRuleNames") AND session.deleteRuleNames is not ""><cfoutput>#session.deleteRuleNames#</cfoutput><cfset session.deleteRuleNames = ""><cfelse>Unknown</cfif>. Remove it from the rule(s) first, then try again.</p>
   </div>
 </cfif>
 <cfif m is 11>
@@ -429,51 +377,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 <cfif m is 12>
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Bulk Delete Complete</h4>
-    <cfif StructKeyExists(session, "bulk_deleted")>
-      <p><cfoutput>#session.bulk_deleted#</cfoutput> extension(s) deleted.</p>
-      <cfset session.bulk_deleted = "">
-    </cfif>
-    <cfif StructKeyExists(session, "bulk_skipped") AND session.bulk_skipped GT 0>
-      <p><cfoutput>#session.bulk_skipped#</cfoutput> extension(s) skipped:</p>
-      <cfif StructKeyExists(session, "bulk_errors") AND session.bulk_errors is not "">
-        <p><cfoutput>#session.bulk_errors#</cfoutput></p>
-      </cfif>
-      <cfset session.bulk_skipped = "">
-      <cfset session.bulk_errors = "">
-    </cfif>
-    <p>Amavis configuration updated and reloaded.</p>
-  </div>
-</cfif>
-<cfif m is 20>
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4>
-    <p>Extension must start with a period (.).</p>
-  </div>
-</cfif>
-<cfif m is 21>
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4>
-    <p>Extension may only contain alphanumeric characters, dashes, periods, and underscores.</p>
-  </div>
-</cfif>
-<cfif m is 22>
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4>
-    <p>Description cannot be blank.</p>
-  </div>
-</cfif>
-<cfif m is 23>
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Duplicate Extension</h4>
-    <p>The extension you are attempting to save already exists.</p>
-  </div>
+  <cfset _bulkDeleted = StructKeyExists(session, "bulk_deleted") ? session.bulk_deleted : 0>
+  <cfset _bulkSkipped = StructKeyExists(session, "bulk_skipped") ? session.bulk_skipped : 0>
+  <cfset _bulkErrors = StructKeyExists(session, "bulk_errors") ? session.bulk_errors : "">
+
+  <cfif _bulkDeleted GT 0 AND _bulkSkipped EQ 0>
+    <!--- All succeeded --->
+    <div class="alert alert-success alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Bulk Delete Complete</h4>
+      <p><cfoutput>#_bulkDeleted#</cfoutput> extension(s) deleted. Amavis configuration updated and reloaded.</p>
+    </div>
+  <cfelseif _bulkDeleted GT 0 AND _bulkSkipped GT 0>
+    <!--- Partial success --->
+    <div class="alert alert-warning alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fas fa-exclamation-triangle"></i> Partial Delete</h4>
+      <p><cfoutput>#_bulkDeleted#</cfoutput> extension(s) deleted. <cfoutput>#_bulkSkipped#</cfoutput> extension(s) could not be deleted:</p>
+      <cfif _bulkErrors is not ""><p><cfoutput>#_bulkErrors#</cfoutput></p></cfif>
+    </div>
+  <cfelse>
+    <!--- All failed --->
+    <div class="alert alert-danger alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
+      <p>None of the selected extensions could be deleted:</p>
+      <cfif _bulkErrors is not ""><p><cfoutput>#_bulkErrors#</cfoutput></p></cfif>
+    </div>
+  </cfif>
+
+  <cfset session.bulk_deleted = "">
+  <cfset session.bulk_skipped = "">
+  <cfset session.bulk_errors = "">
 </cfif>
 <cfif m is 30>
   <div class="alert alert-danger alert-dismissible">
@@ -498,8 +433,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             placeholder=".docm Microsoft Word Macro-Enabled Document
 .xlsm Microsoft Excel Macro-Enabled Spreadsheet"></textarea>
           <small class="text-muted">
-            One entry per line. Format: <code>.extension description</code><br>
+            One entry per line. Format: <code>.extension description</code> (description is <strong>required</strong>)<br>
+            Example: <code>.docm Microsoft Word Macro-Enabled Document</code><br>
             Extension must start with a dot. Only alphanumeric, dashes, periods, and underscores allowed.
+            The extension will be automatically prefixed to the description (e.g., "(.docm) Microsoft Word Macro-Enabled Document").
           </small>
         </div>
         <div class="col-md-3">
@@ -568,9 +505,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <td>.#encodeForHTML(file)#</td>
               <td>#encodeForHTML(description)#</td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(file)#', '#encodeForJavaScript(description)#');" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
                 <button type="button" class="btn btn-sm btn-danger" onclick="deleteSingle('#id#', '.#encodeForJavaScript(file)#');" title="Delete">
                   <i class="fas fa-trash"></i>
                 </button>
@@ -619,49 +553,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </div>
 
 <!-- EDIT MODAL -->
-<div class="modal fade" id="editModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post">
-        <input type="hidden" name="action" value="edit_entry">
-        <input type="hidden" name="edit_id" id="edit_id" value="">
-        <div class="modal-header">
-          <h5 class="modal-title">Edit File Extension</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="mb-3">
-            <label for="edit_extension" class="form-label"><strong>Extension</strong></label>
-            <input type="text" class="form-control" id="edit_extension" name="edit_extension" required
-              pattern="^\.[a-zA-Z0-9\-\.\_]+$" title="Must start with a dot. Only alphanumeric, dashes, periods, and underscores.">
-          </div>
-          <div class="mb-3">
-            <label for="edit_description" class="form-label"><strong>Description</strong></label>
-            <input type="text" class="form-control" id="edit_description" name="edit_description" required>
-          </div>
-          <div class="mb-3">
-            <label class="form-label"><strong>Case Sensitivity</strong></label>
-            <div>
-              <div class="form-check mb-1">
-                <input class="form-check-input" type="radio" name="edit_casesense" id="edit_case_insensitive" value="no" checked>
-                <label class="form-check-label" for="edit_case_insensitive">Case Insensitive <small class="text-muted">(Recommended)</small></label>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="radio" name="edit_casesense" id="edit_case_sensitive" value="yes">
-                <label class="form-check-label" for="edit_case_sensitive">Case Sensitive</label>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Changes</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 <form id="deleteForm" method="post" style="display:none;">
   <input type="hidden" name="action" value="delete">
   <input type="hidden" name="delete_id" id="delete_id" value="">
@@ -710,13 +601,6 @@ $(document).ready(function() {
   };
 });
 
-function openEditModal(id, file, description) {
-  document.getElementById('edit_id').value = id;
-  document.getElementById('edit_extension').value = '.' + file;
-  document.getElementById('edit_description').value = description;
-  document.getElementById('edit_case_insensitive').checked = true;
-  new bootstrap.Modal(document.getElementById('editModal')).show();
-}
 
 function deleteSingle(id, name) {
   if (!confirm('Delete "' + name + '"?')) return;
