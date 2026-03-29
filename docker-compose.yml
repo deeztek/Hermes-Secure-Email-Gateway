@@ -277,6 +277,7 @@ services:
       - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
       - ./config/opendmarc/etc/opendmarc:/etc/opendmarc
       - ./config/mail_filter/etc/amavis:/etc/amavis #Amavis config (mynetworks, white/black lists)
+      - ./config/mail_filter/etc/spamassassin:/etc/spamassassin #SpamAssassin config (local.cf)
       - ./config/mail_filter/etc/clamav:/etc/clamav #ClamAV config (clamd.conf)
       - mail_filter_data_clamav:/var/lib/clamav #ClamAV signature data (local.ign2)
       - ./config/ldap:/ldap

@@ -147,35 +147,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!--- /ETC/SPAMASSASSIN/LOCAL.CF CUSTOM TESTS BELOW --->
     
     <cfquery name="gettests" datasource="hermes">
-    SELECT parameter, value, spamfilter, active, score FROM spam_settings where spamfilter='1' and active = '1' order by parameter asc
+    SELECT parameter, value, spamfilter, active FROM spam_settings where spamfilter='1' and active = '1' order by parameter asc
     </cfquery>
-    
+
     <cfif #gettests.recordcount# GTE 1>
-    
+
     <cffile action = "write"
         file = "/opt/hermes/tmp/#customtrans3#_sa_tests"
         output = ""
         addNewLine = "no">
-    
+
     <cfloop query="gettests">
-    
-    <cfif #score# is "1">
-    
+
     <cffile action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_sa_tests"
         output = "score #parameter# #value#"
         addNewLine = "yes">
-    
-    
-    <cfelse>
-    
-      <cffile action = "append"
-        file = "/opt/hermes/tmp/#customtrans3#_sa_tests"
-        output = "#parameter# #value#"
-        addNewLine = "yes">
-    
-    <!--- /CFIF #score# is "1" --->
-    </cfif>
     
     </cfloop>
     

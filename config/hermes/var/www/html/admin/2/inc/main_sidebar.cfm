@@ -283,9 +283,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/spam_filter_tests.cfm" class="nav-link">
-                <i class="nav-icon fas fa-flask"></i>
-                <p>Anti-Spam Filter Tests</p>
+              <a href="view_score_overrides.cfm" class="nav-link">
+                <i class="nav-icon fas fa-sliders-h"></i>
+                <p>Score Overrides</p>
               </a>
             </li>
             <li class="nav-item">
