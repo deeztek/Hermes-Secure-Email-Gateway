@@ -1,0 +1,4 @@
+FROM dovecot/dovecot:2.4.0
+LABEL maintainer="Deeztek <support@deeztek.com>"
+
+RUN apt-get update && apt-get -y install curl default-mysql-client
