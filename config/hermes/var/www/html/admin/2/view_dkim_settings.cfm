@@ -234,6 +234,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-md-6">
             <div class="mb-3">
               <label class="form-label"><strong>Body Canonicalization</strong></label>
+              <small class="form-text text-muted d-block mb-1">Controls how the message body is normalized before DKIM signing/verification. <strong>Relaxed</strong> ignores trailing whitespace changes (recommended - tolerates minor modifications by mail servers). <strong>Simple</strong> requires the body to remain nearly identical to the original.</small>
               <select class="form-select" name="body_canonicalization">
                 <option value="relaxed" <cfif body_canonicalization is "relaxed">selected</cfif>>Relaxed (Recommended)</option>
                 <option value="simple" <cfif body_canonicalization is "simple">selected</cfif>>Simple</option>
@@ -242,6 +243,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Headers Canonicalization</strong></label>
+              <small class="form-text text-muted d-block mb-1">Controls how message headers are normalized before DKIM signing/verification. <strong>Relaxed</strong> converts header names to lowercase and removes extra whitespace (recommended - tolerates reformatting by mail servers). <strong>Simple</strong> requires headers to remain unchanged.</small>
               <select class="form-select" name="headers_canonicalization">
                 <option value="relaxed" <cfif headers_canonicalization is "relaxed">selected</cfif>>Relaxed (Recommended)</option>
                 <option value="simple" <cfif headers_canonicalization is "simple">selected</cfif>>Simple</option>
@@ -250,6 +252,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Default Message Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Blanket action for any DKIM verification or internal error not covered by the specific settings below. This is evaluated first, then overridden by the more specific actions.</small>
               <select class="form-select" name="default_action">
                 <option value="accept" <cfif default_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif default_action is "discard">selected</cfif>>Discard</option>
@@ -261,6 +264,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Bad Signature Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Action when a DKIM signature is present but fails verification (e.g., message was modified in transit, or the signing key doesn't match).</small>
               <select class="form-select" name="badsignature_action">
                 <option value="accept" <cfif badsignature_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif badsignature_action is "discard">selected</cfif>>Discard</option>
@@ -274,6 +278,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-md-6">
             <div class="mb-3">
               <label class="form-label"><strong>DNS Error Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Action when a transient DNS error occurs while looking up the sender's DKIM public key record. Temp Fail causes the sending server to retry later.</small>
               <select class="form-select" name="dnserror_action">
                 <option value="accept" <cfif dnserror_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif dnserror_action is "discard">selected</cfif>>Discard</option>
@@ -285,6 +290,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Internal Error Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Action when an internal OpenDKIM processing error occurs (e.g., resource exhaustion or unexpected failure). Should not happen under normal conditions.</small>
               <select class="form-select" name="internalerror_action">
                 <option value="accept" <cfif internalerror_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif internalerror_action is "discard">selected</cfif>>Discard</option>
@@ -296,6 +302,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>No Signature Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Action when an inbound message arrives without any DKIM signature. Many legitimate senders still do not sign with DKIM, so rejecting unsigned mail is not recommended.</small>
               <select class="form-select" name="nosignature_action">
                 <option value="accept" <cfif nosignature_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif nosignature_action is "discard">selected</cfif>>Discard</option>
@@ -307,6 +314,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Security Concern Action</strong></label>
+              <small class="form-text text-muted d-block mb-1">Action when a message contains properties that may indicate a security concern (e.g., a signature referencing an unusually short key or a known-weak algorithm).</small>
               <select class="form-select" name="security_action">
                 <option value="accept" <cfif security_action is "accept">selected</cfif>>Accept (Recommended)</option>
                 <option value="discard" <cfif security_action is "discard">selected</cfif>>Discard</option>
@@ -318,6 +326,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Signature Algorithm</strong></label>
+              <small class="form-text text-muted d-block mb-1">The algorithm used when signing outbound messages. RSA-SHA256 is the current standard. RSA-SHA1 is deprecated and may not be accepted by receiving servers.</small>
               <select class="form-select" name="signature_algorithm">
                 <option value="rsa-sha256" <cfif signature_algorithm is "rsa-sha256">selected</cfif>>RSA-SHA256 (Recommended)</option>
                 <option value="rsa-sha1" <cfif signature_algorithm is "rsa-sha1">selected</cfif>>RSA-SHA1</option>
@@ -341,6 +350,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-list"></i> Whitelisted Domains &amp; Trusted Hosts</h3>
   </div>
   <div class="card-body">
+
+    <div class="alert alert-info mb-3">
+      <i class="fas fa-info-circle me-1"></i> <strong>Entry Types:</strong>
+      <ul class="mb-0 mt-1">
+        <li><strong>Whitelisted Domain</strong> - Domains to exempt from DKIM verification (OpenDKIM <code>ExemptDomains</code>). Mail from these domains will not be checked for DKIM signatures. Use for domains that are known to have broken or missing DKIM configurations.<br>
+          Examples: <code>example.com</code> <code>mailinglist.org</code></li>
+        <li><strong>Trusted Host</strong> - Hosts considered internal by OpenDKIM (<code>TrustedHosts</code> / <code>InternalHosts</code>). Outbound mail from these hosts will be DKIM signed, and inbound mail from these hosts will skip DKIM verification. Accepts IP addresses, CIDR ranges, hostnames, and domain names.<br>
+          Examples: <code>192.168.1.100</code> <code>10.0.0.0/24</code> <code>mail.example.com</code> <code>example.com</code></li>
+      </ul>
+      <small class="text-muted">Multiple entries can be added at once, one per line.</small>
+    </div>
 
     <!-- ADD ENTRY FORM -->
     <form method="post" autocomplete="off" class="mb-4">

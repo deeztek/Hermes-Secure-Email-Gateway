@@ -265,6 +265,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-md-6">
             <div class="mb-3">
               <label class="form-label"><strong>Reject Failures</strong></label>
+              <small class="form-text text-muted d-block mb-1">When enabled, messages that fail DMARC evaluation are rejected (or temp-failed if evaluation could not be completed). When disabled, messages are accepted regardless of DMARC result and only an Authentication-Results header is added.</small>
               <select class="form-select" name="rejectfailures">
                 <option value="true" <cfif rejectfailures is "true">selected</cfif>>YES (Recommended)</option>
                 <option value="false" <cfif rejectfailures is "false">selected</cfif>>NO</option>
@@ -273,6 +274,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Hold Quarantine Policy Messages</strong></label>
+              <small class="form-text text-muted d-block mb-1">When enabled, messages from domains with a DMARC <code>p=quarantine</code> policy that fail DMARC checks are held in the Postfix hold queue rather than being delivered. An admin must then manually release or delete held messages. When disabled, quarantine policy messages are delivered normally with an Authentication-Results header added.</small>
               <select class="form-select" name="holdquarantinedmessages">
                 <option value="false" <cfif holdquarantinedmessages is "false">selected</cfif>>NO (Recommended)</option>
                 <option value="true" <cfif holdquarantinedmessages is "true">selected</cfif>>YES</option>
@@ -281,6 +283,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Generate Daily Failure Reports</strong></label>
+              <small class="form-text text-muted d-block mb-1">When enabled, DMARC failure reports (formatted per RFC 6591) are generated and sent to the addresses specified in the sending domain's DMARC record. Reports are only generated for domains advertising a <code>p=quarantine</code> or <code>p=reject</code> policy.</small>
               <select class="form-select" name="failurereports" id="failurereports">
                 <option value="true" <cfif failurereports is "true">selected</cfif>>YES (Recommended)</option>
                 <option value="false" <cfif failurereports is "false">selected</cfif>>NO</option>
@@ -292,15 +295,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div id="failureReportFields" <cfif failurereports is "false">style="display:none;"</cfif>>
               <div class="mb-3">
                 <label class="form-label"><strong>Failure Reports From E-mail Address</strong></label>
+                <small class="form-text text-muted d-block mb-1">The email address used as the sender (From:) for outgoing DMARC failure reports.</small>
                 <cfoutput>
-                <input type="text" class="form-control" name="report_email" value="#encodeForHTMLAttribute(report_email)#" placeholder="Enter a valid e-mail address" autocomplete="off">
+                <input type="text" class="form-control" name="report_email" value="#encodeForHTMLAttribute(report_email)#" placeholder="e.g. dmarc@yourdomain.com" autocomplete="off">
                 </cfoutput>
               </div>
 
               <div class="mb-3">
                 <label class="form-label"><strong>Failure Reports Reporting Organization</strong></label>
+                <small class="form-text text-muted d-block mb-1">The organization name included in outgoing DMARC failure reports to identify your mail system as the report source.</small>
                 <cfoutput>
-                <input type="text" class="form-control" name="report_org" value="#encodeForHTMLAttribute(report_org)#" placeholder="Letters and numbers only (e.g. MyOrg)" autocomplete="off">
+                <input type="text" class="form-control" name="report_org" value="#encodeForHTMLAttribute(report_org)#" placeholder="e.g. MyCompany" autocomplete="off">
                 </cfoutput>
               </div>
             </div>
@@ -322,6 +327,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-list"></i> Whitelisted Domains</h3>
   </div>
   <div class="card-body">
+
+    <div class="alert alert-info mb-3">
+      <i class="fas fa-info-circle me-1"></i> <strong>Whitelisted Domains</strong> are exempt from DMARC evaluation by OpenDMARC. Mail from these domains will not be checked against the sender's DMARC policy. Use this for trusted domains that have known DMARC configuration issues or for domains where you want to bypass DMARC enforcement. Only domain names are accepted (not IP addresses).<br>
+      <small class="text-muted">Examples: <code>example.com</code> <code>mailinglist.org</code> <code>legacy-partner.net</code></small>
+    </div>
 
     <!-- ADD DOMAIN FORM -->
     <form method="post" autocomplete="off" class="mb-4">

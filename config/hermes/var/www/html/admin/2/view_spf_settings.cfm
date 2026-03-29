@@ -230,6 +230,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-md-6">
             <div class="mb-3">
               <label class="form-label"><strong>Logging Level</strong></label>
+              <small class="form-text text-muted d-block mb-1">Controls the verbosity of SPF policy daemon logging. Higher levels are useful for troubleshooting but generate more log entries.</small>
               <select class="form-select" name="debuglevel">
                 <option value="1" <cfif debuglevel is "1">selected</cfif>>Level 1 (Default. Logs only basic policy results and errors.)</option>
                 <option value="2" <cfif debuglevel is "2">selected</cfif>>Level 2 (Logs SPF results for each Mail From and HELO check)</option>
@@ -242,6 +243,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Test Mode</strong></label>
+              <small class="form-text text-muted d-block mb-1">When enabled, SPF checks run but no email is rejected. Useful for evaluating SPF impact before enforcing. Results are logged and added as headers only.</small>
               <select class="form-select" name="testonly">
                 <option value="1" <cfif testonly is "1">selected</cfif>>Enabled (Run SPF in test mode, do NOT reject email)</option>
                 <option value="2" <cfif testonly is "2">selected</cfif>>Disabled (Recommended. Normal operation)</option>
@@ -250,6 +252,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>HELO Check Rejection Policy</strong></label>
+              <small class="form-text text-muted d-block mb-1">Controls how the system handles SPF results for the HELO/EHLO hostname check. The HELO identity is checked first in the SMTP dialogue before the Mail From check.</small>
               <select class="form-select" name="helo_reject">
                 <option value="Fail" <cfif helo_reject is "Fail">selected</cfif>>Reject HELO Fail (Default. Reject only on HELO Fail)</option>
                 <option value="SPF_Not_Pass" <cfif helo_reject is "SPF_Not_Pass">selected</cfif>>Reject All (Reject on Fail, Softfail, Neutral or PermError)</option>
@@ -264,6 +267,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-md-6">
             <div class="mb-3">
               <label class="form-label"><strong>Mail From Check Rejection Policy</strong></label>
+              <small class="form-text text-muted d-block mb-1">Controls how the system handles SPF results for the envelope sender (MAIL FROM) check. If HELO rejection is already configured, messages failing HELO are rejected before reaching this check.</small>
               <select class="form-select" name="mail_from_reject">
                 <option value="Fail" <cfif mail_from_reject is "Fail">selected</cfif>>Reject Mail From Fail (Default. Reject only on Mail From Fail)</option>
                 <option value="SPF_Not_Pass" <cfif mail_from_reject is "SPF_Not_Pass">selected</cfif>>Reject All (NOT Recommended)</option>
@@ -275,6 +279,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Permanent Error Policy</strong></label>
+              <small class="form-text text-muted d-block mb-1">A PermError occurs when the sender's SPF record is malformed or contains syntax errors. Setting to False treats it as if no SPF record exists, which avoids rejecting mail due to the sender's DNS misconfiguration.</small>
               <select class="form-select" name="permerror_reject">
                 <option value="False" <cfif permerror_reject is "False">selected</cfif>>False (Recommended. Treat PermError as no SPF record)</option>
                 <option value="True" <cfif permerror_reject is "True">selected</cfif>>True (Reject on PermError)</option>
@@ -283,6 +288,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <div class="mb-3">
               <label class="form-label"><strong>Temporary Error Policy</strong></label>
+              <small class="form-text text-muted d-block mb-1">A TempError occurs when the SPF DNS lookup times out or the DNS server is temporarily unavailable. Setting to True defers the message (4xx response) so the sender retries later, which can reduce unwanted mail but may delay legitimate messages.</small>
               <select class="form-select" name="temperror_defer">
                 <option value="False" <cfif temperror_defer is "False">selected</cfif>>False (Recommended. Treat TempError as no SPF record)</option>
                 <option value="True" <cfif temperror_defer is "True">selected</cfif>>True (Defer on TempError)</option>
@@ -306,6 +312,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-list"></i> SPF Whitelist Entries</h3>
   </div>
   <div class="card-body">
+
+    <div class="alert alert-info mb-3">
+      <i class="fas fa-info-circle me-1"></i> <strong>SPF Whitelist</strong> bypasses SPF checks for trusted relays, forwarders, or hosts with buggy SPF records. Entries are written to the <code>policyd-spf.conf</code> Whitelist directives.
+      <hr>
+      <strong>Entry Types and Examples:</strong>
+      <ul class="mb-0 mt-1">
+        <li><strong>IP/Network Address</strong> - Whitelists by connecting IP. Use for trusted relays such as a secondary MX or known forwarders.<br>
+          Examples: <code>192.168.1.100</code> <code>10.0.0.0/24</code></li>
+        <li><strong>HELO/EHLO Host Name</strong> - Whitelists by the hostname announced during SMTP handshake. A DNS check verifies the connecting IP has an A/AAAA record matching the HELO domain to prevent forgery.<br>
+          Examples: <code>mail.example.com</code> <code>relay.provider.net</code></li>
+        <li><strong>Domain Name</strong> - Whitelists by the sender's envelope domain (MAIL FROM).<br>
+          Examples: <code>example.com</code> <code>lists.company.com</code></li>
+        <li><strong>PTR Domain</strong> - Whitelists by the reverse DNS (PTR) domain of the connecting IP address.<br>
+          Examples: <code>outbound.mailprovider.com</code> <code>servers.example.net</code></li>
+      </ul>
+      <small class="text-muted">Multiple entries can be added at once, one per line. Use IP-based whitelisting when possible to avoid DNS lookup delays.</small>
+    </div>
 
     <!-- ADD WHITELIST FORM -->
     <form method="post" autocomplete="off" class="mb-4">

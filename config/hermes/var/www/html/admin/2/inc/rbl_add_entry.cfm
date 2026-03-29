@@ -52,7 +52,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <!--- Set weight: positive for block, negative for allow --->
 <cfif rblType is "allow">
   <cfset actualWeight = -Abs(rblWeight)>
-  <cfset paramValue = rblHost>
+  <cfset paramValue = rblHost & "*-" & Abs(rblWeight)>
 <cfelse>
   <cfset actualWeight = Abs(rblWeight)>
   <cfset paramValue = rblHost & "*" & Abs(rblWeight)>

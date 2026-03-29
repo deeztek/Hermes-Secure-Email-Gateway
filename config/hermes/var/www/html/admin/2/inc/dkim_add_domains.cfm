@@ -61,10 +61,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     <cfelse>
     
-      <!--- CHECK IF VALID DOMAIN --->
+      <!--- CHECK IF VALID DOMAIN (reject IP addresses - ExemptDomains only accepts domain names) --->
       <cfset tempemail="bob@#domain#">
-    
-      <cfif IsValid("email", tempemail)>
+      <cfset ip_pattern = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\/\d{1,2})?$">
+
+      <cfif IsValid("email", tempemail) AND NOT REFind(ip_pattern, domain)>
     
           <!--- CHECK IF DOMAIN EXISTS --->
         <cfoutput>
@@ -101,13 +102,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </cfif>
         
     
-        <cfelseif NOT IsValid("email", tempemail)>
-    
+        <cfelse>
+
         <cfset session.errormessage=3>
         <cfset session.invalid=#session.invalid#+1>
-        <cfset session.invalid_entry="#session.invalid_entry# #domain#<br>">
-    
-         <!--- /CFIF IsValid("email", recipient) --->
+        <cfset session.invalid_entry="#session.invalid_entry# #domain# (Whitelisted Domain entries must be domain names, not IP addresses)<br>">
+
+         <!--- /CFIF IsValid AND NOT IP --->
         </cfif>
         
     

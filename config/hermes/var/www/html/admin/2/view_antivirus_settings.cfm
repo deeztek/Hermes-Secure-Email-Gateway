@@ -1,1829 +1,453 @@
 <!DOCTYPE html>
 
- <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards. All Rights Reserved.
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
-This file is part of Hermes Secure Email Gateway Pro Edition.
+This file is part of Hermes Secure Email Gateway Community Edition.
 
-Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered under the Hermes Secure Email Gateway Pro Edition License.
+    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
-  --->
+    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
 
+    You should have received a copy of the GNU Affero General Public License
+    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+--->
 
 <html lang="en">
 
-
-  <head>
+<head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Antivirus Settings</title>
-
   <cfinclude template="./inc/html_head.cfm" />
-<!--- Sort Table Script Default Sort by Column 4 Desc --->
-
-
-<!--- Sort Table Script  --->
-<script>
-  $(document).ready(function() {
-      $('#sortTable').DataTable( {
-        dom: 'Blfrtip',
-          buttons: [
-              'copy', 'csv', 'excel', 'pdf', 'print'
-          ],
-          stateSave: true,
-          lengthMenu: [
-            [ 25, 50, 100, -1 ],
-      [ '25 rows', '50 rows', '100 rows', 'Show all' ]
-  
-      ],
-      
-          "order": [[ 1, "asc" ]]
-      } );
-  } );
-    </script>
-
-    
-
-<script>
-
-  $(document).ready(function() {
-    $("#deletewhitelists").click(function() {
-      var deletewhitelists = [];
-      $.each($("input[name='id']:checked"), function() {
-        deletewhitelists.push($(this).val());
-      });
-      $('#delete_modal').modal('show').on('shown.bs.modal', function() {
-      $("#deleteid").html('<input type="hidden" name="delete_id" value=' + deletewhitelists + '>');
-      });
-    });
-  });
-  
-  </script>
-
-
-  
-
-<!--- STYLE FOR EYE-SLASH STARTS HERE --->    
-<style>
-  td {
-   word-break: break-all;
-       },
-
-body{
- padding:100px 0;
- background-color:#efefef
-}
-
-a, a:hover{
- color:#333
-}
-
-</style>
-<!--- STYLE FOR EYE-SLASH ENDS HERE --->  
-
-<!--- TEXT AREA STYLE ---> 
-<style>
-  textarea{
-border:1px solid #999999;
-width:100%;
-margin:5px 0;
-padding:3px;
-  }
-  .textareacontainer{
-padding-right: 8px; /* 1 + 3 + 3 + 1 */
-  }
-    </style>
-
-<!--- BACK TO TOP BUTTON STYLE ---> 
-<style>
-#btn-back-to-top {
-  position: fixed;
-  bottom: 20px;
-  right: 20px;
-  display: none;
-}
-</style>
-
 </head>
-
-
 
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
 
-
-
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <cfoutput>
             <h1 class="m-0">Antivirus Settings</h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-          </cfoutput>
-            
-          </div><!-- /.col -->
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item active">Antivirus Settings</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
-    <div class="content">
+    <div class="app-content">
       <div class="container-fluid">
 
-<!-- Back to top button -->
-<button
-        type="button"
-        class="btn btn-danger btn-floating btn-lg"
-        id="btn-back-to-top"
-        >
-  <i class="fas fa-arrow-up"></i>
-</button>
+<cfparam name="m" default="0">
+<cfparam name="action" default="">
 
-
-  <cfparam name = "m" default = "0">
-  <cfif StructKeyExists(session, "m")>
-  <cfif session.m is not "">
+<cfif StructKeyExists(session, "m") AND session.m is not "">
   <cfset m = session.m>
-
-  <!--- ENABLE FOR DEBUG BELOW --->
-
-  <!---
-  <cfoutput>M: #session.m#</cfoutput>
-  --->
-
-  <!--- /CFIF for session.m is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.m --->
-  </cfif>
-
-  <!---
-  <cfoutput>session M: #m#</cfoutput>
-  --->
-
-
-  <cfquery name="getavwhitelist" datasource="hermes">
-    select id, parameter, module from parameters2 where module = 'clamav-bypass'
-    </cfquery>
-
-  <cfparam name = "errormessage" default = "0">
-  <cfif StructKeyExists(session, "errormessage")>
-    <cfif session.errormessage is not "">
-    <cfset errormessage = session.errormessage>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-  <!---
-  <cfoutput>M: #session.errormessage#</cfoutput>
-  --->
-
-    <!--- /CFIF for session.errormessage is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.errormessage --->
-  </cfif>
-
-
-<cfparam name = "invalid" default = "0">
-
-<cfif StructKeyExists(session, "invalid")>
-  <cfif session.invalid is not "">
-  <cfset invalid = session.invalid>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.invalid#</cfoutput>
---->
-
-
-    <!--- /CFIF for session.invalid is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.invalid --->
-  </cfif>
-
-
-<cfparam name = "invalid_entry" default = "">
-
-<cfif StructKeyExists(session, "invalid_entry")>
-  <cfif session.invalid_entry is not "">
-  <cfset invalid_entry = session.invalid_entry>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.invalid_entry#</cfoutput>
---->
-
-    <!--- /CFIF for session.invalid_entry is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.invalid_entry --->
-  </cfif>
-
-
-
-<cfparam name = "exists" default = "0">
-
-<cfif StructKeyExists(session, "exists")>
-  <cfif session.exists is not "">
-  <cfset exists = session.exists>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.exists#</cfoutput>
---->
-
-
-    <!--- /CFIF for session.exists is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.exists --->
-  </cfif>
-
-
-<cfparam name = "exists_entry" default = "">
-
-<cfif StructKeyExists(session, "exists_entry")>
-  <cfif session.exists_entry is not "">
-  <cfset exists_entry = session.exists_entry>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.exists#</cfoutput>
---->
-
-    <!--- /CFIF for session.exists_entry is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.exists_entry --->
-  </cfif>
-
-<cfparam name = "success" default = "0">
-
-<cfif StructKeyExists(session, "success")>
-  <cfif session.success is not "">
-  <cfset success = session.success>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.success#</cfoutput>
---->
-
-
-    <!--- /CFIF for session.success is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.success --->
-  </cfif>
-
-<cfparam name = "success_entry" default = "">
-
-<cfif StructKeyExists(session, "success_entry")>
-  <cfif session.success_entry is not "">
-  <cfset success_entry = session.success_entry>
-
-<!--- ENABLE FOR DEBUG BELOW --->
-
-<!---
-<cfoutput>M: #session.success_entry#</cfoutput>
---->
-
-
-    <!--- /CFIF for session.success_entry is not "" --->
-  </cfif>
-
-  <!--- /CFIF for StructKeyExists session.success_entry --->
-  </cfif>
-  
-    <cfparam name = "step" default = "0">
-    
-    <cfparam name = "action" default = ""> 
-    <cfif IsDefined("form.action") is "True">
-    <cfif form.action is not "">
-    <cfset action = form.action>
-    </cfif></cfif>  
-
-
-    <cfinclude template="./inc/get_antivirus_settings.cfm" />  
-   
-
-      <cfif #m# is "9">
-        <div class="alert alert-success alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-check"></i> Success!</h4>
-          <cfoutput>Antivirus Settings were saved successfully </cfoutput><br> 
-        </div>
-
-              
-        <cfset session.m = 0>
-      
-      </cfif>
-
-      
-      <cfif #m# is "11">
-
-        <div class="alert alert-danger alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-          <cfoutput>You must select entries before clicking the <strong>Delete</strong> button</cfoutput>
-        </div>
-      
-        <cfset session.m = 0>
-      
-      </cfif>
-
-      <cfif #m# is "12">
-        <div class="alert alert-success alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-check"></i> Success!</h4>
-          <cfoutput>Entries were deleted successfully </cfoutput><br> 
-        </div>
-
-              
-        <cfset session.m = 0>
-      
-      </cfif>
-
-
-      <cfif #m# is "13">
-
-        <div class="alert alert-danger alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-          <cfoutput>The Whitelist Entry field cannot be empty</cfoutput>
-        </div>
-      
-        <cfset session.m = 0>
-      
-      </cfif>
-
-      <cfif #m# is "14">
-
-        <div class="alert alert-danger alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-          <cfoutput>The Entry field in the entry you are attempting to edit already exists</cfoutput>
-        </div>
-      
-        <cfset session.m = 0>
-      
-      </cfif>
-
-
-      <cfif #success# GTE "1">
-        <div class="alert alert-success alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <h4><i class="icon fa fa-check"></i> Success!</h4>
-          <cfoutput>The following #success# entries were added successfully:</cfoutput><br>
-          <cfoutput>#success_entry#</cfoutput>
-        </div>
-
-        <cfset session.success = 0>
-        <cfset session.success_entry = "">
-
-      </cfif>
-       
-      
-     
-      
-      
-      
-      
-      <cfif #invalid# is not "0">
-      
-          <div class="alert alert-danger alert-dismissible">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-            <!--- <h4><i class="icon fa fa-ban"></i> Oops!</h4> --->
-            <cfoutput>The following #invalid# entries were invalid:</cfoutput><br>
-            <cfoutput>#invalid_entry#</cfoutput>
-          </div>
-
-          <cfset session.invalid = 0>
-          <cfset session.invalid_entry = "">
-      
-      </cfif>
-      
-      <cfif #exists# is not "0">
-      
-        <div class="alert alert-danger alert-dismissible">
-          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-          <!--- <h4><i class="icon fa fa-ban"></i> Oops!</h4> --->
-          <cfoutput>The following #exists# entries already exist:</cfoutput><br>
-          <cfoutput>#exists_entry#</cfoutput>
-        </div>
-
-        <cfset session.exists = 0>
-        <cfset session.exists_entry = "">
-      
-      </cfif>
-
-
-      
-
-
-
-<!--- ERROR MESSAGES END HERE --->
-
-<cfif #session.license# is "VALID">   
-  <span>
-    <p>  
-
-
- 
-
-<!--- ADD AV WHITELIST BUTTON STARTS HERE --->
-<cfoutput>
-  <a href="##addwhitelist_modal"  class="btn btn-primary" role="button" data-bs-toggle="modal" ><i class="fa fa-plus-square fa-lg"></i>&nbsp;&nbsp;Add AV Signature Whitelist Entries</a>
+</cfif>
+<cfif StructKeyExists(form, "action") AND form.action is not "">
+  <cfset action = form.action>
+</cfif>
+
+<cfinclude template="./inc/get_antivirus_settings.cfm" />
+
+<!--- Get AV whitelist entries --->
+<cfquery name="getavwhitelist" datasource="hermes">
+  SELECT id, parameter, module FROM parameters2 WHERE module = 'clamav-bypass'
+</cfquery>
+
+<!--- Session variables for whitelist add results --->
+<cfparam name="session.success" default="0">
+<cfparam name="session.success_entry" default="">
+<cfparam name="session.invalid" default="0">
+<cfparam name="session.invalid_entry" default="">
+<cfparam name="session.exists" default="0">
+<cfparam name="session.exists_entry" default="">
+
+<cfset _success = session.success>
+<cfset _success_entry = session.success_entry>
+<cfset _invalid = session.invalid>
+<cfset _invalid_entry = session.invalid_entry>
+<cfset _exists = session.exists>
+<cfset _exists_entry = session.exists_entry>
+
+<cfset session.m = "">
+<cfset session.success = 0>
+<cfset session.success_entry = "">
+<cfset session.invalid = 0>
+<cfset session.invalid_entry = "">
+<cfset session.exists = 0>
+<cfset session.exists_entry = "">
+
+<!--- ALERTS (data-driven) --->
+<cfset alerts = {
+  "9":  {type:"success", msg:"Antivirus Settings were saved successfully"},
+  "11": {type:"danger",  msg:"You must first select entries before clicking the Delete button"},
+  "12": {type:"success", msg:"Entries deleted successfully"},
+  "13": {type:"danger",  msg:"The Entry field cannot be blank"}
+}>
+
+<cfif structKeyExists(alerts, toString(m))>
+  <cfset a = alerts[toString(m)]>
+  <cfoutput>
+  <div class="alert alert-#a.type# alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <cfif a.type is "success"><h4><i class="icon fa fa-check"></i> Success</h4>
+    <cfelse><h4><i class="icon fa fa-ban"></i> Error</h4></cfif>
+    #a.msg#
+  </div>
   </cfoutput>
-<!--- ADD AV WHITELIST BUTTON STARTS HERE --->
-&nbsp;&nbsp;
-
-<!--- DELETE AV WHITELIST BUTTON STARTS HERE --->
-
-<button type="button" id="deletewhitelists" class="btn btn-danger"><i class="fas fa-trash-alt"></i>&nbsp;&nbsp;Delete AV Signature Whitelist Entries</button>
-<!--- DELETE ADD AV WHITELIST BUTTON STARTS HERE --->
-
-<!--- /CFIF #session.license# is "VALID" --->
-
-
-</p>
-</span>
-
 </cfif>
 
-<div class="card col-sm-8">
-          
-  <div class="form-group" id="avsettings">
-
-    <div class="col-sm-8">
-
-
-      <form name="avsettings" method="post">
-
-        <input type="hidden" name="action" value="AV Settings">
-
-      <label><strong>Scan E-mail Attachments</strong></label>
-        
-      <select class="form-control" name="ScanMail" style="width: 100%;" id="ScanMail">
-
-<cfif #ScanMail# is "true">
-  
-          <option value="true" selected>Enabled (Recommended)</option>
-          <option value="false">Disabled</option>
-   
-
-      <cfelseif #ScanMail# is "false">
-
-        <option value="false" selected>Disabled</option>
-        <option value="true">Enabled (Recommended)</option>
-
-     
-
-        <!--- /CFIF cfif #ScanMail# is --->
-      </cfif>
-     
-          </select>   
-
-          <label><strong>Scan Archives</strong></label>
-        
-          <select class="form-control" name="ScanArchive" style="width: 100%;" id="ScanArchive">
-    
-    <cfif #ScanArchive# is "true">
-      
-              <option value="true" selected>Enabled (Recommended)</option>
-              <option value="false">Disabled</option>
-       
-    
-          <cfelseif #ScanArchive# is "false">
-    
-            <option value="false" selected>Disabled</option>
-            <option value="true">Enabled (Recommended)</option>
-    
-         
-    
-            <!--- /CFIF cfif #ScanArchive# is --->
-          </cfif>
-         
-              </select>   
-
-              <label><strong>Mark Encrypted Archives as Viruses</strong></label>
-        
-              <select class="form-control" name="ArchiveBlockEncrypted" style="width: 100%;" id="ArchiveBlockEncrypted">
-        
-        <cfif #ArchiveBlockEncrypted# is "true">
-          
-                  <option value="true" selected>Enabled</option>
-                  <option value="false">Disabled (Recommended)</option>
-           
-        
-              <cfelseif #ArchiveBlockEncrypted# is "false">
-        
-                <option value="false" selected>Disabled (Recommended)</option>
-                <option value="true">Enabled</option>
-        
-             
-        
-                <!--- /CFIF cfif #ArchiveBlockEncrypted# is --->
-              </cfif>
-             
-                  </select>   
-
-                  <label><strong>Scan Portable Executables Files</strong> (Windows Executable File Format)</label>
-        
-                  <select class="form-control" name="ScanPE" style="width: 100%;" id="ScanPE">
-            
-            <cfif #ScanPE# is "true">
-              
-                      <option value="true" selected>Enabled (Recommended)</option>
-                      <option value="false">Disabled</option>
-               
-            
-                  <cfelseif #ScanPE# is "false">
-            
-                    <option value="false" selected>Disabled</option>
-                    <option value="true">Enabled (Recommended)</option>
-            
-                 
-            
-                    <!--- /CFIF cfif #ScanPE# is --->
-                  </cfif>
-                 
-                      </select>   
-  
-                      <label><strong>Scan OLE2 Files</strong> (MS Office and Windows .msi Files)</label>
-        
-                      <select class="form-control" name="ScanOLE2" style="width: 100%;" id="ScanOLE2">
-                
-                <cfif #ScanOLE2# is "true">
-                  
-                          <option value="true" selected>Enabled (Recommended)</option>
-                          <option value="false">Disabled</option>
-                   
-                
-                      <cfelseif #ScanOLE2# is "false">
-                
-                        <option value="false" selected>Disabled</option>
-                        <option value="true">Enabled (Recommended)</option>
-                
-                     
-                
-                        <!--- /CFIF cfif #ScanOLE2# is --->
-                      </cfif>
-                     
-                          </select>   
-
-  
-                          <label><strong>Block OLE2 Macros</strong> (MS Office Files with VBA Macros)</label>
-
-                          <div class="alert alert-warning">
-             
-                            <p><i class="icon fas fa-exclamation-triangle"></i>This setting will bypass scanning and simply block all OLE2 files with VBA Macros in them whether malicious or not. In effect, it will treat any VBA macros as a virus. This setting has no effect if <strong>Scan OLE2 Macros</strong> is <strong>Disabled.</strong> It's recommended that you set this setting to <strong>Disabled.</strong></p>
-                            </div>
-                          
-        
-                          <select class="form-control" name="OLE2BlockMacros" style="width: 100%;" id="OLE2BlockMacros">
-                    
-                    <cfif #OLE2BlockMacros# is "true">
-                      
-                              <option value="true" selected>Enabled</option>
-                              <option value="false">Disabled (Recommended)</option>
-                       
-                    
-                          <cfelseif #OLE2BlockMacros# is "false">
-                    
-                            <option value="false" selected>Disabled (Recommended)</option>
-                            <option value="true">Enabled</option>
-                    
-                         
-                    
-                            <!--- /CFIF cfif #OLE2BlockMacros# is --->
-                          </cfif>
-                         
-                              </select>   
-
-                              <label><strong>Scan PDF Files</strong></label>
-        
-                              <select class="form-control" name="ScanPDF" style="width: 100%;" id="ScanPDF">
-                        
-                        <cfif #ScanPDF# is "true">
-                          
-                                  <option value="true" selected>Enabled (Recommended)</option>
-                                  <option value="false">Disabled</option>
-                           
-                        
-                              <cfelseif #ScanPDF# is "false">
-                        
-                                <option value="false" selected>Disabled</option>
-                                <option value="true">Enabled (Recommended)</option>
-                        
-                             
-                        
-                                <!--- /CFIF cfif #ScanPDF# is --->
-                              </cfif>
-                             
-                                  </select>  
-                                  
-
-                                  <label><strong>Perform HTML/Javascript/ScriptEncoder Normalization and Decryption</strong></label>
-        
-                                  <select class="form-control" name="ScanHTML" style="width: 100%;" id="ScanHTML">
-                            
-                            <cfif #ScanHTML# is "true">
-                              
-                                      <option value="true" selected>Enabled (Recommended)</option>
-                                      <option value="false">Disabled</option>
-                               
-                            
-                                  <cfelseif #ScanHTML# is "false">
-                            
-                                    <option value="false" selected>Disabled</option>
-                                    <option value="true">Enabled (Recommended)</option>
-                            
-                                 
-                            
-                                    <!--- /CFIF cfif #ScanHTML# is --->
-                                  </cfif>
-                                 
-                                      </select>  
-
-                                  <label><strong>Algorithmic Detection</strong> (Detects complex malware, graphic files exploits and others)</label>
-        
-                                  <select class="form-control" name="AlgorithmicDetection" style="width: 100%;" id="AlgorithmicDetection">
-                            
-                            <cfif #AlgorithmicDetection# is "true">
-                              
-                                      <option value="true" selected>Enabled (Recommended)</option>
-                                      <option value="false">Disabled</option>
-                               
-                            
-                                  <cfelseif #AlgorithmicDetection# is "false">
-                            
-                                    <option value="false" selected>Disabled</option>
-                                    <option value="true">Enabled (Recommended)</option>
-                            
-                                 
-                            
-                                    <!--- /CFIF cfif #AlgorithmicDetection# is --->
-                                  </cfif>
-                                 
-                                      </select>   
-
-
-                                      <label><strong>Scan ELF Files</strong> (UN*X Executables)</label>
-        
-                                      <select class="form-control" name="ScanELF" style="width: 100%;" id="ScanELF">
-                                
-                                <cfif #ScanELF# is "true">
-                                  
-                                          <option value="true" selected>Enabled (Recommended)</option>
-                                          <option value="false">Disabled</option>
-                                   
-                                
-                                      <cfelseif #ScanELF# is "false">
-                                
-                                        <option value="false" selected>Disabled</option>
-                                        <option value="true">Enabled (Recommended)</option>
-                                
-                                     
-                                
-                                        <!--- /CFIF cfif #ScanELF# is --->
-                                      </cfif>
-                                     
-                                          </select>   
-
-                                          <label><strong>Signature Based Detection of Phishing</strong> </label>
-        
-                                          <select class="form-control" name="PhishingSignatures" style="width: 100%;" id="PhishingSignatures">
-                                    
-                                    <cfif #PhishingSignatures# is "true">
-                                      
-                                              <option value="true" selected>Enabled (Recommended)</option>
-                                              <option value="false">Disabled</option>
-                                       
-                                    
-                                          <cfelseif #PhishingScanURLs# is "false">
-                                    
-                                            <option value="false" selected>Disabled</option>
-                                            <option value="true">Enabled (Recommended)</option>
-                                    
-                                         
-                                    
-                                            <!--- /CFIF cfif #PhishingScanURLs# is --->
-                                          </cfif>
-                                         
-                                              </select>   
-
-
-                                              <label><strong>Scan E-mail URLs for Phishing</strong> </label>
-        
-                                              <select class="form-control" name="PhishingScanURLs" style="width: 100%;" id="PhishingScanURLs">
-                                        
-                                        <cfif #PhishingScanURLs# is "true">
-                                          
-                                                  <option value="true" selected>Enabled (Recommended)</option>
-                                                  <option value="false">Disabled</option>
-                                           
-                                        
-                                              <cfelseif #PhishingScanURLs# is "false">
-                                        
-                                                <option value="false" selected>Disabled</option>
-                                                <option value="true">Enabled (Recommended)</option>
-                                        
-                                             
-                                        
-                                                <!--- /CFIF cfif #PhishingScanURLs# is --->
-                                              </cfif>
-                                             
-                                                  </select>   
-
-                                                  <label><strong>Block SSL Mismatches in E-mail URLs</strong> </label>
-
-                                                  <div class="alert alert-warning">
-             
-                                                    <p><i class="icon fas fa-exclamation-triangle"></i> Enabling can lead to false positivies.</p>
-                                                    </div>
-        
-                                                  <select class="form-control" name="PhishingAlwaysBlockSSLMismatch" style="width: 100%;" id="PhishingAlwaysBlockSSLMismatch">
-                                            
-                                            <cfif #PhishingAlwaysBlockSSLMismatch# is "true">
-                                              
-                                                      <option value="true" selected>Enabled</option>
-                                                      <option value="false">Disabled (Recommended)</option>
-                                               
-                                            
-                                                  <cfelseif #PhishingAlwaysBlockSSLMismatch# is "false">
-                                            
-                                                    <option value="false" selected>Disabled (Recommended)</option>
-                                                    <option value="true">Enabled</option>
-                                            
-                                                 
-                                            
-                                                    <!--- /CFIF cfif #PhishingAlwaysBlockSSLMismatch# is --->
-                                                  </cfif>
-                                                 
-                                                      </select>  
-
-                                                      <label><strong>Block Cloaked E-mail URLs</strong> </label>
-
-                                                      <div class="alert alert-warning">
-                 
-                                                        <p><i class="icon fas fa-exclamation-triangle"></i> Enabling can lead to false positivies.</p>
-                                                        </div>
-            
-                                                      <select class="form-control" name="PhishingAlwaysBlockCloak" style="width: 100%;" id="PhishingAlwaysBlockCloak">
-                                                
-                                                <cfif #PhishingAlwaysBlockCloak# is "true">
-                                                  
-                                                          <option value="true" selected>Enabled</option>
-                                                          <option value="false">Disabled (Recommended)</option>
-                                                   
-                                                
-                                                      <cfelseif #PhishingAlwaysBlockCloak# is "false">
-                                                
-                                                        <option value="false" selected>Disabled (Recommended)</option>
-                                                        <option value="true">Enabled</option>
-                                                
-                                                     
-                                                
-                                                        <!--- /CFIF cfif #PhishingAlwaysBlockCloak# is --->
-                                                      </cfif>
-                                                     
-                                                          </select> 
-
-
-                                                          <label><strong>Detect Possibly Unwanted Applications (PUA)</strong> </label>
-
-                                    
-                
-                                                          <select class="form-control" name="DetectPUA" style="width: 100%;" id="DetectPUA">
-                                                    
-                                                    <cfif #DetectPUA# is "true">
-                                                      
-                                                              <option value="true" selected>Enabled (Recommended)</option>
-                                                              <option value="false">Disabled</option>
-                                                       
-                                                    
-                                                          <cfelseif #DetectPUA# is "false">
-                                                    
-                                                            <option value="false" selected>Disabled</option>
-                                                            <option value="true">Enabled (Recommended)</option>
-                                                    
-                                                         
-                                                    
-                                                            <!--- /CFIF cfif #DetectPUA# is --->
-                                                          </cfif>
-                                                         
-                                                              </select> 
-    
-
-
-                                                              <label><strong>Heuristic Scan Precedence</strong> </label>
-
-                                                              <div class="alert alert-warning">
-                 
-                                                                <p><i class="icon fas fa-exclamation-triangle"></i> Allow heuristic match to take precedence. When enabled, if a heuristic scan (such as phishingScan) detects a possible virus/phishing it will  stop  scanning  immediately.
-                                                                  Recommended to be Enabled because it saves  CPU  scan-time.  When  disabled, virus/phishing detected by heuristic scans will be reported only at the end of a scan. If an archive contains both a
-                                                                  heuristically detected virus/phishing, and a real malware, the real malware will be reported. Keep this disabled if you intend to handle "*.Heuristics.*" viruses  differ‐
-                                                                  ently from "real" malware. If a non-heuristically-detected virus (signature-based) is found first, the scan is interrupted immediately, regardless of this config option.</p>
-                                                                </div>
-                
-                                                              <select class="form-control" name="HeuristicScanPrecedence" style="width: 100%;" id="HeuristicScanPrecedence">
-                                                        
-                                                        <cfif #HeuristicScanPrecedence# is "true">
-                                                          
-                                                                  <option value="true" selected>Enabled (Recommended)</option>
-                                                                  <option value="false">Disabled</option>
-                                                           
-                                                        
-                                                              <cfelseif #HeuristicScanPrecedence# is "false">
-                                                        
-                                                                <option value="false" selected>Disabled</option>
-                                                                <option value="true">Enabled (Recommended)</option>
-                                                        
-                                                             
-                                                        
-                                                                <!--- /CFIF cfif #HeuristicScanPrecedence# is --->
-                                                              </cfif>
-                                                             
-                                                                  </select> 
-<!---  class="col-sm-6" --->
-</div>
-
-    <!--- class="form-group" class="form-group" id="avsettings"  --->  
-      </div>
-       
-
-  
-          
-
-  
-  
-  <div class="col-sm-6">
-  
-  <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  <!--- div class="col-sm-6" --->
+<!--- Whitelist add result alerts --->
+<cfif _success GTE 1>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4>
+    <cfoutput>The following #_success# entries were added successfully:</cfoutput><br>
+    <cfoutput>#_success_entry#</cfoutput>
   </div>
-    
-  </form>  
-  
-<br>
-
-  <!--- div class="card"  --->  
-</div>
-
-
-<cfif #session.license# is "VALID">   
-
-<!--- DELETE ENTRY MODAL HTML STARTS HERE --->
-   
-<div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="deleteCertificateModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-danger">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Delete Entries </h4>
-</div>
-  
-<div class="modal-body">
-  <p>Are you sure you send to delete the Entries you have selected? This action is irreversible! </p>
-
-</div>
-<div class="modal-footer">
-  <form name="DeleteEntry" method="post">
-
-    <input type="hidden" name="action" value="Delete Entry">
-    <div id="deleteid"></div>
-    <input type="submit" value="Yes" class="btn btn-danger" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-   
-    
-</form>
-  <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No</button>
-</div>
-    </div>
+</cfif>
+<cfif _invalid is not "0">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Invalid Entries</h4>
+    <cfoutput>The following #_invalid# entries were invalid:</cfoutput><br>
+    <cfoutput>#_invalid_entry#</cfoutput>
   </div>
-</div>
-<!--- DELETE ENTRY MODAL HTML ENDS HERE --->
-
-<!--- /CFIF #session.license# is "VALID" --->
 </cfif>
-
-
-<cfif #session.license# is "VALID">   
-<!--- ADD AV SIGNATURE WHITELIST MODAL HTML STARTS HERE --->
-
-<div class="modal fade" id="addwhitelist_modal" tabindex="-1" role="dialog" aria-labelledby="AddWhitelistModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
-<div class="modal-header alert-primary">
-  <!---
-  <button type="button" class="btn-close" data-bs-dismiss="modal"><span aria-hidden="true">&times;</span><span class="sr-only">Close</span></button>
-  --->
-    <h4 class="modal-title">Add AV Signature Whitelist Entries </h4>
-</div>
-  
-<div class="modal-body">
-
-  <form name="AddWhitelist" autocomplete="off" method="post">
-
-    <input type="hidden" name="action" value="Add AV Whitelist">
-
-    
-
-      <div class="form-group">
-        <label>AV Signature(s)</label>
-        <div class="textareacontainer">
-    <textarea name="whitelist" placeholder="Enter AV Signature Whitelist Entries each in its own line" wrap="physical" rows="10"></textarea>
-    </div>
-    
-      </div>
-
-            
-<!---
-            <cfoutput>
-              <div class="form-group">
-                <label><strong>Note</strong></label>
-                <input type="text" class="form-control" name="note" value="" id="note" placeholder="Enter Note" maxLength="255">
-              </div>
-              </cfoutput>
-            --->
-
-    <div>&nbsp;</div>
-
-    <input type="submit" value="Submit" class="btn btn-primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-
-  </form>
-
-</div>
-
-
-<div class="modal-footer">
- 
-<button type="button" class="btn btn-danger" data-bs-dismiss="modal">Cancel</button>
-
-</div>
-    </div>
+<cfif _exists is not "0">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Duplicate Entries</h4>
+    <cfoutput>The following #_exists# entries already exist:</cfoutput><br>
+    <cfoutput>#_exists_entry#</cfoutput>
   </div>
-</div>
-<!--- ADD AV WHITELIST MODAL HTML ENDS HERE --->
-
-  <!--- /CFIF #session.license# is "VALID" --->
 </cfif>
 
-         
+<!--- ACTION ROUTING --->
+<cfif action is "AV Settings">
 
-<cfif #action# is "AV Settings">
+  <!--- Define required boolean fields --->
+  <cfset avFields = "ScanMail,ScanArchive,ArchiveBlockEncrypted,ScanPE,ScanOLE2,OLE2BlockMacros,ScanPDF,ScanHTML,AlgorithmicDetection,ScanELF,PhishingSignatures,PhishingScanURLs,PhishingAlwaysBlockSSLMismatch,PhishingAlwaysBlockCloak,DetectPUA,HeuristicScanPrecedence">
 
-  <cfif NOT StructKeyExists(form, "ScanMail")>
-
-    <cfset m="Antivirus Settings: form.ScanMail does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanMail")>
-
-      <cfif #form.ScanMail# is "true" OR #form.ScanMail# is "false">      
-
-        <cfset step=1>
-          
-          <cfelse>
-          
-      
-            <cfset m="Antivirus Settings: form.ScanMail is not true or false">
-            <cfinclude template="./inc/error.cfm">
-            <cfabort>
-
-  <!--- /CFIF #form.ScanMail# is "" --->
-</cfif>
-
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanMail") --->
-</cfif>
-
-
-
-<cfif #step# is "1">
-
-  <cfif NOT StructKeyExists(form, "ScanArchive")>
-
-    <cfset m="Antivirus Settings: form.ScanArchive does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-
-<cfelseif StructKeyExists(form, "ScanArchive")>
-      
-
-<cfif #form.ScanArchive# is "true" OR #form.ScanArchive# is "false">      
-
-  <cfset step=2>
-    
-    <cfelse>
-    
-
-      <cfset m="Antivirus Settings: form.ScanArchive is not true or false">
+  <!--- Validate all fields exist and are true/false --->
+  <cfloop list="#avFields#" index="f">
+    <cfif NOT StructKeyExists(form, f)>
+      <cfset m = "Antivirus Settings: form.#f# does not exist">
       <cfinclude template="./inc/error.cfm">
       <cfabort>
-
-
-<!--- /CFIF #form.ScanArchive# is "" --->
-</cfif>
-
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanArchive") --->
-</cfif>
-
-
-<!--- /CFIF #step# is "1" --->  
-</cfif>
-
-
-
-<cfif #step# is "2">
-
-  <cfif NOT StructKeyExists(form, "ArchiveBlockEncrypted")>
-
-    <cfset m="Antivirus Settings: form.ArchiveBlockEncrypted does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-
-    <cfelseif StructKeyExists(form, "ArchiveBlockEncrypted")>
-
-
-<cfif #form.ArchiveBlockEncrypted# is "true" OR #form.ArchiveBlockEncrypted# is "false">      
-
-  <cfset step=3>
-    
-    <cfelse>
-    
-
-      <cfset m="Antivirus Settings: form.ArchiveBlockEncrypted is not true or false">
+    </cfif>
+    <cfif NOT ListFindNoCase("true,false", form[f])>
+      <cfset m = "Antivirus Settings: form.#f# is not true or false">
       <cfinclude template="./inc/error.cfm">
       <cfabort>
-
-<!--- /CFIF #form.ArchiveBlockEncrypted# is "" --->
-</cfif>
-
-
-<!--- /CFIF NOT/StructKeyExists(form, "ArchiveBlockEncrypted") --->
-</cfif>
-
-
-<!--- /CFIF #step# is "2" --->  
-</cfif>
-
-
-
-<cfif #step# is "3">
-
-  <cfif NOT StructKeyExists(form, "ScanPE")>
-
-    <cfset m="Antivirus Settings: form.ScanPE does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanPE")>
-
-
-      <cfif #form.ScanPE# is "true" OR #form.ScanPE# is "false">       
-
-  <cfset step=4>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.ScanPE is not true or false">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.ScanPE# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanPE") --->
-</cfif>
-
-<!--- /CFIF #step# is "3" --->  
-</cfif>
-
-
-<cfif #step# is "4">
-
-  <cfif NOT StructKeyExists(form, "ScanOLE2")>
-
-    <cfset m="Antivirus Settings: form.ScanOLE2 does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanOLE2")>
-
-
-      <cfif #form.ScanOLE2# is "true" OR #form.ScanOLE2# is "false">        
-
-  <cfset step=5>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.ScanOLE2 is not true or false">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.ScanOLE2# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanOLE2") --->
-</cfif>
-
-<!--- /CFIF #step# is "4" --->  
-</cfif>
-
-
-<cfif #step# is "5">
-
-  <cfif NOT StructKeyExists(form, "OLE2BlockMacros")>
-
-    <cfset m="Antivirus Settings: form.OLE2BlockMacros does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "OLE2BlockMacros")>
-
-
-<cfif #form.OLE2BlockMacros# is "False" OR #form.OLE2BlockMacros# is "True">      
-
-  <cfset step=6>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.OLE2BlockMacros is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.OLE2BlockMacros# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "OLE2BlockMacros") --->
-</cfif>
-
-<!--- /CFIF #step# is "5" --->  
-</cfif>
-
-
-<cfif #step# is "6">
-
-  <cfif NOT StructKeyExists(form, "ScanPDF")>
-
-    <cfset m="Antivirus Settings: form.ScanPDF does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanPDF")>
-
-
-<cfif #form.ScanPDF# is "False" OR #form.ScanPDF# is "True">      
-
-  <cfset step=7>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.ScanPDF is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.ScanPDF# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanPDF") --->
-</cfif>
-
-<!--- /CFIF #step# is "6" --->  
-</cfif>
-
-
-<cfif #step# is "7">
-
-  <cfif NOT StructKeyExists(form, "ScanHTML")>
-
-    <cfset m="Antivirus Settings: form.ScanHTML does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanHTML")>
-
-
-<cfif #form.ScanHTML# is "False" OR #form.ScanHTML# is "True">      
-
-  <cfset step=8>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.ScanHTML is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.ScanHTML# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanHTML") --->
-</cfif>
-
-<!--- /CFIF #step# is "7" --->  
-</cfif>
-
-
-
-<cfif #step# is "8">
-
-  <cfif NOT StructKeyExists(form, "AlgorithmicDetection")>
-
-    <cfset m="Antivirus Settings: form.AlgorithmicDetection does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "AlgorithmicDetection")>
-
-
-<cfif #form.AlgorithmicDetection# is "False" OR #form.AlgorithmicDetection# is "True">      
-
-  <cfset step=9>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.AlgorithmicDetection is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.AlgorithmicDetection# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "AlgorithmicDetection") --->
-</cfif>
-
-<!--- /CFIF #step# is "8" --->  
-</cfif>
-
-
-
-<cfif #step# is "9">
-
-  <cfif NOT StructKeyExists(form, "ScanELF")>
-
-    <cfset m="Antivirus Settings: form.ScanELF does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "ScanELF")>
-
-
-<cfif #form.ScanELF# is "False" OR #form.ScanELF# is "True">      
-
-  <cfset step=10>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.ScanELF is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.ScanELF# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "ScanELF") --->
-</cfif>
-
-<!--- /CFIF #step# is "9" --->  
-</cfif>
-
-
-<cfif #step# is "10">
-
-  <cfif NOT StructKeyExists(form, "PhishingSignatures")>
-
-    <cfset m="Antivirus Settings: form.PhishingSignatures does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "PhishingSignatures")>
-
-
-<cfif #form.PhishingSignatures# is "False" OR #form.PhishingSignatures# is "True">      
-
-  <cfset step=11>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.PhishingSignatures is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.PhishingSignatures# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "PhishingSignatures") --->
-</cfif>
-
-<!--- /CFIF #step# is "10" --->  
-</cfif>
-
-
-
-<cfif #step# is "11">
-
-  <cfif NOT StructKeyExists(form, "PhishingScanURLs")>
-
-    <cfset m="Antivirus Settings: form.PhishingScanURLs does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "PhishingScanURLs")>
-
-
-<cfif #form.PhishingScanURLs# is "False" OR #form.PhishingScanURLs# is "True">      
-
-  <cfset step=12>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.PhishingScanURLs is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.PhishingScanURLs# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "PhishingScanURLs") --->
-</cfif>
-
-<!--- /CFIF #step# is "11" --->  
-</cfif>
-
-
-<cfif #step# is "12">
-
-  <cfif NOT StructKeyExists(form, "PhishingAlwaysBlockSSLMismatch")>
-
-    <cfset m="Antivirus Settings: form.PhishingAlwaysBlockSSLMismatch does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "PhishingAlwaysBlockSSLMismatch")>
-
-
-<cfif #form.PhishingAlwaysBlockSSLMismatch# is "False" OR #form.PhishingAlwaysBlockSSLMismatch# is "True">      
-
-  <cfset step=13>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.PhishingAlwaysBlockSSLMismatch is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.PhishingAlwaysBlockSSLMismatch# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "PhishingAlwaysBlockSSLMismatch") --->
-</cfif>
-
-<!--- /CFIF #step# is "12" --->  
-</cfif>
-
-
-
-<cfif #step# is "13">
-
-  <cfif NOT StructKeyExists(form, "PhishingAlwaysBlockCloak")>
-
-    <cfset m="Antivirus Settings: form.PhishingAlwaysBlockCloak does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "PhishingAlwaysBlockCloak")>
-
-
-<cfif #form.PhishingAlwaysBlockCloak# is "False" OR #form.PhishingAlwaysBlockCloak# is "True">      
-
-  <cfset step=14>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.PhishingAlwaysBlockCloak is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.PhishingAlwaysBlockCloak# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "PhishingAlwaysBlockCloak") --->
-</cfif>
-
-<!--- /CFIF #step# is "13" --->  
-</cfif>
-
-
-<cfif #step# is "14">
-
-  <cfif NOT StructKeyExists(form, "DetectPUA")>
-
-    <cfset m="Antivirus Settings: form.DetectPUA does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "DetectPUA")>
-
-
-<cfif #form.DetectPUA# is "False" OR #form.DetectPUA# is "True">      
-
-  <cfset step=15>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.DetectPUA is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.DetectPUA# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "DetectPUA") --->
-</cfif>
-
-<!--- /CFIF #step# is "14" --->  
-</cfif>
-
-
-
-<cfif #step# is "15">
-
-  <cfif NOT StructKeyExists(form, "HeuristicScanPrecedence")>
-
-    <cfset m="Antivirus Settings: form.HeuristicScanPrecedence does not exist">
-    <cfinclude template="./inc/error.cfm">
-    <cfabort>
-
-
-    <cfelseif StructKeyExists(form, "HeuristicScanPrecedence")>
-
-
-<cfif #form.HeuristicScanPrecedence# is "False" OR #form.HeuristicScanPrecedence# is "True">      
-
-  <cfset step=16>
-
-    
-    <cfelse>  
-
-      <cfset m="Antivirus Settings: form.HeuristicScanPrecedence is not True or False">
-      <cfinclude template="./inc/error.cfm">
-      <cfabort>
-
-
-
-<!--- /CFIF #form.HeuristicScanPrecedence# is "" --->
-</cfif>
-
-<!--- /CFIF NOT/StructKeyExists(form, "HeuristicScanPrecedence") --->
-</cfif>
-
-<!--- /CFIF #step# is "15" --->  
-</cfif>
-
-
-<cfif #step# is "16">
-
-
-<cfinclude template="./inc/antivirus_set_settings.cfm">
-
-<cfinclude template="./inc/generate_antivirus_configuration.cfm">
-
-<cfset session.m=9>
-
-<cflocation url="view_antivirus_settings.cfm" addtoken="no">
-
-
-<!--- /CFIF #step# is "16" --->
-</cfif>
-
-
-<cfelseif #action# is "Delete Entry">
-
-
-  <cfif NOT StructKeyExists(form, "delete_id")>
-
-    <cfset session.m = 11>
-
-  <cflocation url="view_antivirus_settings.cfm" addtoken="no">
-
-
-    <cfelseif StructKeyExists(form, "delete_id")>
-
-    <cfif #form.delete_id# is "">
-
-      <cfset session.m = 11>
-
-    <cflocation url="view_antivirus_settings.cfm" addtoken="no">
-        
-
-    <cfelseif #form.delete_id# is not "">      
-
-<cfloop index="i" list="#form.delete_id#" delimiters=",">
-
-  <cfoutput>#i#<br></cfoutput>
-
-  <cfquery name="getentry" datasource="hermes">
-  select id from parameters2 where id = <cfqueryparam value = #i# CFSQLType = "CF_SQL_INTEGER">
-  </cfquery>
-
-
-  <cfif #getentry.recordcount# GTE 1>
-
-    <cfset delete_id = #i#>
-
-    <cfinclude template="./inc/antivirus_delete_entry.cfm">
-  
-
-    <!--- /CFIF #getentry.recordcount# --->
-  </cfif>
-
-  
+    </cfif>
   </cfloop>
 
+  <!--- Set variables from form for the set_settings include --->
+  <cfloop list="#avFields#" index="f">
+    <cfset "#f#" = form[f]>
+  </cfloop>
 
-  <cfset session.m = 12>
-
+  <cfinclude template="./inc/antivirus_set_settings.cfm">
   <cfinclude template="./inc/generate_antivirus_configuration.cfm">
-  
-  <cflocation url="view_antivirus_settings.cfm" addtoken="no">  
 
+  <cfset session.m = 9>
+  <cflocation url="view_antivirus_settings.cfm" addtoken="no">
 
-<!--- /CFIF #form.delete_id# is/is not "" --->
-</cfif>
+<cfelseif action is "Delete Entry">
 
-
-<!--- /CFIF NOT/StructKeyExists(form, "delete_id") --->
-</cfif>
-
-
-<cfelseif #action# is "Add AV Whitelist">
-
-
-
-      <cfif NOT StructKeyExists(form, "whitelist")>
-      
-      
-        <cfset m="Antivirus Settings Add Whitelist Entries: form.whitelist does not exist">
-        <cfinclude template="./inc/error.cfm">
-        <cfabort>
-         
-      
-      <cfelseif StructKeyExists(form, "whitelist")>
-
-        <cfif #form.whitelist# is not "">
-      
-      <cfinclude template="./inc/antivirus_add_whitelists.cfm">
-
-        <cfelseif #form.whitelist# is "">
-
-          
-    <cfset session.m = 13>
-
+  <cfif NOT StructKeyExists(form, "delete_id") OR trim(form.delete_id) is "">
+    <cfset session.m = 11>
     <cflocation url="view_antivirus_settings.cfm" addtoken="no">
-      
-    <!--- #form.whitelist# is not "" --->
-    </cfif>
-      
-      <!--- /CFIF StructKeyExists(form, "whitelist") --->
-      </cfif>
-  
- 
-<cfinclude template="./inc/generate_antivirus_configuration.cfm">
-
-<cflocation url="view_antivirus_settings.cfm" addtoken="no">
-
-    
-<!--- /CFIF #action# is --->     
-</cfif> 
-
-
-<cfif #session.license# is "VALID">   
-
-<form>
-
-    <cfif #getavwhitelist.recordcount# GTE 1>
-
-    
-                
-      <table class="table table-striped"  id="sortTable" style="width:100%">
-        <thead>
-          <tr>
-            <th><input type="checkbox" id="selectAll" value="selectAll"></th>
-            <th>AV Signature Whitelist</th> 
-          
-
-          </tr>
-        </thead>
-        <tbody>
-
-        
-
-<cfoutput query="getavwhitelist">
-
-
-  <td><input type="checkbox" name="id" value="#id#"></td>
-
-
-<td>#parameter#</td>  
-
-</tr>
-
-</cfoutput>
-
-
-
-
-    
-
-        </tbody>
-        
-       
-        <tfoot>
-          <tr>
-      
-            <th></th>
-            <th>AV Signature Whitelist</th>  
-              
-
-
-           
-          </tr>
-        </tfoot>
-      
-
-      </table>
-
-    </form>
-    
- 
-    
-    <cfelse>
-    
-      <div class="alert alert-danger alert-dismissible">
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-        <h4><i class="icon fa fa-ban"></i> Oops!</h4>
-        <cfoutput>No AV Signature Whitelist entries were found</strong></cfoutput>
-      </div>
-    
-      <!--- /CFIF FOR getavwhitelist.recordcount --->
-    </cfif>
-
-  <!--- /CFIF FOR #session.license# is "VALID" --->
   </cfif>
 
-    <div>&nbsp;</div>
+  <cfloop index="i" list="#form.delete_id#" delimiters=",">
+    <cfif IsValid("integer", i)>
+      <cfquery name="getentry" datasource="hermes">
+        SELECT id FROM parameters2 WHERE id = <cfqueryparam value="#i#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfif getentry.recordcount GTE 1>
+        <cfset delete_id = i>
+        <cfinclude template="./inc/antivirus_delete_entry.cfm">
+      </cfif>
+    </cfif>
+  </cfloop>
 
-    
-    
-  </div><!-- /.container-fluid -->
+  <cfset session.m = 12>
+  <cfinclude template="./inc/generate_antivirus_configuration.cfm">
+  <cflocation url="view_antivirus_settings.cfm" addtoken="no">
+
+<cfelseif action is "Add AV Whitelist">
+
+  <cfif NOT StructKeyExists(form, "whitelist") OR trim(form.whitelist) is "">
+    <cfset session.m = 13>
+    <cflocation url="view_antivirus_settings.cfm" addtoken="no">
+  </cfif>
+
+  <cfinclude template="./inc/antivirus_add_whitelists.cfm">
+  <cfinclude template="./inc/generate_antivirus_configuration.cfm">
+  <cflocation url="view_antivirus_settings.cfm" addtoken="no">
+
+</cfif>
+
+<!--- ================================================================ --->
+<!--- ANTIVIRUS SETTINGS CARD                                          --->
+<!--- ================================================================ --->
+
+<cfset avSettings = [
+  {name:"ScanMail", label:"Scan Email Attachments", rec:"true",
+   hint:"Enables scanning of email attachments for viruses and malware. This is the primary scanning function for inbound mail."},
+  {name:"ScanArchive", label:"Scan Archives", rec:"true",
+   hint:"Enables scanning inside compressed archives (ZIP, RAR, 7z, etc.). Without this, only the archive file itself is scanned, not its contents."},
+  {name:"ArchiveBlockEncrypted", label:"Mark Encrypted Archives as Viruses", rec:"false",
+   hint:"When enabled, encrypted archives that cannot be scanned are treated as viruses and blocked. This is aggressive and may cause false positives with legitimate password-protected files."},
+  {name:"ScanPE", label:"Scan Portable Executables (Windows EXE)", rec:"true",
+   hint:"Enables deep analysis of Windows executable files (PE format). Required for decompression of executable packers such as UPX, FSG, and Petite."},
+  {name:"ScanOLE2", label:"Scan OLE2 Files (MS Office, .msi)", rec:"true",
+   hint:"Enables scanning of OLE2 files such as Microsoft Office documents (.doc, .xls, .ppt) and Windows Installer (.msi) files."},
+  {name:"OLE2BlockMacros", label:"Block OLE2 VBA Macros", rec:"false",
+   hint:"When enabled, ALL OLE2 files containing VBA macros are blocked regardless of whether the macros are malicious. Detected as 'Heuristics.OLE2.ContainsMacros'. Has no effect if Scan OLE2 is disabled. Use with caution as it blocks legitimate macro-enabled documents."},
+  {name:"ScanPDF", label:"Scan PDF Files", rec:"true",
+   hint:"Enables scanning within PDF files for embedded malware, JavaScript exploits, and malicious content."},
+  {name:"ScanHTML", label:"Scan HTML/JavaScript Content", rec:"true",
+   hint:"Enables HTML detection, normalization, and decryption of JavaScript/ScriptEncoder content in email messages. Helps detect HTML-based phishing and script exploits."},
+  {name:"AlgorithmicDetection", label:"Algorithmic Detection", rec:"true",
+   hint:"Enables special detection algorithms for complex malware, exploits in graphic files, and other threats that cannot be detected by signatures alone."},
+  {name:"ScanELF", label:"Scan ELF Files (Linux Executables)", rec:"true",
+   hint:"Enables scanning of ELF (Executable and Linking Format) files, the standard executable format for Linux/Unix systems."},
+  {name:"PhishingSignatures", label:"Phishing Signature Detection", rec:"true",
+   hint:"Enables signature-based detection of phishing attempts in email messages using ClamAV's phishing signature database."},
+  {name:"PhishingScanURLs", label:"Scan Email URLs for Phishing", rec:"true",
+   hint:"Enables scanning of URLs within email messages to detect phishing attempts by checking against known phishing URL databases."},
+  {name:"PhishingAlwaysBlockSSLMismatch", label:"Block SSL Mismatches in URLs", rec:"false",
+   hint:"When enabled, blocks emails containing URLs where the displayed URL hostname does not match the actual SSL certificate. Can lead to false positives with legitimate CDN or redirect URLs."},
+  {name:"PhishingAlwaysBlockCloak", label:"Block Cloaked URLs", rec:"false",
+   hint:"When enabled, blocks emails containing cloaked URLs (where the visible link text differs from the actual URL destination). Can lead to false positives with URL shorteners and marketing links."},
+  {name:"DetectPUA", label:"Detect Potentially Unwanted Applications", rec:"true",
+   hint:"Enables detection of Potentially Unwanted Applications (PUA) such as adware, spyware, dialers, and other non-malicious but unwanted software."},
+  {name:"HeuristicScanPrecedence", label:"Heuristic Scan Precedence", rec:"true",
+   hint:"When enabled, heuristic scan results (phishing, macro detection) take priority and stop scanning immediately when detected. Saves CPU time. When disabled, heuristic detections are reported only after the full scan completes, allowing signature-based detections to take precedence."}
+]>
+
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-shield-virus"></i> ClamAV Antivirus Settings</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="AV Settings">
+
+      <div class="row">
+        <cfloop array="#avSettings#" index="s">
+          <div class="col-md-6">
+            <div class="mb-3">
+              <cfoutput>
+              <label class="form-label"><strong>#s.label#</strong></label>
+              <small class="form-text text-muted d-block mb-1">#s.hint#</small>
+              <cfset currentVal = evaluate(s.name)>
+              <select class="form-select" name="#s.name#">
+                <cfif s.rec EQ "true">
+                  <option value="true" <cfif currentVal is "true">selected</cfif>>Enabled (Recommended)</option>
+                  <option value="false" <cfif currentVal is "false">selected</cfif>>Disabled</option>
+                <cfelse>
+                  <option value="false" <cfif currentVal is "false">selected</cfif>>Disabled (Recommended)</option>
+                  <option value="true" <cfif currentVal is "true">selected</cfif>>Enabled</option>
+                </cfif>
+              </select>
+              </cfoutput>
+            </div>
+          </div>
+        </cfloop>
+      </div>
+
+      <button type="submit" class="btn btn-primary"
+        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+        <i class="fas fa-save"></i> Save &amp; Apply Settings
+      </button>
+    </form>
+  </div>
 </div>
-<!-- /.content -->
+
+<!--- ================================================================ --->
+<!--- AV SIGNATURE WHITELIST CARD (Pro Edition Only)                   --->
+<!--- ================================================================ --->
+
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-list"></i> AV Signature Whitelist</h3>
+  </div>
+  <div class="card-body">
+
+    <div class="alert alert-info mb-3">
+      <i class="fas fa-info-circle me-1"></i> <strong>AV Signature Whitelist</strong> allows you to exclude specific ClamAV signature names from detection. Use this when ClamAV produces false positives on known-safe files.
+      <hr>
+      <strong>How to find a ClamAV signature name:</strong>
+      <ol class="mb-1 mt-1">
+        <li>Go to <strong>Message History</strong> and find the blocked message (Type column will show <strong>Virus</strong> or <strong>Banned</strong>)</li>
+        <li>Check the mail filter logs for the message ID:<br>
+          <code>docker logs hermes_mail_filter 2>&amp;1 | grep "mail_id_here"</code></li>
+        <li>The log entry will show the signature name, for example:<br>
+          <code>Blocked INFECTED (Heuristics.OLE2.ContainsMacros)</code><br>
+          The text in parentheses is the signature name to whitelist</li>
+        <li>Alternatively, scan a file directly to see what ClamAV detects:<br>
+          <code>docker exec hermes_mail_filter clamscan /path/to/file</code></li>
+      </ol>
+      <small class="text-muted">Enter the exact signature name as reported by ClamAV. Multiple entries can be added at once, one per line.</small>
+    </div>
+
+    <div class="mb-3">
+      <cfoutput>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##addWhitelistModal">
+        <i class="fa fa-plus-square fa-lg"></i> Add Entries
+      </button>
+      </cfoutput>
+      <button type="button" id="deleteWhitelists" class="btn btn-danger">
+        <i class="fas fa-trash-alt"></i> Delete Selected
+      </button>
+    </div>
+
+    <cfif getavwhitelist.recordcount GTE 1>
+      <form id="whitelistForm">
+      <div class="table-responsive">
+        <table id="sortTable" class="table table-bordered table-hover table-striped" style="width:100%">
+          <thead>
+            <tr>
+              <th style="width:40px"><input type="checkbox" id="selectAll"></th>
+              <th>AV Signature</th>
+            </tr>
+          </thead>
+          <tbody>
+            <cfoutput query="getavwhitelist">
+            <tr>
+              <td><input type="checkbox" name="id" value="#id#"></td>
+              <td>#encodeForHTML(parameter)#</td>
+            </tr>
+            </cfoutput>
+          </tbody>
+        </table>
+      </div>
+      </form>
+    <cfelse>
+      <div class="alert alert-info">
+        <i class="icon fa fa-info-circle"></i> No AV Signature Whitelist entries found.
+      </div>
+    </cfif>
+
+  </div>
 </div>
-</main><!-- replaced content-wrapper -->
 
+<!-- ADD WHITELIST MODAL -->
+<div class="modal fade" id="addWhitelistModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" autocomplete="off">
+        <input type="hidden" name="action" value="Add AV Whitelist">
+        <div class="modal-header">
+          <h5 class="modal-title">Add AV Signature Whitelist Entries</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label"><strong>AV Signature(s)</strong></label>
+            <textarea class="form-control" name="whitelist" rows="8" placeholder="Enter ClamAV signature names, one per line"></textarea>
+            <small class="form-text text-muted">Example: <code>Heuristics.OLE2.ContainsMacros</code></small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
+            Add Entries
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
-<cfinclude template="./inc/main_footer.cfm" />
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" value="Delete Entry">
+        <input type="hidden" name="delete_id" id="deleteIds" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete Entries</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to delete the selected entries? This action is irreversible!</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger"
+            onclick="this.disabled=true;this.innerHTML='Deleting...';this.form.submit();">Yes, Delete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
 
-<!-- ./wrapper -->
+      </div>
+    </div>
+  </main>
 
+  <cfinclude template="./inc/main_footer.cfm" />
 
-
-</body>
-
-
-
-  <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE STARTS HERE --->
-     <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
-     <script>
-      $('#selectAll').click(function() {
-        if(this.checked) {
-            $(':checkbox').each(function() {
-                this.checked = true;                        
-            });
-        } else {
-           $(':checkbox').each(function() {
-                this.checked = false;                        
-            });
-        } 
-      });
-      </script>
-    <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE ENDS HERE --->
-
-
-<!--- BACK TO TOP BUTTON SCRIPT STARTS HERE  --->
+</div>
 
 <script>
+$(document).ready(function() {
+  $('#sortTable').DataTable({
+    dom: 'Blfrtip',
+    buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
+    stateSave: true,
+    lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
+    order: [[1, 'asc']],
+    columnDefs: [
+      { orderable: false, targets: [0] },
+      { searchable: false, targets: [0] }
+    ]
+  });
 
-//Get the button
-let mybutton = document.getElementById("btn-back-to-top");
+  // Select All checkbox
+  $('#selectAll').click(function() {
+    $('input[name="id"]').prop('checked', this.checked);
+  });
 
-// When the user scrolls down 20px from the top of the document, show the button
-window.onscroll = function () {
-  scrollFunction();
-};
-
-function scrollFunction() {
-  if (
-    document.body.scrollTop > 200 ||
-    document.documentElement.scrollTop > 200
-  ) {
-    mybutton.style.display = "block";
-  } else {
-    mybutton.style.display = "none";
-  }
-}
-// When the user clicks on the button, scroll to the top of the document
-mybutton.addEventListener("click", backToTop);
-
-function backToTop() {
-  document.body.scrollTop = 0;
-  document.documentElement.scrollTop = 0;
-}
-
+  // Delete button - collect selected IDs and show modal
+  $('#deleteWhitelists').click(function() {
+    var selected = [];
+    $('input[name="id"]:checked').each(function() {
+      selected.push($(this).val());
+    });
+    if (selected.length === 0) {
+      alert('Please select at least one entry to delete.');
+      return;
+    }
+    $('#deleteIds').val(selected.join(','));
+    new bootstrap.Modal(document.getElementById('deleteModal')).show();
+  });
+});
 </script>
 
-<!--- BACK TO TOP BUTTON SCRIPT ENDS HERE  --->
-
+</body>
 </html>

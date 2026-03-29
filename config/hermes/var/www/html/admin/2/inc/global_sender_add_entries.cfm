@@ -56,11 +56,13 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
       <cfcontinue>
     </cfif>
   <cfelse>
+    <!--- Bare domain: validate and auto-prepend @ --->
     <cfif NOT IsValid("email", "test@" & line)>
       <cfset entries_skipped = entries_skipped + 1>
       <cfset invalid_list = invalid_list & encodeForHTML(line) & "<br>">
       <cfcontinue>
     </cfif>
+    <cfset line = "@" & line>
   </cfif>
 
   <!--- Check for duplicates --->

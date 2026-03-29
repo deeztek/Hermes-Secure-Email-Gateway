@@ -131,10 +131,10 @@ values
 
 <cfif #step# is "2">
 
-     <!--- CHECK IF VALID FQDN --->
+     <!--- CHECK IF VALID FQDN (reject IP addresses for helo/domain/ptr types) --->
      <cfset tempemail="bob@#host#">
-    
-     <cfif IsValid("email", tempemail)>
+
+     <cfif IsValid("email", tempemail) AND NOT REFind(ip_cidr, host) AND NOT REFind(network_cidr, host)>
 
 <!--- CHECK IF HOST EXISTS --->
 <cfoutput>

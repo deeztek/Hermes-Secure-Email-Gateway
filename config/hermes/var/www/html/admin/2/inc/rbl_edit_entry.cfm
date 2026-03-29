@@ -28,7 +28,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
   <!--- Derive signed weight and parameter value from type --->
   <cfif editType is "allow">
     <cfset actualWeight = -editWeight>
-    <cfset editParam = editHost>
+    <cfset editParam = editHost & "*-" & editWeight>
   <cfelse>
     <cfset actualWeight = editWeight>
     <cfset editParam = editHost & "*" & editWeight>

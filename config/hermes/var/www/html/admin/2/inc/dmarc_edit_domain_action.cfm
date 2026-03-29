@@ -13,9 +13,10 @@ Expects: form.id, form.domain, form.note
   <cflocation url="view_dmarc_settings.cfm" addtoken="no">
 </cfif>
 
-<!--- Validate domain format --->
+<!--- Validate domain format (reject IP addresses) --->
 <cfset tempemail = "bob@#form.domain#">
-<cfif NOT IsValid("email", tempemail)>
+<cfset ip_pattern = "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(?:\/\d{1,2})?$">
+<cfif NOT IsValid("email", tempemail) OR REFind(ip_pattern, form.domain)>
   <cfset session.m = 17>
   <cflocation url="view_dmarc_settings.cfm" addtoken="no">
 </cfif>
