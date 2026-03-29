@@ -1,6 +1,6 @@
 {
   "version": "v260119",
-  "generated": "2026-03-19T17:10:07Z",
+  "generated": "2026-03-29T12:30:39Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -9,16 +9,16 @@
     "schedule/generate_smtp_sni.cfm": "07cb8658dbc06250764386333696bc7c7df63279c0eb85b5abce3a58f966252d",
     "admin/2/inc/license_check.cfm": "07585ba63546e088a1c9b96ba09ad07910f2f5320abc0d13563ca2be7afcdc49",
     "admin/2/inc/license_invalid.cfm": "bd3dc27eabf4eb5b4bcc0267368dd9dbc5424a26bcfc9a4039229ce367a76e7c",
-    "admin/2/inc/setsession.cfm": "5afd17d713d980cf121de8920e5522a96cbb9d2139442a6a7ae1e28aa30baa04",
+    "admin/2/inc/setsession.cfm": "ec9d81ac28d04f5f33f7cb43cc41fd251a3b72146cab788b152b7f5310e8b131",
     "admin/2/inc/add_serial_number.cfm": "ceedccaccb2dc940b18258d7da08202dfbe8d9a3a1f645bf547dd7af4c9c5d05",
     "admin/2/inc/manifest_verify.cfm": "2f51a14d0a5acc6efa3b98947977d6e312084ce507be3fb922eaacbbdfc0b686",
     "admin/2/view_remoteauth.cfm": "4f600d6912caed4283e056935bc767e74405205a3ae9396e92f841ce447e3cce",
     "admin/2/edit_remoteauth_mapping.cfm": "54da48ee176e94fa2721788db370b480e0c07db5905af0dc2b7a0b1a525cb2a7",
     "admin/2/view_intrusion_prevention.cfm": "d138e83e0f1a82cc7cef364644f1be7611bc2d85761c131d3233ab25ddec1320",
-    "admin/2/view_console_firewall.cfm": "62812a2746aafb3ee3c20bfbe33537fa7d1cf6393f3960e87609e77193aaecc0",
-    "admin/2/view_system_certificates.cfm": "e2becae47eca4c758d600c441beb2ca83001a854b6569913004ded30b5922560",
+    "admin/2/view_console_firewall.cfm": "23b8de82283ee91f730503f6fa4fb50ec41de30ec9a8f99d7cacbcd7eac4bf8b",
+    "admin/2/view_system_certificates.cfm": "f0f963080b4167954996389a73af35fe7ca7fe0c2df4e38799ece8cff92bea1a",
     "admin/2/view_antivirus_signature_feeds.cfm": "96382d593b0ac0793cec0dc9d8b1f00062d9634a9a676d66d53de25e6a608fa4",
     "admin/2/edit_antivirus_signature_feed.cfm": "4241126bad6fbac37899376527385ca8d5c3415681deb71d8d8b9643243c310b"
   },
-  "fingerprint": "800924238ed2650a9293eef6e0082b49e67aa6d910477ad869b4076e5647031d"
+  "fingerprint": "72fb93d2d762caf8bd52bf7172e8608dfeaee2fba4419e3a190dca329f9e1280"
 }

@@ -222,7 +222,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                 <cfset session.edition = "Community">
             </cfif>
         <cfelse>
-            <!--- No valid cached data and no remote validation — Community Edition --->
+            <!--- No valid cached data and no remote validation - Community Edition --->
             <!--- Legacy file-based license validation removed (incompatible with Docker) --->
         </cfif>
     </cfif>
