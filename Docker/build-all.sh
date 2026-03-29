@@ -58,8 +58,10 @@ build_image() {
     echo "Context:    $context"
     echo "----------------------------------------"
 
-    echo "[RUN] docker build --no-cache -t \"$full_tag\" -f \"$dockerfile\" \"$context\""
-    docker build --no-cache -t "$full_tag" -f "$dockerfile" "$context"
+    # --provenance=false --sbom=false: Docker 25+ OCI attestation manifests break
+    # GitLab Container Registry ("Invalid tag: missing manifest digest")
+    echo "[RUN] docker build --no-cache --provenance=false --sbom=false -t \"$full_tag\" -f \"$dockerfile\" \"$context\""
+    docker build --no-cache --provenance=false --sbom=false -t "$full_tag" -f "$dockerfile" "$context"
 
     if [ $? -eq 0 ]; then
         echo "[OK] $name built successfully"
