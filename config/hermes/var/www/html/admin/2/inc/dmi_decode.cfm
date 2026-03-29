@@ -27,7 +27,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
     
 
   
-  <cffile action="read" file="/usr/share/UUID" variable="uuid">
+  <cffile action="read" file="/opt/hermes/keys/uuid" variable="uuid">
   
   <cfset temp="#REReplace("#uuid#","#chr(10)#","","ALL")#">
 

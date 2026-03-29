@@ -1,1 +1,1 @@
-/usr/sbin/dmidecode|grep UUID > /usr/share/UUID
+/usr/sbin/dmidecode|grep UUID > /opt/hermes/keys/uuid

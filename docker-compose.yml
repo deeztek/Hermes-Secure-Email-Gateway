@@ -264,7 +264,7 @@ services:
       - amavis_data:/mnt/data/amavis #Amavis Data
       - dovecot_mail:/mnt/data/vmail:ro #Dovecot Vmail Data (read-only for monitoring)
       - nextcloud:/mnt/data/nextcloud #Nextcloud Data
-      - ./config/ciphermail/usr/share:/usr/share #Ciphermail
+      - ./config/ciphermail/usr/share/djigzo:/usr/share/djigzo #Ciphermail
       - ./config/hermes/opt/hermes:/opt/hermes
       - ./config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt:/serverhome/WEB-INF/lucee-server/context/password.txt
       - ./config/certbot/conf:/etc/letsencrypt

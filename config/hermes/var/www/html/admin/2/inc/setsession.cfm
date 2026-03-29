@@ -17,14 +17,14 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <!--- Get UUID from system --->
 <cfexecute name="/opt/hermes/scripts/dmidecode" arguments="" timeout="10"></cfexecute>
 
-<cffile action="read" file="/usr/share/UUID" variable="temp1">
+<cffile action="read" file="/opt/hermes/keys/uuid" variable="temp1">
 <cfset temp2="#REReplace("#temp1#","#chr(10)#","","ALL")#">
 <cfset temp3="#REReplace("#temp2#","#chr(13)#","","ALL")#">
 <cfset temp4="#REReplace("#temp3#","","","ALL")#">
 <cfset temp5="#REReplace("#temp4#","UUID:","","ALL")#">
 <cfset theUuid = TRIM(temp5)>
 
-<cffile action="write" file="/usr/share/UUID" output="#theUuid#" addnewline="no">
+<cffile action="write" file="/opt/hermes/keys/uuid" output="#theUuid#" addnewline="no">
 
 <!--- Get serial number from database --->
 <cfquery name="getserial" datasource="hermes">
@@ -222,51 +222,8 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                 <cfset session.edition = "Community">
             </cfif>
         <cfelse>
-            <!--- No valid cached data, check legacy file-based system --->
-            <cfset uuid2_file = "/usr/share/UUID2">
-
-            <cfif fileExists(uuid2_file)>
-                <!--- Legacy file-based license exists --->
-                <cffile action="read" file="/usr/share/UUID" variable="uuid">
-                <cffile action="read" file="/usr/share/UUID2" variable="uuid2">
-                <cfset compare_uuid = Compare(TRIM(uuid), TRIM(uuid2))>
-
-                <cfif compare_uuid EQ 0>
-                    <!--- UUID match - check expiration --->
-                    <cftry>
-                        <cffile action="read" file="/usr/share/lt" variable="lt">
-                        <cffile action="read" file="/usr/share/djigzo/ADDITIONAL-NOTES.TXT" variable="licenseDate">
-
-                        <cfset lt2 = TRIM(lt)>
-                        <cfset datenow = DateFormat(Now(), "yyyy-mm-dd")>
-                        <cfset timenow = TimeFormat(now(), "HH:mm:ss")>
-                        <cfset difference = datediff("d", "#datenow# #timenow#", TRIM(licenseDate))>
-
-                        <cfif difference GTE 1>
-                            <cfset session.license = "VALID">
-                            <cfset session.edition = "Pro">
-                            <cfset session.licensevaliddays = difference>
-                            <cfset session.licenseexpires = DateFormat(licenseDate, "mm/dd/yyyy")>
-                            <cfset session.validationMode = "cached">
-
-                            <!--- Migrate legacy data to database for future logins --->
-                            <cfset updateRetentionPolicy("VALID", TRIM(licenseDate), theSerial, "LEGACY")>
-                        <cfelse>
-                            <cfset session.license = "EXPIRED">
-                            <cfset session.edition = "Community">
-                        </cfif>
-
-                        <cfcatch type="any">
-                            <cfset session.license = "N/A">
-                            <cfset session.edition = "Community">
-                        </cfcatch>
-                    </cftry>
-                <cfelse>
-                    <!--- UUID mismatch - violation --->
-                    <cfset session.license = "VIOLATION">
-                    <cfset session.edition = "Community">
-                </cfif>
-            </cfif>
+            <!--- No valid cached data and no remote validation — Community Edition --->
+            <!--- Legacy file-based license validation removed (incompatible with Docker) --->
         </cfif>
     </cfif>
 
