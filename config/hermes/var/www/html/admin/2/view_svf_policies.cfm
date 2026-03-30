@@ -394,11 +394,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <!--- Cannot delete policy assigned to recipients --->
   <cfquery name="checkAssigned" datasource="hermes">
-    SELECT COUNT(*) as cnt FROM recipients
+    SELECT recipient FROM recipients
     WHERE policy_id = <cfqueryparam value="#form.delete_policy_id#" cfsqltype="cf_sql_integer">
   </cfquery>
-  <cfif checkAssigned.cnt GT 0>
+  <cfif checkAssigned.recordCount GT 0>
     <cfset session.m = 12>
+    <cfset session.deleteAssignedRecipients = ValueList(checkAssigned.recipient, ", ")>
     <cflocation url="view_svf_policies.cfm" addtoken="no">
   </cfif>
 
@@ -539,7 +540,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    <p>This policy is assigned to relay recipients. Assign them to a different policy first.</p>
+    <p>This policy is assigned to the following recipient(s): <strong><cfif StructKeyExists(session, "deleteAssignedRecipients") AND session.deleteAssignedRecipients is not ""><cfoutput>#encodeForHTML(session.deleteAssignedRecipients)#</cfoutput><cfset session.deleteAssignedRecipients = ""><cfelse>Unknown</cfif></strong>. Assign them to a different policy first.</p>
   </div>
 </cfif>
 <cfif m is 13>
@@ -620,17 +621,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
+<div class="callout callout-info mb-4">
+  <h5><i class="fas fa-info-circle"></i> Page Guide</h5>
+  <p class="mb-1">SVF (Spam/Virus/File) policies control how Amavis handles incoming mail for each recipient. Each policy defines <strong>spam scoring thresholds</strong> (tag and quarantine scores), a <strong>file rule</strong> for banned attachment filtering, and per-category settings for viruses, spam, banned files, and bad headers.</p>
+  <p class="mb-1"><strong>Accept Settings</strong> determine whether messages matching a category are delivered instead of quarantined. <strong>Bypass Checks</strong> skip the corresponding scan entirely. <strong>Notifications</strong> control whether the recipient is informed when a message is quarantined.</p>
+  <p class="mb-0">Policies are assigned to recipients under Relay Recipients or Mailbox Recipients. The <strong>default policy</strong> applies to any recipient that does not have a specific policy assigned. There must always be exactly one default policy.</p>
+</div>
+
 <!--- ============================================ --->
 <!--- ADD POLICY FORM                              --->
 <!--- ============================================ --->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add SVF Policy</h3>
-    <div class="card-tools">
-      <button type="button" class="btn btn-tool" data-bs-toggle="collapse" data-bs-target="#addPolicyCollapse" aria-expanded="false">
-        <i class="fas fa-minus"></i>
+    <h3 class="card-title">
+      <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggleAddPolicy" title="Expand">
+        <i class="fas fa-chevron-down"></i>
       </button>
-    </div>
+      <i class="fas fa-plus-circle"></i> Add SVF Policy
+    </h3>
   </div>
   <div class="collapse" id="addPolicyCollapse">
     <div class="card-body">
@@ -639,17 +647,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <div class="row mb-3">
           <div class="col-md-4">
-            <label for="policy_name" class="form-label"><strong>Policy Name</strong></label>
+            <label for="policy_name" class="form-label">Policy Name</label>
             <input type="text" class="form-control" id="policy_name" name="policy_name" maxlength="32" required
               placeholder="e.g. Custom Strict Policy">
           </div>
           <div class="col-md-4">
-            <label for="spam_tag2_level" class="form-label"><strong>Spam Tag Score</strong></label>
+            <label for="spam_tag2_level" class="form-label">Spam Tag Score</label>
             <input type="number" class="form-control" id="spam_tag2_level" name="spam_tag2_level" step="0.01" min="-999" max="999" value="6.31" required>
             <small class="text-muted">Score at which spam header is added (-999 to 999)</small>
           </div>
           <div class="col-md-4">
-            <label for="spam_kill_level" class="form-label"><strong>Spam Quarantine Score</strong></label>
+            <label for="spam_kill_level" class="form-label">Spam Quarantine Score</label>
             <input type="number" class="form-control" id="spam_kill_level" name="spam_kill_level" step="0.01" min="-999" max="999" value="6.31" required>
             <small class="text-muted">Score at which spam is quarantined (-999 to 999)</small>
           </div>
@@ -657,7 +665,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <div class="row mb-3">
           <div class="col-md-4">
-            <label for="banned_rulenames" class="form-label"><strong>File Rule</strong></label>
+            <label for="banned_rulenames" class="form-label">File Rule</label>
             <select class="form-select" id="banned_rulenames" name="banned_rulenames" required>
               <cfoutput query="get_file_rules">
                 <option value="#encodeForHTML(rule_name)#">#encodeForHTML(rule_name)#</option>
@@ -668,9 +676,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <hr>
         <h6 class="mb-3"><strong>Accept Settings</strong></h6>
+        <p class="text-muted mb-2">When set to Yes, messages matching these categories will be delivered to the recipient instead of being quarantined.</p>
         <div class="row mb-3">
           <div class="col-md-3">
-            <label class="form-label"><strong>Accept Viruses</strong></label>
+            <label class="form-label">Accept Viruses</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="virus_lover" id="virus_lover_y" value="Y">
@@ -683,7 +692,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Accept Spam</strong></label>
+            <label class="form-label">Accept Spam</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="spam_lover" id="spam_lover_y" value="Y">
@@ -696,7 +705,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Accept Banned Files</strong></label>
+            <label class="form-label">Accept Banned Files</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="banned_files_lover" id="banned_files_lover_y" value="Y">
@@ -709,7 +718,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Accept Bad Headers</strong></label>
+            <label class="form-label">Accept Bad Headers</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="bad_header_lover" id="bad_header_lover_y" value="Y">
@@ -724,9 +733,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
 
         <h6 class="mb-3"><strong>Bypass Checks</strong></h6>
+        <p class="text-muted mb-2">When set to Yes, the corresponding check is skipped entirely for this policy's recipients.</p>
         <div class="row mb-3">
           <div class="col-md-3">
-            <label class="form-label"><strong>Bypass Virus Checks</strong></label>
+            <label class="form-label">Bypass Virus Checks</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="bypass_virus_checks" id="bypass_virus_y" value="Y">
@@ -739,7 +749,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Bypass Spam Checks</strong></label>
+            <label class="form-label">Bypass Spam Checks</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="bypass_spam_checks" id="bypass_spam_y" value="Y">
@@ -752,7 +762,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Bypass Banned File Checks</strong></label>
+            <label class="form-label">Bypass Banned File Checks</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="bypass_banned_checks" id="bypass_banned_y" value="Y">
@@ -765,7 +775,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-3">
-            <label class="form-label"><strong>Bypass Header Checks</strong></label>
+            <label class="form-label">Bypass Header Checks</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="bypass_header_checks" id="bypass_header_y" value="Y">
@@ -780,9 +790,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
 
         <h6 class="mb-3"><strong>Notifications</strong></h6>
+        <p class="text-muted mb-2">When set to Yes, the recipient is notified when a message is quarantined for the corresponding reason.</p>
         <div class="row mb-3">
           <div class="col-md-4">
-            <label class="form-label"><strong>Notify Recipient on Banned File</strong></label>
+            <label class="form-label">Notify Recipient on Banned File</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="warnbannedrecip" id="warnbanned_y" value="Y">
@@ -795,7 +806,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-4">
-            <label class="form-label"><strong>Notify Recipient on Virus</strong></label>
+            <label class="form-label">Notify Recipient on Virus</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="warnvirusrecip" id="warnvirus_y" value="Y">
@@ -808,7 +819,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
           <div class="col-md-4">
-            <label class="form-label"><strong>Notify Recipient on Bad Header</strong></label>
+            <label class="form-label">Notify Recipient on Bad Header</label>
             <div>
               <div class="form-check form-check-inline">
                 <input class="form-check-input" type="radio" name="warnbadhrecip" id="warnbadh_y" value="Y">
@@ -950,44 +961,51 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+          <p class="text-muted mb-3">SVF (Spam/Virus/File) policies control how incoming mail is handled for spam scoring, virus detection, banned file filtering, and bad header checks. Each policy is assigned to one or more recipients and determines what gets quarantined, accepted, or bypassed.</p>
+
           <div class="row mb-3">
             <div class="col-md-4">
-              <label for="edit_policy_name" class="form-label"><strong>Policy Name</strong></label>
+              <label for="edit_policy_name" class="form-label">Policy Name</label>
               <input type="text" class="form-control" id="edit_policy_name" name="edit_policy_name" maxlength="32" required>
             </div>
             <div class="col-md-4">
-              <label for="edit_spam_tag2_level" class="form-label"><strong>Spam Tag Score</strong></label>
+              <label for="edit_spam_tag2_level" class="form-label">Spam Tag Score</label>
               <input type="number" class="form-control" id="edit_spam_tag2_level" name="edit_spam_tag2_level" step="0.01" min="-999" max="999" required>
+              <small class="text-muted">Score at which spam header is added (-999 to 999)</small>
             </div>
             <div class="col-md-4">
-              <label for="edit_spam_kill_level" class="form-label"><strong>Spam Quarantine Score</strong></label>
+              <label for="edit_spam_kill_level" class="form-label">Spam Quarantine Score</label>
               <input type="number" class="form-control" id="edit_spam_kill_level" name="edit_spam_kill_level" step="0.01" min="-999" max="999" required>
+              <small class="text-muted">Score at which spam is quarantined (-999 to 999)</small>
             </div>
           </div>
 
           <div class="row mb-3">
             <div class="col-md-4">
-              <label for="edit_banned_rulenames" class="form-label"><strong>File Rule</strong></label>
+              <label for="edit_banned_rulenames" class="form-label">File Rule</label>
               <select class="form-select" id="edit_banned_rulenames" name="edit_banned_rulenames" required>
                 <cfoutput query="get_file_rules">
                   <option value="#encodeForHTML(rule_name)#">#encodeForHTML(rule_name)#</option>
                 </cfoutput>
               </select>
+              <small class="text-muted">File rule used for banned attachment filtering</small>
             </div>
             <div class="col-md-4">
-              <label class="form-label"><strong>Default Policy</strong></label>
+              <label class="form-label">Default Policy</label>
               <select class="form-select" id="edit_default_policy" name="edit_default_policy">
                 <option value="2">No</option>
                 <option value="1">Yes</option>
               </select>
+              <small class="text-muted" id="edit_default_policy_hint">Default policy applies to recipients without a specific policy</small>
             </div>
           </div>
 
           <hr>
           <h6 class="mb-3"><strong>Accept Settings</strong></h6>
+          <p class="text-muted mb-2">When set to Yes, messages matching these categories will be delivered to the recipient instead of being quarantined.</p>
           <div class="row mb-3">
             <div class="col-md-3">
-              <label class="form-label"><strong>Accept Viruses</strong></label>
+              <label class="form-label">Accept Viruses</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_virus_lover" id="edit_virus_lover_y" value="Y">
@@ -1000,7 +1018,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Accept Spam</strong></label>
+              <label class="form-label">Accept Spam</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_spam_lover" id="edit_spam_lover_y" value="Y">
@@ -1013,7 +1031,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Accept Banned Files</strong></label>
+              <label class="form-label">Accept Banned Files</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_banned_files_lover" id="edit_banned_files_lover_y" value="Y">
@@ -1026,7 +1044,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Accept Bad Headers</strong></label>
+              <label class="form-label">Accept Bad Headers</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_bad_header_lover" id="edit_bad_header_lover_y" value="Y">
@@ -1041,9 +1059,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
 
           <h6 class="mb-3"><strong>Bypass Checks</strong></h6>
+          <p class="text-muted mb-2">When set to Yes, the corresponding check is skipped entirely for this policy's recipients.</p>
           <div class="row mb-3">
             <div class="col-md-3">
-              <label class="form-label"><strong>Bypass Virus Checks</strong></label>
+              <label class="form-label">Bypass Virus Checks</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_bypass_virus_checks" id="edit_bypass_virus_y" value="Y">
@@ -1056,7 +1075,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Bypass Spam Checks</strong></label>
+              <label class="form-label">Bypass Spam Checks</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_bypass_spam_checks" id="edit_bypass_spam_y" value="Y">
@@ -1069,7 +1088,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Bypass Banned Checks</strong></label>
+              <label class="form-label">Bypass Banned Checks</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_bypass_banned_checks" id="edit_bypass_banned_y" value="Y">
@@ -1082,7 +1101,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label"><strong>Bypass Header Checks</strong></label>
+              <label class="form-label">Bypass Header Checks</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_bypass_header_checks" id="edit_bypass_header_y" value="Y">
@@ -1097,9 +1116,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
 
           <h6 class="mb-3"><strong>Notifications</strong></h6>
+          <p class="text-muted mb-2">When set to Yes, the recipient is notified when a message is quarantined for the corresponding reason.</p>
           <div class="row mb-3">
             <div class="col-md-4">
-              <label class="form-label"><strong>Notify on Banned File</strong></label>
+              <label class="form-label">Notify on Banned File</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_warnbannedrecip" id="edit_warnbanned_y" value="Y">
@@ -1112,7 +1132,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-4">
-              <label class="form-label"><strong>Notify on Virus</strong></label>
+              <label class="form-label">Notify on Virus</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_warnvirusrecip" id="edit_warnvirus_y" value="Y">
@@ -1125,7 +1145,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
             <div class="col-md-4">
-              <label class="form-label"><strong>Notify on Bad Header</strong></label>
+              <label class="form-label">Notify on Bad Header</label>
               <div>
                 <div class="form-check form-check-inline">
                   <input class="form-check-input" type="radio" name="edit_warnbadhrecip" id="edit_warnbadh_y" value="Y">
@@ -1161,6 +1181,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
 $(document).ready(function() {
+  // Add SVF Policy toggle (chevron down/up)
+  $('#toggleAddPolicy').on('click', function() {
+    $('#addPolicyCollapse').collapse('toggle');
+  });
+  $('#addPolicyCollapse').on('shown.bs.collapse', function() {
+    $('#toggleAddPolicy').find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    $('#toggleAddPolicy').attr('title', 'Collapse');
+  });
+  $('#addPolicyCollapse').on('hidden.bs.collapse', function() {
+    $('#toggleAddPolicy').find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    $('#toggleAddPolicy').attr('title', 'Expand');
+  });
+
   $('#policiesTable').DataTable({
     dom: 'Blfrtip',
     buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
@@ -1210,7 +1243,16 @@ function openEditModal(id, name, virusLover, spamLover, bannedFilesLover, badHea
   document.getElementById('edit_spam_tag2_level').value = spamTag2;
   document.getElementById('edit_spam_kill_level').value = spamKill;
   document.getElementById('edit_banned_rulenames').value = bannedRulenames;
-  document.getElementById('edit_default_policy').value = defaultPolicy;
+  var defSelect = document.getElementById('edit_default_policy');
+  var defHint = document.getElementById('edit_default_policy_hint');
+  defSelect.value = defaultPolicy;
+  if (defaultPolicy === '1') {
+    defSelect.disabled = true;
+    defHint.textContent = 'To change the default, set another policy as the default instead';
+  } else {
+    defSelect.disabled = false;
+    defHint.textContent = 'Default policy applies to recipients without a specific policy';
+  }
 
   // Set radio buttons
   setRadio('edit_virus_lover', virusLover);

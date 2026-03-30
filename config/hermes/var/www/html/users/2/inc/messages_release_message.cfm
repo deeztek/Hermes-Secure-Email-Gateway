@@ -88,85 +88,55 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfif fileExists(quarfile)> 
     
 
-        <cffile action="read" file="/opt/hermes/scripts/amavis_release_message.sh" variable="temp">
-
-        <cffile action = "write"
-            file = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-            output = "#REReplace("#temp#","THE-QUAR-LOC","#getmsg.quar_loc#","ALL")#" addnewline="no">
-        
-        <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh" variable="temp">
-        
-        <cffile action = "write"
-            file = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-            output = "#REReplace("#temp#","THE-SECRET-ID","#getemail.secret_id#","ALL")#" addnewline="no">
-        
-        <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh" variable="temp">
-        
-        <cffile action = "write"
-            file = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-            output = "#REReplace("#temp#","THE-RECIPIENT","#getrec.email#","ALL")#" addnewline="no">
-     
-
         <cftry>
 
-              
-        <cfexecute name = "/bin/chmod"
-        arguments="+x /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-        timeout = "60">
-        </cfexecute>
-                    
-            <cfcatch type="any">
-                
-            <cfset m="Messages Release Message: There was an error making /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh executable">
-            <cfinclude template="error.cfm">
-            <cfabort>   
-                
-            </cfcatch>
-            </cftry>
-        
-        <cftry>
+        <cffile action="write"
+            file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
+            output="docker exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getemail.secret_id# #getrec.email# 2>&1">
 
-            <cfexecute name = "/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-            timeout = "240"
-            variable ="release"
-            arguments="">
-            </cfexecute>
-                    
+            <cftry>
+
+                <cfexecute name="/bin/chmod"
+                arguments="+x /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
+                timeout="60">
+                </cfexecute>
+
             <cfcatch type="any">
-                
-            <cfset m="Messages Release Message: There was an error executing /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh">
+            <cfset m="Messages Release Message: There was an error making release script executable">
             <cfinclude template="error.cfm">
-            <cfabort>   
-                
+            <cfabort>
             </cfcatch>
             </cftry>
-                    
+
+            <cftry>
+
+                <cfexecute name="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
+                timeout="240"
+                variable="release"
+                arguments="">
+                </cfexecute>
+
+            <cfcatch type="any">
+            <cfset m="Messages Release Message: There was an error executing amavisd-release">
+            <cfinclude template="error.cfm">
+            <cfabort>
+            </cfcatch>
+            </cftry>
+
         <!--- DELETE SCRIPT --->
-        <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh">
-        
-        <cfif fileExists(FiletoDelete)> 
-        <cfoutput>
-        <cffile action="delete" 
-        file = "#FiletoDelete#">
-        </cfoutput>
-        
-        <!--- /CFIF fileExists(FiletoDelete) --->
+        <cfif fileExists("/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh")>
+          <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh">
         </cfif>
         
         
-         <!--- IF COMMAND OUTPUT CONTAINS Message received THEN RELEASE SUCCEEDED --->
-         <cfif FindNoCase("Message received", release)>
-                    
+         <!--- Check for success: amavisd-release returns "250 2.0.0" on success via docker exec --->
+         <cfif FindNoCase("250 2.0.0", release)>
         <cfset session.successreleasemessage=#successreleasemessage#+1>
         <cfset session.successreleasemessage_email= successreleasemessage_email & "#getmsg.subject# <br>">
-        
-        <!--- IF COMMAND OUTPUT DOES NOT CONTAIN Message received THEN RELEASE FAILED --->
-        <cfelse>
-                    
+         <cfelse>
         <cfset session.failurereleasemessage=#failurereleasemessage#+1>
         <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#getmsg.subject# <br>">
-                    
-        </cfif>
+         </cfif>
               
     
     <cfelseif NOT fileExists(quarfile)> 

@@ -81,26 +81,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif fileExists(quarfile)> 
     
-      <cftry>
+      <cfinclude template="generate_customtrans.cfm">
+      <cffile action="write"
+          file="/opt/hermes/tmp/#customtrans3#_sa_learn.sh"
+          output="docker exec hermes_mail_filter /usr/bin/sa-learn -u amavis --no-sync --ham #quarfile# 2>&1">
 
-        <cfexecute name = "/usr/bin/sa-learn"
-        timeout = "240"
-        variable ="salearnresult"
-        arguments="-u amavis --no-sync --ham #quarfile#">
-        </cfexecute>
-                    
-            <cfcatch type="any">
-                
-            <cfset m="Messages Train Ham: There was an error executing /usr/bin/sa-learn">
-            <cfinclude template="error.cfm">
-            <cfabort>   
-                
-            </cfcatch>
-            </cftry>
+      <cftry>
+          <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_sa_learn.sh" timeout="60"></cfexecute>
+          <cfexecute name="/opt/hermes/tmp/#customtrans3#_sa_learn.sh" timeout="240" variable="salearnresult" arguments=""></cfexecute>
+      <cfcatch type="any">
+          <cfset m="Messages Train Ham: There was an error executing /usr/bin/sa-learn">
+          <cfinclude template="error.cfm">
+          <cfabort>
+      </cfcatch>
+      </cftry>
+      <cfif fileExists("/opt/hermes/tmp/#customtrans3#_sa_learn.sh")>
+        <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_sa_learn.sh">
+      </cfif>
         
         
          <!--- IF COMMAND OUTPUT CONTAINS Learned tokens from 1 message(s) THEN TRAIN SUCCEEDED --->
-         <cfif FindNoCase("Learned tokens from 1 message(s)", salearnresult)>
+         <cfif FindNoCase("Learned tokens from", salearnresult)>
                     
         <cfset session.successhammessage=#successhammessage#+1>
         <cfset session.successhammessage_email= successhammessage_email & "#getmsg.subject# <br>">

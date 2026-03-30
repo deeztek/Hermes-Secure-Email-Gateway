@@ -946,3 +946,18 @@ WHERE job_name IN (
 ) AND active = '1';
 
 
+-- ============================================================
+-- SYSLOG DATABASE INDEXES (GitHub #184)
+-- ============================================================
+
+USE Syslog;
+
+-- Index on ReceivedAt for date range filtering, sorting, and cleanup deletions
+CREATE INDEX IF NOT EXISTS idx_systemevents_receivedat ON SystemEvents(ReceivedAt);
+
+-- Composite index on SysLogTag + ReceivedAt for facility-filtered queries
+CREATE INDEX IF NOT EXISTS idx_systemevents_tag_receivedat ON SystemEvents(SysLogTag, ReceivedAt);
+
+-- Switch back to hermes for any subsequent statements
+USE hermes;
+

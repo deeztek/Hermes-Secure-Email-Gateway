@@ -89,26 +89,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif fileExists(quarfile)> 
     
-        <cftry>
+        <cfinclude template="generate_customtrans.cfm">
+        <cffile action="write"
+            file="/opt/hermes/tmp/#customtrans3#_sa_learn.sh"
+            output="docker exec hermes_mail_filter /usr/bin/sa-learn --no-sync --forget #quarfile# 2>&1">
 
-            <cfexecute name = "/usr/bin/sa-learn"
-            timeout = "240"
-            variable ="salearnresult"
-            arguments="--no-sync --forget #quarfile#">
-            </cfexecute>
-                        
-                <cfcatch type="any">
-                    
-                <cfset m="Messages Forget Bayes: There was an error executing /usr/bin/sa-learn --forget">
-                <cfinclude template="error.cfm">
-                <cfabort>   
-                    
-                </cfcatch>
-                </cftry>
+        <cftry>
+            <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_sa_learn.sh" timeout="60"></cfexecute>
+            <cfexecute name="/opt/hermes/tmp/#customtrans3#_sa_learn.sh" timeout="240" variable="salearnresult" arguments=""></cfexecute>
+        <cfcatch type="any">
+            <cfset m="Messages Forget Bayes: There was an error executing /usr/bin/sa-learn --forget">
+            <cfinclude template="error.cfm">
+            <cfabort>
+        </cfcatch>
+        </cftry>
+        <cfif fileExists("/opt/hermes/tmp/#customtrans3#_sa_learn.sh")>
+          <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_sa_learn.sh">
+        </cfif>
         
         
          <!--- IF COMMAND OUTPUT CONTAINS Forgot tokens from 1 message(s) THEN TRAIN SUCCEEDED --->
-         <cfif FindNoCase("Forgot tokens from 1 message(s)", salearnresult)>
+         <cfif FindNoCase("Forgot tokens from", salearnresult)>
                     
         <cfset session.successforgetmessage=#successforgetmessage#+1>
         <cfset session.successforgetmessage_email= successforgetmessage_email & "#getmsg.subject# <br>">

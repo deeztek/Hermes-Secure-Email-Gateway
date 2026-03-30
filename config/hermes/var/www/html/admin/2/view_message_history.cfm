@@ -1887,6 +1887,7 @@ id="btn-back-to-top"
                                 }
                             },
                             localization: {
+                                hourCycle: 'h23',
                                 format: 'yyyy-MM-dd HH:mm:ss',
                                 dayViewHeaderFormat: { month: 'long', year: 'numeric' }
                             }

@@ -349,11 +349,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
+<div class="callout callout-info mb-4">
+  <h5><i class="fas fa-info-circle"></i> Page Guide</h5>
+  <p class="mb-1">File expressions use regex patterns to match attachment filenames during mail filtering. Unlike file extensions which match by type, expressions provide flexible pattern matching (e.g. <code>\.exe$</code> for files ending in .exe, or <code>^invoice</code> for filenames starting with "invoice").</p>
+  <p class="mb-1">Expressions are assigned to <strong>File Rules</strong> under Content Checks &gt; File Rules, which are then assigned to <strong>SVF Policies</strong> to control attachment filtering per recipient. Use the Expression Helper below for help building and testing patterns.</p>
+  <p class="mb-0"><strong>Regex Syntax:</strong>
+    <code>\.exe$</code> files ending with .exe |
+    <code>\.(exe|bat|cmd)$</code> multiple extensions |
+    <code>^invoice</code> filenames starting with "invoice" |
+    <code>macro</code> filenames containing "macro" |
+    <code>^.+\.docm$</code> any .docm file |
+    <code>\.(zip|rar|7z|tar|gz)$</code> archive files
+  </p>
+</div>
+
 <!-- REGEX HELPER -->
 <div class="card card-secondary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#regexHelper" aria-expanded="false" aria-controls="regexHelper">
-      <i class="fas fa-lightbulb me-1"></i> Expression Helper <i class="fas fa-chevron-down ms-2 small"></i>
+    <h3 class="card-title">
+      <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggleExpressionHelper" title="Expand">
+        <i class="fas fa-chevron-down"></i>
+      </button>
+      <i class="fas fa-lightbulb me-1"></i> Expression Helper
     </h3>
   </div>
   <div class="collapse" id="regexHelper">
@@ -441,59 +458,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
           <div id="testResult" class="mt-2" style="display:none;"></div>
         </div>
-      </div>
-
-      <hr>
-
-      <!-- SECTION 4: Reference -->
-      <h5 class="border-bottom pb-2 mb-3"><i class="fas fa-book me-1"></i> Pattern Reference</h5>
-      <div class="table-responsive">
-        <table class="table table-sm table-bordered">
-          <thead class="table-light">
-            <tr>
-              <th>Pattern</th>
-              <th>Matches</th>
-              <th>Example Files</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><code>\.exe$</code></td>
-              <td>Files ending with .exe</td>
-              <td>setup.exe, installer.exe</td>
-            </tr>
-            <tr>
-              <td><code>\.(exe|bat|cmd)$</code></td>
-              <td>Files ending with .exe, .bat, or .cmd</td>
-              <td>run.exe, script.bat, deploy.cmd</td>
-            </tr>
-            <tr>
-              <td><code>^invoice</code></td>
-              <td>Files starting with "invoice"</td>
-              <td>invoice_2026.pdf, invoice.docx</td>
-            </tr>
-            <tr>
-              <td><code>macro</code></td>
-              <td>Files containing "macro"</td>
-              <td>macro_report.xlsm, file_with_macro.doc</td>
-            </tr>
-            <tr>
-              <td><code>^.+\.docm$</code></td>
-              <td>Any file ending with .docm (macro-enabled Word)</td>
-              <td>report.docm, letter.docm</td>
-            </tr>
-            <tr>
-              <td><code>\.(zip|rar|7z|tar|gz)$</code></td>
-              <td>Archive files</td>
-              <td>backup.zip, data.tar.gz</td>
-            </tr>
-            <tr>
-              <td><code>^(?=.*\.pdf$)(?=.*invoice)</code></td>
-              <td>PDF files with "invoice" in the name</td>
-              <td>invoice_march.pdf</td>
-            </tr>
-          </tbody>
-        </table>
       </div>
     </div>
   </div>
@@ -584,6 +548,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
 $(document).ready(function() {
+  // Expression Helper toggle (chevron down/up)
+  $('#toggleExpressionHelper').on('click', function() {
+    var icon = $(this).find('i');
+    var target = $('#regexHelper');
+    target.collapse('toggle');
+  });
+  $('#regexHelper').on('shown.bs.collapse', function() {
+    var icon = $('#toggleExpressionHelper').find('i');
+    icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
+    $('#toggleExpressionHelper').attr('title', 'Collapse');
+  });
+  $('#regexHelper').on('hidden.bs.collapse', function() {
+    var icon = $('#toggleExpressionHelper').find('i');
+    icon.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+    $('#toggleExpressionHelper').attr('title', 'Expand');
+  });
+
   $('#expressionsTable').DataTable({
     dom: 'Blfrtip',
     buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],

@@ -18,18 +18,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cftry>
+<cfinclude template="generate_customtrans.cfm">
+<cffile action="write"
+    file="/opt/hermes/tmp/#customtrans3#_sa_learn_sync.sh"
+    output="docker exec hermes_mail_filter /usr/bin/sa-learn --sync 2>&1">
 
-    <cfexecute name = "/usr/bin/sa-learn"
-    timeout = "240"
-    arguments="--sync">
-    </cfexecute>
-                
-        <cfcatch type="any">
-            
-        <cfset m="Messages SA Learn Sync: There was an error executing /usr/bin/sa-learn --sync">
-        <cfinclude template="error.cfm">
-        <cfabort>   
-            
-        </cfcatch>
-        </cftry>
+<cftry>
+    <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_sa_learn_sync.sh" timeout="60"></cfexecute>
+    <cfexecute name="/opt/hermes/tmp/#customtrans3#_sa_learn_sync.sh" timeout="240" variable="syncResult" arguments=""></cfexecute>
+<cfcatch type="any">
+    <cfset m="Messages SA Learn Sync: There was an error executing /usr/bin/sa-learn --sync">
+    <cfinclude template="error.cfm">
+    <cfabort>
+</cfcatch>
+</cftry>
+<cfif fileExists("/opt/hermes/tmp/#customtrans3#_sa_learn_sync.sh")>
+  <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_sa_learn_sync.sh">
+</cfif>

@@ -294,11 +294,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfquery>
   <cfif getDelRuleName.recordCount GT 0>
     <cfquery name="checkAssigned" datasource="hermes">
-      SELECT COUNT(*) as cnt FROM policy
+      SELECT policy_name FROM policy
       WHERE banned_rulenames = <cfqueryparam value="#getDelRuleName.rule_name#" cfsqltype="cf_sql_varchar">
     </cfquery>
-    <cfif checkAssigned.cnt GT 0>
+    <cfif checkAssigned.recordCount GT 0>
       <cfset session.m = 25>
+      <cfset session.deleteAssignedPolicies = ValueList(checkAssigned.policy_name, ", ")>
       <cflocation url="view_file_rules.cfm" addtoken="no">
     </cfif>
   </cfif>
@@ -411,7 +412,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Rule Added</h4>
-    <p>File rule created successfully. Please assign the rule to a policy under Content Checks &gt; Spam/Virus/File Policies.</p>
+    <p>File rule created successfully. Please assign the rule to a policy under Content Checks &gt; SVF Policies.</p>
   </div>
 </cfif>
 <cfif m is 2>
@@ -432,7 +433,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Rule Copied</h4>
-    <p>File rule copied successfully. Please assign the rule to a policy under Content Checks &gt; Spam/Virus/File Policies.</p>
+    <p>File rule copied successfully. Please assign the rule to a policy under Content Checks &gt; SVF Policies.</p>
   </div>
 </cfif>
 <cfif m is 10>
@@ -481,7 +482,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Rule In Use</h4>
-    <p>You cannot delete a file rule that is assigned to a Spam/Virus/File Policy. Remove the assignment first under Content Checks &gt; Spam/Virus/File Policies.</p>
+    <p>You cannot delete a file rule that is assigned to SVF Policy: <strong><cfif StructKeyExists(session, "deleteAssignedPolicies") AND session.deleteAssignedPolicies is not ""><cfoutput>#encodeForHTML(session.deleteAssignedPolicies)#</cfoutput><cfset session.deleteAssignedPolicies = ""><cfelse>Unknown</cfif></strong>. Remove the assignment first under Content Checks &gt; SVF Policies.</p>
   </div>
 </cfif>
 
@@ -492,7 +493,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     File rules define which file types are banned or allowed in email attachments. Rules are processed top-down;
     once a match is found, the assigned action is taken. System rules cannot be modified or deleted, but you can
     copy them and customize the copy. After creating a rule, assign it to a policy under
-    <strong>Content Checks &gt; Spam/Virus/File Policies</strong>.
+    <strong>Content Checks &gt; SVF Policies</strong>.
   </p>
 </div>
 

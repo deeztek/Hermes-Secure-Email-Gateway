@@ -199,7 +199,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         addNewLine = "no">
     
     <cfloop query="getmessagerules">
-    
+
     <cfif #rule_type# is not "header">
 
     <cfif #rule_desc# is not "">
@@ -266,7 +266,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!--- EDIT /ETC/SPAMASASSIN/LOCAL.CF ABOVE --->
 
       <!--- MAKE BACKUP /ETC/SPAMASASSIN/LOCAL.CF --->
-  <cffile action="copy" source = "/etc/spamassassin/local.cf" destination = "/etc/spamassassin/local.cf.HERMES.BACKUP">
+  <cfif fileExists("/etc/spamassassin/local.cf")>
+    <cffile action="copy" source = "/etc/spamassassin/local.cf" destination = "/etc/spamassassin/local.cf.HERMES.BACKUP">
+  </cfif>
 
   <!--- Move /opt/hermes/tmp/#customtrans3#local.cf.HERMES to /etc/spamassassin/local.cf --->
   <cffile action="move" source = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES" destination = "/etc/spamassassin/local.cf">

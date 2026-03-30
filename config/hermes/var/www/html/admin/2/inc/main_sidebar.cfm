@@ -339,26 +339,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
-              <a href="/admin/ca_settings.cfm" class="nav-link">
+              <a href="/admin/2/view_internal_ca.cfm" class="nav-link">
                 <i class="nav-icon fab fa-expeditedssl"></i>
                 <p>Internal CA</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/key_servers.cfm" class="nav-link">
-                <i class="nav-icon fab fa-microsoft"></i>
+              <a href="/admin/2/view_pgp_key_servers.cfm" class="nav-link">
+                <i class="nav-icon fas fa-key"></i>
                 <p>PGP Key Servers</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/encryption_settings.cfm" class="nav-link">
+              <a href="/admin/2/view_encryption_settings.cfm" class="nav-link">
                 <i class="nav-icon fas fa-cogs"></i>
                 <p>Encryption Settings</p>
               </a>
             </li>
             <li class="nav-item">
-              <a href="/admin/external_encryption_users.cfm" class="nav-link">
-                <i class="nav-icon fas fa-info"></i>
+              <a href="/admin/2/view_ext_rec_encryption.cfm" class="nav-link">
+                <i class="nav-icon fas fa-user-lock"></i>
                 <p>Ext Rec Encryption</p>
               </a>
             </li>

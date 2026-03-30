@@ -418,6 +418,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
+<div class="callout callout-info mb-4">
+  <h5><i class="fas fa-info-circle"></i> Page Guide</h5>
+  <p class="mb-1">File extensions define attachment types that Amavis checks during mail filtering. Each extension entry specifies a file type (e.g. <code>.exe</code>, <code>.bat</code>) and whether it should be <strong>banned</strong> or <strong>allowed</strong> when matched.</p>
+  <p class="mb-0">Extensions are assigned to <strong>File Rules</strong> under Content Checks &gt; File Rules, which are then assigned to <strong>SVF Policies</strong> to control attachment filtering per recipient.</p>
+</div>
+
 <!-- ADD EXTENSIONS CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
