@@ -176,7 +176,3 @@ Expects these variables to be set before including:
   </cfif>
 </cfif>
 
-<!--- Step 5: Mark as manual in djigzo --->
-<cfquery datasource="djigzo">
-  UPDATE cm_users SET cm_locality = 'manual' WHERE cm_email = <cfqueryparam value="#ext_email#" cfsqltype="cf_sql_varchar">
-</cfquery>

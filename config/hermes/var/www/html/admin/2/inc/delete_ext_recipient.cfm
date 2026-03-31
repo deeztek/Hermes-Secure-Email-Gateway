@@ -34,6 +34,7 @@ Expects: delete_email - The email address to delete
   </cfquery>
   <cfloop query="getRecCerts">
     <cfset getcerts = getRecCerts>
+    <cfset form.certificate_id = getRecCerts.id>
     <cftry>
       <cfinclude template="delete_smime_certificate.cfm">
       <cfcatch type="any"></cfcatch>
@@ -42,10 +43,12 @@ Expects: delete_email - The email address to delete
 
   <!--- Delete all PGP keyrings --->
   <cfquery name="getRecKeys" datasource="hermes">
-    SELECT * FROM recipient_keystores WHERE user_id = <cfqueryparam value="#getExtRec.id#" cfsqltype="cf_sql_integer">
+    SELECT * FROM recipient_keystores WHERE user_id = <cfqueryparam value="#getExtRec.id#" cfsqltype="cf_sql_integer"> AND master = '1'
   </cfquery>
+  <cfset url.type = "2">
   <cfloop query="getRecKeys">
     <cfset getkeys = getRecKeys>
+    <cfset form.keyring_id = getRecKeys.id>
     <cftry>
       <cfinclude template="delete_pgp_keyring.cfm">
       <cfcatch type="any"></cfcatch>
@@ -58,13 +61,16 @@ Expects: delete_email - The email address to delete
   </cfquery>
 </cfif>
 
-<!--- Delete from djigzo --->
+<!--- Delete user from Ciphermail via CLITool (handles all FK cascades) --->
 <cftry>
-  <cfquery datasource="djigzo">
-    DELETE FROM cm_properties WHERE cm_email = <cfqueryparam value="#delete_email#" cfsqltype="cf_sql_varchar">
-  </cfquery>
-  <cfquery datasource="djigzo">
-    DELETE FROM cm_users WHERE cm_email = <cfqueryparam value="#delete_email#" cfsqltype="cf_sql_varchar">
-  </cfquery>
+  <cfinclude template="generate_customtrans.cfm">
+  <cfset scriptContent = "docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CLITool --delete-user " & delete_email & chr(10)>
+  <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_delete_ext_recipient.sh">
+  <cffile action="write" file="#scriptPath#" output="#scriptContent#">
+  <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="60"></cfexecute>
+  <cfexecute name="#scriptPath#" timeout="240" outputfile="/dev/null" arguments=""></cfexecute>
+  <cfif fileExists(scriptPath)>
+    <cffile action="delete" file="#scriptPath#">
+  </cfif>
   <cfcatch type="any"></cfcatch>
 </cftry>

@@ -44,7 +44,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">Ext Rec Encryption</a></li>
+              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">External Recipients</a></li>
               <li class="breadcrumb-item active">PGP Keyrings</li>
             </ol>
           </div>
@@ -62,7 +62,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfabort>
 </cfif>
 
-<cfparam name="url.show" default="manual">
 <cfparam name="action" default="">
 <cfparam name="m" default="0">
 
@@ -96,6 +95,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       SELECT * FROM recipient_keystores WHERE id = <cfqueryparam value="#form.key_id#" cfsqltype="cf_sql_integer">
     </cfquery>
     <cfif getkeys.recordcount GTE 1>
+      <cfset url.type = "2">
+      <cfset form.keyring_id = form.key_id>
       <cftry>
         <cfinclude template="./inc/delete_pgp_keyring.cfm">
         <cfset session.m_pgpk = 3>
@@ -105,7 +106,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cftry>
     </cfif>
   </cfif>
-  <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" addtoken="no">
+  <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(recipientEmail)#" addtoken="no">
 </cfif>
 
 <!--- ACTION: DOWNLOAD PUBLIC KEY --->
@@ -115,6 +116,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       SELECT * FROM recipient_keystores WHERE id = <cfqueryparam value="#form.key_id#" cfsqltype="cf_sql_integer">
     </cfquery>
     <cfif getkeys.recordcount GTE 1>
+      <cfset getkeyhex = getkeys>
       <cfinclude template="./inc/download_public_keyring.cfm">
     </cfif>
   </cfif>
@@ -127,6 +129,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       SELECT * FROM recipient_keystores WHERE id = <cfqueryparam value="#form.key_id#" cfsqltype="cf_sql_integer">
     </cfquery>
     <cfif getkeys.recordcount GTE 1>
+      <cfset getkeyhex = getkeys>
       <cfinclude template="./inc/download_private_keyring.cfm">
     </cfif>
   </cfif>
@@ -151,7 +154,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cftry>
     </cfif>
   </cfif>
-  <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" addtoken="no">
+  <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(recipientEmail)#" addtoken="no">
 </cfif>
 
 <!--- Get keyrings (master keys only) --->
@@ -160,6 +163,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   WHERE user_id = <cfqueryparam value="#recipientId#" cfsqltype="cf_sql_integer">
     AND master = '1'
 </cfquery>
+
+<!--- Build lookup for private key status from djigzo cm_keyring --->
+<cfset privateKeyLookup = StructNew()>
+<cfloop query="getkeyrings">
+  <cfif getkeyrings.djigzo_keystore_id is not "">
+    <cfquery name="checkPrivateKey" datasource="djigzo">
+      SELECT cm_private_key_alias FROM cm_keyring WHERE cm_id = <cfqueryparam value="#getkeyrings.djigzo_keystore_id#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif checkPrivateKey.recordcount GTE 1 AND checkPrivateKey.cm_private_key_alias is not "">
+      <cfset privateKeyLookup[getkeyrings.id] = true>
+    <cfelse>
+      <cfset privateKeyLookup[getkeyrings.id] = false>
+    </cfif>
+  <cfelse>
+    <cfset privateKeyLookup[getkeyrings.id] = false>
+  </cfif>
+</cfloop>
 
 <!--- Get available keyservers for publish modal --->
 <cfquery name="getAllKeyservers" datasource="hermes">
@@ -195,10 +215,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- TOOLBAR --->
 <div class="mb-3">
   <cfoutput>
-  <a href="view_ext_rec_encryption.cfm?show=#url.show#" class="btn btn-secondary">
+  <a href="view_ext_rec_encryption.cfm" class="btn btn-secondary">
     <i class="fas fa-arrow-left"></i> Back to Recipients
   </a>
-  <a href="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" class="btn btn-primary">
+  <a href="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(recipientEmail)#" class="btn btn-primary">
     <i class="fas fa-plus-circle"></i> Add PGP Keyring
   </a>
   </cfoutput>
@@ -226,7 +246,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <th>Expires</th>
             <th>Private Key</th>
             <th>Key ID</th>
-            <th style="width: 200px">Actions</th>
+            <th style="width: 280px">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -240,29 +260,51 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <td>#encodeForHTML(user_name)#</td>
               <td>#DateFormat(pgp_keystore_creation, "yyyy-mm-dd")#</td>
               <td><cfif pgp_keystore_expiration is not "">#DateFormat(pgp_keystore_expiration, "yyyy-mm-dd")#<cfelse><span class="text-muted">Never</span></cfif></td>
-              <td class="text-center"><cfif private_key is "1"><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary">No</span></cfif></td>
-              <td><code>#encodeForHTML(key_id)#</code></td>
+              <cfset hasPrivateKey = StructKeyExists(privateKeyLookup, id) AND privateKeyLookup[id]>
+              <td class="text-center"><cfif hasPrivateKey><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary">No</span></cfif></td>
+              <td><code>#encodeForHTML(pgp_key_id)#</code></td>
               <td>
-                <form method="post" class="d-inline">
-                  <input type="hidden" name="key_id" value="#id#">
-                  <button type="submit" name="action" value="download_public" class="btn btn-sm btn-outline-primary" title="Download Public Key">
-                    <i class="fas fa-download"></i> Pub
+                <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
+                <cfset decryptedPgpPwd = decrypt(pgp_keystore_password, theKey, "AES", "Base64")>
+                <div class="d-flex gap-1 flex-nowrap justify-content-center align-items-center">
+                  <button type="button" class="btn btn-sm btn-outline-primary" title="Download Public Key"
+                    onclick="document.getElementById('dlPubForm_#id#').submit(); setTimeout(function(){ window.location.reload(); }, 2000);">
+                    <i class="fas fa-download"></i>
                   </button>
-                  <cfif private_key is "1">
-                    <button type="submit" name="action" value="download_private" class="btn btn-sm btn-outline-warning" title="Download Private Key">
-                      <i class="fas fa-download"></i> Priv
-                    </button>
+                  <cfif hasPrivateKey>
+                  <button type="button" class="btn btn-sm btn-outline-warning" title="Download Private Key"
+                    onclick="document.getElementById('dlPrivForm_#id#').submit(); setTimeout(function(){ window.location.reload(); }, 2000);">
+                    <i class="fas fa-key"></i>
+                  </button>
                   </cfif>
+                  <button type="button" class="btn btn-sm btn-outline-secondary" title="View Password"
+                    onclick="openViewPasswordModal('#encodeForJavaScript(pgp_key_id)#', '#encodeForJavaScript(decryptedPgpPwd)#')">
+                    <i class="fas fa-eye"></i>
+                  </button>
                   <cfif getAllKeyservers.recordcount GT 0>
-                    <button type="button" class="btn btn-sm btn-outline-info" title="Publish to Key Server"
-                      onclick="openPublishModal('#id#', '#encodeForJavaScript(key_id)#');">
-                      <i class="fas fa-globe"></i>
-                    </button>
+                  <button type="button" class="btn btn-sm btn-outline-info" title="Publish to Key Server"
+                    onclick="openPublishModal('#id#', '#encodeForJavaScript(pgp_key_id)#');">
+                    <i class="fas fa-globe"></i>
+                  </button>
                   </cfif>
-                  <button type="submit" name="action" value="delete_key" class="btn btn-sm btn-outline-danger" title="Delete Keyring"
-                    onclick="return confirm('Delete this PGP keyring? This cannot be undone.');">
+                  <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Keyring"
+                    onclick="if(confirm('Delete this PGP keyring? This cannot be undone.')) { document.getElementById('deleteForm_#id#').submit(); }">
                     <i class="fas fa-trash-alt"></i>
                   </button>
+                </div>
+                <form method="post" id="dlPubForm_#id#" target="downloadFrame" style="display:none;">
+                  <input type="hidden" name="key_id" value="#id#">
+                  <input type="hidden" name="action" value="download_public">
+                </form>
+                <cfif hasPrivateKey>
+                <form method="post" id="dlPrivForm_#id#" target="downloadFrame" style="display:none;">
+                  <input type="hidden" name="key_id" value="#id#">
+                  <input type="hidden" name="action" value="download_private">
+                </form>
+                </cfif>
+                <form method="post" id="deleteForm_#id#" style="display:none;">
+                  <input type="hidden" name="key_id" value="#id#">
+                  <input type="hidden" name="action" value="delete_key">
                 </form>
               </td>
             </tr>
@@ -271,14 +313,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               SELECT * FROM recipient_keystores WHERE parent = <cfqueryparam value="#id#" cfsqltype="cf_sql_integer"> AND master = '0'
             </cfquery>
             <cfloop query="getchildkeys">
+              <cfset childHasPrivateKey = false>
+              <cfif getchildkeys.djigzo_keystore_id is not "">
+                <cfquery name="checkChildPrivateKey" datasource="djigzo">
+                  SELECT cm_private_key_alias FROM cm_keyring WHERE cm_id = <cfqueryparam value="#getchildkeys.djigzo_keystore_id#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfif checkChildPrivateKey.recordcount GTE 1 AND checkChildPrivateKey.cm_private_key_alias is not "">
+                  <cfset childHasPrivateKey = true>
+                </cfif>
+              </cfif>
               <tr class="table-light">
                 <td><span class="badge bg-secondary">Sub</span></td>
                 <td>#encodeForHTML(getchildkeys.encryption)#</td>
                 <td>#encodeForHTML(getchildkeys.user_name)#</td>
                 <td>#DateFormat(getchildkeys.pgp_keystore_creation, "yyyy-mm-dd")#</td>
                 <td><cfif getchildkeys.pgp_keystore_expiration is not "">#DateFormat(getchildkeys.pgp_keystore_expiration, "yyyy-mm-dd")#<cfelse><span class="text-muted">Never</span></cfif></td>
-                <td class="text-center"><cfif getchildkeys.private_key is "1"><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary">No</span></cfif></td>
-                <td><code>#encodeForHTML(getchildkeys.key_id)#</code></td>
+                <td class="text-center"><cfif childHasPrivateKey><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary">No</span></cfif></td>
+                <td><code>#encodeForHTML(getchildkeys.pgp_key_id)#</code></td>
                 <td></td>
               </tr>
             </cfloop>
@@ -335,12 +386,73 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 
+<iframe name="downloadFrame" style="display:none;"></iframe>
+
+<!--- VIEW PASSWORD MODAL --->
+<div class="modal fade" id="viewPasswordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-secondary text-white">
+        <h5 class="modal-title"><i class="fas fa-eye"></i> Keyring Password</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Password for key <strong id="viewPwdKeyId"></strong>:</p>
+        <div class="input-group">
+          <input type="password" class="form-control" id="viewPwdPassword" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="toggleViewPwd" title="Show/Hide Password">
+            <i class="fas fa-eye" id="viewPwdIcon"></i>
+          </button>
+          <button class="btn btn-outline-primary" type="button" id="copyViewPwd" title="Copy to Clipboard">
+            <i class="fas fa-copy"></i>
+          </button>
+        </div>
+        <small class="text-muted">Share this password via secure means if the recipient needs to import the private key.</small>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 function openPublishModal(keyDbId, keyId) {
   document.getElementById('publish_key_id').value = keyDbId;
   document.getElementById('publish_key_display').textContent = keyId;
   new bootstrap.Modal(document.getElementById('publishModal')).show();
 }
+
+function openViewPasswordModal(keyId, password) {
+  document.getElementById('viewPwdKeyId').textContent = keyId;
+  document.getElementById('viewPwdPassword').value = password;
+  document.getElementById('viewPwdPassword').type = 'password';
+  document.getElementById('viewPwdIcon').className = 'fas fa-eye';
+  new bootstrap.Modal(document.getElementById('viewPasswordModal')).show();
+}
+
+$(document).ready(function() {
+  $('#toggleViewPwd').on('click', function() {
+    var pwd = document.getElementById('viewPwdPassword');
+    var icon = document.getElementById('viewPwdIcon');
+    if (pwd.type === 'password') {
+      pwd.type = 'text';
+      icon.className = 'fas fa-eye-slash';
+    } else {
+      pwd.type = 'password';
+      icon.className = 'fas fa-eye';
+    }
+  });
+
+  $('#copyViewPwd').on('click', function() {
+    var pwd = document.getElementById('viewPwdPassword');
+    navigator.clipboard.writeText(pwd.value).then(function() {
+      var btn = document.getElementById('copyViewPwd');
+      btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+      setTimeout(function() { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 2000);
+    });
+  });
+});
 </script>
 
 </body>

@@ -44,7 +44,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">Ext Rec Encryption</a></li>
+              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">External Recipients</a></li>
               <li class="breadcrumb-item active">Add PGP Keyring</li>
             </ol>
           </div>
@@ -62,7 +62,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfabort>
 </cfif>
 
-<cfparam name="url.show" default="manual">
 <cfparam name="action" default="">
 <cfparam name="m" default="0">
 
@@ -105,19 +104,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- Validate --->
   <cfif trim(form.realname) is "">
     <cfset session.m_addpgp = 1>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
   <cfif REFind("[^a-zA-Z0-9 .]", form.realname) GT 0>
     <cfset session.m_addpgp = 2>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
-  <cfif Len(form.password1) LT 10>
+  <cfif Len(form.password1) LT 12>
     <cfset session.m_addpgp = 3>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
-  </cfif>
-  <cfif form.password1 NEQ form.password2>
-    <cfset session.m_addpgp = 4>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
 
   <cfset password1 = form.password1>
@@ -125,10 +120,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cftry>
     <cfinclude template="./inc/create_keyring.cfm">
     <cfset session.m_pgpk = 5>
-    <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     <cfcatch type="any">
       <cfset session.m_addpgp = 5>
-      <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+      <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     </cfcatch>
   </cftry>
 </cfif>
@@ -139,11 +134,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfif form.keytype is "" OR NOT ListFindNoCase("public,private", form.keytype)>
     <cfset session.m_addpgp = 6>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
   <cfif NOT StructKeyExists(form, "thekeyfile") OR form.thekeyfile is "">
     <cfset session.m_addpgp = 7>
-    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
 
   <cfinclude template="./inc/generate_customtrans.cfm">
@@ -155,10 +150,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfinclude template="./inc/import_keyring.cfm">
     <cfset session.m_pgpk = 6>
-    <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     <cfcatch type="any">
       <cfset session.m_addpgp = 8>
-      <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+      <cflocation url="view_ext_add_pgp_keyring.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     </cfcatch>
   </cftry>
 </cfif>
@@ -174,7 +169,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 <cfif m is 3>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>Passphrase must be at least 10 characters.</p></div>
+    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>Passphrase must be at least 12 characters.</p></div>
 </cfif>
 <cfif m is 4>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -200,7 +195,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- TOOLBAR --->
 <div class="mb-3">
   <cfoutput>
-  <a href="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" class="btn btn-secondary">
+  <a href="view_ext_pgp_keyrings.cfm?email=#URLEncodedFormat(url.email)#" class="btn btn-secondary">
     <i class="fas fa-arrow-left"></i> Back to Keyrings
   </a>
   </cfoutput>
@@ -235,14 +230,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
       <div class="row mb-3">
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label class="form-label">Passphrase</label>
-          <input type="password" class="form-control" name="password1" maxlength="255" required placeholder="Minimum 10 characters">
-          <small class="text-muted">Min 10 chars with letters and numbers</small>
-        </div>
-        <div class="col-md-3">
-          <label class="form-label">Confirm Passphrase</label>
-          <input type="password" class="form-control" name="password2" maxlength="255" required>
+          <div class="input-group">
+            <input type="password" class="form-control" name="password1" id="pgpPassword" maxlength="255" required minlength="12">
+            <input type="hidden" name="password2" id="pgpPassword2">
+            <button class="btn btn-outline-secondary" type="button" id="togglePgpPassword" title="Show/Hide Passphrase">
+              <i class="fas fa-eye" id="pgpPasswordIcon"></i>
+            </button>
+            <button class="btn btn-outline-primary" type="button" id="regeneratePgpPassword" title="Generate New Passphrase">
+              <i class="fas fa-sync-alt"></i>
+            </button>
+          </div>
+          <small class="text-muted">Auto-generated (min 12 characters). Click <i class="fas fa-eye"></i> to reveal, <i class="fas fa-sync-alt"></i> to regenerate.</small>
         </div>
       </div>
       <button type="submit" class="btn btn-primary"
@@ -298,6 +298,56 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </div>
 
+
+<script>
+function generatePassword(length) {
+  var upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var lower = 'abcdefghijklmnopqrstuvwxyz';
+  var digits = '0123456789';
+  var all = upper + lower + digits;
+  var password = upper.charAt(Math.floor(Math.random() * upper.length))
+               + lower.charAt(Math.floor(Math.random() * lower.length))
+               + digits.charAt(Math.floor(Math.random() * digits.length));
+  for (var i = 3; i < length; i++) {
+    password += all.charAt(Math.floor(Math.random() * all.length));
+  }
+  return password.split('').sort(function() { return 0.5 - Math.random(); }).join('');
+}
+
+$(document).ready(function() {
+  var pgpPwd = document.getElementById('pgpPassword');
+  var pgpPwd2 = document.getElementById('pgpPassword2');
+
+  // Auto-generate on page load
+  var initial = generatePassword(16);
+  pgpPwd.value = initial;
+  pgpPwd2.value = initial;
+
+  // Sync password2 whenever password1 changes
+  pgpPwd.addEventListener('input', function() {
+    pgpPwd2.value = pgpPwd.value;
+  });
+
+  // Show/hide toggle
+  $('#togglePgpPassword').on('click', function() {
+    var icon = $('#pgpPasswordIcon');
+    if (pgpPwd.type === 'password') {
+      pgpPwd.type = 'text';
+      icon.removeClass('fa-eye').addClass('fa-eye-slash');
+    } else {
+      pgpPwd.type = 'password';
+      icon.removeClass('fa-eye-slash').addClass('fa-eye');
+    }
+  });
+
+  // Regenerate button
+  $('#regeneratePgpPassword').on('click', function() {
+    var newPwd = generatePassword(16);
+    pgpPwd.value = newPwd;
+    pgpPwd2.value = newPwd;
+  });
+});
+</script>
 
 </body>
 </html>

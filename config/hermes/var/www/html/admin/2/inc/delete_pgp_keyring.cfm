@@ -70,71 +70,73 @@ select * from external_recipients where id='#getkeys.user_id#'
     <cfquery name="getpgpcmid" datasource="djigzo">
     select cm_id from cm_pgp_trust_list where cm_fingerprint = '#getchildkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
+    <cfif getpgpcmid.recordcount GTE 1>
     <cfquery name="deletepgpnamevalues" datasource="djigzo">
     delete from cm_pgp_trust_list_cm_name_values where cm_pgp_trust_list = '#getpgpcmid.cm_id#'
     </cfquery>
-    
+
     <cfquery name="deletetrustlist" datasource="djigzo">
     delete from cm_pgp_trust_list where cm_fingerprint = '#getchildkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+    </cfif>
+
     <cfquery name="deletekeystore" datasource="djigzo">
     delete from cm_keystore where cm_alias = 'PGP:#getchildkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyringuserid" datasource="djigzo">
     delete from cm_keyring_userid where cm_keyring_id = '#getchildkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
-    
+
     <cfquery name="deletecmkeyringemail" datasource="djigzo">
     delete from cm_keyring_email where cm_keyring_id = '#getchildkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyring" datasource="djigzo">
     delete from cm_keyring where cm_id = '#getchildkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deleterecipientkeystore" datasource="hermes">
     delete from recipient_keystores where pgp_fingerprint_sha256 = '#getchildkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     </cfloop>
     
     <cfquery name="getpgpcmid" datasource="djigzo">
     select cm_id from cm_pgp_trust_list where cm_fingerprint = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
+    <cfif getpgpcmid.recordcount GTE 1>
     <cfquery name="deletepgpnamevalues" datasource="djigzo">
     delete from cm_pgp_trust_list_cm_name_values where cm_pgp_trust_list = '#getpgpcmid.cm_id#'
     </cfquery>
-    
+
     <cfquery name="deletetrustlist" datasource="djigzo">
     delete from cm_pgp_trust_list where cm_fingerprint = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+    </cfif>
+
     <cfquery name="deletekeystore" datasource="djigzo">
     delete from cm_keystore where cm_alias = 'PGP:#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyringuserid" datasource="djigzo">
     delete from cm_keyring_userid where cm_keyring_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
-    
+
     <cfquery name="deletecmkeyringemail" datasource="djigzo">
     delete from cm_keyring_email where cm_keyring_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyring" datasource="djigzo">
     delete from cm_keyring where cm_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deleterecipientkeystore" datasource="hermes">
     delete from recipient_keystores where pgp_fingerprint_sha256 = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     <!-- DELETE FROM GNUPG STARTS HERE -->
     
     <cfinclude template="generate_customtrans.cfm">
@@ -204,36 +206,37 @@ select * from external_recipients where id='#getkeys.user_id#'
     <cfquery name="getpgpcmid" datasource="djigzo">
     select cm_id from cm_pgp_trust_list where cm_fingerprint = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
+    <cfif getpgpcmid.recordcount GTE 1>
     <cfquery name="deletepgpnamevalues" datasource="djigzo">
     delete from cm_pgp_trust_list_cm_name_values where cm_pgp_trust_list = '#getpgpcmid.cm_id#'
     </cfquery>
-    
+
     <cfquery name="deletetrustlist" datasource="djigzo">
     delete from cm_pgp_trust_list where cm_fingerprint = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+    </cfif>
+
     <cfquery name="deletekeystore" datasource="djigzo">
     delete from cm_keystore where cm_alias = 'PGP:#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyringuserid" datasource="djigzo">
     delete from cm_keyring_userid where cm_keyring_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
-    
+
     <cfquery name="deletecmkeyringemail" datasource="djigzo">
     delete from cm_keyring_email where cm_keyring_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deletecmkeyring" datasource="djigzo">
     delete from cm_keyring where cm_id = '#getkeystoredetails.djigzo_keystore_id#'
     </cfquery>
-    
+
     <cfquery name="deleterecipientkeystore" datasource="hermes">
     delete from recipient_keystores where pgp_fingerprint_sha256 = '#getkeystoredetails.pgp_fingerprint_sha256#'
     </cfquery>
-    
+
     <!-- SINCE THERE IS NO WAY TO DELETE SUB KEY FROM GNUPG WITHOUT INTERACTIVE PROMPTS, WE DON'T DELETE FROM GNUPG FOR A SUB KEY -->
 
     <!--- Disable PGP encryption if no keyrings remain for this recipient --->

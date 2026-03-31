@@ -44,7 +44,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">Ext Rec Encryption</a></li>
+              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">External Recipients</a></li>
               <li class="breadcrumb-item active">Add S/MIME Certificate</li>
             </ol>
           </div>
@@ -62,7 +62,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfabort>
 </cfif>
 
-<cfparam name="url.show" default="manual">
 <cfparam name="action" default="">
 <cfparam name="m" default="0">
 
@@ -108,19 +107,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- Validate --->
   <cfif form.ca is "" OR NOT IsNumeric(form.ca)>
     <cfset session.m_addsmime = 1>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
   <cfif form.password1 is "">
     <cfset session.m_addsmime = 2>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
-  <cfif Len(form.password1) LT 8>
+  <cfif Len(form.password1) LT 12>
     <cfset session.m_addsmime = 3>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
-  </cfif>
-  <cfif form.password1 NEQ form.password2>
-    <cfset session.m_addsmime = 4>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
 
   <!--- Get CA details --->
@@ -137,7 +132,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfif getcadetails.recordcount LT 1>
     <cfset session.m_addsmime = 5>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
 
   <!--- Set url.type for the include --->
@@ -146,10 +141,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cftry>
     <cfinclude template="./inc/create_certificate.cfm">
     <cfset session.m_smime = 5>
-    <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     <cfcatch type="any">
       <cfset session.m_addsmime = 6>
-      <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+      <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     </cfcatch>
   </cftry>
 </cfif>
@@ -161,11 +156,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfif form.import_password is "">
     <cfset session.m_addsmime = 7>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
   <cfif NOT StructKeyExists(form, "pfx") OR form.pfx is "">
     <cfset session.m_addsmime = 8>
-    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
   </cfif>
 
   <cfset recipient = getrecipient.email>
@@ -174,10 +169,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cftry>
     <cfinclude template="./inc/import_certificate.cfm">
     <cfset session.m_smime = 6>
-    <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+    <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     <cfcatch type="any">
       <cfset session.m_addsmime = 9>
-      <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" addtoken="no">
+      <cflocation url="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(url.email)#" addtoken="no">
     </cfcatch>
   </cftry>
 </cfif>
@@ -193,7 +188,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 <cfif m is 3>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>Certificate password must be at least 8 characters.</p></div>
+    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>Certificate password must be at least 12 characters.</p></div>
 </cfif>
 <cfif m is 4>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -223,7 +218,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- TOOLBAR --->
 <div class="mb-3">
   <cfoutput>
-  <a href="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#&show=#url.show#" class="btn btn-secondary">
+  <a href="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(url.email)#" class="btn btn-secondary">
     <i class="fas fa-arrow-left"></i> Back to Certificates
   </a>
   </cfoutput>
@@ -282,13 +277,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
         </div>
         <div class="row mb-3">
-          <div class="col-md-3">
+          <div class="col-md-4">
             <label class="form-label">Certificate Password</label>
-            <input type="password" class="form-control" name="password1" maxlength="255" required placeholder="Minimum 8 characters">
-          </div>
-          <div class="col-md-3">
-            <label class="form-label">Confirm Password</label>
-            <input type="password" class="form-control" name="password2" maxlength="255" required>
+            <div class="input-group">
+              <input type="password" class="form-control" name="password1" id="certPassword" maxlength="255" required minlength="12">
+              <input type="hidden" name="password2" id="certPassword2">
+              <button class="btn btn-outline-secondary" type="button" id="toggleCertPassword" title="Show/Hide Password">
+                <i class="fas fa-eye" id="certPasswordIcon"></i>
+              </button>
+              <button class="btn btn-outline-primary" type="button" id="regenerateCertPassword" title="Generate New Password">
+                <i class="fas fa-sync-alt"></i>
+              </button>
+            </div>
+            <small class="text-muted">Auto-generated (min 12 characters). Click <i class="fas fa-eye"></i> to reveal, <i class="fas fa-sync-alt"></i> to regenerate.</small>
           </div>
         </div>
         <button type="submit" class="btn btn-primary"
@@ -336,6 +337,56 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </div>
 
+
+<script>
+function generatePassword(length) {
+  var upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var lower = 'abcdefghijklmnopqrstuvwxyz';
+  var digits = '0123456789';
+  var all = upper + lower + digits;
+  var password = upper.charAt(Math.floor(Math.random() * upper.length))
+               + lower.charAt(Math.floor(Math.random() * lower.length))
+               + digits.charAt(Math.floor(Math.random() * digits.length));
+  for (var i = 3; i < length; i++) {
+    password += all.charAt(Math.floor(Math.random() * all.length));
+  }
+  return password.split('').sort(function() { return 0.5 - Math.random(); }).join('');
+}
+
+$(document).ready(function() {
+  var certPwd = document.getElementById('certPassword');
+  var certPwd2 = document.getElementById('certPassword2');
+
+  // Auto-generate on page load
+  var initial = generatePassword(16);
+  certPwd.value = initial;
+  certPwd2.value = initial;
+
+  // Sync password2 whenever password1 changes
+  certPwd.addEventListener('input', function() {
+    certPwd2.value = certPwd.value;
+  });
+
+  // Show/hide toggle
+  $('#toggleCertPassword').on('click', function() {
+    var icon = $('#certPasswordIcon');
+    if (certPwd.type === 'password') {
+      certPwd.type = 'text';
+      icon.removeClass('fa-eye').addClass('fa-eye-slash');
+    } else {
+      certPwd.type = 'password';
+      icon.removeClass('fa-eye-slash').addClass('fa-eye');
+    }
+  });
+
+  // Regenerate button
+  $('#regenerateCertPassword').on('click', function() {
+    var newPwd = generatePassword(16);
+    certPwd.value = newPwd;
+    certPwd2.value = newPwd;
+  });
+});
+</script>
 
 </body>
 </html>

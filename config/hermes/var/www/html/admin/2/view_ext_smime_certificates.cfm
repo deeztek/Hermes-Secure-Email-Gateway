@@ -44,7 +44,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">Ext Rec Encryption</a></li>
+              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">External Recipients</a></li>
               <li class="breadcrumb-item active">S/MIME Certificates</li>
             </ol>
           </div>
@@ -64,7 +64,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfabort>
 </cfif>
 
-<cfparam name="url.show" default="manual">
 <cfparam name="action" default="">
 <cfparam name="m" default="0">
 
@@ -107,7 +106,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cftry>
     </cfif>
   </cfif>
-  <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" addtoken="no">
+  <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(recipientEmail)#" addtoken="no">
 </cfif>
 
 <!--- ACTION: DOWNLOAD CERTIFICATE --->
@@ -130,7 +129,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
     <cfif getcerts.recordcount GTE 1>
       <cftry>
-        <cfinclude template="./inc/send_smime_certificate.cfm">
+        <cfinclude template="./inc/send_ext_smime_certificate.cfm">
         <cfset session.m_smime = 4>
         <cfcatch type="any">
           <cfset session.m_smime = 11>
@@ -138,7 +137,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cftry>
     </cfif>
   </cfif>
-  <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" addtoken="no">
+  <cflocation url="view_ext_smime_certificates.cfm?email=#URLEncodedFormat(recipientEmail)#" addtoken="no">
 </cfif>
 
 <!--- Get certificates for this recipient --->
@@ -175,10 +174,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- TOOLBAR --->
 <div class="mb-3">
   <cfoutput>
-  <a href="view_ext_rec_encryption.cfm?show=#url.show#" class="btn btn-secondary">
+  <a href="view_ext_rec_encryption.cfm" class="btn btn-secondary">
     <i class="fas fa-arrow-left"></i> Back to Recipients
   </a>
-  <a href="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(recipientEmail)#&show=#url.show#" class="btn btn-primary">
+  <a href="view_ext_add_smime_cert.cfm?email=#URLEncodedFormat(recipientEmail)#" class="btn btn-primary">
     <i class="fas fa-plus-circle"></i> Add S/MIME Certificate
   </a>
   </cfoutput>
@@ -225,19 +224,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <td><cfif external_ca is "1">N/A<cfelse>#encodeForHTML(algorithm)#</cfif></td>
               <td><cfif external_ca is "1"><span class="badge bg-info">Imported</span><cfelse><span class="badge bg-primary">Internal</span></cfif></td>
               <td>
-                <form method="post" class="d-inline">
-                  <input type="hidden" name="certificate_id" value="#id#">
-                  <button type="submit" name="action" value="download_cert" class="btn btn-sm btn-outline-primary" title="Download PFX">
+                <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
+                <cfset decryptedPwd = decrypt(smime_certificate_password, theKey, "AES", "Base64")>
+                <div class="d-flex gap-1 flex-nowrap justify-content-center align-items-center">
+                  <button type="button" class="btn btn-sm btn-outline-primary" title="Download PFX"
+                    onclick="document.getElementById('downloadForm_#id#').submit(); setTimeout(function(){ window.location.reload(); }, 2000);">
                     <i class="fas fa-download"></i>
                   </button>
-                  <button type="submit" name="action" value="send_cert" class="btn btn-sm btn-outline-success" title="Send to Recipient"
-                    onclick="return confirm('Send certificate to #encodeForJavaScript(recipientEmail)#?');">
+                  <button type="button" class="btn btn-sm btn-outline-success" title="Send to Recipient"
+                    onclick="openSendCertModal('#id#', '#encodeForJavaScript(recipientEmail)#', '#encodeForJavaScript(decryptedPwd)#')">
                     <i class="fas fa-envelope"></i>
                   </button>
-                  <button type="submit" name="action" value="delete_cert" class="btn btn-sm btn-outline-danger" title="Delete Certificate"
-                    onclick="return confirm('Delete this S/MIME certificate? This cannot be undone.');">
+                  <button type="button" class="btn btn-sm btn-outline-danger" title="Delete Certificate"
+                    onclick="if(confirm('Delete this S/MIME certificate? This cannot be undone.')) { document.getElementById('deleteForm_#id#').submit(); }">
                     <i class="fas fa-trash-alt"></i>
                   </button>
+                </div>
+                <form method="post" id="downloadForm_#id#" target="downloadFrame" style="display:none;">
+                  <input type="hidden" name="certificate_id" value="#id#">
+                  <input type="hidden" name="action" value="download_cert">
+                </form>
+                <form method="post" id="deleteForm_#id#" style="display:none;">
+                  <input type="hidden" name="certificate_id" value="#id#">
+                  <input type="hidden" name="action" value="delete_cert">
                 </form>
               </td>
             </tr>
@@ -257,6 +266,83 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </div>
 
+
+<iframe name="downloadFrame" style="display:none;"></iframe>
+
+<!--- SEND CERTIFICATE MODAL --->
+<div class="modal fade" id="sendCertModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" id="sendCertForm">
+        <input type="hidden" name="action" value="send_cert">
+        <input type="hidden" name="certificate_id" id="sendCertId" value="">
+        <div class="modal-header bg-success text-white">
+          <h5 class="modal-title"><i class="fas fa-envelope"></i> Send Certificate</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Send the PFX certificate to <strong id="sendCertEmail"></strong>.</p>
+          <div class="mb-3">
+            <label class="form-label">Certificate Password</label>
+            <div class="input-group">
+              <input type="password" class="form-control" id="sendCertPassword" readonly>
+              <button class="btn btn-outline-secondary" type="button" id="toggleSendCertPassword" title="Show/Hide Password">
+                <i class="fas fa-eye" id="sendCertPasswordIcon"></i>
+              </button>
+              <button class="btn btn-outline-primary" type="button" id="copySendCertPassword" title="Copy to Clipboard">
+                <i class="fas fa-copy"></i>
+              </button>
+            </div>
+            <small class="text-muted">Share this password with the recipient via secure means so they can import the PFX file.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success"
+            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Sending...';this.form.submit();">
+            <i class="fas fa-envelope"></i> Send Certificate
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function openSendCertModal(certId, email, password) {
+  document.getElementById('sendCertId').value = certId;
+  document.getElementById('sendCertEmail').textContent = email;
+  document.getElementById('sendCertPassword').value = password;
+  document.getElementById('sendCertPassword').type = 'password';
+  document.getElementById('sendCertPasswordIcon').className = 'fas fa-eye';
+  new bootstrap.Modal(document.getElementById('sendCertModal')).show();
+}
+
+$(document).ready(function() {
+  // Show/hide password toggle
+  $('#toggleSendCertPassword').on('click', function() {
+    var pwd = document.getElementById('sendCertPassword');
+    var icon = document.getElementById('sendCertPasswordIcon');
+    if (pwd.type === 'password') {
+      pwd.type = 'text';
+      icon.className = 'fas fa-eye-slash';
+    } else {
+      pwd.type = 'password';
+      icon.className = 'fas fa-eye';
+    }
+  });
+
+  // Copy to clipboard
+  $('#copySendCertPassword').on('click', function() {
+    var pwd = document.getElementById('sendCertPassword');
+    navigator.clipboard.writeText(pwd.value).then(function() {
+      var btn = document.getElementById('copySendCertPassword');
+      btn.innerHTML = '<i class="fas fa-check text-success"></i>';
+      setTimeout(function() { btn.innerHTML = '<i class="fas fa-copy"></i>'; }, 2000);
+    });
+  });
+});
+</script>
 
 </body>
 </html>

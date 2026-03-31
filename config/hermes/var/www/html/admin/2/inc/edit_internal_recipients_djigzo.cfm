@@ -74,16 +74,7 @@ select cm_email from cm_users where cm_email = '#recipient#'
 
 <cfif #checkdjigzoadded.recordcount# GTE 1>
 
-<!--- SET DJIGZO LOCALITY TO INTERNAL --->
-<cfquery name="updatedjigzo" datasource="djigzo">
-update cm_users
-set 
-cm_locality='internal'
-where
-cm_email = '#recipient#'
-</cfquery>
-
-<!--- CONFIGURE SIGN WHEN ENCRYPT IN DJIGZO --->    
+<!--- CONFIGURE SIGN WHEN ENCRYPT IN DJIGZO --->
 <cffile action="read" file="/opt/hermes/scripts/configure_intrecipient_sign.sh" variable="temp">
 
 <cfif #form.sign# is "1">
@@ -446,16 +437,7 @@ arguments="-inputformat none">
 
 <cfelseif #checkdjigzo.recordcount# GTE 1>
 
-    <!--- SET DJIGZO LOCALITY TO INTERNAL --->
-<cfquery name="updatedjigzo" datasource="djigzo">
-    update cm_users
-    set 
-    cm_locality='internal'
-    where
-    cm_email = '#recipient#'
-    </cfquery>
-    
-    <!--- CONFIGURE SIGN WHEN ENCRYPT IN DJIGZO --->    
+    <!--- CONFIGURE SIGN WHEN ENCRYPT IN DJIGZO --->
     <cffile action="read" file="/opt/hermes/scripts/configure_intrecipient_sign.sh" variable="temp">
     
     <cfif #form.sign# is "1">

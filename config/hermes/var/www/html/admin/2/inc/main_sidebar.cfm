@@ -359,7 +359,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="/admin/2/view_ext_rec_encryption.cfm" class="nav-link">
                 <i class="nav-icon fas fa-user-lock"></i>
-                <p>Ext Rec Encryption</p>
+                <p>External Recipients</p>
               </a>
             </li>
           </ul>

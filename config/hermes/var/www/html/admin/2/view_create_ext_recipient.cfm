@@ -44,7 +44,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">Ext Rec Encryption</a></li>
+              <li class="breadcrumb-item"><a href="view_ext_rec_encryption.cfm">External Recipients</a></li>
               <li class="breadcrumb-item active">Create</li>
             </ol>
           </div>
@@ -106,7 +106,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     SELECT COUNT(*) as cnt FROM external_recipients WHERE email = <cfqueryparam value="#ext_email#" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfquery name="checkDjigzo" datasource="djigzo">
-    SELECT COUNT(*) as cnt FROM cm_properties WHERE cm_email = <cfqueryparam value="#ext_email#" cfsqltype="cf_sql_varchar">
+    SELECT COUNT(*) as cnt FROM cm_properties WHERE cm_category LIKE <cfqueryparam value="user:#ext_email#%" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfif checkExtRec.cnt GT 0 OR checkDjigzo.cnt GT 0>
     <cfset session.m_extcreate = 3>
@@ -135,7 +135,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif ext_pdf_mode is "static">
       <cfset ext_pdf_password = form.pdf_password>
-      <cfif Len(ext_pdf_password) LT 8>
+      <cfif Len(ext_pdf_password) LT 12>
         <cfset session.m_extcreate = 7>
         <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
       </cfif>
@@ -169,6 +169,115 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cflocation url="view_ext_rec_encryption.cfm?action=add" addtoken="no">
 </cfif>
 
+<!--- ===================== --->
+<!--- ACTION: BULK CREATE   --->
+<!--- ===================== --->
+<cfif action is "bulk_create">
+  <cfparam name="form.ext_emails" default="">
+  <cfparam name="form.encryption_mode" default="">
+  <cfparam name="form.pdf_mode" default="">
+  <cfparam name="form.pdf_password" default="">
+  <cfparam name="form.pdf_password2" default="">
+  <cfparam name="form.pdf_password_age" default="60">
+  <cfparam name="form.pdf_password_length" default="20">
+
+  <!--- Parse email list --->
+  <cfset emailLines = ListToArray(Replace(Replace(trim(form.ext_emails), chr(13), chr(10), "ALL"), chr(10) & chr(10), chr(10), "ALL"), chr(10))>
+  <cfif ArrayLen(emailLines) LT 1>
+    <cfset session.m_extcreate = 1>
+    <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Validate encryption mode (bulk only supports PDF) --->
+  <cfset ext_encryption_mode = trim(form.encryption_mode)>
+  <cfif NOT ListFindNoCase("pdf_mandatory,pdf_by_subject", ext_encryption_mode)>
+    <cfset session.m_extcreate = 4>
+    <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+  </cfif>
+
+  <!--- PDF password validation --->
+  <cfset ext_pdf_mode = trim(form.pdf_mode)>
+  <cfset ext_pdf_password = "">
+  <cfset ext_pdf_password_age = "60">
+  <cfset ext_pdf_password_length = "20">
+
+  <cfif NOT ListFindNoCase("static,random,backtosender", ext_pdf_mode)>
+    <cfset session.m_extcreate = 6>
+    <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+  </cfif>
+  <cfif ext_pdf_mode is "static">
+    <cfset ext_pdf_password = form.pdf_password>
+    <cfif Len(ext_pdf_password) LT 12>
+      <cfset session.m_extcreate = 7>
+      <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+    </cfif>
+    <cfif ext_pdf_password NEQ form.pdf_password2>
+      <cfset session.m_extcreate = 8>
+      <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+    </cfif>
+  </cfif>
+  <cfif ext_pdf_mode is "backtosender">
+    <cfset ext_pdf_password_age = trim(form.pdf_password_age)>
+    <cfset ext_pdf_password_length = trim(form.pdf_password_length)>
+    <cfif NOT IsNumeric(ext_pdf_password_age) OR ext_pdf_password_age LT 15 OR ext_pdf_password_age GT 240>
+      <cfset session.m_extcreate = 9>
+      <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+    </cfif>
+  </cfif>
+
+  <!--- Process each email --->
+  <cfset created_count = 0>
+  <cfset skipped_list = "">
+  <cfset failed_list = "">
+  <cfset ext_is_edit = false>
+
+  <cfloop array="#emailLines#" index="emailLine">
+    <cfset ext_email = trim(emailLine)>
+    <cfif ext_email is ""><cfcontinue></cfif>
+
+    <!--- Validate email format --->
+    <cfif NOT IsValid("email", ext_email)>
+      <cfset skipped_list = ListAppend(skipped_list, ext_email & " (invalid format)")>
+      <cfcontinue>
+    </cfif>
+
+    <!--- Check internal domain --->
+    <cfset emailDomain = ListLast(ext_email, "@")>
+    <cfquery name="checkDomain" datasource="hermes">
+      SELECT COUNT(*) as cnt FROM domains WHERE domain = <cfqueryparam value="#emailDomain#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif checkDomain.cnt GT 0>
+      <cfset skipped_list = ListAppend(skipped_list, ext_email & " (internal domain)")>
+      <cfcontinue>
+    </cfif>
+
+    <!--- Check duplicate --->
+    <cfquery name="checkExtRec" datasource="hermes">
+      SELECT COUNT(*) as cnt FROM external_recipients WHERE email = <cfqueryparam value="#ext_email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif checkExtRec.cnt GT 0>
+      <cfset skipped_list = ListAppend(skipped_list, ext_email & " (already exists)")>
+      <cfcontinue>
+    </cfif>
+
+    <!--- Create recipient --->
+    <cftry>
+      <cfinclude template="./inc/create_ext_recipient.cfm">
+      <cfset created_count = created_count + 1>
+      <cfcatch type="any">
+        <cfset failed_list = ListAppend(failed_list, ext_email)>
+      </cfcatch>
+    </cftry>
+  </cfloop>
+
+  <!--- Store results in session for display --->
+  <cfset session.bulk_created = created_count>
+  <cfset session.bulk_skipped = skipped_list>
+  <cfset session.bulk_failed = failed_list>
+  <cfset session.m_extcreate = 11>
+  <cflocation url="view_create_ext_recipient.cfm" addtoken="no">
+</cfif>
+
 <!--- ALERTS --->
 <cfif m is 1>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -196,7 +305,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 <cfif m is 7>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>PDF password must be at least 8 characters.</p></div>
+    <h4><i class="icon fa fa-ban"></i> Validation Error</h4><p>PDF password must be at least 12 characters.</p></div>
 </cfif>
 <cfif m is 8>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -210,6 +319,47 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4><p>An error occurred while creating the external recipient. Please check the logs.</p></div>
 </cfif>
+<cfif m is 11>
+  <cfparam name="session.bulk_created" default="0">
+  <cfparam name="session.bulk_skipped" default="">
+  <cfparam name="session.bulk_failed" default="">
+  <cfoutput>
+  <cfif session.bulk_created GT 0 AND session.bulk_skipped is "" AND session.bulk_failed is "">
+    <div class="alert alert-success alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Success</h4>
+      <p>Created <strong>#session.bulk_created#</strong> external recipient(s).</p></div>
+  <cfelseif session.bulk_created GT 0>
+    <div class="alert alert-warning alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fas fa-exclamation-triangle"></i> Partial Success</h4>
+      <p>Created <strong>#session.bulk_created#</strong> recipient(s).</p>
+      <cfif session.bulk_skipped is not "">
+        <p class="mb-1"><strong>Skipped:</strong></p>
+        <ul class="mb-1"><cfloop list="#session.bulk_skipped#" index="s"><li>#encodeForHTML(s)#</li></cfloop></ul>
+      </cfif>
+      <cfif session.bulk_failed is not "">
+        <p class="mb-1"><strong>Failed:</strong></p>
+        <ul class="mb-0"><cfloop list="#session.bulk_failed#" index="f"><li>#encodeForHTML(f)#</li></cfloop></ul>
+      </cfif>
+    </div>
+  <cfelse>
+    <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-ban"></i> Error</h4>
+      <p>No recipients were created.</p>
+      <cfif session.bulk_skipped is not "">
+        <p class="mb-1"><strong>Skipped:</strong></p>
+        <ul class="mb-1"><cfloop list="#session.bulk_skipped#" index="s"><li>#encodeForHTML(s)#</li></cfloop></ul>
+      </cfif>
+      <cfif session.bulk_failed is not "">
+        <p class="mb-1"><strong>Failed:</strong></p>
+        <ul class="mb-0"><cfloop list="#session.bulk_failed#" index="f"><li>#encodeForHTML(f)#</li></cfloop></ul>
+      </cfif>
+    </div>
+  </cfif>
+  </cfoutput>
+  <cfset session.bulk_created = "">
+  <cfset session.bulk_skipped = "">
+  <cfset session.bulk_failed = "">
+</cfif>
 
 <!--- CREATE FORM --->
 <div class="card card-primary card-outline mb-4">
@@ -217,16 +367,36 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-user-plus"></i> Create External Recipient</h3>
   </div>
   <div class="card-body">
-    <form method="post" autocomplete="off">
-      <input type="hidden" name="action" value="create">
+    <form method="post" autocomplete="off" id="createForm">
+      <input type="hidden" name="action" value="create" id="formAction">
 
-      <!--- Email --->
-      <div class="row mb-3">
+      <!--- Mode Toggle --->
+      <div class="mb-3">
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" name="create_mode" id="modeSingle" value="single" checked>
+          <label class="btn btn-outline-primary" for="modeSingle"><i class="fas fa-user"></i> Single</label>
+          <input type="radio" class="btn-check" name="create_mode" id="modeBulk" value="bulk">
+          <label class="btn btn-outline-primary" for="modeBulk"><i class="fas fa-users"></i> Bulk</label>
+        </div>
+      </div>
+
+      <!--- Single Email --->
+      <div id="singleEmailField" class="row mb-3">
         <div class="col-md-6">
           <label for="ext_email" class="form-label">Recipient Email Address</label>
-          <input type="email" class="form-control" id="ext_email" name="ext_email" maxlength="255" required
+          <input type="email" class="form-control" id="ext_email" name="ext_email" maxlength="255"
             placeholder="user@external-domain.com">
           <small class="text-muted">Must be an external email address (not a domain managed by this system)</small>
+        </div>
+      </div>
+
+      <!--- Bulk Emails --->
+      <div id="bulkEmailField" class="row mb-3" style="display:none;">
+        <div class="col-md-6">
+          <label for="ext_emails" class="form-label">Recipient Email Addresses</label>
+          <textarea class="form-control" id="ext_emails" name="ext_emails" rows="8"
+            placeholder="user1@external-domain.com&#10;user2@another-domain.com&#10;user3@example.com"></textarea>
+          <small class="text-muted">One email address per line. Invalid, duplicate, and internal domain addresses will be skipped.</small>
         </div>
       </div>
 
@@ -250,7 +420,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 single-only-enc">
           <div class="card">
             <div class="card-header bg-success text-white"><strong><i class="fas fa-certificate"></i> S/MIME Encryption</strong></div>
             <div class="card-body">
@@ -265,7 +435,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
         </div>
-        <div class="col-md-4">
+        <div class="col-md-4 single-only-enc">
           <div class="card">
             <div class="card-header bg-info text-white"><strong><i class="fas fa-key"></i> PGP Encryption</strong></div>
             <div class="card-body">
@@ -318,7 +488,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="col-md-4">
               <label for="pdf_password" class="form-label">PDF Password</label>
               <input type="password" class="form-control" id="pdf_password" name="pdf_password" maxlength="255"
-                placeholder="Minimum 8 characters">
+                placeholder="Minimum 12 characters">
               <small class="text-muted">Min 8 chars with uppercase, lowercase, numbers, and special characters</small>
             </div>
             <div class="col-md-4">
@@ -375,6 +545,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
 $(document).ready(function() {
+  // Mode toggle: Single vs Bulk
+  $('input[name="create_mode"]').on('change', function() {
+    if (this.value === 'bulk') {
+      $('#singleEmailField').hide();
+      $('#bulkEmailField').show();
+      $('#formAction').val('bulk_create');
+      $('#ext_email').removeAttr('required');
+      // Hide S/MIME and PGP options, auto-select PDF Mandatory
+      $('.single-only-enc').hide();
+      // Uncheck any S/MIME or PGP selection
+      $('input[name="encryption_mode"]').filter('[value^="smime_"],[value^="pgp_"]').prop('checked', false);
+      // Auto-select PDF Mandatory if nothing selected
+      if (!$('input[name="encryption_mode"]:checked').length) {
+        $('#enc_pdf_m').prop('checked', true).trigger('change');
+      }
+    } else {
+      $('#singleEmailField').show();
+      $('#bulkEmailField').hide();
+      $('#formAction').val('create');
+      $('.single-only-enc').show();
+    }
+  });
+
   // Show/hide PDF options based on encryption mode
   $('.enc-mode-radio').on('change', function() {
     if (this.value.startsWith('pdf_')) {

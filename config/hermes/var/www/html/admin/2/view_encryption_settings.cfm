@@ -130,34 +130,100 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset show_clientkeyword = theClientKeyword>
 <cfset show_mailkeyword = theMailKeyword>
 
+<!--- Mask keywords for display (show last 4 chars only) --->
+<cfset masked_serverkeyword = IIF(Len(theServerKeyword) GTE 4, DE("********************" & Right(theServerKeyword, 4)), DE(theServerKeyword))>
+<cfset masked_clientkeyword = IIF(Len(theClientKeyword) GTE 4, DE("********************" & Right(theClientKeyword, 4)), DE(theClientKeyword))>
+<cfset masked_mailkeyword = IIF(Len(theMailKeyword) GTE 4, DE("********************" & Right(theMailKeyword, 4)), DE(theMailKeyword))>
+
 <!--- Override with form values if submitted --->
 <cfif StructKeyExists(form, "subjectenable")><cfset show_subjectenable = form.subjectenable></cfif>
 <cfif StructKeyExists(form, "subject_trigger")><cfset show_subject_trigger = form.subject_trigger></cfif>
 <cfif StructKeyExists(form, "removesubjecttrigger")><cfset show_removesubjecttrigger = form.removesubjecttrigger></cfif>
 <cfif StructKeyExists(form, "pdfreply_sender")><cfset show_pdfreply_sender = form.pdfreply_sender></cfif>
-<cfif StructKeyExists(form, "serverkeyword")><cfset show_serverkeyword = form.serverkeyword></cfif>
-<cfif StructKeyExists(form, "clientkeyword")><cfset show_clientkeyword = form.clientkeyword></cfif>
-<cfif StructKeyExists(form, "mailkeyword")><cfset show_mailkeyword = form.mailkeyword></cfif>
 
 <!--- ===================== --->
 <!--- ACTION: GENERATE     --->
 <!--- ===================== --->
 <cfif action is "generate_server" OR action is "generate_client" OR action is "generate_mail">
-  <cfinclude template="./inc/generate_customtrans.cfm">
-  <cfquery name="genRandom" datasource="hermes" result="genResult">
-    INSERT INTO salt (salt) VALUES (<cfqueryparam value="#LCase(customtrans3)##LCase(customtrans3)##Left(LCase(customtrans3),7)#" cfsqltype="cf_sql_varchar">)
-  </cfquery>
-  <cfquery name="getRandom" datasource="hermes">
-    SELECT salt FROM salt WHERE id = <cfqueryparam value="#genResult.GENERATED_KEY#" cfsqltype="cf_sql_integer">
-  </cfquery>
-  <cfquery datasource="hermes">
-    DELETE FROM salt WHERE id = <cfqueryparam value="#genResult.GENERATED_KEY#" cfsqltype="cf_sql_integer">
-  </cfquery>
-  <cfset generatedKeyword = LCase(getRandom.salt)>
+  <!--- Generate 64-character random keyword by concatenating multiple rounds --->
+  <cfset generatedKeyword = "">
+  <cfloop from="1" to="8" index="i">
+    <cfinclude template="./inc/generate_customtrans.cfm">
+    <cfset generatedKeyword = generatedKeyword & LCase(customtrans3)>
+  </cfloop>
+  <cfset generatedKeyword = Left(generatedKeyword, 64)>
+  <cfset encrypted_generated = encrypt(generatedKeyword, hermeskey, "AES", "Base64")>
 
-  <cfif action is "generate_server"><cfset show_serverkeyword = generatedKeyword></cfif>
-  <cfif action is "generate_client"><cfset show_clientkeyword = generatedKeyword></cfif>
-  <cfif action is "generate_mail"><cfset show_mailkeyword = generatedKeyword></cfif>
+  <!--- Save immediately to DB and apply to Ciphermail --->
+  <cfif action is "generate_server">
+    <cfquery datasource="hermes">
+      UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_generated#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.serverSecret'
+    </cfquery>
+    <cfset show_serverkeyword = generatedKeyword>
+  </cfif>
+  <cfif action is "generate_client">
+    <cfquery datasource="hermes">
+      UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_generated#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.clientSecret'
+    </cfquery>
+    <cfset show_clientkeyword = generatedKeyword>
+  </cfif>
+  <cfif action is "generate_mail">
+    <cfquery datasource="hermes">
+      UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_generated#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.systemMailSecret'
+    </cfquery>
+    <cfset show_mailkeyword = generatedKeyword>
+  </cfif>
+
+  <!--- Apply all current keywords to Ciphermail (legacy write-read-write pattern) --->
+  <cfinclude template="./inc/generate_customtrans.cfm">
+  <cffile action="read" file="/opt/hermes/scripts/edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'PDFREPLY-SENDER', trim(show_pdfreply_sender), 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'PORTAL-URL', show_portal_url, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SUBJECT-TRIGGER', trim(show_subject_trigger), 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SUBJECT-ENABLE', show_subjectenable, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'TRIGGER-REMOVE', show_removesubjecttrigger, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SERVER-SECRET', show_serverkeyword, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'CLIENT-SECRET', show_clientkeyword, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'MAIL-SECRET', show_mailkeyword, 'ALL')#" addnewline="no">
+
+  <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" timeout="60"></cfexecute>
+  <cftry>
+    <cfexecute name="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+      timeout="240"
+      variable="ciphermailOutput2"
+      errorVariable="ciphermailError2">
+    </cfexecute>
+    <cfcatch type="any"></cfcatch>
+  </cftry>
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh">
+  </cfif>
+
+  <cfset session.m_enc = 12>
+  <cflocation url="view_encryption_settings.cfm" addtoken="no">
 </cfif>
 
 <!--- ===================== --->
@@ -177,20 +243,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset session.m_enc = 2>
     <cflocation url="view_encryption_settings.cfm" addtoken="no">
   </cfif>
-  <cfif NOT (Len(show_serverkeyword) GTE 10 AND REFind("[a-z]", show_serverkeyword) GTE 1 AND REFind("[0-9]", show_serverkeyword) GTE 1)>
-    <cfset session.m_enc = 8>
-    <cflocation url="view_encryption_settings.cfm" addtoken="no">
-  </cfif>
-  <cfif NOT (Len(show_clientkeyword) GTE 10 AND REFind("[a-z]", show_clientkeyword) GTE 1 AND REFind("[0-9]", show_clientkeyword) GTE 1)>
-    <cfset session.m_enc = 9>
-    <cflocation url="view_encryption_settings.cfm" addtoken="no">
-  </cfif>
-  <cfif NOT (Len(show_mailkeyword) GTE 10 AND REFind("[a-z]", show_mailkeyword) GTE 1 AND REFind("[0-9]", show_mailkeyword) GTE 1)>
-    <cfset session.m_enc = 10>
-    <cflocation url="view_encryption_settings.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Update database --->
+  <!--- Update database (keywords managed separately via generate) --->
   <cfquery datasource="hermes">
     UPDATE encryption_settings SET value = <cfqueryparam value="#trim(show_pdfreply_sender)#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.pdf.replySender'
   </cfquery>
@@ -207,37 +260,52 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     UPDATE encryption_settings SET value = <cfqueryparam value="#show_removesubjecttrigger#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.subjectTriggerRemovePattern'
   </cfquery>
 
-  <!--- Encrypt and save keywords --->
-  <cfset encrypted_serverkeyword = encrypt(show_serverkeyword, hermeskey, "AES", "Base64")>
-  <cfquery datasource="hermes">
-    UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_serverkeyword#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.serverSecret'
-  </cfquery>
-  <cfset encrypted_clientkeyword = encrypt(show_clientkeyword, hermeskey, "AES", "Base64")>
-  <cfquery datasource="hermes">
-    UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_clientkeyword#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.clientSecret'
-  </cfquery>
-  <cfset encrypted_mailkeyword = encrypt(show_mailkeyword, hermeskey, "AES", "Base64")>
-  <cfquery datasource="hermes">
-    UPDATE encryption_settings SET value = <cfqueryparam value="#encrypted_mailkeyword#" cfsqltype="cf_sql_varchar"> WHERE property = 'user.systemMailSecret'
-  </cfquery>
-
-  <!--- Apply to Ciphermail via temp script --->
+  <!--- Apply to Ciphermail via temp script (legacy write-read-write pattern) --->
   <cfinclude template="./inc/generate_customtrans.cfm">
   <cffile action="read" file="/opt/hermes/scripts/edit_encryption_settings.sh" variable="temp">
-  <cfset temp = REReplace(temp, "PDFREPLY-SENDER", trim(show_pdfreply_sender), "ALL")>
-  <cfset temp = REReplace(temp, "PORTAL-URL", show_portal_url, "ALL")>
-  <cfset temp = REReplace(temp, "SUBJECT-TRIGGER", trim(show_subject_trigger), "ALL")>
-  <cfset temp = REReplace(temp, "SUBJECT-ENABLE", show_subjectenable, "ALL")>
-  <cfset temp = REReplace(temp, "TRIGGER-REMOVE", show_removesubjecttrigger, "ALL")>
-  <cfset temp = REReplace(temp, "SERVER-SECRET", show_serverkeyword, "ALL")>
-  <cfset temp = REReplace(temp, "CLIENT-SECRET", show_clientkeyword, "ALL")>
-  <cfset temp = REReplace(temp, "MAIL-SECRET", show_mailkeyword, "ALL")>
-  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" output="#temp#">
 
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'PDFREPLY-SENDER', trim(show_pdfreply_sender), 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'PORTAL-URL', show_portal_url, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SUBJECT-TRIGGER', trim(show_subject_trigger), 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SUBJECT-ENABLE', show_subjectenable, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'TRIGGER-REMOVE', show_removesubjecttrigger, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'SERVER-SECRET', show_serverkeyword, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'CLIENT-SECRET', show_clientkeyword, 'ALL')#" addnewline="no">
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" variable="temp">
+
+  <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+    output="#REReplace(temp, 'MAIL-SECRET', show_mailkeyword, 'ALL')#" addnewline="no">
+
+  <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" timeout="60"></cfexecute>
   <cftry>
-    <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" timeout="60"></cfexecute>
-    <cfexecute name="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh" timeout="240" outputfile="/dev/null" arguments="-inputformat none"></cfexecute>
+    <cfexecute name="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh"
+      timeout="240"
+      variable="ciphermailOutput"
+      errorVariable="ciphermailError">
+    </cfexecute>
     <cfcatch type="any">
+      <cfif fileExists("/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh")>
+        <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_edit_encryption_settings.sh">
+      </cfif>
       <cfset session.m_enc = 11>
       <cflocation url="view_encryption_settings.cfm" addtoken="no">
     </cfcatch>
@@ -284,12 +352,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4><p>Settings saved to database but failed to apply to Ciphermail. Please check the logs.</p></div>
 </cfif>
+<cfif m is 12>
+  <div class="alert alert-success alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success</h4><p>Secret keyword generated and applied to Ciphermail.</p></div>
+</cfif>
 
 <!--- PAGE GUIDE --->
 <div class="callout callout-info mb-4">
   <h5><i class="fas fa-info-circle"></i> Page Guide</h5>
   <p class="mb-1">Configure Ciphermail encryption settings including subject-triggered encryption, PDF reply sender, and secret keywords used for secure portal communication.</p>
-  <p class="mb-0">The <strong>Subject Trigger</strong> allows users to trigger email encryption by including a keyword in the subject line. <strong>Secret Keywords</strong> are used by Ciphermail for server, client, and mail authentication -- they must be at least 10 characters with lowercase letters and numbers.</p>
+  <p class="mb-0">The <strong>Subject Trigger</strong> allows users to trigger email encryption by including a keyword in the subject line. <strong>Secret Keywords</strong> are used by Ciphermail for server, client, and mail authentication -- use the generate button to create new keywords.</p>
 </div>
 
 <!--- SETTINGS FORM --->
@@ -299,6 +371,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <div class="card-body">
     <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="save_settings">
 
       <!--- Subject Trigger Settings --->
       <h6 class="mb-3"><strong>Subject Trigger Settings</strong></h6>
@@ -348,33 +421,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <!--- Secret Keywords --->
       <h6 class="mb-3"><strong>Secret Keywords</strong></h6>
-      <p class="text-muted mb-2">Minimum 10 characters, lowercase letters and numbers only. Use the Generate button to create a random keyword.</p>
+      <p class="text-muted mb-2">Use the <i class="fas fa-sync-alt"></i> button to generate a new keyword. Keywords are auto-generated and cannot be edited manually.</p>
 
       <div class="row mb-3">
         <div class="col-md-4">
-          <label for="serverkeyword" class="form-label">Server Secret Keyword</label>
+          <label class="form-label">Server Secret Keyword</label>
           <div class="input-group">
-            <cfoutput><input type="text" class="form-control" id="serverkeyword" name="serverkeyword" maxlength="255" value="#encodeForHTMLAttribute(show_serverkeyword)#" required></cfoutput>
-            <button type="submit" name="action" value="generate_server" class="btn btn-outline-secondary" title="Generate Server Keyword">
-              <i class="fas fa-random"></i>
+            <cfoutput><input type="text" class="form-control" value="#encodeForHTMLAttribute(masked_serverkeyword)#" disabled></cfoutput>
+            <button type="button" class="btn btn-secondary" onclick="showGenerateModal('generate_server', 'Server Secret Keyword');" title="Generate Server Keyword">
+              <i class="fas fa-sync-alt"></i>
             </button>
           </div>
         </div>
         <div class="col-md-4">
-          <label for="clientkeyword" class="form-label">Client Secret Keyword</label>
+          <label class="form-label">Client Secret Keyword</label>
           <div class="input-group">
-            <cfoutput><input type="text" class="form-control" id="clientkeyword" name="clientkeyword" maxlength="255" value="#encodeForHTMLAttribute(show_clientkeyword)#" required></cfoutput>
-            <button type="submit" name="action" value="generate_client" class="btn btn-outline-secondary" title="Generate Client Keyword">
-              <i class="fas fa-random"></i>
+            <cfoutput><input type="text" class="form-control" value="#encodeForHTMLAttribute(masked_clientkeyword)#" disabled></cfoutput>
+            <button type="button" class="btn btn-secondary" onclick="showGenerateModal('generate_client', 'Client Secret Keyword');" title="Generate Client Keyword">
+              <i class="fas fa-sync-alt"></i>
             </button>
           </div>
         </div>
         <div class="col-md-4">
-          <label for="mailkeyword" class="form-label">Mail Secret Keyword</label>
+          <label class="form-label">Mail Secret Keyword</label>
           <div class="input-group">
-            <cfoutput><input type="text" class="form-control" id="mailkeyword" name="mailkeyword" maxlength="255" value="#encodeForHTMLAttribute(show_mailkeyword)#" required></cfoutput>
-            <button type="submit" name="action" value="generate_mail" class="btn btn-outline-secondary" title="Generate Mail Keyword">
-              <i class="fas fa-random"></i>
+            <cfoutput><input type="text" class="form-control" value="#encodeForHTMLAttribute(masked_mailkeyword)#" disabled></cfoutput>
+            <button type="button" class="btn btn-secondary" onclick="showGenerateModal('generate_mail', 'Mail Secret Keyword');" title="Generate Mail Keyword">
+              <i class="fas fa-sync-alt"></i>
             </button>
           </div>
         </div>
@@ -382,7 +455,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <hr>
 
-      <button type="submit" name="action" value="save_settings" class="btn btn-primary btn-lg"
+      <button type="submit" class="btn btn-primary btn-lg"
         onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
         <i class="fas fa-save"></i> Save Settings
       </button>
@@ -398,6 +471,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </div>
 
+
+<!-- GENERATE SECRET MODAL (reusable) -->
+<div class="modal fade" id="generateModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <input type="hidden" name="action" id="generateAction" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="generateTitle">Generate Secret</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Are you sure you want to generate a new <strong id="generateLabel"></strong>?</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
+          <button type="submit" class="btn btn-danger"
+            onclick="this.disabled=true;this.innerHTML='Generating...';this.form.submit();">Yes, Generate</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function showGenerateModal(action, label) {
+  document.getElementById('generateAction').value = action;
+  document.getElementById('generateTitle').textContent = 'Generate ' + label;
+  document.getElementById('generateLabel').textContent = label;
+  new bootstrap.Modal(document.getElementById('generateModal')).show();
+}
+</script>
 
 </body>
 </html>
