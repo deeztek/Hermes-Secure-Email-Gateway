@@ -1,0 +1,27 @@
+#!/bin/bash
+
+echo "Starting Hermes SEG Dovecot"
+
+echo "Setting permissions on Dovecot directories"
+chown -R vmail:vmail /srv/mail 2>/dev/null || true
+chown -R vmail:vmail /logs 2>/dev/null || true
+
+# Ensure log files exist so tail can follow them
+touch /logs/dovecot.log /logs/dovecot-info.log
+chown vmail:vmail /logs/dovecot.log /logs/dovecot-info.log
+
+echo "Startup complete - starting Dovecot"
+
+# Run Dovecot in background so we can tail the logs to stdout
+/usr/sbin/dovecot -F &
+DOVECOT_PID=$!
+
+# Tail logs to stdout for docker logs visibility
+tail -F /logs/dovecot.log /logs/dovecot-info.log &
+TAIL_PID=$!
+
+# Handle signals to shut down cleanly
+trap "kill $DOVECOT_PID $TAIL_PID 2>/dev/null; exit 0" SIGTERM SIGINT
+
+# Wait on dovecot process
+wait $DOVECOT_PID

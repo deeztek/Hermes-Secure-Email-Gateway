@@ -564,11 +564,8 @@ services:
 
 
   hermes_dovecot:
-    image: dovecot/dovecot:${DOVECOTVERSION}
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dovecot:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dovecot
-    build:
-      context: .
-      dockerfile: ./dockerfiles/dovecot/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -594,9 +591,8 @@ services:
     - "host.docker.internal:host-gateway"
     - "${HERMES_HOSTNAME}:${HOST_IP}"
     volumes:
-      - ./config/dovecot/conf.d:/etc/dovecot/conf.d
-      - ./config/dovecot/conf:/etc/dovecot
-      - ./config/dovecot/scripts:/scripts
+      - ./config/dovecot-2.4/conf:/etc/dovecot
+      - ./config/dovecot-2.4/scripts:/scripts
       - ./config/certbot/conf:/etc/letsencrypt
       - ./config/hermes/opt/hermes/ssl:/opt/hermes/ssl
       - /opt/hermes/keys/ecprivkey.pem:/keys/ecprivkey.pem

@@ -7,8 +7,26 @@
 # Running "bash" from PowerShell invokes WSL bash which has an incompatible Docker.
 
 REGISTRY="hub.deeztek.com/dedwards/hermes-seg-docker-gl"
-VERSION="${1:-v260119}"
+DEFAULT_VERSION="v260119"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Prompt for version (use arg if provided, otherwise prompt)
+if [ -n "$1" ]; then
+    VERSION="$1"
+else
+    read -p "Enter version tag [$DEFAULT_VERSION]: " VERSION
+    VERSION="${VERSION:-$DEFAULT_VERSION}"
+fi
+
+# Validate version format (vYYMMDD)
+if ! echo "$VERSION" | grep -qE '^v[0-9]{6}$'; then
+    echo "[WARN] Version '$VERSION' does not match expected format (vYYMMDD, e.g., v260119)"
+    read -p "Continue anyway? [y/N]: " CONFIRM
+    if [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ]; then
+        echo "Aborted."
+        exit 1
+    fi
+fi
 
 # Check Docker is available
 if ! command -v docker &>/dev/null; then
@@ -117,6 +135,11 @@ build_image "hermes-dmarc" \
     "$SCRIPT_DIR/opendmarc/dockerfiles/opendmarc/Dockerfile" \
     "$SCRIPT_DIR/opendmarc/"
 
+# Dovecot
+build_image "hermes-dovecot" \
+    "$SCRIPT_DIR/dovecot/dockerfiles/dovecot/Dockerfile" \
+    "$SCRIPT_DIR/dovecot/"
+
 # Summary
 echo "========================================"
 echo "Build Summary"
@@ -139,12 +162,12 @@ fi
 
 echo ""
 echo "To push all images:"
-echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc; do"
+echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot; do"
 echo "    docker push $REGISTRY/\$img:$VERSION"
 echo "  done"
 echo ""
 echo "To promote to latest after testing:"
-echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc; do"
+echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot; do"
 echo "    docker tag $REGISTRY/\$img:$VERSION $REGISTRY/\$img:latest"
 echo "    docker push $REGISTRY/\$img:latest"
 echo "  done"

@@ -3,17 +3,20 @@ LABEL maintainer="Deeztek <support@deeztek.com>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install base tools, Dovecot 2.4 from official repo, and quota-warning dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install Dovecot 2.4 from official repo + quota-warning script dependencies
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         gnupg \
         dumb-init \
     && curl -fsSL https://repo.dovecot.org/DOVECOT-REPO-GPG-2.4 \
         | gpg --dearmor -o /usr/share/keyrings/dovecot-2.4.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/dovecot-2.4.gpg] https://repo.dovecot.org/ce-2.4/ubuntu/noble noble main" \
+    && echo "deb [signed-by=/usr/share/keyrings/dovecot-2.4.gpg] https://repo.dovecot.org/ce-2.4-latest/ubuntu/noble noble main" \
         > /etc/apt/sources.list.d/dovecot.list \
-    && apt-get update && apt-get install -y --no-install-recommends \
+    && apt-get update && \
+    apt-get install -y --no-install-recommends \
         dovecot-core \
         dovecot-imapd \
         dovecot-pop3d \
@@ -27,13 +30,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create vmail user/group (UID/GID 1000) for mail storage
-RUN groupadd -g 1000 vmail && \
+# Remove default ubuntu user (UID/GID 1000) and create vmail in its place
+RUN userdel -r ubuntu 2>/dev/null || true && \
+    groupadd -g 1000 vmail && \
     useradd -u 1000 -g 1000 -d /srv/mail -s /sbin/nologin vmail && \
     mkdir -p /srv/mail /logs /scripts /keys && \
     chown -R vmail:vmail /srv/mail /logs
 
+# Copy entrypoint script
+COPY entrypoints/dovecot/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 EXPOSE 993 995 143 110 24 4190 9587
 
-# Run Dovecot in foreground
-ENTRYPOINT ["dumb-init", "dovecot", "-F"]
+ENTRYPOINT ["dumb-init", "/entrypoint.sh"]
