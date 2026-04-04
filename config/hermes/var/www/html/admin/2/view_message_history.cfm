@@ -730,9 +730,42 @@ id="btn-back-to-top"
      <!--- /CFIF IsDefined("url.limit") --->
     </cfif>
 
+    <!--- Type filter (content type) - comma-delimited list from multi-select --->
+    <cfparam name="url.content_filter" default="">
+    <cfset contentFilterList = url.content_filter>
+
+    <!--- Action filter (ds) - comma-delimited list from multi-select --->
+    <cfparam name="url.action_filter" default="">
+    <cfset actionFilterList = url.action_filter>
+
+    <!--- Get all content types for filter dropdown --->
+    <cfquery name="getContentTypes" datasource="hermes">
+      SELECT content_type, description FROM msg_content_type ORDER BY description ASC
+    </cfquery>
 
     <cfquery name="getmsgs" datasource="hermes">
-      SELECT msgrcpt.mail_id, msgrcpt.ds, msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgs.archive, msgs.client_addr FROM msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.time_iso between '#startdate#' and '#enddate#' order by msgs.time_iso desc limit #limit#
+      SELECT msgrcpt.mail_id, msgrcpt.ds, msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgs.archive, msgs.client_addr FROM msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.time_iso between '#startdate#' and '#enddate#'
+      <cfif contentFilterList is not "">
+        AND msgs.content IN (
+          <cfset ci = 0>
+          <cfloop list="#contentFilterList#" index="ct">
+            <cfset ci = ci + 1>
+            <cfif ci GT 1>,</cfif>
+            <cfqueryparam value="#trim(ct)#" cfsqltype="cf_sql_varchar">
+          </cfloop>
+        )
+      </cfif>
+      <cfif actionFilterList is not "">
+        AND msgrcpt.ds IN (
+          <cfset ai = 0>
+          <cfloop list="#actionFilterList#" index="af">
+            <cfset ai = ai + 1>
+            <cfif ai GT 1>,</cfif>
+            <cfqueryparam value="#trim(af)#" cfsqltype="cf_sql_varchar">
+          </cfloop>
+        )
+      </cfif>
+      order by msgs.time_iso desc limit #limit#
       </cfquery>
 
   
@@ -1894,54 +1927,48 @@ id="btn-back-to-top"
                         };
                         new tempusDominus.TempusDominus(document.getElementById('startdatetime'), pickerOptions);
                         new tempusDominus.TempusDominus(document.getElementById('enddatetime'), pickerOptions);
+
+                        // Tom Select multi-select for Type and Action filters
+                        var tsOptions = {
+                            plugins: {
+                                'remove_button': { title: 'Remove' },
+                                'clear_button': { title: 'Clear All', html: function(data) { return '<button type="button" class="btn btn-sm btn-outline-secondary ms-1" style="padding:0 6px;font-size:0.75rem;line-height:1.5;">&times; Clear</button>'; } }
+                            }
+                        };
+                        new TomSelect('#contentFilterSelect', Object.assign({}, tsOptions, { placeholder: 'All Types' }));
+                        new TomSelect('#actionFilterSelect', Object.assign({}, tsOptions, { placeholder: 'All Actions' }));
                     });
                 </script>
 
                         <div class="col-md-4 mb-3">
                             <label class="form-label">Search Results Limit</label>
                             <select class="form-control" name="limit">
-                                <cfoutput>
-                                <option value="#limit#" selected="selected">#limit#</option>
-                                </cfoutput>
-                                <cfif #limit# is "1000">
-                                    <option value="1500">1500</option>
-                                    <option value="2500">2500</option>
-                                    <option value="5000">5000</option>
-                                    <option value="10000">10000</option>
-                                    <option value="15000">15000</option>
-                                <cfelseif #limit# is "1500">
-                                    <option value="1000">1000 (Default)</option>
-                                    <option value="2500">2500</option>
-                                    <option value="5000">5000</option>
-                                    <option value="10000">10000</option>
-                                    <option value="15000">15000</option>
-                                <cfelseif #limit# is "2500">
-                                    <option value="1000">1000 (Default)</option>
-                                    <option value="1500">1500</option>
-                                    <option value="5000">5000</option>
-                                    <option value="10000">10000</option>
-                                    <option value="15000">15000</option>
-                                <cfelseif #limit# is "5000">
-                                    <option value="1000">1000 (Default)</option>
-                                    <option value="1500">1500</option>
-                                    <option value="2500">2500</option>
-                                    <option value="10000">10000</option>
-                                    <option value="15000">15000</option>
-                                <cfelseif #limit# is "10000">
-                                    <option value="1000">1000 (Default)</option>
-                                    <option value="1500">1500</option>
-                                    <option value="2500">2500</option>
-                                    <option value="5000">5000</option>
-                                    <option value="15000">15000</option>
-                                <cfelseif #limit# is "15000">
-                                    <option value="1000">1000 (Default)</option>
-                                    <option value="1500">1500</option>
-                                    <option value="2500">2500</option>
-                                    <option value="5000">5000</option>
-                                    <option value="10000">10000</option>
-                                </cfif>
+                                <cfloop list="1000,1500,2500,5000,10000,15000" index="l">
+                                  <cfoutput><option value="#l#" <cfif limit is l>selected</cfif>>#l#</option></cfoutput>
+                                </cfloop>
                             </select>
                             <div class="form-text text-warning"><i class="icon fas fa-exclamation-triangle"></i> Setting limit to 10000+ will significantly increase page load time</div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Type</label>
+                            <select id="contentFilterSelect" class="form-select" name="content_filter" multiple placeholder="All Types">
+                              <cfoutput query="getContentTypes">
+                                <option value="#encodeForHTMLAttribute(content_type)#" <cfif ListFindNoCase(contentFilterList, content_type)>selected</cfif>>#encodeForHTML(description)#</option>
+                              </cfoutput>
+                            </select>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Action</label>
+                            <select id="actionFilterSelect" class="form-select" name="action_filter" multiple placeholder="All Actions">
+                              <cfoutput>
+                              <option value="P" <cfif ListFindNoCase(actionFilterList, "P")>selected</cfif>>Delivered</option>
+                              <option value="D" <cfif ListFindNoCase(actionFilterList, "D")>selected</cfif>>Blocked (Discarded)</option>
+                              <option value="B" <cfif ListFindNoCase(actionFilterList, "B")>selected</cfif>>Blocked (Bounced)</option>
+                              </cfoutput>
+                            </select>
                         </div>
                     </div>
 

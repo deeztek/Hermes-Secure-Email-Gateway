@@ -345,6 +345,9 @@ button[type="submit"].btn {
 <!-- DataTables Checkboxes CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jquery-datatables-checkboxes@1.2.14/css/dataTables.checkboxes.css">
 
+<!-- Tom Select CSS (multi-select dropdowns) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css" crossorigin="anonymous">
+
 <!-- Tempus Dominus 6 Datetimepicker CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/css/tempus-dominus.min.css" crossorigin="anonymous">
 
@@ -497,3 +500,6 @@ window.addEventListener('beforeunload', function() {
 
 <!-- DataTables Checkboxes -->
 <script src="https://cdn.jsdelivr.net/npm/jquery-datatables-checkboxes@1.2.14/js/dataTables.checkboxes.min.js"></script>
+
+<!-- Tom Select JS (multi-select dropdowns) -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js" crossorigin="anonymous"></script>

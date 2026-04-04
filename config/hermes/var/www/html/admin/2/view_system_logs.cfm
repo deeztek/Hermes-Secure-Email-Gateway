@@ -89,7 +89,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset startdate = url.startdate>
 <cfset enddate = url.enddate>
 <cfset limit = url.limit>
-<cfset facility = url.facility>
+<!--- facility can be a comma-delimited list from multi-select --->
+<cfset facilityList = url.facility>
 
 <!--- Validate dates --->
 <cfif NOT isValid("date", startdate)><cfset startdate = defaultstartdate></cfif>
@@ -108,13 +109,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   ORDER BY facility ASC
 </cfquery>
 
-<!--- Get logs with optional facility filter --->
+<!--- Get logs with optional facility filter (supports multiple facilities) --->
 <cfquery name="getlogs" datasource="syslog">
   SELECT ReceivedAt, Message, SysLogTag FROM SystemEvents
   WHERE ReceivedAt BETWEEN <cfqueryparam value="#startdate#" cfsqltype="cf_sql_timestamp">
     AND <cfqueryparam value="#enddate#" cfsqltype="cf_sql_timestamp">
-  <cfif facility is not "">
-    AND SysLogTag LIKE <cfqueryparam value="#facility#%" cfsqltype="cf_sql_varchar">
+  <cfif facilityList is not "">
+    AND (
+      <cfset i = 0>
+      <cfloop list="#facilityList#" index="fac">
+        <cfset i = i + 1>
+        <cfif i GT 1> OR </cfif>
+        SysLogTag LIKE <cfqueryparam value="#trim(fac)#%" cfsqltype="cf_sql_varchar">
+      </cfloop>
+    )
   </cfif>
   ORDER BY ReceivedAt DESC
   LIMIT <cfqueryparam value="#limit#" cfsqltype="cf_sql_integer">
@@ -203,20 +211,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-3">
           <div class="mb-3">
             <label class="form-label"><strong>Facility</strong></label>
-            <select class="form-select" name="facility">
-              <option value="">All Facilities</option>
+            <select id="facilitySelect" class="form-select" name="facility" multiple placeholder="All Facilities">
               <cfoutput query="getFacilities">
-                <cfif facility is not "">
-                  <option value="#encodeForHTMLAttribute(getFacilities.facility)#" <cfif url.facility is getFacilities.facility>selected</cfif>>#encodeForHTML(getFacilities.facility)#</option>
+                <cfif getFacilities.facility is not "">
+                  <option value="#encodeForHTMLAttribute(getFacilities.facility)#" <cfif ListFindNoCase(facilityList, getFacilities.facility)>selected</cfif>>#encodeForHTML(getFacilities.facility)#</option>
                 </cfif>
               </cfoutput>
             </select>
           </div>
         </div>
-        <div class="col-md-2">
+        <div class="col-md-1">
           <div class="mb-3">
             <label class="form-label"><strong>Limit</strong></label>
             <select class="form-select" name="limit">
@@ -290,6 +297,15 @@ $(document).ready(function() {
       { width: '120px', targets: [2] }
     ]
   });
+});
+
+// Tom Select multi-select for Facility filter
+new TomSelect('#facilitySelect', {
+  plugins: {
+    'remove_button': { title: 'Remove' },
+    'clear_button': { title: 'Clear All', html: function(data) { return '<button type="button" class="btn btn-sm btn-outline-secondary ms-1" style="padding:0 6px;font-size:0.75rem;line-height:1.5;">&times; Clear</button>'; } }
+  },
+  placeholder: 'All Facilities'
 });
 
 // Tempus Dominus datetime pickers
