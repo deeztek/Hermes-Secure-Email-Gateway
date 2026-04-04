@@ -634,10 +634,14 @@ WHERE id NOT IN (SELECT DISTINCT sid FROM wblist);
 -- ============================================================================
 
 INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
-SELECT '[job-exec "hermes-dmarc-report"]', '0 30 02 * * *', '/opt/hermes/schedule/dmarc_report_script.sh', 'hermes_commandbox', '2', 'dmarc'
+SELECT '[job-exec "hermes-dmarc-report"]', '0 30 02 * * *', '/opt/hermes/schedule/dmarc_report_script.sh', 'hermes_dmarc', '2', 'dmarc'
 WHERE NOT EXISTS (
     SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-dmarc-report"]'
 );
+
+-- Fix DMARC report job container (was hermes_commandbox, needs hermes_dmarc for opendmarc binaries)
+UPDATE ofelia_jobs SET container = 'hermes_dmarc'
+WHERE job_name = '[job-exec "hermes-dmarc-report"]' AND container = 'hermes_commandbox';
 
 INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
 SELECT '[job-exec "hermes-update-check"]', '0 30 04 * * *', '/opt/hermes/schedule/update_check.sh', 'hermes_commandbox', '1', 'system'

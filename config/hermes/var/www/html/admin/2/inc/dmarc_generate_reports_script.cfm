@@ -53,7 +53,13 @@ file = "#FiletoDelete#">
   
   
   <cffile action="read" file="/opt/hermes/scripts/dmarc_report_script.sh" variable="dmarcfile">
-  
+
+  <cffile action = "write"
+      file = "/opt/hermes/tmp/#customtrans3#_dmarc_report_script.sh"
+      output = "#REReplace("#dmarcfile#","DATABASE-SERVER","hermes_db_server","ALL")#">
+
+  <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_dmarc_report_script.sh" variable="dmarcfile">
+
   <cffile action = "write"
       file = "/opt/hermes/tmp/#customtrans3#_dmarc_report_script.sh"
       output = "#REReplace("#dmarcfile#","DATABASE-USER","#mysqlusernameopendmarc#","ALL")#">
