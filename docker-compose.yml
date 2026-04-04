@@ -279,6 +279,7 @@ services:
       - ./config/mail_filter/etc/amavis:/etc/amavis #Amavis config (mynetworks, white/black lists)
       - ./config/mail_filter/etc/spamassassin:/etc/spamassassin #SpamAssassin config (local.cf)
       - ./config/mail_filter/etc/clamav:/etc/clamav #ClamAV config (clamd.conf)
+      - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf #Fangfrisch config (malware feeds)
       - mail_filter_data_clamav:/var/lib/clamav #ClamAV signature data (local.ign2)
       - ./config/ldap:/ldap
       - /proc:/host/proc:ro #Host /proc for system resource monitoring
@@ -405,6 +406,7 @@ services:
       - ./config/mail_filter/etc/spamassassin/local.cf:/etc/spamassassin/local.cf
       - ./config/mail_filter/sa-bayes:/sa-bayes
       - ./config/mail_filter/etc/clamav/clamd.conf:/etc/clamav/clamd.conf
+      - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf
       - ./config/mail_filter/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
       - ./config/mail_filter/usr/local/bin/setup-clamav-sigs:/usr/local/bin/setup-clamav-sigs
       - ./config/common/etc/mailname:/etc/mailname

@@ -277,6 +277,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_malware_feeds.cfm" class="nav-link">
+                <i class="nav-icon fas fa-biohazard"></i>
+                <p>Malware Feeds</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_antispam_maintenance.cfm" class="nav-link">
                 <i class="nav-icon fas fa-shield-virus"></i>
                 <p>Antispam Settings</p>

@@ -74,7 +74,7 @@ RUN apt-get update && \
 
 COPY config/etc/fangfrisch/fangfrisch.conf /etc/fangfrisch/fangfrisch.conf
 COPY config/usr/local/bin/setup-clamav-sigs /usr/local/bin/setup-clamav-sigs
-COPY config/etc/cron.d/fangfrisch /etc/cron.d/fangfrisch
+# Fangfrisch cron.d removed - now managed via Ofelia scheduled job
 
 #Entrypoint
 COPY entrypoints/mail_filter/entrypoint.sh /

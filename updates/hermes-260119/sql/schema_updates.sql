@@ -965,3 +965,254 @@ CREATE INDEX IF NOT EXISTS idx_systemevents_tag_receivedat ON SystemEvents(SysLo
 -- Switch back to hermes for any subsequent statements
 USE hermes;
 
+-- ============================================================================
+-- MALWARE FEEDS: Tables for managing Fangfrisch malware signature feeds
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS malware_feeds_config (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    section_name VARCHAR(100) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    enabled TINYINT(3) NOT NULL DEFAULT 0,
+    is_builtin TINYINT(3) NOT NULL DEFAULT 0,
+    prefix VARCHAR(500) NULL,
+    interval_value VARCHAR(20) NULL,
+    max_size VARCHAR(20) NULL,
+    integrity_check VARCHAR(20) NULL,
+    api_key_1_name VARCHAR(50) NULL,
+    api_key_1_value VARCHAR(500) NULL,
+    api_key_2_name VARCHAR(50) NULL,
+    api_key_2_value VARCHAR(500) NULL,
+    description TEXT NULL,
+    sort_order INT NOT NULL DEFAULT 100,
+    UNIQUE KEY uq_section_name (section_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS malware_feed_urls (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    feed_id INT NOT NULL,
+    url_key VARCHAR(255) NOT NULL,
+    url_value VARCHAR(1000) NOT NULL,
+    enabled TINYINT(3) NOT NULL DEFAULT 1,
+    filename_override VARCHAR(255) NULL,
+    sort_order INT NOT NULL DEFAULT 100,
+    UNIQUE KEY uq_feed_url (feed_id, url_key),
+    FOREIGN KEY (feed_id) REFERENCES malware_feeds_config(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Global DEFAULT settings for malware feeds
+INSERT INTO parameters2 (parameter, value2, module, active)
+SELECT 'log_level', 'info', 'malware_feeds', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'log_level' AND module = 'malware_feeds');
+
+INSERT INTO parameters2 (parameter, value2, module, active)
+SELECT 'max_size', '5MB', 'malware_feeds', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'max_size' AND module = 'malware_feeds');
+
+INSERT INTO parameters2 (parameter, value2, module, active)
+SELECT 'on_update_timeout', '42', 'malware_feeds', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'on_update_timeout' AND module = 'malware_feeds');
+
+-- ============================================================================
+-- MALWARE FEEDS: Seed data from default fangfrisch.conf
+-- ============================================================================
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'sanesecurity', 'SaneSecurity', 1, 1, 'https://ftp.swin.edu.au/sanesecurity/', '1h', '10M', NULL, NULL, NULL, 'SaneSecurity ClamAV signatures (built-in feed)', 10
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'sanesecurity');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'urlhaus', 'URLhaus', 1, 1, NULL, NULL, '2MB', NULL, NULL, NULL, 'URLhaus malicious URL signatures (built-in feed)', 20
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'urlhaus');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'malwarepatrol', 'MalwarePatrol', 0, 1, NULL, NULL, NULL, NULL, 'receipt', 'product', 'MalwarePatrol commercial feed (requires receipt and product ID)', 30
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'malwarepatrol');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'malwareexpert', 'MalwareExpert', 0, 1, 'https://signatures.malware.expert', '1d', '20M', NULL, 'serial_key', NULL, 'MalwareExpert commercial feed (requires serial key)', 40
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'malwareexpert');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'securiteinfo', 'SecuriteInfo', 0, 1, NULL, NULL, NULL, NULL, 'customer_id', NULL, 'SecuriteInfo commercial feed (requires customer ID)', 50
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'securiteinfo');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'twinwave', 'TwinWave', 1, 1, 'https://raw.githubusercontent.com/twinwave-security/twinclams/master/', '1h', '2M', 'disabled', NULL, NULL, 'TwinWave Security ClamAV signatures', 60
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'twinwave');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'clampunch', 'ClamPunch', 1, 1, 'https://raw.githubusercontent.com/wmetcalf/clam-punch/master/', '24h', '2M', 'disabled', NULL, NULL, 'ClamPunch malware signatures', 70
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'clampunch');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'rfxn', 'RFXN', 1, 1, 'https://www.rfxn.com/downloads/', '4h', '10M', 'disabled', NULL, NULL, 'R-fx Networks Linux Malware Detect signatures', 80
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'rfxn');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'interserver', 'InterServer', 1, 1, 'https://sigs.interserver.net/', '1d', NULL, 'disabled', NULL, NULL, 'InterServer ClamAV signatures', 90
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'interserver');
+
+INSERT INTO malware_feeds_config (section_name, display_name, enabled, is_builtin, prefix, interval_value, max_size, integrity_check, api_key_1_name, api_key_2_name, description, sort_order)
+SELECT 'ditekshen', 'Ditekshen', 1, 1, 'https://raw.githubusercontent.com/ditekshen/detection/master/clamav/', '1d', NULL, 'disabled', NULL, NULL, 'Ditekshen YARA/ClamAV detection rules', 100
+WHERE NOT EXISTS (SELECT 1 FROM malware_feeds_config WHERE section_name = 'ditekshen');
+
+-- Fix is_builtin for existing installations that already ran the seed with is_builtin=0
+UPDATE malware_feeds_config SET is_builtin = 1
+WHERE section_name IN ('malwarepatrol', 'malwareexpert', 'securiteinfo', 'twinwave', 'clampunch', 'rfxn', 'interserver', 'ditekshen')
+AND is_builtin = 0;
+
+-- ============================================================================
+-- MALWARE FEEDS: Seed URL entries for each feed
+-- NOTE: CONCAT used to avoid DBeaver interpreting ${} as bind parameters
+-- ============================================================================
+
+-- SaneSecurity: disable malwareexpert URLs that overlap
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malwareexpert_fp', 'disabled', 0, 10
+FROM malware_feeds_config f WHERE f.section_name = 'sanesecurity'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malwareexpert_fp');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malwareexpert_hdb', 'disabled', 0, 20
+FROM malware_feeds_config f WHERE f.section_name = 'sanesecurity'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malwareexpert_hdb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malwareexpert_ldb', 'disabled', 0, 30
+FROM malware_feeds_config f WHERE f.section_name = 'sanesecurity'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malwareexpert_ldb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malwareexpert_ndb', 'disabled', 0, 40
+FROM malware_feeds_config f WHERE f.section_name = 'sanesecurity'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malwareexpert_ndb');
+
+-- SecuriteInfo URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, '0hour', CONCAT('$','{prefix}securiteinfo0hour.hdb'), 0, 10
+FROM malware_feeds_config f WHERE f.section_name = 'securiteinfo'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = '0hour');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'securiteinfo_mdb', CONCAT('$','{prefix}securiteinfo.mdb'), 0, 20
+FROM malware_feeds_config f WHERE f.section_name = 'securiteinfo'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'securiteinfo_mdb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'old', CONCAT('$','{prefix}securiteinfoold.hdb'), 1, 30
+FROM malware_feeds_config f WHERE f.section_name = 'securiteinfo'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'old');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'spam_marketing', CONCAT('$','{prefix}spam_marketing.ndb'), 1, 40
+FROM malware_feeds_config f WHERE f.section_name = 'securiteinfo'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'spam_marketing');
+
+-- MalwareExpert URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malware.expert_fp', CONCAT('$','{prefix}/$','{serial_key}/malware.expert.fp'), 1, 10
+FROM malware_feeds_config f WHERE f.section_name = 'malwareexpert'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malware.expert_fp');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malware.expert_hdb', CONCAT('$','{prefix}/$','{serial_key}/malware.expert.hdb'), 1, 20
+FROM malware_feeds_config f WHERE f.section_name = 'malwareexpert'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malware.expert_hdb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malware.expert_ldb', CONCAT('$','{prefix}/$','{serial_key}/malware.expert.ldb'), 1, 30
+FROM malware_feeds_config f WHERE f.section_name = 'malwareexpert'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malware.expert_ldb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'malware.expert.ndb', CONCAT('$','{prefix}/$','{serial_key}/malware.expert.ndb'), 1, 40
+FROM malware_feeds_config f WHERE f.section_name = 'malwareexpert'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'malware.expert.ndb');
+
+-- TwinWave URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'twinclams', CONCAT('$','{prefix}twinclams.ldb'), 1, 10
+FROM malware_feeds_config f WHERE f.section_name = 'twinwave'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'twinclams');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'twinwave_ign2', CONCAT('$','{prefix}twinwave.ign2'), 1, 20
+FROM malware_feeds_config f WHERE f.section_name = 'twinwave'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'twinwave_ign2');
+
+-- ClamPunch URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'miscreantpunch099low', CONCAT('$','{prefix}MiscreantPunch099-Low.ldb'), 1, 10
+FROM malware_feeds_config f WHERE f.section_name = 'clampunch'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'miscreantpunch099low');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'exexor99', CONCAT('$','{prefix}exexor99.ldb'), 1, 20
+FROM malware_feeds_config f WHERE f.section_name = 'clampunch'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'exexor99');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'miscreantpuchhdb', CONCAT('$','{prefix}miscreantpunch.hdb'), 1, 30
+FROM malware_feeds_config f WHERE f.section_name = 'clampunch'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'miscreantpuchhdb');
+
+-- RFXN URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'rfxn_ndb', CONCAT('$','{prefix}rfxn.ndb'), 1, 10
+FROM malware_feeds_config f WHERE f.section_name = 'rfxn'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'rfxn_ndb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'rfxn_hdb', CONCAT('$','{prefix}rfxn.hdb'), 1, 20
+FROM malware_feeds_config f WHERE f.section_name = 'rfxn'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'rfxn_hdb');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'rfxn_yara', CONCAT('$','{prefix}rfxn.yara'), 1, 30
+FROM malware_feeds_config f WHERE f.section_name = 'rfxn'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'rfxn_yara');
+
+-- InterServer URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'interserver_sha256', CONCAT('$','{prefix}interserver256.hdb'), 1, 10
+FROM malware_feeds_config f WHERE f.section_name = 'interserver'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'interserver_sha256');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'interserver_topline', CONCAT('$','{prefix}interservertopline.db'), 1, 20
+FROM malware_feeds_config f WHERE f.section_name = 'interserver'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'interserver_topline');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'interserver_shell', CONCAT('$','{prefix}shell.ldb'), 1, 30
+FROM malware_feeds_config f WHERE f.section_name = 'interserver'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'interserver_shell');
+
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, sort_order)
+SELECT f.id, 'interserver_whitelist', CONCAT('$','{prefix}whitelist.fp'), 1, 40
+FROM malware_feeds_config f WHERE f.section_name = 'interserver'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'interserver_whitelist');
+
+-- Ditekshen URLs
+INSERT INTO malware_feed_urls (feed_id, url_key, url_value, enabled, filename_override, sort_order)
+SELECT f.id, 'ditekshen_ldb', CONCAT('$','{prefix}clamav.ldb'), 1, 'ditekshen.ldb', 10
+FROM malware_feeds_config f WHERE f.section_name = 'ditekshen'
+AND NOT EXISTS (SELECT 1 FROM malware_feed_urls u WHERE u.feed_id = f.id AND u.url_key = 'ditekshen_ldb');
+
+-- ============================================================================
+-- MALWARE FEEDS: Ofelia scheduled job for Fangfrisch refresh
+-- Replaces cron.d job inside hermes_mail_filter container
+-- ============================================================================
+
+INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
+SELECT '[job-exec "hermes-fangfrisch-refresh"]', '@every 10m', '/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh', 'hermes_mail_filter', '1', 'malware_feeds'
+WHERE NOT EXISTS (
+    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-fangfrisch-refresh"]'
+);
+
+-- Global setting for Fangfrisch refresh interval
+INSERT INTO parameters2 (parameter, value2, module, active)
+SELECT 'refresh_interval', '10m', 'malware_feeds', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'refresh_interval' AND module = 'malware_feeds');
+
