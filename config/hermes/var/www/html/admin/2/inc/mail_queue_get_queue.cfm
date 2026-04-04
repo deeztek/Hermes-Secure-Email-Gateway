@@ -64,7 +64,8 @@ Sets: getqueue (query), mailqueuelimit (boolean)
   Queue ID ends with * (active), ! (hold), or nothing
   --->
 
-  <cfset lines = ListToArray(mailqOutput, Chr(10))>
+  <!--- includeEmptyFields=true preserves blank lines between queue entries --->
+  <cfset lines = ListToArray(mailqOutput, Chr(10), true)>
   <cfset totalParsed = 0>
   <cfset lineIdx = 1>
 
@@ -92,28 +93,30 @@ Sets: getqueue (query), mailqueuelimit (boolean)
       <cfset tokens = ListToArray(line, " ")>
       <cfset sender = tokens[ArrayLen(tokens)]>
 
-      <!--- Next line(s): connection status (indented, in parentheses) --->
+      <!--- Next line(s): connection status (indented, in parentheses) and recipients --->
       <cfset connStatus = "">
-      <cfset recipient = "">
+      <cfset recipients = []>
 
       <cfset lineIdx = lineIdx + 1>
       <cfloop condition="lineIdx LTE ArrayLen(lines)">
-        <cfset nextLine = trim(lines[lineIdx])>
+        <cfset nextLine = lines[lineIdx]>
 
-        <!--- Skip empty lines --->
-        <cfif nextLine is "">
+        <!--- Empty line = end of this queue entry --->
+        <cfif trim(nextLine) is "">
           <cfset lineIdx = lineIdx + 1>
           <cfbreak>
         </cfif>
 
+        <!--- New queue entry header = end of current entry (don't advance lineIdx) --->
+        <cfif REFind("^[A-F0-9]", nextLine)>
+          <cfbreak>
+        </cfif>
+
+        <cfset nextLine = trim(nextLine)>
+
         <!--- Connection status line starts with ( --->
         <cfif Left(nextLine, 1) is "(">
           <cfset connStatus = nextLine>
-          <cfset lineIdx = lineIdx + 1>
-
-        <!--- Recipient line (email address, no parentheses) --->
-        <cfelseif REFind("^[^ (]", nextLine)>
-          <cfset recipient = nextLine>
           <cfset lineIdx = lineIdx + 1>
 
         <!--- Summary line at bottom (-- X Kbytes in Y Requests.) --->
@@ -121,16 +124,21 @@ Sets: getqueue (query), mailqueuelimit (boolean)
           <cfset lineIdx = lineIdx + 1>
           <cfbreak>
 
+        <!--- Recipient line (email address) --->
+        <cfelseif REFind("^[^ (]", nextLine)>
+          <cfset ArrayAppend(recipients, nextLine)>
+          <cfset lineIdx = lineIdx + 1>
+
         <cfelse>
           <cfset lineIdx = lineIdx + 1>
         </cfif>
       </cfloop>
 
-      <!--- Add row to query --->
+      <!--- Add row to query (join multiple recipients with comma) --->
       <cfset QueryAddRow(getqueue)>
       <cfset QuerySetCell(getqueue, "QueueID", queueId)>
       <cfset QuerySetCell(getqueue, "Sender", sender)>
-      <cfset QuerySetCell(getqueue, "Recipient", recipient)>
+      <cfset QuerySetCell(getqueue, "Recipient", ArrayToList(recipients, ", "))>
       <cfset QuerySetCell(getqueue, "ConnectionStatus", connStatus)>
       <cfset QuerySetCell(getqueue, "MsgStatus", msgStatus)>
 

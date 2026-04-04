@@ -57,28 +57,39 @@ Expects: form.action, form.msg_id (comma-separated for message actions)
   <cfset session[failureKey] = 0>
   <cfset session[failureEmailKey] = "">
 
-  <!--- Process each selected message --->
+  <!--- Process each selected message via temp script (postsuper outputs to stderr) --->
+  <cfinclude template="./generate_customtrans.cfm">
+
   <cfloop index="msgId" list="#form.msg_id#" delimiters=",">
     <cfset msgId = trim(msgId)>
-    <cfif msgId is not "">
+    <!--- Validate queue ID: hex only, no shell injection --->
+    <cfif msgId is not "" AND REFind("^[A-Fa-f0-9]+$", msgId)>
       <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-          arguments="exec hermes_postfix_dkim /usr/sbin/postsuper #psFlag# #msgId#"
-          timeout="240"
-          variable="psOutput"
-          errorVariable="psError" />
+        <!--- Write temp script to capture stderr --->
+        <cfset scriptContent = "##!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_postfix_dkim /usr/sbin/postsuper " & psFlag & " " & msgId & " 2>&1">
+        <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_postsuper.sh">
+        <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
+        <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
 
-        <cfif psOutput contains "1 message" OR psOutput is "">
+        <cfexecute name="#scriptPath#"
+          timeout="240"
+          variable="psOutput" />
+
+        <!--- Clean up temp script --->
+        <cffile action="delete" file="#scriptPath#">
+
+        <!--- postsuper outputs "postsuper: <queueid>: <action>" on success --->
+        <cfif psOutput contains msgId>
           <cfset session[successKey] = session[successKey] + 1>
           <cfset session[successEmailKey] = session[successEmailKey] & msgId & "<br>">
         <cfelse>
           <cfset session[failureKey] = session[failureKey] + 1>
-          <cfset session[failureEmailKey] = session[failureEmailKey] & msgId & "<br>">
+          <cfset session[failureEmailKey] = session[failureEmailKey] & msgId & ": " & encodeForHTML(trim(psOutput)) & "<br>">
         </cfif>
 
         <cfcatch type="any">
           <cfset session[failureKey] = session[failureKey] + 1>
-          <cfset session[failureEmailKey] = session[failureEmailKey] & msgId & "<br>">
+          <cfset session[failureEmailKey] = session[failureEmailKey] & msgId & ": " & encodeForHTML(cfcatch.message) & "<br>">
         </cfcatch>
       </cftry>
     </cfif>
