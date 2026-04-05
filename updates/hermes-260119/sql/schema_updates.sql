@@ -1216,3 +1216,51 @@ INSERT INTO parameters2 (parameter, value2, module, active)
 SELECT 'refresh_interval', '10m', 'malware_feeds', '1'
 WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE parameter = 'refresh_interval' AND module = 'malware_feeds');
 
+
+-- ============================================================================
+-- EMAIL SERVER: Mailbox Domains support (Issue #196)
+-- Makes the `domains` table the single source of truth for both relay
+-- domains (type='relay') and mailbox-hosting domains (type='mailbox'),
+-- with mailbox-specific metadata columns. The `mailbox_domains` table
+-- remains as cert SAN binding metadata only (its original purpose).
+-- ============================================================================
+
+-- Migrate existing domains to type='relay' (mailbox domains didn't exist before)
+UPDATE domains SET type = 'relay'
+WHERE type IS NULL OR type = '';
+
+-- Add mailbox-hosting metadata columns to `domains` table
+-- NULL/defaults for relay rows; populated for type='mailbox' rows
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS default_quota_mb INT NULL DEFAULT NULL AFTER type;
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS catchall_mailbox VARCHAR(255) NULL AFTER default_quota_mb;
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS nextcloud_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER catchall_mailbox;
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS nextcloud_group VARCHAR(255) NULL AFTER nextcloud_enabled;
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS created_at DATETIME NULL AFTER nextcloud_group;
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS updated_at DATETIME NULL AFTER created_at;
+
+-- Clean up columns that were briefly added to mailbox_domains by an
+-- earlier iteration of this migration (they belong on `domains` now).
+-- IF EXISTS makes these no-ops on fresh installs.
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS active;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS default_quota_mb;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS catchall_mailbox;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS nextcloud_enabled;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS nextcloud_group;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS created_at;
+ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS updated_at;
+
+-- Drop `active` column from domains. Active/inactive semantics live at
+-- the mailbox level (per-user), not the domain level. Delete is the
+-- canonical off-switch for domains.
+ALTER TABLE domains DROP COLUMN IF EXISTS active;
+
+-- additional_sans is already seeded with system prefixes (autoconfig,
+-- autodiscover). sync_mailbox_sans.cfm cross-joins these with
+-- domains.type='mailbox' to produce one mailbox_sans row per
+-- (prefix, domain) combination.

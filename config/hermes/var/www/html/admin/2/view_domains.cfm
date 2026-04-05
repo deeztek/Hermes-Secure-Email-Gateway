@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Domains</title>
+  <title>Hermes SEG | Email Relay - Domains</title>
   <cfinclude template="./inc/html_head.cfm" />
 </head>
 
@@ -39,7 +39,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Domains</h1>
+            <h1 class="m-0">Email Relay - Domains</h1>
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
@@ -78,11 +78,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   SELECT d.id, d.domain, d.transport_id, d.senders_id, d.recipients_id,
     t.destination, t.port, t.mx, t.method, t.authentication,
     r.status AS recipient_status,
-    CASE WHEN tp.id IS NOT NULL THEN 'YES' ELSE 'NO' END AS tls_enforced
+    CASE WHEN tp.id IS NOT NULL THEN 'YES' ELSE 'NO' END AS tls_enforced,
+    COALESCE(dks.dkim_active, 0) AS dkim_active,
+    COALESCE(dks.dkim_total, 0) AS dkim_total
   FROM domains d
   LEFT JOIN transport t ON t.id = d.transport_id
   LEFT JOIN recipients r ON r.id = d.recipients_id
   LEFT JOIN tls_policies tp ON tp.domain = d.domain
+  LEFT JOIN (
+    SELECT domain,
+           SUM(CASE WHEN enabled = '1' THEN 1 ELSE 0 END) AS dkim_active,
+           COUNT(*) AS dkim_total
+    FROM dkim_sign
+    GROUP BY domain
+  ) dks ON dks.domain = d.domain
+  WHERE (d.type IS NULL OR d.type = '' OR d.type = 'relay')
   ORDER BY d.domain ASC
 </cfquery>
 
@@ -202,10 +212,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
-<!-- DOMAINS CARD -->
+<!-- ADD DOMAIN CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-globe"></i> Domains</h3>
+    <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add Domain</h3>
   </div>
   <div class="card-body">
 
@@ -304,6 +314,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </button>
     </form>
 
+  </div>
+</div>
+
+<!-- DOMAINS LIST CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-globe"></i> Domains</h3>
+  </div>
+  <div class="card-body">
+
     <!-- DOMAINS TABLE -->
     <table id="domainsTable" class="table table-bordered table-hover table-striped" style="width:100%">
       <thead>
@@ -315,6 +335,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>MX</th>
           <th>Recipients</th>
           <th>Auth</th>
+          <th>DKIM</th>
           <th>TLS</th>
           <th style="width: 15%">Actions</th>
         </tr>
@@ -345,6 +366,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <span class="badge bg-warning">YES</span>
               <cfelse>
                 <span class="badge bg-secondary">NO</span>
+              </cfif>
+            </td>
+            <td>
+              <cfif dkim_active GT 0>
+                <span class="badge bg-success">Active</span>
+              <cfelseif dkim_total GT 0>
+                <span class="badge bg-warning">Disabled</span>
+              <cfelse>
+                <span class="badge bg-secondary">None</span>
               </cfif>
             </td>
             <td>
@@ -522,8 +552,8 @@ $(document).ready(function() {
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[0, 'asc']],
     columnDefs: [
-      { orderable: false, targets: [8] },
-      { searchable: false, targets: [8] }
+      { orderable: false, targets: [9] },
+      { searchable: false, targets: [9] }
     ]
   });
 

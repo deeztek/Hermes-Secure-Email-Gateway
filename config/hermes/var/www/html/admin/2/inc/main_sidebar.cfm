@@ -212,6 +212,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </li>
         <!--- GATEWAY ENDS HERE --->
 
+        <!--- EMAIL SERVER STARTS HERE --->
+        <li class="nav-item">
+          <a href="##" class="nav-link">
+            <i class="nav-icon fas fa-inbox"></i>
+            <p>
+              <strong>Email Server</strong>
+              <i class="nav-arrow bi bi-chevron-right"></i>
+            </p>
+          </a>
+          <ul class="nav nav-treeview">
+            <li class="nav-item">
+              <a href="view_mailbox_domains.cfm" class="nav-link">
+                <i class="nav-icon fas fa-cogs"></i>
+                <p>Domains</p>
+              </a>
+            </li>
+          </ul>
+        </li>
+        <!--- EMAIL SERVER ENDS HERE --->
+
         <!--- CONTENT CHECKS STARTS HERE --->
         <li class="nav-item">
           <a href="##" class="nav-link">

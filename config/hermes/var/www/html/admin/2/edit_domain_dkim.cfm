@@ -212,8 +212,12 @@ padding-right: 8px; /* 1 + 3 + 3 + 1 */
 </cfif> 
 
 <cfquery name="getdomain" datasource="hermes">
-select id, domain from domains where id = <cfqueryparam value = #theDomainID# CFSQLType = "CF_SQL_INTEGER">
+select id, domain, type from domains where id = <cfqueryparam value = #theDomainID# CFSQLType = "CF_SQL_INTEGER">
 </cfquery>
+
+<!--- Determine back URL based on domain type --->
+<cfset backUrl = (getdomain.type IS "mailbox") ? "view_mailbox_domains.cfm" : "view_domains.cfm">
+<cfset backLabel = (getdomain.type IS "mailbox") ? "Back to Mailbox Domains" : "Back to Domains">
 
 <cfif #getdomain.recordcount# LT 1>
 <cfset m="Edit Domain DKIM Configuration: getdomain.recordcount LT 1">
@@ -1298,7 +1302,7 @@ select selector, domain from dkim_sign where domain = <cfqueryparam cfsqltype="c
   <p>       
 
 <!--- BACK TO RECIPIENTS BUTTON STARTS HERE --->
-<a href="view_domains.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Domains</a>
+<cfoutput><a href="#backUrl#" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;#backLabel#</a></cfoutput>
 
 <!--- BACK TO RECIPIENTS BUTTON ENDS HERE --->
 &nbsp;

@@ -129,12 +129,13 @@ Expects: form.domain_name, form.delivery_method, form.recipient_delivery,
 
 <!--- Insert domain --->
 <cfquery datasource="hermes">
-  INSERT INTO domains (domain, transport_id, senders_id, recipients_id, action_taken) VALUES (
+  INSERT INTO domains (domain, transport_id, senders_id, recipients_id, action_taken, type) VALUES (
     <cfqueryparam cfsqltype="cf_sql_varchar" value="#domain_name#">,
     <cfqueryparam cfsqltype="cf_sql_integer" value="#transResult.GENERATED_KEY#">,
     <cfqueryparam cfsqltype="cf_sql_integer" value="#sendersResult.GENERATED_KEY#">,
     <cfqueryparam cfsqltype="cf_sql_integer" value="#recResult.GENERATED_KEY#">,
-    'OK'
+    'OK',
+    'relay'
   )
 </cfquery>
 
