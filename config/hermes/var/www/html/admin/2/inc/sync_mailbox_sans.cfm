@@ -77,7 +77,9 @@ mailbox domains or additional_sans.
             )
         </cfquery>
     <cfelse>
-        <!--- FQDN exists but certificate may have changed — update to match current mailbox_domains cert --->
+        <!--- FQDN exists — update cert binding if changed but PRESERVE ip/dns
+             validation state. Resetting ip/dns would destroy validated SANs and
+             prevent nginx vhost generation until acme_validate_ip re-runs. --->
         <cfquery name="syncCurrentCert" datasource="hermes">
             SELECT certificate FROM mailbox_sans
             WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#existingFqdns[syncFqdn]#">
@@ -94,11 +96,7 @@ mailbox domains or additional_sans.
             <cfquery datasource="hermes">
                 UPDATE mailbox_sans
                 SET certificate = <cfqueryparam cfsqltype="cf_sql_integer" value="#validFqdns[syncFqdn].cert_id#">,
-                    acme = <cfqueryparam cfsqltype="cf_sql_integer" value="#syncAcme#">,
-                    ip = 'NO',
-                    dns = 'NO',
-                    ip_result_msg = '',
-                    dns_result_msg = ''
+                    acme = <cfqueryparam cfsqltype="cf_sql_integer" value="#syncAcme#">
                 WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#existingFqdns[syncFqdn]#">
             </cfquery>
         </cfif>

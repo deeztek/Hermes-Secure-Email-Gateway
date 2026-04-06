@@ -408,7 +408,40 @@ update mailbox_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_
 
 <cfelse>
 
-<cfoutput>No changes to SAN Domains found. Nothing to do. Exiting...</cfoutput><br>
+<!--- Hash unchanged = cert already covers these SANs. But some SANs may
+     have dns='NO' (e.g. after a delete/re-add cycle recreated the rows).
+     If ip='YES' and hash matches the last successful cert request, then
+     dns='YES' is provably correct — set it. --->
+<cfquery name="checkStuckDns" datasource="hermes">
+  SELECT id FROM mailbox_sans
+  WHERE certificate = '#certificate#'
+  AND ip = 'YES'
+  AND dns = 'NO'
+</cfquery>
+
+<cfif checkStuckDns.recordcount GT 0>
+
+<cfquery datasource="hermes">
+  UPDATE mailbox_sans
+  SET dns = 'YES',
+      dns_result_msg = 'SUCCESS: SAN verified against existing certificate',
+      dns_result_datetime = '#datenow# #timenow#'
+  WHERE certificate = '#certificate#'
+  AND ip = 'YES'
+  AND dns = 'NO'
+</cfquery>
+
+<cfoutput>No changes to SAN Domains found but corrected #checkStuckDns.recordcount# SAN(s) with dns='NO' that are already covered by existing certificate. Regenerating Nginx...</cfoutput><br>
+
+<!--- GENERATE NGINX CONFIGURATION --->
+<cfinclude template="../admin/2/inc/generate_nginx_configuration.cfm">
+
+<!--- RESTART NGINX --->
+<cfinclude template="../admin/2/inc/restart_nginx.cfm">
+
+<cfelse>
+<cfoutput>No changes to SAN Domains found. Nothing to do.</cfoutput><br>
+</cfif>
 
 <!--- /CFIF #requestacme# is "1" --->
 </cfif>

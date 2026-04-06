@@ -44,9 +44,9 @@ Returns 404 if the domain is not configured as a mailbox domain.
 
 <!--- Verify this domain is a configured mailbox domain --->
 <cfquery name="checkDomain" datasource="hermes">
-  SELECT id FROM mailbox_domains
+  SELECT id FROM domains
   WHERE domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#emailDomain#">
-  AND active = 1
+  AND type = 'mailbox'
 </cfquery>
 <cfif checkDomain.recordcount EQ 0>
   <cfheader statuscode="404" statustext="Not Found">

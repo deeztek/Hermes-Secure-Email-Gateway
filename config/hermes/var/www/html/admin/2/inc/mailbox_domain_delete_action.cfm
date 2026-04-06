@@ -62,9 +62,14 @@ re-request).
   DELETE FROM recipients WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#getDomainRow.recipients_id#">
 </cfquery>
 
-<!--- Re-sync mailbox_sans: stale mail./autodiscover./autoconfig./etc. rows
-     for this domain will be DELETEd automatically --->
-<cfinclude template="./sync_mailbox_sans.cfm">
+<!--- Delete this domain's mailbox_sans rows directly (don't use
+     sync_mailbox_sans which would nuke validated ip/dns state on
+     other domains if run during a delete→re-add cycle) --->
+<cfquery datasource="hermes">
+  DELETE FROM mailbox_sans
+  WHERE mailbox_domain = '1'
+  AND subdomain LIKE <cfqueryparam cfsqltype="cf_sql_varchar" value="%.#theDomain#">
+</cfquery>
 
 <!--- Regenerate Postfix configs --->
 <cfinclude template="./generate_transports.cfm">
