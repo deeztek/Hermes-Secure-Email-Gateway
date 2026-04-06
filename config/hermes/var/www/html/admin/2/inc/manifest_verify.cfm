@@ -33,6 +33,21 @@ Supports offline verification using server-signed fingerprints.
      TEMPLATE HASH COMPUTATION
      ============================================================================ --->
 
+<!--- SHA-256 hash using Java MessageDigest directly. Bypasses Lucee's Hash()
+     function which produces different results across Lucee versions (5.3 vs 5.4).
+     Using .getBytes("UTF-8") ensures consistent byte encoding regardless of
+     JVM default charset or Lucee version. --->
+<cffunction name="javaSHA256" returntype="string" access="public" output="false">
+    <cfargument name="input" type="string" required="true">
+    <cfset var md = CreateObject("java", "java.security.MessageDigest").getInstance("SHA-256")>
+    <cfset var digest = md.digest(arguments.input.getBytes("UTF-8"))>
+    <cfset var sb = CreateObject("java", "java.lang.StringBuilder").init()>
+    <cfloop array="#digest#" index="b">
+        <cfset sb.append(Right("0" & FormatBaseN(BitAnd(b, 255), 16), 2))>
+    </cfloop>
+    <cfreturn LCase(sb.toString())>
+</cffunction>
+
 <cffunction name="computeTemplateHashes" returntype="struct" access="public" output="false">
     <cfset var hashes = {}>
     <cfset var basePath = "/var/www/html/">
@@ -40,11 +55,11 @@ Supports offline verification using server-signed fingerprints.
     <cfloop array="#variables.proTemplates#" index="templatePath">
         <cfset var fullPath = basePath & templatePath>
         <cfif FileExists(fullPath)>
-            <cffile action="read" file="#fullPath#" variable="content">
+            <cffile action="read" file="#fullPath#" variable="content" charset="utf-8">
             <!--- Normalize line endings to LF for consistent hashing across platforms --->
             <cfset var normalizedContent = Replace(content, chr(13) & chr(10), chr(10), "all")>
             <cfset normalizedContent = Replace(normalizedContent, chr(13), chr(10), "all")>
-            <cfset hashes[templatePath] = LCase(Hash(normalizedContent, "SHA-256"))>
+            <cfset hashes[templatePath] = javaSHA256(normalizedContent)>
         </cfif>
     </cfloop>
 
@@ -65,7 +80,7 @@ Supports offline verification using server-signed fingerprints.
     </cfloop>
 
     <!--- Hash the concatenation to produce fingerprint --->
-    <cfreturn LCase(Hash(concatenated, "SHA-256"))>
+    <cfreturn javaSHA256(concatenated)>
 </cffunction>
 
 <cffunction name="getTemplateFingerprint" returntype="string" access="public" output="false"

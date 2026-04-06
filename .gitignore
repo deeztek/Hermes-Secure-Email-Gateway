@@ -1,0 +1,159 @@
+sync.ffs*
+.gitignore
+sync-smtp-dev-docker.ffs_gui
+.env
+
+# Backup files
+*.bak
+*.OLD
+*.adminlte3
+.backup-*/
+
+# AdminLTE download (use dist/ for deployed files)
+AdminLTE-4.0.0-rc4/
+adminlte-4.0.0-rc4.zip
+
+# Runtime data files
+config/ciphermail/usr/share/UUID
+config/ciphermail/usr/share/UUID2
+config/ciphermail/usr/share/UUID3
+config/ciphermail/usr/share/lt
+config/ciphermail/usr/share/djigzo/ADDITIONAL-NOTES.TXT
+config/fail2ban/config/fail2ban/fail2ban.sqlite3
+config/opendmarc/etc/opendmarc/opendmarc.dat
+
+# IDE and editor files
+.vscode/
+.idea/
+
+# Sensitive credentials
+config/hermes/opt/hermes/creds/*
+!config/hermes/opt/hermes/creds/.gitkeep
+
+# Private keys (DKIM, SSL, CA)
+config/hermes/opt/hermes/dkim/keys/*.private
+config/hermes/opt/hermes/dkim/keys/*.txt
+config/hermes/opt/hermes/ssl/*.key
+config/hermes/opt/hermes/**/private/cakey.pem
+config/hermes/opt/hermes/CA/**/private/cakey.pem
+
+# DKIM config files (contain domain-specific info)
+config/hermes/opt/hermes/dkim/ExemptDomains
+config/hermes/opt/hermes/dkim/KeyTable*
+config/hermes/opt/hermes/dkim/SigningTable*
+config/hermes/opt/hermes/dkim/TrustedHosts*
+config/hermes/opt/hermes/templates/DkimKeyTable
+Docker/common/opt/hermes/dkim/ExemptDomains
+Docker/common/opt/hermes/dkim/KeyTable*
+Docker/common/opt/hermes/dkim/SigningTable*
+Docker/common/opt/hermes/dkim/TrustedHosts*
+Docker/common/opt/hermes/templates/DkimKeyTable
+
+# Authelia secrets, LDAP passwords, license keys
+config/hermes/opt/hermes/keys/*
+!config/hermes/opt/hermes/keys/.gitkeep
+!config/hermes/opt/hermes/keys/manifest_verify.pub
+Docker/common/opt/hermes/keys/*
+!Docker/common/opt/hermes/keys/.gitkeep
+!Docker/common/opt/hermes/keys/manifest_verify.pub
+
+# Generated config files with credentials
+config/postfix-dkim/etc/postfix/mysql-*.cf
+config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml
+
+# Amavis config with DB credentials
+config/mail_filter/etc/amavis/conf.d/50-user
+Docker/common/opt/hermes/conf_files/50-user*
+config/hermes/opt/hermes/conf_files/50-user*
+
+# Dovecot configs with DB credentials
+config/dovecot/conf/dovecot-sql-user.conf
+config/dovecot/conf/dovecot-dict-sql-quota.conf
+
+# Backup files with potential secrets
+config/postfix-dkim/etc/postfix/*.BACKUP
+config/postfix-dkim/etc/postfix/*.HERMES.BACKUP
+Docker/postfix_dkim/config/postfix-dkim/etc/postfix/*.BACKUP
+Docker/postfix_dkim/config/postfix-dkim/etc/postfix/*.HERMES.BACKUP
+
+# Backup scripts with hardcoded credentials
+config/hermes/opt/hermes/scripts/daily_backup.sh
+Docker/common/opt/hermes/scripts/daily_backup.sh
+
+# ===========================================
+# ALL CERTIFICATES AND KEYS (sanitized repo)
+# ===========================================
+
+# Let's Encrypt / Certbot (entire directory - contains real certs)
+config/certbot/
+
+# Authelia (entire directory - configs contain secrets, db has user data)
+config/authelia/
+
+# Apache certs/keys
+config/hermes/opt/hermes/apache_certs/
+Docker/common/opt/hermes/apache_certs/
+
+# All SSL certificates and keys (except public keys for distribution)
+config/hermes/opt/hermes/ssl/*
+!config/hermes/opt/hermes/ssl/public.pem
+!config/hermes/opt/hermes/ssl/manifest_verify.pub
+Docker/common/opt/hermes/ssl/*
+!Docker/common/opt/hermes/ssl/public.pem
+!Docker/common/opt/hermes/ssl/manifest_verify.pub
+
+# All CA directories (contain private keys and certs)
+config/hermes/opt/hermes/CA/
+config/hermes/opt/hermes/root_ca/
+Docker/common/opt/hermes/CA/
+Docker/common/opt/hermes/root_ca/
+
+# Lucee password
+config/commandbox/opt/CommandBox/web-contexts/*/WEB-INF/lucee-server/context/password.txt
+
+# Cloudflare token
+config/fail2ban/config/fail2ban/action.d/cloudflare-token.conf
+
+# External CA certificates (PFX files with user private keys)
+config/hermes/opt/hermes/HermesExternalCACerts/
+Docker/common/opt/hermes/HermesExternalCACerts/
+
+# Any private key patterns (catch-all)
+**/privkey*.pem
+**/private_key.json
+**/*_key.pem
+**/*.pfx
+
+# License server code and documentation (internal only)
+license-server/
+license-check-workflow.md
+
+# ===========================================
+# GENERATED FILES WITH SENSITIVE DATA
+# ===========================================
+
+# Generated AD integration scheduled tasks (contain LDAP credentials)
+config/hermes/var/www/html/schedule/*_ad_tasks.cfm
+
+# Temporary config files generated during operation
+config/hermes/opt/hermes/tmp/
+
+# Postfix/Nginx config files with environment-specific data
+config/postfix-dkim/etc/postfix/main.cf
+config/postfix-dkim/etc/postfix/main.cf.*
+config/postfix-dkim/etc/postfix/networks
+config/nginx/etc/nginx/sites-available/hermes-ssl.conf
+config/nginx/etc/nginx/sites-available/hermes-ssl.*
+
+# SpamAssassin config (may have custom rules/IPs)
+config/mail_filter/etc/spamassassin/local.cf
+config/hermes/opt/hermes/conf_files/local.cf.*
+
+# ===========================================
+# PLAN FILES (internal development only)
+# ===========================================
+.claude/plans/
+claude_conversation.md
+
+# Manifest generation scripts (internal workflow, not distributed)
+manifest/
