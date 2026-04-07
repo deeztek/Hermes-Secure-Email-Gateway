@@ -365,7 +365,7 @@ update system_certificates set acme_hash = '#newHash#' where id = '#certificate#
 <cfif FindNoCase("Successfully received certificate", acmeOutput)>
 
 <cfquery name="insertsuccess" datasource="hermes">
-update mailbox_sans set dns = 'YES', dns_result_msg = 'SUCCESS: Successfully Received SAN Certificate', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#'
+update mailbox_sans set dns = 'YES', dns_result_msg = 'SUCCESS: Successfully Received SAN Certificate', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#' and ip = 'YES'
 </cfquery>
 
 <cfoutput>Successfully obtained certificate for #theCertname#...</cfoutput><br>

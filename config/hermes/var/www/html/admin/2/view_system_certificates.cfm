@@ -204,7 +204,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             </cfif>
 
             <!--- Parse certificate details --->
-            <cfif path is not "">
+            <cfif path is not "" AND fileExists(path)>
               <cftry>
                 <cfinclude template="./inc/parse_certificate_details.cfm">
                 <cfcatch type="any">
@@ -217,6 +217,15 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                   <cfset san = "Error">
                 </cfcatch>
               </cftry>
+            <cfelseif path is not "" AND NOT fileExists(path)>
+              <!--- Certificate file not yet created (e.g. Acme pending validation) --->
+              <cfset subject = "Pending">
+              <cfset issuer = "Pending">
+              <cfset thestartdate = "Pending">
+              <cfset theenddate = "Pending">
+              <cfset serial = "Pending">
+              <cfset fingerprint = "Pending">
+              <cfset san = "Pending">
             <cfelse>
               <cfset subject = "N/A">
               <cfset issuer = "N/A">

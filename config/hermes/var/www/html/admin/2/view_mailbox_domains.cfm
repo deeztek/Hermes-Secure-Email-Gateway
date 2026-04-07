@@ -87,7 +87,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
          sc.type AS cert_type,
          sc.file_name AS cert_file_name,
          COALESCE(dks.dkim_active, 0) AS dkim_active,
-         COALESCE(dks.dkim_total, 0) AS dkim_total
+         COALESCE(dks.dkim_total, 0) AS dkim_total,
+         COALESCE(sanstats.san_total, 0) AS san_total,
+         COALESCE(sanstats.san_ip_verified, 0) AS san_ip_verified,
+         COALESCE(sanstats.san_dns_verified, 0) AS san_dns_verified,
+         COALESCE(sanstats.san_checked, 0) AS san_checked
   FROM domains d
   LEFT JOIN mailbox_domains md ON md.domain = d.domain
   LEFT JOIN system_certificates sc ON sc.id = md.mailbox_certificate
@@ -98,6 +102,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     FROM dkim_sign
     GROUP BY domain
   ) dks ON dks.domain = d.domain
+  LEFT JOIN (
+    SELECT SUBSTRING_INDEX(subdomain, '.', -2) AS san_domain,
+           COUNT(*) AS san_total,
+           SUM(CASE WHEN ip = 'YES' THEN 1 ELSE 0 END) AS san_ip_verified,
+           SUM(CASE WHEN dns = 'YES' THEN 1 ELSE 0 END) AS san_dns_verified,
+           SUM(CASE WHEN ip_result_msg IS NOT NULL AND ip_result_msg <> '' THEN 1 ELSE 0 END) AS san_checked
+    FROM mailbox_sans
+    WHERE mailbox_domain = '1'
+    GROUP BY SUBSTRING_INDEX(subdomain, '.', -2)
+  ) sanstats ON sanstats.san_domain = d.domain
   WHERE d.type = 'mailbox'
   ORDER BY d.domain ASC
 </cfquery>
@@ -110,6 +124,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   ORDER BY friendly_name ASC
 </cfquery>
 
+<!--- Get SAN prefixes for DNS guidance --->
+<cfquery name="getSanPrefixes" datasource="hermes">
+    SELECT san FROM additional_sans ORDER BY san ASC
+</cfquery>
+
 <cfset session.m = "">
 
 <!--- ALERTS --->
@@ -119,6 +138,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-check"></i> Success</h4>
     Mailbox domain added successfully. Certificate validation will run on the next scheduled cycle (every 30 minutes).
   </div>
+  <cfif StructKeyExists(session, "added_domain") AND session.added_domain NEQ "">
+  <div class="alert alert-info alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fas fa-info-circle"></i> DNS Records Required</h4>
+    <p>Create DNS A or CNAME records pointing to your server's public IP address for:</p>
+    <cfoutput>
+    <ul class="mb-2">
+      <li><code>autoconfig.#session.added_domain#</code></li>
+      <li><code>autodiscover.#session.added_domain#</code></li>
+    </ul>
+    <cfif getSanPrefixes.recordcount GT 2>
+    <p class="mb-2">Plus <strong>#getSanPrefixes.recordcount - 2#</strong> additional SAN prefix(es) from <a href="view_mailbox_sans.cfm">SAN Management</a>.</p>
+    </cfif>
+    </cfoutput>
+    <p class="mb-0"><small>Validation runs every 30 minutes. Check the <strong>Cert Status</strong> column below for progress. Details are available in <a href="view_system_certificates.cfm">System Certificates</a>.</small></p>
+  </div>
+  <cfset session.added_domain = "">
+  </cfif>
 </cfif>
 <cfif m is "2">
   <div class="alert alert-success alert-dismissible">
@@ -175,6 +212,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     Default Mailbox Quota must be a positive number (MB).
   </div>
+</cfif>
+<cfif m is "16">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
+    <cfoutput>This domain has <strong><cfif StructKeyExists(session, "m_detail")>#session.m_detail#<cfelse>existing</cfif></strong> mailbox(es). Delete all mailboxes under this domain first in <a href="view_mailboxes.cfm">Email Server &gt; Mailboxes</a>.</cfoutput>
+  </div>
+  <cfset session.m_detail = "">
+</cfif>
+<cfif m is "17">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
+    <cfoutput>This domain has <strong><cfif StructKeyExists(session, "m_detail")>#session.m_detail#<cfelse>existing</cfif></strong> recipient(s). Delete all recipients under this domain first.</cfoutput>
+  </div>
+  <cfset session.m_detail = "">
 </cfif>
 <cfif m is "20">
   <div class="alert alert-danger alert-dismissible">
@@ -235,6 +288,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <code>autoconfig.</code>) plus any additional prefixes you've added to
       <code>additional_sans</code> for client auto-configuration.
     </p>
+
+    <div class="alert alert-warning">
+      <h5><i class="icon fas fa-exclamation-triangle"></i> DNS Setup Required</h5>
+      <p>Before adding a domain, ensure DNS A or CNAME records pointing to your server's public IP address exist for at minimum:</p>
+      <ul class="mb-2">
+        <li><code>autoconfig.<strong>yourdomain.com</strong></code> (email client auto-configuration)</li>
+        <li><code>autodiscover.<strong>yourdomain.com</strong></code> (email client auto-discovery)</li>
+      </ul>
+      <cfoutput>
+      <cfif getSanPrefixes.recordcount GT 2>
+      <p class="mb-2">Plus <strong>#getSanPrefixes.recordcount - 2#</strong> additional SAN prefix(es) configured in <a href="view_mailbox_sans.cfm">SAN Management</a>. All SAN prefixes require DNS records.</p>
+      </cfif>
+      </cfoutput>
+      <p class="mb-0"><small>DNS records are required for both Let's Encrypt validation <strong>and</strong> for email clients to reach the services behind each subdomain.</small></p>
+    </div>
 
     <!-- ADD MAILBOX DOMAIN FORM -->
     <form method="post" autocomplete="off" class="mb-4" id="addMailboxDomainForm">
@@ -352,6 +420,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <tr>
           <th>Domain</th>
           <th>Certificate</th>
+          <th>Cert Status</th>
           <th>Default Quota</th>
           <th>Catch-All</th>
           <th>Nextcloud</th>
@@ -365,7 +434,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <td><strong>#encodeForHTML(domain)#</strong></td>
             <td>
               <cfif Len(cert_friendly_name)>
-                #encodeForHTML(cert_friendly_name)#
+                <a href="view_system_certificates.cfm" title="View certificate details">#encodeForHTML(cert_friendly_name)#</a>
                 <cfif cert_type IS "Acme">
                   <span class="badge bg-info ms-1">Auto (LE)</span>
                 <cfelse>
@@ -373,6 +442,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </cfif>
               <cfelse>
                 <span class="badge bg-danger">Missing</span>
+              </cfif>
+            </td>
+            <td>
+              <cfif NOT Len(cert_friendly_name)>
+                <span class="badge bg-danger">No Cert</span>
+              <cfelseif cert_type IS "Imported">
+                <span class="badge bg-success">Imported</span>
+              <cfelseif san_total EQ 0>
+                <span class="badge bg-warning text-dark">No SANs</span>
+              <cfelseif san_checked EQ 0>
+                <span class="badge bg-secondary">Pending</span>
+              <cfelseif san_dns_verified EQ san_total>
+                <span class="badge bg-success">Verified</span>
+                <br><small class="text-muted">#san_dns_verified#/#san_total# SANs</small>
+              <cfelseif san_dns_verified GT 0>
+                <span class="badge bg-warning text-dark">Partial</span>
+                <br><small class="text-muted">#san_dns_verified#/#san_total# SANs</small>
+              <cfelseif san_ip_verified GT 0>
+                <span class="badge bg-warning text-dark">Awaiting Cert</span>
+                <br><small class="text-muted">IP #san_ip_verified#/#san_total#</small>
+              <cfelse>
+                <span class="badge bg-danger">DNS Failed</span>
+                <br><small class="text-muted">0/#san_total# SANs</small>
               </cfif>
             </td>
             <td><cfset quotaGb = default_quota_mb / 1024><cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB</td>
@@ -574,7 +666,7 @@ $(document).ready(function() {
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[0, 'asc']],
     columnDefs: [
-      { orderable: false, targets: [6] },
+      { orderable: false, targets: [7] },
       { searchable: false, targets: [6] }
     ]
   });

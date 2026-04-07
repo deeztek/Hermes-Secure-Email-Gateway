@@ -1918,6 +1918,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
                             },
                             localization: {
                                 format: 'yyyy-MM-dd HH:mm:ss',
+                                hourCycle: 'h23',
                                 dayViewHeaderFormat: { month: 'long', year: 'numeric' }
                             }
                         };

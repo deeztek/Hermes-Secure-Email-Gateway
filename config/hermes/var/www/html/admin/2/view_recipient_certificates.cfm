@@ -249,7 +249,7 @@ a, a:hover{
 <cfif #url.type# is "1">
 
 <cfquery name="getrecipientdetails" datasource="hermes">
-select id, recipient from recipients where 
+select id, recipient, COALESCE(recipient_type, 'relay') AS recipient_type from recipients where
 id = <cfqueryparam value = #url.id# CFSQLType = "CF_SQL_INTEGER">
 </cfquery>
 
@@ -266,6 +266,8 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
 </cfquery>
 
 <cfset theRecipient = #url.id#>
+<cfset backUrl = (getrecipientdetails.recipient_type EQ "mailbox") ? "view_mailboxes.cfm" : "view_internal_recipients.cfm">
+<cfset backLabel = (getrecipientdetails.recipient_type EQ "mailbox") ? "Back to Mailboxes" : "Back to Recipients">
 
 <!--- /CFIF #getrecipientdetails.recordcount# --->
 </cfif>
@@ -290,7 +292,9 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
 </cfquery>
 
 <cfset theRecipient = #url.id#>
-  
+<cfset backUrl = "view_external_recipients.cfm">
+<cfset backLabel = "Back to Recipients">
+
 <!--- /CFIF #getrecipientdetails.recordcount# --->
 </cfif>
 
@@ -526,7 +530,7 @@ select * from recipient_certificates where user_id = <cfqueryparam value = #url.
 <span>
   <p>       
 
-    <a href="view_internal_recipients.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Recipients</a>
+    <cfoutput><a href="#backUrl#" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;#backLabel#</a></cfoutput>
 
     &nbsp;&nbsp;
 

@@ -1264,3 +1264,27 @@ ALTER TABLE domains DROP COLUMN IF EXISTS active;
 -- autodiscover). sync_mailbox_sans.cfm cross-joins these with
 -- domains.type='mailbox' to produce one mailbox_sans row per
 -- (prefix, domain) combination.
+
+-- ============================================================================
+-- Email Server > Mailboxes (#199)
+-- ============================================================================
+
+-- Add recipient_type to distinguish relay vs mailbox recipients
+ALTER TABLE recipients
+  ADD COLUMN IF NOT EXISTS recipient_type VARCHAR(20) NOT NULL DEFAULT 'relay' AFTER remoteauth_domain;
+
+-- Set existing non-domain recipients to 'relay' (skip domain entries where domain='1')
+UPDATE recipients SET recipient_type = 'relay' WHERE (recipient_type IS NULL OR recipient_type = '') AND (domain IS NULL OR domain <> '1');
+
+-- Set recipient_type='mailbox' for any recipients that exist in the mailboxes table
+UPDATE recipients r
+INNER JOIN mailboxes m ON r.recipient = m.username
+SET r.recipient_type = 'mailbox'
+WHERE r.recipient_type <> 'mailbox';
+
+-- Drop vestigial password column from mailboxes (auth is handled by LDAP)
+ALTER TABLE mailboxes DROP COLUMN IF EXISTS password;
+
+-- Add per-mailbox Nextcloud toggle (defaults to domain setting on creation)
+ALTER TABLE mailboxes
+  ADD COLUMN IF NOT EXISTS nextcloud_enabled TINYINT(3) NOT NULL DEFAULT 0 AFTER active;

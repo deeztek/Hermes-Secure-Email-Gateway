@@ -34,6 +34,29 @@ re-request).
 
 <cfset theDomain = getDomainRow.domain>
 
+<!--- Block deletion if mailboxes exist under this domain --->
+<cfquery name="checkMailboxes" datasource="hermes">
+  SELECT COUNT(*) AS cnt FROM mailboxes
+  WHERE domain_id = <cfqueryparam cfsqltype="cf_sql_integer" value="#getDomainRow.id#">
+</cfquery>
+<cfif checkMailboxes.cnt GT 0>
+  <cfset session.m = 16>
+  <cfset session.m_detail = checkMailboxes.cnt>
+  <cflocation url="view_mailbox_domains.cfm" addtoken="no">
+</cfif>
+
+<!--- Block deletion if recipients (non-domain entries) exist for this domain --->
+<cfquery name="checkRecipients" datasource="hermes">
+  SELECT COUNT(*) AS cnt FROM recipients
+  WHERE recipient LIKE <cfqueryparam cfsqltype="cf_sql_varchar" value="%@#theDomain#">
+  AND recipient NOT LIKE '@%'
+</cfquery>
+<cfif checkRecipients.cnt GT 0>
+  <cfset session.m = 17>
+  <cfset session.m_detail = checkRecipients.cnt>
+  <cflocation url="view_mailbox_domains.cfm" addtoken="no">
+</cfif>
+
 <!--- Capture the cert id before deleting mailbox_domains row --->
 <cfquery name="getMbxCert" datasource="hermes">
   SELECT mailbox_certificate

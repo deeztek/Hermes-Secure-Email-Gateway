@@ -228,6 +228,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>Domains</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="view_mailboxes.cfm" class="nav-link">
+                <i class="nav-icon fas fa-envelope"></i>
+                <p>Mailboxes</p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="view_mailbox_sans.cfm" class="nav-link">
+                <i class="nav-icon fas fa-network-wired"></i>
+                <p>SAN Management</p>
+              </a>
+            </li>
           </ul>
         </li>
         <!--- EMAIL SERVER ENDS HERE --->

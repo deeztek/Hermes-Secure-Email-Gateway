@@ -230,4 +230,5 @@ Expects:
 <cfinclude template="./add_domain_djigzo.cfm">
 
 <cfset session.m = 1>
+<cfset session.added_domain = domain_name>
 <cflocation url="preload_restart_nginx.cfm?returnUrl=/admin/2/view_mailbox_domains.cfm" addtoken="no">
