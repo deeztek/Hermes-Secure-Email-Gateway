@@ -291,6 +291,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_bcc_maps.cfm" class="nav-link">
+                <i class="nav-icon fas fa-copy"></i>
+                <p>BCC Maps</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_spf_settings.cfm" class="nav-link">
                 <i class="nav-icon fas fa-crop-alt"></i>
                 <p>SPF Settings</p>

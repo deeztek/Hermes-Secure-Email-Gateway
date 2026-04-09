@@ -1336,3 +1336,18 @@ WHERE vr.system = '2';
 DELETE vr FROM virtual_recipients vr
 INNER JOIN domains d ON d.domain = SUBSTRING_INDEX(vr.virtual_address, '@', -1) AND d.type = 'mailbox'
 WHERE vr.system = '2';
+
+-- ============================================================================
+-- Gateway > BCC Maps
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS bcc_maps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  address VARCHAR(255) NOT NULL,
+  bcc_to VARCHAR(255) NOT NULL,
+  bcc_type VARCHAR(10) NOT NULL DEFAULT 'sender',
+  enabled TINYINT(3) NOT NULL DEFAULT 1,
+  description VARCHAR(255) NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_bcc_address_type (address, bcc_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
