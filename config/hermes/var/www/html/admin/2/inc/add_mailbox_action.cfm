@@ -319,6 +319,19 @@ Requires form variables:
      'mailbox')
 </cfquery>
 
+<!--- 1b. INSERT INTO MADDR TABLE (Amavis address tracking, required for user portal session) --->
+<cfset domainParts = ListToArray(getDomain.domain, ".")>
+<cfset reversedDomain = ArrayReverse(domainParts)>
+<cfset maddrdomain = ArrayToList(reversedDomain, ".")>
+<cfquery datasource="hermes">
+    INSERT IGNORE INTO maddr (partition_tag, email, domain)
+    VALUES (
+      0,
+      <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#maddrdomain#" cfsqltype="cf_sql_varchar">
+    )
+</cfquery>
+
 <!--- 2. INSERT INTO USER_SETTINGS TABLE --->
 <cfquery name="insertUserSettings" datasource="hermes">
     INSERT INTO user_settings

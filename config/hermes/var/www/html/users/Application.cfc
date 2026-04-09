@@ -108,14 +108,11 @@ the url: https://#ConsoleHost#</cfoutput>
   </cfquery>
 
 <cfif #getid.recordcount# LT 1>
-
-       <cfset m="User Application.cfc: Unable to get maddr id ">
-       <cfinclude template="/user-auth/error.cfm">
-       <cfabort>
+  <!--- No maddr entry yet (new mailbox user, no mail processed by Amavis).
+       Set owner to 0 so portal loads with empty message history/filters. --->
+  <cfset session.owner = 0>
 <cfelse>
-
-<cfset session.owner = #getid.id#>
-
+  <cfset session.owner = #getid.id#>
 <!--- /CFIF #getid.recordcount# --->
 </cfif>
 
