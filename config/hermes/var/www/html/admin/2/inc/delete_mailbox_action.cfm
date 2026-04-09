@@ -144,7 +144,19 @@ Removes a mailbox user from all systems:
     </cfquery>
 </cfif>
 
-<!--- 3. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
+<!--- 3. DELETE SENDER LOGIN MAPS (own address + any aliases) --->
+<cfquery datasource="hermes">
+    DELETE FROM sender_login_maps
+    WHERE login_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
+<cfquery datasource="hermes">
+    DELETE FROM mailbox_aliases
+    WHERE delivers_to = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 5. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
 <cfquery datasource="hermes">
     DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
 </cfquery>

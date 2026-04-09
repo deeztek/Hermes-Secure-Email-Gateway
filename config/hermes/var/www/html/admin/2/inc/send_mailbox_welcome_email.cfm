@@ -55,18 +55,6 @@ Requires the following variables to be set before including:
 
 <p>A mailbox has been created for you on Hermes SEG. Your email address is: <strong>#recipientEmail#</strong></p>
 
-<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
-    <h3 style="margin-top: 0; color: ##495057;">Before You Can Login</h3>
-    <p>For security purposes, you must set your password before you can access your account.</p>
-    <p><strong>To set your password:</strong></p>
-    <ol style="text-align: left;">
-        <li>Go to the login page: <a href="#loginUrl#">#loginUrl#</a></li>
-        <li>Click the <strong>"Reset password?"</strong> link</li>
-        <li>Enter your email address: <strong>#recipientEmail#</strong></li>
-        <li>Follow the instructions sent to your email</li>
-    </ol>
-</div>
-
 <div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##004085;">Email Client Settings</h3>
     <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
@@ -77,7 +65,13 @@ Requires the following variables to be set before including:
     </table>
 </div>
 
-<p>Once you have set your password, you will be able to:</p>
+<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##495057;">User Portal</h3>
+    <p>You can manage your email settings, view quarantined messages, and release held messages from the user portal:</p>
+    <p><a href="#loginUrl#">#loginUrl#</a></p>
+</div>
+
+<p>With your account, you can:</p>
 <ul style="text-align: left;">
     <li>Send and receive email via your email client or webmail</li>
     <li>View your message quarantine</li>

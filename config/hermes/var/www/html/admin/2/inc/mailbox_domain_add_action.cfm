@@ -166,10 +166,16 @@ Expects:
   )
 </cfquery>
 
-<!--- Insert recipient (any @domain accepted; individual mailbox filtering is enforced by Dovecot LMTP) --->
+<!--- Get default SVF policy for domain-level Amavis filtering --->
+<cfquery name="getDefaultPolicy" datasource="hermes">
+  SELECT policy_id FROM spam_policies WHERE default_policy = '1'
+</cfquery>
+
+<!--- Insert recipient with default policy (ensures Amavis applies SVF filtering to all mail for this domain) --->
 <cfquery name="addRecipient" datasource="hermes" result="recResult">
-  INSERT INTO recipients (recipient, domain, status) VALUES (
-    <cfqueryparam cfsqltype="cf_sql_varchar" value="@#domain_name#">, '1', 'OK'
+  INSERT INTO recipients (recipient, domain, status, policy_id) VALUES (
+    <cfqueryparam cfsqltype="cf_sql_varchar" value="@#domain_name#">, '1', 'OK',
+    <cfqueryparam cfsqltype="cf_sql_integer" value="#getDefaultPolicy.policy_id#">
   )
 </cfquery>
 

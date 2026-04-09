@@ -53,6 +53,8 @@ submission inet n       -       n       -       -       smtpd
   -o smtpd_sasl_path=inet:hermes_dovecot:9587
   -o smtpd_reject_unlisted_recipient=no
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_sender_login_maps=mysql:/etc/postfix/mysql-sender-login-maps.cf
+  -o smtpd_sender_restrictions=reject_sender_login_mismatch
   -o milter_macro_daemon_name=ORIGINATING
  
 #smtps     inet  n       -       n       -       -       smtpd

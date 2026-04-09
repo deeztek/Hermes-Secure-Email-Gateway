@@ -39,7 +39,7 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
 
   <!--- Validate domain exists in the system --->
   <cfquery name="checkDomain" datasource="hermes">
-    SELECT domain FROM domains
+    SELECT domain, type FROM domains
     WHERE domain = <cfqueryparam value="#entryDomain#" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfif checkDomain.recordcount LT 1>
@@ -48,7 +48,14 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
     <cfcontinue>
   </cfif>
 
-  <!--- Check for duplicates --->
+  <!--- Block mailbox domains - use Email Server > Aliases instead --->
+  <cfif checkDomain.type EQ "mailbox">
+    <cfset invaliddomain = invaliddomain + 1>
+    <cfset invaliddomainrecipient = invaliddomainrecipient & " " & encodeForHTML(entry) & " (mailbox domain - use Email Server &gt; Aliases)<br>">
+    <cfcontinue>
+  </cfif>
+
+  <!--- Check for duplicates in virtual_recipients --->
   <cfquery name="checkEntry" datasource="hermes">
     SELECT virtual_address FROM virtual_recipients
     WHERE virtual_address = <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">
@@ -57,6 +64,17 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
   <cfif checkEntry.recordcount GTE 1>
     <cfset alreadyexists = alreadyexists + 1>
     <cfset alreadyexistsrecipient = alreadyexistsrecipient & " " & encodeForHTML(virtualAddress) & " --> " & encodeForHTML(forwards) & "<br>">
+    <cfcontinue>
+  </cfif>
+
+  <!--- Check for duplicates in mailbox_aliases --->
+  <cfquery name="checkAlias" datasource="hermes">
+    SELECT alias_address FROM mailbox_aliases
+    WHERE alias_address = <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkAlias.recordcount GTE 1>
+    <cfset alreadyexists = alreadyexists + 1>
+    <cfset alreadyexistsrecipient = alreadyexistsrecipient & " " & encodeForHTML(virtualAddress) & " (exists as mailbox alias)<br>">
     <cfcontinue>
   </cfif>
 

@@ -92,6 +92,31 @@ Requires form variables:
     <cflocation url="add_mailbox.cfm" addtoken="no">
 </cfif>
 
+<!--- CHECK FOR DUPLICATE IN MAILBOX ALIASES --->
+<cfquery name="checkAliasDuplicate" datasource="hermes">
+    SELECT id FROM mailbox_aliases WHERE alias_address = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfif checkAliasDuplicate.recordcount GTE 1>
+    <cfset session.m = 14>
+    <cflocation url="add_mailbox.cfm" addtoken="no">
+</cfif>
+
+<!--- CHECK FOR DUPLICATE IN VIRTUAL RECIPIENTS --->
+<cfquery name="checkVirtualDuplicate" datasource="hermes">
+    SELECT id FROM virtual_recipients WHERE virtual_address = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfif checkVirtualDuplicate.recordcount GTE 1>
+    <cfset session.m = 14>
+    <cflocation url="add_mailbox.cfm" addtoken="no">
+</cfif>
+
+<cfif checkMailboxDuplicate.recordcount GTE 1>
+    <cfset session.m = 14>
+    <cflocation url="add_mailbox.cfm" addtoken="no">
+</cfif>
+
 <!--- VALIDATE QUOTA --->
 <cfparam name="form.quota_gb" default="5">
 <cfif NOT IsNumeric(form.quota_gb) OR form.quota_gb LTE 0>
@@ -318,6 +343,15 @@ Requires form variables:
      <cfqueryparam value="#form.nextcloud_enabled#" cfsqltype="cf_sql_tinyint">,
      NOW(),
      NOW())
+</cfquery>
+
+<!--- 3b. INSERT INTO SENDER_LOGIN_MAPS (allows user to send as their own address) --->
+<cfquery datasource="hermes">
+    INSERT IGNORE INTO sender_login_maps (sender, login_user)
+    VALUES (
+      <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+    )
 </cfquery>
 
 <!--- 4. CREATE LDAP USER --->

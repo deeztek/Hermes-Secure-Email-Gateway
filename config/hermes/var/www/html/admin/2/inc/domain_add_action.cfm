@@ -119,11 +119,17 @@ Expects: form.domain_name, form.delivery_method, form.recipient_delivery,
   )
 </cfquery>
 
-<!--- Insert recipient --->
+<!--- Get default SVF policy for domain-level Amavis filtering --->
+<cfquery name="getDefaultPolicy" datasource="hermes">
+  SELECT policy_id FROM spam_policies WHERE default_policy = '1'
+</cfquery>
+
+<!--- Insert recipient with default policy (ensures Amavis applies SVF filtering to all mail for this domain) --->
 <cfquery name="addRecipient" datasource="hermes" result="recResult">
-  INSERT INTO recipients (recipient, domain, status) VALUES (
+  INSERT INTO recipients (recipient, domain, status, policy_id) VALUES (
     <cfqueryparam cfsqltype="cf_sql_varchar" value="@#domain_name#">, '1',
-    <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.recipient_delivery#">
+    <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.recipient_delivery#">,
+    <cfqueryparam cfsqltype="cf_sql_integer" value="#getDefaultPolicy.policy_id#">
   )
 </cfquery>
 

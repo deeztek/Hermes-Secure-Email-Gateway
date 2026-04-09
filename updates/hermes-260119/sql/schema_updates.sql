@@ -1282,9 +1282,57 @@ INNER JOIN mailboxes m ON r.recipient = m.username
 SET r.recipient_type = 'mailbox'
 WHERE r.recipient_type <> 'mailbox';
 
+-- Backfill default policy_id on domain-level recipients entries (@domain with domain='1')
+-- that have no policy set. Without this, Amavis skips SVF filtering for unmatched addresses.
+UPDATE recipients
+SET policy_id = (SELECT policy_id FROM spam_policies WHERE default_policy = '1' LIMIT 1)
+WHERE domain = '1' AND (policy_id IS NULL OR policy_id = 0);
+
 -- Drop vestigial password column from mailboxes (auth is handled by LDAP)
 ALTER TABLE mailboxes DROP COLUMN IF EXISTS password;
 
 -- Add per-mailbox Nextcloud toggle (defaults to domain setting on creation)
 ALTER TABLE mailboxes
   ADD COLUMN IF NOT EXISTS nextcloud_enabled TINYINT(3) NOT NULL DEFAULT 0 AFTER active;
+
+-- ============================================================================
+-- Email Server > Aliases (#200)
+-- ============================================================================
+
+-- Mailbox aliases (separate from virtual_recipients which is for relay domains)
+CREATE TABLE IF NOT EXISTS mailbox_aliases (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  alias_address VARCHAR(255) NOT NULL,
+  delivers_to VARCHAR(255) NOT NULL,
+  alias_type VARCHAR(20) NOT NULL DEFAULT 'forward',
+  send_as TINYINT(3) NOT NULL DEFAULT 0,
+  domain_id INT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_alias_address (alias_address)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Sender login maps: controls which authenticated users can send as which addresses
+-- Used by Postfix smtpd_sender_login_maps to enforce send-as permissions
+CREATE TABLE IF NOT EXISTS sender_login_maps (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  sender VARCHAR(255) NOT NULL,
+  login_user VARCHAR(255) NOT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_sender_login (sender, login_user)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Every mailbox user can send as themselves (seed from existing mailboxes)
+INSERT IGNORE INTO sender_login_maps (sender, login_user)
+SELECT username, username FROM mailboxes;
+
+-- Migrate any existing virtual_recipients entries for mailbox domains to mailbox_aliases
+INSERT IGNORE INTO mailbox_aliases (alias_address, delivers_to, alias_type, domain_id)
+SELECT vr.virtual_address, vr.maps, 'forward', d.id
+FROM virtual_recipients vr
+INNER JOIN domains d ON d.domain = SUBSTRING_INDEX(vr.virtual_address, '@', -1) AND d.type = 'mailbox'
+WHERE vr.system = '2';
+
+-- Remove migrated entries from virtual_recipients (only mailbox domain entries)
+DELETE vr FROM virtual_recipients vr
+INNER JOIN domains d ON d.domain = SUBSTRING_INDEX(vr.virtual_address, '@', -1) AND d.type = 'mailbox'
+WHERE vr.system = '2';

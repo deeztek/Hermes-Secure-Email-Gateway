@@ -108,6 +108,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfset session.m = "">
 
+<!--- HELP CALLOUT --->
+<div class="alert alert-info alert-dismissible">
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  <h5><i class="icon fas fa-info-circle"></i> About Virtual Recipients</h5>
+  <p class="mb-1">Virtual recipients forward email addresses on your <strong>relay domains</strong> to any email address, internal or external.</p>
+  <ul class="mb-1">
+    <li>Forward a specific address: <code>info@domain.com</code> &rarr; <code>bob@gmail.com</code></li>
+    <li>Catch-all for a domain: <code>@domain.com</code> &rarr; <code>admin@domain.com</code></li>
+  </ul>
+  <p class="mb-0"><small>For mailbox domains (Email Server), use <a href="view_mailbox_aliases.cfm">Email Server &gt; Aliases</a> instead. Virtual recipients cannot be created for mailbox domains.</small></p>
+</div>
+
 <!--- ALERTS --->
 <cfif m is "1">
   <div class="alert alert-danger alert-dismissible">
