@@ -1351,3 +1351,30 @@ CREATE TABLE IF NOT EXISTS bcc_maps (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE KEY uq_bcc_address_type (address, bcc_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- Sieve Rules (admin global + user personal)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS sieve_rules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scope VARCHAR(10) NOT NULL DEFAULT 'global',
+  username VARCHAR(255) NULL,
+  rule_name VARCHAR(255) NOT NULL,
+  rule_order INT NOT NULL DEFAULT 0,
+  enabled TINYINT(3) NOT NULL DEFAULT 1,
+  is_system TINYINT(3) NOT NULL DEFAULT 0,
+  condition_field VARCHAR(50) NOT NULL,
+  condition_type VARCHAR(50) NOT NULL,
+  condition_value VARCHAR(500) NOT NULL,
+  action_type VARCHAR(50) NOT NULL,
+  action_value VARCHAR(255) NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- System rule: move spam to Junk folder (global, cannot be deleted)
+INSERT IGNORE INTO sieve_rules
+(scope, username, rule_name, rule_order, enabled, is_system, condition_field, condition_type, condition_value, action_type, action_value)
+VALUES
+('global', NULL, 'Move spam to Junk', 1, 1, 1, 'header', 'is', 'X-Spam-Flag: YES', 'fileinto', 'Junk');

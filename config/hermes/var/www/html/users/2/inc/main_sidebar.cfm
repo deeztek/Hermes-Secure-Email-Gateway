@@ -66,6 +66,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
         <cfif #session.theGroups# contains "mailboxes">
         <li class="nav-item">
+          <a href="view_sieve_rules.cfm" class="nav-link">
+            <i class="nav-icon fas fa-filter"></i>
+            <p><strong>Mail Filters</strong></p>
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="/nc/" class="nav-link">
             <i class="nav-icon fas fa-inbox"></i>
             <p><strong>Login to Webmail</strong></p>

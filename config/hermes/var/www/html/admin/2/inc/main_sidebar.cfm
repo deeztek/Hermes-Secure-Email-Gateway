@@ -241,6 +241,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_sieve_rules.cfm" class="nav-link">
+                <i class="nav-icon fas fa-filter"></i>
+                <p>Sieve Rules</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_mailbox_sans.cfm" class="nav-link">
                 <i class="nav-icon fas fa-network-wired"></i>
                 <p>SAN Management</p>
