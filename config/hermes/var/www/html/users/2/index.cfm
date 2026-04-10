@@ -58,7 +58,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfset isMailboxUser = session.theGroups CONTAINS "mailboxes">
 
-<!--- ===== GATHER STATS (fast queries only - msgs table is huge, skip live counts) ===== --->
+<!--- ===== GATHER STATS ===== --->
+
+<!--- Quarantined messages (last 24 hours - matches view_message_history default window) --->
+<cfset quarantineCount = 0>
+<cfif isDefined("session.owner") AND session.owner GT 0>
+    <cfquery name="getQuarantineCount" datasource="hermes">
+        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND msgs.content IN ('S','V','B','U')
+    </cfquery>
+    <cfif getQuarantineCount.recordcount GTE 1>
+        <cfset quarantineCount = getQuarantineCount.cnt>
+    </cfif>
+</cfif>
+
+<!--- Total messages last 24 hours --->
+<cfset totalMessages = 0>
+<cfif isDefined("session.owner") AND session.owner GT 0>
+    <cfquery name="getTotalMessages" datasource="hermes">
+        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+    </cfquery>
+    <cfif getTotalMessages.recordcount GTE 1>
+        <cfset totalMessages = getTotalMessages.cnt>
+    </cfif>
+</cfif>
 
 <!--- Sender filter count --->
 <cfset senderFilterCount = 0>
@@ -114,7 +145,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===== STATS CARDS ===== --->
 <cfoutput>
 <div class="row">
-    <div class="col-lg-4 col-6">
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-warning">
+            <div class="inner">
+                <h3>#quarantineCount#</h3>
+                <p>Quarantined (24h)</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-shield-alt"></i></span>
+            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                View History <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-success">
+            <div class="inner">
+                <h3>#totalMessages#</h3>
+                <p>Total Messages (24h)</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-envelope"></i></span>
+            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                View All <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
         <div class="small-box text-bg-info">
             <div class="inner">
                 <h3>#senderFilterCount#</h3>
@@ -127,7 +182,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
     </div>
     <cfif isMailboxUser>
-    <div class="col-lg-4 col-6">
+    <div class="col-lg-3 col-6">
         <div class="small-box text-bg-primary">
             <div class="inner">
                 <h3>#mailFilterCount#</h3>
@@ -139,19 +194,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </a>
         </div>
     </div>
-    </cfif>
-    <div class="col-lg-4 col-6">
-        <div class="small-box text-bg-warning">
+    <cfelse>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-secondary">
             <div class="inner">
-                <h3><i class="fas fa-history"></i></h3>
-                <p>Message History</p>
+                <h3>Account</h3>
+                <p>Settings &amp; Profile</p>
             </div>
-            <span class="small-box-icon"><i class="fas fa-shield-alt"></i></span>
-            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                View Quarantined <i class="fas fa-arrow-circle-right"></i>
+            <span class="small-box-icon"><i class="fas fa-user-cog"></i></span>
+            <a href="user_settings.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Manage <i class="fas fa-arrow-circle-right"></i>
             </a>
         </div>
     </div>
+    </cfif>
 </div>
 </cfoutput>
 
