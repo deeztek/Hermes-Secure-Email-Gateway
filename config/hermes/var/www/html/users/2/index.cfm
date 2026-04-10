@@ -58,38 +58,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfset isMailboxUser = session.theGroups CONTAINS "mailboxes">
 
-<!--- ===== GATHER STATS ===== --->
-
-<!--- Quarantined messages (last 30 days) --->
-<cfset quarantineCount = 0>
-<cfif isDefined("session.owner") AND session.owner GT 0>
-    <cfquery name="getQuarantineCount" datasource="hermes">
-        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
-        FROM msgs
-        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        AND msgs.content IN ('S','V','B','U')
-    </cfquery>
-    <cfif getQuarantineCount.recordcount GTE 1>
-        <cfset quarantineCount = getQuarantineCount.cnt>
-    </cfif>
-</cfif>
-
-<!--- Total messages last 30 days --->
-<cfset totalMessages = 0>
-<cfif isDefined("session.owner") AND session.owner GT 0>
-    <cfquery name="getTotalMessages" datasource="hermes">
-        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
-        FROM msgs
-        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-    </cfquery>
-    <cfif getTotalMessages.recordcount GTE 1>
-        <cfset totalMessages = getTotalMessages.cnt>
-    </cfif>
-</cfif>
+<!--- ===== GATHER STATS (fast queries only - msgs table is huge, skip live counts) ===== --->
 
 <!--- Sender filter count --->
 <cfset senderFilterCount = 0>
@@ -145,31 +114,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===== STATS CARDS ===== --->
 <cfoutput>
 <div class="row">
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-warning">
-            <div class="inner">
-                <h3>#quarantineCount#</h3>
-                <p>Quarantined (30 days)</p>
-            </div>
-            <span class="small-box-icon"><i class="fas fa-shield-alt"></i></span>
-            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                View History <i class="fas fa-arrow-circle-right"></i>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-success">
-            <div class="inner">
-                <h3>#totalMessages#</h3>
-                <p>Total Messages (30 days)</p>
-            </div>
-            <span class="small-box-icon"><i class="fas fa-envelope"></i></span>
-            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                View All <i class="fas fa-arrow-circle-right"></i>
-            </a>
-        </div>
-    </div>
-    <div class="col-lg-3 col-6">
+    <div class="col-lg-4 col-6">
         <div class="small-box text-bg-info">
             <div class="inner">
                 <h3>#senderFilterCount#</h3>
@@ -182,7 +127,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
     </div>
     <cfif isMailboxUser>
-    <div class="col-lg-3 col-6">
+    <div class="col-lg-4 col-6">
         <div class="small-box text-bg-primary">
             <div class="inner">
                 <h3>#mailFilterCount#</h3>
@@ -194,20 +139,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </a>
         </div>
     </div>
-    <cfelse>
-    <div class="col-lg-3 col-6">
-        <div class="small-box text-bg-secondary">
+    </cfif>
+    <div class="col-lg-4 col-6">
+        <div class="small-box text-bg-warning">
             <div class="inner">
-                <h3>Account</h3>
-                <p>Settings &amp; Profile</p>
+                <h3><i class="fas fa-history"></i></h3>
+                <p>Message History</p>
             </div>
-            <span class="small-box-icon"><i class="fas fa-user-cog"></i></span>
-            <a href="user_settings.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
-                Manage <i class="fas fa-arrow-circle-right"></i>
+            <span class="small-box-icon"><i class="fas fa-shield-alt"></i></span>
+            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                View Quarantined <i class="fas fa-arrow-circle-right"></i>
             </a>
         </div>
     </div>
-    </cfif>
 </div>
 </cfoutput>
 
@@ -295,66 +239,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
     </div>
 </div>
-
-<!--- ===== RECENT QUARANTINED MESSAGES ===== --->
-<cfif isDefined("session.owner") AND session.owner GT 0>
-<cfquery name="getRecentQuarantine" datasource="hermes">
-    SELECT DISTINCT msgs.mail_id, msgs.time_iso, msgs.subject, msgs.content, msgs.from_addr AS sender
-    FROM msgs
-    INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-    WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-    AND msgs.content IN ('S','V','B','U')
-    ORDER BY msgs.time_iso DESC
-    LIMIT 5
-</cfquery>
-
-<cfif getRecentQuarantine.recordcount GTE 1>
-<div class="card card-outline card-warning mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Recent Quarantined Messages</h3>
-    </div>
-    <div class="card-body p-0">
-        <table class="table table-striped mb-0">
-            <thead>
-                <tr>
-                    <th>Date</th>
-                    <th>From</th>
-                    <th>Subject</th>
-                    <th>Type</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody>
-                <cfoutput query="getRecentQuarantine">
-                <tr>
-                    <td><small>#DateTimeFormat(time_iso, "mm/dd/yyyy HH:nn")#</small></td>
-                    <td><small>#HTMLEditFormat(sender)#</small></td>
-                    <td><small>#HTMLEditFormat(subject)#</small></td>
-                    <td>
-                        <cfif content EQ "S"><span class="badge bg-warning text-dark">Spam</span>
-                        <cfelseif content EQ "V"><span class="badge bg-danger">Virus</span>
-                        <cfelseif content EQ "B"><span class="badge bg-info">Banned</span>
-                        <cfelseif content EQ "U"><span class="badge bg-secondary">Unchecked</span>
-                        </cfif>
-                    </td>
-                    <td>
-                        <a href="view_message.cfm?mid=#mail_id#" class="btn btn-sm btn-secondary" title="View">
-                            <i class="fas fa-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                </cfoutput>
-            </tbody>
-        </table>
-    </div>
-    <div class="card-footer text-end">
-        <a href="view_message_history.cfm" class="btn btn-sm btn-warning">
-            <i class="fas fa-history me-2"></i>View All Quarantined Messages
-        </a>
-    </div>
-</div>
-</cfif>
-</cfif>
 
 <!--- ===== ACCOUNT INFO ===== --->
 <cfquery name="getAccountInfo" datasource="hermes">
