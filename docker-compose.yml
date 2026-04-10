@@ -262,7 +262,7 @@ services:
       - ./config/hermes/var/www/html:/var/www/html #Application Directory
       - commandbox_serverhome:/serverhome #Server Home Directory
       - amavis_data:/mnt/data/amavis #Amavis Data
-      - dovecot_mail:/mnt/data/vmail:ro #Dovecot Vmail Data (read-only for monitoring)
+      - dovecot_mail:/mnt/data/vmail #Dovecot Vmail Data (read-write for sieve script generation)
       - nextcloud:/mnt/data/nextcloud #Nextcloud Data
       - ./config/ciphermail/usr/share/djigzo:/usr/share/djigzo #Ciphermail
       - ./config/hermes/opt/hermes:/opt/hermes

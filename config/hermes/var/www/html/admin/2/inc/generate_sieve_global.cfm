@@ -160,27 +160,31 @@ After writing, compiles the script using sievec via Docker exec.
 <!--- Write the sieve file --->
 <cfset sieveContent = ArrayToList(sieveLines, Chr(10))>
 
-<!--- Ensure the global sieve directory exists --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot mkdir -p /srv/mail/sieve/global"
-    timeout="30" />
+<!--- The dovecot_mail volume is mounted at /mnt/data/vmail in commandbox.
+     Inside the dovecot container, the same volume is at /srv/mail.
+     Writing to /mnt/data/vmail/sieve/global/before.sieve from commandbox
+     makes the file appear at /srv/mail/sieve/global/before.sieve in dovecot. --->
 
-<!--- Write the script file via temp file (commandbox can write, then docker exec moves it) --->
+<!--- Ensure the global sieve directory exists --->
+<cfif NOT DirectoryExists("/mnt/data/vmail/sieve/global")>
+    <cfdirectory action="create" directory="/mnt/data/vmail/sieve/global" mode="755" recurse="true">
+</cfif>
+
+<!--- Write the script file directly to the shared volume --->
 <cffile action="write"
-    file="/opt/hermes/tmp/before.sieve"
+    file="/mnt/data/vmail/sieve/global/before.sieve"
     output="#sieveContent#"
     charset="utf-8"
     addNewLine="no">
 
-<!--- Copy to Dovecot container's sieve directory --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot cp /opt/hermes/tmp/before.sieve /srv/mail/sieve/global/before.sieve"
-    timeout="30" />
-
-<!--- Set ownership --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot chown -R 1000:1000 /srv/mail/sieve/global"
-    timeout="30" />
+<!--- Set ownership inside the Dovecot container (vmail uid/gid 1000) --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_dovecot chown -R 1000:1000 /srv/mail/sieve/global"
+        timeout="30" />
+<cfcatch type="any">
+</cfcatch>
+</cftry>
 
 <!--- Compile the sieve script --->
 <cftry>
@@ -193,8 +197,3 @@ After writing, compiles the script using sievec via Docker exec.
     <!--- Compilation failure is non-critical - Dovecot will interpret at runtime --->
 </cfcatch>
 </cftry>
-
-<!--- Cleanup temp file --->
-<cfif fileExists("/opt/hermes/tmp/before.sieve")>
-    <cffile action="delete" file="/opt/hermes/tmp/before.sieve">
-</cfif>

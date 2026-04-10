@@ -74,7 +74,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- ACTION HANDLERS --->
-<cfif action EQ "add_rule" OR action EQ "edit_rule" OR action EQ "delete_rule" OR action EQ "toggle_rule">
+<cfif action EQ "add_rule" OR action EQ "edit_rule" OR action EQ "delete_rule" OR action EQ "toggle_rule" OR action EQ "reorder_rule">
   <cfinclude template="./inc/sieve_user_rule_actions.cfm">
 </cfif>
 
@@ -102,6 +102,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     Filter toggled successfully.
+  </div>
+<cfelseif m EQ 5>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Filter order updated.
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -170,14 +176,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput query="getRules">
         <tr>
           <td>
-            <div class="d-flex gap-1 flex-nowrap">
-              <form method="post" action="view_sieve_rules.cfm" style="display:inline;">
-                <input type="hidden" name="action" value="toggle_rule">
-                <input type="hidden" name="toggle_rule_id" value="#id#">
-                <button type="submit" class="btn btn-sm <cfif enabled EQ 1>btn-success<cfelse>btn-secondary</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>">
-                  <i class="fas <cfif enabled EQ 1>fa-toggle-on<cfelse>fa-toggle-off</cfif>"></i>
-                </button>
-              </form>
+            <div class="d-flex gap-1 flex-nowrap align-items-center">
+              <button type="button" class="btn btn-sm btn-outline-secondary" title="Move Up" onclick="reorderRule(#id#, 'up')">
+                <i class="fas fa-arrow-up"></i>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" title="Move Down" onclick="reorderRule(#id#, 'down')">
+                <i class="fas fa-arrow-down"></i>
+              </button>
+              <button type="button" class="btn btn-sm <cfif enabled EQ 1>btn-success<cfelse>btn-secondary</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>" onclick="toggleRule(#id#)">
+                <i class="fas <cfif enabled EQ 1>fa-toggle-on<cfelse>fa-toggle-off</cfif>"></i>
+              </button>
               <button type="button" class="btn btn-sm btn-primary" title="Edit" onclick="loadEditRuleModal(#id#)">
                 <i class="fas fa-edit"></i>
               </button>
@@ -390,6 +398,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- HIDDEN FORMS FOR TOGGLE AND REORDER ACTIONS --->
+<form id="toggleRuleForm" method="post" action="view_sieve_rules.cfm" style="display:none;">
+  <input type="hidden" name="action" value="toggle_rule">
+  <input type="hidden" name="toggle_rule_id" id="toggleRuleId">
+</form>
+<form id="reorderRuleForm" method="post" action="view_sieve_rules.cfm" style="display:none;">
+  <input type="hidden" name="action" value="reorder_rule">
+  <input type="hidden" name="reorder_rule_id" id="reorderRuleId">
+  <input type="hidden" name="reorder_direction" id="reorderDirection">
+</form>
+
 <!--- DELETE CONFIRMATION MODAL --->
 <div class="modal fade" id="deleteRuleModal" tabindex="-1">
   <div class="modal-dialog">
@@ -490,6 +509,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#deleteRuleId').val(ruleId);
     $('#deleteRuleName').text(ruleName);
     new bootstrap.Modal(document.getElementById('deleteRuleModal')).show();
+  }
+
+  function toggleRule(ruleId) {
+    $('#toggleRuleId').val(ruleId);
+    document.getElementById('toggleRuleForm').submit();
+  }
+
+  function reorderRule(ruleId, direction) {
+    $('#reorderRuleId').val(ruleId);
+    $('#reorderDirection').val(direction);
+    document.getElementById('reorderRuleForm').submit();
   }
 </script>
 

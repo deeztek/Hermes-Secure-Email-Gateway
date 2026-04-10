@@ -24,7 +24,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Email Server - Sieve Rules</title>
+  <title>Hermes SEG | Email Server - Mailbox Rules</title>
   <cfinclude template="./inc/html_head.cfm" />
 </head>
 
@@ -39,13 +39,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Email Server - Sieve Rules</h1>
+            <h1 class="m-0">Email Server - Mailbox Rules</h1>
           </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="index.cfm">Home</a></li>
               <li class="breadcrumb-item">Email Server</li>
-              <li class="breadcrumb-item active">Sieve Rules</li>
+              <li class="breadcrumb-item active">Mailbox Rules</li>
             </ol>
           </div>
         </div>
@@ -67,7 +67,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- ACTION HANDLERS --->
-<cfif action EQ "add_rule" OR action EQ "edit_rule" OR action EQ "delete_rule" OR action EQ "toggle_rule">
+<cfif action EQ "add_rule" OR action EQ "edit_rule" OR action EQ "delete_rule" OR action EQ "toggle_rule" OR action EQ "reorder_rule">
   <cfinclude template="./inc/sieve_rule_actions.cfm">
 </cfif>
 
@@ -95,6 +95,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     Rule toggled and sieve script regenerated.
+  </div>
+<cfelseif m EQ 5>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Rule order updated.
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -125,8 +131,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- HELP CALLOUT --->
 <div class="alert alert-info alert-dismissible">
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  <h5><i class="icon fas fa-info-circle"></i> About Global Sieve Rules</h5>
-  <p class="mb-1">Global sieve rules run <strong>before</strong> any user's personal rules on every incoming message delivered to a mailbox. They are mandatory and cannot be overridden by users.</p>
+  <h5><i class="icon fas fa-info-circle"></i> About Global Mailbox Rules</h5>
+  <p class="mb-1">Global mailbox rules run <strong>before</strong> any user's personal rules on every incoming message delivered to a mailbox. They are mandatory and cannot be overridden by users.</p>
   <p class="mb-0"><small>System rules (marked with <span class="badge bg-primary">System</span>) cannot be deleted but can be enabled or disabled. Rules are processed in order from top to bottom.</small></p>
 </div>
 
@@ -148,7 +154,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- RULES TABLE --->
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-filter me-2"></i>Global Sieve Rules (<cfoutput>#getRules.recordcount#</cfoutput>)</h3>
+    <h3 class="card-title"><i class="fas fa-filter me-2"></i>Global Mailbox Rules (<cfoutput>#getRules.recordcount#</cfoutput>)</h3>
   </div>
   <div class="card-body">
     <table id="sieveRulesTable" class="table table-bordered table-striped" style="width:100%">
@@ -167,15 +173,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <tr>
           <td>#rule_order#</td>
           <td>
-            <div class="d-flex gap-1 flex-nowrap">
-              <!--- Toggle enabled/disabled --->
-              <form method="post" action="view_sieve_rules.cfm" style="display:inline;">
-                <input type="hidden" name="action" value="toggle_rule">
-                <input type="hidden" name="toggle_rule_id" value="#id#">
-                <button type="submit" class="btn btn-sm <cfif enabled EQ 1>btn-success<cfelse>btn-secondary</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>">
-                  <i class="fas <cfif enabled EQ 1>fa-toggle-on<cfelse>fa-toggle-off</cfif>"></i>
-                </button>
-              </form>
+            <div class="d-flex gap-1 flex-nowrap align-items-center">
+              <button type="button" class="btn btn-sm btn-outline-secondary" title="Move Up" onclick="reorderRule(#id#, 'up')">
+                <i class="fas fa-arrow-up"></i>
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" title="Move Down" onclick="reorderRule(#id#, 'down')">
+                <i class="fas fa-arrow-down"></i>
+              </button>
+              <button type="button" class="btn btn-sm <cfif enabled EQ 1>btn-success<cfelse>btn-secondary</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>" onclick="toggleRule(#id#)">
+                <i class="fas <cfif enabled EQ 1>fa-toggle-on<cfelse>fa-toggle-off</cfif>"></i>
+              </button>
               <cfif is_system NEQ 1>
                 <button type="button" class="btn btn-sm btn-primary" title="Edit" onclick="loadEditRuleModal(#id#)">
                   <i class="fas fa-edit"></i>
@@ -184,7 +191,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   <i class="fas fa-trash"></i>
                 </button>
               <cfelse>
-                <span class="badge bg-primary align-self-center">System</span>
+                <span class="badge bg-primary">System</span>
               </cfif>
             </div>
           </td>
@@ -438,6 +445,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- HIDDEN FORMS FOR TOGGLE AND REORDER ACTIONS --->
+<form id="toggleRuleForm" method="post" action="view_sieve_rules.cfm" style="display:none;">
+  <input type="hidden" name="action" value="toggle_rule">
+  <input type="hidden" name="toggle_rule_id" id="toggleRuleId">
+</form>
+<form id="reorderRuleForm" method="post" action="view_sieve_rules.cfm" style="display:none;">
+  <input type="hidden" name="action" value="reorder_rule">
+  <input type="hidden" name="reorder_rule_id" id="reorderRuleId">
+  <input type="hidden" name="reorder_direction" id="reorderDirection">
+</form>
+
 <!--- ================================================================
      DELETE CONFIRMATION MODAL
      ================================================================ --->
@@ -570,6 +588,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#deleteRuleId').val(ruleId);
     $('#deleteRuleName').text(ruleName);
     new bootstrap.Modal(document.getElementById('deleteRuleModal')).show();
+  }
+
+  // Toggle rule via hidden form
+  function toggleRule(ruleId) {
+    $('#toggleRuleId').val(ruleId);
+    document.getElementById('toggleRuleForm').submit();
+  }
+
+  // Reorder rule (up/down)
+  function reorderRule(ruleId, direction) {
+    $('#reorderRuleId').val(ruleId);
+    $('#reorderDirection').val(direction);
+    document.getElementById('reorderRuleForm').submit();
   }
 </script>
 

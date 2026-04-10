@@ -154,31 +154,27 @@ Requires: sieveUsername variable to be set before including.
 
 </cfloop>
 
-<!--- Write the sieve file --->
+<!--- Write the sieve file directly to shared volume (commandbox /mnt/data/vmail = dovecot /srv/mail) --->
 <cfset sieveContent = ArrayToList(sieveLines, Chr(10))>
 
-<!--- Ensure the sieve directory exists --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot mkdir -p /srv/mail/sieve"
-    timeout="30" />
+<cfif NOT DirectoryExists("/mnt/data/vmail/sieve")>
+    <cfdirectory action="create" directory="/mnt/data/vmail/sieve" mode="755" recurse="true">
+</cfif>
 
-<!--- Write via temp file --->
-<cfset sieveTempFile = "/opt/hermes/tmp/#Replace(sieveUsername, '@', '_at_', 'ALL')#.sieve">
 <cffile action="write"
-    file="#sieveTempFile#"
+    file="/mnt/data/vmail/sieve/#sieveUsername#.sieve"
     output="#sieveContent#"
     charset="utf-8"
     addNewLine="no">
 
-<!--- Copy to Dovecot container --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot cp #sieveTempFile# /srv/mail/sieve/#sieveUsername#.sieve"
-    timeout="30" />
-
-<!--- Set ownership --->
-<cfexecute name="/usr/local/bin/docker"
-    arguments="exec hermes_dovecot chown 1000:1000 /srv/mail/sieve/#sieveUsername#.sieve"
-    timeout="30" />
+<!--- Set ownership inside Dovecot container --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_dovecot chown 1000:1000 /srv/mail/sieve/#sieveUsername#.sieve"
+        timeout="30" />
+<cfcatch type="any">
+</cfcatch>
+</cftry>
 
 <!--- Compile --->
 <cftry>
@@ -190,8 +186,3 @@ Requires: sieveUsername variable to be set before including.
 <cfcatch type="any">
 </cfcatch>
 </cftry>
-
-<!--- Cleanup --->
-<cfif fileExists(sieveTempFile)>
-    <cffile action="delete" file="#sieveTempFile#">
-</cfif>

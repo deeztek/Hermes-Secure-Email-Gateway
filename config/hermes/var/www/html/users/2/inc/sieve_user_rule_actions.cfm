@@ -135,4 +135,58 @@ Uses session.email for the username scope.
     <cfset session.m = 4>
     <cflocation url="view_sieve_rules.cfm" addtoken="no">
 
+<cfelseif action EQ "reorder_rule">
+
+    <cfif NOT StructKeyExists(form, "reorder_rule_id") OR NOT IsNumeric(form.reorder_rule_id)>
+        <cfset session.m = 20>
+        <cflocation url="view_sieve_rules.cfm" addtoken="no">
+    </cfif>
+
+    <cfparam name="form.reorder_direction" default="down">
+
+    <cfquery name="getCurrentRule" datasource="hermes">
+        SELECT id, rule_order FROM sieve_rules
+        WHERE id = <cfqueryparam value="#form.reorder_rule_id#" cfsqltype="cf_sql_integer">
+        AND scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+
+    <cfif getCurrentRule.recordcount LT 1>
+        <cfset session.m = 21>
+        <cflocation url="view_sieve_rules.cfm" addtoken="no">
+    </cfif>
+
+    <cfif form.reorder_direction EQ "up">
+        <cfquery name="getAdjacent" datasource="hermes">
+            SELECT id, rule_order FROM sieve_rules
+            WHERE scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
+            AND rule_order < <cfqueryparam value="#getCurrentRule.rule_order#" cfsqltype="cf_sql_integer">
+            ORDER BY rule_order DESC
+            LIMIT 1
+        </cfquery>
+    <cfelse>
+        <cfquery name="getAdjacent" datasource="hermes">
+            SELECT id, rule_order FROM sieve_rules
+            WHERE scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
+            AND rule_order > <cfqueryparam value="#getCurrentRule.rule_order#" cfsqltype="cf_sql_integer">
+            ORDER BY rule_order ASC
+            LIMIT 1
+        </cfquery>
+    </cfif>
+
+    <cfif getAdjacent.recordcount GTE 1>
+        <cfquery datasource="hermes">
+            UPDATE sieve_rules SET rule_order = <cfqueryparam value="#getAdjacent.rule_order#" cfsqltype="cf_sql_integer">
+            WHERE id = <cfqueryparam value="#getCurrentRule.id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfquery datasource="hermes">
+            UPDATE sieve_rules SET rule_order = <cfqueryparam value="#getCurrentRule.rule_order#" cfsqltype="cf_sql_integer">
+            WHERE id = <cfqueryparam value="#getAdjacent.id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+
+        <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+    </cfif>
+
+    <cfset session.m = 5>
+    <cflocation url="view_sieve_rules.cfm" addtoken="no">
+
 </cfif>
