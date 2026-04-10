@@ -64,10 +64,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset quarantineCount = 0>
 <cfif isDefined("session.owner") AND session.owner GT 0>
     <cfquery name="getQuarantineCount" datasource="hermes">
-        SELECT COUNT(*) AS cnt FROM msgs
-        WHERE rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
-        AND content IN ('S','V','B','U')
+        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        AND msgs.content IN ('S','V','B','U')
     </cfquery>
     <cfif getQuarantineCount.recordcount GTE 1>
         <cfset quarantineCount = getQuarantineCount.cnt>
@@ -78,9 +80,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset totalMessages = 0>
 <cfif isDefined("session.owner") AND session.owner GT 0>
     <cfquery name="getTotalMessages" datasource="hermes">
-        SELECT COUNT(*) AS cnt FROM msgs
-        WHERE rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
+        FROM msgs
+        INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
     </cfquery>
     <cfif getTotalMessages.recordcount GTE 1>
         <cfset totalMessages = getTotalMessages.cnt>
@@ -295,10 +299,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===== RECENT QUARANTINED MESSAGES ===== --->
 <cfif isDefined("session.owner") AND session.owner GT 0>
 <cfquery name="getRecentQuarantine" datasource="hermes">
-    SELECT msgs.mail_id, msgs.time_iso, msgs.subject, msgs.content, mailaddr.email AS sender
+    SELECT DISTINCT msgs.mail_id, msgs.time_iso, msgs.subject, msgs.content, msgs.from_addr AS sender
     FROM msgs
-    LEFT JOIN mailaddr ON msgs.sid = mailaddr.id
-    WHERE msgs.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+    INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
+    WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
     AND msgs.content IN ('S','V','B','U')
     ORDER BY msgs.time_iso DESC
     LIMIT 5
