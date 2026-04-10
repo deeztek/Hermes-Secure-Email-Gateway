@@ -1373,8 +1373,8 @@ CREATE TABLE IF NOT EXISTS sieve_rules (
   modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- System rule: move spam to Junk folder (global, cannot be deleted)
+-- System rule: move spam to Spam folder (global, cannot be deleted)
 INSERT IGNORE INTO sieve_rules
 (scope, username, rule_name, rule_order, enabled, is_system, condition_field, condition_type, condition_value, action_type, action_value)
 VALUES
-('global', NULL, 'Move spam to Junk', 1, 1, 1, 'header', 'is', 'X-Spam-Flag: YES', 'fileinto', 'Junk');
+('global', NULL, 'Move spam to Spam folder', 1, 1, 1, 'header', 'contains', 'X-Spam-Status: Yes', 'fileinto', 'Spam');
