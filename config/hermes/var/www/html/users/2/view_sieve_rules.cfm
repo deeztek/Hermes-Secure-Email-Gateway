@@ -561,7 +561,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   // Load edit modal via AJAX
   function loadEditRuleModal(ruleId) {
-    $.post('../admin/2/inc/get_sieve_rule_json.cfm', { id: ruleId }, function(data) {
+    $.post('./inc/get_sieve_rule_json.cfm', { id: ruleId }, function(data) {
       try {
         var r = (typeof data === 'string') ? JSON.parse(data) : data;
         if (r.error) { alert('Error: ' + r.error); return; }

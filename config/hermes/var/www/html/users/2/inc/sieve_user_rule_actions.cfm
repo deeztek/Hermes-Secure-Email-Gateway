@@ -52,7 +52,7 @@ Uses session.email for the username scope.
         )
     </cfquery>
 
-    <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+    <cfinclude template="../../../admin/2/inc/generate_sieve_user.cfm">
 
     <cfset session.m = 1>
     <cflocation url="view_sieve_rules.cfm" addtoken="no">
@@ -94,7 +94,7 @@ Uses session.email for the username scope.
         AND scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
     </cfquery>
 
-    <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+    <cfinclude template="../../../admin/2/inc/generate_sieve_user.cfm">
 
     <cfset session.m = 2>
     <cflocation url="view_sieve_rules.cfm" addtoken="no">
@@ -112,7 +112,7 @@ Uses session.email for the username scope.
         AND scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
     </cfquery>
 
-    <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+    <cfinclude template="../../../admin/2/inc/generate_sieve_user.cfm">
 
     <cfset session.m = 3>
     <cflocation url="view_sieve_rules.cfm" addtoken="no">
@@ -130,7 +130,7 @@ Uses session.email for the username scope.
         AND scope = 'user' AND username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
     </cfquery>
 
-    <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+    <cfinclude template="../../../admin/2/inc/generate_sieve_user.cfm">
 
     <cfset session.m = 4>
     <cflocation url="view_sieve_rules.cfm" addtoken="no">
@@ -183,7 +183,7 @@ Uses session.email for the username scope.
             WHERE id = <cfqueryparam value="#getAdjacent.id#" cfsqltype="cf_sql_integer">
         </cfquery>
 
-        <cfinclude template="../../admin/2/inc/generate_sieve_user.cfm">
+        <cfinclude template="../../../admin/2/inc/generate_sieve_user.cfm">
     </cfif>
 
     <cfset session.m = 5>
