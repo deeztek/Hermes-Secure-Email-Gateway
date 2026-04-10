@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-  <!---
+<!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
@@ -21,94 +21,383 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <html lang="en">
 
-
-
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Hermes SEG | Welcome</title>
-
   <cfinclude template="./inc/html_head.cfm" />
- 
-
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
-
-
 
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
-  <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
-    <!-- Content Header (Page header) -->
     <div class="content-header">
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
             <cfoutput>
             <h1 class="m-0">Welcome #session.theName#!</h1>
-            <!---
-            <h2 class="m-0">Group Member: #session.thegroups#</h2>
-            --->
-          </cfoutput>
-            
-          </div><!-- /.col -->
+            </cfoutput>
+          </div>
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
-              <li class="breadcrumb-item"><a href="#">Home</a></li>
+              <li class="breadcrumb-item"><a href="##">Home</a></li>
               <li class="breadcrumb-item active">Home</li>
             </ol>
-          </div><!-- /.col -->
-        </div><!-- /.row -->
-      </div><!-- /.container-fluid -->
+          </div>
+        </div>
+      </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Main content -->
     <div class="content">
       <div class="container-fluid">
 
-        <!--- QUICK LINKS CARD --->
-        <div class="card card-outline card-primary mb-4">
-            <div class="card-header">
-                <h3 class="card-title"><i class="fas fa-th-large me-2"></i>Quick Links</h3>
+<cfset isMailboxUser = session.theGroups CONTAINS "mailboxes">
+
+<!--- ===== GATHER STATS ===== --->
+
+<!--- Quarantined messages (last 30 days) --->
+<cfset quarantineCount = 0>
+<cfif isDefined("session.owner") AND session.owner GT 0>
+    <cfquery name="getQuarantineCount" datasource="hermes">
+        SELECT COUNT(*) AS cnt FROM msgs
+        WHERE rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        AND content IN ('S','V','B','U')
+    </cfquery>
+    <cfif getQuarantineCount.recordcount GTE 1>
+        <cfset quarantineCount = getQuarantineCount.cnt>
+    </cfif>
+</cfif>
+
+<!--- Total messages last 30 days --->
+<cfset totalMessages = 0>
+<cfif isDefined("session.owner") AND session.owner GT 0>
+    <cfquery name="getTotalMessages" datasource="hermes">
+        SELECT COUNT(*) AS cnt FROM msgs
+        WHERE rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+        AND time_iso >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+    </cfquery>
+    <cfif getTotalMessages.recordcount GTE 1>
+        <cfset totalMessages = getTotalMessages.cnt>
+    </cfif>
+</cfif>
+
+<!--- Sender filter count --->
+<cfset senderFilterCount = 0>
+<cfif isDefined("session.owner") AND session.owner GT 0>
+    <cfquery name="getSenderFilters" datasource="hermes">
+        SELECT COUNT(*) AS cnt FROM wblist WHERE rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfif getSenderFilters.recordcount GTE 1>
+        <cfset senderFilterCount = getSenderFilters.cnt>
+    </cfif>
+</cfif>
+
+<!--- Mail filter count (mailbox users only) --->
+<cfset mailFilterCount = 0>
+<cfif isMailboxUser>
+    <cfquery name="getMailFilters" datasource="hermes">
+        SELECT COUNT(*) AS cnt FROM sieve_rules
+        WHERE scope = 'user' AND username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif getMailFilters.recordcount GTE 1>
+        <cfset mailFilterCount = getMailFilters.cnt>
+    </cfif>
+</cfif>
+
+<!--- Mailbox quota usage (mailbox users only) --->
+<cfset quotaUsedGb = 0>
+<cfset quotaLimitGb = 0>
+<cfset quotaPct = 0>
+<cfif isMailboxUser>
+    <cfquery name="getMailbox" datasource="hermes">
+        SELECT quota FROM mailboxes WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif getMailbox.recordcount GTE 1 AND getMailbox.quota GT 0>
+        <cfset quotaLimitGb = getMailbox.quota / 1024 / 1024 / 1024>
+        <!--- Get used quota from quota2 table (Dovecot quota tracking) --->
+        <cftry>
+            <cfquery name="getUsed" datasource="hermes">
+                SELECT bytes FROM quota2 WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+            </cfquery>
+            <cfif getUsed.recordcount GTE 1>
+                <cfset quotaUsedGb = getUsed.bytes / 1024 / 1024 / 1024>
+                <cfif quotaLimitGb GT 0>
+                    <cfset quotaPct = Round((quotaUsedGb / quotaLimitGb) * 100)>
+                </cfif>
+            </cfif>
+        <cfcatch type="any">
+            <!--- quota2 table may not exist or be populated yet --->
+        </cfcatch>
+        </cftry>
+    </cfif>
+</cfif>
+
+<!--- ===== STATS CARDS ===== --->
+<cfoutput>
+<div class="row">
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-warning">
+            <div class="inner">
+                <h3>#quarantineCount#</h3>
+                <p>Quarantined (30 days)</p>
             </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <a href="view_sender_filters.cfm" class="btn btn-outline-primary btn-block w-100">
-                            <i class="fas fa-filter me-2"></i>Sender Filters
-                        </a>
-                    </div>
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <a href="report_settings.cfm" class="btn btn-outline-primary btn-block w-100">
-                            <i class="fas fa-bell me-2"></i>Notification Settings
-                        </a>
-                    </div>
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <a href="user_settings.cfm" class="btn btn-outline-primary btn-block w-100">
-                            <i class="fas fa-cog me-2"></i>Account Settings
-                        </a>
-                    </div>
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <a href="view_message_history.cfm" class="btn btn-outline-primary btn-block w-100">
-                            <i class="fas fa-history me-2"></i>Message History
-                        </a>
-                    </div>
-                </div>
+            <span class="small-box-icon"><i class="fas fa-shield-alt"></i></span>
+            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                View History <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-success">
+            <div class="inner">
+                <h3>#totalMessages#</h3>
+                <p>Total Messages (30 days)</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-envelope"></i></span>
+            <a href="view_message_history.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                View All <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-info">
+            <div class="inner">
+                <h3>#senderFilterCount#</h3>
+                <p>Sender Filters</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-filter"></i></span>
+            <a href="view_sender_filters.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Manage <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <cfif isMailboxUser>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-primary">
+            <div class="inner">
+                <h3>#mailFilterCount#</h3>
+                <p>Mail Filters</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-cogs"></i></span>
+            <a href="view_sieve_rules.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Manage <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    <cfelse>
+    <div class="col-lg-3 col-6">
+        <div class="small-box text-bg-secondary">
+            <div class="inner">
+                <h3>Account</h3>
+                <p>Settings &amp; Profile</p>
+            </div>
+            <span class="small-box-icon"><i class="fas fa-user-cog"></i></span>
+            <a href="user_settings.cfm" class="small-box-footer link-light link-underline-opacity-0 link-underline-opacity-50-hover">
+                Manage <i class="fas fa-arrow-circle-right"></i>
+            </a>
+        </div>
+    </div>
+    </cfif>
+</div>
+</cfoutput>
+
+<!--- ===== MAILBOX QUOTA (mailbox users only) ===== --->
+<cfif isMailboxUser AND quotaLimitGb GT 0>
+<cfoutput>
+<div class="card card-outline card-info mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-database me-2"></i>Mailbox Storage</h3>
+    </div>
+    <div class="card-body">
+        <div class="d-flex justify-content-between mb-2">
+            <span>
+                <strong>#NumberFormat(quotaUsedGb, "0.00")# GB</strong> used of
+                <strong>#NumberFormat(quotaLimitGb, "0.0")# GB</strong>
+            </span>
+            <span class="text-muted">#quotaPct#%</span>
+        </div>
+        <div class="progress" style="height: 20px;">
+            <div class="progress-bar
+                <cfif quotaPct GTE 90>bg-danger
+                <cfelseif quotaPct GTE 75>bg-warning
+                <cfelse>bg-success</cfif>"
+                role="progressbar"
+                style="width: #quotaPct#%;"
+                aria-valuenow="#quotaPct#" aria-valuemin="0" aria-valuemax="100">
+                #quotaPct#%
             </div>
         </div>
-
-      </div><!-- /.container-fluid -->
+        <cfif quotaPct GTE 90>
+        <div class="alert alert-danger mt-3 mb-0">
+            <i class="fas fa-exclamation-triangle me-2"></i>
+            Your mailbox is almost full. Delete old messages or contact your administrator to increase your quota.
+        </div>
+        <cfelseif quotaPct GTE 75>
+        <div class="alert alert-warning mt-3 mb-0">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            Your mailbox is filling up. Consider archiving or deleting old messages.
+        </div>
+        </cfif>
     </div>
-    <!-- /.content -->
+</div>
+</cfoutput>
+</cfif>
+
+<!--- ===== QUICK LINKS - matches sidebar order exactly ===== --->
+<div class="card card-outline card-primary mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-th-large me-2"></i>Quick Links</h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="report_settings.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-bell me-2"></i>Notification Settings
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_sender_filters.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-filter me-2"></i>Sender Filters
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="user_settings.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-cog me-2"></i>Account Settings
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_message_history.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-history me-2"></i>Message History
+                </a>
+            </div>
+            <cfif isMailboxUser>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_sieve_rules.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-filter me-2"></i>Mail Filters
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="/nc/" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-inbox me-2"></i>Login to Webmail
+                </a>
+            </div>
+            </cfif>
+        </div>
+    </div>
+</div>
+
+<!--- ===== RECENT QUARANTINED MESSAGES ===== --->
+<cfif isDefined("session.owner") AND session.owner GT 0>
+<cfquery name="getRecentQuarantine" datasource="hermes">
+    SELECT msgs.mail_id, msgs.time_iso, msgs.subject, msgs.content, mailaddr.email AS sender
+    FROM msgs
+    LEFT JOIN mailaddr ON msgs.sid = mailaddr.id
+    WHERE msgs.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+    AND msgs.content IN ('S','V','B','U')
+    ORDER BY msgs.time_iso DESC
+    LIMIT 5
+</cfquery>
+
+<cfif getRecentQuarantine.recordcount GTE 1>
+<div class="card card-outline card-warning mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Recent Quarantined Messages</h3>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>From</th>
+                    <th>Subject</th>
+                    <th>Type</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                <cfoutput query="getRecentQuarantine">
+                <tr>
+                    <td><small>#DateTimeFormat(time_iso, "mm/dd/yyyy HH:nn")#</small></td>
+                    <td><small>#HTMLEditFormat(sender)#</small></td>
+                    <td><small>#HTMLEditFormat(subject)#</small></td>
+                    <td>
+                        <cfif content EQ "S"><span class="badge bg-warning text-dark">Spam</span>
+                        <cfelseif content EQ "V"><span class="badge bg-danger">Virus</span>
+                        <cfelseif content EQ "B"><span class="badge bg-info">Banned</span>
+                        <cfelseif content EQ "U"><span class="badge bg-secondary">Unchecked</span>
+                        </cfif>
+                    </td>
+                    <td>
+                        <a href="view_message.cfm?mid=#mail_id#" class="btn btn-sm btn-secondary" title="View">
+                            <i class="fas fa-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                </cfoutput>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-end">
+        <a href="view_message_history.cfm" class="btn btn-sm btn-warning">
+            <i class="fas fa-history me-2"></i>View All Quarantined Messages
+        </a>
+    </div>
+</div>
+</cfif>
+</cfif>
+
+<!--- ===== ACCOUNT INFO ===== --->
+<cfquery name="getAccountInfo" datasource="hermes">
+    SELECT auth_type, recipient_type FROM recipients WHERE recipient = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfoutput>
+<div class="card card-outline card-secondary mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-user-circle me-2"></i>Account Information</h3>
+    </div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Email:</strong> #session.email#</p>
+                <p class="mb-2"><strong>Display Name:</strong> #session.theName#</p>
+            </div>
+            <div class="col-md-6">
+                <p class="mb-2"><strong>Account Type:</strong>
+                    <cfif isMailboxUser>
+                        <span class="badge bg-primary">Mailbox</span>
+                    <cfelse>
+                        <span class="badge bg-info">Relay</span>
+                    </cfif>
+                </p>
+                <cfif getAccountInfo.recordcount GTE 1>
+                <p class="mb-2"><strong>Authentication:</strong>
+                    <cfif getAccountInfo.auth_type EQ "remote">
+                        <span class="badge bg-info">Remote (SSO)</span>
+                    <cfelse>
+                        <span class="badge bg-secondary">Local Password</span>
+                    </cfif>
+                </p>
+                </cfif>
+            </div>
+        </div>
+    </div>
+</div>
+</cfoutput>
+
+      </div>
+    </div>
   </main>
 
   <cfinclude template="./inc/main_footer.cfm" />
 
+</div>
+
 </body>
-
-
 </html>

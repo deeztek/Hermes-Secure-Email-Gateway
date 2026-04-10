@@ -483,19 +483,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     });
 
     // Initialize Tom Select with create:true (allows custom folder names)
-    addFolderTS = new TomSelect('#addActionValueSelect', {
-      create: true,
+    var tsConfig = {
+      create: function(input) {
+        return { value: input, text: input };
+      },
+      createOnBlur: true,
+      persist: true,
       sortField: { field: 'text', direction: 'asc' },
       placeholder: 'Select or type folder name...',
-      createOnBlur: true
-    });
+      addPrecedence: false,
+      maxOptions: 200
+    };
 
-    editFolderTS = new TomSelect('#editActionValueSelect', {
-      create: true,
-      sortField: { field: 'text', direction: 'asc' },
-      placeholder: 'Select or type folder name...',
-      createOnBlur: true
-    });
+    addFolderTS = new TomSelect('#addActionValueSelect', tsConfig);
+    editFolderTS = new TomSelect('#editActionValueSelect', tsConfig);
   }
 
   // Helper: update condition UI
