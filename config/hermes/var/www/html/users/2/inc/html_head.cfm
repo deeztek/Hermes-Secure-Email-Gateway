@@ -282,6 +282,9 @@ button[type="submit"].btn {
 <!-- Tempus Dominus 6 Datetimepicker CSS -->
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/css/tempus-dominus.min.css" crossorigin="anonymous">
 
+<!-- Tom Select CSS (searchable dropdowns) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.bootstrap5.min.css" crossorigin="anonymous">
+
 <!-- Favicon -->
 <link rel="icon" href="favicon.ico" type="image/x-icon">
 <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
@@ -386,6 +389,9 @@ window.addEventListener('beforeunload', function() {
 
 <!-- Tempus Dominus 6 Datetimepicker -->
 <script src="https://cdn.jsdelivr.net/npm/@eonasdan/tempus-dominus@6.9.4/dist/js/tempus-dominus.min.js" crossorigin="anonymous"></script>
+
+<!-- Tom Select JS (searchable dropdowns) -->
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js" crossorigin="anonymous"></script>
 
 <!-- InputMask -->
 <script src="/plugins/inputmask/jquery.inputmask.min.js"></script>
