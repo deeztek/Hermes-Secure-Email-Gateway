@@ -303,7 +303,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
                 <div class="col-md-8 mb-2" id="addActionValueGroup">
                   <label id="addActionValueLabel">Folder name</label>
-                  <input type="text" class="form-control" name="action_value" id="addActionValue" placeholder="e.g., Newsletters">
+                  <select class="form-control" name="action_value" id="addActionValueSelect" style="width:100%;">
+                    <option value=""></option>
+                  </select>
+                  <input type="text" class="form-control" name="action_value_text" id="addActionValueText" placeholder="e.g., user@domain.com" style="display:none;">
+                  <small class="text-muted" id="addActionValueHint">Select existing folder or type to create a new one</small>
                 </div>
               </div>
             </div>
@@ -382,7 +386,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
                 <div class="col-md-8 mb-2" id="editActionValueGroup">
                   <label id="editActionValueLabel">Folder name</label>
-                  <input type="text" class="form-control" name="edit_action_value" id="editActionValue">
+                  <select class="form-control" name="edit_action_value" id="editActionValueSelect" style="width:100%;">
+                    <option value=""></option>
+                  </select>
+                  <input type="text" class="form-control" name="edit_action_value_text" id="editActionValueText" style="display:none;">
+                  <small class="text-muted" id="editActionValueHint">Select existing folder or type to create a new one</small>
                 </div>
               </div>
             </div>
@@ -446,6 +454,50 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </body>
 
 <script>
+  var addFolderTS, editFolderTS;
+  var folderList = [];
+
+  // Fetch user's mailbox folders on page load
+  $(document).ready(function() {
+    $.getJSON('./inc/get_mailbox_folders.cfm', function(data) {
+      if (data && data.folders) {
+        folderList = data.folders;
+      }
+      initFolderSelects();
+    }).fail(function() {
+      // If folder fetch fails, still init with empty list
+      initFolderSelects();
+    });
+  });
+
+  function initFolderSelects() {
+    // Populate select options from folder list
+    var addSelect = document.getElementById('addActionValueSelect');
+    var editSelect = document.getElementById('editActionValueSelect');
+
+    folderList.forEach(function(f) {
+      var opt1 = new Option(f, f);
+      var opt2 = new Option(f, f);
+      addSelect.appendChild(opt1);
+      editSelect.appendChild(opt2);
+    });
+
+    // Initialize Tom Select with create:true (allows custom folder names)
+    addFolderTS = new TomSelect('#addActionValueSelect', {
+      create: true,
+      sortField: { field: 'text', direction: 'asc' },
+      placeholder: 'Select or type folder name...',
+      createOnBlur: true
+    });
+
+    editFolderTS = new TomSelect('#editActionValueSelect', {
+      create: true,
+      sortField: { field: 'text', direction: 'asc' },
+      placeholder: 'Select or type folder name...',
+      createOnBlur: true
+    });
+  }
+
   // Helper: update condition UI
   function updateConditionUI(prefix) {
     var field = $('#' + prefix + 'CondField').val();
@@ -464,19 +516,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     }
   }
 
-  // Helper: update action UI
+  // Helper: update action UI - swap between folder dropdown and text input
   function updateActionUI(prefix) {
     var action = $('#' + prefix + 'ActionType').val();
+    var ts = (prefix === 'add') ? addFolderTS : editFolderTS;
+    var selectWrapper = $('#' + prefix + 'ActionValueSelect').next('.ts-wrapper');
+    if (selectWrapper.length === 0) selectWrapper = $('#' + prefix + 'ActionValueSelect');
+    var textInput = $('#' + prefix + 'ActionValueText');
+    var hint = $('#' + prefix + 'ActionValueHint');
+
     if (action === 'fileinto') {
       $('#' + prefix + 'ActionValueGroup').show();
       $('#' + prefix + 'ActionValueLabel').text('Folder name');
-      $('#' + prefix + 'ActionValue').attr('placeholder', 'e.g., Newsletters');
+      selectWrapper.show();
+      textInput.hide().prop('required', false);
+      $('#' + prefix + 'ActionValueSelect').prop('name', (prefix === 'add') ? 'action_value' : 'edit_action_value');
+      textInput.prop('name', '');
+      hint.text('Select existing folder or type to create a new one');
     } else if (action === 'redirect') {
       $('#' + prefix + 'ActionValueGroup').show();
       $('#' + prefix + 'ActionValueLabel').text('Email address');
-      $('#' + prefix + 'ActionValue').attr('placeholder', 'e.g., user@domain.com');
+      selectWrapper.hide();
+      textInput.show().attr('placeholder', 'e.g., user@domain.com').prop('required', true);
+      $('#' + prefix + 'ActionValueSelect').prop('name', '');
+      textInput.prop('name', (prefix === 'add') ? 'action_value' : 'edit_action_value');
+      hint.text('Email address to forward messages to');
     } else {
       $('#' + prefix + 'ActionValueGroup').hide();
+      $('#' + prefix + 'ActionValueSelect').prop('name', '');
+      textInput.prop('name', '').prop('required', false);
     }
   }
 
@@ -484,6 +552,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   $('#addActionType').on('change', function() { updateActionUI('add'); });
   $('#editCondField').on('change', function() { updateConditionUI('edit'); });
   $('#editActionType').on('change', function() { updateActionUI('edit'); });
+
+  // Initialize default action UI when add modal opens
+  $('#addRuleModal').on('shown.bs.modal', function() {
+    updateActionUI('add');
+  });
 
   // Load edit modal via AJAX
   function loadEditRuleModal(ruleId) {
@@ -499,7 +572,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $('#editCondValue').val(r.condition_value);
         $('#editActionType').val(r.action_type);
         updateActionUI('edit');
-        $('#editActionValue').val(r.action_value);
+        if (r.action_type === 'fileinto') {
+          // Add option if not already present (custom folder)
+          if (folderList.indexOf(r.action_value) === -1 && r.action_value) {
+            editFolderTS.addOption({value: r.action_value, text: r.action_value});
+          }
+          editFolderTS.setValue(r.action_value);
+        } else if (r.action_type === 'redirect') {
+          $('#editActionValueText').val(r.action_value);
+        }
         new bootstrap.Modal(document.getElementById('editRuleModal')).show();
       } catch(e) { alert('Error loading filter data.'); }
     });

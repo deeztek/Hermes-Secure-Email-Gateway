@@ -48,7 +48,10 @@ Requires: sieveUsername variable to be set before including.
 
 <!--- Require statements --->
 <cfset requires = []>
-<cfif needsFileinto><cfset ArrayAppend(requires, '"fileinto"')></cfif>
+<cfif needsFileinto>
+    <cfset ArrayAppend(requires, '"fileinto"')>
+    <cfset ArrayAppend(requires, '"mailbox"')>
+</cfif>
 <cfif needsImap4flags><cfset ArrayAppend(requires, '"imap4flags"')></cfif>
 <cfif needsReject><cfset ArrayAppend(requires, '"reject"')></cfif>
 <cfif needsVacation><cfset ArrayAppend(requires, '"vacation"')></cfif>
@@ -130,7 +133,8 @@ Requires: sieveUsername variable to be set before including.
     </cfif>
 
     <cfif action_type EQ "fileinto">
-        <cfset action = 'fileinto "#action_value#";'>
+        <!--- :create flag auto-creates the folder if it doesn't exist --->
+        <cfset action = 'fileinto :create "#action_value#";'>
     <cfelseif action_type EQ "discard">
         <cfset action = "discard;">
     <cfelseif action_type EQ "keep">
