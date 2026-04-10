@@ -1374,7 +1374,9 @@ CREATE TABLE IF NOT EXISTS sieve_rules (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- System rule: move spam to Spam folder (global, cannot be deleted)
+-- Note: uses :matches with "Yes,*" to anchor at start - :contains "Yes" would
+-- match "BAYES_60" in tests= array (sieve :contains is case-insensitive substring)
 INSERT IGNORE INTO sieve_rules
 (scope, username, rule_name, rule_order, enabled, is_system, condition_field, condition_type, condition_value, action_type, action_value)
 VALUES
-('global', NULL, 'Move spam to Spam folder', 1, 1, 1, 'header', 'contains', 'X-Spam-Status: Yes', 'fileinto', 'Spam');
+('global', NULL, 'Move spam to Spam folder', 1, 1, 1, 'header', 'matches', 'X-Spam-Status: Yes,*', 'fileinto', 'Spam');
