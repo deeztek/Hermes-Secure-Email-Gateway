@@ -160,27 +160,24 @@ After writing, compiles the script using sievec via Docker exec.
 <!--- Write the sieve file --->
 <cfset sieveContent = ArrayToList(sieveLines, Chr(10))>
 
-<!--- The dovecot_mail volume is mounted at /mnt/data/vmail in commandbox.
-     Inside the dovecot container, the same volume is at /srv/mail.
-     Writing to /mnt/data/vmail/sieve/global/before.sieve from commandbox
-     makes the file appear at /srv/mail/sieve/global/before.sieve in dovecot. --->
+<!--- Dedicated sieve volume: commandbox writes to /mnt/data/sieve,
+     dovecot reads from /srv/sieve. Same underlying volume.
+     This is isolated from /srv/mail (user mailboxes) for security. --->
 
-<!--- Ensure the global sieve directory exists --->
-<cfif NOT DirectoryExists("/mnt/data/vmail/sieve/global")>
-    <cfdirectory action="create" directory="/mnt/data/vmail/sieve/global" mode="755" recurse="true">
+<cfif NOT DirectoryExists("/mnt/data/sieve/global")>
+    <cfdirectory action="create" directory="/mnt/data/sieve/global" mode="755" recurse="true">
 </cfif>
 
-<!--- Write the script file directly to the shared volume --->
 <cffile action="write"
-    file="/mnt/data/vmail/sieve/global/before.sieve"
+    file="/mnt/data/sieve/global/before.sieve"
     output="#sieveContent#"
     charset="utf-8"
     addNewLine="no">
 
-<!--- Set ownership inside the Dovecot container (vmail uid/gid 1000) --->
+<!--- Set ownership inside the Dovecot container --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_dovecot chown -R 1000:1000 /srv/mail/sieve/global"
+        arguments="exec hermes_dovecot chown -R 1000:1000 /srv/sieve/global"
         timeout="30" />
 <cfcatch type="any">
 </cfcatch>
@@ -189,11 +186,10 @@ After writing, compiles the script using sievec via Docker exec.
 <!--- Compile the sieve script --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_dovecot sievec /srv/mail/sieve/global/before.sieve"
+        arguments="exec hermes_dovecot sievec /srv/sieve/global/before.sieve"
         variable="sievecOutput"
         errorVariable="sievecError"
         timeout="30" />
 <cfcatch type="any">
-    <!--- Compilation failure is non-critical - Dovecot will interpret at runtime --->
 </cfcatch>
 </cftry>

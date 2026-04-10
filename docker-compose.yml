@@ -262,7 +262,8 @@ services:
       - ./config/hermes/var/www/html:/var/www/html #Application Directory
       - commandbox_serverhome:/serverhome #Server Home Directory
       - amavis_data:/mnt/data/amavis #Amavis Data
-      - dovecot_mail:/mnt/data/vmail #Dovecot Vmail Data (read-write for sieve script generation)
+      - dovecot_mail:/mnt/data/vmail:ro #Dovecot Vmail Data (read-only for monitoring)
+      - dovecot_sieve:/mnt/data/sieve #Sieve scripts (shared with hermes_dovecot)
       - nextcloud:/mnt/data/nextcloud #Nextcloud Data
       - ./config/ciphermail/usr/share/djigzo:/usr/share/djigzo #Ciphermail
       - ./config/hermes/opt/hermes:/opt/hermes
@@ -599,7 +600,8 @@ services:
       - /opt/hermes/keys/ecpubkey.pem:/keys/ecpubkey.pem
       - /opt/hermes/creds/hermes_username:/opt/hermes/creds/hermes_username
       - /opt/hermes/creds/hermes_password:/opt/hermes/creds/hermes_password
-      - dovecot_mail:/srv/mail  
+      - dovecot_mail:/srv/mail
+      - dovecot_sieve:/srv/sieve
       - dovecot_logs:/logs
       #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/fullchain.pem:/certs/fullchain.pem
       #- /etc/letsencrypt/live/${HERMES_HOSTNAME}/privkey.pem:/certs/privkey.pem
@@ -679,6 +681,13 @@ volumes:
       type: none
       o: bind
       device: /mnt/data/dovecot/vmail
+
+  dovecot_sieve:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/data/dovecot/sieve
 
   authelia_redis:
     driver: local

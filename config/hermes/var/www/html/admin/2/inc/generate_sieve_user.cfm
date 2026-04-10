@@ -154,15 +154,16 @@ Requires: sieveUsername variable to be set before including.
 
 </cfloop>
 
-<!--- Write the sieve file directly to shared volume (commandbox /mnt/data/vmail = dovecot /srv/mail) --->
+<!--- Dedicated sieve volume: commandbox writes to /mnt/data/sieve,
+     dovecot reads from /srv/sieve. Isolated from /srv/mail for security. --->
 <cfset sieveContent = ArrayToList(sieveLines, Chr(10))>
 
-<cfif NOT DirectoryExists("/mnt/data/vmail/sieve")>
-    <cfdirectory action="create" directory="/mnt/data/vmail/sieve" mode="755" recurse="true">
+<cfif NOT DirectoryExists("/mnt/data/sieve/users")>
+    <cfdirectory action="create" directory="/mnt/data/sieve/users" mode="755" recurse="true">
 </cfif>
 
 <cffile action="write"
-    file="/mnt/data/vmail/sieve/#sieveUsername#.sieve"
+    file="/mnt/data/sieve/users/#sieveUsername#.sieve"
     output="#sieveContent#"
     charset="utf-8"
     addNewLine="no">
@@ -170,7 +171,7 @@ Requires: sieveUsername variable to be set before including.
 <!--- Set ownership inside Dovecot container --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_dovecot chown 1000:1000 /srv/mail/sieve/#sieveUsername#.sieve"
+        arguments="exec hermes_dovecot chown 1000:1000 /srv/sieve/users/#sieveUsername#.sieve"
         timeout="30" />
 <cfcatch type="any">
 </cfcatch>
@@ -179,7 +180,7 @@ Requires: sieveUsername variable to be set before including.
 <!--- Compile --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_dovecot sievec /srv/mail/sieve/#sieveUsername#.sieve"
+        arguments="exec hermes_dovecot sievec /srv/sieve/users/#sieveUsername#.sieve"
         variable="sievecOutput"
         errorVariable="sievecError"
         timeout="30" />
