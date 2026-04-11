@@ -42,8 +42,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <!---
             <h2 class="m-0">Group Member: #session.thegroups#</h2>
             --->
+            <cfif StructKeyExists(session, "previous_login") AND IsDate(session.previous_login)>
+              <small class="text-muted"><i class="fas fa-clock me-1"></i>Last login: #DateTimeFormat(session.previous_login, "yyyy/mm/dd HH:nn")#</small>
+            <cfelseif StructKeyExists(session, "previous_login")>
+              <small class="text-muted"><i class="fas fa-clock me-1"></i>Last login: First login</small>
+            </cfif>
           </cfoutput>
-            
+
           </div><!-- /.col -->
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">

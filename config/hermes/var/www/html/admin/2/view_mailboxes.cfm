@@ -471,6 +471,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </select>
           </div>
 
+          <!--- Timezone --->
+          <div class="form-group mb-3">
+            <label><strong>Timezone</strong></label>
+            <p class="help-block">Used for the user's vacation auto-reply schedule and dashboard timestamps. Defaults to system timezone; the user can change it in their Account Settings.</p>
+            <select class="form-control" name="edit_timezone" id="editTimezone" style="width:100%;">
+              <cfset zoneIdClass = createObject("java", "java.time.ZoneId")>
+              <cfset availableZones = zoneIdClass.getAvailableZoneIds().toArray()>
+              <cfset tzList = []>
+              <cfloop array="#availableZones#" index="z">
+                  <cfset ArrayAppend(tzList, z)>
+              </cfloop>
+              <cfset ArraySort(tzList, "textnocase")>
+              <cfoutput>
+              <cfloop array="#tzList#" index="z">
+                <option value="#z#">#z#</option>
+              </cfloop>
+              </cfoutput>
+            </select>
+          </div>
+
           <!--- Auth Type (read-only) --->
           <div class="form-group mb-3">
             <label><strong>Authentication Type</strong></label>
@@ -605,9 +625,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <li>Encryption settings and certificates</li>
               <li>User portal settings</li>
               <li>Quarantine preferences</li>
+              <li>Mailbox aliases pointing to this mailbox</li>
+              <li>User mail filters (sieve rules)</li>
             </ul>
             <p class="mb-0"><strong>This action cannot be undone.</strong></p>
           </div>
+
+          <!--- BCC map cascade warning - populated by AJAX on modal open --->
+          <div id="deleteMailboxBccWarn" class="alert alert-warning" style="display:none;">
+            <h5><i class="icon fas fa-exclamation-circle"></i> BCC map entries will also be deleted</h5>
+            <p class="mb-0" id="deleteMailboxBccWarnText"></p>
+          </div>
+
           <p>Are you sure you want to delete <strong id="deleteMailboxEmail"></strong>?</p>
         </div>
         <div class="modal-footer">
@@ -646,7 +675,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       var val = $(this).val();
       table.column(5).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
     });
+
+    // Initialize Tom Select for the edit-mailbox timezone dropdown
+    if (typeof TomSelect !== 'undefined' && document.getElementById('editTimezone')) {
+      window.editTimezoneTS = new TomSelect('#editTimezone', {
+        create: false,
+        sortField: { field: 'text', direction: 'asc' },
+        maxOptions: 1000
+      });
+    }
   });
+
+  var editTimezoneTS = null;
 
   // Load Edit Options modal via AJAX
   function loadEditModal(mailboxId) {
@@ -664,6 +704,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $('#editTrainBayes').val(mb.train_bayes);
         $('#editDownloadMsg').val(mb.download_msg);
         $('#editNextcloud').val(mb.nextcloud_enabled || '0');
+        if (editTimezoneTS) {
+          editTimezoneTS.setValue(mb.timezone || '');
+        } else {
+          $('#editTimezone').val(mb.timezone || '');
+        }
         $('#editAuthType').val(mb.auth_type === 'remote' ? 'Remote' : 'Local');
         // Show password field only for local auth
         if (mb.auth_type === 'local') {
@@ -732,6 +777,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   function confirmDelete(mailboxId, email) {
     $('#deleteMailboxId').val(mailboxId);
     $('#deleteMailboxEmail').text(email);
+    // Hide/reset the BCC warning before fetching fresh count
+    $('#deleteMailboxBccWarn').hide();
+    $('#deleteMailboxBccWarnText').text('');
+    $.post('./inc/get_mailbox_bcc_count.cfm', { mailbox_id: mailboxId }, function(data) {
+      try {
+        var r = (typeof data === 'string') ? JSON.parse(data) : data;
+        if (r && r.count > 0) {
+          var parts = [];
+          if (r.as_address > 0) parts.push(r.as_address + ' rule(s) where this mailbox is the watched address');
+          if (r.as_target > 0)  parts.push(r.as_target  + ' rule(s) where this mailbox is the BCC destination');
+          var text = 'Deleting this mailbox will also remove ' + r.count + ' BCC map entr' + (r.count === 1 ? 'y' : 'ies') + ': ' + parts.join(', ') + '.';
+          $('#deleteMailboxBccWarnText').text(text);
+          $('#deleteMailboxBccWarn').show();
+        }
+      } catch(e) { /* silent - modal still works without warning */ }
+    }, 'json');
     new bootstrap.Modal(document.getElementById('deleteMailboxModal')).show();
   }
 </script>

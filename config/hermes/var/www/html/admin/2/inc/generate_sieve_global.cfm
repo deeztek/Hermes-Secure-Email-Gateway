@@ -3,18 +3,42 @@
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 GENERATE GLOBAL SIEVE SCRIPT
-Reads all enabled global sieve rules from the database and generates
-the sieve_before script at /srv/mail/sieve/global/before.sieve.
-After writing, compiles the script using sievec via Docker exec.
+Reads all enabled global sieve rules (with their multi-condition/multi-action
+children) from the database and generates the sieve_before script at
+/mnt/data/sieve/global/before.sieve. After writing, compiles the script using
+sievec via Docker exec.
 --->
+
+<cfinclude template="sieve_helpers.cfm">
 
 <!--- Get all enabled global rules ordered by rule_order --->
 <cfquery name="getGlobalRules" datasource="hermes">
-    SELECT id, rule_name, condition_field, condition_type, condition_value,
-           action_type, action_value
+    SELECT id, rule_name, match_type
     FROM sieve_rules
     WHERE scope = 'global' AND enabled = 1
     ORDER BY rule_order ASC
+</cfquery>
+
+<!--- Pre-load all conditions and actions for these rules.
+     Use cfqueryparam list="yes" so the IN clause is parameterized
+     (defense in depth even though ids come from a typed query). --->
+<cfset ruleIds = ValueList(getGlobalRules.id)>
+<cfif ruleIds EQ "">
+    <cfset ruleIds = "0">
+</cfif>
+
+<cfquery name="allConditions" datasource="hermes">
+    SELECT rule_id, condition_field, condition_type, condition_value
+    FROM sieve_rule_conditions
+    WHERE rule_id IN (<cfqueryparam value="#ruleIds#" cfsqltype="cf_sql_integer" list="yes">)
+    ORDER BY rule_id ASC, condition_order ASC, id ASC
+</cfquery>
+
+<cfquery name="allActions" datasource="hermes">
+    SELECT rule_id, action_type, action_value
+    FROM sieve_rule_actions
+    WHERE rule_id IN (<cfqueryparam value="#ruleIds#" cfsqltype="cf_sql_integer" list="yes">)
+    ORDER BY rule_id ASC, action_order ASC, id ASC
 </cfquery>
 
 <!--- Determine which sieve extensions are needed --->
@@ -23,7 +47,7 @@ After writing, compiles the script using sievec via Docker exec.
 <cfset needsReject = false>
 <cfset needsVacation = false>
 
-<cfloop query="getGlobalRules">
+<cfloop query="allActions">
     <cfif action_type EQ "fileinto">
         <cfset needsFileinto = true>
     <cfelseif action_type EQ "flag_seen">
@@ -35,16 +59,14 @@ After writing, compiles the script using sievec via Docker exec.
     </cfif>
 </cfloop>
 
-<!--- Build the sieve script --->
+<!--- Build sieve script --->
 <cfset sieveLines = []>
 
-<!--- Header comment --->
 <cfset ArrayAppend(sieveLines, "## Hermes SEG Global Sieve Rules (auto-generated)")>
 <cfset ArrayAppend(sieveLines, "## Do not edit manually - changes will be overwritten")>
 <cfset ArrayAppend(sieveLines, "## Generated: #DateTimeFormat(Now(), 'yyyy-MM-dd HH:nn:ss')#")>
 <cfset ArrayAppend(sieveLines, "")>
 
-<!--- Require statements --->
 <cfset requires = []>
 <cfif needsFileinto><cfset ArrayAppend(requires, '"fileinto"')></cfif>
 <cfif needsImap4flags><cfset ArrayAppend(requires, '"imap4flags"')></cfif>
@@ -56,113 +78,66 @@ After writing, compiles the script using sievec via Docker exec.
     <cfset ArrayAppend(sieveLines, "")>
 </cfif>
 
-<!--- Generate rules --->
 <cfloop query="getGlobalRules">
+    <cfset ruleId = getGlobalRules.id>
+    <cfset matchType = getGlobalRules.match_type>
 
-    <cfset ArrayAppend(sieveLines, "## Rule: #rule_name#")>
+    <!--- Collect this rule's conditions --->
+    <cfset condArr = []>
+    <cfset hasAllCondition = false>
+    <cfloop query="allConditions">
+        <cfif allConditions.rule_id EQ ruleId>
+            <cfif allConditions.condition_field EQ "all">
+                <cfset hasAllCondition = true>
+            <cfelse>
+                <cfset condStr = buildSieveCondition(allConditions.condition_field, allConditions.condition_type, allConditions.condition_value)>
+                <cfif condStr NEQ "">
+                    <cfset ArrayAppend(condArr, condStr)>
+                </cfif>
+            </cfif>
+        </cfif>
+    </cfloop>
 
-    <!--- Build condition --->
-    <cfset condField = condition_field>
-    <cfset condType = condition_type>
-    <cfset condValue = condition_value>
+    <!--- Collect this rule's actions (admin: no :create on fileinto) --->
+    <cfset actArr = []>
+    <cfloop query="allActions">
+        <cfif allActions.rule_id EQ ruleId>
+            <cfset actStr = buildSieveAction(allActions.action_type, allActions.action_value, false)>
+            <cfif actStr NEQ "">
+                <cfset ArrayAppend(actArr, actStr)>
+            </cfif>
+        </cfif>
+    </cfloop>
 
-    <cfif condField EQ "header">
-        <!--- Header condition: value format is "Header-Name: value" --->
-        <cfset headerName = ListFirst(condValue, ":")>
-        <cfset headerValue = trim(ListRest(condValue, ":"))>
-
-        <cfif condType EQ "is">
-            <cfset condition = 'header :is "#trim(headerName)#" "#headerValue#"'>
-        <cfelseif condType EQ "contains">
-            <cfset condition = 'header :contains "#trim(headerName)#" "#headerValue#"'>
-        <cfelseif condType EQ "matches">
-            <cfset condition = 'header :matches "#trim(headerName)#" "#headerValue#"'>
-        <cfelseif condType EQ "not_contains">
-            <cfset condition = 'not header :contains "#trim(headerName)#" "#headerValue#"'>
-        </cfif>
-    <cfelseif condField EQ "from">
-        <cfif condType EQ "is">
-            <cfset condition = 'header :is "From" "#condValue#"'>
-        <cfelseif condType EQ "contains">
-            <cfset condition = 'header :contains "From" "#condValue#"'>
-        <cfelseif condType EQ "matches">
-            <cfset condition = 'header :matches "From" "#condValue#"'>
-        <cfelseif condType EQ "not_contains">
-            <cfset condition = 'not header :contains "From" "#condValue#"'>
-        </cfif>
-    <cfelseif condField EQ "to">
-        <cfif condType EQ "is">
-            <cfset condition = 'header :is "To" "#condValue#"'>
-        <cfelseif condType EQ "contains">
-            <cfset condition = 'header :contains "To" "#condValue#"'>
-        <cfelseif condType EQ "matches">
-            <cfset condition = 'header :matches "To" "#condValue#"'>
-        <cfelseif condType EQ "not_contains">
-            <cfset condition = 'not header :contains "To" "#condValue#"'>
-        </cfif>
-    <cfelseif condField EQ "cc">
-        <cfif condType EQ "is">
-            <cfset condition = 'header :is "Cc" "#condValue#"'>
-        <cfelseif condType EQ "contains">
-            <cfset condition = 'header :contains "Cc" "#condValue#"'>
-        <cfelseif condType EQ "matches">
-            <cfset condition = 'header :matches "Cc" "#condValue#"'>
-        <cfelseif condType EQ "not_contains">
-            <cfset condition = 'not header :contains "Cc" "#condValue#"'>
-        </cfif>
-    <cfelseif condField EQ "subject">
-        <cfif condType EQ "is">
-            <cfset condition = 'header :is "Subject" "#condValue#"'>
-        <cfelseif condType EQ "contains">
-            <cfset condition = 'header :contains "Subject" "#condValue#"'>
-        <cfelseif condType EQ "matches">
-            <cfset condition = 'header :matches "Subject" "#condValue#"'>
-        <cfelseif condType EQ "not_contains">
-            <cfset condition = 'not header :contains "Subject" "#condValue#"'>
-        </cfif>
-    <cfelseif condField EQ "size">
-        <cfif condType EQ "over">
-            <cfset condition = 'size :over #condValue#'>
-        <cfelseif condType EQ "under">
-            <cfset condition = 'size :under #condValue#'>
-        </cfif>
-    <cfelseif condField EQ "all">
-        <cfset condition = 'true'>
+    <cfif ArrayLen(actArr) EQ 0>
+        <cfcontinue>
     </cfif>
 
-    <!--- Build action --->
-    <cfif action_type EQ "fileinto">
-        <cfset action = 'fileinto "#action_value#";'>
-    <cfelseif action_type EQ "discard">
-        <cfset action = "discard;">
-    <cfelseif action_type EQ "keep">
-        <cfset action = "keep;">
-    <cfelseif action_type EQ "redirect">
-        <cfset action = 'redirect "#action_value#";'>
-    <cfelseif action_type EQ "flag_seen">
-        <cfset action = 'addflag "\\Seen";'>
-    <cfelseif action_type EQ "reject">
-        <cfset action = 'reject "#action_value#";'>
-    </cfif>
+    <cfset ArrayAppend(sieveLines, "## Rule: #getGlobalRules.rule_name#")>
 
-    <!--- Write the rule --->
-    <cfif condField EQ "all">
-        <cfset ArrayAppend(sieveLines, "#action#")>
+    <cfif hasAllCondition OR ArrayLen(condArr) EQ 0>
+        <!--- Unconditional actions --->
+        <cfloop array="#actArr#" index="a">
+            <cfset ArrayAppend(sieveLines, a)>
+        </cfloop>
+    <cfelseif ArrayLen(condArr) EQ 1>
+        <cfset ArrayAppend(sieveLines, "if #condArr[1]# {")>
+        <cfloop array="#actArr#" index="a">
+            <cfset ArrayAppend(sieveLines, "    #a#")>
+        </cfloop>
+        <cfset ArrayAppend(sieveLines, "}")>
     <cfelse>
-        <cfset ArrayAppend(sieveLines, "if #condition# {")>
-        <cfset ArrayAppend(sieveLines, "    #action#")>
+        <cfset matchKw = (matchType EQ "any") ? "anyof" : "allof">
+        <cfset ArrayAppend(sieveLines, "if #matchKw# (#ArrayToList(condArr, ', ')#) {")>
+        <cfloop array="#actArr#" index="a">
+            <cfset ArrayAppend(sieveLines, "    #a#")>
+        </cfloop>
         <cfset ArrayAppend(sieveLines, "}")>
     </cfif>
     <cfset ArrayAppend(sieveLines, "")>
-
 </cfloop>
 
-<!--- Write the sieve file --->
 <cfset sieveContent = ArrayToList(sieveLines, Chr(10))>
-
-<!--- Dedicated sieve volume: commandbox writes to /mnt/data/sieve,
-     dovecot reads from /srv/sieve. Same underlying volume.
-     This is isolated from /srv/mail (user mailboxes) for security. --->
 
 <cfif NOT DirectoryExists("/mnt/data/sieve/global")>
     <cfdirectory action="create" directory="/mnt/data/sieve/global" mode="755" recurse="true">
@@ -174,7 +149,6 @@ After writing, compiles the script using sievec via Docker exec.
     charset="utf-8"
     addNewLine="no">
 
-<!--- Set ownership inside the Dovecot container --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
         arguments="exec hermes_dovecot chown -R 1000:1000 /srv/sieve/global"
@@ -183,13 +157,32 @@ After writing, compiles the script using sievec via Docker exec.
 </cfcatch>
 </cftry>
 
-<!--- Compile the sieve script --->
+<!--- Compile via sievec. If anything is written to stderr the compilation
+     failed - log it to sieve_compile_log and surface via request.sieveCompileError
+     so the action handler can show a warning. The previous .svbin remains. --->
+<cfset request.sieveCompileError = "">
 <cftry>
+    <cfset sievecOutput = "">
+    <cfset sievecError = "">
     <cfexecute name="/usr/local/bin/docker"
         arguments="exec hermes_dovecot sievec /srv/sieve/global/before.sieve"
         variable="sievecOutput"
         errorVariable="sievecError"
         timeout="30" />
+    <cfif IsDefined("sievecError") AND Len(trim(sievecError)) GT 0>
+        <cfset request.sieveCompileError = trim(sievecError)>
+        <cftry>
+            <cfquery datasource="hermes">
+                INSERT INTO sieve_compile_log (scope, username, rule_id, error_text)
+                VALUES (
+                    'global', NULL, NULL,
+                    <cfqueryparam value="#request.sieveCompileError#" cfsqltype="cf_sql_longvarchar">
+                )
+            </cfquery>
+        <cfcatch type="any"></cfcatch>
+        </cftry>
+    </cfif>
 <cfcatch type="any">
+    <cfset request.sieveCompileError = "sievec execution error: " & cfcatch.message>
 </cfcatch>
 </cftry>

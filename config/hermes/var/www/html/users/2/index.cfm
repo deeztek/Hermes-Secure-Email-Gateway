@@ -41,6 +41,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <cfoutput>
             <h1 class="m-0">Welcome #session.theName#!</h1>
+            <cfif StructKeyExists(session, "previous_login") AND IsDate(session.previous_login)>
+              <small class="text-muted"><i class="fas fa-clock me-1"></i>Last login: #DateTimeFormat(session.previous_login, "yyyy/mm/dd HH:nn")#</small>
+            <cfelseif StructKeyExists(session, "previous_login")>
+              <small class="text-muted"><i class="fas fa-clock me-1"></i>Last login: First login</small>
+            </cfif>
             </cfoutput>
           </div>
           <div class="col-sm-6">
@@ -57,6 +62,52 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
 
 <cfset isMailboxUser = session.theGroups CONTAINS "mailboxes">
+
+<!--- ===== VACATION AUTO-REPLY STATUS ===== --->
+<!--- Show a top-of-dashboard banner if the user has an active vacation
+     auto-reply, so they can't accidentally leave it on after returning. --->
+<cfif isMailboxUser>
+    <!--- Active = enabled + within date window. Stored times are user-local
+         wall clock; compare against "now in user TZ" for an accurate banner. --->
+    <cfinclude template="../../admin/2/inc/get_user_timezone.cfm">
+    <cfset bannerUserTz = getUserTimezone(session.email)>
+    <cfquery name="getActiveVacation" datasource="hermes">
+        SELECT subject, start_date, end_date
+        FROM user_vacation
+        WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+          AND enabled = 1
+    </cfquery>
+    <cfset showBanner = false>
+    <cfif getActiveVacation.recordcount GTE 1>
+        <cfset showBanner = true>
+        <cftry>
+            <cfset nowUserTz = convertFromUTC(DateConvert("local2utc", Now()), bannerUserTz, "yyyy-MM-dd HH:mm:ss")>
+            <cfif IsDate(getActiveVacation.start_date) AND DateCompare(nowUserTz, getActiveVacation.start_date) LT 0>
+                <cfset showBanner = false>
+            </cfif>
+            <cfif IsDate(getActiveVacation.end_date) AND DateCompare(nowUserTz, getActiveVacation.end_date) GT 0>
+                <cfset showBanner = false>
+            </cfif>
+        <cfcatch type="any"></cfcatch>
+        </cftry>
+    </cfif>
+    <cfif showBanner>
+        <cfoutput>
+        <div class="alert alert-success alert-dismissible">
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          <h5 class="mb-1"><i class="icon fas fa-paper-plane me-2"></i>Vacation auto-reply is ACTIVE</h5>
+          <p class="mb-0">
+            <cfif IsDate(getActiveVacation.end_date)>
+              Auto-reply is currently being sent to incoming mail until #DateFormat(getActiveVacation.end_date, "yyyy/mm/dd")# #TimeFormat(getActiveVacation.end_date, "HH:mm")# (#bannerUserTz#).
+            <cfelse>
+              Auto-reply is currently being sent to incoming mail.
+            </cfif>
+            <a href="view_vacation.cfm" class="alert-link">Manage</a>
+          </p>
+        </div>
+        </cfoutput>
+    </cfif>
+</cfif>
 
 <!--- ===== GATHER STATS ===== --->
 

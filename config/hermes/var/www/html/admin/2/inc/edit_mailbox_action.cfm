@@ -130,13 +130,27 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 </cfquery>
 
 <!--- UPDATE USER_SETTINGS TABLE --->
+<cfparam name="form.edit_timezone" default="">
 <cfquery datasource="hermes">
     UPDATE user_settings
     SET report_enabled = <cfqueryparam value="#form.edit_reports#" cfsqltype="cf_sql_varchar">,
         train_bayes = <cfqueryparam value="#form.edit_train_bayes#" cfsqltype="cf_sql_varchar">,
         download_msg = <cfqueryparam value="#form.edit_download_msg#" cfsqltype="cf_sql_varchar">
+        <cfif trim(form.edit_timezone) NEQ "">
+        , timezone = <cfqueryparam value="#trim(form.edit_timezone)#" cfsqltype="cf_sql_varchar">
+        </cfif>
     WHERE email = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
 </cfquery>
+
+<!--- If timezone changed, regenerate the sieve script so vacation date
+     comparisons pick up the new TZ immediately --->
+<cfif trim(form.edit_timezone) NEQ "">
+    <cftry>
+        <cfset sieveUsername = getMailbox.username>
+        <cfinclude template="generate_sieve_user.cfm">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
+</cfif>
 
 <!--- CHANGE PASSWORD (if provided, local auth only) --->
 <cfparam name="form.edit_password" default="">

@@ -335,12 +335,13 @@ Requires form variables:
 <!--- 2. INSERT INTO USER_SETTINGS TABLE --->
 <cfquery name="insertUserSettings" datasource="hermes">
     INSERT INTO user_settings
-    (email, report_enabled, train_bayes, download_msg)
+    (email, report_enabled, train_bayes, download_msg, timezone)
     VALUES
     (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
      <cfqueryparam value="#form.reports#" cfsqltype="cf_sql_varchar">,
      <cfqueryparam value="#form.train_bayes#" cfsqltype="cf_sql_varchar">,
-     <cfqueryparam value="#form.download_msg#" cfsqltype="cf_sql_varchar">)
+     <cfqueryparam value="#form.download_msg#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#trim(form.timezone)#" cfsqltype="cf_sql_varchar" null="#(NOT StructKeyExists(form, 'timezone') OR trim(form.timezone) IS '')#">)
 </cfquery>
 
 <!--- 3. INSERT INTO MAILBOXES TABLE (Dovecot userdb) --->

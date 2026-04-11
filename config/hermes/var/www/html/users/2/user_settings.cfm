@@ -85,6 +85,8 @@ $(document).ready(function() {
         <cfinclude template="./inc/resend_secondary_email_verification.cfm">
     <cfelseif form.action EQ "remove_secondary_email">
         <cfinclude template="./inc/remove_secondary_email.cfm">
+    <cfelseif form.action EQ "save_timezone">
+        <cfinclude template="./inc/save_timezone.cfm">
     <cfelseif form.action EQ "changepassword">
         <!--- BLOCK PASSWORD CHANGE FOR REMOTE AUTH USERS --->
         <cfquery name="checkUserAuthType" datasource="hermes">
@@ -336,16 +338,57 @@ $(document).ready(function() {
 
 <!--- GET CURRENT USER SETTINGS --->
 <cfquery name="getUserSettings" datasource="hermes">
-    SELECT secondary_email, secondary_email_verified
+    SELECT secondary_email, secondary_email_verified, timezone
     FROM user_settings
     WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
 </cfquery>
 
 <cfset currentSecondaryEmail = "">
 <cfset secondaryEmailVerified = 0>
+<cfset currentTimezone = "">
 <cfif getUserSettings.recordcount GTE 1>
     <cfset currentSecondaryEmail = getUserSettings.secondary_email>
     <cfset secondaryEmailVerified = getUserSettings.secondary_email_verified>
+    <cfset currentTimezone = getUserSettings.timezone>
+</cfif>
+
+<!--- Fall back to system TZ if user has no value yet --->
+<cfif currentTimezone EQ "">
+    <cfinclude template="../../admin/2/inc/get_user_timezone.cfm">
+    <cfset currentTimezone = getUserTimezone(session.email)>
+</cfif>
+
+<!--- Build the IANA timezone list once for the dropdown --->
+<cfset zoneIdClass = createObject("java", "java.time.ZoneId")>
+<cfset availableZones = zoneIdClass.getAvailableZoneIds().toArray()>
+<cfset tzList = []>
+<cfloop array="#availableZones#" index="z">
+    <cfset ArrayAppend(tzList, z)>
+</cfloop>
+<cfset ArraySort(tzList, "textnocase")>
+
+<cfparam name="session.tzMessage" default="">
+<cfparam name="session.tzMessageType" default="">
+
+<!--- Check if vacation auto-reply has start/end times set so we can warn
+     the user that wall-clock values stay the same when changing TZ --->
+<cfquery name="getVacationForTzWarn" datasource="hermes">
+    SELECT enabled, start_date, end_date
+    FROM user_vacation
+    WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+      AND enabled = 1
+      AND (start_date IS NOT NULL OR end_date IS NOT NULL)
+</cfquery>
+<cfset vacationHasTimes = (getVacationForTzWarn.recordcount GTE 1)>
+<cfset vacationStartDisplay = "">
+<cfset vacationEndDisplay = "">
+<cfif vacationHasTimes>
+    <cfif IsDate(getVacationForTzWarn.start_date)>
+        <cfset vacationStartDisplay = DateFormat(getVacationForTzWarn.start_date, "yyyy/mm/dd") & " " & TimeFormat(getVacationForTzWarn.start_date, "HH:mm")>
+    </cfif>
+    <cfif IsDate(getVacationForTzWarn.end_date)>
+        <cfset vacationEndDisplay = DateFormat(getVacationForTzWarn.end_date, "yyyy/mm/dd") & " " & TimeFormat(getVacationForTzWarn.end_date, "HH:mm")>
+    </cfif>
 </cfif>
 
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
@@ -655,6 +698,93 @@ $(document).ready(function() {
                 </cfif>
             </div>
         </div>
+
+        <!--- TIMEZONE CARD --->
+        <div class="card col-sm-8 mt-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="fas fa-globe me-2"></i>Timezone</h3>
+            </div>
+            <div class="card-body">
+                <cfif session.tzMessage NEQ "">
+                    <cfoutput>
+                    <div class="alert alert-#session.tzMessageType# alert-dismissible">
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        #session.tzMessage#
+                    </div>
+                    </cfoutput>
+                    <cfset session.tzMessage = "">
+                    <cfset session.tzMessageType = "">
+                </cfif>
+
+                <p>Your timezone is used for vacation auto-reply scheduling, dashboard timestamps, and notification times. Choose the timezone that matches where you live or work.</p>
+
+                <form method="post" action="user_settings.cfm" id="timezoneForm">
+                    <input type="hidden" name="action" value="save_timezone">
+                    <div class="mb-3">
+                        <label for="timezone" class="form-label"><strong>Timezone</strong></label>
+                        <select name="timezone" id="timezone" class="form-control" style="width:100%;">
+                            <cfoutput>
+                            <cfloop array="#tzList#" index="z">
+                                <option value="#z#"<cfif z EQ currentTimezone> selected</cfif>>#z#</option>
+                            </cfloop>
+                            </cfoutput>
+                        </select>
+                        <div class="form-text">Currently set to: <strong><cfoutput>#currentTimezone#</cfoutput></strong></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Timezone
+                    </button>
+                </form>
+
+                <cfif vacationHasTimes>
+                <cfoutput>
+                <script>
+                    // Saved vacation has start/end times. Warn the user that
+                    // changing TZ keeps the wall-clock values the same, which
+                    // shifts the absolute moment they fire.
+                    var vacationStart = "#JSStringFormat(vacationStartDisplay)#";
+                    var vacationEnd = "#JSStringFormat(vacationEndDisplay)#";
+                    var currentTz = "#JSStringFormat(currentTimezone)#";
+
+                    document.getElementById('timezoneForm').addEventListener('submit', function(e) {
+                        var newTz = document.getElementById('timezone').value;
+                        if (newTz === currentTz) return; // No change, skip
+
+                        var msg = 'You have a vacation auto-reply enabled with the following times:\n\n';
+                        if (vacationStart) msg += '  Start: ' + vacationStart + '\n';
+                        if (vacationEnd)   msg += '  End:   ' + vacationEnd + '\n';
+                        msg += '\nThese values are interpreted as wall-clock times in your selected timezone. ';
+                        msg += 'If you change your timezone from "' + currentTz + '" to "' + newTz + '", the same wall-clock numbers will now be evaluated in the new timezone, ';
+                        msg += 'which means the auto-reply may fire at a different absolute moment than you originally intended.\n\n';
+                        msg += 'Continue with the timezone change?';
+
+                        if (!confirm(msg)) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+                            // Hide the global preloader if it kicked in
+                            var preloader = document.querySelector('.preloader');
+                            if (preloader) {
+                                preloader.style.display = 'none';
+                                preloader.style.opacity = '0';
+                            }
+                            return false;
+                        }
+                    });
+                </script>
+                </cfoutput>
+                </cfif>
+            </div>
+        </div>
+
+        <script>
+        $(document).ready(function() {
+            new TomSelect('#timezone', {
+                create: false,
+                sortField: { field: 'text', direction: 'asc' },
+                maxOptions: 1000
+            });
+        });
+        </script>
 
         </cfif>
 

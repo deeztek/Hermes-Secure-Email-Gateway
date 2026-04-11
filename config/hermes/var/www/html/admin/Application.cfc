@@ -295,6 +295,9 @@ the url: https://#ConsoleHost#</cfoutput>
        </cfif>
       --->
 
+      <!--- Record login (first request of new session only; flag-gated inside) --->
+      <cfinclude template="/admin/2/inc/record_login.cfm" />
+
       <cfinclude template="#Arguments.targetPage#" />
       <cfreturn />
 

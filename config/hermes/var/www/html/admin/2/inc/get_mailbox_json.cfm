@@ -35,7 +35,7 @@ Expects: form.id (mailbox.id)
     SELECT m.id, m.username, m.name, m.quota, m.active, m.domain_id, m.nextcloud_enabled,
            d.domain, d.default_quota_mb,
            r.id AS recipient_id, r.policy_id, r.auth_type, r.remoteauth_domain,
-           us.report_enabled, us.train_bayes, us.download_msg
+           us.report_enabled, us.train_bayes, us.download_msg, us.timezone
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id
     LEFT JOIN recipients r ON r.recipient = m.username
@@ -67,7 +67,8 @@ Expects: form.id (mailbox.id)
     "report_enabled": "#JSStringFormat(getMailbox.report_enabled)#",
     "train_bayes": "#JSStringFormat(getMailbox.train_bayes)#",
     "download_msg": "#JSStringFormat(getMailbox.download_msg)#",
-    "nextcloud_enabled": #getMailbox.nextcloud_enabled#
+    "nextcloud_enabled": #getMailbox.nextcloud_enabled#,
+    "timezone": "#JSStringFormat(getMailbox.timezone)#"
 }
 </cfprocessingdirective>
 </cfoutput>

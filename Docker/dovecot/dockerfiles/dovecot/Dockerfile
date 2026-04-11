@@ -3,7 +3,11 @@ LABEL maintainer="Deeztek <support@deeztek.com>"
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Dovecot 2.4 from official repo + quota-warning script dependencies
+# Install Dovecot 2.4 from official repo + quota-warning script dependencies.
+# tzdata is required so the TZ env var works - without it, glibc has no
+# zoneinfo database to look up IANA names like "America/New_York" and
+# silently falls back to UTC. --no-install-recommends excludes tzdata by
+# default, so we install it explicitly.
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
@@ -11,6 +15,7 @@ RUN apt-get update && \
         curl \
         gnupg \
         dumb-init \
+        tzdata \
     && curl -fsSL https://repo.dovecot.org/DOVECOT-REPO-GPG-2.4 \
         | gpg --dearmor -o /usr/share/keyrings/dovecot-2.4.gpg \
     && echo "deb [signed-by=/usr/share/keyrings/dovecot-2.4.gpg] https://repo.dovecot.org/ce-2.4-latest/ubuntu/noble noble main" \

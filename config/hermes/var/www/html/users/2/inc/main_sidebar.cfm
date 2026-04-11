@@ -72,6 +72,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </a>
         </li>
         <li class="nav-item">
+          <a href="view_vacation.cfm" class="nav-link">
+            <i class="nav-icon fas fa-paper-plane"></i>
+            <p><strong>Vacation Auto-Reply</strong></p>
+          </a>
+        </li>
+        <li class="nav-item">
           <a href="/nc/" class="nav-link">
             <i class="nav-icon fas fa-inbox"></i>
             <p><strong>Login to Webmail</strong></p>

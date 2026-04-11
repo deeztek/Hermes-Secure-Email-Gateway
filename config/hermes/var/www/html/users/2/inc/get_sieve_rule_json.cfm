@@ -4,7 +4,7 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
 
 GET SIEVE RULE JSON - AJAX endpoint for user mail filters edit modal.
 Scoped to the logged-in user only - cannot access other users' rules
-or admin global rules.
+or admin global rules. Returns multi-condition/multi-action arrays.
 --->
 
 <cfparam name="form.id" default="">
@@ -19,11 +19,8 @@ or admin global rules.
     <cfabort>
 </cfif>
 
-<!--- Only return rules belonging to the current user --->
 <cfquery name="getRule" datasource="hermes">
-    SELECT id, scope, username, rule_name, rule_order, enabled, is_system,
-           condition_field, condition_type, condition_value,
-           action_type, action_value
+    SELECT id, scope, username, rule_name, rule_order, enabled, is_system, match_type
     FROM sieve_rules
     WHERE id = <cfqueryparam value="#form.id#" cfsqltype="cf_sql_integer">
     AND scope = 'user'
@@ -35,21 +32,49 @@ or admin global rules.
     <cfabort>
 </cfif>
 
-<cfoutput>
-<cfprocessingdirective suppresswhitespace="true">
-{
-    "id": #getRule.id#,
-    "scope": "#JSStringFormat(getRule.scope)#",
-    "rule_name": "#JSStringFormat(getRule.rule_name)#",
-    "rule_order": #getRule.rule_order#,
-    "enabled": #getRule.enabled#,
-    "is_system": #getRule.is_system#,
-    "condition_field": "#JSStringFormat(getRule.condition_field)#",
-    "condition_type": "#JSStringFormat(getRule.condition_type)#",
-    "condition_value": "#JSStringFormat(getRule.condition_value)#",
-    "action_type": "#JSStringFormat(getRule.action_type)#",
-    "action_value": "#JSStringFormat(getRule.action_value)#"
-}
-</cfprocessingdirective>
-</cfoutput>
+<cfquery name="getConds" datasource="hermes">
+    SELECT condition_field, condition_type, condition_value
+    FROM sieve_rule_conditions
+    WHERE rule_id = <cfqueryparam value="#form.id#" cfsqltype="cf_sql_integer">
+    ORDER BY condition_order ASC, id ASC
+</cfquery>
+
+<cfquery name="getActs" datasource="hermes">
+    SELECT action_type, action_value
+    FROM sieve_rule_actions
+    WHERE rule_id = <cfqueryparam value="#form.id#" cfsqltype="cf_sql_integer">
+    ORDER BY action_order ASC, id ASC
+</cfquery>
+
+<cfset condJson = []>
+<cfloop query="getConds">
+    <cfset ArrayAppend(condJson, {
+        "field": getConds.condition_field,
+        "type": getConds.condition_type,
+        "value": getConds.condition_value
+    })>
+</cfloop>
+
+<cfset actJson = []>
+<cfloop query="getActs">
+    <cfset ArrayAppend(actJson, {
+        "type": getActs.action_type,
+        "value": getActs.action_value
+    })>
+</cfloop>
+
+<cfset out = {
+    "id": getRule.id,
+    "scope": getRule.scope,
+    "rule_name": getRule.rule_name,
+    "rule_order": getRule.rule_order,
+    "enabled": getRule.enabled,
+    "is_system": getRule.is_system,
+    "match_type": getRule.match_type,
+    "conditions": condJson,
+    "actions": actJson
+}>
+
+<cfcontent type="application/json" reset="true">
+<cfoutput>#SerializeJSON(out)#</cfoutput>
 <cfabort>

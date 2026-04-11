@@ -156,7 +156,46 @@ Removes a mailbox user from all systems:
     WHERE delivers_to = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<!--- 5. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
+<!--- 4b. DELETE BCC MAP ENTRIES referencing this mailbox (as watched address
+     OR as BCC destination). Postfix reads bcc_maps via MySQL lookup tables
+     (mysql-*-bcc-maps.cf) so no postmap regeneration is required - lookups
+     hit the live DB on every message. --->
+<cfquery datasource="hermes">
+    DELETE FROM bcc_maps
+    WHERE address = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+       OR bcc_to  = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 4c. DELETE VACATION AUTO-REPLY config (one row per user) --->
+<cfquery datasource="hermes">
+    DELETE FROM user_vacation
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 5. DELETE USER SIEVE RULES + ON-DISK SCRIPT FILES.
+     ON DELETE CASCADE on sieve_rule_conditions/sieve_rule_actions handles
+     the child rows automatically when the parent sieve_rules row is deleted. --->
+<cfquery datasource="hermes">
+    DELETE FROM sieve_rules
+    WHERE scope = 'user'
+    AND username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cftry>
+    <cfset sieveSrcFile = "/mnt/data/sieve/users/" & recipient & ".sieve">
+    <cfset sieveBinFile = "/mnt/data/sieve/users/" & recipient & ".svbin">
+    <cfif FileExists(sieveSrcFile)>
+        <cffile action="delete" file="#sieveSrcFile#">
+    </cfif>
+    <cfif FileExists(sieveBinFile)>
+        <cffile action="delete" file="#sieveBinFile#">
+    </cfif>
+<cfcatch type="any">
+    <!--- File cleanup is non-critical --->
+</cfcatch>
+</cftry>
+
+<!--- 6. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
 <cfquery datasource="hermes">
     DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
 </cfquery>

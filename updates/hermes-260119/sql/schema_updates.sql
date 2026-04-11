@@ -398,6 +398,33 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_verified TINY
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token VARCHAR(64) NULL;
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token_expires TIMESTAMP NULL;
 
+-- Per-user IANA timezone (e.g. America/New_York). Used by vacation auto-reply,
+-- dashboard timestamps, and notification scheduling so per-user times stay
+-- correct in multi-tenant deployments where users may be in different zones.
+ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) NULL;
+
+-- Backfill: existing rows get the system timezone configured by the admin
+-- in System Settings (system_settings.parameter='timezone'), which is the
+-- canonical IANA name (e.g. America/New_York). Falls back to MariaDB's
+-- session timezone, then UTC, if for some reason the system_settings row
+-- is missing or empty. Idempotent - only touches NULLs.
+--
+-- Note: we don't use @@session.time_zone as the primary source because
+-- MariaDB returns 'SYSTEM' by default unless mysql_tzinfo_to_sql has been
+-- run to load the timezone tables, even when the container TZ env var is
+-- set correctly. system_settings is the reliable source.
+UPDATE user_settings us
+LEFT JOIN system_settings ss ON ss.parameter = 'timezone'
+SET us.timezone = COALESCE(
+    NULLIF(TRIM(ss.value), ''),
+    CASE
+        WHEN @@session.time_zone = 'SYSTEM' THEN 'UTC'
+        WHEN @@session.time_zone REGEXP '^[+-][0-9]{2}:[0-9]{2}$' THEN 'UTC'
+        ELSE @@session.time_zone
+    END
+)
+WHERE us.timezone IS NULL OR us.timezone = '';
+
 -- ============================================================================
 -- SYSTEM_SETTINGS: Pushover configuration for admin notifications
 -- System-wide config for critical alerts (mail queue issues, security events)
@@ -1364,19 +1391,155 @@ CREATE TABLE IF NOT EXISTS sieve_rules (
   rule_order INT NOT NULL DEFAULT 0,
   enabled TINYINT(3) NOT NULL DEFAULT 1,
   is_system TINYINT(3) NOT NULL DEFAULT 0,
-  condition_field VARCHAR(50) NOT NULL,
-  condition_type VARCHAR(50) NOT NULL,
-  condition_value VARCHAR(500) NOT NULL,
-  action_type VARCHAR(50) NOT NULL,
+  condition_field VARCHAR(50) NULL,
+  condition_type VARCHAR(50) NULL,
+  condition_value VARCHAR(500) NULL,
+  action_type VARCHAR(50) NULL,
   action_value VARCHAR(255) NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Add match_type for AND/OR logic across multiple conditions
+ALTER TABLE sieve_rules
+  ADD COLUMN IF NOT EXISTS match_type VARCHAR(10) NOT NULL DEFAULT 'all' AFTER is_system;
+
+-- Relax legacy single-condition/single-action columns to nullable.
+-- The new schema stores conditions/actions in sieve_rule_conditions and
+-- sieve_rule_actions; these legacy columns are only kept for the migration
+-- backfill below and are no longer written by the application.
+ALTER TABLE sieve_rules MODIFY COLUMN condition_field VARCHAR(50) NULL;
+ALTER TABLE sieve_rules MODIFY COLUMN condition_type  VARCHAR(50) NULL;
+ALTER TABLE sieve_rules MODIFY COLUMN condition_value VARCHAR(500) NULL;
+ALTER TABLE sieve_rules MODIFY COLUMN action_type     VARCHAR(50) NULL;
+ALTER TABLE sieve_rules MODIFY COLUMN action_value    VARCHAR(255) NULL;
+
+-- Multi-condition support (each rule can have 1+ conditions)
+CREATE TABLE IF NOT EXISTS sieve_rule_conditions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rule_id INT NOT NULL,
+  condition_field VARCHAR(50) NOT NULL,
+  condition_type VARCHAR(50) NOT NULL,
+  condition_value VARCHAR(500) NOT NULL,
+  condition_order INT NOT NULL DEFAULT 0,
+  KEY idx_rule (rule_id),
+  CONSTRAINT fk_sieve_cond_rule FOREIGN KEY (rule_id) REFERENCES sieve_rules(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Multi-action support (each rule can have 1+ actions)
+CREATE TABLE IF NOT EXISTS sieve_rule_actions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  rule_id INT NOT NULL,
+  action_type VARCHAR(50) NOT NULL,
+  action_value VARCHAR(255) NULL,
+  action_order INT NOT NULL DEFAULT 0,
+  KEY idx_rule (rule_id),
+  CONSTRAINT fk_sieve_act_rule FOREIGN KEY (rule_id) REFERENCES sieve_rules(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- System rule: move spam to Spam folder (global, cannot be deleted)
 -- Note: uses :matches with "Yes,*" to anchor at start - :contains "Yes" would
 -- match "BAYES_60" in tests= array (sieve :contains is case-insensitive substring)
-INSERT IGNORE INTO sieve_rules
-(scope, username, rule_name, rule_order, enabled, is_system, condition_field, condition_type, condition_value, action_type, action_value)
-VALUES
-('global', NULL, 'Move spam to Spam folder', 1, 1, 1, 'header', 'matches', 'X-Spam-Status: Yes,*', 'fileinto', 'Spam');
+-- Idempotent: WHERE NOT EXISTS instead of INSERT IGNORE because there's no
+-- unique constraint on rule_name (system rules are identified by is_system=1).
+INSERT INTO sieve_rules
+(scope, username, rule_name, rule_order, enabled, is_system, match_type, condition_field, condition_type, condition_value, action_type, action_value)
+SELECT 'global', NULL, 'Move spam to Spam folder', 1, 1, 1, 'all', 'header', 'matches', 'X-Spam-Status: Yes,*', 'fileinto', 'Spam'
+WHERE NOT EXISTS (
+    SELECT 1 FROM sieve_rules
+    WHERE scope = 'global' AND is_system = 1 AND rule_name = 'Move spam to Spam folder'
+);
+
+-- ============================================================================
+-- User Vacation / Auto-Reply (one row per mailbox user)
+-- ============================================================================
+-- Stores per-user out-of-office configuration. The user_vacation row is
+-- consumed by generate_sieve_user.cfm which prepends a sieve "vacation"
+-- block to the user's personal sieve script when active.
+--
+-- Active = enabled = 1 AND (start_date IS NULL OR start_date <= CURDATE())
+--                  AND (end_date   IS NULL OR end_date   >= CURDATE())
+CREATE TABLE IF NOT EXISTS user_vacation (
+  username VARCHAR(255) NOT NULL PRIMARY KEY,
+  enabled TINYINT(3) NOT NULL DEFAULT 0,
+  subject VARCHAR(255) NULL,
+  body TEXT NULL,
+  start_date DATE NULL,
+  end_date DATE NULL,
+  reply_interval_days INT NOT NULL DEFAULT 7,
+  reply_external TINYINT(3) NOT NULL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Add reply_external if upgrading from an earlier version where it didn't exist.
+ALTER TABLE user_vacation
+  ADD COLUMN IF NOT EXISTS reply_external TINYINT(3) NOT NULL DEFAULT 0 AFTER reply_interval_days;
+
+-- Restrict auto-reply to messages addressed to one of these addresses
+-- (comma-separated). Empty = reply to any address that reaches the mailbox.
+-- Used for users with multiple aliases who only want vacation to fire for
+-- mail addressed to a specific identity (e.g. only for sales@... but not for
+-- their personal alias).
+ALTER TABLE user_vacation
+  ADD COLUMN IF NOT EXISTS reply_addresses TEXT NULL AFTER reply_external;
+
+-- Discard incoming mail while vacation is active. The auto-reply is still
+-- sent, but the message itself is dropped (not delivered to the inbox).
+-- Niche - mostly used by people who don't want to come back to thousands of
+-- messages. Carries the same warnings as the sieve discard action.
+ALTER TABLE user_vacation
+  ADD COLUMN IF NOT EXISTS discard_incoming TINYINT(3) NOT NULL DEFAULT 0 AFTER reply_addresses;
+
+-- Upgrade start_date / end_date from DATE to DATETIME so users can specify
+-- precise start/end times (e.g. "leave at 5pm Friday, return at 8am Monday").
+-- DATE -> DATETIME conversion is lossless: existing 2026-04-15 becomes
+-- 2026-04-15 00:00:00. Idempotent because MODIFY is a no-op if the column
+-- type already matches.
+ALTER TABLE user_vacation MODIFY COLUMN start_date DATETIME NULL;
+ALTER TABLE user_vacation MODIFY COLUMN end_date   DATETIME NULL;
+
+-- ============================================================================
+-- Sieve Compile Log (records sievec compilation failures for diagnostics)
+-- ============================================================================
+-- When a sieve script fails to compile after a rule save, the rule lives
+-- in the database but the previous compiled .svbin remains in place. This
+-- log lets admins see why a save "succeeded but the rule isn't running".
+CREATE TABLE IF NOT EXISTS sieve_compile_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  scope VARCHAR(10) NOT NULL,
+  username VARCHAR(255) NULL,
+  rule_id INT NULL,
+  error_text TEXT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  KEY idx_scope_user (scope, username),
+  KEY idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- User Login History (per-user current + previous login timestamp)
+-- ============================================================================
+-- Stores the timestamp of each user's most recent login plus the one before it,
+-- so the dashboard can display "Last login: <previous>". Updated on the first
+-- request of each new session by record_login.cfm.
+CREATE TABLE IF NOT EXISTS user_login_history (
+  username VARCHAR(255) NOT NULL PRIMARY KEY,
+  current_login DATETIME NULL,
+  previous_login DATETIME NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Migrate existing single-condition/single-action rows into the new tables
+-- (idempotent: only inserts if no condition/action row already exists for that rule)
+INSERT INTO sieve_rule_conditions (rule_id, condition_field, condition_type, condition_value, condition_order)
+SELECT r.id, r.condition_field, r.condition_type, COALESCE(r.condition_value, ''), 0
+FROM sieve_rules r
+LEFT JOIN sieve_rule_conditions c ON c.rule_id = r.id
+WHERE r.condition_field IS NOT NULL
+  AND c.id IS NULL;
+
+INSERT INTO sieve_rule_actions (rule_id, action_type, action_value, action_order)
+SELECT r.id, r.action_type, r.action_value, 0
+FROM sieve_rules r
+LEFT JOIN sieve_rule_actions a ON a.rule_id = r.id
+WHERE r.action_type IS NOT NULL
+  AND a.id IS NULL;

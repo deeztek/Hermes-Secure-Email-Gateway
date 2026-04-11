@@ -250,6 +250,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </select>
       </div>
 
+      <!--- TIMEZONE - defaults to System Settings > Timezone --->
+      <cfinclude template="./inc/get_user_timezone.cfm">
+      <cfset defaultTz = getSystemTimezone()>
+      <cfset zoneIdClass = createObject("java", "java.time.ZoneId")>
+      <cfset availableZones = zoneIdClass.getAvailableZoneIds().toArray()>
+      <cfset tzList = []>
+      <cfloop array="#availableZones#" index="z">
+          <cfset ArrayAppend(tzList, z)>
+      </cfloop>
+      <cfset ArraySort(tzList, "textnocase")>
+      <div class="form-group mb-3">
+        <label><strong>Timezone</strong></label>
+        <p class="help-block">Defaults to the system timezone (<code><cfoutput>#defaultTz#</cfoutput></code> from System Settings). The user can change their own timezone later from Account Settings in the user portal. Used for vacation auto-reply scheduling and dashboard timestamps.</p>
+        <select class="form-control" name="timezone" id="addMailboxTimezone" style="width:100%;">
+          <cfloop array="#tzList#" index="z">
+            <option value="#z#"<cfif z EQ defaultTz> selected</cfif>>#z#</option>
+          </cfloop>
+        </select>
+      </div>
+
       <!--- QUARANTINE NOTIFICATIONS --->
       <div class="form-group mb-3">
         <label><strong>Quarantine Notifications</strong></label>
@@ -488,6 +508,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </body>
 
 <script>
+
+  $(document).ready(function() {
+    if (typeof TomSelect !== 'undefined') {
+      new TomSelect('#addMailboxTimezone', {
+        create: false,
+        sortField: { field: 'text', direction: 'asc' },
+        maxOptions: 1000
+      });
+    }
+  });
 
   // Update quota default and Nextcloud toggle when domain changes
   $('#domainSelect').on('change', function() {
