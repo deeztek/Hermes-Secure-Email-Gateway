@@ -80,6 +80,12 @@ output = "#REReplace("#authelia#","hermes_session_inactivity","#session_inactivi
 
 <cffile action = "write"
 file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
+output = "#REReplace("#authelia#","hermes_session_remember_me","#session_remember_me.value2#","ALL")#" addnewline="no">
+
+<cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">
+
+<cffile action = "write"
+file = "/opt/hermes/tmp/#customtrans3#_configuration.yml"
 output = "#REReplace("#authelia#","hermes_notifier_smtp_sender","#notifier_smtp_sender.value2#","ALL")#" addnewline="no">
 
 <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_configuration.yml" variable="authelia">

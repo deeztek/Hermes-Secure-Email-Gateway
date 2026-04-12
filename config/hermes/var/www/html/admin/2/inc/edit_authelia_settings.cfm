@@ -95,12 +95,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </cfif>
     
           <cfif NOT StructKeyExists(form, "session_inactivity")>
-      
+
             <cfset m="Edit Authentication Settings: form.session_inactivity does not exist">
             <cfinclude template="error.cfm">
             <cfabort>
-            
+
             <!--- /CFIF StructKeyExists(form, "session_inactivity") --->
+            </cfif>
+
+          <cfif NOT StructKeyExists(form, "session_remember_me")>
+
+            <cfset m="Edit Authentication Settings: form.session_remember_me does not exist">
+            <cfinclude template="error.cfm">
+            <cfabort>
+
+            <!--- /CFIF StructKeyExists(form, "session_remember_me") --->
+            </cfif>
+
+          <cfif NOT StructKeyExists(form, "nextcloud_oidc_auto_redirect")>
+
+            <cfset m="Edit Authentication Settings: form.nextcloud_oidc_auto_redirect does not exist">
+            <cfinclude template="error.cfm">
+            <cfabort>
+
+            <!--- /CFIF StructKeyExists(form, "nextcloud_oidc_auto_redirect") --->
             </cfif>
     
        
@@ -358,15 +376,70 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfquery name="update" datasource="hermes">
       update parameters2 set value2='#form.session_inactivity#', applied='2' where parameter='session.inactivity'
       </cfquery>
-      
-      <cfset step=3>
-      
+
+      <!--- VALIDATE REMEMBER ME DURATION (nested inside step 2 so we don't
+           have to renumber the rest of the validation cascade). Accepts a
+           positive integer of seconds, or the literal -1 which disables the
+           Remember Me checkbox in Authelia entirely. --->
+      <cfif #form.session_remember_me# is "">
+
+        <cfset step=0>
+        <cfset session.m=44>
+
+        <cfoutput>
+        <cflocation url="#cgi.http_referer#" addtoken="no">
+        </cfoutput>
+
+      <cfelse>
+
+        <cfif NOT (form.session_remember_me EQ "-1" OR REFind("^[0-9]+$", form.session_remember_me) GT 0)>
+
+          <cfset step=0>
+          <cfset session.m=45>
+
+          <cfoutput>
+          <cflocation url="#cgi.http_referer#" addtoken="no">
+          </cfoutput>
+
+        <cfelse>
+
+          <cfquery name="update" datasource="hermes">
+          update parameters2 set value2='#form.session_remember_me#', applied='2' where parameter='session.remember_me'
+          </cfquery>
+
+          <!--- VALIDATE NEXTCLOUD OIDC AUTO-REDIRECT (also nested in step 2).
+               Only the literal strings "true" or "false" are accepted - the
+               value flows directly into Nextcloud's config.php as a PHP
+               literal, so anything else would syntax-error the file. --->
+          <cfif form.nextcloud_oidc_auto_redirect NEQ "true" AND form.nextcloud_oidc_auto_redirect NEQ "false">
+
+            <cfset step=0>
+            <cfset session.m=46>
+
+            <cfoutput>
+            <cflocation url="#cgi.http_referer#" addtoken="no">
+            </cfoutput>
+
+          <cfelse>
+
+            <cfquery name="update" datasource="hermes">
+            update parameters2 set value2='#form.nextcloud_oidc_auto_redirect#', applied='2' where module='nextcloud' and parameter='oidc.auto_redirect'
+            </cfquery>
+
+            <cfset step=3>
+
+          </cfif>
+
+        </cfif>
+
+      </cfif>
+
       <!--- /CFIF REFind("[^_a-zA-Z0-9-]",form.session_inactivity) gt 0>  --->
       </cfif>
-  
+
          <!--- /CFIF #form.session_inactivity# is "" --->
         </cfif>
-      
+
       <!--- /CFIF step is 2 --->
       </cfif>
   

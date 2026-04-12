@@ -13,7 +13,7 @@ LDAP_USER_PASS=$(cat /run/secrets/LDAP_USER_PASSWORD)
 LDAP_DOMAIN=${LDAP_DOMAIN:-hermes.local}
 LDAP_ADMIN_USERNAME=${LDAP_ADMIN_USERNAME:-hermes-ldap-admin}
 LDAP_USER_USERNAME=${LDAP_USER_USERNAME:-hermes-ldap-user}
-LDAP_GROUPS=${LDAP_GROUPS:-"admins relays mailboxes two_factor one_factor readers"}
+LDAP_GROUPS=${LDAP_GROUPS:-"admins relays mailboxes nextcloud two_factor one_factor readers"}
 
 LDAP_BASE_DN="dc=$(echo "$LDAP_DOMAIN" | sed 's/\./,dc=/g')"
 LDAPI_URI="ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi"

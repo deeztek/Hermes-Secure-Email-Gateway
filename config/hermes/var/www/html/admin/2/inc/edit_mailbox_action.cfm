@@ -36,7 +36,7 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
 <!--- GET EXISTING MAILBOX --->
 <cfquery name="getMailbox" datasource="hermes">
-    SELECT m.id, m.username, m.domain_id, d.domain
+    SELECT m.id, m.username, m.domain_id, m.nextcloud_enabled AS prev_nextcloud_enabled, d.domain
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id
     WHERE m.id = <cfqueryparam value="#form.mailbox_id#" cfsqltype="cf_sql_integer">
@@ -149,6 +149,37 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
         <cfset sieveUsername = getMailbox.username>
         <cfinclude template="generate_sieve_user.cfm">
     <cfcatch type="any"></cfcatch>
+    </cftry>
+</cfif>
+
+<!--- NEXTCLOUD ACCESS GROUP TOGGLE.
+     If the admin flipped Nextcloud Webmail on or off, sync LDAP group
+     membership accordingly. Authelia checks cn=nextcloud on every request
+     to /nc, so this takes effect immediately on the next page load.
+     Idempotent: the include scripts catch "already a member" / "no such
+     attribute" errors. --->
+<cfif Val(form.edit_nextcloud_enabled) NEQ Val(getMailbox.prev_nextcloud_enabled)>
+    <cftry>
+        <!--- Look up the LDAP username (may not be the same as the email) --->
+        <cfquery name="getLdapUsernameForNc" datasource="hermes">
+            SELECT ldap_username FROM user_settings
+            WHERE email = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+        <cfif getLdapUsernameForNc.recordcount GTE 1 AND getLdapUsernameForNc.ldap_username NEQ "">
+            <cfset ldapUsername = getLdapUsernameForNc.ldap_username>
+        <cfelse>
+            <cfset ldapUsername = LCase(getMailbox.username)>
+        </cfif>
+
+        <cfif Val(form.edit_nextcloud_enabled) EQ 1>
+            <cfinclude template="ldap_add_user_groups_nextcloud.cfm">
+        <cfelse>
+            <cfinclude template="ldap_remove_user_groups_nextcloud.cfm">
+        </cfif>
+    <cfcatch type="any">
+        <!--- Non-fatal: the mailbox row was already updated, admin can
+             retry by re-toggling. --->
+    </cfcatch>
     </cftry>
 </cfif>
 

@@ -378,6 +378,21 @@ Requires form variables:
     <cfinclude template="ldap_add_user_mailbox.cfm">
 </cfif>
 
+<!--- 4b. NEXTCLOUD ACCESS GROUP. The mailboxes.nextcloud_enabled toggle on
+     this form controls whether the user is added to cn=nextcloud, which
+     Authelia checks before permitting access to the /nc endpoint. Without
+     this group membership the user can still log into the user portal but
+     gets denied at /nc. --->
+<cfif form.nextcloud_enabled EQ "1" AND ldapUsername NEQ "">
+    <cftry>
+        <cfinclude template="ldap_add_user_groups_nextcloud.cfm">
+    <cfcatch type="any">
+        <!--- Non-fatal: mailbox creation succeeds even if group add fails.
+             Admin can re-toggle in Edit Mailbox to retry. --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- 5. SEND WELCOME EMAIL --->
 <cfset recipientName = displayName>
 <cftry>

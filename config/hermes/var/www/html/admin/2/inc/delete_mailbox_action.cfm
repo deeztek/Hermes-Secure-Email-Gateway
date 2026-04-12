@@ -94,6 +94,14 @@ Removes a mailbox user from all systems:
         <cfif fileExists(fileToDelete)>
             <cffile action="delete" file="#fileToDelete#">
         </cfif>
+
+        <!--- Also remove from cn=nextcloud group (idempotent - the include
+             handles "No such object" / "No such attribute" gracefully if
+             the user wasn't in the group). --->
+        <cftry>
+            <cfinclude template="ldap_remove_user_groups_nextcloud.cfm">
+        <cfcatch type="any"></cfcatch>
+        </cftry>
     <cfcatch type="any">
         <!--- Mailbox group removal is non-critical - continue with deletion --->
     </cfcatch>

@@ -25,9 +25,14 @@ $CONFIG = array (
     'password' => 'NEXTCLOUD_REDIS_PASSWORD',
     'port' => 6379,
   ),
-  'overwriteprotocol' => 'https',
-  'overwritewebroot' => '/nc',
-  'trusted_proxies' => 
+  // overwriteprotocol, overwritewebroot, and overwrite.cli.url are
+  // intentionally NOT defined here. They are owned by the official
+  // Nextcloud Docker image's reverse-proxy.config.php which reads them
+  // from the OVERWRITEPROTOCOL, OVERWRITEWEBROOT, and OVERWRITECLIURL
+  // environment variables in docker-compose.yml on every request. Defining
+  // them here would create two writers fighting over the same keys and
+  // caused a URL doubling bug in the OIDC auto-redirect flow.
+  'trusted_proxies' =>
   array (
     0 => '172.16.0.0/12',
     1 => '127.0.0.1',
@@ -54,8 +59,7 @@ $CONFIG = array (
   ),
   'datadirectory' => '/var/www/html/data',
   'dbtype' => 'mysql',
-  'version' => '30.0.14.1',
-  'overwrite.cli.url' => 'https://localhost/nc',
+  'version' => 'NEXTCLOUD_VERSION',
   'dbname' => 'nextcloud',
   'dbhost' => 'hermes_db_server:3306',
   'dbport' => '',
@@ -70,7 +74,7 @@ $CONFIG = array (
   'oidc_login_provider_url' => 'OIDC_LOGIN_PROVIDER_URL',
   'oidc_login_client_id' => 'Hermes_SEG_Webmail',
   'oidc_login_client_secret' => 'OIDC_LOGIN_CLIENT_SECRET',
-  'oidc_login_auto_redirect' => false,
+  'oidc_login_auto_redirect' => OIDC_LOGIN_AUTO_REDIRECT,
   'oidc_login_logout_url' => '/users/logout.cfm',
   'oidc_login_end_session_redirect' => false,
   'oidc_login_button_text' => 'Click to Login to Webmail',
@@ -83,9 +87,9 @@ $CONFIG = array (
     'mail' => 'email',
     'groups' => 'groups',
   ),
-  'oidc_login_allowed_groups' => 
+  'oidc_login_allowed_groups' =>
   array (
-    0 => 'mailboxes',
+    0 => 'nextcloud',
   ),
   'oidc_login_default_group' => '',
   'oidc_login_use_external_storage' => false,

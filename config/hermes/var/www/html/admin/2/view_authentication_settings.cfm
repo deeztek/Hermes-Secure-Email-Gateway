@@ -124,7 +124,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   "40":{type:"success", msg:"Webmail OIDC Key generated successfully."},
   "41":{type:"success", msg:"Session Provider Password generated successfully."},
   "42":{type:"success", msg:"Webmail OIDC Secret generated successfully."},
-  "43":{type:"success", msg:"Webmail OIDC Client Secret generated successfully."}
+  "43":{type:"success", msg:"Webmail OIDC Client Secret generated successfully."},
+  "44":{type:"danger", msg:"The Remember Me Duration field cannot be blank. Use a positive number of seconds, or -1 to disable the Remember Me checkbox."},
+  "45":{type:"danger", msg:"Invalid Remember Me Duration. Only digits (0-9) or the literal value -1 are allowed."},
+  "46":{type:"danger", msg:"Invalid Nextcloud Auto-Redirect to SSO value. Only true or false are allowed."}
 }>
 
 <cfif StructKeyExists(_alerts, toString(m))>
@@ -194,6 +197,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-clock"></i> Session Settings</h3>
   </div>
   <div class="card-body">
+
+    <div class="alert alert-info">
+      <h5 class="mb-2"><i class="fas fa-info-circle me-1"></i> Session Termination Compliance Reference</h5>
+      <p class="mb-2">The two timeout values below affect your compliance posture under <strong>NIST SP 800-53 rev 5 AC-12</strong> (Session Termination) and <strong>NIST SP 800-63B</strong> (Digital Identity Guidelines). Both fields below are in <strong>seconds</strong>.</p>
+      <ul class="mb-2">
+        <li><strong>Session Expiration</strong>: absolute session lifetime from login, regardless of activity. NIST 800-63B requires reauthentication at least every <strong>12 hours</strong> for both AAL2 and AAL3 extended sessions. Recommended value: <strong>43200</strong> seconds (12h).</li>
+        <li><strong>Session Inactivity</strong>: idle timeout before the session is destroyed. NIST 800-63B requires reauthentication after <strong>30 minutes</strong> of inactivity at AAL2 (typical for email services), or <strong>15 minutes</strong> at AAL3 (high-assurance environments). Recommended value: <strong>1800</strong> seconds (30 min) for AAL2, or <strong>900</strong> seconds (15 min) for AAL3.</li>
+      </ul>
+      <p class="mb-2"><small>NIST SP 800-53 rev 5 AC-12 itself does not mandate specific durations - it defers to organization-defined values. The numbers above come from NIST SP 800-63B which AC-12 references.</small></p>
+
+      <div class="alert alert-warning mb-0 mt-3">
+        <h6 class="mb-2"><i class="fas fa-exclamation-triangle me-1"></i> Important: "Remember Me" interaction</h6>
+        <p class="mb-2"><small>When a user ticks <strong>"Remember Me"</strong> at login, Authelia replaces <strong>Session Expiration</strong> with the <strong>Remember Me Duration</strong> setting AND completely <strong>bypasses the Session Inactivity check</strong>. A remembered session lives for the full Remember Me Duration as a hard ceiling regardless of user activity (verified in Authelia v4.39 source code at <code>internal/handlers/handler_authz_authn.go</code> line 495).</small></p>
+        <p class="mb-2"><small><strong>Implications for compliance:</strong></small></p>
+        <ul class="mb-2"><small>
+          <li>If you allow "Remember Me", the inactivity values above only apply to users who do NOT tick the box.</li>
+          <li>Set <strong>Remember Me Duration</strong> to a short, bounded value (recommended: <strong>43200</strong> seconds / 12 hours, matching the Session Expiration ceiling) to stay within NIST 800-63B AAL2.</li>
+          <li>To <strong>fully disable</strong> the "Remember Me" checkbox and force every user through the Session Expiration + Inactivity path, set Remember Me Duration to <code>-1</code>. This is the only way to guarantee inactivity enforcement for all sessions.</li>
+        </small></ul>
+        <p class="mb-0"><small>The <strong>Remember Me Duration</strong> field below this card is the configurable value. Set it conservatively (<code>43200</code> for 12h matching the AAL2 ceiling) or set it to <code>-1</code> to disable the Remember Me checkbox entirely.</small></p>
+      </div>
+    </div>
+
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
@@ -227,6 +253,45 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <div class="mb-3">
           <label class="form-label"><strong>Session Inactivity</strong> (seconds)</label>
           <cfoutput><input type="text" class="form-control" name="session_inactivity" value="#encodeForHTMLAttribute(session_inactivity.value2)#" placeholder="Seconds"></cfoutput>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-12">
+        <div class="mb-3">
+          <label class="form-label"><strong>Remember Me Duration</strong> (seconds)</label>
+          <cfoutput><input type="text" class="form-control" name="session_remember_me" value="#encodeForHTMLAttribute(session_remember_me.value2)#" placeholder="Seconds, or -1 to disable"></cfoutput>
+          <small class="form-text text-muted">When a user ticks "Remember Me" at login, this absolute lifetime replaces Session Expiration AND <strong>bypasses Session Inactivity entirely</strong>. Recommended: <code>43200</code> (12h, NIST 800-63B AAL2 ceiling). Set to <code>-1</code> to remove the "Remember Me" checkbox from the login form and force every user through Session Expiration + Inactivity.</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NEXTCLOUD WEBMAIL SSO CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-inbox"></i> Nextcloud Webmail SSO</h3>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="mb-3">
+          <label class="form-label"><strong>Auto-Redirect to Hermes SSO</strong></label>
+          <cfoutput>
+          <select class="form-select" name="nextcloud_oidc_auto_redirect">
+            <option value="false" <cfif nextcloud_oidc_auto_redirect.value2 is "false">selected</cfif>>Disabled (show Nextcloud login page)</option>
+            <option value="true" <cfif nextcloud_oidc_auto_redirect.value2 is "true">selected</cfif>>Enabled (silent SSO via Authelia)</option>
+          </select>
+          </cfoutput>
+          <small class="form-text text-muted">
+            Controls Nextcloud's <code>oidc_login_auto_redirect</code> setting.
+            <ul class="mb-0 mt-1">
+              <li><strong>Disabled</strong> (default): users clicking "Login to Webmail" land on the Nextcloud login page where they must click the "Click to Login to Webmail" button to complete SSO. Local Nextcloud users (created via <code>occ user:add</code>) can also log in here with their username/password. Two clicks for SSO users.</li>
+              <li><strong>Enabled</strong>: users clicking "Login to Webmail" are silently bounced through Authelia OIDC and land in Nextcloud already logged in. One-click SSO. Local Nextcloud users <strong>cannot log in</strong> in this mode because the auto-redirect hijacks the login page before the local password form is reachable.</li>
+            </ul>
+          </small>
         </div>
       </div>
     </div>

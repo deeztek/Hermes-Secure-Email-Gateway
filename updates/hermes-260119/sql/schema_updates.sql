@@ -403,6 +403,46 @@ ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS secondary_email_token_expires
 -- correct in multi-tenant deployments where users may be in different zones.
 ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS timezone VARCHAR(64) NULL;
 
+-- ============================================================================
+-- Authelia Remember Me Duration parameter
+-- ============================================================================
+-- Adds an admin-configurable session.remember_me row to parameters2 so the
+-- value can be set from the Authentication Settings page instead of being
+-- hardcoded in the configuration.yml template. Default is 43200 seconds
+-- (12 hours), matching NIST 800-63B AAL2 extended-session reauth ceiling.
+--
+-- Important security context: Authelia bypasses the Inactivity check entirely
+-- for sessions where "Remember Me" is ticked at login (verified in v4.39
+-- source at internal/handlers/handler_authz_authn.go line 495). The value
+-- below is therefore a hard absolute lifetime with NO inactivity protection.
+-- Set to -1 to disable the "Remember Me" checkbox in the login form entirely.
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'authelia', 'session.remember_me', '43200', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'authelia' AND parameter = 'session.remember_me'
+);
+
+-- ============================================================================
+-- Nextcloud OIDC auto-redirect parameter
+-- ============================================================================
+-- Controls the oidc_login_auto_redirect setting in Nextcloud's config.php.
+-- When 'true', users hitting /nc/ are silently bounced through Authelia OIDC
+-- and land in Nextcloud already logged in (one-click SSO from Hermes user
+-- portal). When 'false', users see Nextcloud's native login page with the
+-- "Click to Login to Webmail" button (two-click SSO, but the local-user
+-- password form is reachable for any non-LDAP Nextcloud accounts).
+--
+-- Default 'false' on upgrade preserves existing behavior. Admin can flip to
+-- 'true' from Authentication Settings if seamless SSO is preferred over
+-- local-user support.
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'nextcloud', 'oidc.auto_redirect', 'false', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
+);
+
 -- Backfill: existing rows get the system timezone configured by the admin
 -- in System Settings (system_settings.parameter='timezone'), which is the
 -- canonical IANA name (e.g. America/New_York). Falls back to MariaDB's

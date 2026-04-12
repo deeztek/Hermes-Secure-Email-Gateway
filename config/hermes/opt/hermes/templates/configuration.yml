@@ -104,18 +104,10 @@ access_control:
       - '^/auth([/?].*)?$'
       policy: bypass
 
-      #Bypass Nextcloud DAV /nc/remote.php/dav endpoint
-    - domain: hermes_access_control_domain
-      resources:
-      - '^/nc/remote.php/dav([/?].*)?$'
-      policy: bypass
-
-      #Bypass Nextcloud DAV /nc/remote.php/dav endpoint
-    - domain: hermes_access_control_domain
-      resources:
-      - '^/nc/remote.php/webdav([/?].*)?$'
-      policy: bypass
-
+    # NOTE: Nextcloud DAV bypass rules (/nc/remote.php/dav and /nc/remote.php/webdav)
+    # have been removed. Authelia no longer gates /nc/ at all (auth_request
+    # removed from the nginx location block), so there is nothing to bypass.
+    # Nextcloud handles its own DAV authentication via app passwords.
 
     #Deny Access to /admin for  mailboxes
     - domain: hermes_access_control_domain
@@ -133,13 +125,14 @@ access_control:
       - "group:relays"
       policy: deny
 
-    #Deny Access to /nc for relays
-    - domain: hermes_access_control_domain
-      resources:
-      - '^/nc([/?].*)?$'
-      subject:
-      - "group:relays"
-      policy: deny
+    # NOTE: /nc (Nextcloud) access control rules have been removed from
+    # Authelia. Nextcloud handles its own authentication via the OIDC plugin
+    # with Authelia as the provider, and group-based access control is
+    # enforced by oidc_login_allowed_groups in Nextcloud's config.php
+    # (requires cn=nextcloud LDAP group membership). The Authelia
+    # auth_request layer was removed from the /nc nginx location block
+    # because it corrupts upstream 302 Location headers during the OIDC
+    # auto-redirect flow.
 
     #Deny Access to /users for admins
     - domain: hermes_access_control_domain
@@ -198,22 +191,6 @@ access_control:
       - ["group:one_factor", "group:relays"]
       policy: one_factor
 
-      #/nc mailboxes two_factor
-    - domain: hermes_access_control_domain
-      resources:
-      - '^/nc([/?].*)?$'
-      subject:
-      - ["group:two_factor", "group:mailboxes"]
-      policy: two_factor
-
-      #/nc/mailboxes one_factor
-    - domain: hermes_access_control_domain
-      resources:
-      - '^/nc([/?].*)?$'
-      subject:
-      - ["group:one_factor", "group:mailboxes"]
-      policy: one_factor
-
 
 session:
   cookies:
@@ -224,7 +201,7 @@ session:
     same_site: lax
     expiration: hermes_session_expiration
     inactivity: hermes_session_inactivity
-    remember_me: 1M
+    remember_me: hermes_session_remember_me
   redis:
     host: hermes_authelia_redis
     port: 6379

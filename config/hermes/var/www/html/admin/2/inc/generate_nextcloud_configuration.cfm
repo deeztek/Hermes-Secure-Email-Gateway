@@ -48,10 +48,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset ncHostIP = getHostIP.value2>
 
+<!--- GET OIDC AUTO-REDIRECT setting from parameters2 (managed from
+     Authentication Settings page). Defaults to "false" if the row is
+     missing for any reason - matches the previous hardcoded behavior. --->
+<cfquery name="getOidcAutoRedirect" datasource="hermes">
+  SELECT value2 FROM parameters2 WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
+</cfquery>
+<cfset ncOidcAutoRedirect = "false">
+<cfif getOidcAutoRedirect.recordcount GTE 1 AND (getOidcAutoRedirect.value2 EQ "true" OR getOidcAutoRedirect.value2 EQ "false")>
+    <cfset ncOidcAutoRedirect = getOidcAutoRedirect.value2>
+</cfif>
+
 <!--- READ EXISTING NEXTCLOUD CONFIG TO EXTRACT INSTALLATION-SPECIFIC VALUES --->
 <cfset ncPasswordSalt = "">
 <cfset ncSecret = "">
 <cfset ncInstanceId = "">
+<cfset ncVersion = "">
 <cftry>
   <cffile action="read" file="/mnt/data/nextcloud/config/config.php" variable="existingConfig">
 
@@ -71,6 +83,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset instanceMatch = REFind("'instanceid'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
   <cfif instanceMatch.pos[1] GT 0>
     <cfset ncInstanceId = Mid(existingConfig, instanceMatch.pos[2], instanceMatch.len[2])>
+  </cfif>
+
+  <!--- Extract version - CRITICAL: Nextcloud compares this against the
+       installed code version on every page load. If it's missing, lower
+       than the code version, or hardcoded to a stale value, NC bounces to
+       the upgrade screen. We must preserve whatever the live config says
+       so the regenerator never causes a phantom upgrade prompt. --->
+  <cfset versionMatch = REFind("'version'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
+  <cfif versionMatch.pos[1] GT 0>
+    <cfset ncVersion = Mid(existingConfig, versionMatch.pos[2], versionMatch.len[2])>
   </cfif>
 
   <cfcatch type="any">
@@ -96,10 +118,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- OIDC client secret from key file --->
 <cfset config = Replace(config, "OIDC_LOGIN_CLIENT_SECRET", Trim(oidcclientplain), "ALL")>
 
+<!--- OIDC auto-redirect: emit as a PHP literal (true/false, no quotes) so
+     it parses as a boolean in config.php instead of a string. --->
+<cfset config = Replace(config, "OIDC_LOGIN_AUTO_REDIRECT", ncOidcAutoRedirect, "ALL")>
+
 <!--- Installation-specific values from existing config --->
 <cfset config = Replace(config, "NEXTCLOUD_PASSWORD_SALT", ncPasswordSalt, "ALL")>
 <cfset config = Replace(config, "NEXTCLOUD_SECRET", ncSecret, "ALL")>
 <cfset config = Replace(config, "NEXTCLOUD_INSTANCE_ID", ncInstanceId, "ALL")>
+<cfset config = Replace(config, "NEXTCLOUD_VERSION", ncVersion, "ALL")>
 
 <!--- WRITE GENERATED CONFIG --->
 <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_config.php" output="#config#">

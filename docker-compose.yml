@@ -543,6 +543,14 @@ services:
       - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS}
       - OVERWRITEWEBROOT=/nc
       - OVERWRITEPROTOCOL=https
+      # OVERWRITECLIURL is the base URL Nextcloud uses for cron, occ
+      # commands, and any code path that builds URLs without an HTTP
+      # request context. It must NOT include the webroot suffix (/nc) -
+      # the URL generator appends OVERWRITEWEBROOT separately when
+      # constructing absolute URLs. Including /nc here causes doubling
+      # (e.g. /nc/nc/index.php/apps/...) in the OIDC auto-redirect flow.
+      # Read at runtime by reverse-proxy.config.php.
+      - OVERWRITECLIURL=https://${HERMES_HOSTNAME}
       #- APACHE_DISABLE_REWRITE_IP=1
       - TRUSTED_PROXIES=${TRUSTED_PROXIES}
       - SMTP_HOST=hermes_postfix_dkim
