@@ -77,12 +77,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Vacation Auto-Reply</strong></p>
           </a>
         </li>
+        <cfif #session.theGroups# contains "nextcloud">
         <li class="nav-item">
           <a href="/nc/" class="nav-link">
             <i class="nav-icon fas fa-inbox"></i>
             <p><strong>Login to Webmail</strong></p>
           </a>
         </li>
+        </cfif>
         </cfif>
 
       </ul>

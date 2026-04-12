@@ -252,6 +252,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>SAN Management</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="view_email_server_settings.cfm" class="nav-link">
+                <i class="nav-icon fas fa-sliders-h"></i>
+                <p>Settings</p>
+              </a>
+            </li>
           </ul>
         </li>
         <!--- EMAIL SERVER ENDS HERE --->

@@ -252,6 +252,21 @@ $(document).ready(function() {
             <cfinclude template="/user-auth/inc/ldap_modify_user_password.cfm">
 
             <cfif ldapPasswordModified>
+                <!--- Sync Nextcloud app password with new LDAP password --->
+                <cfquery name="checkNcEnabledPwd" datasource="hermes">
+                    SELECT nextcloud_enabled FROM mailboxes
+                    WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfif checkNcEnabledPwd.recordcount GTE 1 AND Val(checkNcEnabledPwd.nextcloud_enabled) EQ 1>
+                    <cftry>
+                        <cfset ncAppPasswordAction = "regenerate">
+                        <cfset ncAppPasswordUser = session.email>
+                        <cfset ncAppPasswordValue = trim(form.newpassword)>
+                        <cfinclude template="../../admin/2/inc/nextcloud_app_password.cfm">
+                    <cfcatch type="any"></cfcatch>
+                    </cftry>
+                </cfif>
+
                 <cfinclude template="./inc/send_changed_password_email.cfm">
                 <cfset session.pwdMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Your Password was changed successfully. Please ensure you use the new password to login from now on">
                 <cfset session.pwdMessageType = "success">

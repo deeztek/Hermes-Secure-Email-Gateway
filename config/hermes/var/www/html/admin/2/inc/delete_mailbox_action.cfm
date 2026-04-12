@@ -174,7 +174,25 @@ Removes a mailbox user from all systems:
        OR bcc_to  = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<!--- 4c. DELETE VACATION AUTO-REPLY config (one row per user) --->
+<!--- 4c. INVALIDATE USER SESSIONS (force immediate logout) --->
+<cftry>
+    <cfset targetSessionUser = recipient>
+    <cfinclude template="invalidate_user_sessions.cfm">
+<cfcatch type="any"></cfcatch>
+</cftry>
+
+<!--- 4d. DELETE NEXTCLOUD APP PASSWORD ("Hermes System" token) --->
+<cftry>
+    <cfset ncAppPasswordAction = "delete">
+    <cfset ncAppPasswordUser = recipient>
+    <cfset ncAppPasswordValue = "">
+    <cfinclude template="nextcloud_app_password.cfm">
+<cfcatch type="any">
+    <!--- Non-fatal --->
+</cfcatch>
+</cftry>
+
+<!--- 4d. DELETE VACATION AUTO-REPLY config (one row per user) --->
 <cfquery datasource="hermes">
     DELETE FROM user_vacation
     WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">

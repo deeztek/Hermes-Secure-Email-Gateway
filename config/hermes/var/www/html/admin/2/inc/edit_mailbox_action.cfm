@@ -249,7 +249,36 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
         </cfif>
 
         <cfset session.passwordChanged = true>
+
+        <!--- Sync the Nextcloud app password with the new LDAP password.
+             Regenerates the "Hermes System" token so DAV clients continue
+             working with the updated credentials. --->
+        <cfquery name="checkNcEnabled" datasource="hermes">
+            SELECT nextcloud_enabled FROM mailboxes
+            WHERE username = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+        <cfif checkNcEnabled.recordcount GTE 1 AND Val(checkNcEnabled.nextcloud_enabled) EQ 1>
+            <cftry>
+                <cfset ncAppPasswordAction = "regenerate">
+                <cfset ncAppPasswordUser = getMailbox.username>
+                <cfset ncAppPasswordValue = trim(form.edit_password)>
+                <cfinclude template="nextcloud_app_password.cfm">
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+        </cfif>
     </cfif>
+</cfif>
+
+<!--- INVALIDATE USER SESSIONS if password was changed or account was
+     deactivated. This forces the user to re-authenticate with the new
+     credentials on their next request. Without this, the old session
+     continues working until it naturally expires. --->
+<cfif session.passwordChanged OR Val(form.edit_active) EQ 0>
+    <cftry>
+        <cfset targetSessionUser = getMailbox.username>
+        <cfinclude template="invalidate_user_sessions.cfm">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
 </cfif>
 
 <!--- SUCCESS --->

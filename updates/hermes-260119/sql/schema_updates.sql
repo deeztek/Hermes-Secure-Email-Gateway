@@ -1327,10 +1327,29 @@ ALTER TABLE mailbox_domains DROP COLUMN IF EXISTS updated_at;
 -- canonical off-switch for domains.
 ALTER TABLE domains DROP COLUMN IF EXISTS active;
 
--- additional_sans is already seeded with system prefixes (autoconfig,
--- autodiscover). sync_mailbox_sans.cfm cross-joins these with
--- domains.type='mailbox' to produce one mailbox_sans row per
--- (prefix, domain) combination.
+-- ============================================================================
+-- Additional SANs (SAN prefix management for mailbox domain certificates)
+-- ============================================================================
+-- Each row is a prefix (e.g. 'mail', 'imap', 'smtp') that gets cross-joined
+-- with mailbox-hosting domains to produce one mailbox_sans row per
+-- (prefix, domain) combination via sync_mailbox_sans.cfm.
+-- system=1 rows (autoconfig, autodiscover) are required and cannot be deleted.
+-- system=2 rows are user-added prefixes.
+CREATE TABLE IF NOT EXISTS additional_sans (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  san VARCHAR(255) NOT NULL,
+  system INT NOT NULL DEFAULT 2,
+  UNIQUE KEY uq_san (san)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Seed system prefixes (required for auto-configuration endpoints)
+INSERT INTO additional_sans (san, system)
+SELECT 'autoconfig', 1
+WHERE NOT EXISTS (SELECT 1 FROM additional_sans WHERE san = 'autoconfig');
+
+INSERT INTO additional_sans (san, system)
+SELECT 'autodiscover', 1
+WHERE NOT EXISTS (SELECT 1 FROM additional_sans WHERE san = 'autodiscover');
 
 -- ============================================================================
 -- Email Server > Mailboxes (#199)
