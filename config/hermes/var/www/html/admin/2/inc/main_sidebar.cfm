@@ -223,6 +223,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </a>
           <ul class="nav nav-treeview">
             <li class="nav-item">
+              <a href="view_email_server_settings.cfm" class="nav-link">
+                <i class="nav-icon fas fa-sliders-h"></i>
+                <p>Settings</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_mailbox_domains.cfm" class="nav-link">
                 <i class="nav-icon fas fa-cogs"></i>
                 <p>Domains</p>
@@ -250,12 +256,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <a href="view_mailbox_sans.cfm" class="nav-link">
                 <i class="nav-icon fas fa-network-wired"></i>
                 <p>SAN Management</p>
-              </a>
-            </li>
-            <li class="nav-item">
-              <a href="view_email_server_settings.cfm" class="nav-link">
-                <i class="nav-icon fas fa-sliders-h"></i>
-                <p>Settings</p>
               </a>
             </li>
           </ul>

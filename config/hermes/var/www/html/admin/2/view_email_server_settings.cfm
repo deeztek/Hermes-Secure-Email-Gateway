@@ -87,58 +87,52 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
-<cfquery name="getNcFilesSharing" datasource="hermes">
+<cfquery name="getNcFilesApp" datasource="hermes">
     SELECT value2 FROM parameters2
-    WHERE module = 'nextcloud' AND parameter = 'files_sharing_enabled'
+    WHERE module = 'nextcloud' AND parameter = 'files_app_visible'
 </cfquery>
-<cfset ncFilesSharingEnabled = "no">
-<cfif getNcFilesSharing.recordcount GTE 1>
-    <cfset ncFilesSharingEnabled = getNcFilesSharing.value2>
+<cfset ncFilesAppVisible = "yes">
+<cfif getNcFilesApp.recordcount GTE 1>
+    <cfset ncFilesAppVisible = getNcFilesApp.value2>
 </cfif>
 
-<cfquery name="getNcPublicLinks" datasource="hermes">
+<cfquery name="getNcPasswordForm" datasource="hermes">
     SELECT value2 FROM parameters2
-    WHERE module = 'nextcloud' AND parameter = 'public_links_enabled'
+    WHERE module = 'nextcloud' AND parameter = 'show_password_form'
 </cfquery>
-<cfset ncPublicLinksEnabled = "no">
-<cfif getNcPublicLinks.recordcount GTE 1>
-    <cfset ncPublicLinksEnabled = getNcPublicLinks.value2>
+<cfset ncShowPasswordForm = "no">
+<cfif getNcPasswordForm.recordcount GTE 1>
+    <cfset ncShowPasswordForm = getNcPasswordForm.value2>
 </cfif>
 
 <form method="post" action="view_email_server_settings.cfm">
 <input type="hidden" name="action" value="save_settings">
 
-<!-- NEXTCLOUD FILES & SHARING CARD -->
+<!-- NEXTCLOUD WEBMAIL SETTINGS CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-folder-open"></i> Nextcloud Files & Sharing</h3>
+    <h3 class="card-title"><i class="fas fa-inbox"></i> Nextcloud Webmail Settings</h3>
   </div>
   <div class="card-body">
-    <div class="alert alert-info">
-      <h5><i class="icon fas fa-info-circle"></i> About Files & Sharing</h5>
-      <p class="mb-1">These settings control whether Nextcloud users can share files and create public share links. The Nextcloud Files app itself is always available (it is a core Nextcloud component), but sharing can be disabled independently.</p>
-      <p class="mb-0"><small>When file sharing is disabled, users can still upload and manage their own files but cannot share them with other users or create public links. This is the recommended setting for deployments that use Nextcloud primarily as a webmail client.</small></p>
-    </div>
-
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
-          <label class="form-label"><strong>File Sharing Between Users</strong></label>
-          <select class="form-select" name="nc_files_sharing">
-            <option value="yes" <cfif ncFilesSharingEnabled EQ "yes">selected</cfif>>Enabled</option>
-            <option value="no" <cfif ncFilesSharingEnabled NEQ "yes">selected</cfif>>Disabled</option>
+          <label class="form-label"><strong>Files App</strong></label>
+          <select class="form-select" name="nc_files_app">
+            <option value="yes" <cfif ncFilesAppVisible EQ "yes">selected</cfif>>Visible</option>
+            <option value="no" <cfif ncFilesAppVisible NEQ "yes">selected</cfif>>Hidden</option>
           </select>
-          <small class="form-text text-muted">Allow users to share files and folders with other Nextcloud users on this server.</small>
+          <small class="form-text text-muted">Controls whether the Files app is visible to Nextcloud users. When hidden, Nextcloud functions as a webmail-only client (Mail, Calendar, Contacts). When visible, users can upload, manage, and share files. File sharing settings (permissions, public links, expiration) can be configured in the Nextcloud admin panel directly.</small>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
-          <label class="form-label"><strong>Public Share Links</strong></label>
-          <select class="form-select" name="nc_public_links">
-            <option value="yes" <cfif ncPublicLinksEnabled EQ "yes">selected</cfif>>Enabled</option>
-            <option value="no" <cfif ncPublicLinksEnabled NEQ "yes">selected</cfif>>Disabled</option>
+          <label class="form-label"><strong>Nextcloud Login Form</strong></label>
+          <select class="form-select" name="nc_password_form">
+            <option value="no" <cfif ncShowPasswordForm NEQ "yes">selected</cfif>>Hidden (SSO button only)</option>
+            <option value="yes" <cfif ncShowPasswordForm EQ "yes">selected</cfif>>Visible (SSO button + username/password)</option>
           </select>
-          <small class="form-text text-muted">Allow users to create shareable links that external users can access without a Nextcloud account. Requires file sharing to also be enabled.</small>
+          <small class="form-text text-muted">Controls whether the username/password login form is visible on the Nextcloud login page alongside the SSO button. Set to <strong>Visible</strong> temporarily when you need to log into Nextcloud as a local admin user for maintenance (app management, troubleshooting, etc.), then set it back to <strong>Hidden</strong> to keep the login page clean. Only applies when "Auto-Redirect to Hermes SSO" is disabled in Authentication Settings.</small>
         </div>
       </div>
     </div>
