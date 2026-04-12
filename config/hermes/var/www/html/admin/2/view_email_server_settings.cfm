@@ -139,6 +139,73 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!-- MAIL SERVER TLS CERTIFICATE CARD -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fab fa-expeditedssl"></i> Mail Server TLS Certificate</h3>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info">
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i> Select the TLS certificate used by the mail server (Dovecot) for IMAP, POP3, and Submission connections. This is the certificate your email clients see when connecting over TLS. It should match the hostname your users configure in their mail clients (e.g., <code>mail.example.com</code>).</p>
+    </div>
+
+    <!--- Load current Dovecot certificate from parameters2 --->
+    <cfquery name="dovecotCertParam" datasource="hermes">
+        SELECT value2 FROM parameters2
+        WHERE module = 'certificates' AND parameter = 'mail.certificate'
+    </cfquery>
+    <cfset dovecotCertId = "">
+    <cfif dovecotCertParam.recordcount GTE 1>
+        <cfset dovecotCertId = dovecotCertParam.value2>
+    </cfif>
+
+    <cfset dovecotCertName = "">
+    <cfset dovecotCertSubject = "">
+    <cfset dovecotCertIssuer = "">
+    <cfset dovecotCertSerial = "">
+    <cfif dovecotCertId NEQ "">
+        <cfquery name="getDovecotCert" datasource="hermes">
+            SELECT id, subject, issuer, serial, type, friendly_name
+            FROM system_certificates
+            WHERE id = <cfqueryparam value="#dovecotCertId#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfif getDovecotCert.recordcount GTE 1>
+            <cfset dovecotCertName = getDovecotCert.friendly_name>
+            <cfset dovecotCertSubject = getDovecotCert.subject>
+            <cfset dovecotCertIssuer = getDovecotCert.issuer>
+            <cfset dovecotCertSerial = getDovecotCert.serial>
+        </cfif>
+    </cfif>
+
+    <cfoutput>
+    <input type="hidden" name="dovecot_cert_id" id="dovecot_cert_id" value="#dovecotCertId#">
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label"><strong>Mail Server Certificate</strong></label>
+          <input type="text" name="dovecot_cert_name" class="certificate form-control" id="dovecot_cert_name" placeholder="Start typing to search..." value="#encodeForHTMLAttribute(dovecotCertName)#" autocomplete="off">
+        </div>
+        <div class="mb-3">
+          <label class="form-label"><strong>Certificate Subject</strong></label>
+          <input type="text" class="form-control" id="dovecot_cert_subject" value="#encodeForHTMLAttribute(dovecotCertSubject)#" readonly>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label class="form-label"><strong>Certificate Issuer</strong></label>
+          <input type="text" class="form-control" id="dovecot_cert_issuer" value="#encodeForHTMLAttribute(dovecotCertIssuer)#" readonly>
+        </div>
+        <div class="mb-3">
+          <label class="form-label"><strong>Certificate Serial</strong></label>
+          <input type="text" class="form-control" id="dovecot_cert_serial" value="#encodeForHTMLAttribute(dovecotCertSerial)#" readonly>
+        </div>
+      </div>
+    </div>
+    </cfoutput>
+  </div>
+</div>
+
 <!-- DOVECOT MAIL SERVER INFO CARD (read-only for now) -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
@@ -147,7 +214,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="card-body">
     <div class="alert alert-secondary">
       <h5><i class="icon fas fa-info-circle"></i> Current Configuration</h5>
-      <p class="mb-0">The following Dovecot mail server settings are currently configured. Changes to these settings require editing the Dovecot configuration file directly and are planned for a future release.</p>
+      <p class="mb-0">The following Dovecot mail server settings are currently configured. Admin-configurable controls for these settings are planned for a future release.</p>
     </div>
 
     <div class="row">
@@ -160,7 +227,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </tr>
             <tr>
               <th>Mail Encryption at Rest</th>
-              <td><span class="badge bg-success">Enabled (EC prime256v1)</span></td>
+              <td><span class="badge bg-secondary">Disabled (default)</span></td>
             </tr>
             <tr>
               <th>Protocols</th>
@@ -202,6 +269,44 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/main_footer.cfm" />
 
 </div>
+
+<script>
+  // Certificate autocomplete for the Mail Server TLS Certificate field
+  $(document).on('keydown', '.certificate', function() {
+    var $input = $(this);
+    $input.autocomplete({
+      source: function(request, response) {
+        $.ajax({
+          url: "./inc/getcertificates.cfm",
+          type: 'post',
+          dataType: "json",
+          data: { search: request.term, request: 1 },
+          success: function(data) { response(data); }
+        });
+      },
+      select: function(event, ui) {
+        $input.val(ui.item.label);
+        var certId = ui.item.value;
+
+        $.ajax({
+          url: './inc/getcertificates.cfm',
+          type: 'post',
+          data: { id: certId, request: 2 },
+          dataType: 'json',
+          success: function(response) {
+            if (response.length > 0) {
+              $('#dovecot_cert_id').val(response[0]['id']);
+              $('#dovecot_cert_subject').val(response[0]['subject']);
+              $('#dovecot_cert_issuer').val(response[0]['issuer']);
+              $('#dovecot_cert_serial').val(response[0]['serial']);
+            }
+          }
+        });
+        return false;
+      }
+    });
+  });
+</script>
 
 </body>
 </html>

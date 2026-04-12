@@ -1351,6 +1351,7 @@ INSERT INTO additional_sans (san, system)
 SELECT 'autodiscover', 1
 WHERE NOT EXISTS (SELECT 1 FROM additional_sans WHERE san = 'autodiscover');
 
+
 -- ============================================================================
 -- Email Server > Mailboxes (#199)
 -- ============================================================================
