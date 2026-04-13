@@ -238,6 +238,12 @@ identity_providers:
     jwks:
      - key: {{ secret "/keys/authelia_identity_providers_oidc_jwks_file" | mindent 10 "|" | msquote }}
     enable_client_debug_messages: true
+    authorization_policies:
+      hermes_webmail:
+        default_policy: 'one_factor'
+        rules:
+          - policy: 'two_factor'
+            subject: 'group:two_factor'
     claims_policies:
       nextcloud:
         id_token: ['groups', 'email', 'email_verified', 'preferred_username', 'name']
@@ -245,7 +251,7 @@ identity_providers:
       - client_id: 'Hermes_SEG_Webmail'
         client_secret: {{ secret "/keys/authelia_identity_providers_oidc_clients_client_secret_digest_file" }}
         public: false
-        authorization_policy: 'one_factor'
+        authorization_policy: 'hermes_webmail'
         claims_policy: 'nextcloud'
         token_endpoint_auth_method: 'client_secret_basic'
         require_pkce: true

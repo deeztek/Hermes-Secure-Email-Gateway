@@ -60,15 +60,24 @@ Docker/common/opt/hermes/keys/*
 # Generated config files with credentials
 config/postfix-dkim/etc/postfix/mysql-*.cf
 config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml
+config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml
 
 # Amavis config with DB credentials
 config/mail_filter/etc/amavis/conf.d/50-user
+
+# Syslog rsyslog configs with DB credentials
+config/postfix-dkim/etc/rsyslog.d/mysql.conf
+config/opendmarc/etc/rsyslog.d/mysql.conf
+config/mail_filter/etc/rsyslog.d/mysql.conf
+config/ldap/etc/rsyslog.d/mysql.conf
 Docker/common/opt/hermes/conf_files/50-user*
 config/hermes/opt/hermes/conf_files/50-user*
 
-# Dovecot configs with DB credentials
+# Dovecot configs with DB credentials (generated from template)
 config/dovecot/conf/dovecot-sql-user.conf
 config/dovecot/conf/dovecot-dict-sql-quota.conf
+config/dovecot-2.4/conf/dovecot-dict-sql-quota.conf
+config/dovecot-2.4/conf/dovecot.conf
 
 # Backup files with potential secrets
 config/postfix-dkim/etc/postfix/*.BACKUP
@@ -79,6 +88,11 @@ Docker/postfix_dkim/config/postfix-dkim/etc/postfix/*.HERMES.BACKUP
 # Backup scripts with hardcoded credentials
 config/hermes/opt/hermes/scripts/daily_backup.sh
 Docker/common/opt/hermes/scripts/daily_backup.sh
+
+# Docker build directory - generated configs with credentials
+Docker/postfix_dkim/config/postfix-dkim/etc/postfix/mysql-*.cf
+Docker/mail_filter/config/etc/amavis/conf.d/50-user
+Docker/opendkim/config/opendkim/etc/rsyslog.d/mysql.conf
 
 # ===========================================
 # ALL CERTIFICATES AND KEYS (sanitized repo)

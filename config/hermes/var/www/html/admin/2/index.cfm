@@ -73,26 +73,15 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <!--- /DIV class="alert alert-warning alert-dismissible" --->
           </div>
       
-<!--- Check if Wizard has been ran --->
-<cfquery name="checkwizard" datasource="hermes">
-  select parameter, value from system_settings where parameter='wizard_settings'
-  </cfquery>
-  
-  <cfif #checkwizard.value# is "2">
-  
-<!--- SET POSTFIX, DJIGZO SYSLOG AND AMAVIS DB CREDS IN CONFIG FILES --->
-    <cfinclude template="./inc/update_postfix_config_files.cfm">
-    <cfinclude template="./inc/update_djigzo_config_files.cfm">
-    <cfinclude template="./inc/update_syslog_config_files.cfm">
-    <cfinclude template="./inc/update_amavis_config_files.cfm">
+<!--- Database credential injection into config files is now handled by
+     /opt/hermes/scripts/rotate_db_credentials.sh which is called by the
+     install script after container startup. The wizard_settings flag and
+     the CFML credential updaters (update_postfix_config_files.cfm,
+     update_djigzo_config_files.cfm, update_syslog_config_files.cfm)
+     have been retired in favor of the bash script approach, which can
+     also handle ALTER USER and full service restarts without depending
+     on a working datasource connection. --->
 
-<!--- SET WIZARD TO 1 --->
-<cfquery name="setwizard" datasource="hermes">
-update system_settings set value = '1' where parameter='wizard_settings'
-</cfquery>
-
-<!--- /CFIF #checkwizard.value# is "2" ---> 
-  </cfif>
 
 
   <!--- CHECK IF HERMES.KEY IS BLANK AND IF BLANK GENERATE IT --->

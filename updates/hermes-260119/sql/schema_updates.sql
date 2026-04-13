@@ -1603,3 +1603,153 @@ FROM sieve_rules r
 LEFT JOIN sieve_rule_actions a ON a.rule_id = r.id
 WHERE r.action_type IS NOT NULL
   AND a.id IS NULL;
+
+-- ============================================================================
+-- Dovecot Mail Server Settings (parameters2, module='dovecot')
+-- ============================================================================
+-- Stores admin-configurable Dovecot settings that are applied via the
+-- generate_dovecot_configuration.cfm regenerator. The template at
+-- /opt/hermes/templates/dovecot.conf contains placeholders that are
+-- replaced with these values when the config is regenerated from the
+-- Email Server > Settings page.
+--
+-- COMPRESSION: LZ4 is the default — fast with minimal CPU overhead.
+-- Zstandard (zstd) offers better compression ratios at slightly higher CPU.
+-- Zlib/Deflate is the most compatible but slowest.
+-- Level only applies to zstd (1-22, default 3) and zlib (1-9, default 6).
+--
+-- ENCRYPTION AT REST: Disabled by default. When enabled, only NEW mail
+-- is encrypted; existing mail remains unencrypted but readable. Uses
+-- elliptic curve cryptography with keys mounted at /keys/ in the
+-- Dovecot container. Changing the curve requires regenerating keys.
+--
+-- PROTOCOLS: IMAP and POP3 are toggleable. Submission (587), Sieve,
+-- and LMTP are always enabled (required for mail delivery and filtering).
+--
+-- QUOTA WARNINGS: Three configurable thresholds that trigger email
+-- notifications via the quota-warning.sh script + Hermes API.
+-- The "back under 100%" warning is always active and not configurable.
+--
+-- CONNECTION LIMITS: client_limit controls max concurrent connections
+-- per login service. max_userip limits connections from a single user
+-- from a single IP address (prevents runaway clients).
+-- ============================================================================
+
+-- Mail compression
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'mail.compression', 'yes', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'mail.compression'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'mail.compression_algorithm', 'lz4', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'mail.compression_algorithm'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'mail.compression_level', '3', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'mail.compression_level'
+);
+
+-- Mail encryption at rest
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'mail.encryption', 'no', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'mail.encryption'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'mail.encryption_curve', 'prime256v1', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'mail.encryption_curve'
+);
+
+-- Protocols
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'protocol.imap', 'yes', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'protocol.imap'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'protocol.pop3', 'yes', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'protocol.pop3'
+);
+
+-- SSL/TLS
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'ssl.min_protocol', 'TLSv1.2', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'ssl.min_protocol'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'ssl.cipher_list', 'ALL:!DH:!kRSA:!SRP:!kDHd:!DSS:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4:!ADH:!LOW@STRENGTH', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'ssl.cipher_list'
+);
+
+-- Quota warnings
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'quota.warning_critical', '99', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'quota.warning_critical'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'quota.warning_high', '95', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'quota.warning_high'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'quota.warning_medium', '80', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'quota.warning_medium'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'quota.trash_percentage', '110', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'quota.trash_percentage'
+);
+
+-- Connection limits
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'connection.client_limit', '1000', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'connection.client_limit'
+);
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'connection.max_userip', '20', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'connection.max_userip'
+);
+
+-- Logging
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'logging.debug', 'no', '2'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'logging.debug'
+);

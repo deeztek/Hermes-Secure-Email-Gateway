@@ -68,10 +68,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     select value2 from parameters2 where module = 'authelia' and parameter = 'session.remember_me'
     </cfquery>
 
-    <cfquery name="nextcloud_oidc_auto_redirect" datasource="hermes">
-    select value2 from parameters2 where module = 'nextcloud' and parameter = 'oidc.auto_redirect'
-    </cfquery>
-    
     <cfquery name="session_domain" datasource="hermes">
     select value2 from parameters2 where module = 'authelia' and parameter = 'session.domain'
     </cfquery>

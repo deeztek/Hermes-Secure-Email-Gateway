@@ -76,7 +76,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
-    Settings saved.
+    Settings saved and Dovecot configuration regenerated.
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -87,6 +87,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
+
+<!--- Nextcloud settings --->
 <cfquery name="getNcFilesApp" datasource="hermes">
     SELECT value2 FROM parameters2
     WHERE module = 'nextcloud' AND parameter = 'files_app_visible'
@@ -105,77 +107,128 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset ncShowPasswordForm = getNcPasswordForm.value2>
 </cfif>
 
+<cfquery name="getNcAutoRedirect" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
+</cfquery>
+<cfset ncAutoRedirect = "false">
+<cfif getNcAutoRedirect.recordcount GTE 1>
+    <cfset ncAutoRedirect = getNcAutoRedirect.value2>
+</cfif>
+
+<!--- Dovecot settings --->
+<cfquery name="getDovecotSettings" datasource="hermes">
+    SELECT parameter, value2 FROM parameters2
+    WHERE module = 'dovecot'
+</cfquery>
+<cfset dov = StructNew()>
+<cfloop query="getDovecotSettings">
+    <cfset dov[getDovecotSettings.parameter] = getDovecotSettings.value2>
+</cfloop>
+
+<!--- Defaults for fresh installs before schema_updates has run --->
+<cfparam name="dov['mail.compression']" default="yes">
+<cfparam name="dov['mail.compression_algorithm']" default="lz4">
+<cfparam name="dov['mail.compression_level']" default="3">
+<cfparam name="dov['mail.encryption']" default="no">
+<cfparam name="dov['mail.encryption_curve']" default="prime256v1">
+<cfparam name="dov['protocol.imap']" default="yes">
+<cfparam name="dov['protocol.pop3']" default="yes">
+<cfparam name="dov['ssl.min_protocol']" default="TLSv1.2">
+<cfparam name="dov['ssl.cipher_list']" default="ALL:!DH:!kRSA:!SRP:!kDHd:!DSS:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4:!ADH:!LOW@STRENGTH">
+<cfparam name="dov['quota.warning_critical']" default="99">
+<cfparam name="dov['quota.warning_high']" default="95">
+<cfparam name="dov['quota.warning_medium']" default="80">
+<cfparam name="dov['quota.trash_percentage']" default="110">
+<cfparam name="dov['connection.client_limit']" default="1000">
+<cfparam name="dov['connection.max_userip']" default="20">
+<cfparam name="dov['logging.debug']" default="no">
+
+<!--- TLS Certificate --->
+<cfquery name="dovecotCertParam" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'certificates' AND parameter = 'mail.certificate'
+</cfquery>
+<cfset dovecotCertId = "">
+<cfif dovecotCertParam.recordcount GTE 1>
+    <cfset dovecotCertId = dovecotCertParam.value2>
+</cfif>
+
+<cfset dovecotCertName = "">
+<cfset dovecotCertSubject = "">
+<cfset dovecotCertIssuer = "">
+<cfset dovecotCertSerial = "">
+<cfif dovecotCertId NEQ "">
+    <cfquery name="getDovecotCert" datasource="hermes">
+        SELECT id, subject, issuer, serial, type, friendly_name
+        FROM system_certificates
+        WHERE id = <cfqueryparam value="#dovecotCertId#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfif getDovecotCert.recordcount GTE 1>
+        <cfset dovecotCertName = getDovecotCert.friendly_name>
+        <cfset dovecotCertSubject = getDovecotCert.subject>
+        <cfset dovecotCertIssuer = getDovecotCert.issuer>
+        <cfset dovecotCertSerial = getDovecotCert.serial>
+    </cfif>
+</cfif>
+
 <form method="post" action="view_email_server_settings.cfm">
 <input type="hidden" name="action" value="save_settings">
 
-<!-- NEXTCLOUD WEBMAIL SETTINGS CARD -->
+<!-- ================================================================== -->
+<!-- NEXTCLOUD WEBMAIL SETTINGS CARD                                     -->
+<!-- ================================================================== -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-inbox"></i> Nextcloud Webmail Settings</h3>
   </div>
   <div class="card-body">
     <div class="row">
-      <div class="col-md-6">
+      <div class="col-md-4">
         <div class="mb-3">
           <label class="form-label"><strong>Files App</strong></label>
           <select class="form-select" name="nc_files_app">
             <option value="yes" <cfif ncFilesAppVisible EQ "yes">selected</cfif>>Visible</option>
             <option value="no" <cfif ncFilesAppVisible NEQ "yes">selected</cfif>>Hidden</option>
           </select>
-          <small class="form-text text-muted">Controls whether the Files app is visible to Nextcloud users. When hidden, Nextcloud functions as a webmail-only client (Mail, Calendar, Contacts). When visible, users can upload, manage, and share files. File sharing settings (permissions, public links, expiration) can be configured in the Nextcloud admin panel directly.</small>
+          <small class="form-text text-muted">Controls whether the Files app is visible to Nextcloud users. When hidden, Nextcloud functions as a webmail-only client (Mail, Calendar, Contacts).</small>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Auto-Redirect to Hermes SSO</strong></label>
+          <select class="form-select" name="nc_auto_redirect" id="nc_auto_redirect">
+            <option value="false" <cfif ncAutoRedirect EQ "false">selected</cfif>>Disabled (show Nextcloud login page)</option>
+            <option value="true" <cfif ncAutoRedirect EQ "true">selected</cfif>>Enabled (silent SSO via Authelia)</option>
+          </select>
+          <small class="form-text text-muted">When enabled, users clicking "Login to Webmail" are silently bounced through Authelia OIDC and land in Nextcloud already logged in. When disabled, users see the Nextcloud login page with an SSO button.</small>
+        </div>
+      </div>
+      <div class="col-md-4" id="nc_password_form_group">
         <div class="mb-3">
           <label class="form-label"><strong>Nextcloud Login Form</strong></label>
-          <select class="form-select" name="nc_password_form">
+          <select class="form-select" name="nc_password_form" id="nc_password_form">
             <option value="no" <cfif ncShowPasswordForm NEQ "yes">selected</cfif>>Hidden (SSO button only)</option>
             <option value="yes" <cfif ncShowPasswordForm EQ "yes">selected</cfif>>Visible (SSO button + username/password)</option>
           </select>
-          <small class="form-text text-muted">Controls whether the username/password login form is visible on the Nextcloud login page alongside the SSO button. Set to <strong>Visible</strong> temporarily when you need to log into Nextcloud as a local admin user for maintenance (app management, troubleshooting, etc.), then set it back to <strong>Hidden</strong> to keep the login page clean. Only applies when "Auto-Redirect to Hermes SSO" is disabled in Authentication Settings.</small>
+          <small class="form-text text-muted">Set to <strong>Visible</strong> temporarily when you need to log into Nextcloud as a local admin user for maintenance, then set it back to <strong>Hidden</strong>.</small>
         </div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- MAIL SERVER TLS CERTIFICATE CARD -->
+<!-- ================================================================== -->
+<!-- TLS / SSL SETTINGS CARD                                             -->
+<!-- ================================================================== -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fab fa-expeditedssl"></i> Mail Server TLS Certificate</h3>
+    <h3 class="card-title"><i class="fab fa-expeditedssl"></i> TLS / SSL Settings</h3>
   </div>
   <div class="card-body">
     <div class="alert alert-info">
-      <p class="mb-0"><i class="icon fas fa-info-circle"></i> Select the TLS certificate used by the mail server (Dovecot) for IMAP, POP3, and Submission connections. This is the certificate your email clients see when connecting over TLS. It should match the hostname your users configure in their mail clients (e.g., <code>mail.example.com</code>).</p>
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i> These settings control the TLS certificate and encryption parameters used by the mail server (Dovecot) for IMAP, POP3, and Submission connections. The certificate should match the hostname your users configure in their mail clients (e.g., <code>mail.example.com</code>).</p>
     </div>
-
-    <!--- Load current Dovecot certificate from parameters2 --->
-    <cfquery name="dovecotCertParam" datasource="hermes">
-        SELECT value2 FROM parameters2
-        WHERE module = 'certificates' AND parameter = 'mail.certificate'
-    </cfquery>
-    <cfset dovecotCertId = "">
-    <cfif dovecotCertParam.recordcount GTE 1>
-        <cfset dovecotCertId = dovecotCertParam.value2>
-    </cfif>
-
-    <cfset dovecotCertName = "">
-    <cfset dovecotCertSubject = "">
-    <cfset dovecotCertIssuer = "">
-    <cfset dovecotCertSerial = "">
-    <cfif dovecotCertId NEQ "">
-        <cfquery name="getDovecotCert" datasource="hermes">
-            SELECT id, subject, issuer, serial, type, friendly_name
-            FROM system_certificates
-            WHERE id = <cfqueryparam value="#dovecotCertId#" cfsqltype="cf_sql_integer">
-        </cfquery>
-        <cfif getDovecotCert.recordcount GTE 1>
-            <cfset dovecotCertName = getDovecotCert.friendly_name>
-            <cfset dovecotCertSubject = getDovecotCert.subject>
-            <cfset dovecotCertIssuer = getDovecotCert.issuer>
-            <cfset dovecotCertSerial = getDovecotCert.serial>
-        </cfif>
-    </cfif>
 
     <cfoutput>
     <input type="hidden" name="dovecot_cert_id" id="dovecot_cert_id" value="#dovecotCertId#">
@@ -202,57 +255,330 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
     </div>
+
+    <hr>
+
+    <!--- Determine current TLS profile for preset selection --->
+    <cfset currentCipherList = dov['ssl.cipher_list']>
+    <cfset currentMinProtocol = dov['ssl.min_protocol']>
+    <cfset cipherModern = "">
+    <cfset cipherIntermediate = "ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4">
+    <cfset cipherLegacy = "ALL:!DH:!kRSA:!SRP:!kDHd:!DSS:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4:!ADH:!LOW@STRENGTH">
+
+    <!--- Detect which preset matches the current config --->
+    <cfset currentPreset = "custom">
+    <cfif currentMinProtocol EQ "TLSv1.3" AND (currentCipherList EQ "" OR currentCipherList EQ cipherModern)>
+      <cfset currentPreset = "modern">
+    <cfelseif currentMinProtocol EQ "TLSv1.2" AND currentCipherList EQ cipherIntermediate>
+      <cfset currentPreset = "intermediate">
+    <cfelseif currentMinProtocol EQ "TLSv1.2" AND currentCipherList EQ cipherLegacy>
+      <cfset currentPreset = "legacy">
+    </cfif>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>TLS Security Profile</strong></label>
+          <select class="form-select" name="ssl_profile" id="ssl_profile">
+            <option value="modern" <cfif currentPreset EQ "modern">selected</cfif>>Modern (TLS 1.3 only)</option>
+            <option value="intermediate" <cfif currentPreset EQ "intermediate">selected</cfif>>Intermediate (TLS 1.2+, recommended)</option>
+            <option value="legacy" <cfif currentPreset EQ "legacy">selected</cfif>>Legacy (TLS 1.2+, broad compatibility)</option>
+            <option value="custom" <cfif currentPreset EQ "custom">selected</cfif>>Custom</option>
+          </select>
+          <small class="form-text text-muted">Based on <a href="https://ssl-config.mozilla.org/" target="_blank">Mozilla Server Side TLS</a> guidelines. Intermediate is recommended for most deployments.</small>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3" id="ssl_min_protocol_group">
+          <label class="form-label"><strong>Minimum TLS Version</strong></label>
+          <select class="form-select" name="ssl_min_protocol" id="ssl_min_protocol">
+            <option value="TLSv1.2" <cfif currentMinProtocol EQ "TLSv1.2">selected</cfif>>TLS 1.2</option>
+            <option value="TLSv1.3" <cfif currentMinProtocol EQ "TLSv1.3">selected</cfif>>TLS 1.3</option>
+          </select>
+          <small class="form-text text-muted">Auto-set by profile. Editable in Custom mode.</small>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3" id="ssl_cipher_group">
+          <label class="form-label"><strong>SSL Cipher List</strong></label>
+          <input type="text" class="form-control" name="ssl_cipher_list" id="ssl_cipher_list" value="#encodeForHTMLAttribute(currentCipherList)#">
+          <small class="form-text text-muted">Auto-set by profile. Editable in Custom mode.</small>
+        </div>
+      </div>
+    </div>
+
+    <div id="ssl_profile_info" class="mb-0"></div>
+
     </cfoutput>
   </div>
 </div>
 
-<!-- DOVECOT MAIL SERVER INFO CARD (read-only for now) -->
+<!-- ================================================================== -->
+<!-- MAIL STORAGE CARD (Compression + Encryption)                        -->
+<!-- ================================================================== -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-server"></i> Mail Server Configuration</h3>
+    <h3 class="card-title"><i class="fas fa-hdd"></i> Mail Storage</h3>
   </div>
   <div class="card-body">
-    <div class="alert alert-secondary">
-      <h5><i class="icon fas fa-info-circle"></i> Current Configuration</h5>
-      <p class="mb-0">The following Dovecot mail server settings are currently configured. Admin-configurable controls for these settings are planned for a future release.</p>
+
+    <!--- COMPRESSION SECTION --->
+    <h5><i class="fas fa-compress-arrows-alt"></i> Compression</h5>
+    <p class="text-muted">Mail compression reduces disk usage by compressing messages before writing to disk. Only newly delivered or saved messages are compressed; existing messages are not retroactively re-compressed.</p>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Mail Compression</strong></label>
+          <select class="form-select" name="mail_compression" id="mail_compression">
+            <option value="yes" <cfif dov['mail.compression'] EQ "yes">selected</cfif>>Enabled</option>
+            <option value="no" <cfif dov['mail.compression'] NEQ "yes">selected</cfif>>Disabled</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Algorithm</strong></label>
+          <select class="form-select" name="compression_algorithm" id="compression_algorithm">
+            <option value="lz4" <cfif dov['mail.compression_algorithm'] EQ "lz4">selected</cfif>>LZ4 (fastest, good compression)</option>
+            <option value="zstd" <cfif dov['mail.compression_algorithm'] EQ "zstd">selected</cfif>>Zstandard (balanced speed/ratio)</option>
+            <option value="zlib" <cfif dov['mail.compression_algorithm'] EQ "zlib">selected</cfif>>Zlib/Deflate (best ratio, slowest)</option>
+          </select>
+          <small class="form-text text-muted">LZ4 is recommended for most deployments. Zstandard offers better compression with slightly higher CPU usage. Zlib has the best ratio but highest CPU overhead.</small>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3" id="compression_level_group">
+          <label class="form-label"><strong>Compression Level</strong></label>
+          <cfoutput>
+          <input type="number" class="form-control" name="compression_level" id="compression_level" value="#encodeForHTMLAttribute(dov['mail.compression_level'])#" min="1" max="22">
+          </cfoutput>
+          <small class="form-text text-muted" id="compression_level_help">Zstandard: 1-22 (default 3). Zlib: 1-9 (default 6). Higher = better compression, more CPU. Not applicable to LZ4.</small>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <!--- ENCRYPTION AT REST SECTION --->
+    <h5><i class="fas fa-lock"></i> Encryption at Rest</h5>
+
+    <!--- Check if encryption keys exist --->
+    <cfset keysExist = FileExists("/opt/hermes/keys/ecprivkey.pem") AND FileExists("/opt/hermes/keys/ecpubkey.pem")>
+
+    <div class="alert alert-warning">
+      <i class="icon fas fa-exclamation-triangle"></i> <strong>Important:</strong> When enabled, only <strong>newly delivered</strong> mail is encrypted. Existing messages remain unencrypted but fully readable. Once keys are generated and encryption is enabled, the keys cannot be regenerated from this page -- existing encrypted mail would become permanently unreadable without the original private key.
     </div>
 
     <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Encryption at Rest</strong></label>
+          <cfif keysExist>
+          <select class="form-select" name="mail_encryption" id="mail_encryption">
+            <option value="no" <cfif dov['mail.encryption'] NEQ "yes">selected</cfif>>Disabled (default)</option>
+            <option value="yes" <cfif dov['mail.encryption'] EQ "yes">selected</cfif>>Enabled</option>
+          </select>
+          <cfelse>
+          <select class="form-select" name="mail_encryption" id="mail_encryption">
+            <option value="no" selected>Disabled (default)</option>
+            <option value="yes">Enabled (will generate keys on save)</option>
+          </select>
+          </cfif>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Elliptic Curve</strong></label>
+          <cfif keysExist>
+          <!--- Keys exist: show current curve as read-only to prevent mismatch --->
+          <cfoutput>
+          <input type="hidden" name="encryption_curve" value="#encodeForHTMLAttribute(dov['mail.encryption_curve'])#">
+          <input type="text" class="form-control" value="#encodeForHTMLAttribute(dov['mail.encryption_curve'])#" readonly>
+          </cfoutput>
+          <small class="form-text text-muted">Curve is locked once keys are generated. Changing it would require new keys and make existing encrypted mail unreadable.</small>
+          <cfelse>
+          <!--- No keys yet: allow curve selection --->
+          <select class="form-select" name="encryption_curve" id="encryption_curve">
+            <option value="prime256v1" <cfif dov['mail.encryption_curve'] EQ "prime256v1">selected</cfif>>P-256 / prime256v1 (recommended)</option>
+            <option value="secp384r1" <cfif dov['mail.encryption_curve'] EQ "secp384r1">selected</cfif>>P-384 / secp384r1</option>
+            <option value="secp521r1" <cfif dov['mail.encryption_curve'] EQ "secp521r1">selected</cfif>>P-521 / secp521r1</option>
+          </select>
+          <small class="form-text text-muted">Select the elliptic curve before enabling encryption. P-256 is widely supported and performant. This cannot be changed after keys are generated.</small>
+          </cfif>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Key Status</strong></label>
+          <cfif keysExist>
+          <div class="form-control-plaintext">
+            <span class="badge bg-success"><i class="fas fa-check-circle"></i> Keys Present</span>
+          </div>
+          <cfelse>
+          <div class="form-control-plaintext">
+            <span class="badge bg-secondary"><i class="fas fa-minus-circle"></i> No Keys</span>
+            <small class="d-block text-muted mt-1">Keys will be automatically generated when you enable encryption and save.</small>
+          </div>
+          </cfif>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- PROTOCOLS & CONNECTIONS CARD                                        -->
+<!-- ================================================================== -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-network-wired"></i> Protocols & Connections</h3>
+  </div>
+  <div class="card-body">
+
+    <h5><i class="fas fa-plug"></i> Protocols</h5>
+    <p class="text-muted">Control which mail protocols are available to end users. Submission (SMTP auth on port 587), Sieve (mail filtering), and LMTP (local delivery from Postfix) are always enabled as they are required for core mail operations.</p>
+
+    <div class="row">
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>IMAP</strong> <small class="text-muted">(993/143)</small></label>
+          <select class="form-select" name="protocol_imap">
+            <option value="yes" <cfif dov['protocol.imap'] EQ "yes">selected</cfif>>Enabled</option>
+            <option value="no" <cfif dov['protocol.imap'] NEQ "yes">selected</cfif>>Disabled</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>POP3</strong> <small class="text-muted">(995/110)</small></label>
+          <select class="form-select" name="protocol_pop3">
+            <option value="yes" <cfif dov['protocol.pop3'] EQ "yes">selected</cfif>>Enabled</option>
+            <option value="no" <cfif dov['protocol.pop3'] NEQ "yes">selected</cfif>>Disabled</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>Submission</strong> <small class="text-muted">(587)</small></label>
+          <input type="text" class="form-control" value="Always Enabled" readonly>
+          <small class="form-text text-muted">Required for authenticated mail sending and vacation auto-replies.</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>Sieve / LMTP</strong> <small class="text-muted">(4190/24)</small></label>
+          <input type="text" class="form-control" value="Always Enabled" readonly>
+          <small class="form-text text-muted">Required for mail filtering, delivery from Postfix, and ManageSieve.</small>
+        </div>
+      </div>
+    </div>
+
+    <hr>
+
+    <h5><i class="fas fa-tachometer-alt"></i> Connection Limits</h5>
+
+    <div class="row">
+      <cfoutput>
       <div class="col-md-6">
-        <table class="table table-bordered">
-          <tbody>
-            <tr>
-              <th>Mail Compression</th>
-              <td><span class="badge bg-success">Enabled (LZ4)</span></td>
-            </tr>
-            <tr>
-              <th>Mail Encryption at Rest</th>
-              <td><span class="badge bg-secondary">Disabled (default)</span></td>
-            </tr>
-            <tr>
-              <th>Protocols</th>
-              <td>IMAP, POP3, Submission, Sieve, LMTP</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="mb-3">
+          <label class="form-label"><strong>Login Service Client Limit</strong></label>
+          <input type="number" class="form-control" name="connection_client_limit" value="#encodeForHTMLAttribute(dov['connection.client_limit'])#" min="100" max="10000">
+          <small class="form-text text-muted">Maximum number of concurrent connections per login service (IMAP, POP3, Submission, ManageSieve). Default: 1000. Increase for large deployments with many simultaneous users.</small>
+        </div>
       </div>
       <div class="col-md-6">
-        <table class="table table-bordered">
-          <tbody>
-            <tr>
-              <th>Quota Warnings</th>
-              <td>80%, 95%, 99%, 100% (back under)</td>
-            </tr>
-            <tr>
-              <th>Vacation Auto-Reply</th>
-              <td><span class="badge bg-success">Enabled</span> (via Pigeonhole Sieve)</td>
-            </tr>
-            <tr>
-              <th>ManageSieve</th>
-              <td><span class="badge bg-success">Enabled</span> (port 4190)</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="mb-3">
+          <label class="form-label"><strong>Max Connections per User per IP</strong></label>
+          <input type="number" class="form-control" name="connection_max_userip" value="#encodeForHTMLAttribute(dov['connection.max_userip'])#" min="1" max="1000">
+          <small class="form-text text-muted">Limits connections from a single user from a single IP address. Prevents runaway email clients from consuming excessive resources. Default: 20. Set higher if users have many devices or folders open simultaneously.</small>
+        </div>
+      </div>
+      </cfoutput>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- QUOTA SETTINGS CARD                                                 -->
+<!-- ================================================================== -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-chart-pie"></i> Quota Settings</h3>
+  </div>
+  <div class="card-body">
+
+    <h5><i class="fas fa-bell"></i> Warning Thresholds</h5>
+    <p class="text-muted">When a user's mailbox reaches these thresholds, an email notification is automatically sent. A "back under quota" notification is always sent when usage drops below 100% (not configurable). Per-mailbox quota sizes are set on each mailbox individually.</p>
+
+    <div class="row">
+      <cfoutput>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>Critical Warning</strong></label>
+          <div class="input-group">
+            <input type="number" class="form-control" name="quota_warning_critical" value="#encodeForHTMLAttribute(dov['quota.warning_critical'])#" min="1" max="100">
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="form-text text-muted">Triggers "Mailbox Full" notification. Default: 99%</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>High Warning</strong></label>
+          <div class="input-group">
+            <input type="number" class="form-control" name="quota_warning_high" value="#encodeForHTMLAttribute(dov['quota.warning_high'])#" min="1" max="100">
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="form-text text-muted">Triggers "Nearly Full" notification. Default: 95%</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>Medium Warning</strong></label>
+          <div class="input-group">
+            <input type="number" class="form-control" name="quota_warning_medium" value="#encodeForHTMLAttribute(dov['quota.warning_medium'])#" min="1" max="100">
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="form-text text-muted">Triggers first warning notification. Default: 80%</small>
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div class="mb-3">
+          <label class="form-label"><strong>Trash Quota Overage</strong></label>
+          <div class="input-group">
+            <input type="number" class="form-control" name="quota_trash_percentage" value="#encodeForHTMLAttribute(dov['quota.trash_percentage'])#" min="100" max="200">
+            <span class="input-group-text">%</span>
+          </div>
+          <small class="form-text text-muted">The Trash folder is allowed this percentage of the user's quota, giving headroom to delete messages even when at 100%. Default: 110% (10% overage).</small>
+        </div>
+      </div>
+      </cfoutput>
+    </div>
+
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- LOGGING CARD                                                        -->
+<!-- ================================================================== -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-file-alt"></i> Logging</h3>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label class="form-label"><strong>Debug Logging</strong></label>
+          <select class="form-select" name="logging_debug">
+            <option value="no" <cfif dov['logging.debug'] NEQ "yes">selected</cfif>>Disabled (production)</option>
+            <option value="yes" <cfif dov['logging.debug'] EQ "yes">selected</cfif>>Enabled (troubleshooting)</option>
+          </select>
+          <small class="form-text text-muted">Enables verbose debug logging for mail and auth categories. Useful for troubleshooting delivery or authentication issues. <strong>Disable in production</strong> as it generates significant log volume. Logs are written to <code>/logs/dovecot-debug.log</code> inside the Dovecot container.</small>
+        </div>
       </div>
     </div>
   </div>
@@ -304,6 +630,110 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         });
         return false;
       }
+    });
+  });
+
+  // Compression level visibility — hide for LZ4 (no configurable level)
+  function updateCompressionUI() {
+    var algo = $('#compression_algorithm').val();
+    var compressionEnabled = $('#mail_compression').val() === 'yes';
+
+    if (!compressionEnabled) {
+      $('#compression_algorithm').prop('disabled', true);
+      $('#compression_level').prop('disabled', true);
+      $('#compression_level_group').hide();
+    } else {
+      $('#compression_algorithm').prop('disabled', false);
+
+      if (algo === 'lz4') {
+        $('#compression_level_group').hide();
+        $('#compression_level').prop('disabled', true);
+      } else {
+        $('#compression_level_group').show();
+        $('#compression_level').prop('disabled', false);
+
+        if (algo === 'zstd') {
+          $('#compression_level').attr('max', 22);
+          $('#compression_level_help').text('Zstandard level: 1-22 (default 3). Higher = better compression, more CPU.');
+        } else if (algo === 'zlib') {
+          $('#compression_level').attr('max', 9);
+          if (parseInt($('#compression_level').val()) > 9) {
+            $('#compression_level').val(6);
+          }
+          $('#compression_level_help').text('Zlib level: 1-9 (default 6). Higher = better compression, more CPU.');
+        }
+      }
+    }
+  }
+
+  // Encryption curve visibility — disable when encryption is off
+  function updateEncryptionUI() {
+    var encryptionEnabled = $('#mail_encryption').val() === 'yes';
+    $('#encryption_curve').prop('disabled', !encryptionEnabled);
+  }
+
+  // TLS profile presets (Mozilla Server Side TLS guidelines)
+  var sslProfiles = {
+    modern: {
+      min_protocol: 'TLSv1.3',
+      cipher_list: '',
+      info: '<div class="alert alert-info mb-0"><small><strong>Modern:</strong> TLS 1.3 only. No cipher list needed (OpenSSL selects TLS 1.3 ciphers automatically). Only for environments where all mail clients support TLS 1.3. Excludes Outlook 2016 and older, Thunderbird < 78, iOS < 12.2, Android < 10.</small></div>'
+    },
+    intermediate: {
+      min_protocol: 'TLSv1.2',
+      cipher_list: 'ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4',
+      info: '<div class="alert alert-success mb-0"><small><strong>Intermediate (recommended):</strong> TLS 1.2+ with strong AEAD ciphers (AES-GCM, ChaCha20-Poly1305) and forward secrecy (ECDHE/DHE). Compatible with Outlook 2013+, Thunderbird 27+, iOS 9+, Android 4.4+.</small></div>'
+    },
+    legacy: {
+      min_protocol: 'TLSv1.2',
+      cipher_list: 'ALL:!DH:!kRSA:!SRP:!kDHd:!DSS:!aNULL:!eNULL:!EXPORT:!DES:!3DES:!MD5:!PSK:!RC4:!ADH:!LOW@STRENGTH',
+      info: '<div class="alert alert-warning mb-0"><small><strong>Legacy:</strong> TLS 1.2+ with broad cipher support. Allows older cipher suites for maximum compatibility with legacy mail clients. Not recommended for new deployments.</small></div>'
+    },
+    custom: {
+      info: '<div class="alert alert-secondary mb-0"><small><strong>Custom:</strong> Manually configure the minimum TLS version and cipher list. Only use if you have specific requirements not covered by the presets.</small></div>'
+    }
+  };
+
+  function updateSslProfileUI() {
+    var profile = $('#ssl_profile').val();
+    var p = sslProfiles[profile];
+
+    $('#ssl_profile_info').html(p.info);
+
+    if (profile === 'custom') {
+      $('#ssl_min_protocol').prop('disabled', false);
+      $('#ssl_cipher_list').prop('readonly', false);
+    } else {
+      $('#ssl_min_protocol').val(p.min_protocol).prop('disabled', true);
+      $('#ssl_cipher_list').val(p.cipher_list).prop('readonly', true);
+    }
+  }
+
+  // Auto-redirect / login form dependency
+  function updateAutoRedirectUI() {
+    if ($('#nc_auto_redirect').val() === 'true') {
+      $('#nc_password_form_group').hide();
+      $('#nc_password_form').prop('disabled', true);
+    } else {
+      $('#nc_password_form_group').show();
+      $('#nc_password_form').prop('disabled', false);
+    }
+  }
+
+  $(document).ready(function() {
+    updateCompressionUI();
+    updateEncryptionUI();
+    updateAutoRedirectUI();
+    updateSslProfileUI();
+
+    $('#nc_auto_redirect').on('change', updateAutoRedirectUI);
+    $('#mail_compression, #compression_algorithm').on('change', updateCompressionUI);
+    $('#mail_encryption').on('change', updateEncryptionUI);
+    $('#ssl_profile').on('change', updateSslProfileUI);
+
+    // Re-enable disabled fields before form submission so their values are sent
+    $('form').on('submit', function() {
+      $(this).find(':disabled').prop('disabled', false);
     });
   });
 </script>

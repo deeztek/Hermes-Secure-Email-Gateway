@@ -112,16 +112,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <!--- /CFIF StructKeyExists(form, "session_remember_me") --->
             </cfif>
 
-          <cfif NOT StructKeyExists(form, "nextcloud_oidc_auto_redirect")>
-
-            <cfset m="Edit Authentication Settings: form.nextcloud_oidc_auto_redirect does not exist">
-            <cfinclude template="error.cfm">
-            <cfabort>
-
-            <!--- /CFIF StructKeyExists(form, "nextcloud_oidc_auto_redirect") --->
-            </cfif>
-    
-       
     <cfif NOT StructKeyExists(form, "notifier_smtp_sender")>
       
       <cfset m="Edit Authentication Settings: form.notifier_smtp_sender does not exist">
@@ -407,28 +397,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           update parameters2 set value2='#form.session_remember_me#', applied='2' where parameter='session.remember_me'
           </cfquery>
 
-          <!--- VALIDATE NEXTCLOUD OIDC AUTO-REDIRECT (also nested in step 2).
-               Only the literal strings "true" or "false" are accepted - the
-               value flows directly into Nextcloud's config.php as a PHP
-               literal, so anything else would syntax-error the file. --->
-          <cfif form.nextcloud_oidc_auto_redirect NEQ "true" AND form.nextcloud_oidc_auto_redirect NEQ "false">
-
-            <cfset step=0>
-            <cfset session.m=46>
-
-            <cfoutput>
-            <cflocation url="#cgi.http_referer#" addtoken="no">
-            </cfoutput>
-
-          <cfelse>
-
-            <cfquery name="update" datasource="hermes">
-            update parameters2 set value2='#form.nextcloud_oidc_auto_redirect#', applied='2' where module='nextcloud' and parameter='oidc.auto_redirect'
-            </cfquery>
-
-            <cfset step=3>
-
-          </cfif>
+          <!--- Nextcloud OIDC auto-redirect moved to Email Server Settings page --->
+          <cfset step=3>
 
         </cfif>
 

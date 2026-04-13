@@ -8,28 +8,83 @@ title = "Hermes SEG Secret Detection"
 useDefault = true
 
 # Custom rules for Hermes-specific secrets
+
+# Catches: password = bfrJJDnEb5mv8G8Is5T1 (Dovecot, Postfix mysql-*.cf)
+# Catches: password    = bfrJJDnEb5mv8G8Is5T1 (Postfix mysql-aliases.cf tab-indented)
+# Catches: password = "quoted_value" (LDAP configs, general)
+# Does NOT flag: password = hermes_db_password (template placeholders)
+# Does NOT flag: password = $variable or password = ${ENV_VAR}
+# Does NOT flag: password = PASSWORD / PASS_WORD / YOUR_PASSWORD (documentation placeholders)
 [[rules]]
-id = "hermes-database-password"
-description = "Database password in config files"
-regex = '''(?i)(mysql_password|db_password|database_password)\s*=\s*['"][^'"]+['"]'''
+id = "hermes-password-bare"
+description = "Bare or quoted password in config files"
+regex = '''(?i)password\s*=\s*['"]?[a-zA-Z0-9!@#$%^&*()]{8,}['"]?'''
 secretGroup = 0
 entropy = 3.0
-keywords = ["mysql_password", "db_password", "database_password"]
-
-[[rules]]
-id = "hermes-ldap-password"
-description = "LDAP password in code"
-regex = '''(?i)password\s*=\s*"[a-zA-Z0-9!@#$%^&*()]{8,}"'''
-secretGroup = 0
-entropy = 3.5
 keywords = ["password"]
 [rules.allowlist]
 regexes = [
-    '''password\s*=\s*"PASSWORD"''',
-    '''password\s*=\s*"PASS_WORD"''',
-    '''password\s*=\s*"YOUR_PASSWORD"''',
-    '''password\s*=\s*"\$'''
+    # Template placeholders (hermes_db_password, hermes_ldap_password, etc.)
+    '''(?i)password\s*=\s*['"]?hermes_''',
+    # Documentation/example placeholders
+    '''(?i)password\s*=\s*['"]?PASSWORD['"]?''',
+    '''(?i)password\s*=\s*['"]?PASS_WORD['"]?''',
+    '''(?i)password\s*=\s*['"]?YOUR_PASSWORD['"]?''',
+    '''(?i)password\s*=\s*['"]?CHANGE_ME''',
+    '''(?i)password\s*=\s*['"]?password['"]?''',
+    # Variable references (shell, CFML, Perl)
+    '''(?i)password\s*=\s*['"]?\$''',
+    '''(?i)password\s*=\s*['"]?#''',
+    # Hashed passwords (argon2, bcrypt, sha, ssha)
+    '''(?i)password\s*=\s*['"]?\{''',
+    '''(?i)password\s*=\s*['"]?\$argon2''',
+    '''(?i)password\s*=\s*['"]?\$2[aby]\$'''
 ]
+
+# Catches: MYSQL_PASSWORD=value, DB_PASSWORD=value in env files and scripts
+[[rules]]
+id = "hermes-env-database-password"
+description = "Database password in environment variable"
+regex = '''(?i)(MYSQL_PASSWORD|DB_PASSWORD|DATABASE_PASSWORD|MARIADB_PASSWORD|MARIADB_ROOT_PASSWORD)\s*=\s*['"]?[a-zA-Z0-9!@#$%^&*()]{8,}['"]?'''
+secretGroup = 0
+entropy = 3.0
+keywords = ["MYSQL_PASSWORD", "DB_PASSWORD", "DATABASE_PASSWORD", "MARIADB_PASSWORD", "MARIADB_ROOT_PASSWORD"]
+[rules.allowlist]
+regexes = [
+    '''(?i)=\s*['"]?CHANGE_ME''',
+    '''(?i)=\s*['"]?YOUR_''',
+    '''(?i)=\s*['"]?\$\{''',
+    '''(?i)=\s*['"]?\$[A-Z]'''
+]
+
+# Catches: DBI connection strings with inline credentials
+# Example: ['DBI:mysql:database=hermes;host=db;port=3306', 'hermes', 'thepassword']
+[[rules]]
+id = "hermes-dbi-connection-string"
+description = "DBI/JDBC connection string with inline credentials"
+regex = '''(?i)(DBI|jdbc)[:\w]*[^'"]*['"][,\s]+['"][^'"]+['"][,\s]+['"][a-zA-Z0-9!@#$%^&*()]{8,}['"]'''
+secretGroup = 0
+entropy = 3.0
+keywords = ["DBI", "jdbc"]
+
+# Catches: Hibernate XML connection password
+# Example: <property name="connection.password">thepassword</property>
+[[rules]]
+id = "hermes-hibernate-password"
+description = "Hibernate XML connection password"
+regex = '''(?i)connection\.password['"]*>[a-zA-Z0-9!@#$%^&*()]{8,}<'''
+secretGroup = 0
+entropy = 3.0
+keywords = ["connection.password"]
+
+# Catches: connect = "host=... password=value" (Dovecot dict-sql format)
+[[rules]]
+id = "hermes-connect-string-password"
+description = "Connect string with inline password"
+regex = '''(?i)connect\s*=\s*["'][^"']*password\s*=\s*[a-zA-Z0-9!@#$%^&*()]{8,}'''
+secretGroup = 0
+entropy = 3.0
+keywords = ["connect"]
 
 [[rules]]
 id = "hermes-encryption-key"
@@ -75,7 +130,7 @@ paths = [
 [allowlist]
 description = "Global allowlist"
 paths = [
-    # Template files with placeholder values
+    # Template files with placeholder values (hermes_db_password, etc.)
     '''Docker/common/opt/hermes/templates/''',
     '''config/hermes/opt/hermes/templates/''',
 
@@ -112,6 +167,7 @@ regexes = [
     '''config/hermes/opt/hermes/keys/''',
     '''config/hermes/opt/hermes/ssl/''',
     '''config/hermes/opt/hermes/CA/''',
+    '''config/hermes/opt/hermes/creds/''',
     '''schedule/.*_ad_tasks\.cfm''',
     '''\.env$'''
 ]

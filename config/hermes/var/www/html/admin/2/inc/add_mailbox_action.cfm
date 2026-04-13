@@ -410,6 +410,25 @@ Requires form variables:
     </cftry>
 </cfif>
 
+<!--- 4d. NEXTCLOUD MAIL ACCOUNT. Create an email account in the Nextcloud
+     Mail app so the user can send/receive through webmail. Uses Docker
+     internal networking (IMAP: hermes_dovecot:143, SMTP:
+     hermes_postfix_dkim:25, no TLS — traffic stays on Docker network). --->
+<cfif form.nextcloud_enabled EQ "1" AND trim(form.password) NEQ "">
+    <cftry>
+        <cfset ncMailAction = "create">
+        <cfset ncMailUser = recipientEmail>
+        <cfset ncMailName = displayName>
+        <cfset ncMailEmail = recipientEmail>
+        <cfset ncMailPassword = trim(form.password)>
+        <cfinclude template="nextcloud_mail_account.cfm">
+    <cfcatch type="any">
+        <!--- Non-fatal: mailbox works without webmail profile.
+             Admin can troubleshoot via NC admin panel. --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- 5. SEND WELCOME EMAIL --->
 <cfset recipientName = displayName>
 <cftry>

@@ -192,7 +192,18 @@ Removes a mailbox user from all systems:
 </cfcatch>
 </cftry>
 
-<!--- 4d. DELETE VACATION AUTO-REPLY config (one row per user) --->
+<!--- 4e. DELETE NEXTCLOUD MAIL ACCOUNT (email profile in NC Mail app) --->
+<cftry>
+    <cfset ncMailAction = "delete">
+    <cfset ncMailUser = recipient>
+    <cfset ncMailEmail = recipient>
+    <cfinclude template="nextcloud_mail_account.cfm">
+<cfcatch type="any">
+    <!--- Non-fatal: NC cleans up when user is deleted via LDAP --->
+</cfcatch>
+</cftry>
+
+<!--- 4f. DELETE VACATION AUTO-REPLY config (one row per user) --->
 <cfquery datasource="hermes">
     DELETE FROM user_vacation
     WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">

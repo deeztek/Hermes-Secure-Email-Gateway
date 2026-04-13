@@ -269,35 +269,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
-<!-- NEXTCLOUD WEBMAIL SSO CARD -->
-<div class="card card-primary card-outline mb-4">
-  <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-inbox"></i> Nextcloud Webmail SSO</h3>
-  </div>
-  <div class="card-body">
-    <div class="row">
-      <div class="col-md-12">
-        <div class="mb-3">
-          <label class="form-label"><strong>Auto-Redirect to Hermes SSO</strong></label>
-          <cfoutput>
-          <select class="form-select" name="nextcloud_oidc_auto_redirect">
-            <option value="false" <cfif nextcloud_oidc_auto_redirect.value2 is "false">selected</cfif>>Disabled (show Nextcloud login page)</option>
-            <option value="true" <cfif nextcloud_oidc_auto_redirect.value2 is "true">selected</cfif>>Enabled (silent SSO via Authelia)</option>
-          </select>
-          </cfoutput>
-          <small class="form-text text-muted">
-            Controls Nextcloud's <code>oidc_login_auto_redirect</code> setting.
-            <ul class="mb-0 mt-1">
-              <li><strong>Disabled</strong> (default): users clicking "Login to Webmail" land on the Nextcloud login page where they must click the "Click to Login to Webmail" button to complete SSO. Local Nextcloud users (created via <code>occ user:add</code>) can also log in here with their username/password. Two clicks for SSO users.</li>
-              <li><strong>Enabled</strong>: users clicking "Login to Webmail" are silently bounced through Authelia OIDC and land in Nextcloud already logged in. One-click SSO. Local Nextcloud users <strong>cannot log in</strong> in this mode because the auto-redirect hijacks the login page before the local password form is reachable.</li>
-            </ul>
-          </small>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- SMTP NOTIFICATION SETTINGS CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">

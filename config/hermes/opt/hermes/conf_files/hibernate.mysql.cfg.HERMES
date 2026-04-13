@@ -40,8 +40,8 @@
         <!-- For MySQL JDBC driver, use com.mysql.jdbc.Driver -->
         <property name="hibernate.connection.driver_class">org.mariadb.jdbc.Driver</property>
         <property name="hibernate.connection.url">jdbc:mysql://hermes_db_server:3306/djigzo</property>
-        <property name="hibernate.connection.username">djigzo</property>
-        <property name="hibernate.connection.password">DwRV08foKDrZCeYIvfIm</property>
+        <property name="hibernate.connection.username">DJIGZO-USERNAME</property>
+        <property name="hibernate.connection.password">DJIGZO-PASSWORD</property>
 
 		<property name="hibernate.connection.pool_size">1</property>
 		<property name="hibernate.connection.autocommit">false</property>

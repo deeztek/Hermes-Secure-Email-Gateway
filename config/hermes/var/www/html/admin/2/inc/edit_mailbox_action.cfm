@@ -111,6 +111,14 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cfset form.edit_nextcloud_enabled = 0>
 </cfif>
 
+<!--- Require a password when enabling Nextcloud on a user that didn't have it.
+     The password is needed to create the email profile in the NC Mail app.
+     Without it the user would see an empty Mail app with no account. --->
+<cfif Val(form.edit_nextcloud_enabled) EQ 1 AND Val(getMailbox.prev_nextcloud_enabled) EQ 0 AND trim(form.edit_password) EQ "">
+    <cfset session.m = 51>
+    <cflocation url="view_mailboxes.cfm" addtoken="no">
+</cfif>
+
 <!--- UPDATE MAILBOXES TABLE --->
 <cfquery datasource="hermes">
     UPDATE mailboxes
@@ -173,8 +181,32 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
         <cfif Val(form.edit_nextcloud_enabled) EQ 1>
             <cfinclude template="ldap_add_user_groups_nextcloud.cfm">
+
+            <!--- Create NC Mail account if a password is also being set.
+                 If no password in this form submission, the mail account
+                 will be created on the next password change. --->
+            <cfif trim(form.edit_password) NEQ "">
+                <cftry>
+                    <cfset ncMailAction = "create">
+                    <cfset ncMailUser = getMailbox.username>
+                    <cfset ncMailName = editDisplayName>
+                    <cfset ncMailEmail = getMailbox.username>
+                    <cfset ncMailPassword = trim(form.edit_password)>
+                    <cfinclude template="nextcloud_mail_account.cfm">
+                <cfcatch type="any"></cfcatch>
+                </cftry>
+            </cfif>
         <cfelse>
             <cfinclude template="ldap_remove_user_groups_nextcloud.cfm">
+
+            <!--- Remove NC Mail account when NC access is disabled --->
+            <cftry>
+                <cfset ncMailAction = "delete">
+                <cfset ncMailUser = getMailbox.username>
+                <cfset ncMailEmail = getMailbox.username>
+                <cfinclude template="nextcloud_mail_account.cfm">
+            <cfcatch type="any"></cfcatch>
+            </cftry>
         </cfif>
     <cfcatch type="any">
         <!--- Non-fatal: the mailbox row was already updated, admin can
@@ -263,6 +295,17 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
                 <cfset ncAppPasswordUser = getMailbox.username>
                 <cfset ncAppPasswordValue = trim(form.edit_password)>
                 <cfinclude template="nextcloud_app_password.cfm">
+            <cfcatch type="any"></cfcatch>
+            </cftry>
+
+            <!--- Recreate NC Mail account with new password --->
+            <cftry>
+                <cfset ncMailAction = "update">
+                <cfset ncMailUser = getMailbox.username>
+                <cfset ncMailName = getMailbox.name>
+                <cfset ncMailEmail = getMailbox.username>
+                <cfset ncMailPassword = trim(form.edit_password)>
+                <cfinclude template="nextcloud_mail_account.cfm">
             <cfcatch type="any"></cfcatch>
             </cftry>
         </cfif>

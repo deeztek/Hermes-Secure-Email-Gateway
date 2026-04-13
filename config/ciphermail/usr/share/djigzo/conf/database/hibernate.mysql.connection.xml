@@ -1,7 +1,0 @@
-<!-- connection settings for MySQL (MariaDB) database -->
-
-<property name="hibernate.connection.url">jdbc:mysql://hermes_db_server:3306/djigzo</property>
-<property name="hibernate.connection.username">ciphermail</property>
-<property name="hibernate.connection.password">Le47cGCM2j0XwKbPMdY0</property>
-
-
