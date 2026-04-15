@@ -78,7 +78,7 @@ $CONFIG = array (
   'oidc_login_logout_url' => '/users/logout.cfm',
   'oidc_login_end_session_redirect' => false,
   'oidc_login_button_text' => 'Click to Login to Webmail',
-  'oidc_login_hide_password_form' => true,
+  'oidc_login_hide_password_form' => false,
   'oidc_login_use_id_token' => true,
   'oidc_login_attributes' => 
   array (

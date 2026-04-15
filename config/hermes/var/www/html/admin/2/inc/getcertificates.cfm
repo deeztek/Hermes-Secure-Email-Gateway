@@ -19,11 +19,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <cfif #form.request# is "1">
-       
 
-
+    <!--- Exclude SAN certificates (mailbox domain certs managed automatically via
+         SAN Management). The cert picker is only used for server-level certs:
+         console hostname, SMTP TLS, and Dovecot mail server. --->
     <cfquery name = "getcertificates" datasource="hermes">
-        select * from system_certificates where type like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or subject like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or issuer like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or serial like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or fingerprint like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or friendly_name like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%">
+        select * from system_certificates
+        where (san IS NULL OR san != '1')
+        AND (type like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or subject like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or issuer like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or serial like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or fingerprint like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> or friendly_name like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%">)
          </cfquery>
         
 

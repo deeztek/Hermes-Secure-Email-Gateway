@@ -226,6 +226,14 @@ a, a:hover{
 
 <cfset session.m=27>
 
+<cfelseif action EQ "forcelogoutall">
+
+<!--- FORCE LOGOUT ALL: flush the entire Authelia session store --->
+<cfset targetSessionUser = "*">
+<cfinclude template="./inc/invalidate_user_sessions.cfm">
+<cfset session.m = 36>
+<cflocation url="view_system_settings.cfm" addtoken="no">
+
 <cfelseif action EQ "save_captcha">
 
     <!--- VALIDATE CAPTCHA PROVIDER --->
@@ -318,6 +326,18 @@ a, a:hover{
 
 
 <!--- ERROR MESSAGES START HERE --->
+
+<cfif #m# is "36">
+
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    All user sessions have been invalidated. Every user (including you) will be redirected to the login page on their next request.
+  </div>
+
+  <cfset session.m = 0>
+
+</cfif>
 
 <cfif #m# is "1"> 
 
@@ -852,6 +872,26 @@ a, a:hover{
 </div>
 
 <!-- SYSTEM SETTINGS FORM ENDS HERE -->
+
+<!-- SESSION MANAGEMENT CARD -->
+<div class="card card-outline card-danger mb-4">
+    <div class="card-header">
+        <h3 class="card-title"><i class="fas fa-sign-out-alt"></i> Session Management</h3>
+    </div>
+    <div class="card-body">
+        <p class="text-muted">Immediately invalidates all active sessions across the entire system. Every user (admins, mailbox users, relay users) will be redirected to the login page on their next request, including you.</p>
+        <div class="alert alert-secondary">
+            <h5><i class="icon fas fa-info-circle"></i> Per-user session invalidation</h5>
+            <p class="mb-0">Individual user sessions are automatically invalidated when their password is changed, their account is deactivated, or their account is deleted. There is no manual per-user logout due to Authelia's encrypted session storage.</p>
+        </div>
+        <form method="post" action="view_system_settings.cfm" onsubmit="return confirm('This will immediately log out ALL users system-wide, including yourself. Continue?');">
+            <input type="hidden" name="action" value="forcelogoutall">
+            <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>&nbsp;&nbsp;Invalidating sessions...';this.form.submit();">
+                <i class="fas fa-sign-out-alt"></i>&nbsp;&nbsp;Force Logout All Users
+            </button>
+        </form>
+    </div>
+</div>
 
 </div>
 </div>

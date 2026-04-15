@@ -9,8 +9,6 @@ settings (to parameters2 module='dovecot'), and the TLS certificate
 dovecot.conf from template and reloads Dovecot.
 --->
 
-<cfparam name="form.nc_files_app" default="yes">
-<cfparam name="form.nc_password_form" default="no">
 <cfparam name="form.nc_auto_redirect" default="false">
 <cfparam name="form.dovecot_cert_id" default="">
 <cfparam name="form.ssl_profile" default="intermediate">
@@ -52,81 +50,7 @@ dovecot.conf from template and reloads Dovecot.
 <cfparam name="form.logging_debug" default="no">
 
 <cfset saveError = false>
-
-<!--- ================================================================== --->
-<!--- NEXTCLOUD FILES APP VISIBILITY                                      --->
-<!--- ================================================================== --->
-<cfset ncFilesAppVal = (form.nc_files_app EQ "yes") ? "yes" : "no">
-
-<cftry>
-    <cfif ncFilesAppVal EQ "yes">
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ app:enable files_sharing"
-            variable="occResult"
-            errorVariable="occError"
-            timeout="30" />
-    <cfelse>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ app:disable files_sharing"
-            variable="occResult"
-            errorVariable="occError"
-            timeout="30" />
-    </cfif>
-
-    <cfquery name="checkParam1" datasource="hermes">
-        SELECT parameter FROM parameters2
-        WHERE module = 'nextcloud' AND parameter = 'files_app_visible'
-    </cfquery>
-    <cfif checkParam1.recordcount GTE 1>
-        <cfquery datasource="hermes">
-            UPDATE parameters2 SET value2 = <cfqueryparam value="#ncFilesAppVal#" cfsqltype="cf_sql_varchar">
-            WHERE module = 'nextcloud' AND parameter = 'files_app_visible'
-        </cfquery>
-    <cfelse>
-        <cfquery datasource="hermes">
-            INSERT INTO parameters2 (module, parameter, value2, applied)
-            VALUES ('nextcloud', 'files_app_visible',
-                    <cfqueryparam value="#ncFilesAppVal#" cfsqltype="cf_sql_varchar">, '2')
-        </cfquery>
-    </cfif>
-<cfcatch type="any">
-    <cfset saveError = true>
-</cfcatch>
-</cftry>
-
-<!--- ================================================================== --->
-<!--- NEXTCLOUD PASSWORD FORM VISIBILITY                                  --->
-<!--- ================================================================== --->
-<cfset ncPasswordFormVal = (form.nc_password_form EQ "yes") ? "yes" : "no">
-<cfset hidePasswordForm = (ncPasswordFormVal EQ "yes") ? "false" : "true">
-
-<cftry>
-    <cfexecute name="/usr/local/bin/docker"
-        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set oidc_login_hide_password_form --value=#hidePasswordForm# --type=boolean"
-        variable="occResult2"
-        errorVariable="occError2"
-        timeout="30" />
-
-    <cfquery name="checkParam2" datasource="hermes">
-        SELECT parameter FROM parameters2
-        WHERE module = 'nextcloud' AND parameter = 'show_password_form'
-    </cfquery>
-    <cfif checkParam2.recordcount GTE 1>
-        <cfquery datasource="hermes">
-            UPDATE parameters2 SET value2 = <cfqueryparam value="#ncPasswordFormVal#" cfsqltype="cf_sql_varchar">
-            WHERE module = 'nextcloud' AND parameter = 'show_password_form'
-        </cfquery>
-    <cfelse>
-        <cfquery datasource="hermes">
-            INSERT INTO parameters2 (module, parameter, value2, applied)
-            VALUES ('nextcloud', 'show_password_form',
-                    <cfqueryparam value="#ncPasswordFormVal#" cfsqltype="cf_sql_varchar">, '2')
-        </cfquery>
-    </cfif>
-<cfcatch type="any">
-    <cfset saveError = true>
-</cfcatch>
-</cftry>
+<cfset saveErrors = ArrayNew(1)>
 
 <!--- ================================================================== --->
 <!--- NEXTCLOUD OIDC AUTO-REDIRECT                                        --->
@@ -157,6 +81,7 @@ dovecot.conf from template and reloads Dovecot.
 
 <cfcatch type="any">
     <cfset saveError = true>
+    <cfset ArrayAppend(saveErrors, "Nextcloud Auto-Redirect: " & cfcatch.message)>
 </cfcatch>
 </cftry>
 
@@ -190,6 +115,7 @@ dovecot.conf from template and reloads Dovecot.
         </cfif>
     <cfcatch type="any">
         <cfset saveError = true>
+        <cfset ArrayAppend(saveErrors, "Dovecot TLS Certificate: " & cfcatch.message)>
     </cfcatch>
     </cftry>
 </cfif>
@@ -198,15 +124,22 @@ dovecot.conf from template and reloads Dovecot.
 <!--- MAIL ENCRYPTION KEY GENERATION (if enabling and keys don't exist)   --->
 <!--- ================================================================== --->
 <cfif form.mail_encryption EQ "yes">
-    <cfif NOT FileExists("/opt/hermes/keys/ecprivkey.pem") OR NOT FileExists("/opt/hermes/keys/ecpubkey.pem")>
+    <!--- Generate keys if missing or empty (0 bytes = failed previous attempt) --->
+    <cfset needKeys = NOT FileExists("/opt/hermes/keys/ecprivkey.pem")
+                   OR NOT FileExists("/opt/hermes/keys/ecpubkey.pem")
+                   OR (FileExists("/opt/hermes/keys/ecprivkey.pem") AND FileInfo("/opt/hermes/keys/ecprivkey.pem").size EQ 0)
+                   OR (FileExists("/opt/hermes/keys/ecpubkey.pem") AND FileInfo("/opt/hermes/keys/ecpubkey.pem").size EQ 0)>
+    <cfif needKeys>
         <cftry>
             <cfset keyCurve = form.encryption_curve>
             <cfinclude template="generate_mail_crypt_keys.cfm">
             <cfif keyGenResult EQ "error">
                 <cfset saveError = true>
+                <cfset ArrayAppend(saveErrors, "Encryption Key Generation: " & keyGenError)>
             </cfif>
         <cfcatch type="any">
             <cfset saveError = true>
+            <cfset ArrayAppend(saveErrors, "Encryption Key Generation: " & cfcatch.message)>
         </cfcatch>
         </cftry>
     </cfif>
@@ -253,7 +186,7 @@ dovecot.conf from template and reloads Dovecot.
 <cfset form.protocol_pop3 = (form.protocol_pop3 EQ "yes") ? "yes" : "no">
 <cfset form.logging_debug = (form.logging_debug EQ "yes") ? "yes" : "no">
 
-<!--- Build a struct of parameter name → value for batch upsert --->
+<!--- Build a struct of parameter name -> value for batch upsert --->
 <cfset dovSettings = StructNew()>
 <cfset dovSettings['mail.compression'] = form.mail_compression>
 <cfset dovSettings['mail.compression_algorithm'] = form.compression_algorithm>
@@ -297,6 +230,7 @@ dovecot.conf from template and reloads Dovecot.
     </cfloop>
 <cfcatch type="any">
     <cfset saveError = true>
+    <cfset ArrayAppend(saveErrors, "Dovecot Settings DB: " & cfcatch.message)>
 </cfcatch>
 </cftry>
 
@@ -308,6 +242,7 @@ dovecot.conf from template and reloads Dovecot.
         <cfinclude template="generate_dovecot_configuration.cfm">
     <cfcatch type="any">
         <cfset saveError = true>
+        <cfset ArrayAppend(saveErrors, "Dovecot Config Regeneration: " & cfcatch.message)>
     </cfcatch>
     </cftry>
 </cfif>
@@ -315,6 +250,7 @@ dovecot.conf from template and reloads Dovecot.
 <!--- RESULT --->
 <cfif saveError>
     <cfset session.m = 10>
+    <cfset session.saveErrors = saveErrors>
 <cfelse>
     <cfset session.m = 1>
 </cfif>

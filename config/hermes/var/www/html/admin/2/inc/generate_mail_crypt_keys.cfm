@@ -21,8 +21,12 @@ enabled and keys don't exist yet)
 <cfset privKeyPath = keyDir & "/ecprivkey.pem">
 <cfset pubKeyPath = keyDir & "/ecpubkey.pem">
 
-<!--- Safety check: NEVER overwrite existing keys --->
-<cfif FileExists(privKeyPath) OR FileExists(pubKeyPath)>
+<!--- Safety check: NEVER overwrite existing valid keys.
+     Empty files (0 bytes) are treated as missing — they indicate a
+     failed previous generation attempt and should be regenerated. --->
+<cfset privKeyValid = FileExists(privKeyPath) AND FileInfo(privKeyPath).size GT 0>
+<cfset pubKeyValid = FileExists(pubKeyPath) AND FileInfo(pubKeyPath).size GT 0>
+<cfif privKeyValid AND pubKeyValid>
     <cfset keyGenResult = "exists">
 <cfelse>
     <cfset keyGenResult = "">

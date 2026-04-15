@@ -82,31 +82,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    An error occurred saving settings. Check the system log for details.
+    One or more settings failed to save:
+    <cfif StructKeyExists(session, "saveErrors") AND IsArray(session.saveErrors) AND ArrayLen(session.saveErrors) GT 0>
+      <ul class="mb-0 mt-2">
+        <cfloop array="#session.saveErrors#" index="errMsg">
+          <cfoutput><li><code>#encodeForHTML(errMsg)#</code></li></cfoutput>
+        </cfloop>
+      </ul>
+      <cfset session.saveErrors = ArrayNew(1)>
+    </cfif>
   </div>
 </cfif>
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
 
 <!--- Nextcloud settings --->
-<cfquery name="getNcFilesApp" datasource="hermes">
-    SELECT value2 FROM parameters2
-    WHERE module = 'nextcloud' AND parameter = 'files_app_visible'
-</cfquery>
-<cfset ncFilesAppVisible = "yes">
-<cfif getNcFilesApp.recordcount GTE 1>
-    <cfset ncFilesAppVisible = getNcFilesApp.value2>
-</cfif>
-
-<cfquery name="getNcPasswordForm" datasource="hermes">
-    SELECT value2 FROM parameters2
-    WHERE module = 'nextcloud' AND parameter = 'show_password_form'
-</cfquery>
-<cfset ncShowPasswordForm = "no">
-<cfif getNcPasswordForm.recordcount GTE 1>
-    <cfset ncShowPasswordForm = getNcPasswordForm.value2>
-</cfif>
-
 <cfquery name="getNcAutoRedirect" datasource="hermes">
     SELECT value2 FROM parameters2
     WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
@@ -184,34 +174,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <div class="card-body">
     <div class="row">
-      <div class="col-md-4">
-        <div class="mb-3">
-          <label class="form-label"><strong>Files App</strong></label>
-          <select class="form-select" name="nc_files_app">
-            <option value="yes" <cfif ncFilesAppVisible EQ "yes">selected</cfif>>Visible</option>
-            <option value="no" <cfif ncFilesAppVisible NEQ "yes">selected</cfif>>Hidden</option>
-          </select>
-          <small class="form-text text-muted">Controls whether the Files app is visible to Nextcloud users. When hidden, Nextcloud functions as a webmail-only client (Mail, Calendar, Contacts).</small>
-        </div>
-      </div>
-      <div class="col-md-4">
+      <div class="col-md-12">
         <div class="mb-3">
           <label class="form-label"><strong>Auto-Redirect to Hermes SSO</strong></label>
           <select class="form-select" name="nc_auto_redirect" id="nc_auto_redirect">
-            <option value="false" <cfif ncAutoRedirect EQ "false">selected</cfif>>Disabled (show Nextcloud login page)</option>
-            <option value="true" <cfif ncAutoRedirect EQ "true">selected</cfif>>Enabled (silent SSO via Authelia)</option>
+            <option value="false" <cfif ncAutoRedirect EQ "false">selected</cfif>>Disabled (maintenance mode)</option>
+            <option value="true" <cfif ncAutoRedirect EQ "true">selected</cfif>>Enabled (true SSO)</option>
           </select>
-          <small class="form-text text-muted">When enabled, users clicking "Login to Webmail" are silently bounced through Authelia OIDC and land in Nextcloud already logged in. When disabled, users see the Nextcloud login page with an SSO button.</small>
-        </div>
-      </div>
-      <div class="col-md-4" id="nc_password_form_group">
-        <div class="mb-3">
-          <label class="form-label"><strong>Nextcloud Login Form</strong></label>
-          <select class="form-select" name="nc_password_form" id="nc_password_form">
-            <option value="no" <cfif ncShowPasswordForm NEQ "yes">selected</cfif>>Hidden (SSO button only)</option>
-            <option value="yes" <cfif ncShowPasswordForm EQ "yes">selected</cfif>>Visible (SSO button + username/password)</option>
-          </select>
-          <small class="form-text text-muted">Set to <strong>Visible</strong> temporarily when you need to log into Nextcloud as a local admin user for maintenance, then set it back to <strong>Hidden</strong>.</small>
+          <small class="form-text text-muted">
+            <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode.<br>
+            <strong>Disabled:</strong> Users see the Nextcloud login page with a username/password form and an SSO button. Use this temporarily when you need to log in as a local Nextcloud admin user for maintenance (e.g., app management, troubleshooting), then re-enable.
+          </small>
         </div>
       </div>
     </div>
@@ -324,7 +297,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <!--- COMPRESSION SECTION --->
     <h5><i class="fas fa-compress-arrows-alt"></i> Compression</h5>
-    <p class="text-muted">Mail compression reduces disk usage by compressing messages before writing to disk. Only newly delivered or saved messages are compressed; existing messages are not retroactively re-compressed.</p>
+    <p class="text-muted">Mail compression reduces disk usage by compressing messages before writing to disk. Only newly delivered or saved messages are affected. Existing messages are not retroactively re-compressed when changing algorithms, and remain fully readable when compression is disabled. Dovecot auto-detects the compression format per-message on read, so a mailbox can safely contain a mix of uncompressed, LZ4, and Zstandard messages.</p>
 
     <div class="row">
       <div class="col-md-4">
@@ -364,10 +337,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h5><i class="fas fa-lock"></i> Encryption at Rest</h5>
 
     <!--- Check if encryption keys exist --->
-    <cfset keysExist = FileExists("/opt/hermes/keys/ecprivkey.pem") AND FileExists("/opt/hermes/keys/ecpubkey.pem")>
+    <cfset privKeyPath = "/opt/hermes/keys/ecprivkey.pem">
+    <cfset pubKeyPath = "/opt/hermes/keys/ecpubkey.pem">
+    <cfset keysExist = false>
+    <cfset keysEmpty = false>
+    <cfif FileExists(privKeyPath) AND FileExists(pubKeyPath)>
+        <cfif FileInfo(privKeyPath).size GT 0 AND FileInfo(pubKeyPath).size GT 0>
+            <cfset keysExist = true>
+        <cfelse>
+            <cfset keysEmpty = true>
+        </cfif>
+    </cfif>
 
     <div class="alert alert-warning">
-      <i class="icon fas fa-exclamation-triangle"></i> <strong>Important:</strong> When enabled, only <strong>newly delivered</strong> mail is encrypted. Existing messages remain unencrypted but fully readable. Once keys are generated and encryption is enabled, the keys cannot be regenerated from this page -- existing encrypted mail would become permanently unreadable without the original private key.
+      <i class="icon fas fa-exclamation-triangle"></i> <strong>Important:</strong> When enabled, only <strong>newly delivered</strong> mail is encrypted. Existing messages remain unencrypted but fully readable. Disabling encryption later does not affect existing encrypted mail -- it remains readable as long as the keys are present. Once keys are generated, they cannot be regenerated from this page.<br><br><strong>Back up your encryption keys.</strong> The key pair is stored on the Docker host at <code>/opt/hermes/keys/ecprivkey.pem</code> and <code>ecpubkey.pem</code>. If these files are lost, all encrypted mail becomes <strong>permanently unreadable</strong>. There is no recovery mechanism. Include these files in your system backup.
     </div>
 
     <div class="row">
@@ -408,17 +391,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </cfif>
         </div>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-2">
+        <div class="mb-3">
+          <label class="form-label"><strong>Algorithm</strong></label>
+          <div class="form-control-plaintext">
+            <code>AES-256-GCM</code>
+          </div>
+          <small class="form-text text-muted">Industry standard. Hardware-accelerated on modern CPUs.</small>
+        </div>
+      </div>
+      <div class="col-md-2">
         <div class="mb-3">
           <label class="form-label"><strong>Key Status</strong></label>
           <cfif keysExist>
           <div class="form-control-plaintext">
             <span class="badge bg-success"><i class="fas fa-check-circle"></i> Keys Present</span>
           </div>
+          <cfelseif keysEmpty>
+          <div class="form-control-plaintext">
+            <span class="badge bg-danger"><i class="fas fa-exclamation-circle"></i> Keys Empty</span>
+            <small class="d-block text-danger mt-1">Key files exist but are empty. Delete from Docker host and re-enable to regenerate.</small>
+          </div>
           <cfelse>
           <div class="form-control-plaintext">
             <span class="badge bg-secondary"><i class="fas fa-minus-circle"></i> No Keys</span>
-            <small class="d-block text-muted mt-1">Keys will be automatically generated when you enable encryption and save.</small>
+            <small class="d-block text-muted mt-1">Auto-generated on enable.</small>
           </div>
           </cfif>
         </div>
@@ -709,24 +706,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     }
   }
 
-  // Auto-redirect / login form dependency
-  function updateAutoRedirectUI() {
-    if ($('#nc_auto_redirect').val() === 'true') {
-      $('#nc_password_form_group').hide();
-      $('#nc_password_form').prop('disabled', true);
-    } else {
-      $('#nc_password_form_group').show();
-      $('#nc_password_form').prop('disabled', false);
-    }
-  }
-
   $(document).ready(function() {
     updateCompressionUI();
     updateEncryptionUI();
-    updateAutoRedirectUI();
     updateSslProfileUI();
 
-    $('#nc_auto_redirect').on('change', updateAutoRedirectUI);
     $('#mail_compression, #compression_algorithm').on('change', updateCompressionUI);
     $('#mail_encryption').on('change', updateEncryptionUI);
     $('#ssl_profile').on('change', updateSslProfileUI);

@@ -65,6 +65,7 @@ SYSLOG_CONFS=(
 ROTATE_HERMES=false
 ROTATE_CIPHERMAIL=false
 ROTATE_SYSLOG=false
+REGEN_ONLY=false
 DRY_RUN=false
 NON_INTERACTIVE=false
 
@@ -189,6 +190,9 @@ show_menu() {
     echo ""
     echo -e "  ${BOLD}5)${NC}  Dry run (show what would change without making changes)"
     echo ""
+    echo -e "  ${BOLD}6)${NC}  Regenerate config files only (no password change)"
+    echo -e "      ${CYAN}Rebuilds all config files using current credentials${NC}"
+    echo ""
     echo -e "  ${BOLD}0)${NC}  Cancel and return"
     echo ""
 }
@@ -229,7 +233,7 @@ done
 if [[ "$NON_INTERACTIVE" == false ]]; then
     show_menu
 
-    read -p "  Enter selection [0-5]: " choice
+    read -p "  Enter selection [0-6]: " choice
     echo ""
 
     case "$choice" in
@@ -258,6 +262,13 @@ if [[ "$NON_INTERACTIVE" == false ]]; then
             DRY_RUN=true
             log_info "Selected: Dry run (all credentials)"
             ;;
+        6)
+            ROTATE_HERMES=true
+            ROTATE_CIPHERMAIL=true
+            ROTATE_SYSLOG=true
+            REGEN_ONLY=true
+            log_info "Selected: Regenerate config files only (no password change)"
+            ;;
         0|"")
             echo "  Cancelled."
             exit 0
@@ -278,26 +289,41 @@ check_prerequisites
 
 MYSQL_ROOT_PASS=$(cat "${CREDS_DIR}/mysql_root_password")
 
-# Read current usernames and generate new passwords
+# Read current usernames and generate new passwords (or use current for regen-only)
 if [[ "$ROTATE_HERMES" == true ]]; then
     NEW_HERMES_USER=$(cat "${CREDS_DIR}/hermes_username" | tr -d '\n')
     OLD_HERMES_PASS=$(cat "${CREDS_DIR}/hermes_password" | tr -d '\n')
-    NEW_HERMES_PASS=$(generate_password)
-    log_info "Will rotate password for MariaDB user: ${NEW_HERMES_USER}"
+    if [[ "$REGEN_ONLY" == true ]]; then
+        NEW_HERMES_PASS="$OLD_HERMES_PASS"
+        log_info "Will regenerate configs for MariaDB user: ${NEW_HERMES_USER} (no password change)"
+    else
+        NEW_HERMES_PASS=$(generate_password)
+        log_info "Will rotate password for MariaDB user: ${NEW_HERMES_USER}"
+    fi
 fi
 
 if [[ "$ROTATE_CIPHERMAIL" == true ]]; then
     NEW_CIPHERMAIL_USER=$(cat "${CREDS_DIR}/ciphermail_username" | tr -d '\n')
     OLD_CIPHERMAIL_PASS=$(cat "${CREDS_DIR}/ciphermail_password" | tr -d '\n')
-    NEW_CIPHERMAIL_PASS=$(generate_password)
-    log_info "Will rotate password for MariaDB user: ${NEW_CIPHERMAIL_USER}"
+    if [[ "$REGEN_ONLY" == true ]]; then
+        NEW_CIPHERMAIL_PASS="$OLD_CIPHERMAIL_PASS"
+        log_info "Will regenerate configs for MariaDB user: ${NEW_CIPHERMAIL_USER} (no password change)"
+    else
+        NEW_CIPHERMAIL_PASS=$(generate_password)
+        log_info "Will rotate password for MariaDB user: ${NEW_CIPHERMAIL_USER}"
+    fi
 fi
 
 if [[ "$ROTATE_SYSLOG" == true ]]; then
     NEW_SYSLOG_USER=$(cat "${CREDS_DIR}/syslog_username" | tr -d '\n')
     OLD_SYSLOG_PASS=$(cat "${CREDS_DIR}/syslog_password" | tr -d '\n')
-    NEW_SYSLOG_PASS=$(generate_password)
-    log_info "Will rotate password for MariaDB user: ${NEW_SYSLOG_USER}"
+    if [[ "$REGEN_ONLY" == true ]]; then
+        NEW_SYSLOG_PASS="$OLD_SYSLOG_PASS"
+        log_info "Will regenerate configs for MariaDB user: ${NEW_SYSLOG_USER} (no password change)"
+    else
+        NEW_SYSLOG_PASS=$(generate_password)
+        log_info "Will rotate password for MariaDB user: ${NEW_SYSLOG_USER}"
+    fi
 fi
 
 if [[ "$DRY_RUN" == true ]]; then
@@ -342,28 +368,17 @@ if [[ "$ROTATE_HERMES" == true ]]; then
     # --- POSTFIX mysql-*.cf ---
     next_step "Regenerating Postfix mysql-*.cf files from templates..."
 
-    POSTFIX_TEMPLATES=(
-        mysql-aliases
-        mysql-clients
-        mysql-domains
-        mysql-rbl_override
-        mysql-recipients
-        mysql-senders
-        mysql-transport
-        mysql-virtual
-        mysql-virtual-mailbox
-        mysql-virtual-mailbox-domains
-        mysql-sender-login-maps
-        mysql-sender-bcc-maps
-        mysql-recipient-bcc-maps
-    )
-
-    for tpl in "${POSTFIX_TEMPLATES[@]}"; do
-        regenerate_postfix_mysql "$tpl"
+    # Auto-discover Postfix mysql templates
+    POSTFIX_COUNT=0
+    for template_file in "${CONF_FILES}"/mysql-*.HERMES; do
+        [[ ! -f "$template_file" ]] && continue
+        template_name=$(basename "$template_file" .HERMES)
+        regenerate_postfix_mysql "$template_name"
+        POSTFIX_COUNT=$((POSTFIX_COUNT + 1))
     done
 
     if [[ "$DRY_RUN" == false ]]; then
-        log_info "  Regenerated ${#POSTFIX_TEMPLATES[@]} Postfix config files"
+        log_info "  Regenerated ${POSTFIX_COUNT} Postfix config files"
     fi
 
     # --- AMAVIS 50-user ---
@@ -451,8 +466,12 @@ if [[ "$ROTATE_CIPHERMAIL" == true ]]; then
 fi
 
 # ============================================================================
-# UPDATE CREDS FILES + ALTER USER IN MARIADB
+# UPDATE CREDS FILES + ALTER USER IN MARIADB (skip for regen-only)
 # ============================================================================
+
+if [[ "$REGEN_ONLY" == true ]]; then
+    log_info "Regen-only mode — skipping password changes and ALTER USER"
+else
 
 next_step "Updating credential files and MariaDB passwords..."
 
@@ -493,6 +512,9 @@ if [[ "$ROTATE_SYSLOG" == true ]]; then
             "ALTER USER '${NEW_SYSLOG_USER}'@'%' IDENTIFIED BY '${NEW_SYSLOG_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
         log_info "  MariaDB password rotated for user: ${NEW_SYSLOG_USER}"
     fi
+fi
+
+# End of REGEN_ONLY skip block
 fi
 
 # ============================================================================

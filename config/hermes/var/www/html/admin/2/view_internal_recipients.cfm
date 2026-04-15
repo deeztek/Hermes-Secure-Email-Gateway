@@ -253,18 +253,8 @@ a, a:hover{
     <cfset action = form.action>
     </cfif></cfif>
 
-    <!--- FORCE LOGOUT RELAY USER --->
-    <cfif action EQ "forcelogout">
-        <cfparam name="form.logout_username" default="">
-        <cfif form.logout_username NEQ "">
-            <cfset targetSessionUser = form.logout_username>
-            <cfinclude template="./inc/invalidate_user_sessions.cfm">
-            <cfset session.m = "forcelogout_success">
-        </cfif>
-        <cflocation url="view_internal_recipients.cfm" addtoken="no">
-
     <!--- RESET FAILED CERT QUEUE JOBS --->
-    <cfelseif action EQ "reset_failed_queue">
+    <cfif action EQ "reset_failed_queue">
         <cftry>
             <cfquery datasource="hermes">
                 UPDATE cert_generation_queue
@@ -281,15 +271,7 @@ a, a:hover{
 
         <!--- ERROR MESSAGES START HERE --->
 
-        <cfif m is "forcelogout_success">
-          <div class="alert alert-success alert-dismissible">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-            <h4><i class="icon fa fa-check"></i> Success!</h4>
-            User sessions invalidated. The user will be redirected to the login page on their next request.
-          </div>
-          <cfset session.m = 0>
-
-        <cfelseif #m# is "3">
+        <cfif #m# is "3">
           <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
             <h4><i class="icon fa fa-check"></i> Success!</h4>
@@ -1510,7 +1492,6 @@ a, a:hover{
         <thead>
           <tr>
             <th><input type="checkbox" id="selectAll" value="selectAll"></th>
-            <th></th>
             <th>S/MIME</th>
             <th>PGP</th>
             <th>Recipient</th>
@@ -1540,7 +1521,6 @@ a, a:hover{
           <cfset isTwoFactor = twoFactorMembers CONTAINS "cn=#recipientLdapUser#,ou=users,dc=hermes,dc=local">
           <tr>
             <td><input type="checkbox" name="id" value="#id#"></td>
-            <td><button type="button" class="btn btn-sm btn-outline-warning" title="Force Logout" onclick="confirmForceLogout('#JSStringFormat(recipient)#')"><i class="fas fa-sign-out-alt"></i></button></td>
             <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-shield"></i></a></td>
             <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-lock"></i></a></td>
             <td>#recipient#</td>
@@ -1563,7 +1543,6 @@ a, a:hover{
         </tbody>
         <tfoot>
           <tr>
-            <th></th>
             <th></th>
             <th>S/MIME</th>
             <th>PGP</th>
@@ -1617,39 +1596,7 @@ a, a:hover{
 
 
 
-<!-- Force Logout Modal -->
-<div class="modal fade" id="forceLogoutModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post" action="view_internal_recipients.cfm">
-        <input type="hidden" name="action" value="forcelogout">
-        <input type="hidden" name="logout_username" id="forceLogoutUsername" value="">
-        <div class="modal-header bg-warning">
-          <h5 class="modal-title"><i class="fas fa-sign-out-alt me-2"></i>Force Logout</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p>This will immediately invalidate all active sessions for <strong id="forceLogoutDisplayName"></strong>.</p>
-          <p>The user will be redirected to the login page on their next request.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-warning">Force Logout</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
 </body>
-
-  <script>
-    function confirmForceLogout(username) {
-      $('#forceLogoutUsername').val(username);
-      $('#forceLogoutDisplayName').text(username);
-      new bootstrap.Modal(document.getElementById('forceLogoutModal')).show();
-    }
-  </script>
 
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE STARTS HERE --->
      <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->

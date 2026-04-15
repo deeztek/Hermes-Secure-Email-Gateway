@@ -111,6 +111,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_smtp_tls_settings.cfm" class="nav-link">
+                <i class="nav-icon fab fa-expeditedssl"></i>
+                <p>SMTP TLS Settings</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_system_settings.cfm" class="nav-link">
                 <i class="nav-icon fas fa-cogs"></i>
                 <p>System Settings</p>
@@ -172,12 +178,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </p>
           </a>
           <ul class="nav nav-treeview">
-            <li class="nav-item">
-              <a href="view_smtp_tls_settings.cfm" class="nav-link">
-                <i class="nav-icon fab fa-expeditedssl"></i>
-                <p>SMTP TLS Settings</p>
-              </a>
-            </li>
             <li class="nav-item">
               <a href="view_relay_host.cfm" class="nav-link">
                 <i class="nav-icon fas fa-server"></i>

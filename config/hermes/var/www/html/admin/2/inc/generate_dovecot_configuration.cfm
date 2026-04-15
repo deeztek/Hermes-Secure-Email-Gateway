@@ -18,7 +18,7 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <!--- LOAD ALL DOVECOT SETTINGS FROM parameters2 --->
 <cfquery name="getDovecotSettings" datasource="hermes">
     SELECT parameter, value2 FROM parameters2
-    WHERE module = 'dovecot' AND active = '1'
+    WHERE module = 'dovecot'
 </cfquery>
 
 <!--- Build a struct for easy lookup --->
@@ -68,7 +68,7 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfif dov['logging.debug'] EQ "yes">
     <cfset logDebugLine = "log_debug = category=mail or category=auth">
 <cfelse>
-    <cfset logDebugLine = "# log_debug disabled">
+    <cfset logDebugLine = "">
 </cfif>
 
 <!--- RESOLVE TLS CERTIFICATE PATHS --->
@@ -82,14 +82,29 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset sslKeyPath = "">
 
 <cfif getCertParam.recordcount GTE 1 AND getCertParam.value2 NEQ "">
-    <!--- Look up the certificate's friendly_name to build the Let's Encrypt path --->
-    <cfquery name="getCertDomain" datasource="hermes">
-        SELECT friendly_name FROM system_certificates
-        WHERE id = <cfqueryparam value="#getCertParam.value2#" cfsqltype="cf_sql_integer">
-    </cfquery>
-    <cfif getCertDomain.recordcount GTE 1>
-        <cfset sslCertPath = "/etc/letsencrypt/live/" & getCertDomain.friendly_name & "/fullchain.pem">
-        <cfset sslKeyPath = "/etc/letsencrypt/live/" & getCertDomain.friendly_name & "/privkey.pem">
+    <cfif getCertParam.value2 EQ "1">
+        <!--- Built-in self-signed (snakeoil) certificate — ID 1 is always the
+             system default. Same paths as generate_nginx_configuration.cfm. --->
+        <cfset sslCertPath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
+        <cfset sslKeyPath = "/etc/ssl/private/ssl-cert-snakeoil.key">
+    <cfelse>
+        <!--- Look up the certificate type and file_name to build the correct path.
+             Path patterns match generate_nginx_configuration.cfm:
+               Acme:     /etc/letsencrypt/live/<file_name>/fullchain.pem + privkey.pem
+               Imported: /opt/hermes/ssl/<file_name>_hermes.pem + _hermes.key --->
+        <cfquery name="getCertInfo" datasource="hermes">
+            SELECT type, file_name FROM system_certificates
+            WHERE id = <cfqueryparam value="#getCertParam.value2#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfif getCertInfo.recordcount GTE 1>
+            <cfif getCertInfo.type EQ "Acme">
+                <cfset sslCertPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/fullchain.pem">
+                <cfset sslKeyPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/privkey.pem">
+            <cfelseif getCertInfo.type EQ "Imported">
+                <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.pem">
+                <cfset sslKeyPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.key">
+            </cfif>
+        </cfif>
     </cfif>
 </cfif>
 
@@ -172,8 +187,16 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_compress_method", dov['mail.compression_algorithm'], "ALL")>
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_compress_level_line", compressLevelLine, "ALL")>
 
-<!--- Encryption --->
-<cfset dovecotConf = REReplace(dovecotConf, "hermes_mail_crypt", dov['mail.encryption'], "ALL")>
+<!--- Encryption: mail_crypt plugin is always loaded (needed to read existing
+     encrypted mail). The admin toggle controls crypt_write_algorithm:
+     enabled = encrypt new mail, disabled = don't encrypt new mail. --->
+<cfset cryptWriteLine = "">
+<cfif dov['mail.encryption'] EQ "yes">
+    <cfset cryptWriteLine = "crypt_write_algorithm = aes-256-gcm-sha256">
+<cfelse>
+    <cfset cryptWriteLine = "crypt_write_algorithm =">
+</cfif>
+<cfset dovecotConf = REReplace(dovecotConf, "hermes_crypt_write_algorithm_line", cryptWriteLine, "ALL")>
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_crypt_curve", dov['mail.encryption_curve'], "ALL")>
 
 <!--- Quota warnings --->
@@ -193,11 +216,11 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_ssl_key_path", sslKeyPath, "ALL")>
 
 <!--- WRITE TO TEMP FILE --->
-<cffile action="write"
-    file="/opt/hermes/tmp/#customtrans3#_dovecot.conf"
-    output="#dovecotConf#"
-    charset="utf-8"
-    addNewLine="no">
+<!--- Use fileWrite() instead of cffile tag to avoid Lucee evaluating
+     ## comment characters in the dovecot config as CFML expressions --->
+<cfscript>
+    fileWrite("/opt/hermes/tmp/" & customtrans3 & "_dovecot.conf", dovecotConf, "utf-8");
+</cfscript>
 
 <!--- Run dos2unix to ensure clean line endings --->
 <cftry>
@@ -211,9 +234,10 @@ Called from: email_server_settings_action.cfm (after saving form values)
 </cfcatch>
 </cftry>
 
-<!--- MOVE TEMP FILE TO PRODUCTION --->
-<!--- /etc/dovecot/ is volume-mounted from host config/dovecot-2.4/conf/ so
-     changes persist across container recreations --->
+<!--- COPY TEMP FILE TO PRODUCTION --->
+<!--- /etc/dovecot/ is volume-mounted into commandbox from host
+     config/dovecot-2.4/conf/ — shared with the hermes_dovecot container,
+     so changes persist and are visible to both containers. --->
 <cftry>
     <cffile action="copy"
         source="/opt/hermes/tmp/#customtrans3#_dovecot.conf"
@@ -229,7 +253,7 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cftry>
     <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_dovecot.conf">
 <cfcatch type="any">
-    <!--- Non-fatal — temp file will be cleaned up eventually --->
+    <!--- Non-fatal --->
 </cfcatch>
 </cftry>
 

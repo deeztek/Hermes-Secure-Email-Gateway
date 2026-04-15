@@ -147,9 +147,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##createModal">
         <i class="fa fa-plus-square fa-lg"></i> Create System User
       </button>
-      <button type="button" class="btn btn-outline-danger ms-2" data-bs-toggle="modal" data-bs-target="##forceLogoutAllModal">
-        <i class="fas fa-sign-out-alt"></i> Force Logout All Users
-      </button>
       </cfoutput>
     </div>
 
@@ -181,12 +178,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 data-bs-toggle="modal" data-bs-target="##deleteDevicesModal" data-user="#encodeForHTMLAttribute(username)#">
                 <i class="fas fa-key"></i>
               </button>
-              <cfif id NEQ session.userid>
-              <button type="button" class="btn btn-sm btn-outline-danger" title="Force Logout"
-                onclick="confirmForceLogout('#encodeForJavaScript(username)#')">
-                <i class="fas fa-sign-out-alt"></i>
-              </button>
-              </cfif>
               <cfif system NEQ "1" AND id NEQ session.userid>
               <button type="button" class="btn btn-sm btn-danger" title="Delete User"
                 data-bs-toggle="modal" data-bs-target="##deleteModal" data-user="#id#" data-username="#encodeForHTMLAttribute(username)#">
@@ -478,63 +469,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
-<!--- FORCE LOGOUT MODAL --->
-<div class="modal fade" id="forceLogoutModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post" action="view_system_users.cfm">
-        <input type="hidden" name="action" value="forcelogout">
-        <input type="hidden" name="logout_username" id="forceLogoutUsername" value="">
-        <div class="modal-header bg-warning">
-          <h5 class="modal-title"><i class="fas fa-sign-out-alt me-2"></i>Force Logout</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p>This will immediately invalidate all active sessions for <strong id="forceLogoutDisplayName"></strong>.</p>
-          <p>The user will be redirected to the login page on their next request. Any unsaved work will be lost.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-warning">Force Logout</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!--- FORCE LOGOUT ALL MODAL --->
-<div class="modal fade" id="forceLogoutAllModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post" action="view_system_users.cfm">
-        <input type="hidden" name="action" value="forcelogoutall">
-        <div class="modal-header bg-danger text-white">
-          <h5 class="modal-title"><i class="fas fa-sign-out-alt me-2"></i>Force Logout All Users</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <div class="alert alert-danger">
-            <h5><i class="icon fas fa-exclamation-triangle"></i> Warning</h5>
-            <p>This will immediately invalidate <strong>ALL</strong> active sessions for <strong>every user</strong>, including your own.</p>
-            <p class="mb-0">All users (admins, mailbox users, relay users) will be redirected to the login page on their next request. You will also be logged out.</p>
-          </div>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Force Logout All Users</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
 
 <script>
-function confirmForceLogout(username) {
-  $('#forceLogoutUsername').val(username);
-  $('#forceLogoutDisplayName').text(username);
-  new bootstrap.Modal(document.getElementById('forceLogoutModal')).show();
-}
-
 $(document).ready(function() {
   $('#sortTable').DataTable({
     dom: 'Blfrtip',

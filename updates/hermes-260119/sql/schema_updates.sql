@@ -1753,3 +1753,30 @@ WHERE NOT EXISTS (
     SELECT 1 FROM parameters2
     WHERE module = 'dovecot' AND parameter = 'logging.debug'
 );
+
+-- ============================================================================
+-- Postfix: check_recipient_access for silent discard aliases
+-- ============================================================================
+-- Mailbox aliases with "silent discard" type need Postfix to DISCARD the
+-- message at SMTP time. Without this, the discard:silently value from
+-- the mailbox_aliases table gets treated as an email address by the
+-- virtual alias map, causing undeliverable messages stuck in the queue.
+-- The check_recipient_access lookup runs early in smtpd_recipient_restrictions
+-- (after permit_mynetworks, before reject_unauth_destination) and returns
+-- DISCARD for matching aliases.
+INSERT INTO parameters (
+    parameter, parent_name, child, order1, enabled, applied, action,
+    module, conf_file, editable, name, description
+)
+SELECT
+    'check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf',
+    'smtpd_recipient_restrictions',
+    1, 1.05, 1, 2, 'APPLY',
+    'postfix', 'main.cf', 0,
+    'Discard Recipients Access Check',
+    'Silent discard for mailbox aliases configured to silently drop messages'
+WHERE NOT EXISTS (
+    SELECT 1 FROM parameters
+    WHERE parameter = 'check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf'
+    AND parent_name = 'smtpd_recipient_restrictions'
+);

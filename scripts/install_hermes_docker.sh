@@ -1073,12 +1073,29 @@ main() {
 
 case "${1:-}" in
     --init-db)
-        # Initialize databases (run after containers are up)
+        # Initialize databases and configure services (run after containers are up)
         touch "$LOG_FILE"
         log "Database initialization started at $(date)"
         create_databases
         configure_authelia_mysql
         initialize_ldap
+
+        # Nextcloud post-install configuration
+        log "Configuring Nextcloud defaults..."
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set defaultapp --value="mail,calendar,contacts,dashboard" >> "$LOG_FILE" 2>&1 \
+            && log "  Set default app to Mail" \
+            || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
+
+        # Inject database credentials into config files
+        log "Injecting database credentials into config files..."
+        if [[ -x "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" ]]; then
+            "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" --non-interactive >> "$LOG_FILE" 2>&1 \
+                && log "  Database credentials injected into all config files" \
+                || log "  WARNING: Credential injection failed — run rotate_db_credentials.sh manually"
+        else
+            log "  WARNING: rotate_db_credentials.sh not found — skipping credential injection"
+        fi
+
         log "Database initialization completed"
         ;;
     --generate-secrets)

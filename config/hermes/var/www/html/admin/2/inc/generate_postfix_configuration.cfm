@@ -177,6 +177,75 @@ update parameters set applied='1', action='NONE' where applied = '2'
 </cfquery>
 
 <!--- ============================================== --->
+<!--- REGENERATE POSTFIX mysql-*.cf FROM TEMPLATES --->
+<!--- ============================================== --->
+<!--- Auto-discovers all mysql-*.HERMES templates in /opt/hermes/conf_files/
+     and generates the corresponding mysql-*.cf files in /etc/postfix/ with
+     database credentials injected from /opt/hermes/creds/ files. --->
+<cftry>
+    <cffile action="read" file="/opt/hermes/creds/hermes_username" variable="hermesDbUser" charset="utf-8">
+    <cffile action="read" file="/opt/hermes/creds/hermes_password" variable="hermesDbPass" charset="utf-8">
+    <cfset hermesDbUser = trim(hermesDbUser)>
+    <cfset hermesDbPass = trim(hermesDbPass)>
+
+    <cfdirectory action="list" directory="/opt/hermes/conf_files" filter="mysql-*.HERMES" name="postfixMysqlTemplates" type="file">
+
+    <cfloop query="postfixMysqlTemplates">
+        <cftry>
+            <cfset tplPath = "/opt/hermes/conf_files/" & postfixMysqlTemplates.name>
+            <cfset outName = ReplaceNoCase(postfixMysqlTemplates.name, ".HERMES", ".cf")>
+            <cfset outPath = "/etc/postfix/" & outName>
+
+            <cffile action="read" file="#tplPath#" variable="tplContent" charset="utf-8">
+            <cfset tplContent = ReplaceNoCase(tplContent, "HERMES-USERNAME", hermesDbUser, "ALL")>
+            <cfset tplContent = ReplaceNoCase(tplContent, "HERMES-PASSWORD", hermesDbPass, "ALL")>
+
+            <cfscript>fileWrite(outPath, tplContent, "utf-8");</cfscript>
+        <cfcatch type="any">
+            <!--- Non-fatal: continue with other templates --->
+        </cfcatch>
+        </cftry>
+    </cfloop>
+<cfcatch type="any">
+    <!--- Non-fatal: Postfix main.cf was already applied above --->
+</cfcatch>
+</cftry>
+
+<!--- ============================================== --->
+<!--- REGENERATE CIPHERMAIL HIBERNATE XML FROM TEMPLATES --->
+<!--- ============================================== --->
+<!--- Auto-discovers hibernate.mysql.*.HERMES templates and generates
+     the corresponding XML files with Ciphermail DB credentials. --->
+<cftry>
+    <cffile action="read" file="/opt/hermes/creds/ciphermail_username" variable="ciphermailDbUser" charset="utf-8">
+    <cffile action="read" file="/opt/hermes/creds/ciphermail_password" variable="ciphermailDbPass" charset="utf-8">
+    <cfset ciphermailDbUser = trim(ciphermailDbUser)>
+    <cfset ciphermailDbPass = trim(ciphermailDbPass)>
+
+    <cfdirectory action="list" directory="/opt/hermes/conf_files" filter="hibernate.mysql.*.HERMES" name="ciphermailTemplates" type="file">
+
+    <cfloop query="ciphermailTemplates">
+        <cftry>
+            <cfset tplPath = "/opt/hermes/conf_files/" & ciphermailTemplates.name>
+            <cfset outName = ReplaceNoCase(ciphermailTemplates.name, ".HERMES", ".xml")>
+            <cfset outPath = "/usr/share/djigzo/conf/database/" & outName>
+
+            <cffile action="read" file="#tplPath#" variable="tplContent" charset="utf-8">
+            <cfset tplContent = ReplaceNoCase(tplContent, "DJIGZO-USERNAME", ciphermailDbUser, "ALL")>
+            <cfset tplContent = ReplaceNoCase(tplContent, "DJIGZO-PASSWORD", ciphermailDbPass, "ALL")>
+
+            <cfscript>fileWrite(outPath, tplContent, "utf-8");</cfscript>
+        <cfcatch type="any">
+            <!--- Non-fatal: continue with other templates --->
+        </cfcatch>
+        </cftry>
+    </cfloop>
+<cfcatch type="any">
+    <!--- Non-fatal: ciphermail creds files may not exist on fresh install --->
+</cfcatch>
+</cftry>
+
+<!--- ============================================== --->
 <!--- UPDATE AMAVIS MYNETWORKS FILE --->
 <!--- ============================================== --->
 

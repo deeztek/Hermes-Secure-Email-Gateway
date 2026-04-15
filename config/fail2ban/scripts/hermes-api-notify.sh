@@ -35,26 +35,31 @@ if [ -z "$DB_IP" ] || [ -z "$COMMANDBOX_IP" ]; then
     exit 0
 fi
 
-# Debug logging - uncomment for troubleshooting
-# DATE=$(date)
-# echo "[$DATE] API Notify: Action=$ACTION IP=$IP Source=$SOURCE DB=$DB_IP CB=$COMMANDBOX_IP" >> /scripts/api-notify.log
+# Debug logging
+DATE=$(date)
+echo "[$DATE] API Notify: Action=$ACTION IP=$IP Source=$SOURCE DB=$DB_IP CB=$COMMANDBOX_IP" >> /scripts/api-notify.log
 
 # Get Hermes MySQL credentials
 HERMES_USERNAME=$(cat /opt/hermes/creds/hermes_username 2>/dev/null)
 HERMES_PASSWORD=$(cat /opt/hermes/creds/hermes_password 2>/dev/null)
 
 if [ -z "$HERMES_USERNAME" ] || [ -z "$HERMES_PASSWORD" ]; then
+    echo "[$DATE] ERROR: Missing creds files" >> /scripts/api-notify.log
     exit 1
 fi
 
-# Database connection - use container IP since we're in host network mode
-# Use mariadb instead of mysql to avoid deprecation warning, filter stderr
+# Get API token from database
 THETOKEN=$(mariadb -h $DB_IP -P 3306 -u $HERMES_USERNAME -p$HERMES_PASSWORD hermes -se "SELECT token FROM api_tokens WHERE name='Fail2ban' AND system='1' AND active='1'" 2>/dev/null)
+
+echo "[$DATE] Token result: '${THETOKEN:0:8}...'" >> /scripts/api-notify.log
 
 # Call Hermes API to log the ban/unban in the database
 if [ -n "$THETOKEN" ]; then
-    curl -X "POST" -s "http://${COMMANDBOX_IP}:8888/hermes-api/" \
+    API_RESULT=$(curl -X "POST" -s -w "\nHTTP_CODE:%{http_code}" "http://${COMMANDBOX_IP}:8888/hermes-api/" \
         -H "accept: */*" \
         -H "X-Original-URL: /admin/2/inc/fail2ban_ban_unban.cfm?action=$ACTION&ip=$IP&type=$TYPE&source=$SOURCE" \
-        -H "X-Token: $THETOKEN" > /dev/null 2>&1
+        -H "X-Token: $THETOKEN" 2>&1)
+    echo "[$DATE] API result: ${API_RESULT}" >> /scripts/api-notify.log
+else
+    echo "[$DATE] ERROR: No token returned from database" >> /scripts/api-notify.log
 fi

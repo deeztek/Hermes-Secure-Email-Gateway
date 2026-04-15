@@ -515,25 +515,5 @@ All LDAP includes are reused as-is.
 
   <cflocation url="view_system_users.cfm" addtoken="no">
 
-<cfelseif action is "forcelogout">
-
-  <!--- FORCE LOGOUT: invalidate all sessions for a specific user --->
-  <cfparam name="form.logout_username" default="">
-  <cfif form.logout_username NEQ "">
-      <cfset targetSessionUser = form.logout_username>
-      <cfinclude template="invalidate_user_sessions.cfm">
-      <cfset session.m = 30>
-      <cfset session.alerttype = "success">
-  </cfif>
-  <cflocation url="view_system_users.cfm" addtoken="no">
-
-<cfelseif action is "forcelogoutall">
-
-  <!--- FORCE LOGOUT ALL: flush the entire Authelia session store --->
-  <cfset targetSessionUser = "*">
-  <cfinclude template="invalidate_user_sessions.cfm">
-  <cfset session.m = 31>
-  <cfset session.alerttype = "success">
-  <cflocation url="view_system_users.cfm" addtoken="no">
 
 </cfif>

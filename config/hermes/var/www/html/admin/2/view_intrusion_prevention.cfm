@@ -841,7 +841,7 @@ $(document).ready(function() {
                             <th>Find Time</th>
                             <th>Ban Time</th>
                             <th>Currently Banned</th>
-                            <th>Banned (All Time)</th>
+                            <th>Total (Since Restart)</th>
                             <th>Synced</th>
                             <th>Actions</th>
                         </tr>
@@ -1017,7 +1017,7 @@ $(document).ready(function() {
                                     <cfset banDateTime = ParseDateTime(datetime)>
                                     <cfset unbanDateTime = DateAdd("s", bantime, banDateTime)>
                                     <cfset secondsRemaining = DateDiff("s", Now(), unbanDateTime)>
-                                    <cfset unbanTimestamp = DateDiff("s", CreateDateTime(1970,1,1,0,0,0), DateConvert("local2utc", unbanDateTime))>
+                                    <cfset unbanTimestamp = Int(unbanDateTime.getTime() / 1000)>
                                     <cfif secondsRemaining GT 0>
                                         <span class="countdown-timer badge bg-warning text-dark" data-unban-timestamp="#unbanTimestamp#">
                                             <cfif secondsRemaining GTE 3600>

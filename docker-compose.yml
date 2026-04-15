@@ -273,6 +273,7 @@ services:
       - authelia_logs:/opt/hermes/logs/authelia
       - ./config/authelia:/etc/authelia
       - ./config/nginx/etc/nginx:/etc/nginx
+      - ./config/dovecot-2.4/conf:/etc/dovecot
       - ./config/postfix-dkim/etc/postfix:/etc/postfix
       - ./config/postfix-dkim/etc/opendkim.conf:/etc/opendkim.conf
       - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
@@ -283,6 +284,10 @@ services:
       - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf #Fangfrisch config (malware feeds)
       - mail_filter_data_clamav:/var/lib/clamav #ClamAV signature data (local.ign2)
       - ./config/ldap:/ldap
+      - ./config/postfix-dkim/etc/rsyslog.d:/mnt/rsyslog/postfix
+      - ./config/opendmarc/etc/rsyslog.d:/mnt/rsyslog/opendmarc
+      - ./config/mail_filter/etc/rsyslog.d:/mnt/rsyslog/mail_filter
+      - ./config/ldap/etc/rsyslog.d:/mnt/rsyslog/ldap
       - /proc:/host/proc:ro #Host /proc for system resource monitoring
       - /:/host/root:ro #Host root filesystem for disk usage monitoring
     networks:

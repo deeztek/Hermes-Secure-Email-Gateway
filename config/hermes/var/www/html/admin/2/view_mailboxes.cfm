@@ -75,14 +75,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/edit_mailbox_access_control_action.cfm">
 <cfelseif action is "delete_mailbox">
   <cfinclude template="./inc/delete_mailbox_action.cfm">
-<cfelseif action is "forcelogout">
-  <cfparam name="form.logout_username" default="">
-  <cfif form.logout_username NEQ "">
-    <cfset targetSessionUser = form.logout_username>
-    <cfinclude template="./inc/invalidate_user_sessions.cfm">
-    <cfset session.m = 50>
-  </cfif>
-  <cflocation url="view_mailboxes.cfm" addtoken="no">
 </cfif>
 
 <!--- Edition check --->
@@ -162,12 +154,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     Password must be at least 12 characters.
-  </div>
-<cfelseif m EQ 50>
-  <div class="alert alert-success alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-check"></i> Success!</h4>
-    User sessions invalidated. The user will be redirected to the login page on their next request.
   </div>
 <cfelseif m EQ 51>
   <div class="alert alert-danger alert-dismissible">
@@ -331,7 +317,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-shield-alt me-2"></i>Access Control</a></li>
                 <li><hr class="dropdown-divider"></li>
-                <li><a class="dropdown-item text-warning" href="##" onclick="confirmForceLogout('#JSStringFormat(username)#'); return false;"><i class="fas fa-sign-out-alt me-2"></i>Force Logout</a></li>
                 <li><a class="dropdown-item text-danger" href="##" onclick="confirmDelete(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-trash me-2"></i>Delete</a></li>
               </ul>
             </div>
@@ -490,7 +475,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <option value="0">Disable</option>
               <option value="1">Enable</option>
             </select>
-            <small class="form-text text-warning" id="editNextcloudHint" style="display:none;"><i class="fas fa-exclamation-triangle me-1"></i>A new password is required when enabling Nextcloud for an existing user. Set the password above to create their email profile in the Mail app.</small>
+            <small class="form-text text-warning" id="editNextcloudHint" style="display:none;"><i class="fas fa-exclamation-triangle me-1"></i>A new password is required when enabling Nextcloud for an existing user. Set the password below to create their email profile in the Mail app.</small>
           </div>
 
           <!--- Timezone --->
@@ -670,30 +655,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
-<!-- Force Logout Modal -->
-<div class="modal fade" id="forceLogoutModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <form method="post" action="view_mailboxes.cfm">
-        <input type="hidden" name="action" value="forcelogout">
-        <input type="hidden" name="logout_username" id="forceLogoutUsername" value="">
-        <div class="modal-header bg-warning">
-          <h5 class="modal-title"><i class="fas fa-sign-out-alt me-2"></i>Force Logout</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-        </div>
-        <div class="modal-body">
-          <p>This will immediately invalidate all active sessions for <strong id="forceLogoutDisplayName"></strong>.</p>
-          <p>The user will be redirected to the login page on their next request.</p>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-warning">Force Logout</button>
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
       </div>
     </div>
   </main>
@@ -830,13 +791,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $('#editNextcloudHint').hide();
     }
   });
-
-  // Force Logout
-  function confirmForceLogout(username) {
-    $('#forceLogoutUsername').val(username);
-    $('#forceLogoutDisplayName').text(username);
-    new bootstrap.Modal(document.getElementById('forceLogoutModal')).show();
-  }
 
   // Confirm delete
   function confirmDelete(mailboxId, email) {
