@@ -71,7 +71,8 @@ Idempotent: "already a member" errors are caught and treated as success.
     </cfif>
 
     <!--- Idempotent: "already a member" is not fatal --->
-    <cfif errorDetail CONTAINS "already exists" OR errorDetail CONTAINS "Type or value exists">
+    <cfset fullError = errorDetail & " " & cfcatch.message & " " & cfcatch.detail>
+    <cfif fullError CONTAINS "already exists" OR fullError CONTAINS "Type or value exists">
         <!--- User is already in nextcloud group, that's fine --->
     <cfelse>
         <cfset m="LDAP Add Nextcloud Group: #cfcatch.message# | Detail: #cfcatch.detail# | LDAP Error: #errorDetail#">

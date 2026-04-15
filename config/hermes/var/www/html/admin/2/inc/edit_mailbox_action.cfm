@@ -207,6 +207,19 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
                 <cfinclude template="nextcloud_mail_account.cfm">
             <cfcatch type="any"></cfcatch>
             </cftry>
+
+            <!--- Delete NC user account if admin chose not to keep it --->
+            <cfparam name="form.nc_keep_account" default="1">
+            <cfif form.nc_keep_account NEQ "1">
+                <cftry>
+                    <cfexecute name="/usr/local/bin/docker"
+                        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:delete #getMailbox.username#"
+                        variable="ncDeleteResult"
+                        errorVariable="ncDeleteError"
+                        timeout="30" />
+                <cfcatch type="any"></cfcatch>
+                </cftry>
+            </cfif>
         </cfif>
     <cfcatch type="any">
         <!--- Non-fatal: the mailbox row was already updated, admin can

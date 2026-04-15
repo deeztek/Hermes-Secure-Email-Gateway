@@ -17,15 +17,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<CFHEADER NAME="Expires" VALUE="Mon, 06 Jan 1990 00:00:01 GMT"> 
-<CFHEADER NAME="Pragma" VALUE="no-cache"> 
-<CFHEADER NAME="cache-control" VALUE="no-cache"> 
-<!-- meta anti cache--> 
-<META HTTP-EQUIV="Expires" CONTENT="Mon, 06 Jan 1990 00:00:01 GMT"> 
-<META HTTP-EQUIV="Pragma" CONTENT="no-cache"> 
-<META HTTP-EQUIV="Cache-Control" CONTENT="no-cache"> 
-<!-- Kill session Variables --> 
-<CFSET Session.Loggedin = FALSE> 
+<CFHEADER NAME="Expires" VALUE="Mon, 06 Jan 1990 00:00:01 GMT">
+<CFHEADER NAME="Pragma" VALUE="no-cache">
+<CFHEADER NAME="cache-control" VALUE="no-cache">
+<!-- meta anti cache-->
+<META HTTP-EQUIV="Expires" CONTENT="Mon, 06 Jan 1990 00:00:01 GMT">
+<META HTTP-EQUIV="Pragma" CONTENT="no-cache">
+<META HTTP-EQUIV="Cache-Control" CONTENT="no-cache">
+<!-- Kill session Variables -->
+<CFSET Session.Loggedin = FALSE>
 <cfset session.owner = "">
 <cfset session.email = "">
 <cfset session.train_bayes = "">
@@ -38,7 +38,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name = "getconsolemode" datasource="hermes">
 select parameter, value2 from parameters2 where parameter='console.mode'
 </cfquery>
-    
+
 <cfif #getconsolemode.value2# is "ip">
 
 <cfoutput>

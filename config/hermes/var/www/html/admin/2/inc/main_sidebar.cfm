@@ -424,6 +424,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>External Recipients</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="/ciphermail/" class="nav-link" target="_blank">
+                <i class="nav-icon fas fa-shield-alt"></i>
+                <p>Advanced Settings <i class="fas fa-external-link-alt fa-xs"></i></p>
+              </a>
+            </li>
           </ul>
         </li>
         <!--- ENCRYPTION ENDS HERE --->

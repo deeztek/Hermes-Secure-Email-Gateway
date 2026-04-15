@@ -78,13 +78,22 @@ Non-fatal: failures are caught and logged but do not block the calling action.
         <cfif ncAppPasswordValue EQ "">
             <cfset ncAppPasswordResult = "skipped_no_password">
         <cfelse>
-            <!--- Create a new app password using docker exec with env var for password.
-                 The --name flag sets the display name visible in NC Security page. --->
-            <cfexecute name="/usr/local/bin/docker"
-                arguments="exec -e NC_PASS=#ncAppPasswordValue# -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add #ncAppPasswordUser# --name=#ncAppPasswordName#"
+            <!--- Create a new app password using a temp script to handle
+                 special chars in password. --->
+            <cfinclude template="generate_customtrans.cfm">
+            <cfset appPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_app_pwd.sh">
+            <cfscript>
+                fileWrite(appPwdScript,
+                    chr(35) & "!/bin/bash" & chr(10) &
+                    'docker exec -e NC_PASS="' & ncAppPasswordValue & '" -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add "' & ncAppPasswordUser & '" --password-from-env' & chr(10),
+                    "utf-8");
+            </cfscript>
+            <cfexecute name="/bin/chmod" arguments="+x #appPwdScript#" timeout="10" />
+            <cfexecute name="#appPwdScript#"
                 variable="ncAppPasswordResult"
                 errorVariable="ncAppPasswordError"
                 timeout="30" />
+            <cftry><cffile action="delete" file="#appPwdScript#"><cfcatch type="any"></cfcatch></cftry>
         </cfif>
     </cfif>
 

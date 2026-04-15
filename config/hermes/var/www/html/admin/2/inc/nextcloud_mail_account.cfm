@@ -45,11 +45,41 @@ Sets after execution:
                  <smtp-user> <smtp-password> <auth-method>
     --->
     <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ mail:account:create #ncMailUser# ""#ncMailName#"" #ncMailEmail# hermes_dovecot 143 none #ncMailEmail# #ncMailPassword# hermes_postfix_dkim 25 none #ncMailEmail# #ncMailPassword# password"
+        <!--- Use temp script to handle special characters in password/name --->
+        <cfinclude template="generate_customtrans.cfm">
+        <cfset ncMailScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_mail_create.sh">
+        <cfset ncMailCmd = 'docker exec -u www-data hermes_nextcloud php /var/www/html/occ mail:account:create "' &
+                ncMailUser & '" "' & ncMailName & '" "' & ncMailEmail &
+                '" hermes_dovecot 143 none "' & ncMailEmail & '" "' & ncMailPassword &
+                '" hermes_postfix_dkim 25 none "' & ncMailEmail & '" "' & ncMailPassword & '" password'>
+        <cfscript>
+            fileWrite(ncMailScript,
+                chr(35) & "!/bin/bash" & chr(10) & ncMailCmd & chr(10),
+                "utf-8");
+            // Debug log
+            fileWrite("/opt/hermes/tmp/nc_mail_debug.log",
+                "Action: " & ncMailAction & chr(10) &
+                "User: " & ncMailUser & chr(10) &
+                "Name: " & ncMailName & chr(10) &
+                "Email: " & ncMailEmail & chr(10) &
+                "Password length: " & Len(ncMailPassword) & chr(10) &
+                "Script: " & ncMailScript & chr(10) &
+                "Command: " & ncMailCmd & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #ncMailScript#" timeout="10" />
+        <cfexecute name="#ncMailScript#"
             variable="ncMailOccResult"
             errorVariable="ncMailOccError"
             timeout="30" />
+        <cfscript>
+            fileAppend("/opt/hermes/tmp/nc_mail_debug.log",
+                "Result: " & ncMailOccResult & chr(10) &
+                "Error: " & ncMailOccError & chr(10) &
+                "---" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cffile action="delete" file="#ncMailScript#">
 
         <cfif FindNoCase("error", ncMailOccError) OR FindNoCase("exception", ncMailOccError)>
             <cfset ncMailResult = "error">

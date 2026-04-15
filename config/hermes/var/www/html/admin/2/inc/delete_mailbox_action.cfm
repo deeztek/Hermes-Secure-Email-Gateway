@@ -181,29 +181,21 @@ Removes a mailbox user from all systems:
 <cfcatch type="any"></cfcatch>
 </cftry>
 
-<!--- 4d. DELETE NEXTCLOUD APP PASSWORD ("Hermes System" token) --->
+<!--- 4d. DELETE NEXTCLOUD USER ACCOUNT.
+     occ user:delete removes everything: mail accounts, app passwords,
+     files, calendar, contacts — no need for separate cleanup steps. --->
 <cftry>
-    <cfset ncAppPasswordAction = "delete">
-    <cfset ncAppPasswordUser = recipient>
-    <cfset ncAppPasswordValue = "">
-    <cfinclude template="nextcloud_app_password.cfm">
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:delete #recipient#"
+        variable="ncUserDeleteResult"
+        errorVariable="ncUserDeleteError"
+        timeout="30" />
 <cfcatch type="any">
-    <!--- Non-fatal --->
+    <!--- Non-fatal: user may not exist in NC --->
 </cfcatch>
 </cftry>
 
-<!--- 4e. DELETE NEXTCLOUD MAIL ACCOUNT (email profile in NC Mail app) --->
-<cftry>
-    <cfset ncMailAction = "delete">
-    <cfset ncMailUser = recipient>
-    <cfset ncMailEmail = recipient>
-    <cfinclude template="nextcloud_mail_account.cfm">
-<cfcatch type="any">
-    <!--- Non-fatal: NC cleans up when user is deleted via LDAP --->
-</cfcatch>
-</cftry>
-
-<!--- 4f. DELETE VACATION AUTO-REPLY config (one row per user) --->
+<!--- 4g. DELETE VACATION AUTO-REPLY config (one row per user) --->
 <cfquery datasource="hermes">
     DELETE FROM user_vacation
     WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
@@ -232,7 +224,27 @@ Removes a mailbox user from all systems:
 </cfcatch>
 </cftry>
 
-<!--- 6. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
+<!--- 6. DELETE MAILDIR FILES from Dovecot container.
+     Maildir path: /srv/mail/<domain>/<localpart>/
+     Uses docker exec since commandbox has the vmail volume read-only. --->
+<cfparam name="form.delete_maildir" default="0">
+<cfif form.delete_maildir EQ "1">
+    <cftry>
+        <cfset mailDomain = ListLast(recipient, "@")>
+        <cfset mailLocal = ListFirst(recipient, "@")>
+        <cfset mailDirPath = "/srv/mail/" & mailDomain & "/" & mailLocal>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_dovecot rm -rf #mailDirPath#"
+            variable="rmResult"
+            errorVariable="rmError"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Maildir deletion is non-critical --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 7. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
 <cfquery datasource="hermes">
     DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
 </cfquery>

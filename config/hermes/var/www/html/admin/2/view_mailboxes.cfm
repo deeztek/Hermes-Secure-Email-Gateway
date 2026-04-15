@@ -476,6 +476,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <option value="1">Enable</option>
             </select>
             <small class="form-text text-warning" id="editNextcloudHint" style="display:none;"><i class="fas fa-exclamation-triangle me-1"></i>A new password is required when enabling Nextcloud for an existing user. Set the password below to create their email profile in the Mail app.</small>
+            <div id="editNextcloudDeleteGroup" style="display:none;" class="mt-2">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="nc_keep_account" id="ncKeepAccount" value="1" checked>
+                <label class="form-check-label" for="ncKeepAccount">
+                  Keep Nextcloud account data (calendar, contacts, files)
+                </label>
+              </div>
+              <small class="form-text text-danger"><i class="fas fa-exclamation-triangle me-1"></i>When unchecked, the user's Nextcloud account and all associated data will be permanently deleted.</small>
+            </div>
           </div>
 
           <!--- Timezone --->
@@ -645,6 +654,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
 
           <p>Are you sure you want to delete <strong id="deleteMailboxEmail"></strong>?</p>
+
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" name="delete_maildir" id="deleteMaildir" value="1" checked>
+            <label class="form-check-label" for="deleteMaildir">
+              Also delete all email messages from the server
+            </label>
+            <small class="form-text text-danger d-block"><i class="fas fa-exclamation-triangle me-1"></i>When checked, all messages in this mailbox will be permanently removed from the mail server. This cannot be undone.</small>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -711,8 +728,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $('#editTrainBayes').val(mb.train_bayes);
         $('#editDownloadMsg').val(mb.download_msg);
         $('#editNextcloud').val(mb.nextcloud_enabled || '0');
-        editNextcloudOriginal = mb.nextcloud_enabled || '0';
+        editNextcloudOriginal = String(mb.nextcloud_enabled || '0');
         $('#editNextcloudHint').hide();
+        $('#editNextcloudDeleteGroup').hide();
+        $('#ncKeepAccount').prop('checked', true);
         if (editTimezoneTS) {
           editTimezoneTS.setValue(mb.timezone || '');
         } else {
@@ -787,8 +806,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   $('#editNextcloud').on('change', function() {
     if ($(this).val() === '1' && editNextcloudOriginal === '0') {
       $('#editNextcloudHint').show();
+      $('#editNextcloudDeleteGroup').hide();
+    } else if ($(this).val() === '0' && editNextcloudOriginal === '1') {
+      $('#editNextcloudHint').hide();
+      $('#editNextcloudDeleteGroup').show();
     } else {
       $('#editNextcloudHint').hide();
+      $('#editNextcloudDeleteGroup').hide();
     }
   });
 

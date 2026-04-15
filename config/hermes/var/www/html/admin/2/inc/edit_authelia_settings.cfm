@@ -741,14 +741,32 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                                     </cfquery>
 
                                                    <cfinclude template="generate_nextcloud_configuration.cfm">
-                            
+
+                                                    <!--- Sync NC session settings with Authelia values.
+                                                         NC sessions should expire at the same time as
+                                                         Authelia sessions to prevent stale NC sessions
+                                                         that cause OIDC auto-redirect URL mangling. --->
+                                                    <cftry>
+                                                        <cfexecute name="/usr/local/bin/docker"
+                                                            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set session_lifetime --value=#form.session_inactivity# --type=integer"
+                                                            timeout="15" />
+                                                        <cfexecute name="/usr/local/bin/docker"
+                                                            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set session_keepalive --value=true --type=boolean"
+                                                            timeout="15" />
+                                                        <cfexecute name="/usr/local/bin/docker"
+                                                            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set remember_login_cookie_lifetime --value=0 --type=integer"
+                                                            timeout="15" />
+                                                    <cfcatch type="any">
+                                                        <!--- Non-fatal: NC session sync failure doesn't
+                                                             block auth settings from saving --->
+                                                    </cfcatch>
+                                                    </cftry>
+
                                                     <cfinclude template="restart_nextcloud.cfm">
-                                                    
+
                                                     <cfinclude template="generate_authelia_configuration.cfm">
                             
                                                     <cfinclude template="restart_authelia.cfm">
-
-                                                    <cfinclude template="restart_redis.cfm">
 
 <!--- SLEEP 5 SECONDS WAITING FOR AUTHELIA TO RESTART --->
 <cfscript> 

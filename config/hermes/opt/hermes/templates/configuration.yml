@@ -191,6 +191,24 @@ access_control:
       - ["group:one_factor", "group:relays"]
       policy: one_factor
 
+      #/ciphermail — admin only, two_factor
+      # NOTE: /web/ is NOT protected by Authelia — it's used by external
+      # recipients to access encrypted PDF emails (no Hermes account needed)
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/ciphermail([/?].*)?$'
+      subject:
+      - ["group:two_factor", "group:admins"]
+      policy: two_factor
+
+      #/ciphermail — admin only, one_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/ciphermail([/?].*)?$'
+      subject:
+      - ["group:one_factor", "group:admins"]
+      policy: one_factor
+
 
 session:
   cookies:

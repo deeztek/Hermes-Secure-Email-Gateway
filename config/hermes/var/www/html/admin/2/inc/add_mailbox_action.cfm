@@ -37,6 +37,17 @@ Requires form variables:
 - pgp_encryption (if PGP)
 --->
 
+<!--- DEBUG: log form values at entry --->
+<cfscript>
+    fileWrite("/opt/hermes/tmp/nc_mail_debug_entry.log",
+        "ENTRY DEBUG " & Now() & chr(10) &
+        "form.nextcloud_enabled: [" & (structKeyExists(form, "nextcloud_enabled") ? form.nextcloud_enabled : "NOT SET") & "]" & chr(10) &
+        "form.password exists: [" & structKeyExists(form, "password") & "]" & chr(10) &
+        "form.password length: [" & (structKeyExists(form, "password") ? Len(form.password) : "N/A") & "]" & chr(10) &
+        "form.auth_type: [" & (structKeyExists(form, "auth_type") ? form.auth_type : "NOT SET") & "]" & chr(10),
+        "utf-8");
+</cfscript>
+
 <cfinclude template="generate_customtrans.cfm">
 
 <!--- VALIDATE REQUIRED FIELDS --->
@@ -414,6 +425,14 @@ Requires form variables:
      Mail app so the user can send/receive through webmail. Uses Docker
      internal networking (IMAP: hermes_dovecot:143, SMTP:
      hermes_postfix_dkim:25, no TLS — traffic stays on Docker network). --->
+<cfscript>
+    fileWrite("/opt/hermes/tmp/nc_mail_debug.log",
+        "NC enabled: [" & form.nextcloud_enabled & "]" & chr(10) &
+        "Password length: [" & Len(trim(form.password)) & "]" & chr(10) &
+        "Auth type: [" & form.auth_type & "]" & chr(10) &
+        "Recipient: [" & recipientEmail & "]" & chr(10),
+        "utf-8");
+</cfscript>
 <cfif form.nextcloud_enabled EQ "1" AND trim(form.password) NEQ "">
     <cftry>
         <cfset ncMailAction = "create">
