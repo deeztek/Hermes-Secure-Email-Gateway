@@ -23,9 +23,6 @@
         <cfset This.name="UserGUI" />
         <cfset This.Sessionmanagement="True" />
        <cfset This.loginstorage="session" />
-       <!--- TODO: restrict cookie path to /users/ to prevent NC OIDC redirect
-            mangling (NC bug with OVERWRITEWEBROOT + foreign cookies, see #209).
-            Lucee ignores sessioncookie.path for cfid/cftoken engine cookies. --->
        <cfset This.requestTimeout=createTimeSpan(0,1,0,0) />
 
        //Define POP4 Component
