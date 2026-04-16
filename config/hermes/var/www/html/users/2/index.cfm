@@ -338,7 +338,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </a>
             </div>
             <div class="col-md-4 col-sm-6 mb-3">
-                <a href="/nc/" class="btn btn-outline-primary btn-block w-100">
+                <a href="/users/2/preload_nc_login.cfm" class="btn btn-outline-primary btn-block w-100">
                     <i class="fas fa-inbox me-2"></i>Login to Webmail
                 </a>
             </div>
