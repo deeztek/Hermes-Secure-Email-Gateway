@@ -106,6 +106,18 @@ re-request).
 <cfset theOriginalDomain = theDomain>
 <cfinclude template="./delete_domain_djigzo.cfm">
 
+<!--- Delete Nextcloud group for this domain --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:delete #theDomain#"
+        variable="ncGroupDelResult"
+        errorVariable="ncGroupDelError"
+        timeout="30" />
+<cfcatch type="any">
+    <!--- Non-fatal: group may not exist --->
+</cfcatch>
+</cftry>
+
 <!--- Check if the bound cert is now orphaned (no other mailbox_domains use it) --->
 <cfif IsNumeric(theCertId) AND theCertId GT 0>
   <cfquery name="checkOrphan" datasource="hermes">

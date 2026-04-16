@@ -51,11 +51,12 @@ $CONFIG = array (
   'upgrade.disable-web' => true,
   'passwordsalt' => 'NEXTCLOUD_PASSWORD_SALT',
   'secret' => 'NEXTCLOUD_SECRET',
-  'trusted_domains' => 
+  'trusted_domains' =>
   array (
     0 => 'localhost',
     1 => 'NEXTCLOUD_TRUSTED_DOMAIN_HOST',
     2 => 'NEXTCLOUD_TRUSTED_DOMAIN_IP',
+    3 => 'hermes_nextcloud',
   ),
   'datadirectory' => '/var/www/html/data',
   'dbtype' => 'mysql',
@@ -71,41 +72,17 @@ $CONFIG = array (
   'instanceid' => 'NEXTCLOUD_INSTANCE_ID',
   'defaultapp' => 'mail',
   'lost_password_link' => 'disabled',
-  'oidc_login_provider_url' => 'OIDC_LOGIN_PROVIDER_URL',
-  'oidc_login_client_id' => 'Hermes_SEG_Webmail',
-  'oidc_login_client_secret' => 'OIDC_LOGIN_CLIENT_SECRET',
-  'oidc_login_auto_redirect' => OIDC_LOGIN_AUTO_REDIRECT,
-  'oidc_login_logout_url' => '/users/logout.cfm',
-  'oidc_login_end_session_redirect' => false,
-  'oidc_login_button_text' => 'Click to Login to Webmail',
-  'oidc_login_hide_password_form' => false,
-  'oidc_login_use_id_token' => true,
-  'oidc_login_attributes' => 
-  array (
-    'id' => 'preferred_username',
-    'name' => 'name',
-    'mail' => 'email',
-    'groups' => 'groups',
-  ),
-  'oidc_login_allowed_groups' =>
-  array (
-    0 => 'nextcloud',
-  ),
-  'oidc_login_default_group' => '',
-  'oidc_login_use_external_storage' => false,
-  'oidc_login_scope' => 'openid profile email groups',
-  'oidc_login_proxy_ldap' => false,
-  'oidc_login_disable_registration' => false,
-  'oidc_login_redir_fallback' => false,
-  'oidc_login_tls_verify' => true,
-  'oidc_login_code_challenge_method' => 'S256',
-  'oidc_create_groups' => false,
-  'oidc_login_webdav_enabled' => true,
-  'oidc_login_password_authentication' => true,
-  'oidc_login_public_key_caching_time' => 86400,
-  'oidc_login_min_time_between_jwks_requests' => 10,
-  'oidc_login_well_known_caching_time' => 86400,
-  'oidc_login_update_avatar' => false,
+  // user_oidc provider is configured via occ user_oidc:provider command
+  // (client_id, client_secret, discovery_uri, attribute mappings).
+  // The settings below control app behavior only.
+  'user_oidc' => [
+    'default_token_endpoint_auth_method' => 'client_secret_post',
+    'auto_provision' => true,
+    'soft_auto_provision' => true,
+    'single_logout' => true,
+    'use_pkce' => true,
+  ],
+  'allow_user_to_change_display_name' => false,
   'loglevel' => 2,
   'maintenance' => false,
 );

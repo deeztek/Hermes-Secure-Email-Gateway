@@ -90,15 +90,28 @@ Expects: form.action (generatejwtsecret, generatesessionsecret, etc.)
 
 </cfswitch>
 
-<!--- Regenerate configs and restart services --->
+<!--- Regenerate configs and restart Authelia to pick up new keys --->
 <cfinclude template="./generate_authelia_configuration.cfm">
 <cfinclude template="./restart_authelia.cfm">
-<cfinclude template="./restart_redis.cfm">
 
-<!--- If OIDC secrets changed, also regenerate Nextcloud config and restart --->
-<cfif action contains "oidc">
-  <cfinclude template="./generate_nextcloud_configuration.cfm">
-  <cfinclude template="./restart_nextcloud.cfm">
+<!--- If OIDC client secret changed, update the user_oidc provider in Nextcloud --->
+<cfif action EQ "generateoidcclientsecret">
+  <cffile action="read" file="/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file" variable="newOidcPlain">
+  <cfset newOidcPlain = Trim(newOidcPlain)>
+  <cfinclude template="generate_customtrans.cfm">
+  <cfset oidcUpdateScript = "/opt/hermes/tmp/" & customtrans3 & "_oidc_update_secret.sh">
+  <cfscript>
+    fileWrite(oidcUpdateScript,
+      chr(35) & "!/bin/bash" & chr(10) &
+      "docker exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider Hermes_SEG --clientsecret=""" & newOidcPlain & """" & chr(10),
+      "utf-8");
+  </cfscript>
+  <cfexecute name="/bin/chmod" arguments="+x #oidcUpdateScript#" timeout="10" />
+  <cfexecute name="#oidcUpdateScript#"
+    variable="oidcUpdateResult"
+    errorVariable="oidcUpdateError"
+    timeout="30" />
+  <cffile action="delete" file="#oidcUpdateScript#">
 </cfif>
 
 <cflocation url="view_authentication_settings.cfm" addtoken="no">

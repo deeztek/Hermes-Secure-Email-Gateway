@@ -349,6 +349,55 @@ update parameters2 set value2='disable', active='1', applied='2' where parameter
 <!--- GENERATE AUTHELIA CONFIGURATION --->
 <cfinclude template="generate_authelia_configuration.cfm">
 
+<!--- GENERATE NEXTCLOUD CONFIGURATION (trusted domains) --->
+<cfinclude template="generate_nextcloud_configuration.cfm">
+
+<!--- UPDATE USER_OIDC PROVIDER DISCOVERY URI WITH NEW CONSOLE HOST --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider Hermes_SEG --discoveryuri=https://#form.console_host#/.well-known/openid-configuration --endsessionendpointuri=https://#form.console_host#/logout"
+        variable="oidcProviderResult"
+        errorVariable="oidcProviderError"
+        timeout="30" />
+<cfcatch type="any">
+    <!--- Non-fatal: log but don't block console settings save --->
+</cfcatch>
+</cftry>
+
+<!--- UPDATE NEXTCLOUD EXTERNAL SITES "USER CONSOLE" LINK --->
+<cftry>
+    <cfinclude template="generate_customtrans.cfm">
+    <cfset extSitesScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_ext_sites.sh">
+    <cfscript>
+        fileWrite(extSitesScript,
+            chr(35) & "!/bin/bash" & chr(10) &
+            "docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites " &
+            "--value='{""1"":{""id"":1,""name"":""User Console"",""url"":""https://" & form.console_host & "/users/"",""lang"":"""",""type"":""link"",""device"":"""",""icon"":""external.svg"",""groups"":[],""redirect"":false}}'" & chr(10),
+            "utf-8");
+    </cfscript>
+    <cfexecute name="/bin/chmod" arguments="+x #extSitesScript#" timeout="10" />
+    <cfexecute name="#extSitesScript#"
+        variable="extSitesResult"
+        errorVariable="extSitesError"
+        timeout="30" />
+    <cffile action="delete" file="#extSitesScript#">
+<cfcatch type="any">
+    <!--- Non-fatal: don't block console settings save --->
+</cfcatch>
+</cftry>
+
+<!--- UPDATE NEXTCLOUD THEMING URL --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url https://#form.console_host#"
+        variable="themingResult"
+        errorVariable="themingError"
+        timeout="30" />
+<cfcatch type="any">
+    <!--- Non-fatal --->
+</cfcatch>
+</cftry>
+
 <!--- EDIT CIPHERMAIL SETTINGS --->
 <cfinclude template="edit_ciphermail_settings.cfm">
 

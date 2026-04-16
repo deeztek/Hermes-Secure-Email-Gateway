@@ -22,10 +22,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- GENERATE CUSTOMTRANS --->
 <cfinclude template="generate_customtrans.cfm">
 
-<!--- READ OIDC CLIENT SECRET PLAIN --->
-<cffile action="read" file="/opt/hermes/keys/authelia_identity_providers_oidc_clients_client_secret_plain_file" variable="oidcclientplain">
-
-<!--- GET SERVER URL FOR OIDC_LOGIN_PROVIDER_URL AND TRUSTED DOMAIN --->
+<!--- GET SERVER URL FOR TRUSTED DOMAIN --->
 <cfquery name="getconsolehost" datasource="hermes">
   select value2 from parameters2 where module = 'console' and parameter = 'console.host'
 </cfquery>
@@ -48,17 +45,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset ncHostIP = getHostIP.value2>
 
-<!--- GET OIDC AUTO-REDIRECT setting from parameters2 (managed from
-     Authentication Settings page). Defaults to "false" if the row is
-     missing for any reason - matches the previous hardcoded behavior. --->
-<cfquery name="getOidcAutoRedirect" datasource="hermes">
-  SELECT value2 FROM parameters2 WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
-</cfquery>
-<cfset ncOidcAutoRedirect = "false">
-<cfif getOidcAutoRedirect.recordcount GTE 1 AND (getOidcAutoRedirect.value2 EQ "true" OR getOidcAutoRedirect.value2 EQ "false")>
-    <cfset ncOidcAutoRedirect = getOidcAutoRedirect.value2>
-</cfif>
-
 <!--- READ EXISTING NEXTCLOUD CONFIG TO EXTRACT INSTALLATION-SPECIFIC VALUES --->
 <cfset ncPasswordSalt = "">
 <cfset ncSecret = "">
@@ -73,7 +59,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset ncPasswordSalt = Mid(existingConfig, saltMatch.pos[2], saltMatch.len[2])>
   </cfif>
 
-  <!--- Extract secret (matches 'secret' => but not 'oidc_login_client_secret') --->
+  <!--- Extract secret --->
   <cfset secretMatch = REFind("'secret'\s*=>\s*'([^']*)'", existingConfig, 1, true)>
   <cfif secretMatch.pos[1] GT 0>
     <cfset ncSecret = Mid(existingConfig, secretMatch.pos[2], secretMatch.len[2])>
@@ -113,14 +99,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Domain/host from database --->
 <cfset config = Replace(config, "NEXTCLOUD_TRUSTED_DOMAIN_HOST", consoleHost, "ALL")>
-<cfset config = Replace(config, "OIDC_LOGIN_PROVIDER_URL", "https://#consoleHost#", "ALL")>
-
-<!--- OIDC client secret from key file --->
-<cfset config = Replace(config, "OIDC_LOGIN_CLIENT_SECRET", Trim(oidcclientplain), "ALL")>
-
-<!--- OIDC auto-redirect: emit as a PHP literal (true/false, no quotes) so
-     it parses as a boolean in config.php instead of a string. --->
-<cfset config = Replace(config, "OIDC_LOGIN_AUTO_REDIRECT", ncOidcAutoRedirect, "ALL")>
 
 <!--- Installation-specific values from existing config --->
 <cfset config = Replace(config, "NEXTCLOUD_PASSWORD_SALT", ncPasswordSalt, "ALL")>

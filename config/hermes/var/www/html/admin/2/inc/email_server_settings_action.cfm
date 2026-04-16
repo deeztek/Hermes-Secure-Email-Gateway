@@ -76,8 +76,14 @@ dovecot.conf from template and reloads Dovecot.
         </cfquery>
     </cfif>
 
-    <!--- Regenerate Nextcloud config.php to apply the change --->
-    <cfinclude template="generate_nextcloud_configuration.cfm">
+    <!--- Apply via occ: allow_multiple_user_backends=0 means auto-redirect,
+         =1 means show login form with SSO button. Admin bypass: ?direct=1 --->
+    <cfset occBackendVal = (ncAutoRedirectVal EQ "true") ? "0" : "1">
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set --type=string --value=#occBackendVal# user_oidc allow_multiple_user_backends"
+        variable="occAutoRedirectResult"
+        errorVariable="occAutoRedirectError"
+        timeout="30" />
 
 <cfcatch type="any">
     <cfset saveError = true>

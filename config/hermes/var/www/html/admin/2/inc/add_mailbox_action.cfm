@@ -404,11 +404,53 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4c. NEXTCLOUD APP PASSWORD. Create a "Hermes System" app password in
-     Nextcloud so DAV clients (calendar/contacts) work even if the user
-     enables 2FA. Uses the same password as LDAP so no new secret is
-     introduced. Only created for local-auth mailboxes with nextcloud
-     enabled (remote-auth users authenticate via their IdP). --->
+<!--- 4c. NEXTCLOUD PRE-PROVISION USER. Create the NC user via the user_oidc
+     provisioning API so that group membership, mail profile, and app
+     password can all be set immediately. The user is created as an
+     OIDC-backed account (no local password, no backdoor). When the user
+     logs in via Authelia, user_oidc recognises the existing account. --->
+<cfif form.nextcloud_enabled EQ "1">
+    <cftry>
+        <cfset ncProvisionAction = "create">
+        <cfset ncProvisionUser = recipientEmail>
+        <cfset ncProvisionDisplayName = displayName>
+        <cfset ncProvisionEmail = recipientEmail>
+        <cfinclude template="nextcloud_provision_user.cfm">
+    <cfcatch type="any">
+        <!--- Non-fatal: NC features will be set up on first OIDC login --->
+        <cfscript>
+            fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
+                "OUTER CATCH in add_mailbox_action" & chr(10) &
+                "Message: " & cfcatch.message & chr(10) &
+                "Detail: " & cfcatch.detail & chr(10) &
+                "---" & chr(10),
+                "utf-8");
+        </cfscript>
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 4d. NEXTCLOUD DOMAIN GROUP. Add the user to the NC group for their
+     domain (e.g., deeztek.com). The group was created when the mailbox
+     domain was added. --->
+<cfif form.nextcloud_enabled EQ "1">
+    <cftry>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:adduser #getDomain.domain# #recipientEmail#"
+            variable="ncGroupAddResult"
+            errorVariable="ncGroupAddError"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Non-fatal --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 4e. NEXTCLOUD APP PASSWORD. Create a "Hermes System" app password in
+     Nextcloud so DAV clients (calendar/contacts) work even with 2FA.
+     Uses the same password as LDAP so no new secret is introduced.
+     Only created for local-auth mailboxes with nextcloud enabled
+     (remote-auth users authenticate via their IdP). --->
 <cfif form.nextcloud_enabled EQ "1" AND form.auth_type EQ "local" AND trim(form.password) NEQ "">
     <cftry>
         <cfset ncAppPasswordAction = "create">
@@ -421,18 +463,10 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4d. NEXTCLOUD MAIL ACCOUNT. Create an email account in the Nextcloud
+<!--- 4f. NEXTCLOUD MAIL ACCOUNT. Create an email account in the Nextcloud
      Mail app so the user can send/receive through webmail. Uses Docker
      internal networking (IMAP: hermes_dovecot:143, SMTP:
-     hermes_postfix_dkim:25, no TLS — traffic stays on Docker network). --->
-<cfscript>
-    fileWrite("/opt/hermes/tmp/nc_mail_debug.log",
-        "NC enabled: [" & form.nextcloud_enabled & "]" & chr(10) &
-        "Password length: [" & Len(trim(form.password)) & "]" & chr(10) &
-        "Auth type: [" & form.auth_type & "]" & chr(10) &
-        "Recipient: [" & recipientEmail & "]" & chr(10),
-        "utf-8");
-</cfscript>
+     hermes_postfix_dkim:25, no TLS - traffic stays on Docker network). --->
 <cfif form.nextcloud_enabled EQ "1" AND trim(form.password) NEQ "">
     <cftry>
         <cfset ncMailAction = "create">

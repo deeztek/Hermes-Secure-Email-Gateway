@@ -182,7 +182,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <option value="true" <cfif ncAutoRedirect EQ "true">selected</cfif>>Enabled (true SSO)</option>
           </select>
           <small class="form-text text-muted">
-            <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode.<br>
+            <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode. To bypass for local admin login, append <code>?direct=1</code> to the Nextcloud login URL.<br>
             <strong>Disabled:</strong> Users see the Nextcloud login page with a username/password form and an SSO button. Use this temporarily when you need to log in as a local Nextcloud admin user for maintenance (e.g., app management, troubleshooting), then re-enable.
           </small>
         </div>

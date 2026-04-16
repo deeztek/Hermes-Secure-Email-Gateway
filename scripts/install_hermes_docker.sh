@@ -1081,10 +1081,84 @@ case "${1:-}" in
         initialize_ldap
 
         # Nextcloud post-install configuration
-        log "Configuring Nextcloud defaults..."
+        log "Configuring Nextcloud..."
+
+        # Read hostname from .env (needed for theming URL and OIDC discovery)
+        NC_HOSTNAME=""
+        if [[ -f "${HERMES_ROOT}/.env" ]]; then
+            NC_HOSTNAME=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+        fi
+
+        # Default app
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set defaultapp --value="mail,calendar,contacts,dashboard" >> "$LOG_FILE" 2>&1 \
             && log "  Set default app to Mail" \
             || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
+
+        # Install apps
+        log "  Installing Nextcloud apps..."
+        for app in user_oidc mail calendar contacts external; do
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:install "$app" --force >> "$LOG_FILE" 2>&1 \
+                && log "    Installed: $app" \
+                || log "    WARNING: $app install failed (may already be installed)"
+        done
+
+        # Disable unwanted default apps
+        for app in dashboard photos; do
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:disable "$app" >> "$LOG_FILE" 2>&1 \
+                && log "    Disabled: $app" \
+                || log "    WARNING: Failed to disable $app"
+        done
+
+        # Theming
+        log "  Configuring Nextcloud theming..."
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config name "Hermes SEG" >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config slogan "Secure Email Gateway and Server" >> "$LOG_FILE" 2>&1
+        if [[ -n "$NC_HOSTNAME" ]]; then
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url "https://${NC_HOSTNAME}" >> "$LOG_FILE" 2>&1
+        fi
+        log "  Theming configured"
+
+        # External Sites: "User Console" link in NC top menu
+        if [[ -n "$NC_HOSTNAME" ]]; then
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites \
+                --value='{"1":{"id":1,"name":"User Console","url":"https://'"${NC_HOSTNAME}"'/users/","lang":"","type":"link","device":"","icon":"external.svg","groups":[],"redirect":false}}' >> "$LOG_FILE" 2>&1 \
+                && log "  External Sites: User Console link configured" \
+                || log "  WARNING: Failed to set External Sites link"
+        fi
+
+        # OIDC provider registration (user_oidc)
+        log "  Configuring OIDC provider..."
+        OIDC_CLIENT_SECRET=""
+        if [[ -f "${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_plain_file" ]]; then
+            OIDC_CLIENT_SECRET=$(cat "${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_plain_file")
+        fi
+
+        if [[ -n "$OIDC_CLIENT_SECRET" ]] && [[ -n "$NC_HOSTNAME" ]]; then
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider Hermes_SEG \
+                --clientid="Hermes_SEG_Webmail" \
+                --clientsecret="$OIDC_CLIENT_SECRET" \
+                --discoveryuri="https://${NC_HOSTNAME}/.well-known/openid-configuration" \
+                --endsessionendpointuri="https://${NC_HOSTNAME}/logout" \
+                --unique-uid=0 \
+                --mapping-uid="preferred_username" \
+                --mapping-display-name="name" \
+                --mapping-email="email" \
+                --mapping-groups="groups" \
+                --group-provisioning=1 \
+                --check-bearer=1 >> "$LOG_FILE" 2>&1 \
+                && log "  Registered OIDC provider: Hermes_SEG" \
+                || log "  WARNING: Failed to register OIDC provider"
+
+            # Auto-redirect enabled by default (allow_multiple_user_backends=0)
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set --type=string --value=0 user_oidc allow_multiple_user_backends >> "$LOG_FILE" 2>&1 \
+                && log "  OIDC auto-redirect enabled" \
+                || log "  WARNING: Failed to set OIDC auto-redirect"
+        else
+            log "  WARNING: Skipping OIDC provider registration (missing client secret or hostname)"
+            [[ -z "$OIDC_CLIENT_SECRET" ]] && log "    - OIDC client secret not found at ${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_plain_file"
+            [[ -z "$NC_HOSTNAME" ]] && log "    - HERMES_HOSTNAME not found in ${HERMES_ROOT}/.env"
+        fi
 
         # Inject database credentials into config files
         log "Injecting database credentials into config files..."

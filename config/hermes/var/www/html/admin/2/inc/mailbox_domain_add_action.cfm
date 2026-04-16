@@ -235,6 +235,21 @@ Expects:
 <cfset theNewDomain = domain_name>
 <cfinclude template="./add_domain_djigzo.cfm">
 
+<!--- Create Nextcloud group for this domain (if NC enabled).
+     Users added to this domain will be placed in this group. --->
+<cfif ncEnabled EQ 1>
+    <cftry>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:add #domain_name#"
+            variable="ncGroupResult"
+            errorVariable="ncGroupError"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Non-fatal: group may already exist or NC not ready --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <cfset session.m = 1>
 <cfset session.added_domain = domain_name>
 <cflocation url="preload_restart_nginx.cfm?returnUrl=/admin/2/view_mailbox_domains.cfm" addtoken="no">

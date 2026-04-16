@@ -271,11 +271,11 @@ identity_providers:
         public: false
         authorization_policy: 'hermes_webmail'
         claims_policy: 'nextcloud'
-        token_endpoint_auth_method: 'client_secret_basic'
+        token_endpoint_auth_method: 'client_secret_post'
         require_pkce: true
         pkce_challenge_method: 'S256'
         redirect_uris:
-          - 'https://hermes_access_control_domain/nc/apps/oidc_login/oidc'
+          - 'https://hermes_access_control_domain/nc/apps/user_oidc/code'
         scopes:
           - 'openid'
           - 'profile'
