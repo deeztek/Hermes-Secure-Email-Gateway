@@ -110,13 +110,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
+<!--- Query SAN prefixes early so the help callout can reference the count --->
+<cfquery name="getSanPrefixes" datasource="hermes">
+    SELECT id, san, system FROM additional_sans ORDER BY system ASC, san ASC
+</cfquery>
+
 <!--- HELP CALLOUT --->
 <div class="alert alert-info alert-dismissible">
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   <h5><i class="icon fas fa-info-circle"></i> About SAN Prefixes</h5>
   <p class="mb-1">SAN (Subject Alternative Name) prefixes are subdomain labels that get cross-joined with your mailbox-hosting domains to generate certificate SANs. For example, the prefix <code>mail</code> combined with the domain <code>example.com</code> produces the SAN <code>mail.example.com</code>.</p>
-  <p class="mb-1">Adding or removing a prefix here automatically syncs the <code>mailbox_sans</code> table used for certificate SAN validation. After adding a new prefix, certificates will need to be re-issued to include the new SANs.</p>
-  <p class="mb-0"><small>System prefixes (<span class="badge bg-primary">System</span>) are required for email client auto-configuration (Autodiscover/Autoconfig) and cannot be removed.</small></p>
+  <p class="mb-1">Adding or deleting a prefix here automatically syncs the SAN validation table. Certificate re-issuance is triggered automatically once DNS has been verified for the new SANs. DNS verification runs on a scheduled basis, so the updated certificate may not be issued immediately. Check the status of your certificates in <a href="view_system_certificates.cfm">System Certificates</a>.</p>
+  <p class="mb-1"><small>System prefixes (<span class="badge bg-primary">System</span>) are required for email client auto-configuration (Autodiscover/Autoconfig) and cannot be removed.</small></p>
+  <hr class="my-2">
+  <p class="mb-0"><small><strong>Let's Encrypt SAN limit:</strong> Each domain certificate supports a maximum of <strong>100 SANs</strong>. With <strong><cfoutput>#getSanPrefixes.recordcount#</cfoutput></strong> prefixes configured, each domain's certificate uses <strong><cfoutput>#getSanPrefixes.recordcount + 1#</cfoutput> SANs</strong> (1 for the domain + <cfoutput>#getSanPrefixes.recordcount#</cfoutput> prefixes), leaving room for up to <strong><cfoutput>#99 - getSanPrefixes.recordcount#</cfoutput></strong> additional prefixes.</small></p>
 </div>
 
 <p>
@@ -144,10 +151,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </div>
 
 <!--- CURRENT SAN PREFIXES --->
-<cfquery name="getSanPrefixes" datasource="hermes">
-    SELECT id, san, system FROM additional_sans ORDER BY system ASC, san ASC
-</cfquery>
-
 <div class="card">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-network-wired me-2"></i>Configured SAN Prefixes (<cfoutput>#getSanPrefixes.recordcount#</cfoutput>)</h3>

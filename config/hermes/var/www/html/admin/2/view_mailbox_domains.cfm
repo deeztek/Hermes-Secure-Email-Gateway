@@ -129,6 +129,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     SELECT san FROM additional_sans ORDER BY san ASC
 </cfquery>
 
+<!--- Get console host for DNS guide --->
+<cfquery name="getConsoleHost" datasource="hermes">
+    SELECT value2 FROM parameters2 WHERE module = 'console' AND parameter = 'console.host'
+</cfquery>
+<cfset consoleHost = getConsoleHost.value2>
+
 <cfset session.m = "">
 
 <!--- ALERTS --->
@@ -496,6 +502,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 onclick="openEditModal(#domain_id#);">
                 <i class="fas fa-edit"></i>
               </button>
+              <button type="button" class="btn btn-sm btn-info" title="DNS Records"
+                onclick="openDnsModal('#encodeForJavaScript(domain)#');">
+                <i class="fas fa-globe"></i>
+              </button>
               <a href="edit_domain_dkim.cfm?id=#domain_id#" class="btn btn-sm btn-secondary" title="DKIM Keys">
                 <i class="fas fa-lock"></i>
               </a>
@@ -733,7 +743,98 @@ function openDeleteModal(mailboxDomainId, domainName) {
   var modal = new bootstrap.Modal(document.getElementById('deleteModal'));
   modal.show();
 }
+
+function openDnsModal(domain) {
+  var host = '<cfoutput>#encodeForJavaScript(consoleHost)#</cfoutput>';
+  document.getElementById('dns_domain_title').textContent = domain;
+
+  var records = [
+    { section: 'Email Routing', records: [
+      { type: 'MX', name: domain, value: '10 ' + host + '.', purpose: 'Mail routing' }
+    ]},
+    { section: 'Email Client Auto-Configuration', records: [
+      { type: 'CNAME', name: 'autoconfig.' + domain, value: host + '.', purpose: 'Mozilla Thunderbird / K-9 Mail' },
+      { type: 'CNAME', name: 'autodiscover.' + domain, value: host + '.', purpose: 'Microsoft Outlook / iOS Mail' }
+    ]},
+    { section: 'Email Service Discovery (SRV)', records: [
+      { type: 'SRV', name: '_imap._tcp.' + domain, value: '0 0 143 ' + host + '.', purpose: 'IMAP STARTTLS' },
+      { type: 'SRV', name: '_imaps._tcp.' + domain, value: '0 0 993 ' + host + '.', purpose: 'IMAP SSL' },
+      { type: 'SRV', name: '_pop3._tcp.' + domain, value: '0 0 110 ' + host + '.', purpose: 'POP3 STARTTLS' },
+      { type: 'SRV', name: '_pop3s._tcp.' + domain, value: '0 0 995 ' + host + '.', purpose: 'POP3 SSL' },
+      { type: 'SRV', name: '_submission._tcp.' + domain, value: '0 0 587 ' + host + '.', purpose: 'SMTP submission (STARTTLS)' },
+      { type: 'SRV', name: '_submissions._tcp.' + domain, value: '0 0 465 ' + host + '.', purpose: 'SMTP submission (implicit TLS)' }
+    ]},
+    { section: 'CalDAV / CardDAV Auto-Discovery (Required for calendar and contacts auto-setup)', records: [
+      { type: 'SRV', name: '_caldavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Calendar auto-discovery' },
+      { type: 'SRV', name: '_carddavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Contacts auto-discovery' }
+    ]},
+    { section: 'Email Security', records: [
+      { type: 'TXT', name: domain, value: 'v=spf1 mx a:' + host + ' ~all', purpose: 'SPF (example)' },
+      { type: 'TXT', name: '_dmarc.' + domain, value: 'v=DMARC1; p=quarantine; rua=mailto:postmaster@' + domain, purpose: 'DMARC (example)' }
+    ]}
+  ];
+
+  var tbody = document.getElementById('dns_records_body');
+  tbody.innerHTML = '';
+  records.forEach(function(section) {
+    var headerTr = document.createElement('tr');
+    headerTr.innerHTML = '<td colspan="4" class="bg-light fw-bold small text-uppercase py-1">' + section.section + '</td>';
+    tbody.appendChild(headerTr);
+    section.records.forEach(function(r) {
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><span class="badge bg-secondary">' + r.type + '</span></td>' +
+        '<td><code>' + r.name + '</code></td>' +
+        '<td><code>' + r.value + '</code></td>' +
+        '<td class="text-muted small">' + r.purpose + '</td>';
+      tbody.appendChild(tr);
+    });
+  });
+
+  var modal = new bootstrap.Modal(document.getElementById('dnsModal'));
+  modal.show();
+}
 </script>
+
+<!-- DNS RECORDS MODAL -->
+<div class="modal fade" id="dnsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title"><i class="fas fa-globe"></i> DNS Records for <span id="dns_domain_title"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Configure the following DNS records at your domain registrar or DNS provider. DKIM TXT records are managed separately on the <strong>DKIM Keys</strong> page.</p>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead class="table-light">
+              <tr>
+                <th style="width:70px">Type</th>
+                <th>Name</th>
+                <th>Value</th>
+                <th style="width:180px">Purpose</th>
+              </tr>
+            </thead>
+            <tbody id="dns_records_body">
+            </tbody>
+          </table>
+        </div>
+        <div class="alert alert-info py-2 mb-2 small">
+          <i class="fas fa-info-circle"></i>
+          <strong>SPF and DMARC</strong> records shown are examples. Adjust the SPF mechanisms and DMARC policy to match your environment. DKIM TXT records are generated automatically when you create DKIM keys for this domain.
+        </div>
+        <div class="alert alert-secondary py-2 mb-0 small">
+          <i class="fas fa-info-circle"></i>
+          <strong>Optional CNAME records:</strong> If you have additional SANs configured (e.g., <code>mail</code>, <code>imap</code>, <code>smtp</code>, <code>pop</code>), create CNAME records pointing each prefix to <code><cfoutput>#consoleHost#</cfoutput></code>. For example: <code>mail.domain.com CNAME <cfoutput>#consoleHost#</cfoutput>.</code>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>

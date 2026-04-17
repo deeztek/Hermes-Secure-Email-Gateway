@@ -93,8 +93,7 @@ services:
     volumes:
       - db_data:/config
       - ./config/hermes/opt/hermes:/opt/hermes
-    ports:
-      - 3306:3306
+    # No host ports exposed — only accessed by containers on Docker network
     restart: always
     networks:
       hermes_net_ext:
@@ -296,8 +295,7 @@ services:
     extra_hosts:
     - "host.docker.internal:host-gateway"
     - "${HERMES_HOSTNAME}:${HOST_IP}"
-    ports:
-      - 8888:8888
+    # No host ports exposed — Nginx proxies to 8888 internally
     restart: always
     privileged: true
     expose:
@@ -313,10 +311,9 @@ services:
       options:
         max-size: 10m
     ports:
-      - 10026:10026
       - 25:25
+      - 465:465
       - 587:587
-      - 8891:8891
   
     restart: unless-stopped
     depends_on:
@@ -352,9 +349,7 @@ services:
     logging:
       options:
         max-size: 10m
-    ports:
-      - 54321:54321
-
+    # No host ports exposed — internal OpenDMARC
     restart: unless-stopped
     depends_on:
       - hermes_postfix_dkim
@@ -386,9 +381,7 @@ services:
     logging:
       options:
         max-size: 10m
-    ports:
-      - 10021:10021
-      - 10030:10030
+    # No host ports exposed — Amavis/SpamAssassin, Postfix connects internally
     restart: unless-stopped
     depends_on:
       hermes_db_server:
@@ -436,10 +429,7 @@ services:
     logging:
       options:
         max-size: 10m
-    ports:
-      - 2525:25
-      - 10025:10025
-      - 8443:8443    
+    # No host ports exposed — Nginx proxies to 8443, Postfix connects to 25/10025 internally
 
     restart: unless-stopped
     depends_on:
@@ -530,8 +520,7 @@ services:
     logging:
       options:
         max-size: 10m
-    ports:
-      - 8081:80
+    # No host ports exposed — Nginx proxies to port 80 internally at /nc/
     volumes:
       - nextcloud:/var/www/html
       - /var/www/html/dist/img:/img
@@ -588,9 +577,9 @@ services:
       - 995:995
       - 143:143
       - 110:110
-      - 24:24
+      # Port 24 (LMTP) not exposed — Postfix connects internally
       - 4190:4190
-      - 9587:9587
+      # Port 9587 (SASL auth) not exposed — Postfix connects internally
     depends_on:
       hermes_db_server:
         condition: service_healthy
