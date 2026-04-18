@@ -253,6 +253,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_shared_mailboxes.cfm" class="nav-link">
+                <i class="nav-icon fas fa-users"></i>
+                <p>Shared Mailboxes</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_sieve_rules.cfm" class="nav-link">
                 <i class="nav-icon fas fa-filter"></i>
                 <p>Mailbox Rules</p>

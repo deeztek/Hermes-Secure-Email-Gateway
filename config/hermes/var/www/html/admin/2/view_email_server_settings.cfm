@@ -106,6 +106,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset ncAutoRedirect = getNcAutoRedirect.value2>
 </cfif>
 
+<!--- Sharing settings --->
+<cfparam name="dov['sharing.enabled']" default="no">
+
 <!--- Dovecot settings --->
 <cfquery name="getDovecotSettings" datasource="hermes">
     SELECT parameter, value2 FROM parameters2
@@ -184,6 +187,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <small class="form-text text-muted">
             <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode. To bypass for local admin login, append <code>?direct=1</code> to the Nextcloud login URL.<br>
             <strong>Disabled:</strong> Users see the Nextcloud login page with a username/password form and an SSO button. Use this temporarily when you need to log in as a local Nextcloud admin user for maintenance (e.g., app management, troubleshooting), then re-enable.
+          </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- TLS / SSL SETTINGS CARD                                             -->
+<!-- ================================================================== -->
+<!-- MAILBOX SHARING CARD                                                -->
+<!-- ================================================================== -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-share-alt"></i> Mailbox Sharing</h3>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="mb-3">
+          <label class="form-label"><strong>Shared Mailboxes &amp; Folder Sharing</strong></label>
+          <select class="form-select" name="sharing_enabled">
+            <option value="no" <cfif dov['sharing.enabled'] EQ "no">selected</cfif>>Disabled</option>
+            <option value="yes" <cfif dov['sharing.enabled'] EQ "yes">selected</cfif>>Enabled</option>
+          </select>
+          <small class="form-text text-muted">
+            <strong>Enabled:</strong> Allows shared mailboxes (e.g., info@domain.com accessible by multiple users) and user-managed folder sharing. Shared folders appear under a <code>Shared/</code> namespace in IMAP clients. Manage shared mailboxes in <a href="view_shared_mailboxes.cfm">Email Server &gt; Shared Mailboxes</a>.<br>
+            <strong>Disabled:</strong> All sharing features are turned off. Existing shared mailbox permissions are preserved but not active.
           </small>
         </div>
       </div>

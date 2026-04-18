@@ -191,6 +191,8 @@ dovecot.conf from template and reloads Dovecot.
 <cfset form.protocol_imap = (form.protocol_imap EQ "yes") ? "yes" : "no">
 <cfset form.protocol_pop3 = (form.protocol_pop3 EQ "yes") ? "yes" : "no">
 <cfset form.logging_debug = (form.logging_debug EQ "yes") ? "yes" : "no">
+<cfparam name="form.sharing_enabled" default="no">
+<cfset form.sharing_enabled = (form.sharing_enabled EQ "yes") ? "yes" : "no">
 
 <!--- Build a struct of parameter name -> value for batch upsert --->
 <cfset dovSettings = StructNew()>
@@ -208,6 +210,7 @@ dovecot.conf from template and reloads Dovecot.
 <cfset dovSettings['quota.warning_medium'] = form.quota_warning_medium>
 <cfset dovSettings['quota.trash_percentage'] = form.quota_trash_percentage>
 <cfset dovSettings['connection.client_limit'] = form.connection_client_limit>
+<cfset dovSettings['sharing.enabled'] = form.sharing_enabled>
 <cfset dovSettings['connection.max_userip'] = form.connection_max_userip>
 <cfset dovSettings['logging.debug'] = form.logging_debug>
 

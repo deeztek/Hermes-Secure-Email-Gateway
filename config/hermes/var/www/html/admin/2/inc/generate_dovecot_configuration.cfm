@@ -215,6 +215,54 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_ssl_cert_path", sslCertPath, "ALL")>
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_ssl_key_path", sslKeyPath, "ALL")>
 
+<!--- ACL / Shared Mailboxes --->
+<cfparam name="dov['sharing.enabled']" default="no">
+<cfif dov['sharing.enabled'] EQ "yes">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_enabled", "yes", "ALL")>
+
+    <!--- ACL dict backend block (inside dict_server) --->
+    <cfset aclDictBlock = "dict acldict {" & chr(10) &
+        "    driver = sql" & chr(10) &
+        "    sql_driver = mysql" & chr(10) & chr(10) &
+        "    mysql hermes_db_server {" & chr(10) &
+        "      user = " & dbUsername & chr(10) &
+        "      password = " & dbPassword & chr(10) &
+        "      dbname = hermes" & chr(10) &
+        "    }" & chr(10) & chr(10) &
+        "    dict_map shared/shared-boxes/user/$to/$from {" & chr(10) &
+        "      sql_table = dovecot_acl_shared" & chr(10) &
+        "      username_field = to_user" & chr(10) &
+        "      value_field from_user {" & chr(10) &
+        "      }" & chr(10) &
+        "    }" & chr(10) &
+        "  }">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
+
+    <!--- ACL config block --->
+    <cfset aclConfigBlock = "acl_dict {" & chr(10) &
+        "  dict proxy {" & chr(10) &
+        "    name = acldict" & chr(10) &
+        "  }" & chr(10) &
+        "}">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", aclConfigBlock, "ALL")>
+
+    <!--- Shared namespace block --->
+    <cfset sharedNamespace = "namespace shared {" & chr(10) &
+        "  type = shared" & chr(10) &
+        "  separator = /" & chr(10) &
+        "  prefix = Shared/%%u/" & chr(10) &
+        "  location = maildir:/srv/mail/%%{user | domain}/%%{user | username}/:INDEX=~/Shared/%%{user | username}" & chr(10) &
+        "  subscriptions = no" & chr(10) &
+        "  list = children" & chr(10) &
+        "}">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_shared_namespace_block", sharedNamespace, "ALL")>
+<cfelse>
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_enabled", "no", "ALL")>
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", "", "ALL")>
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", "", "ALL")>
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_shared_namespace_block", "", "ALL")>
+</cfif>
+
 <!--- WRITE TO TEMP FILE --->
 <!--- Use fileWrite() instead of cffile tag to avoid Lucee evaluating
      ## comment characters in the dovecot config as CFML expressions --->
