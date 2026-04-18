@@ -573,9 +573,9 @@ $(document).ready(function() {
             </div>
             <div class="card-body">
                 <cfif session.theGroups CONTAINS "mailboxes">
-                <div class="alert alert-info">
-                    <p class="mb-2"><i class="icon fas fa-info-circle"></i><strong>Important:</strong> Two-Factor Authentication only applies to web-based logins (User Console and Webmail). It does <strong>not</strong> affect email client connections such as IMAP, POP3, or SMTP. Your email applications will continue to use your regular password.</p>
-                    <p class="mb-0"><i class="icon fas fa-mobile-alt"></i><strong>Groupware Apps:</strong> Once 2FA is enabled, third-party apps that sync with Webmail groupware services (Contacts, Calendar, Tasks, Notes) will require <strong>app-specific passwords</strong>. You can generate these in <strong>Webmail &gt; Profile &gt; Personal Settings &gt; Security &gt; Devices &amp; Sessions &gt; Create new app password</strong>.</p>
+                <div class="alert alert-warning">
+                    <p class="mb-2"><i class="icon fas fa-exclamation-triangle"></i><strong>Important:</strong> Two-Factor Authentication only protects web-based logins (User Console and Webmail). It does <strong>not</strong> protect email client connections.</p>
+                    <p class="mb-0">Due to protocol limitations, IMAP, POP3, SMTP, CalDAV, and CardDAV clients authenticate with your password alone. If your password is compromised, an attacker can access your mailbox, calendar, and contacts through any email client regardless of your 2FA status. Protect your account by using a strong, unique password.</p>
                 </div>
                 </cfif>
 

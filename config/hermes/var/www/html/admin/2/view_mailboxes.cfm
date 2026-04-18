@@ -595,6 +595,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <option value="two_factor">Two Factor (Password + 2FA)</option>
             </select>
             <small class="text-muted">Two Factor requires recipients to configure TOTP, Duo Push, or WebAuthn on their next login.</small>
+            <div class="alert alert-warning mt-2 py-2 small mb-0">
+              <i class="fas fa-exclamation-triangle me-1"></i> <strong>Important:</strong> Two-factor authentication protects the User Console and Nextcloud Webmail login only. Due to protocol limitations, IMAP, POP3, SMTP, CalDAV, and CardDAV clients authenticate with the password alone. If a user's password is compromised, an attacker can access the mailbox via any email client regardless of 2FA status.
+            </div>
           </div>
 
           <div class="form-group mb-3">
