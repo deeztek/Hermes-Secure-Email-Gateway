@@ -112,7 +112,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cftry>
   <cfinclude template="./inc/generate_customtrans.cfm">
-  <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker inspect --format='{{.State.Status}}|{{.State.StartedAt}}' hermes_unbound 2>&1">
+  <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker inspect --format='" & chr(123) & chr(123) & ".State.Status" & chr(125) & chr(125) & "|" & chr(123) & chr(123) & ".State.StartedAt" & chr(125) & chr(125) & "' hermes_unbound 2>&1">
   <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dns_status.sh">
   <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
   <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
