@@ -407,7 +407,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <tbody>
         <cfoutput query="getForwarders">
         <tr<cfif enabled NEQ 1> class="table-secondary"</cfif>>
-          <td><code>#encodeForHTML(server)#</code></td>
+          <td><code>#encodeForHTML(getForwarders.server)#</code></td>
           <td>#port#</td>
           <td>
             <cfif tls EQ 1>
@@ -431,7 +431,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <i class="fas fa-<cfif enabled EQ 1>pause<cfelse>play</cfif>"></i>
               </button>
             </form>
-            <form method="post" action="view_dns_resolver.cfm" style="display:inline;" onsubmit="return confirm('Delete forwarder #encodeForJavaScript(server)#?');">
+            <form method="post" action="view_dns_resolver.cfm" style="display:inline;" onsubmit="return confirm('Delete forwarder #encodeForJavaScript(getForwarders.server)#?');">
               <input type="hidden" name="action" value="delete_forwarder">
               <input type="hidden" name="forwarder_id" value="#id#">
               <button type="submit" class="btn btn-sm btn-danger" title="Delete">
