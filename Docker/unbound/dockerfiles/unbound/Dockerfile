@@ -14,14 +14,14 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy main config
-COPY config/unbound/unbound.conf /etc/unbound/unbound.conf
+COPY config/unbound.conf /etc/unbound/unbound.conf
 
 # Create conf.d directory for admin-configurable includes
 RUN mkdir -p /etc/unbound/conf.d
 
-# Copy modular config files into conf.d
-COPY config/unbound/forward.conf /etc/unbound/conf.d/forward.conf
-COPY config/unbound/local.conf /etc/unbound/conf.d/local.conf
+# Copy modular config files into conf.d (defaults, overridden by volume mount)
+COPY config/forward.conf /etc/unbound/conf.d/forward.conf
+COPY config/local.conf /etc/unbound/conf.d/local.conf
 
 # Ensure unbound can read root hints and trust anchor
 RUN chown -R unbound:unbound /etc/unbound

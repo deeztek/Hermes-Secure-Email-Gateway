@@ -5,7 +5,8 @@
 #
 # Available images:
 #   hermes-ciphermail, hermes-commandbox, hermes-postfix-dkim,
-#   hermes-mail-filter, hermes-nginx, hermes-openldap, hermes-dmarc, hermes-dovecot
+#   hermes-mail-filter, hermes-nginx, hermes-openldap, hermes-dmarc, hermes-dovecot,
+#   hermes-unbound
 
 REGISTRY="hub.deeztek.com/dedwards/hermes-seg-docker-gl"
 DEFAULT_VERSION="v260119"
@@ -21,6 +22,7 @@ declare -A IMAGES=(
     ["hermes-openldap"]="openldap"
     ["hermes-dmarc"]="opendmarc"
     ["hermes-dovecot"]="dovecot"
+    ["hermes-unbound"]="unbound"
 )
 
 # Check Docker is available

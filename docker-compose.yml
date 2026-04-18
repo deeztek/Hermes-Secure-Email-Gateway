@@ -70,9 +70,9 @@ services:
   hermes_unbound:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-unbound:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_unbound
-    build:
-      context: .
-      dockerfile: ./dockerfiles/unbound/Dockerfile
+    #build:
+      #context: ./Docker/unbound/
+      #dockerfile: ./dockerfiles/unbound/Dockerfile
     logging:
       options:
         max-size: 10m

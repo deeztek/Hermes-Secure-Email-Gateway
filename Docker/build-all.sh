@@ -140,6 +140,11 @@ build_image "hermes-dovecot" \
     "$SCRIPT_DIR/dovecot/dockerfiles/dovecot/Dockerfile" \
     "$SCRIPT_DIR/dovecot/"
 
+# Unbound DNS Resolver
+build_image "hermes-unbound" \
+    "$SCRIPT_DIR/unbound/dockerfiles/unbound/Dockerfile" \
+    "$SCRIPT_DIR/unbound/"
+
 # Summary
 echo "========================================"
 echo "Build Summary"
@@ -162,12 +167,12 @@ fi
 
 echo ""
 echo "To push all images:"
-echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot; do"
+echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot hermes-unbound; do"
 echo "    docker push $REGISTRY/\$img:$VERSION"
 echo "  done"
 echo ""
 echo "To promote to latest after testing:"
-echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot; do"
+echo "  for img in hermes-ciphermail hermes-commandbox hermes-postfix-dkim hermes-mail-filter hermes-nginx hermes-openldap hermes-dmarc hermes-dovecot hermes-unbound; do"
 echo "    docker tag $REGISTRY/\$img:$VERSION $REGISTRY/\$img:latest"
 echo "    docker push $REGISTRY/\$img:latest"
 echo "  done"
