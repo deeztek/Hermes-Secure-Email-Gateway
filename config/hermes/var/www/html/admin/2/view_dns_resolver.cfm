@@ -338,7 +338,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <div class="card-body">
     <div class="alert alert-info">
-      <p class="mb-0"><i class="icon fas fa-info-circle"></i> <strong>Recursive resolution</strong> (default) queries authoritative DNS servers directly. Recommended for email servers to ensure reliable RBL/DNSBL lookups. <strong>Forwarding</strong> sends queries to upstream resolvers like Cloudflare or Google.</p>
+      <p class="mb-1"><i class="icon fas fa-info-circle"></i> <strong>Recursive resolution</strong> (default) queries authoritative DNS servers directly. Recommended for email servers.</p>
+      <p class="mb-0"><i class="icon fas fa-exclamation-triangle text-warning"></i> <strong>Warning:</strong> Enabling forwarding can cause RBL/DNSBL lookup failures. Public DNS resolvers (Cloudflare, Google, etc.) may rate-limit or block blocklist queries, resulting in missed spam detection by SpamAssassin and Amavis.</p>
     </div>
     <div class="row">
       <div class="col-md-6">
