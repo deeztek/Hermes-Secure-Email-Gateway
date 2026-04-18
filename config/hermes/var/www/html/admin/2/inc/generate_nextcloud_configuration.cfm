@@ -45,15 +45,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset ncHostIP = getHostIP.value2>
 
-<!--- GET HIDE LOGIN FORM setting from parameters2 --->
-<cfquery name="getHideLoginForm" datasource="hermes">
-  SELECT value2 FROM parameters2 WHERE module = 'nextcloud' AND parameter = 'hide.login.form'
-</cfquery>
-<cfset ncHideLoginForm = "false">
-<cfif getHideLoginForm.recordcount GTE 1 AND getHideLoginForm.value2 EQ "true">
-    <cfset ncHideLoginForm = "true">
-</cfif>
-
 <!--- READ EXISTING NEXTCLOUD CONFIG TO EXTRACT INSTALLATION-SPECIFIC VALUES --->
 <cfset ncPasswordSalt = "">
 <cfset ncSecret = "">
@@ -110,8 +101,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset config = Replace(config, "NEXTCLOUD_TRUSTED_DOMAIN_HOST", consoleHost, "ALL")>
 
 <!--- Hide login form (PHP boolean literal, no quotes) --->
-<cfset config = Replace(config, "NEXTCLOUD_HIDE_LOGIN_FORM", ncHideLoginForm, "ALL")>
-
 <!--- Installation-specific values from existing config --->
 <cfset config = Replace(config, "NEXTCLOUD_PASSWORD_SALT", ncPasswordSalt, "ALL")>
 <cfset config = Replace(config, "NEXTCLOUD_SECRET", ncSecret, "ALL")>

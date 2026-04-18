@@ -83,7 +83,6 @@ $CONFIG = array (
     'use_pkce' => true,
   ],
   'allow_user_to_change_display_name' => false,
-  'hide_login_form' => NEXTCLOUD_HIDE_LOGIN_FORM,
   'loglevel' => 2,
   'maintenance' => false,
 );
