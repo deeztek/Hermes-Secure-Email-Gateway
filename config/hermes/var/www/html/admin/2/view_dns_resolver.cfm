@@ -166,21 +166,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!--- Parse forward-addr lines --->
     <cfloop list="#fwdConfContent#" delimiters="#chr(10)#" index="line">
       <cfset line = trim(line)>
-      <cfif FindNoCase("forward-addr:", line)>
-        <cfset fwdAddr = trim(ReplaceNoCase(line, "forward-addr:", ""))>
-        <cfif fwdAddr NEQ "">
-          <cfset ArrayAppend(currentForwarders, fwdAddr)>
-          <cfset forwardingEnabled = true>
+      <!--- Skip commented lines --->
+      <cfif Left(line, 1) NEQ chr(35)>
+        <cfif FindNoCase("forward-addr:", line)>
+          <cfset fwdAddr = trim(ReplaceNoCase(line, "forward-addr:", ""))>
+          <cfif fwdAddr NEQ "">
+            <cfset ArrayAppend(currentForwarders, fwdAddr)>
+            <cfset forwardingEnabled = true>
+          </cfif>
         </cfif>
-      </cfif>
-      <cfif FindNoCase("forward-tls-upstream:", line)>
-        <cfset tlsVal = trim(ReplaceNoCase(line, "forward-tls-upstream:", ""))>
-        <cfif tlsVal EQ "yes">
-          <cfset forwardTls = "yes">
+        <cfif FindNoCase("forward-tls-upstream:", line)>
+          <cfset tlsVal = trim(ReplaceNoCase(line, "forward-tls-upstream:", ""))>
+          <cfif tlsVal EQ "yes">
+            <cfset forwardTls = "yes">
+          </cfif>
         </cfif>
-      </cfif>
-      <cfif FindNoCase("forward-zone:", line)>
-        <cfset forwardingEnabled = true>
       </cfif>
     </cfloop>
 
