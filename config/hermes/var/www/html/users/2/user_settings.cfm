@@ -259,7 +259,7 @@ $(document).ready(function() {
                 </cfquery>
                 <cfif checkNcEnabledPwd.recordcount GTE 1 AND Val(checkNcEnabledPwd.nextcloud_enabled) EQ 1>
                     <cftry>
-                        <cfset ncAppPasswordAction = "regenerate">
+                        <cfset ncAppPasswordAction = "update">
                         <cfset ncAppPasswordUser = session.email>
                         <cfset ncAppPasswordValue = trim(form.newpassword)>
                         <cfinclude template="../../admin/2/inc/nextcloud_app_password.cfm">

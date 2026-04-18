@@ -446,12 +446,13 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4e. NEXTCLOUD APP PASSWORD. Create a "Hermes System" app password in
-     Nextcloud so DAV clients (calendar/contacts) work even with 2FA.
-     Uses the same password as LDAP so no new secret is introduced.
-     Only created for local-auth mailboxes with nextcloud enabled
-     (remote-auth users authenticate via their IdP). --->
-<cfif form.nextcloud_enabled EQ "1" AND form.auth_type EQ "local" AND trim(form.password) NEQ "">
+<!--- 4e. NEXTCLOUD APP PASSWORD (CalDAV/CardDAV). Creates a "Hermes System"
+     app password with the same credentials as the mailbox. The token hash
+     is replaced with SHA-512(password + NC secret) so the user's email
+     password works for DAV authentication. Only created if the admin
+     checked the "Create App Password" checkbox. --->
+<cfparam name="form.create_app_password" default="0">
+<cfif form.nextcloud_enabled EQ "1" AND form.create_app_password EQ "1" AND trim(form.password) NEQ "">
     <cftry>
         <cfset ncAppPasswordAction = "create">
         <cfset ncAppPasswordUser = recipientEmail>

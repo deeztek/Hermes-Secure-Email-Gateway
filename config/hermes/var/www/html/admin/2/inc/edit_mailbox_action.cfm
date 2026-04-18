@@ -304,7 +304,7 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
         </cfquery>
         <cfif checkNcEnabled.recordcount GTE 1 AND Val(checkNcEnabled.nextcloud_enabled) EQ 1>
             <cftry>
-                <cfset ncAppPasswordAction = "regenerate">
+                <cfset ncAppPasswordAction = "update">
                 <cfset ncAppPasswordUser = getMailbox.username>
                 <cfset ncAppPasswordValue = trim(form.edit_password)>
                 <cfinclude template="nextcloud_app_password.cfm">

@@ -207,6 +207,21 @@ URL Parameters:
     <!--- Check if LDAP update was successful --->
     <cfif IsDefined("ldapPasswordModified") AND ldapPasswordModified>
 
+        <!--- Sync Nextcloud app password with new password --->
+        <cfquery name="checkNcEnabledReset" datasource="hermes">
+            SELECT nextcloud_enabled FROM mailboxes
+            WHERE username = <cfqueryparam value="#validateToken.email#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+        <cfif checkNcEnabledReset.recordcount GTE 1 AND Val(checkNcEnabledReset.nextcloud_enabled) EQ 1>
+            <cftry>
+                <cfset ncAppPasswordAction = "update">
+                <cfset ncAppPasswordUser = validateToken.email>
+                <cfset ncAppPasswordValue = trim(form.new_password)>
+                <cfinclude template="../admin/2/inc/nextcloud_app_password.cfm">
+            <cfcatch type="any"><!--- Non-fatal ---></cfcatch>
+            </cftry>
+        </cfif>
+
         <!--- Mark request as completed --->
         <cfquery name="markCompleted" datasource="hermes">
             UPDATE password_reset_requests

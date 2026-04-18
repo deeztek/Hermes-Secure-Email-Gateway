@@ -380,6 +380,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </select>
       </div>
 
+      <!--- APP PASSWORD (DAV) --->
+      <div class="form-group mb-3" id="appPasswordGroup" style="display:none;">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" name="create_app_password" id="createAppPassword" value="1" checked>
+          <label class="form-check-label" for="createAppPassword">
+            <strong>Create App Password for CalDAV/CardDAV</strong>
+          </label>
+        </div>
+        <small class="text-muted">
+          Creates a DAV app password using the same credentials as the mailbox. This allows calendar and contacts clients (Thunderbird, iOS, Android) to authenticate without a separate password.
+        </small>
+      </div>
+
       <!--- ENCRYPTION SECTION --->
       <div class="alert alert-info mb-3">
         <h5><i class="icon fas fa-info-circle"></i> Please Note!</h5>
@@ -530,6 +543,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     }
     var nc = selected.data('nextcloud');
     $('#nextcloudEnabled').val(nc == 1 ? '1' : '0');
+    $('#appPasswordGroup').toggle(nc == 1);
+  });
+
+  // Show/hide app password checkbox when NC toggle changes
+  $('#nextcloudEnabled').on('change', function() {
+    $('#appPasswordGroup').toggle($(this).val() === '1');
   });
 
   // Generate random password (16 chars, alphanumeric only)

@@ -147,6 +147,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_dns_resolver.cfm" class="nav-link">
+                <i class="nav-icon fas fa-globe"></i>
+                <p>DNS Resolver</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_system_backup.cfm" class="nav-link">
                 <i class="nav-icon fas fa-archive"></i>
                 <p>Backup/Restore</p>

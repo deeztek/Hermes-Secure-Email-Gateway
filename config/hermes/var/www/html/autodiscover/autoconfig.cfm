@@ -102,12 +102,12 @@ Returns 404 if the domain is not configured as a mailbox domain.
   '    <addressBook type="carddav">' & Chr(10) &
   '      <username>%EMAILADDRESS%</username>' & Chr(10) &
   '      <authentication>http-basic</authentication>' & Chr(10) &
-  '      <serverURL>https://' & encodeForXML(consoleHost) & '/nc/remote.php/dav/addressbooks/users/%EMAILADDRESS%/</serverURL>' & Chr(10) &
+  '      <serverURL>https://' & encodeForXML(mailHost) & '/nc/remote.php/dav/addressbooks/users/%EMAILADDRESS%/</serverURL>' & Chr(10) &
   '    </addressBook>' & Chr(10) &
   '    <calendar type="caldav">' & Chr(10) &
   '      <username>%EMAILADDRESS%</username>' & Chr(10) &
   '      <authentication>http-basic</authentication>' & Chr(10) &
-  '      <serverURL>https://' & encodeForXML(consoleHost) & '/nc/remote.php/dav/calendars/%EMAILADDRESS%/</serverURL>' & Chr(10) &
+  '      <serverURL>https://' & encodeForXML(mailHost) & '/nc/remote.php/dav/calendars/%EMAILADDRESS%/</serverURL>' & Chr(10) &
   '    </calendar>' & Chr(10) &
   '  </emailProvider>' & Chr(10) &
   '</clientConfig>'>

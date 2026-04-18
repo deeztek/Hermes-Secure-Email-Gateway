@@ -765,8 +765,10 @@ function openDnsModal(domain) {
       { type: 'SRV', name: '_submissions._tcp.' + domain, value: '0 0 465 ' + host + '.', purpose: 'SMTP submission (implicit TLS)' }
     ]},
     { section: 'CalDAV / CardDAV Auto-Discovery (Required for calendar and contacts auto-setup)', records: [
-      { type: 'SRV', name: '_caldavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Calendar auto-discovery' },
-      { type: 'SRV', name: '_carddavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Contacts auto-discovery' }
+      { type: 'SRV', name: '_caldavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Calendar server discovery' },
+      { type: 'TXT', name: '_caldavs._tcp.' + domain, value: 'path=/nc/remote.php/dav/', purpose: 'Calendar DAV path' },
+      { type: 'SRV', name: '_carddavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Contacts server discovery' },
+      { type: 'TXT', name: '_carddavs._tcp.' + domain, value: 'path=/nc/remote.php/dav/', purpose: 'Contacts DAV path' }
     ]},
     { section: 'Email Security', records: [
       { type: 'TXT', name: domain, value: 'v=spf1 mx a:' + host + ' ~all', purpose: 'SPF (example)' },

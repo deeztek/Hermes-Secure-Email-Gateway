@@ -1145,7 +1145,7 @@ case "${1:-}" in
                 --mapping-display-name="name" \
                 --mapping-email="email" \
                 --mapping-groups="groups" \
-                --group-provisioning=1 \
+                --group-provisioning=0 \
                 --check-bearer=1 >> "$LOG_FILE" 2>&1 \
                 && log "  Registered OIDC provider: Hermes_SEG" \
                 || log "  WARNING: Failed to register OIDC provider"

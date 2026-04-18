@@ -170,6 +170,21 @@ Allows administrators to reset a user's password from the admin panel.
     <cfset adminUsername = "admin">
 </cfif>
 
+<!--- Sync Nextcloud app password with new password --->
+<cfquery name="checkNcEnabledAdminReset" datasource="hermes">
+    SELECT nextcloud_enabled FROM mailboxes
+    WHERE username = <cfqueryparam value="#getRequest.email#" cfsqltype="cf_sql_varchar">
+</cfquery>
+<cfif checkNcEnabledAdminReset.recordcount GTE 1 AND Val(checkNcEnabledAdminReset.nextcloud_enabled) EQ 1>
+    <cftry>
+        <cfset ncAppPasswordAction = "update">
+        <cfset ncAppPasswordUser = getRequest.email>
+        <cfset ncAppPasswordValue = trim(form.new_password)>
+        <cfinclude template="nextcloud_app_password.cfm">
+    <cfcatch type="any"><!--- Non-fatal ---></cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Mark request as completed --->
 <cfquery name="markCompleted" datasource="hermes">
     UPDATE password_reset_requests

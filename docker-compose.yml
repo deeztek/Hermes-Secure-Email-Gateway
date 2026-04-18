@@ -67,6 +67,28 @@ networks:
  
 
 services:
+  hermes_unbound:
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-unbound:${HERMES_DOCKER_IMG_VERSION}
+    container_name: hermes_unbound
+    build:
+      context: .
+      dockerfile: ./dockerfiles/unbound/Dockerfile
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
+    # No host ports exposed — internal DNS only
+    expose:
+      - "53"
+    volumes:
+      - ./config/unbound:/etc/unbound/conf.d
+    restart: unless-stopped
+    networks:
+      hermes_net_ext:
+              ipv4_address: ${IPV4SUBNET}.117
+    environment:
+      - TZ=${TIMEZONE}
+
   hermes_db_server:
     image: linuxserver/mariadb
     container_name: hermes_db_server
@@ -74,7 +96,8 @@ services:
       options:
         max-size: 10m
         max-file: "5"
-
+    dns:
+      - ${IPV4SUBNET}.117
     environment:
       - PUID=$PUID
       - PGID=$GUID
@@ -110,7 +133,8 @@ services:
       options:
         max-size: 10m
         max-file: "5"
-
+    dns:
+      - ${IPV4SUBNET}.117
     environment:
       - "TZ=$TIMEZONE"
     volumes:
@@ -127,6 +151,8 @@ services:
   hermes_nginx:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_nginx
+    dns:
+      - ${IPV4SUBNET}.117
     environment:
       - PUID=1000
       - PGID=1000
@@ -163,6 +189,8 @@ services:
   hermes_authelia:
     image: authelia/authelia:${AUTHELIAVERSION}
     container_name: hermes_authelia
+    dns:
+      - ${IPV4SUBNET}.117
     secrets:
       - AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET
       - AUTHELIA_IDENTITY_PROVIDERS_OIDC_HMAC_SECRET
@@ -217,6 +245,8 @@ services:
   hermes_authelia_redis:
     image: redis
     container_name: hermes_authelia_redis
+    dns:
+      - ${IPV4SUBNET}.117
     command: sh -c 'redis-server --requirepass "$$(cat /run/secrets/AUTHELIA_SESSION_REDIS_PASSWORD)"'
     secrets:
       - AUTHELIA_SESSION_REDIS_PASSWORD
@@ -248,6 +278,8 @@ services:
     logging:
       options:
         max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
     environment:
       TZ: ${TIMEZONE}
       CFADMIN_PASSWORD_FILE: /run/secrets/CFADMIN_PASSWORD
@@ -310,6 +342,8 @@ services:
     logging:
       options:
         max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
     ports:
       - 25:25
       - 465:465
@@ -349,6 +383,8 @@ services:
     logging:
       options:
         max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
     # No host ports exposed — internal OpenDMARC
     restart: unless-stopped
     depends_on:
@@ -381,6 +417,8 @@ services:
     logging:
       options:
         max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
     # No host ports exposed — Amavis/SpamAssassin, Postfix connects internally
     restart: unless-stopped
     depends_on:
@@ -429,6 +467,8 @@ services:
     logging:
       options:
         max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
     # No host ports exposed — Nginx proxies to 8443, Postfix connects to 25/10025 internally
 
     restart: unless-stopped
@@ -465,6 +505,8 @@ services:
     build:
       context: .
       dockerfile: ./dockerfiles/fail2ban/Dockerfile
+    dns:
+      - ${IPV4SUBNET}.117
     cap_add:
       - NET_ADMIN
       - NET_RAW
@@ -487,6 +529,8 @@ services:
   hermes_nextcloud_redis:
     image: redis
     container_name: hermes_nextcloud_redis
+    dns:
+      - ${IPV4SUBNET}.117
     logging:
       options:
         max-size: 10m
@@ -511,6 +555,8 @@ services:
       dockerfile: ./dockerfiles/nextcloud/Dockerfile
       args:
         NCVERSION: ${NCVERSION}
+    dns:
+      - ${IPV4SUBNET}.117
     secrets:
       - NEXTCLOUD_MYSQL_USER
       - NEXTCLOUD_MYSQL_PASSWORD
@@ -569,6 +615,8 @@ services:
   hermes_dovecot:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dovecot:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dovecot
+    dns:
+      - ${IPV4SUBNET}.117
     logging:
       options:
         max-size: 10m
@@ -614,6 +662,8 @@ services:
   hermes_ldap:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ldap
+    dns:
+      - ${IPV4SUBNET}.117
     #entrypoint: ["sleep", "infinity"]
     secrets:
       - LDAP_ADMIN_PASSWORD
