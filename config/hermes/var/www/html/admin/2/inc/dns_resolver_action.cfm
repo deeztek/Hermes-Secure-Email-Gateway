@@ -187,4 +187,99 @@ Settings stored in parameters2 + dns_forwarders table.
 
   <cflocation url="view_dns_resolver.cfm" addtoken="no">
 
+<cfelseif action EQ "add_local_record">
+
+  <cfparam name="form.local_hostname" default="">
+  <cfparam name="form.local_type" default="A">
+  <cfparam name="form.local_value" default="">
+  <cfparam name="form.local_description" default="">
+
+  <cfset localHost = trim(form.local_hostname)>
+  <cfset localType = trim(form.local_type)>
+  <cfset localValue = trim(form.local_value)>
+  <cfset localDesc = trim(form.local_description)>
+
+  <!--- Validate --->
+  <cfif localHost EQ "" OR localValue EQ "">
+    <cfset session.m = 11>
+    <cfset session.dnsError = "Hostname and value are required.">
+    <cflocation url="view_dns_resolver.cfm" addtoken="no">
+  </cfif>
+
+  <cfif NOT ListFindNoCase("A,AAAA,CNAME,MX,TXT,PTR", localType)>
+    <cfset session.m = 11>
+    <cfset session.dnsError = "Invalid record type.">
+    <cflocation url="view_dns_resolver.cfm" addtoken="no">
+  </cfif>
+
+  <cftry>
+    <cfquery datasource="hermes">
+      INSERT IGNORE INTO dns_local_records (hostname, record_type, value, enabled, description)
+      VALUES (
+        <cfqueryparam value="#localHost#" cfsqltype="cf_sql_varchar">,
+        <cfqueryparam value="#localType#" cfsqltype="cf_sql_varchar">,
+        <cfqueryparam value="#localValue#" cfsqltype="cf_sql_varchar">,
+        1,
+        <cfqueryparam value="#localDesc#" cfsqltype="cf_sql_varchar" null="#(localDesc EQ '')#">
+      )
+    </cfquery>
+    <cfset session.m = 7>
+  <cfcatch type="any">
+    <cfset session.m = 10>
+    <cfset session.dnsError = cfcatch.message>
+  </cfcatch>
+  </cftry>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "delete_local_record">
+
+  <cfparam name="form.local_record_id" default="">
+  <cfif IsNumeric(form.local_record_id)>
+    <cftry>
+      <cfquery datasource="hermes">
+        DELETE FROM dns_local_records WHERE id = <cfqueryparam value="#form.local_record_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset session.m = 8>
+    <cfcatch type="any">
+      <cfset session.m = 10>
+      <cfset session.dnsError = cfcatch.message>
+    </cfcatch>
+    </cftry>
+  </cfif>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "toggle_local_record">
+
+  <cfparam name="form.local_record_id" default="">
+  <cfif IsNumeric(form.local_record_id)>
+    <cftry>
+      <cfquery datasource="hermes">
+        UPDATE dns_local_records SET enabled = IF(enabled = 1, 0, 1)
+        WHERE id = <cfqueryparam value="#form.local_record_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset session.m = 9>
+    <cfcatch type="any">
+      <cfset session.m = 10>
+      <cfset session.dnsError = cfcatch.message>
+    </cfcatch>
+    </cftry>
+  </cfif>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "apply_local_records">
+
+  <cftry>
+    <cfinclude template="generate_unbound_local_conf.cfm">
+    <cfset session.m = 1>
+  <cfcatch type="any">
+    <cfset session.m = 10>
+    <cfset session.dnsError = cfcatch.message>
+  </cfcatch>
+  </cftry>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
 </cfif>

@@ -106,6 +106,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset ncAutoRedirect = getNcAutoRedirect.value2>
 </cfif>
 
+<cfquery name="getNcHideLoginForm" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'nextcloud' AND parameter = 'hide.login.form'
+</cfquery>
+<cfset ncHideLoginForm = "false">
+<cfif getNcHideLoginForm.recordcount GTE 1>
+    <cfset ncHideLoginForm = getNcHideLoginForm.value2>
+</cfif>
+
 <!--- Dovecot settings --->
 <cfquery name="getDovecotSettings" datasource="hermes">
     SELECT parameter, value2 FROM parameters2
@@ -184,6 +193,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <small class="form-text text-muted">
             <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode. To bypass for local admin login, append <code>?direct=1</code> to the Nextcloud login URL.<br>
             <strong>Disabled:</strong> Users see the Nextcloud login page with a username/password form and an SSO button. Use this temporarily when you need to log in as a local Nextcloud admin user for maintenance (e.g., app management, troubleshooting), then re-enable.
+          </small>
+        </div>
+      </div>
+      <div class="col-md-12">
+        <div class="mb-3">
+          <label class="form-label"><strong>Hide Nextcloud Login Form</strong></label>
+          <select class="form-select" name="nc_hide_login_form" id="nc_hide_login_form">
+            <option value="false" <cfif ncHideLoginForm EQ "false">selected</cfif>>Disabled (show username/password form + SSO button)</option>
+            <option value="true" <cfif ncHideLoginForm EQ "true">selected</cfif>>Enabled (show SSO button only)</option>
+          </select>
+          <small class="form-text text-muted">
+            <strong>Enabled:</strong> Users only see the SSO login button on the Nextcloud login page. The username/password form is hidden, preventing users from logging in with local credentials. Administrators can still access the form by appending <code>?direct=1</code> to the login URL (the <strong>Nextcloud Admin</strong> link in the sidebar already does this).<br>
+            <strong>Disabled:</strong> Both the SSO button and the username/password form are visible on the login page.
           </small>
         </div>
       </div>

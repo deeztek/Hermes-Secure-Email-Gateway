@@ -67,7 +67,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- ACTION HANDLER --->
-<cfif ListFindNoCase("save_forwarding,add_forwarder,delete_forwarder,toggle_forwarder,apply_forwarders,restart_unbound,flush_cache", action)>
+<cfif ListFindNoCase("save_forwarding,add_forwarder,delete_forwarder,toggle_forwarder,apply_forwarders,add_local_record,delete_local_record,toggle_local_record,apply_local_records,restart_unbound,flush_cache", action)>
   <cfinclude template="./inc/dns_resolver_action.cfm">
 </cfif>
 
@@ -107,6 +107,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     Forwarder status updated. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
+<cfelseif m EQ 7>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Local DNS record added. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
+<cfelseif m EQ 8>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Local DNS record deleted. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
+<cfelseif m EQ 9>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Local DNS record status updated. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -451,6 +469,111 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="card-footer">
     <form method="post" action="view_dns_resolver.cfm" style="display:inline;">
       <input type="hidden" name="action" value="apply_forwarders">
+      <button type="submit" class="btn btn-warning"><i class="fas fa-sync"></i> Apply &amp; Restart Unbound</button>
+    </form>
+  </div>
+</div>
+
+<!--- ================================================================== --->
+<!--- CARD: LOCAL DNS OVERRIDES                                            --->
+<!--- ================================================================== --->
+<cfquery name="getLocalRecords" datasource="hermes">
+    SELECT id, hostname, record_type, value, enabled, description
+    FROM dns_local_records ORDER BY hostname ASC
+</cfquery>
+
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-map-marker-alt"></i> Local DNS Overrides (<cfoutput>#getLocalRecords.recordcount#</cfoutput>)</h3>
+  </div>
+  <div class="card-body">
+    <div class="alert alert-info">
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i> Add static DNS entries that Unbound resolves locally instead of querying upstream. Useful for internal hosts, split-horizon DNS, or overriding public DNS for internal routing.</p>
+    </div>
+
+    <!-- ADD LOCAL RECORD -->
+    <form method="post" action="view_dns_resolver.cfm" class="row g-3 align-items-end mb-3">
+      <input type="hidden" name="action" value="add_local_record">
+      <div class="col-md-3">
+        <label class="form-label"><strong>Hostname</strong></label>
+        <input type="text" class="form-control" name="local_hostname" placeholder="e.g., mail.example.com" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label"><strong>Type</strong></label>
+        <select class="form-select" name="local_type">
+          <option value="A" selected>A</option>
+          <option value="AAAA">AAAA</option>
+          <option value="CNAME">CNAME</option>
+          <option value="MX">MX</option>
+          <option value="TXT">TXT</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label"><strong>Value</strong></label>
+        <input type="text" class="form-control" name="local_value" placeholder="e.g., 10.0.0.50" required>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label"><strong>Description</strong></label>
+        <input type="text" class="form-control" name="local_description" placeholder="optional">
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-plus"></i> Add</button>
+      </div>
+    </form>
+
+    <!-- LOCAL RECORDS TABLE -->
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>Hostname</th>
+          <th>Type</th>
+          <th>Value</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <cfoutput query="getLocalRecords">
+        <tr<cfif enabled NEQ 1> class="table-secondary"</cfif>>
+          <td><code>#encodeForHTML(hostname)#</code></td>
+          <td><span class="badge bg-secondary">#encodeForHTML(record_type)#</span></td>
+          <td><code>#encodeForHTML(value)#</code></td>
+          <td class="text-muted small">#encodeForHTML(description)#</td>
+          <td>
+            <cfif enabled EQ 1>
+              <span class="badge bg-success">Enabled</span>
+            <cfelse>
+              <span class="badge bg-secondary">Disabled</span>
+            </cfif>
+          </td>
+          <td>
+            <form method="post" action="view_dns_resolver.cfm" style="display:inline;">
+              <input type="hidden" name="action" value="toggle_local_record">
+              <input type="hidden" name="local_record_id" value="#id#">
+              <button type="submit" class="btn btn-sm btn-<cfif enabled EQ 1>warning<cfelse>success</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>">
+                <i class="fas fa-<cfif enabled EQ 1>pause<cfelse>play</cfif>"></i>
+              </button>
+            </form>
+            <form method="post" action="view_dns_resolver.cfm" style="display:inline;" onsubmit="return confirm('Delete record #encodeForJavaScript(hostname)#?');">
+              <input type="hidden" name="action" value="delete_local_record">
+              <input type="hidden" name="local_record_id" value="#id#">
+              <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        </cfoutput>
+        <cfif getLocalRecords.recordcount EQ 0>
+          <tr><td colspan="6" class="text-center text-muted">No local DNS overrides configured.</td></tr>
+        </cfif>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    <form method="post" action="view_dns_resolver.cfm" style="display:inline;">
+      <input type="hidden" name="action" value="apply_local_records">
       <button type="submit" class="btn btn-warning"><i class="fas fa-sync"></i> Apply &amp; Restart Unbound</button>
     </form>
   </div>

@@ -1810,3 +1810,22 @@ INSERT IGNORE INTO dns_forwarders (server, port, tls, enabled, sort_order) VALUE
 
 -- Clean up old forwarding parameters if they exist from prior schema
 DELETE FROM parameters2 WHERE module = 'unbound' AND parameter IN ('forwarding.tls', 'forwarding.server1', 'forwarding.server2', 'forwarding.server3', 'forwarding.server4');
+
+-- Nextcloud hide login form setting (disabled by default)
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'nextcloud', 'hide.login.form', 'false', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'nextcloud' AND parameter = 'hide.login.form');
+
+-- ============================================================================
+-- Unbound DNS Local Overrides (#211)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS dns_local_records (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    hostname VARCHAR(255) NOT NULL,
+    record_type VARCHAR(10) NOT NULL DEFAULT 'A',
+    value VARCHAR(255) NOT NULL,
+    enabled TINYINT(3) NOT NULL DEFAULT 1,
+    description VARCHAR(255) DEFAULT NULL,
+    UNIQUE KEY uq_hostname_type (hostname, record_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

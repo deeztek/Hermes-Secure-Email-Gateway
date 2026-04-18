@@ -92,6 +92,39 @@ dovecot.conf from template and reloads Dovecot.
 </cftry>
 
 <!--- ================================================================== --->
+<!--- NEXTCLOUD HIDE LOGIN FORM                                            --->
+<!--- ================================================================== --->
+<cfparam name="form.nc_hide_login_form" default="false">
+<cfset ncHideLoginFormVal = (form.nc_hide_login_form EQ "true") ? "true" : "false">
+
+<cftry>
+    <cfquery name="checkHideForm" datasource="hermes">
+        SELECT parameter FROM parameters2
+        WHERE module = 'nextcloud' AND parameter = 'hide.login.form'
+    </cfquery>
+    <cfif checkHideForm.recordcount GTE 1>
+        <cfquery datasource="hermes">
+            UPDATE parameters2 SET value2 = <cfqueryparam value="#ncHideLoginFormVal#" cfsqltype="cf_sql_varchar">
+            WHERE module = 'nextcloud' AND parameter = 'hide.login.form'
+        </cfquery>
+    <cfelse>
+        <cfquery datasource="hermes">
+            INSERT INTO parameters2 (module, parameter, value2, applied)
+            VALUES ('nextcloud', 'hide.login.form',
+                    <cfqueryparam value="#ncHideLoginFormVal#" cfsqltype="cf_sql_varchar">, '2')
+        </cfquery>
+    </cfif>
+
+    <!--- Regenerate NC config.php to apply the setting --->
+    <cfinclude template="generate_nextcloud_configuration.cfm">
+
+<cfcatch type="any">
+    <cfset saveError = true>
+    <cfset ArrayAppend(saveErrors, "Nextcloud Hide Login Form: " & cfcatch.message)>
+</cfcatch>
+</cftry>
+
+<!--- ================================================================== --->
 <!--- DOVECOT TLS CERTIFICATE (parameters2 module='certificates')         --->
 <!--- ================================================================== --->
 <cfif trim(form.dovecot_cert_id) NEQ "" AND IsNumeric(form.dovecot_cert_id)>
