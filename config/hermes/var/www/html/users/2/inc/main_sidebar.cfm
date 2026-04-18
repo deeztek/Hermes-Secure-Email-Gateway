@@ -77,6 +77,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Vacation Auto-Reply</strong></p>
           </a>
         </li>
+        <li class="nav-item">
+          <a href="view_shared_folders.cfm" class="nav-link">
+            <i class="nav-icon fas fa-share-alt"></i>
+            <p><strong>Shared Folders</strong></p>
+          </a>
+        </li>
         <cfif #session.theGroups# contains "nextcloud">
         <li class="nav-item">
           <a href="/users/2/preload_nc_login.cfm" class="nav-link">
