@@ -1780,3 +1780,31 @@ WHERE NOT EXISTS (
     WHERE parameter = 'check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf'
     AND parent_name = 'smtpd_recipient_restrictions'
 );
+
+-- ============================================================================
+-- Unbound DNS Resolver Settings (#211)
+-- ============================================================================
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.enabled', 'no', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.enabled');
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.tls', 'no', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.tls');
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.server1', '1.1.1.1', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server1');
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.server2', '1.0.0.1', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server2');
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.server3', '8.8.8.8', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server3');
+
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'unbound', 'forwarding.server4', '8.8.4.4', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server4');

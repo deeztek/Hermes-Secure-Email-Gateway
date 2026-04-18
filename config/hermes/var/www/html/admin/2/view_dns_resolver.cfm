@@ -153,48 +153,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cftry>
 
 <!--- ================================================================== --->
-<!--- READ CURRENT FORWARD.CONF                                           --->
+<!--- READ SETTINGS FROM DATABASE                                         --->
 <!--- ================================================================== --->
-<cfset forwardingEnabled = false>
-<cfset forwardTls = "no">
+<cfquery name="getUnboundSettings" datasource="hermes">
+    SELECT parameter, value2 FROM parameters2 WHERE module = 'unbound'
+</cfquery>
+<cfset ub = StructNew()>
+<cfloop query="getUnboundSettings">
+    <cfset ub[getUnboundSettings.parameter] = getUnboundSettings.value2>
+</cfloop>
+<cfparam name="ub['forwarding.enabled']" default="no">
+<cfparam name="ub['forwarding.tls']" default="no">
+<cfparam name="ub['forwarding.server1']" default="">
+<cfparam name="ub['forwarding.server2']" default="">
+<cfparam name="ub['forwarding.server3']" default="">
+<cfparam name="ub['forwarding.server4']" default="">
+
+<cfset forwardingEnabled = (ub['forwarding.enabled'] EQ "yes")>
+<cfset forwardTls = ub['forwarding.tls']>
 <cfset currentForwarders = ArrayNew(1)>
-
-<cfif containerRunning>
-  <cftry>
-    <cffile action="read" file="/etc/unbound/conf.d/forward.conf" variable="fwdConfContent" charset="utf-8">
-
-    <!--- Parse forward-addr lines --->
-    <cfloop list="#fwdConfContent#" delimiters="#chr(10)#" index="line">
-      <cfset line = trim(line)>
-      <!--- Skip commented lines --->
-      <cfif Left(line, 1) NEQ chr(35)>
-        <cfif FindNoCase("forward-addr:", line)>
-          <cfset fwdAddr = trim(ReplaceNoCase(line, "forward-addr:", ""))>
-          <cfif fwdAddr NEQ "">
-            <cfset ArrayAppend(currentForwarders, fwdAddr)>
-            <cfset forwardingEnabled = true>
-          </cfif>
-        </cfif>
-        <cfif FindNoCase("forward-tls-upstream:", line)>
-          <cfset tlsVal = trim(ReplaceNoCase(line, "forward-tls-upstream:", ""))>
-          <cfif tlsVal EQ "yes">
-            <cfset forwardTls = "yes">
-          </cfif>
-        </cfif>
-      </cfif>
-    </cfloop>
-
-    <!--- If there's a forward-zone but no forward-addr lines, it's still a forwarding config --->
-    <!--- If the file is just a comment (disabled), forwardingEnabled stays false --->
-    <cfif ArrayLen(currentForwarders) EQ 0>
-      <cfset forwardingEnabled = false>
-    </cfif>
-
-  <cfcatch>
-    <!--- Could not read forward.conf --->
-  </cfcatch>
-  </cftry>
-</cfif>
+<cfloop list="forwarding.server1,forwarding.server2,forwarding.server3,forwarding.server4" index="skey">
+    <cfset ArrayAppend(currentForwarders, Trim(ub[skey]))>
+</cfloop>
 
 <!--- Pad forwarders array to 4 entries --->
 <cfloop condition="ArrayLen(currentForwarders) LT 4">
