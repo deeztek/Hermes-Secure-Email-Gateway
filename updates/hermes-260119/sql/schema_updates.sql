@@ -1829,3 +1829,81 @@ CREATE TABLE IF NOT EXISTS dns_local_records (
     description VARCHAR(255) DEFAULT NULL,
     UNIQUE KEY uq_hostname_type (hostname, record_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- Shared Mailboxes and Folder Sharing (#213)
+-- ============================================================================
+
+-- Add mailbox_type to distinguish user vs shared mailboxes
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS mailbox_type ENUM('user','shared') NOT NULL DEFAULT 'user';
+
+-- Shared mailbox metadata
+CREATE TABLE IF NOT EXISTS shared_mailboxes (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    mailbox_id INT NOT NULL,
+    address VARCHAR(255) NOT NULL,
+    display_name VARCHAR(255) NOT NULL,
+    domain_id INT NOT NULL,
+    auto_subscribe TINYINT(3) NOT NULL DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    modified_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_shared_address (address),
+    KEY idx_domain (domain_id),
+    CONSTRAINT fk_shared_mailbox FOREIGN KEY (mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Permissions: which users can access which shared mailboxes
+CREATE TABLE IF NOT EXISTS shared_mailbox_permissions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    shared_mailbox_id INT NOT NULL,
+    user_mailbox_id INT NOT NULL,
+    username VARCHAR(255) NOT NULL,
+    can_read TINYINT(3) NOT NULL DEFAULT 1,
+    can_write TINYINT(3) NOT NULL DEFAULT 0,
+    can_delete TINYINT(3) NOT NULL DEFAULT 0,
+    can_insert TINYINT(3) NOT NULL DEFAULT 0,
+    can_post TINYINT(3) NOT NULL DEFAULT 0,
+    can_admin TINYINT(3) NOT NULL DEFAULT 0,
+    send_as TINYINT(3) NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_shared_user (shared_mailbox_id, user_mailbox_id),
+    CONSTRAINT fk_perm_shared FOREIGN KEY (shared_mailbox_id) REFERENCES shared_mailboxes(id) ON DELETE CASCADE,
+    CONSTRAINT fk_perm_user FOREIGN KEY (user_mailbox_id) REFERENCES mailboxes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dovecot ACL dict backend table (Dovecot reads directly)
+CREATE TABLE IF NOT EXISTS dovecot_acl (
+    username VARCHAR(255) NOT NULL,
+    mailbox VARCHAR(255) NOT NULL,
+    right_name VARCHAR(50) NOT NULL,
+    value VARCHAR(1) NOT NULL DEFAULT '1',
+    PRIMARY KEY (username, mailbox, right_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dovecot shared mailbox listing (dict backend)
+CREATE TABLE IF NOT EXISTS dovecot_acl_shared (
+    from_user VARCHAR(255) NOT NULL,
+    to_user VARCHAR(255) NOT NULL,
+    dummy CHAR(1) DEFAULT '1',
+    PRIMARY KEY (from_user, to_user)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- User-managed folder sharing
+CREATE TABLE IF NOT EXISTS user_folder_shares (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    owner_username VARCHAR(255) NOT NULL,
+    shared_with_username VARCHAR(255) NOT NULL,
+    folder_path VARCHAR(255) NOT NULL,
+    can_read TINYINT(3) NOT NULL DEFAULT 1,
+    can_write TINYINT(3) NOT NULL DEFAULT 0,
+    can_delete TINYINT(3) NOT NULL DEFAULT 0,
+    can_insert TINYINT(3) NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_folder_share (owner_username, shared_with_username, folder_path),
+    KEY idx_shared_with (shared_with_username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Dovecot sharing toggle
+INSERT INTO parameters2 (module, parameter, value2, applied)
+SELECT 'dovecot', 'sharing.enabled', 'no', '1'
+WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'dovecot' AND parameter = 'sharing.enabled');
