@@ -77,9 +77,6 @@ services:
       options:
         max-size: 10m
         max-file: "5"
-    # No host ports exposed — internal DNS only
-    expose:
-      - "53"
     volumes:
       - ./config/unbound:/etc/unbound/conf.d
     restart: unless-stopped
