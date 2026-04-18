@@ -2,98 +2,138 @@
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 DNS RESOLVER ACTION HANDLER
-Handles save_forwarders, restart_unbound, flush_cache actions.
-Settings stored in parameters2 (module='unbound'), config files
-generated from database via generate_unbound_forward_conf.cfm.
+Handles save_forwarding, add_forwarder, delete_forwarder, toggle_forwarder,
+restart_unbound, flush_cache actions.
+Settings stored in parameters2 + dns_forwarders table.
 --->
 
-<cfif action EQ "save_forwarders">
+<cfif action EQ "save_forwarding">
 
-  <!--- Validate inputs --->
+  <!--- Save global forwarding toggle --->
   <cfparam name="form.forwarding_enabled" default="no">
-  <cfparam name="form.forward_tls" default="no">
-  <cfparam name="form.forwarder1" default="">
-  <cfparam name="form.forwarder2" default="">
-  <cfparam name="form.forwarder3" default="">
-  <cfparam name="form.forwarder4" default="">
-
-  <cfset forwarding_enabled = (form.forwarding_enabled EQ "yes") ? "yes" : "no">
-  <cfset forward_tls = (form.forward_tls EQ "yes") ? "yes" : "no">
-
-  <!--- IP address validation (IPv4) --->
-  <cfset ipPattern = "^(\d{1,3}\.){3}\d{1,3}$">
-  <cfset validForwarders = ArrayNew(1)>
-  <cfloop list="forwarder1,forwarder2,forwarder3,forwarder4" index="fld">
-    <cfset fval = trim(form[fld])>
-    <cfif fval NEQ "" AND REFind(ipPattern, fval)>
-      <cfset validOctets = true>
-      <cfloop list="#fval#" delimiters="." index="octet">
-        <cfif NOT IsNumeric(octet) OR val(octet) LT 0 OR val(octet) GT 255>
-          <cfset validOctets = false>
-        </cfif>
-      </cfloop>
-      <cfif validOctets>
-        <cfset ArrayAppend(validForwarders, fval)>
-      </cfif>
-    </cfif>
-  </cfloop>
-
-  <!--- If forwarding enabled, must have at least one forwarder --->
-  <cfif forwarding_enabled EQ "yes" AND ArrayLen(validForwarders) EQ 0>
-    <cfset session.m = 10>
-    <cfset session.dnsError = "At least one valid forwarder IP address is required when forwarding is enabled.">
-    <cflocation url="view_dns_resolver.cfm" addtoken="no">
-  </cfif>
+  <cfset fwdVal = (form.forwarding_enabled EQ "yes") ? "yes" : "no">
 
   <cftry>
-    <!--- Pad to 4 entries --->
-    <cfloop condition="ArrayLen(validForwarders) LT 4">
-      <cfset ArrayAppend(validForwarders, "")>
-    </cfloop>
-
-    <!--- Save to parameters2 --->
-    <cfloop list="forwarding.enabled,forwarding.tls,forwarding.server1,forwarding.server2,forwarding.server3,forwarding.server4" index="paramKey">
-      <cfswitch expression="#paramKey#">
-        <cfcase value="forwarding.enabled"><cfset paramVal = forwarding_enabled></cfcase>
-        <cfcase value="forwarding.tls"><cfset paramVal = forward_tls></cfcase>
-        <cfcase value="forwarding.server1"><cfset paramVal = validForwarders[1]></cfcase>
-        <cfcase value="forwarding.server2"><cfset paramVal = validForwarders[2]></cfcase>
-        <cfcase value="forwarding.server3"><cfset paramVal = validForwarders[3]></cfcase>
-        <cfcase value="forwarding.server4"><cfset paramVal = validForwarders[4]></cfcase>
-      </cfswitch>
-
-      <cfquery name="checkParam" datasource="hermes">
-        SELECT parameter FROM parameters2
-        WHERE module = 'unbound' AND parameter = <cfqueryparam value="#paramKey#" cfsqltype="cf_sql_varchar">
+    <cfquery name="checkFwd" datasource="hermes">
+      SELECT parameter FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.enabled'
+    </cfquery>
+    <cfif checkFwd.recordcount GTE 1>
+      <cfquery datasource="hermes">
+        UPDATE parameters2 SET value2 = <cfqueryparam value="#fwdVal#" cfsqltype="cf_sql_varchar">, applied = '2'
+        WHERE module = 'unbound' AND parameter = 'forwarding.enabled'
       </cfquery>
-      <cfif checkParam.recordcount GTE 1>
-        <cfquery datasource="hermes">
-          UPDATE parameters2
-          SET value2 = <cfqueryparam value="#paramVal#" cfsqltype="cf_sql_varchar">,
-              applied = '2'
-          WHERE module = 'unbound' AND parameter = <cfqueryparam value="#paramKey#" cfsqltype="cf_sql_varchar">
-        </cfquery>
-      <cfelse>
-        <cfquery datasource="hermes">
-          INSERT INTO parameters2 (module, parameter, value2, applied)
-          VALUES ('unbound',
-                  <cfqueryparam value="#paramKey#" cfsqltype="cf_sql_varchar">,
-                  <cfqueryparam value="#paramVal#" cfsqltype="cf_sql_varchar">,
-                  '2')
-        </cfquery>
-      </cfif>
-    </cfloop>
+    <cfelse>
+      <cfquery datasource="hermes">
+        INSERT INTO parameters2 (module, parameter, value2, applied) VALUES ('unbound', 'forwarding.enabled', <cfqueryparam value="#fwdVal#" cfsqltype="cf_sql_varchar">, '2')
+      </cfquery>
+    </cfif>
 
-    <!--- Regenerate forward.conf and restart Unbound --->
     <cfinclude template="generate_unbound_forward_conf.cfm">
-
     <cfset session.m = 1>
-
   <cfcatch type="any">
     <cfset session.m = 10>
     <cfset session.dnsError = cfcatch.message>
   </cfcatch>
   </cftry>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "add_forwarder">
+
+  <cfparam name="form.new_server" default="">
+  <cfparam name="form.new_port" default="853">
+  <cfparam name="form.new_tls" default="0">
+
+  <cfset newServer = trim(form.new_server)>
+  <cfset newPort = IsNumeric(form.new_port) ? Int(form.new_port) : 853>
+  <cfset newTls = (form.new_tls EQ "1") ? 1 : 0>
+
+  <!--- Validate IP --->
+  <cfset ipPattern = "^(\d{1,3}\.){3}\d{1,3}$">
+  <cfif newServer EQ "" OR NOT REFind(ipPattern, newServer)>
+    <cfset session.m = 11>
+    <cfset session.dnsError = "Invalid IP address.">
+    <cflocation url="view_dns_resolver.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Validate octets --->
+  <cfloop list="#newServer#" delimiters="." index="octet">
+    <cfif NOT IsNumeric(octet) OR val(octet) LT 0 OR val(octet) GT 255>
+      <cfset session.m = 11>
+      <cfset session.dnsError = "Invalid IP address octet.">
+      <cflocation url="view_dns_resolver.cfm" addtoken="no">
+    </cfif>
+  </cfloop>
+
+  <!--- Validate port --->
+  <cfif newPort LT 1 OR newPort GT 65535>
+    <cfset session.m = 11>
+    <cfset session.dnsError = "Invalid port number.">
+    <cflocation url="view_dns_resolver.cfm" addtoken="no">
+  </cfif>
+
+  <cftry>
+    <!--- Get next sort order --->
+    <cfquery name="getMaxSort" datasource="hermes">
+      SELECT COALESCE(MAX(sort_order), 0) + 1 AS next_sort FROM dns_forwarders
+    </cfquery>
+
+    <cfquery datasource="hermes">
+      INSERT IGNORE INTO dns_forwarders (server, port, tls, enabled, sort_order)
+      VALUES (
+        <cfqueryparam value="#newServer#" cfsqltype="cf_sql_varchar">,
+        <cfqueryparam value="#newPort#" cfsqltype="cf_sql_integer">,
+        <cfqueryparam value="#newTls#" cfsqltype="cf_sql_tinyint">,
+        1,
+        <cfqueryparam value="#getMaxSort.next_sort#" cfsqltype="cf_sql_integer">
+      )
+    </cfquery>
+
+    <cfset session.m = 4>
+  <cfcatch type="any">
+    <cfset session.m = 10>
+    <cfset session.dnsError = cfcatch.message>
+  </cfcatch>
+  </cftry>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "delete_forwarder">
+
+  <cfparam name="form.forwarder_id" default="">
+
+  <cfif IsNumeric(form.forwarder_id)>
+    <cftry>
+      <cfquery datasource="hermes">
+        DELETE FROM dns_forwarders WHERE id = <cfqueryparam value="#form.forwarder_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset session.m = 5>
+    <cfcatch type="any">
+      <cfset session.m = 10>
+      <cfset session.dnsError = cfcatch.message>
+    </cfcatch>
+    </cftry>
+  </cfif>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "toggle_forwarder">
+
+  <cfparam name="form.forwarder_id" default="">
+
+  <cfif IsNumeric(form.forwarder_id)>
+    <cftry>
+      <cfquery datasource="hermes">
+        UPDATE dns_forwarders SET enabled = IF(enabled = 1, 0, 1)
+        WHERE id = <cfqueryparam value="#form.forwarder_id#" cfsqltype="cf_sql_integer">
+      </cfquery>
+      <cfset session.m = 6>
+    <cfcatch type="any">
+      <cfset session.m = 10>
+      <cfset session.dnsError = cfcatch.message>
+    </cfcatch>
+    </cftry>
+  </cfif>
 
   <cflocation url="view_dns_resolver.cfm" addtoken="no">
 
@@ -125,6 +165,20 @@ generated from database via generate_unbound_forward_conf.cfm.
     <cfexecute name="#scriptPath#" variable="flushResult" timeout="30" />
     <cffile action="delete" file="#scriptPath#">
     <cfset session.m = 3>
+  <cfcatch type="any">
+    <cfset session.m = 10>
+    <cfset session.dnsError = cfcatch.message>
+  </cfcatch>
+  </cftry>
+
+  <cflocation url="view_dns_resolver.cfm" addtoken="no">
+
+<cfelseif action EQ "apply_forwarders">
+
+  <!--- Regenerate forward.conf from current database state and restart --->
+  <cftry>
+    <cfinclude template="generate_unbound_forward_conf.cfm">
+    <cfset session.m = 1>
   <cfcatch type="any">
     <cfset session.m = 10>
     <cfset session.dnsError = cfcatch.message>

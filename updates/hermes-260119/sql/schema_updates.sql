@@ -1785,26 +1785,28 @@ WHERE NOT EXISTS (
 -- Unbound DNS Resolver Settings (#211)
 -- ============================================================================
 
+-- Global DNS resolver settings
 INSERT INTO parameters2 (module, parameter, value2, applied)
 SELECT 'unbound', 'forwarding.enabled', 'no', '1'
 WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.enabled');
 
-INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'unbound', 'forwarding.tls', 'no', '1'
-WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.tls');
+-- DNS forwarders table
+CREATE TABLE IF NOT EXISTS dns_forwarders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    server VARCHAR(255) NOT NULL,
+    port INT NOT NULL DEFAULT 853,
+    tls TINYINT(3) NOT NULL DEFAULT 0,
+    enabled TINYINT(3) NOT NULL DEFAULT 1,
+    sort_order INT NOT NULL DEFAULT 0,
+    UNIQUE KEY uq_server (server)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'unbound', 'forwarding.server1', '1.1.1.1', '1'
-WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server1');
+-- Seed default forwarders (available when admin enables forwarding)
+INSERT IGNORE INTO dns_forwarders (server, port, tls, enabled, sort_order) VALUES
+    ('1.1.1.1', 53, 0, 1, 1),
+    ('1.0.0.1', 53, 0, 1, 2),
+    ('8.8.8.8', 53, 0, 1, 3),
+    ('8.8.4.4', 53, 0, 1, 4);
 
-INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'unbound', 'forwarding.server2', '1.0.0.1', '1'
-WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server2');
-
-INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'unbound', 'forwarding.server3', '8.8.8.8', '1'
-WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server3');
-
-INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'unbound', 'forwarding.server4', '8.8.4.4', '1'
-WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.server4');
+-- Clean up old forwarding parameters if they exist from prior schema
+DELETE FROM parameters2 WHERE module = 'unbound' AND parameter IN ('forwarding.tls', 'forwarding.server1', 'forwarding.server2', 'forwarding.server3', 'forwarding.server4');

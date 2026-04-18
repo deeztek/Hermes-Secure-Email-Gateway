@@ -67,7 +67,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- ACTION HANDLER --->
-<cfif action EQ "save_forwarders" OR action EQ "restart_unbound" OR action EQ "flush_cache">
+<cfif ListFindNoCase("save_forwarding,add_forwarder,delete_forwarder,toggle_forwarder,apply_forwarders,restart_unbound,flush_cache", action)>
   <cfinclude template="./inc/dns_resolver_action.cfm">
 </cfif>
 
@@ -76,7 +76,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
-    Forwarder settings saved and Unbound restarted.
+    DNS forwarding settings saved and Unbound restarted.
   </div>
 <cfelseif m EQ 2>
   <div class="alert alert-success alert-dismissible">
@@ -90,6 +90,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     DNS cache flushed.
   </div>
+<cfelseif m EQ 4>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Forwarder added. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
+<cfelseif m EQ 5>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Forwarder deleted. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
+<cfelseif m EQ 6>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Forwarder status updated. Click <strong>Apply &amp; Restart Unbound</strong> to activate.
+  </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -99,6 +117,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset session.dnsError = "">
     <cfelse>
       An error occurred while processing your request.
+    </cfif>
+  </div>
+<cfelseif m EQ 11>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    <cfif StructKeyExists(session, "dnsError") AND session.dnsError NEQ "">
+      <cfoutput>#encodeForHTML(session.dnsError)#</cfoutput>
+      <cfset session.dnsError = "">
+    <cfelse>
+      Invalid input.
     </cfif>
   </div>
 </cfif>
@@ -125,12 +154,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset startedAt = ListGetAt(inspectResult, 2, "|")>
     <cfif containerStatus EQ "running">
       <cfset containerRunning = true>
-      <!--- Calculate uptime from startedAt (ISO 8601) --->
+      <!--- Calculate uptime from startedAt (ISO 8601 UTC) --->
       <cftry>
         <cfset startedAt = Replace(startedAt, "T", " ")>
         <cfset startedAt = Left(startedAt, 19)>
         <cfset startDate = ParseDateTime(startedAt)>
-        <cfset uptimeSeconds = DateDiff("s", startDate, Now())>
+        <cfset nowUTC = DateConvert("local2utc", Now())>
+        <cfset uptimeSeconds = DateDiff("s", startDate, nowUTC)>
         <cfset uptimeDays = Int(uptimeSeconds / 86400)>
         <cfset uptimeHours = Int((uptimeSeconds MOD 86400) / 3600)>
         <cfset uptimeMins = Int((uptimeSeconds MOD 3600) / 60)>
@@ -155,31 +185,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ================================================================== --->
 <!--- READ SETTINGS FROM DATABASE                                         --->
 <!--- ================================================================== --->
-<cfquery name="getUnboundSettings" datasource="hermes">
-    SELECT parameter, value2 FROM parameters2 WHERE module = 'unbound'
+<cfquery name="getForwardingEnabled" datasource="hermes">
+    SELECT value2 FROM parameters2 WHERE module = 'unbound' AND parameter = 'forwarding.enabled'
 </cfquery>
-<cfset ub = StructNew()>
-<cfloop query="getUnboundSettings">
-    <cfset ub[getUnboundSettings.parameter] = getUnboundSettings.value2>
-</cfloop>
-<cfparam name="ub['forwarding.enabled']" default="no">
-<cfparam name="ub['forwarding.tls']" default="no">
-<cfparam name="ub['forwarding.server1']" default="">
-<cfparam name="ub['forwarding.server2']" default="">
-<cfparam name="ub['forwarding.server3']" default="">
-<cfparam name="ub['forwarding.server4']" default="">
+<cfset forwardingEnabled = false>
+<cfif getForwardingEnabled.recordcount GTE 1 AND getForwardingEnabled.value2 EQ "yes">
+    <cfset forwardingEnabled = true>
+</cfif>
 
-<cfset forwardingEnabled = (ub['forwarding.enabled'] EQ "yes")>
-<cfset forwardTls = ub['forwarding.tls']>
-<cfset currentForwarders = ArrayNew(1)>
-<cfloop list="forwarding.server1,forwarding.server2,forwarding.server3,forwarding.server4" index="skey">
-    <cfset ArrayAppend(currentForwarders, Trim(ub[skey]))>
-</cfloop>
-
-<!--- Pad forwarders array to 4 entries --->
-<cfloop condition="ArrayLen(currentForwarders) LT 4">
-  <cfset ArrayAppend(currentForwarders, "")>
-</cfloop>
+<cfquery name="getForwarders" datasource="hermes">
+    SELECT id, server, port, tls, enabled, sort_order FROM dns_forwarders ORDER BY sort_order ASC
+</cfquery>
 
 <!--- ================================================================== --->
 <!--- READ DNSSEC STATUS                                                  --->
@@ -313,82 +329,131 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ================================================================== --->
 <!--- CARD 2: UPSTREAM FORWARDERS                                         --->
 <!--- ================================================================== --->
+<!-- FORWARDING MODE -->
 <form method="post" action="view_dns_resolver.cfm">
-<input type="hidden" name="action" value="save_forwarders">
-
+<input type="hidden" name="action" value="save_forwarding">
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-project-diagram"></i> Upstream Forwarders</h3>
+    <h3 class="card-title"><i class="fas fa-project-diagram"></i> DNS Forwarding</h3>
   </div>
   <div class="card-body">
     <div class="alert alert-info">
-      <p class="mb-0"><i class="icon fas fa-info-circle"></i> When forwarding is enabled, Unbound forwards DNS queries to the specified upstream resolvers instead of performing full recursive resolution. When disabled, Unbound queries root servers directly (requires outbound port 53 access).</p>
+      <p class="mb-0"><i class="icon fas fa-info-circle"></i> <strong>Recursive resolution</strong> (default) queries authoritative DNS servers directly. Recommended for email servers to ensure reliable RBL/DNSBL lookups. <strong>Forwarding</strong> sends queries to upstream resolvers like Cloudflare or Google.</p>
     </div>
-
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
-          <label class="form-label"><strong>DNS Forwarding</strong></label>
-          <select class="form-select" name="forwarding_enabled" id="forwarding_enabled">
-            <option value="yes" <cfif forwardingEnabled>selected</cfif>>Enabled (forward to upstream resolvers)</option>
-            <option value="no" <cfif NOT forwardingEnabled>selected</cfif>>Disabled (full recursive resolution)</option>
+          <label class="form-label"><strong>DNS Resolution Mode</strong></label>
+          <select class="form-select" name="forwarding_enabled">
+            <option value="no" <cfif NOT forwardingEnabled>selected</cfif>>Recursive (recommended for email servers)</option>
+            <option value="yes" <cfif forwardingEnabled>selected</cfif>>Forward to upstream resolvers</option>
           </select>
-          <small class="form-text text-muted">When disabled, Unbound acts as a full recursive resolver, querying authoritative DNS servers directly. This provides maximum privacy but requires outbound UDP/TCP port 53.</small>
-        </div>
-      </div>
-      <div class="col-md-6">
-        <div class="mb-3">
-          <label class="form-label"><strong>DNS-over-TLS</strong></label>
-          <select class="form-select" name="forward_tls" id="forward_tls">
-            <option value="no" <cfif forwardTls NEQ "yes">selected</cfif>>Disabled (standard DNS, port 53)</option>
-            <option value="yes" <cfif forwardTls EQ "yes">selected</cfif>>Enabled (DNS-over-TLS, port 853)</option>
-          </select>
-          <small class="form-text text-muted">Encrypts DNS queries to upstream forwarders using TLS (port 853). The upstream resolvers must support DNS-over-TLS (e.g., Cloudflare 1.1.1.1, Google 8.8.8.8, Quad9 9.9.9.9).</small>
         </div>
       </div>
     </div>
-
-    <hr>
-
-    <h5><i class="fas fa-network-wired"></i> Forwarder Addresses</h5>
-    <p class="text-muted">Enter up to 4 upstream DNS resolver IP addresses. Common choices: Cloudflare (1.1.1.1, 1.0.0.1), Google (8.8.8.8, 8.8.4.4), Quad9 (9.9.9.9, 149.112.112.112).</p>
-
-    <div class="row" id="forwarder_fields">
-      <cfoutput>
-      <div class="col-md-3">
-        <div class="mb-3">
-          <label class="form-label"><strong>Forwarder 1</strong></label>
-          <input type="text" class="form-control" name="forwarder1" id="forwarder1" value="#encodeForHTMLAttribute(currentForwarders[1])#" placeholder="e.g., 1.1.1.1">
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="mb-3">
-          <label class="form-label"><strong>Forwarder 2</strong></label>
-          <input type="text" class="form-control" name="forwarder2" id="forwarder2" value="#encodeForHTMLAttribute(currentForwarders[2])#" placeholder="e.g., 1.0.0.1">
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="mb-3">
-          <label class="form-label"><strong>Forwarder 3</strong></label>
-          <input type="text" class="form-control" name="forwarder3" id="forwarder3" value="#encodeForHTMLAttribute(currentForwarders[3])#" placeholder="e.g., 8.8.8.8">
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="mb-3">
-          <label class="form-label"><strong>Forwarder 4</strong></label>
-          <input type="text" class="form-control" name="forwarder4" id="forwarder4" value="#encodeForHTMLAttribute(currentForwarders[4])#" placeholder="e.g., 8.8.4.4">
-        </div>
-      </div>
-      </cfoutput>
-    </div>
-
   </div>
   <div class="card-footer">
-    <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i>&nbsp;&nbsp;Save Forwarders</button>
+    <button type="submit" class="btn btn-primary"><i class="fa fa-save"></i> Save &amp; Apply</button>
   </div>
 </div>
-
 </form>
+
+<!-- FORWARDERS TABLE -->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-network-wired"></i> Upstream Forwarders (<cfoutput>#getForwarders.recordcount#</cfoutput>)</h3>
+  </div>
+  <div class="card-body">
+    <cfif NOT forwardingEnabled>
+      <div class="alert alert-secondary mb-3">
+        <i class="fas fa-info-circle"></i> Forwarding is currently <strong>disabled</strong>. Forwarders below will be used when forwarding is enabled.
+      </div>
+    </cfif>
+
+    <!-- ADD FORWARDER -->
+    <form method="post" action="view_dns_resolver.cfm" class="row g-3 align-items-end mb-3">
+      <input type="hidden" name="action" value="add_forwarder">
+      <div class="col-md-4">
+        <label class="form-label"><strong>Server IP</strong></label>
+        <input type="text" class="form-control" name="new_server" placeholder="e.g., 1.1.1.1" required pattern="(\d{1,3}\.){3}\d{1,3}">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label"><strong>Port</strong></label>
+        <input type="number" class="form-control" name="new_port" value="853" min="1" max="65535">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label"><strong>TLS</strong></label>
+        <select class="form-select" name="new_tls">
+          <option value="0" selected>No</option>
+          <option value="1">Yes</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button type="submit" class="btn btn-primary"><i class="fa fa-plus"></i> Add</button>
+      </div>
+    </form>
+
+    <!-- FORWARDERS LIST -->
+    <table class="table table-bordered table-striped">
+      <thead>
+        <tr>
+          <th>Server</th>
+          <th>Port</th>
+          <th>TLS</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <cfoutput query="getForwarders">
+        <tr<cfif enabled NEQ 1> class="table-secondary"</cfif>>
+          <td><code>#encodeForHTML(server)#</code></td>
+          <td>#port#</td>
+          <td>
+            <cfif tls EQ 1>
+              <span class="badge bg-success">Yes</span>
+            <cfelse>
+              <span class="badge bg-secondary">No</span>
+            </cfif>
+          </td>
+          <td>
+            <cfif enabled EQ 1>
+              <span class="badge bg-success">Enabled</span>
+            <cfelse>
+              <span class="badge bg-secondary">Disabled</span>
+            </cfif>
+          </td>
+          <td>
+            <form method="post" action="view_dns_resolver.cfm" style="display:inline;">
+              <input type="hidden" name="action" value="toggle_forwarder">
+              <input type="hidden" name="forwarder_id" value="#id#">
+              <button type="submit" class="btn btn-sm btn-<cfif enabled EQ 1>warning<cfelse>success</cfif>" title="<cfif enabled EQ 1>Disable<cfelse>Enable</cfif>">
+                <i class="fas fa-<cfif enabled EQ 1>pause<cfelse>play</cfif>"></i>
+              </button>
+            </form>
+            <form method="post" action="view_dns_resolver.cfm" style="display:inline;" onsubmit="return confirm('Delete forwarder #encodeForJavaScript(server)#?');">
+              <input type="hidden" name="action" value="delete_forwarder">
+              <input type="hidden" name="forwarder_id" value="#id#">
+              <button type="submit" class="btn btn-sm btn-danger" title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        </cfoutput>
+        <cfif getForwarders.recordcount EQ 0>
+          <tr><td colspan="5" class="text-center text-muted">No forwarders configured.</td></tr>
+        </cfif>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    <form method="post" action="view_dns_resolver.cfm" style="display:inline;">
+      <input type="hidden" name="action" value="apply_forwarders">
+      <button type="submit" class="btn btn-warning"><i class="fas fa-sync"></i> Apply &amp; Restart Unbound</button>
+    </form>
+  </div>
+</div>
 
 <!--- ================================================================== --->
 <!--- CARD 3: DNSSEC                                                      --->
