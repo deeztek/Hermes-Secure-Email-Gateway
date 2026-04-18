@@ -252,17 +252,24 @@ $(document).ready(function() {
             <cfinclude template="/user-auth/inc/ldap_modify_user_password.cfm">
 
             <cfif ldapPasswordModified>
-                <!--- Sync Nextcloud app password with new LDAP password --->
+                <!--- Sync NC local password for DAV auth --->
                 <cfquery name="checkNcEnabledPwd" datasource="hermes">
                     SELECT nextcloud_enabled FROM mailboxes
                     WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
                 </cfquery>
                 <cfif checkNcEnabledPwd.recordcount GTE 1 AND Val(checkNcEnabledPwd.nextcloud_enabled) EQ 1>
                     <cftry>
-                        <cfset ncAppPasswordAction = "update">
-                        <cfset ncAppPasswordUser = session.email>
-                        <cfset ncAppPasswordValue = trim(form.newpassword)>
-                        <cfinclude template="../../admin/2/inc/nextcloud_app_password.cfm">
+                        <cfinclude template="../../admin/2/inc/generate_customtrans.cfm">
+                        <cfset ncPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_pwd_update.sh">
+                        <cfscript>
+                            fileWrite(ncPwdScript,
+                                chr(35) & "!/bin/bash" & chr(10) &
+                                'docker exec -e OC_PASS="' & trim(form.newpassword) & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & session.email & '" 2>&1' & chr(10),
+                                "utf-8");
+                        </cfscript>
+                        <cfexecute name="/bin/chmod" arguments="+x #ncPwdScript#" timeout="10" />
+                        <cfexecute name="#ncPwdScript#" variable="ncPwdResult" errorVariable="ncPwdError" timeout="30" />
+                        <cftry><cffile action="delete" file="#ncPwdScript#"><cfcatch type="any"></cfcatch></cftry>
                     <cfcatch type="any"></cfcatch>
                     </cftry>
                 </cfif>

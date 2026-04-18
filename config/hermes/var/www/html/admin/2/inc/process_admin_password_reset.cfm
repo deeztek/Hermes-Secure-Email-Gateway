@@ -170,17 +170,24 @@ Allows administrators to reset a user's password from the admin panel.
     <cfset adminUsername = "admin">
 </cfif>
 
-<!--- Sync Nextcloud app password with new password --->
+<!--- Sync NC local password for DAV auth --->
 <cfquery name="checkNcEnabledAdminReset" datasource="hermes">
     SELECT nextcloud_enabled FROM mailboxes
     WHERE username = <cfqueryparam value="#getRequest.email#" cfsqltype="cf_sql_varchar">
 </cfquery>
 <cfif checkNcEnabledAdminReset.recordcount GTE 1 AND Val(checkNcEnabledAdminReset.nextcloud_enabled) EQ 1>
     <cftry>
-        <cfset ncAppPasswordAction = "update">
-        <cfset ncAppPasswordUser = getRequest.email>
-        <cfset ncAppPasswordValue = trim(form.new_password)>
-        <cfinclude template="nextcloud_app_password.cfm">
+        <cfinclude template="generate_customtrans.cfm">
+        <cfset ncPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_pwd_update.sh">
+        <cfscript>
+            fileWrite(ncPwdScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                'docker exec -e OC_PASS="' & trim(form.new_password) & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & getRequest.email & '" 2>&1' & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #ncPwdScript#" timeout="10" />
+        <cfexecute name="#ncPwdScript#" variable="ncPwdResult" errorVariable="ncPwdError" timeout="30" />
+        <cftry><cffile action="delete" file="#ncPwdScript#"><cfcatch type="any"></cfcatch></cftry>
     <cfcatch type="any"><!--- Non-fatal ---></cfcatch>
     </cftry>
 </cfif>

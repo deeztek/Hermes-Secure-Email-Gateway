@@ -301,7 +301,7 @@ services:
       - ./config/ofelia:/etc/ofelia
       - authelia_logs:/opt/hermes/logs/authelia
       - ./config/authelia:/etc/authelia
-      - ./config/unbound/conf.d:/etc/unbound/conf.d
+      - ./config/unbound/conf.d:/etc/unbound/conf.d # Unbound
       - ./config/nginx/etc/nginx:/etc/nginx
       - ./config/dovecot-2.4/conf:/etc/dovecot
       - ./config/postfix-dkim/etc/postfix:/etc/postfix
@@ -569,6 +569,7 @@ services:
     volumes:
       - nextcloud:/var/www/html
       - /var/www/html/dist/img:/img
+      - ./config/hermes/opt/hermes:/opt/hermes #Shared volume for app password crypto, creds, and temp files
     environment:
       - TZ=${TIMEZONE}
       - MYSQL_HOST=hermes_db_server:3306

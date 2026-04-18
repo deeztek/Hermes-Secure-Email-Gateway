@@ -2,20 +2,20 @@
 <!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
-NEXTCLOUD USER PRE-PROVISIONING (user_oidc API)
-Pre-creates a Nextcloud user via the user_oidc provisioning API so that
-group membership, mail profile, and app password can be set immediately
-at mailbox creation time - without waiting for the user's first OIDC login.
-
-The user is created as an OIDC-backed account (no local password). When
-the user eventually logs in via Authelia, user_oidc recognises the existing
+NEXTCLOUD USER PRE-PROVISIONING (occ user:add)
+Creates a local Nextcloud user with the same password as the mailbox.
+When the user logs in via OIDC, user_oidc recognises the existing
 account (soft_auto_provision=true) and takes over seamlessly.
+
+The local password enables DAV authentication (CalDAV/CardDAV/WebDAV)
+using the same credentials as email — no app passwords needed.
 
 Requires the following variables before including:
   - ncProvisionAction: "create" or "delete"
   - ncProvisionUser: Nextcloud username (email address)
   - ncProvisionDisplayName: Display name (for create)
   - ncProvisionEmail: Email address (for create)
+  - ncProvisionPassword: Plaintext password (for create)
 
 Sets after execution:
   - ncProvisionResult: "success", "error", or "skipped"
@@ -26,6 +26,7 @@ Sets after execution:
 <cfparam name="ncProvisionUser" default="">
 <cfparam name="ncProvisionDisplayName" default="">
 <cfparam name="ncProvisionEmail" default="">
+<cfparam name="ncProvisionPassword" default="">
 
 <cfset ncProvisionResult = "skipped">
 <cfset ncProvisionError = "">
@@ -35,91 +36,50 @@ Sets after execution:
 
 <cfelseif ncProvisionAction EQ "create">
 
-    <cftry>
-        <!--- Read NC admin credentials --->
-        <cffile action="read" file="/opt/hermes/creds/nextcloud_admin_username" variable="ncAdminUser" charset="utf-8">
-        <cfset ncAdminUser = Trim(ncAdminUser)>
-        <cffile action="read" file="/opt/hermes/creds/nextcloud_admin_password" variable="ncAdminPass" charset="utf-8">
-        <cfset ncAdminPass = Trim(ncAdminPass)>
-
-        <!--- Get the user_oidc provider ID. We registered the provider as
-             "Hermes_SEG" - parse the occ output to find its numeric ID. --->
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider --output=json"
-            variable="providerListJson"
-            errorVariable="providerListError"
-            timeout="30" />
-
-        <cfset providerId = "">
-        <cfif IsJSON(Trim(providerListJson))>
-            <cfset providers = DeserializeJSON(Trim(providerListJson))>
-            <cfif IsArray(providers)>
-                <cfloop array="#providers#" index="p">
-                    <cfif IsStruct(p) AND StructKeyExists(p, "identifier") AND p.identifier EQ "Hermes_SEG">
-                        <cfset providerId = p.id>
-                    </cfif>
-                </cfloop>
-            </cfif>
-        </cfif>
-
-        <cfif providerId EQ "">
-            <cfset ncProvisionResult = "error">
-            <cfset ncProvisionError = "Could not find Hermes_SEG provider ID">
+    <cfif ncProvisionPassword EQ "">
+        <cfset ncProvisionResult = "skipped">
+        <cfset ncProvisionError = "No password provided">
+    <cfelse>
+        <cftry>
+            <!--- Create NC user with occ user:add using password from env var --->
+            <cfinclude template="generate_customtrans.cfm">
+            <cfset provScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_provision.sh">
             <cfscript>
-                fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
-                    "ERROR: Provider not found" & chr(10) &
-                    "occ output: " & Left(providerListJson, 500) & chr(10) &
-                    "occ error: " & Left(providerListError, 500) & chr(10) &
-                    "---" & chr(10),
+                fileWrite(provScript,
+                    chr(35) & "!/bin/bash" & chr(10) &
+                    'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10),
                     "utf-8");
             </cfscript>
-        <cfelse>
-            <!--- Call the user_oidc pre-provisioning API.
-                 URL uses hermes_nextcloud:80 (Docker internal) without /nc/
-                 prefix - the /nc/ is Nginx's reverse proxy path, not NC's. --->
-            <cfhttp url="http://hermes_nextcloud:80/ocs/v2.php/apps/user_oidc/api/v1/user"
-                method="POST"
-                timeout="30"
-                username="#ncAdminUser#"
-                password="#ncAdminPass#">
-                <cfhttpparam type="header" name="OCS-APIREQUEST" value="true">
-                <cfhttpparam type="header" name="Content-Type" value="application/json">
-                <cfhttpparam type="body" value='{"providerId":#providerId#,"userId":"#ncProvisionUser#","displayName":"#ncProvisionDisplayName#","email":"#ncProvisionEmail#"}'>
-            </cfhttp>
+            <cfexecute name="/bin/chmod" arguments="+x #provScript#" timeout="10" />
+            <cfexecute name="#provScript#"
+                variable="provResult"
+                errorVariable="provError"
+                timeout="30" />
+            <cftry><cffile action="delete" file="#provScript#"><cfcatch type="any"></cfcatch></cftry>
 
             <!--- Debug log --->
             <cfscript>
                 fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
                     "Provision: " & ncProvisionUser & chr(10) &
-                    "Provider ID: " & providerId & chr(10) &
-                    "HTTP Status: " & cfhttp.statusCode & chr(10) &
-                    "Response: " & Left(cfhttp.fileContent, 500) & chr(10) &
+                    "Result: " & provResult & chr(10) &
+                    "Error: " & provError & chr(10) &
                     "---" & chr(10),
                     "utf-8");
             </cfscript>
 
-            <cfif cfhttp.statusCode CONTAINS "200">
+            <cfif FindNoCase("created successfully", provResult) OR FindNoCase("already exists", provResult)>
                 <cfset ncProvisionResult = "success">
             <cfelse>
                 <cfset ncProvisionResult = "error">
-                <cfset ncProvisionError = "API returned: " & cfhttp.statusCode & " - " & Left(cfhttp.fileContent, 500)>
+                <cfset ncProvisionError = provResult>
             </cfif>
-        </cfif>
 
-    <cfcatch type="any">
-        <cfset ncProvisionResult = "error">
-        <cfset ncProvisionError = cfcatch.message>
-        <cfscript>
-            fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
-                "EXCEPTION in provision" & chr(10) &
-                "Message: " & cfcatch.message & chr(10) &
-                "Detail: " & cfcatch.detail & chr(10) &
-                "Type: " & cfcatch.type & chr(10) &
-                "---" & chr(10),
-                "utf-8");
-        </cfscript>
-    </cfcatch>
-    </cftry>
+        <cfcatch type="any">
+            <cfset ncProvisionResult = "error">
+            <cfset ncProvisionError = cfcatch.message>
+        </cfcatch>
+        </cftry>
+    </cfif>
 
 <cfelseif ncProvisionAction EQ "delete">
 

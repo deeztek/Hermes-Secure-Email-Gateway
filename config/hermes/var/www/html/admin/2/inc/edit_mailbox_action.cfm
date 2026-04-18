@@ -303,11 +303,19 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
             WHERE username = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
         </cfquery>
         <cfif checkNcEnabled.recordcount GTE 1 AND Val(checkNcEnabled.nextcloud_enabled) EQ 1>
+            <!--- Update NC local password for DAV auth --->
             <cftry>
-                <cfset ncAppPasswordAction = "update">
-                <cfset ncAppPasswordUser = getMailbox.username>
-                <cfset ncAppPasswordValue = trim(form.edit_password)>
-                <cfinclude template="nextcloud_app_password.cfm">
+                <cfinclude template="generate_customtrans.cfm">
+                <cfset ncPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_pwd_update.sh">
+                <cfscript>
+                    fileWrite(ncPwdScript,
+                        chr(35) & "!/bin/bash" & chr(10) &
+                        'docker exec -e OC_PASS="' & trim(form.edit_password) & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & getMailbox.username & '" 2>&1' & chr(10),
+                        "utf-8");
+                </cfscript>
+                <cfexecute name="/bin/chmod" arguments="+x #ncPwdScript#" timeout="10" />
+                <cfexecute name="#ncPwdScript#" variable="ncPwdResult" errorVariable="ncPwdError" timeout="30" />
+                <cftry><cffile action="delete" file="#ncPwdScript#"><cfcatch type="any"></cfcatch></cftry>
             <cfcatch type="any"></cfcatch>
             </cftry>
 

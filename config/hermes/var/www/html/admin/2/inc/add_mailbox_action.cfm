@@ -404,17 +404,18 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4c. NEXTCLOUD PRE-PROVISION USER. Create the NC user via the user_oidc
-     provisioning API so that group membership, mail profile, and app
-     password can all be set immediately. The user is created as an
-     OIDC-backed account (no local password, no backdoor). When the user
-     logs in via Authelia, user_oidc recognises the existing account. --->
+<!--- 4c. NEXTCLOUD PRE-PROVISION USER. Create a local NC user with the same
+     password as the mailbox. DAV auth (CalDAV/CardDAV) works with the
+     email password directly — no app passwords needed. When the user
+     logs in via OIDC, user_oidc takes over the existing account
+     (soft_auto_provision=true). --->
 <cfif form.nextcloud_enabled EQ "1">
     <cftry>
         <cfset ncProvisionAction = "create">
         <cfset ncProvisionUser = recipientEmail>
         <cfset ncProvisionDisplayName = displayName>
         <cfset ncProvisionEmail = recipientEmail>
+        <cfset ncProvisionPassword = trim(form.password)>
         <cfinclude template="nextcloud_provision_user.cfm">
     <cfcatch type="any">
         <!--- Non-fatal: NC features will be set up on first OIDC login --->
@@ -446,23 +447,8 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4e. NEXTCLOUD APP PASSWORD (CalDAV/CardDAV). Creates a "Hermes System"
-     app password with the same credentials as the mailbox. The token hash
-     is replaced with SHA-512(password + NC secret) so the user's email
-     password works for DAV authentication. Only created if the admin
-     checked the "Create App Password" checkbox. --->
-<cfparam name="form.create_app_password" default="0">
-<cfif form.nextcloud_enabled EQ "1" AND form.create_app_password EQ "1" AND trim(form.password) NEQ "">
-    <cftry>
-        <cfset ncAppPasswordAction = "create">
-        <cfset ncAppPasswordUser = recipientEmail>
-        <cfset ncAppPasswordValue = trim(form.password)>
-        <cfinclude template="nextcloud_app_password.cfm">
-    <cfcatch type="any">
-        <!--- Non-fatal --->
-    </cfcatch>
-    </cftry>
-</cfif>
+<!--- 4e. (App password removed — DAV auth uses the local NC password
+     created in step 4c via occ user:add. No separate app password needed.) --->
 
 <!--- 4f. NEXTCLOUD MAIL ACCOUNT. Create an email account in the Nextcloud
      Mail app so the user can send/receive through webmail. Uses Docker

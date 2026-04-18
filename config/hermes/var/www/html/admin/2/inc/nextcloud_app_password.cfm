@@ -9,9 +9,10 @@ The app password is named "Hermes System" and allows DAV clients
 
 How it works:
   1. Creates an app password token via occ user:auth-tokens:add
-  2. Computes SHA-512(ldap_password + nc_secret) where nc_secret is from config.php
-  3. Updates oc_authtoken.token with the computed hash and renames to "Hermes System"
-  4. The user's email password now works for DAV authentication
+  2. Calls nextcloud_app_password_crypto.cfm to replace the token's
+     crypto chain (token hash, RSA keypair, encrypted private key,
+     encrypted password) so the user's email password works for DAV
+  3. Renames the token from "cli" to "Hermes System"
 
 Requires the following variables before including:
   - ncAppPasswordAction: "create", "update", or "delete"
@@ -86,10 +87,6 @@ Non-fatal: failures are caught and logged but do not block the calling action.
         <cftry>
             <!--- Step 1: If updating, delete existing "Hermes System" tokens first --->
             <cfif ncAppPasswordAction EQ "update">
-                <cfset savedAction = ncAppPasswordAction>
-                <cfset savedValue = ncAppPasswordValue>
-                <cfset ncAppPasswordAction = "delete">
-                <!--- Inline delete instead of recursive include --->
                 <cftry>
                     <cfexecute name="/usr/local/bin/docker"
                         arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:list #ncAppPasswordUser# --output=json"
@@ -119,12 +116,9 @@ Non-fatal: failures are caught and logged but do not block the calling action.
                     </cfif>
                 <cfcatch type="any"><!--- ignore delete errors ---></cfcatch>
                 </cftry>
-                <cfset ncAppPasswordAction = savedAction>
-                <cfset ncAppPasswordValue = savedValue>
             </cfif>
 
-            <!--- Step 2: Create a new app password via occ.
-                 Use --password-from-env to embed the login password in the token. --->
+            <!--- Step 2: Create a new app password via occ --->
             <cfinclude template="generate_customtrans.cfm">
             <cfset appPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_app_pwd.sh">
             <cfscript>
@@ -140,58 +134,78 @@ Non-fatal: failures are caught and logged but do not block the calling action.
                 timeout="30" />
             <cftry><cffile action="delete" file="#appPwdScript#"><cfcatch type="any"></cfcatch></cftry>
 
-            <!--- Step 3: Read NC secret from config.php for token hash --->
-            <cffile action="read" file="/mnt/data/nextcloud/config/config.php" variable="ncConfigContent" charset="utf-8">
-            <cfset secretMatch = REFind("'secret'\s*=>\s*'([^']*)'", ncConfigContent, 1, true)>
-            <cfif secretMatch.pos[1] GT 0>
-                <cfset ncSecret = Mid(ncConfigContent, secretMatch.pos[2], secretMatch.len[2])>
-            <cfelse>
-                <cfthrow message="Could not read NC secret from config.php">
-            </cfif>
-
-            <!--- Step 4: Compute SHA-512(password + secret) --->
-            <cfscript>
-                msgDigest = createObject("java", "java.security.MessageDigest").getInstance("SHA-512");
-                inputBytes = (ncAppPasswordValue & ncSecret).getBytes("UTF-8");
-                msgDigest.update(inputBytes);
-                hashBytes = msgDigest.digest();
-                sb = createObject("java", "java.lang.StringBuilder");
-                for (b in hashBytes) {
-                    sb.append(createObject("java", "java.lang.String").format("%02x",
-                        [createObject("java", "java.lang.Integer").valueOf(bitAnd(b, 255))]));
-                }
-                tokenHash = sb.toString();
-            </cfscript>
-
-            <!--- Step 5: Update oc_authtoken — set token hash and rename to "Hermes System".
-                 Uses docker exec mysql since the nextcloud datasource is not available
-                 in the CFML application context. --->
+            <!--- Step 3: Find the token ID we just created (most recent "cli" token for this user) --->
             <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncDbUser" charset="utf-8">
             <cfset ncDbUser = Trim(ncDbUser)>
             <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPass" charset="utf-8">
             <cfset ncDbPass = Trim(ncDbPass)>
 
             <cfinclude template="generate_customtrans.cfm">
-            <cfset updateScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_update.sh">
+            <cfset findScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_find_token.sh">
             <cfscript>
-                fileWrite(updateScript,
+                fileWrite(findScript,
                     chr(35) & "!/bin/bash" & chr(10) &
-                    "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -e """ &
-                    "UPDATE oc_authtoken SET token='" & tokenHash & "', name='Hermes System' " &
-                    "WHERE uid='" & ncAppPasswordUser & "' AND name='cli' ORDER BY id DESC LIMIT 1;" &
+                    "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -N -e """ &
+                    "SELECT id FROM oc_authtoken WHERE uid='" & ncAppPasswordUser & "' AND name='cli' ORDER BY id DESC LIMIT 1;" &
                     """" & chr(10),
                     "utf-8");
             </cfscript>
-            <cfexecute name="/bin/chmod" arguments="+x #updateScript#" timeout="10" />
-            <cfexecute name="#updateScript#"
-                variable="updateResult"
-                errorVariable="updateError"
+            <cfexecute name="/bin/chmod" arguments="+x #findScript#" timeout="10" />
+            <cfexecute name="#findScript#"
+                variable="tokenIdResult"
+                errorVariable="tokenIdError"
                 timeout="30" />
-            <cftry><cffile action="delete" file="#updateScript#"><cfcatch type="any"></cfcatch></cftry>
+            <cftry><cffile action="delete" file="#findScript#"><cfcatch type="any"></cfcatch></cftry>
 
-            <cfset ncAppPasswordResult = "success">
+            <cfset newTokenId = Trim(tokenIdResult)>
+
+            <cfscript>
+                fileWrite("/opt/hermes/tmp/nc_apppwd_debug.log",
+                    "Step 3 complete" & chr(10) &
+                    "occ result: " & occResult & chr(10) &
+                    "token ID result: [" & tokenIdResult & "]" & chr(10) &
+                    "token ID trimmed: [" & newTokenId & "]" & chr(10) &
+                    "is numeric: " & IsNumeric(newTokenId) & chr(10) &
+                    "---" & chr(10),
+                    "utf-8");
+            </cfscript>
+
+            <cfif NOT IsNumeric(newTokenId)>
+                <cfthrow message="Could not find newly created token ID. occ output: #occResult# | find result: #tokenIdResult#">
+            </cfif>
+
+            <!--- Step 4: Replace the crypto chain using the crypto module --->
+            <cfset ncCryptoTokenId = newTokenId>
+            <cfset ncCryptoPassword = ncAppPasswordValue>
+            <cfset ncCryptoUser = ncAppPasswordUser>
+            <cfinclude template="nextcloud_app_password_crypto.cfm">
+
+            <cfscript>
+                fileAppend("/opt/hermes/tmp/nc_apppwd_debug.log",
+                    "Step 4 complete" & chr(10) &
+                    "crypto result: " & ncCryptoResult & chr(10) &
+                    "crypto error: " & ncCryptoError & chr(10) &
+                    "---" & chr(10),
+                    "utf-8");
+            </cfscript>
+
+            <cfif ncCryptoResult EQ "success">
+                <cfset ncAppPasswordResult = "success">
+            <cfelse>
+                <cfset ncAppPasswordResult = "error">
+                <cfset ncAppPasswordError = ncCryptoError>
+            </cfif>
 
         <cfcatch type="any">
+            <cfscript>
+                fileWrite("/opt/hermes/tmp/nc_apppwd_debug.log",
+                    "EXCEPTION in nextcloud_app_password" & chr(10) &
+                    "Message: " & cfcatch.message & chr(10) &
+                    "Detail: " & cfcatch.detail & chr(10) &
+                    "Type: " & cfcatch.type & chr(10) &
+                    "---" & chr(10),
+                    "utf-8");
+            </cfscript>
             <cfset ncAppPasswordResult = "error">
             <cfset ncAppPasswordError = cfcatch.message & " | " & cfcatch.detail>
         </cfcatch>
