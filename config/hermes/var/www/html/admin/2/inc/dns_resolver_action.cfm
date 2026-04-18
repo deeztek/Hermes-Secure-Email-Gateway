@@ -111,7 +111,7 @@ Uses docker exec for container restart and cache flush.
   <cftry>
     <!--- Use temp script to capture stderr from unbound-control --->
     <cfinclude template="generate_customtrans.cfm">
-    <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound unbound-control flush_zone . 2>&1">
+    <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound unbound-control flush_zone . 2>&1">
     <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_flush_cache.sh">
     <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
     <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />

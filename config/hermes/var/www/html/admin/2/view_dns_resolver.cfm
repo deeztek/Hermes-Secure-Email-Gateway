@@ -210,7 +210,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif containerRunning>
   <cftry>
     <cfinclude template="./inc/generate_customtrans.cfm">
-    <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound cat /etc/unbound/unbound.conf 2>&1">
+    <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound cat /etc/unbound/unbound.conf 2>&1">
     <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dns_sec.sh">
     <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
     <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
@@ -250,7 +250,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif containerRunning>
   <cftry>
     <cfinclude template="./inc/generate_customtrans.cfm">
-    <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound unbound-control stats_noreset 2>&1">
+    <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound unbound-control stats_noreset 2>&1">
     <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dns_stats.sh">
     <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
     <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
@@ -447,7 +447,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfif StructKeyExists(form, "dnssec_test") AND form.dnssec_test EQ "1" AND containerRunning>
           <cftry>
             <cfinclude template="./inc/generate_customtrans.cfm">
-            <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound drill -D example.com 2>&1">
+            <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound drill -D example.com 2>&1">
             <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dnssec_test.sh">
             <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
             <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
@@ -658,7 +658,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfif containerRunning>
           <cftry>
             <cfinclude template="./inc/generate_customtrans.cfm">
-            <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound drill @127.0.0.1 #lookupType# #lookupDomain# 2>&1">
+            <cfset scriptContent = chr(35) & "!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound drill @127.0.0.1 #lookupType# #lookupDomain# 2>&1">
             <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dns_lookup.sh">
             <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
             <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
