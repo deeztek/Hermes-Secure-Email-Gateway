@@ -13,8 +13,8 @@ RUN apt-get update && \
         ldnsutils \
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure unbound can read root hints and trust anchor
-RUN chown -R unbound:unbound /etc/unbound
+# Ensure unbound can read/write root hints and trust anchor
+RUN chown -R unbound:unbound /etc/unbound /usr/share/dns
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD drill @127.0.0.1 localhost || exit 1
