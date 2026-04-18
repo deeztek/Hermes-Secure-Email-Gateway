@@ -3,7 +3,8 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
 
 DNS RESOLVER ACTION HANDLER
 Handles save_forwarders, restart_unbound, flush_cache actions.
-Uses docker exec / docker cp to manage the hermes_unbound container.
+Writes config files directly to mounted /etc/unbound/conf.d/ volume.
+Uses docker exec for container restart and cache flush.
 --->
 
 <cfif action EQ "save_forwarders">
@@ -58,35 +59,15 @@ Uses docker exec / docker cp to manage the hermes_unbound container.
         <cfset forwarderConf = forwarderConf & "    forward-addr: " & fwdIP & nl>
       </cfloop>
 
-      <!--- Write temp file, docker cp into container --->
-      <cfinclude template="generate_customtrans.cfm">
-      <cfset tmpFile = "/opt/hermes/tmp/#customtrans3#_forward.conf">
-      <cfscript>fileWrite(tmpFile, forwarderConf, "utf-8");</cfscript>
-
-      <cfexecute name="/usr/local/bin/docker"
-          arguments="cp #tmpFile# hermes_unbound:/etc/unbound/conf.d/forward.conf"
-          variable="cpResult"
-          errorVariable="cpError"
-          timeout="10" />
-
-      <cffile action="delete" file="#tmpFile#">
+      <!--- Write directly to mounted config directory --->
+      <cfscript>fileWrite("/etc/unbound/conf.d/forward.conf", forwarderConf, "utf-8");</cfscript>
 
     <cfelse>
       <!--- Forwarding disabled: write an empty forward.conf (comments only) --->
       <cfset nl = chr(10)>
       <cfset forwarderConf = "## Forwarding disabled - Unbound performs full recursive resolution" & nl>
 
-      <cfinclude template="generate_customtrans.cfm">
-      <cfset tmpFile = "/opt/hermes/tmp/#customtrans3#_forward.conf">
-      <cfscript>fileWrite(tmpFile, forwarderConf, "utf-8");</cfscript>
-
-      <cfexecute name="/usr/local/bin/docker"
-          arguments="cp #tmpFile# hermes_unbound:/etc/unbound/conf.d/forward.conf"
-          variable="cpResult"
-          errorVariable="cpError"
-          timeout="10" />
-
-      <cffile action="delete" file="#tmpFile#">
+      <cfscript>fileWrite("/etc/unbound/conf.d/forward.conf", forwarderConf, "utf-8");</cfscript>
     </cfif>
 
     <!--- Restart unbound to apply --->

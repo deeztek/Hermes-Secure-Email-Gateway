@@ -161,13 +161,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfif containerRunning>
   <cftry>
-    <cfinclude template="./inc/generate_customtrans.cfm">
-    <cfset scriptContent = "#!/bin/bash" & chr(10) & "/usr/local/bin/docker exec hermes_unbound cat /etc/unbound/conf.d/forward.conf 2>&1">
-    <cfset scriptPath = "/opt/hermes/tmp/#customtrans3#_dns_fwd.sh">
-    <cffile action="write" file="#scriptPath#" output="#scriptContent#" addnewline="no">
-    <cfexecute name="/bin/chmod" arguments="+x #scriptPath#" timeout="10" />
-    <cfexecute name="#scriptPath#" variable="fwdConfContent" timeout="10" />
-    <cffile action="delete" file="#scriptPath#">
+    <cffile action="read" file="/etc/unbound/conf.d/forward.conf" variable="fwdConfContent" charset="utf-8">
 
     <!--- Parse forward-addr lines --->
     <cfloop list="#fwdConfContent#" delimiters="#chr(10)#" index="line">

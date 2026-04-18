@@ -301,6 +301,7 @@ services:
       - ./config/ofelia:/etc/ofelia
       - authelia_logs:/opt/hermes/logs/authelia
       - ./config/authelia:/etc/authelia
+      - ./config/unbound/conf.d:/etc/unbound/conf.d
       - ./config/nginx/etc/nginx:/etc/nginx
       - ./config/dovecot-2.4/conf:/etc/dovecot
       - ./config/postfix-dkim/etc/postfix:/etc/postfix
