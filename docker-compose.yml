@@ -78,7 +78,8 @@ services:
         max-size: 10m
         max-file: "5"
     volumes:
-      - ./config/unbound:/etc/unbound/conf.d
+      - ./config/unbound/unbound.conf:/etc/unbound/unbound.conf:ro
+      - ./config/unbound/conf.d:/etc/unbound/conf.d
     restart: unless-stopped
     networks:
       hermes_net_ext:
