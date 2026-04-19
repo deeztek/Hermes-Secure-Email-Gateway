@@ -36,10 +36,34 @@ Returns:
 <!--- LDAP USERNAME IS THE EMAIL ADDRESS --->
 <cfset ldapUsername = LCase(recipientEmail)>
 
-<!--- EXTRACT NAME PARTS FROM EMAIL --->
+<!--- givenName/sn feed the seeAlso DN pattern via {firstname}/{lastname}
+     placeholders (ldap_add_user_remoteauth.cfm). When the remoteauth DN
+     pattern requires them (typical AD default), the admin supplies real
+     values via the form and they arrive here as remoteFirstName/remoteLastName.
+     Otherwise we fall back to email-derived values. --->
 <cfset emailLocalPart = ListFirst(recipientEmail, "@")>
-<cfset ldapFirstName = emailLocalPart>
-<cfset ldapLastName = "User">
+<cfif isDefined("remoteFirstName") AND Len(Trim(remoteFirstName)) GT 0>
+    <cfset ldapFirstName = Trim(remoteFirstName)>
+<cfelse>
+    <cfset ldapFirstName = emailLocalPart>
+</cfif>
+<cfif isDefined("remoteLastName") AND Len(Trim(remoteLastName)) GT 0>
+    <cfset ldapLastName = Trim(remoteLastName)>
+<cfelse>
+    <cfset ldapLastName = "User">
+</cfif>
+
+<!--- displayName attribute = admin-entered display name (or derived from
+     the real AD First/Last, or email local part as a last resort). This
+     feeds the Authelia OIDC `name` claim and the Nextcloud display name. --->
+<cfif isDefined("displayName") AND Len(Trim(displayName)) GT 0>
+    <cfset ldapDisplayName = Trim(displayName)>
+<cfelseif (isDefined("remoteFirstName") AND Len(Trim(remoteFirstName)) GT 0)
+       OR (isDefined("remoteLastName")  AND Len(Trim(remoteLastName))  GT 0)>
+    <cfset ldapDisplayName = Trim(ldapFirstName & " " & ldapLastName)>
+<cfelse>
+    <cfset ldapDisplayName = emailLocalPart>
+</cfif>
 <cfset ldapEmail = recipientEmail>
 
 <!--- SET THE REMOTEAUTH DOMAIN FOR THE LDAP TEMPLATE --->

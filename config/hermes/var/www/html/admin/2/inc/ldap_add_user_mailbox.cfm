@@ -34,10 +34,24 @@ Returns:
 <!--- LDAP USERNAME IS THE EMAIL ADDRESS --->
 <cfset ldapUsername = LCase(recipientEmail)>
 
-<!--- EXTRACT NAME PARTS FROM EMAIL --->
+<!--- EXTRACT NAME PARTS FROM EMAIL.
+     givenName/sn are intentionally derived from the email (not the admin-entered
+     display name) because the remoteauth overlay substitutes them into the
+     seeAlso DN pattern (see ldap_add_user_remoteauth.cfm). Changing them would
+     break remote authentication for any deployment whose remote_dn_pattern
+     references {firstname} or {lastname}. --->
 <cfset emailLocalPart = ListFirst(recipientEmail, "@")>
 <cfset ldapFirstName = emailLocalPart>
 <cfset ldapLastName = "User">
+
+<!--- displayName attribute = admin-entered display name (or email local part
+     if blank). This feeds the Authelia OIDC `name` claim and the Nextcloud
+     display name. Decoupled from givenName/sn for remoteauth compatibility. --->
+<cfif isDefined("displayName") AND Len(Trim(displayName)) GT 0>
+    <cfset ldapDisplayName = Trim(displayName)>
+<cfelse>
+    <cfset ldapDisplayName = emailLocalPart>
+</cfif>
 <cfset ldapEmail = recipientEmail>
 
 <!--- USE PROVIDED PASSWORD (form.password already set by add_mailbox_action.cfm) --->

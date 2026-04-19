@@ -19,6 +19,7 @@ IMAGES=(
     "hermes-openldap"
     "hermes-dmarc"
     "hermes-dovecot"
+    "hermes-unbound"
 )
 
 # Check Docker is available

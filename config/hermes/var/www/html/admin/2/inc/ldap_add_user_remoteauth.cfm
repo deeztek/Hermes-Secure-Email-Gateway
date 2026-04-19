@@ -43,10 +43,18 @@ via the remoteauth overlay. The seeAlso attribute points to the remote DN.
     SELECT server_address, remote_dn_pattern FROM remoteauth_mappings WHERE domain_name = <cfqueryparam value="#ldapRemoteauthDomain#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<!--- BUILD THE SEEALSO DN - This points to the remote user DN --->
-<!--- Replace placeholders in the DN pattern with actual user values --->
+<!--- BUILD THE SEEALSO DN - This points to the remote user DN.
+     Placeholder semantics (must match the admin-facing help in view_remoteauth.cfm
+     and add_mailbox.cfm):
+       {username}  = local part of email (e.g. jsmith) — for sAMAccountName / uid patterns
+       {email}     = full email address (e.g. jsmith@example.com)
+       {firstname} = First Name field
+       {lastname}  = Last Name field --->
 <cfset ldapSeeAlso = getRemoteMapping.remote_dn_pattern>
-<cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{username}", ldapUsername, "ALL")>
+<!--- ListFirst on `@` handles both shapes:
+       mailbox/relay users: ldapUsername = "jsmith@company.com" -> "jsmith"
+       system users:        ldapUsername = "hermesadmin"        -> "hermesadmin" --->
+<cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{username}", ListFirst(ldapUsername, "@"), "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{firstname}", ldapFirstName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{lastname}", ldapLastName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{email}", ldapEmail, "ALL")>
@@ -56,11 +64,15 @@ via the remoteauth overlay. The seeAlso attribute points to the remote DN.
 <!--- READ THE LDAP ADDUSER REMOTEAUTH TEMPLATE --->
 <cffile action="read" file="/opt/hermes/templates/ldap_adduser_remoteauth.ldif" variable="ldapUserTemplate">
 
+<!--- DEFAULT DISPLAY NAME TO "firstName lastName" when caller did not provide one --->
+<cfparam name="ldapDisplayName" default="#ldapFirstName# #ldapLastName#">
+
 <!--- REPLACE PLACEHOLDERS WITH ACTUAL VALUES --->
 <cfset ldapUserLdif = ldapUserTemplate>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_USERNAME", ldapUsername, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_FIRSTNAME", ldapFirstName, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_LASTNAME", ldapLastName, "ALL")>
+<cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_DISPLAYNAME", ldapDisplayName, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_EMAIL", ldapEmail, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_SEEALSO", ldapSeeAlso, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_DOMAIN", ldapRemoteauthDomain, "ALL")>

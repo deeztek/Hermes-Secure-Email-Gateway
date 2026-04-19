@@ -24,6 +24,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cflocation url="index.cfm" addtoken="no">
 </cfif>
 
+<!--- FEATURE CHECK: Mailbox sharing must be enabled by an administrator --->
+<cfquery name="getSharingEnabled" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+</cfquery>
+<cfset sharingEnabled = (getSharingEnabled.recordcount GTE 1 AND getSharingEnabled.value2 EQ "yes")>
+
 <html lang="en">
 
 <head>
@@ -39,8 +46,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfparam name="session.sfMessage" default="">
 <cfparam name="session.sfMessageType" default="">
 
-<!--- PROCESS FORM SUBMISSION --->
-<cfif StructKeyExists(form, "action")>
+<!--- PROCESS FORM SUBMISSION (only if sharing is enabled) --->
+<cfif sharingEnabled AND StructKeyExists(form, "action")>
     <cfif form.action EQ "share_folder" OR form.action EQ "unshare_folder">
         <cfinclude template="./inc/shared_folder_actions.cfm">
     </cfif>
@@ -112,6 +119,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <div class="content">
       <div class="container-fluid">
 
+        <cfif NOT sharingEnabled>
+        <!--- FEATURE UNAVAILABLE --->
+        <div class="card card-outline card-secondary">
+            <div class="card-body text-center py-5">
+                <i class="fas fa-share-alt fa-4x text-muted mb-3"></i>
+                <h3 class="text-muted">Folder Sharing Unavailable</h3>
+                <p class="text-muted mb-0">Folder sharing is currently disabled on this server.<br>Please contact your administrator if you need access to this feature.</p>
+            </div>
+        </div>
+        <cfelse>
+
         <!--- DISPLAY MESSAGES --->
         <cfif session.sfMessage NEQ "">
             <div class="alert alert-<cfoutput>#session.sfMessageType#</cfoutput> alert-dismissible">
@@ -146,8 +164,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                             <div class="row mb-3">
                                 <div class="col-md-4">
                                     <label for="folder_path" class="form-label"><strong>Folder Path</strong></label>
-                                    <input type="text" class="form-control" name="folder_path" id="folder_path" placeholder="e.g. INBOX, INBOX/Projects, Sent" maxlength="255" required>
-                                    <div class="form-text">The mailbox folder you want to share.</div>
+                                    <select class="form-control" name="folder_path" id="folder_path" required>
+                                        <option value=""></option>
+                                    </select>
+                                    <div class="form-text">Pick a folder from your mailbox, or type a custom path.</div>
                                 </div>
                                 <div class="col-md-4">
                                     <label for="shared_with_username" class="form-label"><strong>Share With</strong></label>
@@ -276,9 +296,36 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
         </div>
 
+        </cfif>
+
       </div>
     </div>
   </main>
+
+<cfif sharingEnabled AND getDomainUsers.recordcount GTE 1>
+<script>
+  $(document).ready(function() {
+    var sel = document.getElementById('folder_path');
+    if (!sel) return;
+
+    var ts = new TomSelect(sel, {
+      create: function(input) { return { value: input, text: input }; },
+      createOnBlur: true,
+      persist: true,
+      sortField: { field: 'text', direction: 'asc' },
+      placeholder: 'Select or type folder name...',
+      maxOptions: 500
+    });
+
+    $.getJSON('./inc/get_mailbox_folders.cfm', function(data) {
+      if (data && data.folders && data.folders.length) {
+        data.folders.forEach(function(f) { ts.addOption({ value: f, text: f }); });
+        ts.refreshOptions(false);
+      }
+    });
+  });
+</script>
+</cfif>
 
 <cfinclude template="./inc/main_footer.cfm" />
 

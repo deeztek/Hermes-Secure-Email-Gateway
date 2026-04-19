@@ -17,6 +17,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
+<!--- FEATURE GUARD: block creation of new shares when sharing is disabled.
+     unshare_folder is allowed so users can clean up existing shares. --->
+<cfif form.action EQ "share_folder">
+    <cfquery name="checkSharingEnabledForAction" datasource="hermes">
+        SELECT value2 FROM parameters2
+        WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+    </cfquery>
+    <cfif checkSharingEnabledForAction.recordcount EQ 0 OR checkSharingEnabledForAction.value2 NEQ "yes">
+        <cfset session.sfMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>Folder sharing is currently disabled. Please contact your administrator.">
+        <cfset session.sfMessageType = "danger">
+        <cflocation url="view_shared_folders.cfm" addtoken="no">
+    </cfif>
+</cfif>
+
 <!--- SHARE FOLDER ACTION --->
 <cfif form.action EQ "share_folder">
     <cftry>

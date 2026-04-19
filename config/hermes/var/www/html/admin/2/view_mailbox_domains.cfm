@@ -754,7 +754,8 @@ function openDnsModal(domain) {
     ]},
     { section: 'Email Client Auto-Configuration', records: [
       { type: 'CNAME', name: 'autoconfig.' + domain, value: host + '.', purpose: 'Mozilla Thunderbird / K-9 Mail' },
-      { type: 'CNAME', name: 'autodiscover.' + domain, value: host + '.', purpose: 'Microsoft Outlook / iOS Mail' }
+      { type: 'CNAME', name: 'autodiscover.' + domain, value: host + '.', purpose: 'Microsoft Outlook / iOS Mail' },
+      { type: 'SRV', name: '_autodiscover._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Autodiscover SRV (Thunderbird CalDAV/CardDAV chain)' }
     ]},
     { section: 'Email Service Discovery (SRV)', records: [
       { type: 'SRV', name: '_imap._tcp.' + domain, value: '0 0 143 ' + host + '.', purpose: 'IMAP STARTTLS' },
@@ -762,7 +763,8 @@ function openDnsModal(domain) {
       { type: 'SRV', name: '_pop3._tcp.' + domain, value: '0 0 110 ' + host + '.', purpose: 'POP3 STARTTLS' },
       { type: 'SRV', name: '_pop3s._tcp.' + domain, value: '0 0 995 ' + host + '.', purpose: 'POP3 SSL' },
       { type: 'SRV', name: '_submission._tcp.' + domain, value: '0 0 587 ' + host + '.', purpose: 'SMTP submission (STARTTLS)' },
-      { type: 'SRV', name: '_submissions._tcp.' + domain, value: '0 0 465 ' + host + '.', purpose: 'SMTP submission (implicit TLS)' }
+      { type: 'SRV', name: '_submissions._tcp.' + domain, value: '0 0 465 ' + host + '.', purpose: 'SMTP submission (implicit TLS)' },
+      { type: 'SRV', name: '_sieve._tcp.' + domain, value: '0 0 4190 ' + host + '.', purpose: 'ManageSieve' }
     ]},
     { section: 'CalDAV / CardDAV Auto-Discovery (Required for calendar and contacts auto-setup)', records: [
       { type: 'SRV', name: '_caldavs._tcp.' + domain, value: '0 0 443 ' + host + '.', purpose: 'Calendar server discovery' },

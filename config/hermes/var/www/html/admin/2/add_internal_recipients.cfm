@@ -375,6 +375,17 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 </cfif>
 </cfif>
 
+<!--- PRO GATE: RemoteAuth is a Pro feature. Defense in depth against a
+     direct POST bypassing the disabled UI on Community Edition. --->
+<cfif show_auth_type EQ "remote">
+<cfset isPro = isDefined("session.edition") AND session.edition EQ "Pro">
+<cfif NOT isPro>
+<cfset m="Add Relay Recipients: Remote Authentication requires a Pro License.">
+<cfinclude template="./inc/error.cfm">
+<cfabort>
+</cfif>
+</cfif>
+
 <!--- SHOW_REMOTEAUTH_DOMAIN --->
 <cfparam name="show_remoteauth_domain" default="">
 

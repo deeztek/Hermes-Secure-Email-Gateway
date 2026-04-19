@@ -3,7 +3,7 @@ objectClass: inetOrgPerson
 objectClass: domainRelatedObject
 givenName: THE_FIRSTNAME
 sn: THE_LASTNAME
-displayName: THE_FIRSTNAME THE_LASTNAME
+displayName: THE_DISPLAYNAME
 mail: THE_EMAIL
 uid: THE_USERNAME
 seeAlso: THE_SEEALSO

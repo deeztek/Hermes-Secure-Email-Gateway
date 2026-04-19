@@ -96,14 +96,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
 
-<!--- Nextcloud settings --->
-<cfquery name="getNcAutoRedirect" datasource="hermes">
+<!--- Nextcloud login-form behavior.
+     Stored in parameters2 under the legacy key `oidc.auto_redirect`.
+     Three values are supported; legacy boolean strings are normalized. --->
+<cfquery name="getNcLoginMode" datasource="hermes">
     SELECT value2 FROM parameters2
     WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
 </cfquery>
-<cfset ncAutoRedirect = "false">
-<cfif getNcAutoRedirect.recordcount GTE 1>
-    <cfset ncAutoRedirect = getNcAutoRedirect.value2>
+<cfset ncLoginMode = "auto_redirect">
+<cfif getNcLoginMode.recordcount GTE 1>
+    <cfset rawVal = getNcLoginMode.value2>
+    <cfif rawVal EQ "true" OR rawVal EQ "auto_redirect">
+        <cfset ncLoginMode = "auto_redirect">
+    <cfelseif rawVal EQ "sso_only">
+        <cfset ncLoginMode = "sso_only">
+    <cfelseif rawVal EQ "false" OR rawVal EQ "full_form">
+        <cfset ncLoginMode = "full_form">
+    </cfif>
 </cfif>
 
 <!--- Sharing settings --->
@@ -179,14 +188,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <div class="row">
       <div class="col-md-12">
         <div class="mb-3">
-          <label class="form-label"><strong>Auto-Redirect to Hermes SSO</strong></label>
-          <select class="form-select" name="nc_auto_redirect" id="nc_auto_redirect">
-            <option value="false" <cfif ncAutoRedirect EQ "false">selected</cfif>>Disabled (maintenance mode)</option>
-            <option value="true" <cfif ncAutoRedirect EQ "true">selected</cfif>>Enabled (true SSO)</option>
+          <label class="form-label"><strong>Nextcloud Login Form</strong></label>
+          <select class="form-select" name="nc_login_mode" id="nc_login_mode">
+            <option value="auto_redirect" <cfif ncLoginMode EQ "auto_redirect">selected</cfif>>Auto-redirect to SSO (true SSO, no login page)</option>
+            <option value="sso_only"      <cfif ncLoginMode EQ "sso_only">selected</cfif>>SSO button only (hide username/password fields)</option>
+            <option value="full_form"     <cfif ncLoginMode EQ "full_form">selected</cfif>>Show full form (username/password + SSO button)</option>
           </select>
           <small class="form-text text-muted">
-            <strong>Enabled:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. This is the normal operating mode. To bypass for local admin login, append <code>?direct=1</code> to the Nextcloud login URL.<br>
-            <strong>Disabled:</strong> Users see the Nextcloud login page with a username/password form and an SSO button. Use this temporarily when you need to log in as a local Nextcloud admin user for maintenance (e.g., app management, troubleshooting), then re-enable.
+            <strong>Auto-redirect to SSO:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. Recommended for normal operation.<br>
+            <strong>SSO button only:</strong> Users see the Nextcloud login page with just the SSO button &mdash; username/password fields are hidden. Good for deployments where you want users to know SSO is required but don't want to auto-redirect.<br>
+            <strong>Show full form:</strong> Users see the username/password form and the SSO button. Use temporarily for local Nextcloud admin maintenance.<br>
+            <em>In all modes, append <code>?direct=1</code> to the Nextcloud login URL to force-show the full form for local admin login.</em>
           </small>
         </div>
       </div>

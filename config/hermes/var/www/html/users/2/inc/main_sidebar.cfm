@@ -18,6 +18,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
+<!--- Check if mailbox sharing is enabled (for Shared Folders link visibility) --->
+<cfquery name="getSidebarSharingEnabled" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+</cfquery>
+<cfset sidebarSharingEnabled = (getSidebarSharingEnabled.recordcount GTE 1 AND getSidebarSharingEnabled.value2 EQ "yes")>
+
 <cfoutput>
 <!--begin::Sidebar-->
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
@@ -77,17 +84,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Vacation Auto-Reply</strong></p>
           </a>
         </li>
+        <cfif sidebarSharingEnabled>
         <li class="nav-item">
           <a href="view_shared_folders.cfm" class="nav-link">
             <i class="nav-icon fas fa-share-alt"></i>
             <p><strong>Shared Folders</strong></p>
           </a>
         </li>
+        </cfif>
         <cfif #session.theGroups# contains "nextcloud">
         <li class="nav-item">
-          <a href="/users/2/preload_nc_login.cfm" class="nav-link">
+          <a href="/users/2/preload_nc_login.cfm" class="nav-link" title="Mail, Calendar, Contacts, Files">
             <i class="nav-icon fas fa-inbox"></i>
-            <p><strong>Login to Webmail</strong></p>
+            <p><strong>Webmail &amp; Apps</strong></p>
           </a>
         </li>
         </cfif>

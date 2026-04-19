@@ -220,8 +220,23 @@ Requires form variables:
     <cfabort>
 </cfif>
 
+<!--- PRO GATE: RemoteAuth is a Pro feature. Defense in depth against a
+     direct POST bypassing the disabled UI on Community Edition. --->
+<cfif form.auth_type EQ "remote">
+    <cfset isPro = isDefined("session.edition") AND session.edition EQ "Pro">
+    <cfif NOT isPro>
+        <cfset m="Add Mailbox: Remote Authentication requires a Pro License.">
+        <cfinclude template="error.cfm">
+        <cfabort>
+    </cfif>
+</cfif>
+
 <!--- VALIDATE REMOTEAUTH DOMAIN (required if auth_type is remote) --->
 <cfparam name="form.remoteauth_domain" default="">
+<cfparam name="form.remote_first_name" default="">
+<cfparam name="form.remote_last_name" default="">
+<cfset remoteFirstName = "">
+<cfset remoteLastName = "">
 <cfif form.auth_type EQ "remote">
     <cfif form.remoteauth_domain EQ "">
         <cfset m="Add Mailbox: RemoteAuth domain is required when auth type is Remote">
@@ -229,7 +244,7 @@ Requires form variables:
         <cfabort>
     </cfif>
     <cfquery name="checkRemoteauthDomain" datasource="hermes">
-        SELECT id FROM remoteauth_mappings
+        SELECT id, remote_dn_pattern FROM remoteauth_mappings
         WHERE domain_name = <cfqueryparam value="#form.remoteauth_domain#" cfsqltype="cf_sql_varchar">
         AND enabled = 1
     </cfquery>
@@ -237,6 +252,23 @@ Requires form variables:
         <cfset m="Add Mailbox: invalid RemoteAuth domain">
         <cfinclude template="error.cfm">
         <cfabort>
+    </cfif>
+
+    <!--- When the DN pattern references {firstname}/{lastname}, the admin must
+         supply the real AD values so the seeAlso DN resolves correctly. --->
+    <cfif FindNoCase("{firstname}", checkRemoteauthDomain.remote_dn_pattern) GT 0>
+        <cfif Trim(form.remote_first_name) EQ "">
+            <cfset session.m = 17>
+            <cflocation url="add_mailbox.cfm" addtoken="no">
+        </cfif>
+        <cfset remoteFirstName = Trim(form.remote_first_name)>
+    </cfif>
+    <cfif FindNoCase("{lastname}", checkRemoteauthDomain.remote_dn_pattern) GT 0>
+        <cfif Trim(form.remote_last_name) EQ "">
+            <cfset session.m = 18>
+            <cflocation url="add_mailbox.cfm" addtoken="no">
+        </cfif>
+        <cfset remoteLastName = Trim(form.remote_last_name)>
     </cfif>
 </cfif>
 

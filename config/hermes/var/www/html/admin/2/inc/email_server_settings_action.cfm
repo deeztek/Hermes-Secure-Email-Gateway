@@ -9,7 +9,7 @@ settings (to parameters2 module='dovecot'), and the TLS certificate
 dovecot.conf from template and reloads Dovecot.
 --->
 
-<cfparam name="form.nc_auto_redirect" default="false">
+<cfparam name="form.nc_login_mode" default="auto_redirect">
 <cfparam name="form.dovecot_cert_id" default="">
 <cfparam name="form.ssl_profile" default="intermediate">
 <cfparam name="form.ssl_min_protocol" default="TLSv1.2">
@@ -53,41 +53,80 @@ dovecot.conf from template and reloads Dovecot.
 <cfset saveErrors = ArrayNew(1)>
 
 <!--- ================================================================== --->
-<!--- NEXTCLOUD OIDC AUTO-REDIRECT                                        --->
+<!--- NEXTCLOUD LOGIN FORM MODE                                            --->
+<!---                                                                      --->
+<!--- Three states map onto two underlying Nextcloud knobs:                --->
+<!---   auto_redirect: allow_multiple_user_backends=0, hide_login_form=no  --->
+<!---   sso_only:      allow_multiple_user_backends=1, hide_login_form=yes --->
+<!---   full_form:     allow_multiple_user_backends=1, hide_login_form=no  --->
+<!---                                                                      --->
+<!--- The legacy key `oidc.auto_redirect` is reused as the storage slot    --->
+<!--- so existing upgraders don't need a schema migration — the read path  --->
+<!--- in view_email_server_settings.cfm normalizes legacy boolean values.  --->
 <!--- ================================================================== --->
-<cfset ncAutoRedirectVal = (form.nc_auto_redirect EQ "true") ? "true" : "false">
+<cfif form.nc_login_mode NEQ "auto_redirect" AND form.nc_login_mode NEQ "sso_only" AND form.nc_login_mode NEQ "full_form">
+    <cfset form.nc_login_mode = "auto_redirect">
+</cfif>
+<cfset ncLoginModeVal = form.nc_login_mode>
+
+<cfif ncLoginModeVal EQ "auto_redirect">
+    <cfset occBackendVal = "0">
+    <cfset hideLoginFormVal = "false">
+<cfelseif ncLoginModeVal EQ "sso_only">
+    <cfset occBackendVal = "1">
+    <cfset hideLoginFormVal = "true">
+<cfelse>
+    <cfset occBackendVal = "1">
+    <cfset hideLoginFormVal = "false">
+</cfif>
 
 <cftry>
-    <!--- Persist to parameters2 --->
+    <!--- Persist to parameters2 (reuses legacy key name) --->
     <cfquery name="checkParam3" datasource="hermes">
         SELECT parameter FROM parameters2
         WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
     </cfquery>
     <cfif checkParam3.recordcount GTE 1>
         <cfquery datasource="hermes">
-            UPDATE parameters2 SET value2 = <cfqueryparam value="#ncAutoRedirectVal#" cfsqltype="cf_sql_varchar">
+            UPDATE parameters2 SET value2 = <cfqueryparam value="#ncLoginModeVal#" cfsqltype="cf_sql_varchar">
             WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'
         </cfquery>
     <cfelse>
         <cfquery datasource="hermes">
             INSERT INTO parameters2 (module, parameter, value2, applied)
             VALUES ('nextcloud', 'oidc.auto_redirect',
-                    <cfqueryparam value="#ncAutoRedirectVal#" cfsqltype="cf_sql_varchar">, '2')
+                    <cfqueryparam value="#ncLoginModeVal#" cfsqltype="cf_sql_varchar">, '2')
         </cfquery>
     </cfif>
 
-    <!--- Apply via occ: allow_multiple_user_backends=0 means auto-redirect,
-         =1 means show login form with SSO button. Admin bypass: ?direct=1 --->
-    <cfset occBackendVal = (ncAutoRedirectVal EQ "true") ? "0" : "1">
+    <!--- Apply user_oidc app config: allow_multiple_user_backends --->
     <cfexecute name="/usr/local/bin/docker"
         arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set --type=string --value=#occBackendVal# user_oidc allow_multiple_user_backends"
         variable="occAutoRedirectResult"
         errorVariable="occAutoRedirectError"
         timeout="30" />
 
+    <!--- Apply NC system config: hide_login_form (hides u/p fields but keeps
+         the SSO button visible when allow_multiple_user_backends=1).
+         ?direct=1 always bypasses this and shows the full form. --->
+    <cfif hideLoginFormVal EQ "true">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set hide_login_form --type=boolean --value=true"
+            variable="occHideFormResult"
+            errorVariable="occHideFormError"
+            timeout="30" />
+    <cfelse>
+        <!--- Remove the key so NC falls back to its default (form visible) --->
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:delete hide_login_form"
+            variable="occHideFormResult"
+            errorVariable="occHideFormError"
+            timeout="30" />
+    </cfif>
+
 <cfcatch type="any">
     <cfset saveError = true>
-    <cfset ArrayAppend(saveErrors, "Nextcloud Auto-Redirect: " & cfcatch.message)>
+    <cfset ArrayAppend(saveErrors, "Nextcloud Login Form: " & cfcatch.message)>
 </cfcatch>
 </cftry>
 

@@ -41,13 +41,16 @@ Sets after execution:
         <cfset ncProvisionError = "No password provided">
     <cfelse>
         <cftry>
-            <!--- Create NC user with occ user:add using password from env var --->
+            <!--- Create NC user with occ user:add using password from env var, then
+                 set the email via occ user:setting so it appears in NC admin UI
+                 immediately (otherwise email is only populated on first OIDC login). --->
             <cfinclude template="generate_customtrans.cfm">
             <cfset provScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_provision.sh">
             <cfscript>
                 fileWrite(provScript,
                     chr(35) & "!/bin/bash" & chr(10) &
-                    'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10),
+                    'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10) &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10),
                     "utf-8");
             </cfscript>
             <cfexecute name="/bin/chmod" arguments="+x #provScript#" timeout="10" />

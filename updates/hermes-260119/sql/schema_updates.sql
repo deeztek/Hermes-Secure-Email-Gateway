@@ -433,11 +433,13 @@ WHERE NOT EXISTS (
 -- "Click to Login to Webmail" button (two-click SSO, but the local-user
 -- password form is reachable for any non-LDAP Nextcloud accounts).
 --
--- Default 'false' on upgrade preserves existing behavior. Admin can flip to
--- 'true' from Authentication Settings if seamless SSO is preferred over
--- local-user support.
+-- Nextcloud login-form mode. Three string values: 'auto_redirect' (default,
+-- silent SSO), 'sso_only' (show SSO button, hide u/p fields), or 'full_form'
+-- (u/p + SSO button). The column name is retained from the old boolean knob
+-- for backwards compatibility; the CFML read path normalizes legacy
+-- 'true'/'false' values.
 INSERT INTO parameters2 (module, parameter, value2, applied)
-SELECT 'nextcloud', 'oidc.auto_redirect', 'false', '2'
+SELECT 'nextcloud', 'oidc.auto_redirect', 'auto_redirect', '2'
 WHERE NOT EXISTS (
     SELECT 1 FROM parameters2
     WHERE module = 'nextcloud' AND parameter = 'oidc.auto_redirect'

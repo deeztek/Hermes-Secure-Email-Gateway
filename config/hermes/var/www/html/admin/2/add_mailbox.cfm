@@ -84,17 +84,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="getRemoteauthStatus" datasource="hermes">
         SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'enabled'
     </cfquery>
+    <!--- All enabled remoteauth mappings are now supported. Patterns using
+         {firstname}/{lastname} cause the form to reveal First/Last Name
+         fields so the admin can supply the real AD values. --->
     <cfquery name="getRemoteauthDomains" datasource="hermes">
         SELECT domain_name, server_address, remote_dn_pattern FROM remoteauth_mappings
         WHERE enabled = 1
-        AND remote_dn_pattern NOT LIKE '%{firstname}%'
-        AND remote_dn_pattern NOT LIKE '%{lastname}%'
         ORDER BY domain_name
     </cfquery>
     <cfif getRemoteauthStatus.recordcount EQ 0 OR getRemoteauthStatus.setting_value NEQ "1">
         <cfset remoteauthDisabledReason = "RemoteAuth is not enabled. Enable it in <a href='view_remoteauth.cfm'>Remote Authentication</a> settings.">
     <cfelseif getRemoteauthDomains.recordcount EQ 0>
-        <cfset remoteauthDisabledReason = "No compatible domain mappings found. Add a domain mapping with a <code>{username}</code> or <code>{email}</code> DN pattern in <a href='view_remoteauth.cfm'>Remote Authentication</a>.">
+        <cfset remoteauthDisabledReason = "No enabled domain mappings found. Add one in <a href='view_remoteauth.cfm'>Remote Authentication</a>.">
     <cfelse>
         <cfset remoteauthAvailable = true>
         <cfloop query="getRemoteauthDomains">
@@ -159,6 +160,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     Password is required for local authentication mailbox users.
   </div>
+<cfelseif m EQ 17>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    First Name is required for this RemoteAuth domain (DN pattern uses <code>{firstname}</code>).
+  </div>
+<cfelseif m EQ 18>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Last Name is required for this RemoteAuth domain (DN pattern uses <code>{lastname}</code>).
+  </div>
 <cfelseif m EQ 99>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -184,6 +197,80 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="box-body">
     <cfoutput>
     <div class="form-horizontal">
+
+      <!--- AUTHENTICATION TYPE (top of form — fields below adapt to selection) --->
+      <cfif remoteauthAvailable>
+        <div class="form-group mb-3">
+          <label><strong>Authentication Type</strong></label>
+          <div class="alert alert-info">
+            <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
+            <p class="mb-0">Select <strong>Remote</strong> to authenticate this mailbox user against an external AD/LDAP server. The user will use their existing organization credentials &mdash; no local password will be created.</p>
+          </div>
+          <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
+            <option value="local" selected>Local</option>
+            <option value="remote">Remote</option>
+          </select>
+        </div>
+
+        <!--- RemoteAuth Domain Selection --->
+        <div class="form-group mb-3" id="remoteauthDomainGroup" style="display:none;">
+          <label><strong>RemoteAuth Domain</strong></label>
+          <select class="form-control" name="remoteauth_domain" id="remoteauthDomain" style="width: 100%;">
+            <option value="">-- Select Domain --</option>
+            <cfloop array="#remoteauthDomains#" index="domainItem">
+              <option value="#domainItem.domain#" data-pattern="#HTMLEditFormat(domainItem.pattern)#">#domainItem.domain# (#domainItem.server#)</option>
+            </cfloop>
+          </select>
+          <small class="text-muted">Select the domain this user will authenticate against</small>
+        </div>
+
+        <!--- DN Pattern Guidance --->
+        <div class="form-group mb-3" id="dnPatternGuidance" style="display:none;">
+          <div class="alert alert-secondary">
+            <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
+            <p>This user will be authenticated against the remote server using this DN pattern:</p>
+            <p><code id="dnPatternDisplay"></code></p>
+            <p class="mb-0"><small><strong>How placeholders are resolved:</strong><br>
+            <code>{username}</code> &rarr; local part of email (e.g., <em>jsmith</em>)<br>
+            <code>{email}</code> &rarr; full email address (e.g., <em>jsmith@example.com</em>)<br>
+            <code>{firstname}</code> / <code>{lastname}</code> &rarr; the First Name / Last Name fields below</small></p>
+          </div>
+        </div>
+
+        <!--- First / Last Name (revealed when pattern needs them) --->
+        <div class="form-group mb-3" id="remoteFirstNameGroup" style="display:none;">
+          <label><strong>First Name</strong> <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="remote_first_name" id="remoteFirstName" placeholder="e.g. John">
+          <small class="text-muted">Must match the user's <code>givenName</code> spelling in your AD/LDAP. Active Directory matches case-insensitively; some OpenLDAP servers are case-sensitive.</small>
+        </div>
+        <div class="form-group mb-3" id="remoteLastNameGroup" style="display:none;">
+          <label><strong>Last Name</strong> <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" name="remote_last_name" id="remoteLastName" placeholder="e.g. Smith">
+          <small class="text-muted">Must match the user's <code>sn</code> / <code>surname</code> spelling in your AD/LDAP. Active Directory matches case-insensitively; some OpenLDAP servers are case-sensitive.</small>
+        </div>
+
+      <cfelseif isPro>
+        <!--- Pro Edition but RemoteAuth not fully configured --->
+        <div class="form-group mb-3">
+          <label><strong>Authentication Type</strong></label>
+          <select class="form-control" name="auth_type" id="authType" style="width: 100%;" disabled>
+            <option value="local" selected>Local</option>
+            <option value="remote">Remote</option>
+          </select>
+          <small class="text-muted">#remoteauthDisabledReason#</small>
+        </div>
+      <cfelse>
+        <!--- Community Edition - show locked with upsell --->
+        <input type="hidden" name="auth_type" value="local">
+        <div class="form-group mb-3">
+          <label><strong>Authentication Type</strong></label>
+          <select class="form-control" style="width: 100%;" disabled>
+            <option selected>Local</option>
+            <option disabled>Remote (Pro License Required)</option>
+          </select>
+          <small class="text-muted"><i class="fas fa-crown text-warning"></i> Remote Authentication requires a <strong>Pro License</strong>.</small>
+        </div>
+      </cfif>
 
       <!--- EMAIL ADDRESS (username + domain) --->
       <div class="form-group mb-3">
@@ -305,67 +392,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <option value="1">Enable</option>
         </select>
       </div>
-
-      <!--- AUTHENTICATION TYPE --->
-      <cfif remoteauthAvailable>
-        <div class="form-group mb-3">
-          <label><strong>Authentication Type</strong></label>
-          <div class="alert alert-info">
-            <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
-            <p class="mb-0">Select <strong>Remote</strong> to authenticate this mailbox user against an external AD/LDAP server. The user will use their existing organization credentials - no local password will be created.</p>
-          </div>
-          <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
-            <option value="local" selected>Local</option>
-            <option value="remote">Remote</option>
-          </select>
-        </div>
-
-        <!--- RemoteAuth Domain Selection --->
-        <div class="form-group mb-3" id="remoteauthDomainGroup" style="display:none;">
-          <label><strong>RemoteAuth Domain</strong></label>
-          <select class="form-control" name="remoteauth_domain" id="remoteauthDomain" style="width: 100%;">
-            <option value="">-- Select Domain --</option>
-            <cfloop array="#remoteauthDomains#" index="domainItem">
-              <option value="#domainItem.domain#" data-pattern="#HTMLEditFormat(domainItem.pattern)#">#domainItem.domain# (#domainItem.server#)</option>
-            </cfloop>
-          </select>
-          <small class="text-muted">Select the domain this user will authenticate against</small>
-        </div>
-
-        <!--- DN Pattern Guidance --->
-        <div class="form-group mb-3" id="dnPatternGuidance" style="display:none;">
-          <div class="alert alert-secondary">
-            <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
-            <p>This user will be authenticated against the remote server using this DN pattern:</p>
-            <p><code id="dnPatternDisplay"></code></p>
-            <p class="mb-0"><small><strong>How placeholders are resolved:</strong><br>
-            <code>{username}</code> &rarr; local part of email (e.g., <em>jsmith</em>)<br>
-            <code>{email}</code> &rarr; full email address (e.g., <em>jsmith@example.com</em>)</small></p>
-          </div>
-        </div>
-
-      <cfelseif isPro>
-        <!--- Pro Edition but RemoteAuth not fully configured --->
-        <div class="form-group mb-3">
-          <label><strong>Authentication Type</strong></label>
-          <select class="form-control" name="auth_type" id="authType" style="width: 100%;" disabled>
-            <option value="local" selected>Local</option>
-            <option value="remote">Remote</option>
-          </select>
-          <small class="text-muted">#remoteauthDisabledReason#</small>
-        </div>
-      <cfelse>
-        <!--- Community Edition - show locked with upsell --->
-        <input type="hidden" name="auth_type" value="local">
-        <div class="form-group mb-3">
-          <label><strong>Authentication Type</strong></label>
-          <select class="form-control" style="width: 100%;" disabled>
-            <option selected>Local</option>
-            <option disabled>Remote (Pro License Required)</option>
-          </select>
-          <small class="text-muted"><i class="fas fa-crown text-warning"></i> Remote Authentication requires a <strong>Pro License</strong>.</small>
-        </div>
-      </cfif>
 
       <!--- NEXTCLOUD TOGGLE --->
       <div class="form-group mb-3">
@@ -594,18 +620,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $('#remoteauthDomain').val('');
       $('#passwordGroup').show();
       $('#passwordInput').prop('required', true);
+      hideRemoteNameFields();
     }
   });
 
-  // Show DN pattern guidance when a domain is selected
+  // Reveal First/Last Name fields only when the selected pattern references them.
+  // Requiring real AD values keeps the seeAlso DN resolvable for remoteauth.
+  function updateRemoteNameFields(pattern) {
+    var needsFirst = /\{firstname\}/i.test(pattern || '');
+    var needsLast  = /\{lastname\}/i.test(pattern || '');
+    $('#remoteFirstNameGroup').toggle(needsFirst);
+    $('#remoteLastNameGroup').toggle(needsLast);
+    $('#remoteFirstName').prop('required', needsFirst);
+    $('#remoteLastName').prop('required', needsLast);
+    if (!needsFirst) $('#remoteFirstName').val('');
+    if (!needsLast)  $('#remoteLastName').val('');
+  }
+  function hideRemoteNameFields() {
+    updateRemoteNameFields('');
+  }
+
+  // Show DN pattern guidance and First/Last Name fields when a domain is selected
   $('#remoteauthDomain').on('change', function() {
     var selected = $(this).find(':selected');
     var pattern = selected.data('pattern');
     if (pattern) {
       $('#dnPatternDisplay').text(pattern);
       $('#dnPatternGuidance').show();
+      updateRemoteNameFields(pattern);
     } else {
       $('#dnPatternGuidance').hide();
+      hideRemoteNameFields();
     }
   });
 

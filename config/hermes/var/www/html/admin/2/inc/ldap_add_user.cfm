@@ -26,6 +26,9 @@ Requires the following variables to be set before including:
 - ldapLastName: User's last name (sn)
 - ldapEmail: User's email address (mail)
 - ldapPassword: The Argon2 password hash from generate_ldap_password.cfm
+Optional:
+- ldapDisplayName: User's display name (displayName attribute).
+  Defaults to "ldapFirstName ldapLastName" for backward compatibility.
 --->
 
 <!--- GENERATE CUSTOMTRANS FOR UNIQUE TEMP FILENAMES --->
@@ -40,11 +43,15 @@ Requires the following variables to be set before including:
 <!--- READ THE LDAP ADDUSER TEMPLATE --->
 <cffile action="read" file="/opt/hermes/templates/ldap_adduser.ldif" variable="ldapUserTemplate">
 
+<!--- DEFAULT DISPLAY NAME TO "firstName lastName" when caller did not provide one --->
+<cfparam name="ldapDisplayName" default="#ldapFirstName# #ldapLastName#">
+
 <!--- REPLACE PLACEHOLDERS WITH ACTUAL VALUES --->
 <cfset ldapUserLdif = ldapUserTemplate>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_USERNAME", ldapUsername, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_FIRSTNAME", ldapFirstName, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_LASTNAME", ldapLastName, "ALL")>
+<cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_DISPLAYNAME", ldapDisplayName, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_EMAIL", ldapEmail, "ALL")>
 <cfset ldapUserLdif = REReplace(ldapUserLdif, "THE_PASSWORD", ldapPassword, "ALL")>
 

@@ -29,6 +29,19 @@ Dispatches to the appropriate action based on form.action:
 
 <cfinclude template="generate_customtrans.cfm">
 
+<!--- FEATURE GUARD: block creation/permission-add when sharing is disabled.
+     Delete and remove-permission are allowed so admins can clean up. --->
+<cfif action is "add_shared_mailbox" OR action is "add_permission">
+    <cfquery name="checkSharingEnabledForAction" datasource="hermes">
+        SELECT value2 FROM parameters2
+        WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+    </cfquery>
+    <cfif checkSharingEnabledForAction.recordcount EQ 0 OR checkSharingEnabledForAction.value2 NEQ "yes">
+        <cfset session.m = 31>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfif>
+</cfif>
+
 <!--- ====================================================================
      ADD SHARED MAILBOX
      ==================================================================== --->
@@ -205,6 +218,156 @@ Dispatches to the appropriate action based on form.action:
               <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
             )
         </cfquery>
+
+        <!--- 5. GRANT DEFAULT PERMISSIONS TO INITIAL MEMBERS (if any were selected).
+             Each selected member gets the same permission set chosen on the Add modal.
+             Members must belong to the same domain as the shared mailbox. --->
+        <cfparam name="form.initial_members" default="">
+        <cfif Trim(form.initial_members) NEQ "">
+            <!--- Parse default permission flags once --->
+            <cfparam name="form.default_perm_read" default="0">
+            <cfparam name="form.default_perm_write" default="0">
+            <cfparam name="form.default_perm_delete" default="0">
+            <cfparam name="form.default_perm_insert" default="0">
+            <cfparam name="form.default_perm_post" default="0">
+            <cfparam name="form.default_perm_admin" default="0">
+            <cfparam name="form.default_perm_send_as" default="0">
+
+            <cfset dpRead   = (form.default_perm_read EQ "1") ? 1 : 0>
+            <cfset dpWrite  = (form.default_perm_write EQ "1") ? 1 : 0>
+            <cfset dpDelete = (form.default_perm_delete EQ "1") ? 1 : 0>
+            <cfset dpInsert = (form.default_perm_insert EQ "1") ? 1 : 0>
+            <cfset dpPost   = (form.default_perm_post EQ "1") ? 1 : 0>
+            <cfset dpAdmin  = (form.default_perm_admin EQ "1") ? 1 : 0>
+            <cfset dpSendAs = (form.default_perm_send_as EQ "1") ? 1 : 0>
+
+            <!--- Skip entirely if no permissions selected (nothing to grant) --->
+            <cfif dpRead OR dpWrite OR dpDelete OR dpInsert OR dpPost OR dpAdmin OR dpSendAs>
+                <cfloop list="#form.initial_members#" index="memberId">
+                    <cfif IsNumeric(memberId)>
+                        <!--- Validate member is an active user mailbox in the same domain --->
+                        <cfquery name="getInitMember" datasource="hermes">
+                            SELECT id, username FROM mailboxes
+                            WHERE id = <cfqueryparam value="#memberId#" cfsqltype="cf_sql_integer">
+                            AND domain_id = <cfqueryparam value="#getDomain.id#" cfsqltype="cf_sql_integer">
+                            AND mailbox_type = 'user'
+                            AND active = 1
+                        </cfquery>
+
+                        <cfif getInitMember.recordcount GTE 1>
+                            <cfset initMemberName = getInitMember.username>
+
+                            <!--- Look up the shared_mailbox row we just created --->
+                            <cfquery name="getSharedId" datasource="hermes">
+                                SELECT id FROM shared_mailboxes
+                                WHERE mailbox_id = <cfqueryparam value="#newMailboxId#" cfsqltype="cf_sql_integer">
+                            </cfquery>
+
+                            <cfif getSharedId.recordcount GTE 1>
+                                <cfquery datasource="hermes">
+                                    INSERT INTO shared_mailbox_permissions
+                                    (shared_mailbox_id, user_mailbox_id, username, can_read, can_write, can_delete, can_insert, can_post, can_admin, send_as, created_at)
+                                    VALUES
+                                    (<cfqueryparam value="#getSharedId.id#" cfsqltype="cf_sql_integer">,
+                                     <cfqueryparam value="#getInitMember.id#" cfsqltype="cf_sql_integer">,
+                                     <cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                     <cfqueryparam value="#dpRead#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpWrite#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpDelete#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpInsert#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpPost#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpAdmin#" cfsqltype="cf_sql_tinyint">,
+                                     <cfqueryparam value="#dpSendAs#" cfsqltype="cf_sql_tinyint">,
+                                     NOW())
+                                </cfquery>
+
+                                <!--- Populate dovecot_acl rights matching the selected permissions.
+                                     Mirrors the mapping used in the add_permission action. --->
+                                <cfif dpRead EQ 1>
+                                    <cfloop list="lookup,read,write-seen" index="rt">
+                                        <cfquery datasource="hermes">
+                                            INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                            VALUES
+                                            (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                             <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                             <cfqueryparam value="#rt#" cfsqltype="cf_sql_varchar">, 'yes')
+                                        </cfquery>
+                                    </cfloop>
+                                </cfif>
+                                <cfif dpWrite EQ 1>
+                                    <cfloop list="write,write-deleted" index="rt">
+                                        <cfquery datasource="hermes">
+                                            INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                            VALUES
+                                            (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                             <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                             <cfqueryparam value="#rt#" cfsqltype="cf_sql_varchar">, 'yes')
+                                        </cfquery>
+                                    </cfloop>
+                                </cfif>
+                                <cfif dpDelete EQ 1>
+                                    <cfquery datasource="hermes">
+                                        INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                        VALUES
+                                        (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                         <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                         'expunge', 'yes')
+                                    </cfquery>
+                                </cfif>
+                                <cfif dpInsert EQ 1>
+                                    <cfquery datasource="hermes">
+                                        INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                        VALUES
+                                        (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                         <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                         'insert', 'yes')
+                                    </cfquery>
+                                </cfif>
+                                <cfif dpPost EQ 1>
+                                    <cfquery datasource="hermes">
+                                        INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                        VALUES
+                                        (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                         <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                         'post', 'yes')
+                                    </cfquery>
+                                </cfif>
+                                <cfif dpAdmin EQ 1>
+                                    <cfquery datasource="hermes">
+                                        INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                                        VALUES
+                                        (<cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                         <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                         'admin', 'yes')
+                                    </cfquery>
+                                </cfif>
+
+                                <!--- Shared namespace visibility --->
+                                <cfquery datasource="hermes">
+                                    INSERT IGNORE INTO dovecot_acl_shared (from_user, to_user, dummy)
+                                    VALUES (
+                                      <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                      <cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">,
+                                      ''
+                                    )
+                                </cfquery>
+
+                                <!--- Send-As mapping --->
+                                <cfif dpSendAs EQ 1>
+                                    <cfquery datasource="hermes">
+                                        INSERT IGNORE INTO sender_login_maps (sender, login_user)
+                                        VALUES (
+                                          <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                                          <cfqueryparam value="#initMemberName#" cfsqltype="cf_sql_varchar">
+                                        )
+                                    </cfquery>
+                                </cfif>
+                            </cfif>
+                        </cfif>
+                    </cfif>
+                </cfloop>
+            </cfif>
+        </cfif>
 
         <!--- SUCCESS --->
         <cfset session.m = 1>

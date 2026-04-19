@@ -40,10 +40,18 @@ Requires the following variables to be set before including:
     SELECT server_address, remote_dn_pattern FROM remoteauth_mappings WHERE domain_name = <cfqueryparam value="#ldapRemoteauthDomain#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<!--- BUILD THE SEEALSO DN - This points to the remote user DN --->
-<!--- Replace placeholders in the DN pattern with actual user values --->
+<!--- BUILD THE SEEALSO DN - This points to the remote user DN.
+     Placeholder semantics (must match the admin-facing help in view_remoteauth.cfm
+     and add_mailbox.cfm):
+       {username}  = local part of email (e.g. jsmith) — for sAMAccountName / uid patterns
+       {email}     = full email address (e.g. jsmith@example.com)
+       {firstname} = First Name field
+       {lastname}  = Last Name field --->
 <cfset ldapSeeAlso = getRemoteMapping.remote_dn_pattern>
-<cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{username}", ldapUsername, "ALL")>
+<!--- ListFirst on `@` handles both shapes:
+       mailbox/relay users: ldapUsername = "jsmith@company.com" -> "jsmith"
+       system users:        ldapUsername = "hermesadmin"        -> "hermesadmin" --->
+<cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{username}", ListFirst(ldapUsername, "@"), "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{firstname}", ldapFirstName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{lastname}", ldapLastName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{email}", ldapEmail, "ALL")>

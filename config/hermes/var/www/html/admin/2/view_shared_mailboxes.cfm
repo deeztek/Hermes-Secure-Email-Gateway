@@ -66,6 +66,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset action = form.action>
 </cfif>
 
+<!--- FEATURE CHECK: mailbox sharing must be enabled in Email Server Settings --->
+<cfquery name="getSharingEnabled" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+</cfquery>
+<cfset sharingEnabled = (getSharingEnabled.recordcount GTE 1 AND getSharingEnabled.value2 EQ "yes")>
+
 <!--- ACTION HANDLERS --->
 <cfif action is "add_shared_mailbox">
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
@@ -180,6 +187,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     An unexpected error occurred. Check the system log for details.
   </div>
+<cfelseif m EQ 31>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Action Blocked</h4>
+    Mailbox sharing is currently disabled. Enable it in <a href="view_email_server_settings.cfm" class="alert-link">Email Server &gt; Settings</a> before adding shared mailboxes or permissions.
+  </div>
 </cfif>
 
 <!--- HELP CALLOUT --->
@@ -194,6 +207,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </ul>
   <p class="mb-0"><small>Shared mailboxes cannot log in directly. Access is managed through permissions granted to individual user mailboxes.</small></p>
 </div>
+
+<!--- FEATURE DISABLED BANNER --->
+<cfif NOT sharingEnabled>
+<div class="alert alert-warning">
+  <h5><i class="icon fas fa-exclamation-triangle"></i> Mailbox Sharing is Disabled</h5>
+  <p class="mb-2">Shared mailboxes and folder sharing are currently turned off. Any configurations shown below are preserved but <strong>inactive</strong> &mdash; Dovecot will not serve them to IMAP clients until the feature is enabled.</p>
+  <p class="mb-0">Enable mailbox sharing in <a href="view_email_server_settings.cfm" class="alert-link">Email Server &gt; Settings</a> (Mailbox Sharing card) to activate. You can still delete existing entries from this page while the feature is disabled.</p>
+</div>
+</cfif>
 
 <!--- GET ALL SHARED MAILBOXES --->
 <cfquery name="getSharedMailboxes" datasource="hermes">
@@ -234,7 +256,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ADD SHARED MAILBOX BUTTON + DOMAIN FILTER --->
 <div class="d-flex justify-content-between align-items-center mb-3">
-  <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSharedMailboxModal"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Shared Mailbox</button>
+  <cfif sharingEnabled>
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSharedMailboxModal"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Shared Mailbox</button>
+  <cfelse>
+    <button type="button" class="btn btn-primary" disabled title="Enable Mailbox Sharing in Email Server Settings to add shared mailboxes"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Shared Mailbox</button>
+  </cfif>
   <cfif getFilterDomains.recordcount GTE 1>
   <div class="d-flex align-items-center gap-2">
     <label class="mb-0"><strong>Filter by Domain:</strong></label>
@@ -274,10 +300,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <tr>
           <td>
             <div class="d-flex gap-1 flex-nowrap">
-              <button type="button" class="btn btn-sm btn-primary" title="Manage Permissions"
-                      onclick="openPermissionsModal(#id#, '#JSStringFormat(address)#', '#JSStringFormat(display_name)#')">
-                <i class="fas fa-users-cog"></i>
-              </button>
+              <cfif sharingEnabled>
+                <button type="button" class="btn btn-sm btn-primary" title="Manage Permissions"
+                        onclick="openPermissionsModal(#id#, '#JSStringFormat(address)#', '#JSStringFormat(display_name)#')">
+                  <i class="fas fa-users-cog"></i>
+                </button>
+              <cfelse>
+                <button type="button" class="btn btn-sm btn-primary" disabled title="Enable Mailbox Sharing in Email Server Settings to manage permissions">
+                  <i class="fas fa-users-cog"></i>
+                </button>
+              </cfif>
               <button type="button" class="btn btn-sm btn-danger" title="Delete"
                       onclick="confirmDeleteSharedMailbox(#id#, '#JSStringFormat(address)#')">
                 <i class="fas fa-trash"></i>
@@ -309,7 +341,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <cfif active EQ 1>
+            <cfif NOT sharingEnabled>
+              <span class="badge bg-warning text-dark" title="Mailbox sharing is disabled in Email Server Settings">Inactive (Sharing Off)</span>
+            <cfelseif active EQ 1>
               <span class="badge bg-success">Active</span>
             <cfelse>
               <span class="badge bg-danger">Inactive</span>
@@ -381,6 +415,71 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <option value="0">No</option>
             </select>
             <small class="text-muted">When enabled, the shared mailbox folder automatically appears in each member's IMAP client.</small>
+          </div>
+
+          <hr>
+
+          <!--- Initial Members --->
+          <h6 class="mb-2"><i class="fas fa-users me-1"></i> Initial Members <small class="text-muted fw-normal">(optional &mdash; you can add more later)</small></h6>
+          <div class="form-group mb-3">
+            <label><strong>Select Members</strong></label>
+            <div class="form-text mb-2">Only user mailboxes in the selected domain are eligible.</div>
+            <div class="border rounded p-2" style="max-height: 180px; overflow-y: auto;" id="addMemberList">
+              <cfif getUserMailboxes.recordcount EQ 0>
+                <div class="text-muted small">No user mailboxes exist yet.</div>
+              <cfelse>
+                <cfoutput query="getUserMailboxes">
+                  <div class="form-check add-member-row" data-domain="#HTMLEditFormat(domain)#">
+                    <input class="form-check-input" type="checkbox" name="initial_members" value="#id#" id="addMember_#id#">
+                    <label class="form-check-label" for="addMember_#id#">#HTMLEditFormat(username)# <span class="text-muted">(#HTMLEditFormat(name)#)</span></label>
+                  </div>
+                </cfoutput>
+              </cfif>
+              <div class="text-muted small d-none" id="addMemberEmpty">No eligible user mailboxes in this domain.</div>
+            </div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label><strong>Default Permissions</strong> <small class="text-muted">(applied to each selected member)</small></label>
+            <div class="d-flex flex-wrap gap-3 mt-1">
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_read" id="addPermRead" value="1" checked>
+                <label class="form-check-label" for="addPermRead">Read</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_write" id="addPermWrite" value="1" checked>
+                <label class="form-check-label" for="addPermWrite">Write</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_delete" id="addPermDelete" value="1">
+                <label class="form-check-label" for="addPermDelete">Delete</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_insert" id="addPermInsert" value="1" checked>
+                <label class="form-check-label" for="addPermInsert">Insert</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_post" id="addPermPost" value="1">
+                <label class="form-check-label" for="addPermPost">Post</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_admin" id="addPermAdmin" value="1">
+                <label class="form-check-label" for="addPermAdmin">Admin</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" name="default_perm_send_as" id="addPermSendAs" value="1">
+                <label class="form-check-label" for="addPermSendAs">Send-As</label>
+              </div>
+            </div>
+            <small class="text-muted d-block mt-1">
+              <strong>Read</strong> = view messages |
+              <strong>Write</strong> = flag/mark |
+              <strong>Delete</strong> = expunge |
+              <strong>Insert</strong> = append/copy |
+              <strong>Post</strong> = submit |
+              <strong>Admin</strong> = manage ACLs |
+              <strong>Send-As</strong> = send from shared address
+            </small>
           </div>
 
         </div>
@@ -606,10 +705,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     });
   });
 
-  // Update the address suffix when domain changes
+  // Filter the initial members list to users in the currently-selected domain.
+  // Hides non-matching rows and un-checks them so only same-domain members are submitted.
+  function filterAddMembersByDomain() {
+    var domainText = $('#addDomainId').find('option:selected').text();
+    var visibleCount = 0;
+    $('#addMemberList .add-member-row').each(function() {
+      var $row = $(this);
+      if ($row.data('domain') === domainText) {
+        $row.removeClass('d-none');
+        visibleCount++;
+      } else {
+        $row.addClass('d-none');
+        $row.find('input[type=checkbox]').prop('checked', false);
+      }
+    });
+    $('#addMemberEmpty').toggleClass('d-none', visibleCount > 0);
+  }
+
+  // Update the address suffix and member list when domain changes
   $('#addDomainId').on('change', function() {
     var domainText = $(this).find('option:selected').text();
     $('#addAddressSuffix').text('@' + domainText);
+    filterAddMembersByDomain();
   });
   // Trigger on load
   $(document).ready(function() {
@@ -617,6 +735,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     if (domainText) {
       $('#addAddressSuffix').text('@' + domainText);
     }
+    filterAddMembersByDomain();
   });
 
   // Open Permissions Modal and load current members via AJAX

@@ -1109,11 +1109,18 @@ case "${1:-}" in
                 || log "    WARNING: Failed to disable $app"
         done
 
-        # Theming
+        # Theming — Hermes branding applied on every fresh install.
+        # Colors match the admin UI: sidebar dark (#343A40) + Hermes logo orange.
+        # Background image is reset so background_color drives the header bar
+        # (NC samples an uploaded image for header color; without one, the
+        # background_color setting is used directly).
         log "  Configuring Nextcloud theming..."
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config name "Hermes SEG" >> "$LOG_FILE" 2>&1
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png >> "$LOG_FILE" 2>&1
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config slogan "Secure Email Gateway and Server" >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config primary_color '#343A40' >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background_color '#343A40' >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background --reset >> "$LOG_FILE" 2>&1
         if [[ -n "$NC_HOSTNAME" ]]; then
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url "https://${NC_HOSTNAME}" >> "$LOG_FILE" 2>&1
         fi
