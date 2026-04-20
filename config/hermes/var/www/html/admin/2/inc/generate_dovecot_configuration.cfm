@@ -248,17 +248,19 @@ Called from: email_server_settings_action.cfm (after saving form values)
     <!--- Shared namespace block.
          Dovecot 2.4 split the old `location = maildir:/path:INDEX=/idx`
          one-liner into separate settings `mail_driver`, `mail_path`,
-         `mail_index_path` (which are also valid at top level and inherited).
-         Uses %{user} syntax (old %u/%n/%d shortcuts were removed). In a
-         shared namespace context, %{user} refers to the OWNER of the
-         shared mailbox, not the currently-connected user. --->
+         `mail_index_path` (valid top-level too, and inherited).
+         Uses %{user} syntax directly — 2.4 removed the %u/%n/%d shortcuts
+         AND does NOT interpret %% as an escape. A single percent is
+         literal in both the CFML string and the generated config file.
+         In a shared namespace context %{user} refers to the OWNER of
+         the shared mailbox, not the currently-connected user. --->
     <cfset sharedNamespace = "namespace shared {" & chr(10) &
         "  type = shared" & chr(10) &
         "  separator = /" & chr(10) &
-        "  prefix = Shared/%%{user}/" & chr(10) &
+        "  prefix = Shared/%{user}/" & chr(10) &
         "  mail_driver = maildir" & chr(10) &
-        "  mail_path = /srv/mail/%%{user | domain}/%%{user | username}" & chr(10) &
-        "  mail_index_path = ~/Shared/%%{user | username}" & chr(10) &
+        "  mail_path = /srv/mail/%{user | domain}/%{user | username}" & chr(10) &
+        "  mail_index_path = ~/Shared/%{user | username}" & chr(10) &
         "  subscriptions = no" & chr(10) &
         "  list = children" & chr(10) &
         "}">
