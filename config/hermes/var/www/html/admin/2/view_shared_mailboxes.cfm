@@ -82,6 +82,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
 <cfelseif action is "remove_permission">
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
+<cfelseif action is "sync_all_acl_files">
+  <cfinclude template="./inc/shared_mailbox_actions.cfm">
 </cfif>
 
 <!--- SUCCESS / ERROR MESSAGES --->
@@ -108,6 +110,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     Permission removed successfully.
+  </div>
+<cfelseif m EQ 5>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>Rebuilt Dovecot ACL files for #StructKeyExists(session, "acl_synced_count") ? session.acl_synced_count : 0# shared mailbox(es).</cfoutput>
+    <cfset session.acl_synced_count = 0>
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -254,13 +263,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     ORDER BY m.username ASC
 </cfquery>
 
-<!--- ADD SHARED MAILBOX BUTTON + DOMAIN FILTER --->
+<!--- ADD SHARED MAILBOX BUTTON + REBUILD ACL + DOMAIN FILTER --->
 <div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="d-flex align-items-center gap-2">
   <cfif sharingEnabled>
     <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addSharedMailboxModal"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Shared Mailbox</button>
+    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#rebuildAclFilesModal" title="Rebuild the on-disk Dovecot ACL files for every shared mailbox from the current permissions in the database"><i class="fas fa-sync-alt"></i>&nbsp;&nbsp;Rebuild ACL Files</button>
   <cfelse>
     <button type="button" class="btn btn-primary" disabled title="Enable Mailbox Sharing in Email Server Settings to add shared mailboxes"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Shared Mailbox</button>
+    <button type="button" class="btn btn-outline-secondary" disabled title="Enable Mailbox Sharing in Email Server Settings to rebuild ACL files"><i class="fas fa-sync-alt"></i>&nbsp;&nbsp;Rebuild ACL Files</button>
   </cfif>
+  </div>
   <cfif getFilterDomains.recordcount GTE 1>
   <div class="d-flex align-items-center gap-2">
     <label class="mb-0"><strong>Filter by Domain:</strong></label>
@@ -661,6 +674,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
           <button type="submit" class="btn btn-danger">Remove Member</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!--- REBUILD ACL FILES MODAL --->
+<div class="modal fade" id="rebuildAclFilesModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="view_shared_mailboxes.cfm">
+        <input type="hidden" name="action" value="sync_all_acl_files">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-sync-alt me-2"></i>Rebuild Dovecot ACL Files</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>This will regenerate the on-disk <code>dovecot-acl</code> file for every shared mailbox from the current permissions in the database.</p>
+          <p class="mb-2"><strong>When to use this:</strong></p>
+          <ul class="mb-2">
+            <li>After upgrading to a Dovecot 2.4 release (first run &mdash; migrates existing permissions to the new vfile driver).</li>
+            <li>If members report they cannot see or access a shared mailbox they should have permissions on.</li>
+            <li>If you&rsquo;ve manually edited the <code>shared_mailbox_permissions</code> table.</li>
+          </ul>
+          <p class="text-muted mb-0"><small>Safe to run anytime &mdash; it rebuilds files from the database and does not modify permission records.</small></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-sync-alt me-1"></i> Rebuild Now</button>
         </div>
       </form>
     </div>

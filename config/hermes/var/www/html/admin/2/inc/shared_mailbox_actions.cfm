@@ -31,7 +31,7 @@ Dispatches to the appropriate action based on form.action:
 
 <!--- FEATURE GUARD: block creation/permission-add when sharing is disabled.
      Delete and remove-permission are allowed so admins can clean up. --->
-<cfif action is "add_shared_mailbox" OR action is "add_permission">
+<cfif action is "add_shared_mailbox" OR action is "add_permission" OR action is "sync_all_acl_files">
     <cfquery name="checkSharingEnabledForAction" datasource="hermes">
         SELECT value2 FROM parameters2
         WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
@@ -391,6 +391,14 @@ Dispatches to the appropriate action based on form.action:
             </cfif>
         </cfif>
 
+        <!--- 6. SYNC DOVECOT-ACL FILE (Dovecot 2.4 vfile driver).
+             Rebuilds /srv/mail/<domain>/<local>/dovecot-acl from the
+             shared_mailbox_permissions rows inserted above. Safe to call
+             even when no initial members were selected — produces an
+             empty file, which gives no users explicit rights (owner
+             still has implicit all rights). --->
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+
         <!--- SUCCESS --->
         <cfset session.m = 1>
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
@@ -711,6 +719,9 @@ Dispatches to the appropriate action based on form.action:
             </cfquery>
         </cfif>
 
+        <!--- 5. SYNC DOVECOT-ACL FILE (Dovecot 2.4 vfile driver) --->
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+
         <!--- SUCCESS --->
         <cfset session.m = 3>
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
@@ -780,6 +791,9 @@ Dispatches to the appropriate action based on form.action:
             </cfquery>
         </cfif>
 
+        <!--- 5. SYNC DOVECOT-ACL FILE (Dovecot 2.4 vfile driver) --->
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+
         <!--- SUCCESS --->
         <cfset session.m = 4>
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
@@ -789,5 +803,33 @@ Dispatches to the appropriate action based on form.action:
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
     </cfcatch>
     </cftry>
+
+<!--- ====================================================================
+     SYNC ALL ACL FILES (one-shot migration / healing)
+     Iterates every shared mailbox and rebuilds its dovecot-acl file from
+     shared_mailbox_permissions. Used to backfill files after the 2.3→2.4
+     driver change, or to heal drift if a sync previously failed.
+     ==================================================================== --->
+<cfelseif action is "sync_all_acl_files">
+
+    <cfquery name="getAllShared" datasource="hermes">
+        SELECT address FROM shared_mailboxes ORDER BY address ASC
+    </cfquery>
+
+    <cfset aclSyncedCount = 0>
+    <cfloop query="getAllShared">
+        <cfset sharedAddress = getAllShared.address>
+        <cftry>
+            <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+            <cfset aclSyncedCount = aclSyncedCount + 1>
+        <cfcatch type="any">
+            <!--- Per-mailbox failure is non-fatal; continue with the rest --->
+        </cfcatch>
+        </cftry>
+    </cfloop>
+
+    <cfset session.m = 5>
+    <cfset session.acl_synced_count = aclSyncedCount>
+    <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
 
 </cfif>
