@@ -238,19 +238,22 @@ Called from: email_server_settings_action.cfm (after saving form values)
         "  }">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
 
-    <!--- ACL config block --->
-    <cfset aclConfigBlock = "acl_dict {" & chr(10) &
-        "  dict proxy {" & chr(10) &
-        "    name = acldict" & chr(10) &
-        "  }" & chr(10) &
-        "}">
+    <!--- ACL config: top-level setting in Dovecot 2.4 (not a block).
+         Points the shared-mailbox lookup at the `acldict` defined inside
+         dict_server above. In 2.3 this was `acl_dict { dict proxy {...} }`
+         but 2.4 removed that section syntax. --->
+    <cfset aclConfigBlock = "acl_shared_dict = proxy::acldict">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", aclConfigBlock, "ALL")>
 
-    <!--- Shared namespace block --->
+    <!--- Shared namespace block.
+         Dovecot 2.4 uses %{user}, %{user | domain}, %{user | username}
+         consistently. The old %u/%n/%d shortcuts were removed, so %%u
+         (which parses to literal %u) no longer substitutes. Use the
+         new %%{user} form everywhere. --->
     <cfset sharedNamespace = "namespace shared {" & chr(10) &
         "  type = shared" & chr(10) &
         "  separator = /" & chr(10) &
-        "  prefix = Shared/%%u/" & chr(10) &
+        "  prefix = Shared/%%{user}/" & chr(10) &
         "  location = maildir:/srv/mail/%%{user | domain}/%%{user | username}/:INDEX=~/Shared/%%{user | username}" & chr(10) &
         "  subscriptions = no" & chr(10) &
         "  list = children" & chr(10) &
