@@ -246,21 +246,23 @@ Called from: email_server_settings_action.cfm (after saving form values)
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", "", "ALL")>
 
     <!--- Shared namespace block.
-         Dovecot 2.4 split the old `location = maildir:/path:INDEX=/idx`
-         one-liner into separate settings `mail_driver`, `mail_path`,
-         `mail_index_path` (valid top-level too, and inherited).
-         Uses %{user} syntax directly — 2.4 removed the %u/%n/%d shortcuts
-         AND does NOT interpret %% as an escape. A single percent is
-         literal in both the CFML string and the generated config file.
-         In a shared namespace context %{user} refers to the OWNER of
-         the shared mailbox, not the currently-connected user. --->
+         Dovecot 2.4 uses %{owner_user} for the owner of the shared
+         mailbox (the "from" side). %{user} in 2.4 always means the
+         connected user, even in shared-namespace context — this is a
+         semantic change from 2.3 where %%u in a shared namespace
+         referred to the owner. Without this change, the mail_path
+         resolved to the connected user's own Maildir, causing members
+         to see their own mailbox under Shared/<themselves>/ instead
+         of the actual shared owner's folders.
+         mail_index_path keeps %{user | username} so per-viewer indexes
+         are stored under the connected user's ~/Shared/... tree. --->
     <cfset sharedNamespace = "namespace shared {" & chr(10) &
         "  type = shared" & chr(10) &
         "  separator = /" & chr(10) &
-        "  prefix = Shared/%{user}/" & chr(10) &
+        "  prefix = Shared/%{owner_user}/" & chr(10) &
         "  mail_driver = maildir" & chr(10) &
-        "  mail_path = /srv/mail/%{user | domain}/%{user | username}" & chr(10) &
-        "  mail_index_path = ~/Shared/%{user | username}" & chr(10) &
+        "  mail_path = /srv/mail/%{owner_user | domain}/%{owner_user | username}" & chr(10) &
+        "  mail_index_path = ~/Shared/%{owner_user | username}" & chr(10) &
         "  subscriptions = no" & chr(10) &
         "  list = children" & chr(10) &
         "}">
