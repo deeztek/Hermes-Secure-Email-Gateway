@@ -215,54 +215,77 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_ssl_cert_path", sslCertPath, "ALL")>
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_ssl_key_path", sslKeyPath, "ALL")>
 
-<!--- ACL / Shared Mailboxes --->
+<!--- ACL / Shared Mailboxes (Dovecot 2.4 upstream syntax)
+     Authoritative reference:
+       https://doc.dovecot.org/main/core/config/shared_mailboxes.html
+       https://doc.dovecot.org/main/core/plugins/acl.html
+       https://doc.dovecot.org/main/installation/upgrade/2.3-to-2.4.html
+
+     Key 2.4 changes vs. 2.3 we had to account for:
+       1. No `plugin {}` wrapper. `acl_driver` is top-level.
+       2. `acl_shared_dict` setting is GONE. Replaced with a top-level
+          `acl_sharing_map { dict mysql { ... } dict_map ... }` block.
+          There is no backward-compat wrapper.
+       3. Shared namespace `location = maildir:...:INDEX=...` one-liner
+          is GONE. Replaced with `mail_driver`, `mail_path`, and
+          `mail_index_private_path` per-namespace settings.
+       4. In the `prefix` the templating context uses `$user` / `$username`
+          / `$domain` (dollar-sign form). Everywhere else (`mail_path`,
+          `mail_index_private_path`, etc.) use `%{owner_user}` /
+          `%{owner_user | username}` / `%{owner_user | domain}` to refer
+          to the share owner. `%{user}` always refers to the connected
+          user — using it in a shared namespace's path silently points
+          at the connected user's own Maildir.
+       5. No shipped SQL driver for per-mailbox ACL rights in 2.4.
+          Only `vfile` ships — reads per-mailbox `dovecot-acl` files
+          inside each Maildir. Hermes writes these files when admin
+          adds/removes permissions (see shared_mailbox_actions.cfm).
+          The `dovecot_acl` SQL table is retained for Hermes admin UI
+          display only; Dovecot itself reads the files. --->
 <cfparam name="dov['sharing.enabled']" default="no">
 <cfif dov['sharing.enabled'] EQ "yes">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_enabled", "yes", "ALL")>
 
-    <!--- ACL dict backend block (inside dict_server) --->
-    <cfset aclDictBlock = "dict acldict {" & chr(10) &
-        "    driver = sql" & chr(10) &
-        "    sql_driver = mysql" & chr(10) & chr(10) &
-        "    mysql hermes_db_server {" & chr(10) &
-        "      user = " & dbUsername & chr(10) &
-        "      password = " & dbPassword & chr(10) &
-        "      dbname = hermes" & chr(10) &
-        "    }" & chr(10) & chr(10) &
-        "    dict_map shared/shared-boxes/user/$to/$from {" & chr(10) &
-        "      sql_table = dovecot_acl_shared" & chr(10) &
-        "      username_field = to_user" & chr(10) &
-        "      value_field from_user {" & chr(10) &
-        "      }" & chr(10) &
+    <!--- hermes_acl_dict_block was inside dict_server for the 2.3 shared
+         mailbox dict. In 2.4 the dict moved out of dict_server into the
+         new acl_sharing_map {} block, so we leave this placeholder empty. --->
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", "", "ALL")>
+
+    <!--- Top-level acl_driver = vfile + acl_sharing_map {} for the
+         shared-mailbox LISTING dict (SQL, against dovecot_acl_shared).
+         The dict_map pattern `shared/shared-boxes/user/$to/$from` is the
+         canonical key Dovecot's ACL code uses internally to look up
+         "who has shared what with whom". --->
+    <cfset aclConfigBlock = "acl_driver = vfile" & chr(10) & chr(10) &
+        "acl_sharing_map {" & chr(10) &
+        "  dict mysql {" & chr(10) &
+        "    connect = host=hermes_db_server dbname=hermes user=" & dbUsername & " password=" & dbPassword & chr(10) &
+        "  }" & chr(10) & chr(10) &
+        "  dict_map shared/shared-boxes/user/$to/$from {" & chr(10) &
+        "    sql_table = dovecot_acl_shared" & chr(10) &
+        "    value_field dummy {" & chr(10) &
         "    }" & chr(10) &
-        "  }">
-    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
+        "    key_field from_user {" & chr(10) &
+        "      pattern = $from" & chr(10) &
+        "    }" & chr(10) &
+        "    key_field to_user {" & chr(10) &
+        "      pattern = $to" & chr(10) &
+        "    }" & chr(10) &
+        "  }" & chr(10) &
+        "}">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", aclConfigBlock, "ALL")>
 
-    <!--- ACL config: in Dovecot 2.4 the shared-mailbox dict is auto-wired
-         by the `dict_map shared/shared-boxes/user/$to/$from` pattern on the
-         named dict inside dict_server — there is no explicit top-level
-         `acl_shared_dict` setting. The pattern itself tells the ACL plugin
-         which dict holds the "who has shared what with whom" index. --->
-    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", "", "ALL")>
-
-    <!--- Shared namespace block.
-         Dovecot 2.4 uses %{owner_user} for the owner of the shared
-         mailbox (the "from" side). %{user} in 2.4 always means the
-         connected user, even in shared-namespace context — this is a
-         semantic change from 2.3 where %%u in a shared namespace
-         referred to the owner. Without this change, the mail_path
-         resolved to the connected user's own Maildir, causing members
-         to see their own mailbox under Shared/<themselves>/ instead
-         of the actual shared owner's folders.
-         mail_index_path keeps %{user | username} so per-viewer indexes
-         are stored under the connected user's ~/Shared/... tree. --->
+    <!--- Shared namespace. See header comment for 2.4 variable rules.
+         - prefix uses `$user` (template context)
+         - mail_path uses `%{owner_user | ...}` (substitution context)
+         - mail_index_private_path (NOT mail_index_path) for shared --->
     <cfset sharedNamespace = "namespace shared {" & chr(10) &
         "  type = shared" & chr(10) &
         "  separator = /" & chr(10) &
-        "  prefix = Shared/%{owner_user}/" & chr(10) &
+        "  prefix = Shared/$user/" & chr(10) &
         "  mail_driver = maildir" & chr(10) &
         "  mail_path = /srv/mail/%{owner_user | domain}/%{owner_user | username}" & chr(10) &
-        "  mail_index_path = ~/Shared/%{owner_user | username}" & chr(10) &
+        "  mail_index_private_path = ~/shared-index/%{owner_user}" & chr(10) &
         "  subscriptions = no" & chr(10) &
         "  list = children" & chr(10) &
         "}">
