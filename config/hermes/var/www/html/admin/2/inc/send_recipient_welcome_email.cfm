@@ -58,6 +58,11 @@ Requires the following variables to be set before including:
 
 <p>An account has been created for you on Hermes SEG.</p>
 
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##805500;">Your Login Username</h3>
+    <p style="margin: 0;">Your username for the user portal is your full email address: <code>#recipientEmail#</code></p>
+</div>
+
 <div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##495057;">Before You Can Login</h3>
     <p>For security purposes, you must set your password before you can access your account.</p>
@@ -65,7 +70,7 @@ Requires the following variables to be set before including:
     <ol style="text-align: left;">
         <li>Go to the login page: <a href="#loginUrl#">#loginUrl#</a></li>
         <li>Click the <strong>"Reset password?"</strong> link</li>
-        <li>Enter your email address: <strong>#recipientEmail#</strong></li>
+        <li>Enter your email address (<strong>#recipientEmail#</strong>) &mdash; that's also your username</li>
         <li>Follow the instructions sent to your email</li>
     </ol>
 </div>

@@ -198,6 +198,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfoutput>
     <div class="form-horizontal">
 
+      <!--- LOGIN PREVIEW — updates live as the admin fills in the form so
+           they know exactly what the mailbox user will type to log in. --->
+      <div class="alert alert-primary mb-3" id="loginPreview">
+        <h5 class="mb-2"><i class="icon fas fa-sign-in-alt"></i> Login Information (for this mailbox user)</h5>
+        <div class="row">
+          <div class="col-md-4"><strong>URL</strong></div>
+          <div class="col-md-8"><code id="lpUrl">https://#cgi.http_host#/users/</code> <small class="text-muted">(and <code>/nc/</code> for webmail)</small></div>
+        </div>
+        <div class="row">
+          <div class="col-md-4"><strong>Username</strong></div>
+          <div class="col-md-8"><code id="lpUsername">username@domain</code> <small class="text-muted">&mdash; the full email address</small></div>
+        </div>
+        <div class="row">
+          <div class="col-md-4"><strong>Password</strong></div>
+          <div class="col-md-8" id="lpPassword">The password you set below</div>
+        </div>
+      </div>
+
       <!--- AUTHENTICATION TYPE (top of form — fields below adapt to selection) --->
       <cfif remoteauthAvailable>
         <div class="form-group mb-3">
@@ -652,7 +670,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $('#dnPatternGuidance').hide();
       hideRemoteNameFields();
     }
+    updateLoginPreview();
   });
+
+  // ================================================================
+  // LOGIN PREVIEW — keep in sync with form inputs so admin sees the
+  // exact username/URL/password-source the mailbox user will need.
+  // ================================================================
+  function updateLoginPreview() {
+    var usernameField = $('input[name="username"]').val() || '';
+    var domainText = $('#domainSelect option:selected').text() || '';
+    var fullEmail = usernameField && domainText ? (usernameField + '@' + domainText) : 'username@domain';
+    $('#lpUsername').text(fullEmail);
+
+    var authType = $('#authType').val() || 'local';
+    if (authType === 'remote') {
+      var rdomain = $('#remoteauthDomain option:selected').text() || 'the selected RemoteAuth domain';
+      // Strip the "(server)" suffix for readability
+      rdomain = rdomain.replace(/\s*\(.+\)\s*$/, '');
+      if (rdomain === '-- Select Domain --') rdomain = 'the selected RemoteAuth domain';
+      $('#lpPassword').html('The <strong>remote password</strong> from <code>' + rdomain + '</code> (their AD/LDAP account password).');
+    } else {
+      $('#lpPassword').html('The <strong>local password</strong> you set in the Password field below.');
+    }
+  }
+  $('input[name="username"]').on('input', updateLoginPreview);
+  $('#domainSelect').on('change', updateLoginPreview);
+  $('#authType').on('change', updateLoginPreview);
+  $(document).ready(updateLoginPreview);
 
 </script>
 

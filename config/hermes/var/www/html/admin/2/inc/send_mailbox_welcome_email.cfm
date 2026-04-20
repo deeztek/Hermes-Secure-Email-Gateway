@@ -55,13 +55,19 @@ Requires the following variables to be set before including:
 
 <p>A mailbox has been created for you on Hermes SEG. Your email address is: <strong>#recipientEmail#</strong></p>
 
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##805500;">Your Login Credentials</h3>
+    <p style="margin: 0 0 8px 0;"><strong>Username:</strong> Your full email address &mdash; <code>#recipientEmail#</code> &mdash; for <em>all</em> login methods (webmail, user portal, email clients).</p>
+    <p style="margin: 0;"><strong>Password:</strong> Provided to you separately by your administrator.</p>
+</div>
+
 <div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##004085;">Email Client Settings</h3>
     <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
     <table style="text-align: left; width: 100%; border-collapse: collapse;">
         <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 993 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail#</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
     </table>
 </div>
 

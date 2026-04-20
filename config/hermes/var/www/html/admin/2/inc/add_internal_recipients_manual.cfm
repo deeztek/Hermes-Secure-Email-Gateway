@@ -173,11 +173,13 @@ textarea: #show_recipient#
         <cfinclude template="ldap_add_user_relay.cfm">
     </cfif>
 
-    <!--- SEND WELCOME EMAIL TO NEW RECIPIENT --->
+    <!--- SEND WELCOME EMAIL TO NEW RECIPIENT (local auth only).
+         Remote-auth recipients skip: username/password instructions would
+         mismatch (Hermes username != AD username) and the email is
+         delivered to the recipient's mailbox which they can't read until
+         they've already logged in. Admins handle out-of-band onboarding. --->
     <cfset recipientName = recipientEmail>
-    <cfif show_auth_type EQ "remote">
-        <cfinclude template="send_recipient_welcome_email_remoteauth.cfm">
-    <cfelse>
+    <cfif show_auth_type EQ "local">
         <cfinclude template="send_recipient_welcome_email.cfm">
     </cfif>
     <!--- CREATE LDAP USER FOR RECIPIENT ENDS HERE --->
