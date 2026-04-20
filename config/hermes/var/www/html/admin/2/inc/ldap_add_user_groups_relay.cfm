@@ -79,8 +79,11 @@ This will add the user to:
         <cfset errorDetail = ldapModifyError>
     </cfif>
 
-    <!--- Check if this is just "already a member" error - not fatal --->
-    <cfif errorDetail CONTAINS "already exists" OR errorDetail CONTAINS "Type or value exists">
+    <!--- Check if this is just "already a member" error - not fatal.
+         Lucee's cfexecute may raise with stderr in cfcatch.detail rather
+         than the errorVariable — check both. --->
+    <cfif errorDetail CONTAINS "already exists" OR errorDetail CONTAINS "Type or value exists"
+       OR cfcatch.detail CONTAINS "already exists" OR cfcatch.detail CONTAINS "Type or value exists">
         <!--- User is already in group, that's OK --->
     <cfelse>
         <cfset m="LDAP Add Relay User Groups: #cfcatch.message# | Detail: #cfcatch.detail# | LDAP Error: #errorDetail#">
