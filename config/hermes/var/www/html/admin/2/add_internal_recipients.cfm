@@ -426,19 +426,20 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
     <cfquery name="getRemoteauthStatus" datasource="hermes">
         SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'enabled'
     </cfquery>
-    <!--- Get compatible domains (exclude patterns with {firstname} or {lastname}) --->
+    <!--- All enabled remoteauth mappings are supported. Patterns using
+         {firstname}/{lastname} require the recipient list to be pasted as
+         CSV (First,Last,Email) so the real AD names can be supplied; see
+         the DN Pattern guidance below the form for the exact format. --->
     <cfquery name="getRemoteauthDomains" datasource="hermes">
         SELECT domain_name, server_address, remote_dn_pattern FROM remoteauth_mappings
         WHERE enabled = 1
-        AND remote_dn_pattern NOT LIKE '%{firstname}%'
-        AND remote_dn_pattern NOT LIKE '%{lastname}%'
         ORDER BY domain_name
     </cfquery>
 
     <cfif getRemoteauthStatus.recordcount EQ 0 OR getRemoteauthStatus.setting_value NEQ "1">
         <cfset remoteauthDisabledReason = "RemoteAuth is not enabled. Enable it in <a href='view_remoteauth.cfm'>Remote Authentication</a> settings.">
     <cfelseif getRemoteauthDomains.recordcount EQ 0>
-        <cfset remoteauthDisabledReason = "No compatible domain mappings found. Add a domain mapping with a <code>{username}</code> or <code>{email}</code> DN pattern in <a href='view_remoteauth.cfm'>Remote Authentication</a>.">
+        <cfset remoteauthDisabledReason = "No enabled domain mappings found. Add one in <a href='view_remoteauth.cfm'>Remote Authentication</a>.">
     <cfelse>
         <cfset remoteauthAvailable = true>
         <cfloop query="getRemoteauthDomains">
@@ -583,14 +584,101 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
   <form name="add_internal_recipients.cfm" method="post" action="">
   <input type="hidden" name="action" value="add">
     <div class="box-body">
-       
+
       <cfoutput>
         <div class="form-horizontal">
+
+          <!--- LOGIN PREVIEW — updates live as admin picks auth type /
+               domain so they know what each recipient will use to log in. --->
+          <div class="alert alert-primary mb-3" id="loginPreview">
+            <h5 class="mb-2"><i class="icon fas fa-sign-in-alt"></i> Login Information (for each recipient)</h5>
+            <div class="row">
+              <div class="col-md-4"><strong>URL</strong></div>
+              <div class="col-md-8"><code>https://#cgi.http_host#/users/</code></div>
+            </div>
+            <div class="row">
+              <div class="col-md-4"><strong>Username</strong></div>
+              <div class="col-md-8">Each recipient's full email address (as entered in the textarea below)</div>
+            </div>
+            <div class="row">
+              <div class="col-md-4"><strong>Password</strong></div>
+              <div class="col-md-8" id="lpPassword">Each recipient sets their own via the "Reset password?" link on first login</div>
+            </div>
+          </div>
+
+          <!--- AUTHENTICATION TYPE (top of form so recipient input adapts) --->
+          <cfif remoteauthAvailable>
+            <div class="form-group">
+              <label><strong>Authentication Type</strong></label>
+              <div class="alert alert-info">
+                <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
+                <p class="mb-0">Select <strong>Remote</strong> to authenticate recipients against an external AD/LDAP server. Recipients use their existing organization credentials &mdash; no local password is created.</p>
+              </div>
+              <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
+                <option value="local" selected>Local</option>
+                <option value="remote">Remote</option>
+              </select>
+            </div>
+
+            <div class="form-group mt-3" id="remoteauthDomainGroup" style="display:none;">
+              <label><strong>RemoteAuth Domain</strong></label>
+              <select class="form-control" name="remoteauth_domain" id="remoteauthDomain" style="width: 100%;">
+                <option value="">-- Select Domain --</option>
+                <cfloop array="#remoteauthDomains#" index="domainItem">
+                  <option value="#domainItem.domain#" data-pattern="#HTMLEditFormat(domainItem.pattern)#">#domainItem.domain# (#domainItem.server#)</option>
+                </cfloop>
+              </select>
+              <small class="text-muted">Select the domain recipients will authenticate against</small>
+            </div>
+
+            <div class="form-group mt-3" id="dnPatternGuidance" style="display:none;">
+              <div class="alert alert-secondary">
+                <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
+                <p>Recipients will be authenticated against the remote server using this DN pattern:</p>
+                <p><code id="dnPatternDisplay"></code></p>
+                <p class="mb-1"><small><strong>Placeholder resolution for each recipient:</strong><br>
+                <code>{username}</code> &rarr; local part of email (e.g. <em>jsmith</em>)<br>
+                <code>{email}</code> &rarr; full email (e.g. <em>jsmith@example.com</em>)<br>
+                <code>{firstname}</code> / <code>{lastname}</code> &rarr; First/Last Name from the CSV row (see below)</small></p>
+                <div id="csvFormatHelp" style="display:none;">
+                  <hr>
+                  <p class="mb-1"><strong>CSV Format required for this DN pattern.</strong> Paste one recipient per line as <code>First,Last,Email</code>. Common AD/LDAP exports are accepted as-is:</p>
+                  <ul class="mb-1">
+                    <li><strong>PowerShell Get-ADUser</strong>: <code>Select-Object GivenName,Surname,Mail | Export-Csv users.csv -NoTypeInformation</code> &mdash; header row auto-detected</li>
+                    <li><strong>CSVDE</strong> (AD built-in): <code>csvde -f users.csv -l "givenName,sn,mail"</code> &mdash; unknown columns (like <code>DN</code>) are ignored</li>
+                    <li><strong>Excel / manual</strong>: type three columns (First, Last, Email), save as CSV</li>
+                  </ul>
+                  <p class="mb-0"><small>Column headers are matched case-insensitively against: <code>givenname</code>/<code>firstname</code>/<code>first</code>, <code>surname</code>/<code>sn</code>/<code>lastname</code>/<code>last</code>, <code>mail</code>/<code>email</code>/<code>emailaddress</code>. No header row is also fine &mdash; columns are interpreted positionally as First, Last, Email.</small></p>
+                </div>
+              </div>
+            </div>
+
+          <cfelseif isPro>
+            <div class="form-group">
+              <label><strong>Authentication Type</strong></label>
+              <select class="form-control" name="auth_type" id="authType" style="width: 100%;" disabled>
+                <option value="local" selected>Local</option>
+                <option value="remote">Remote</option>
+              </select>
+              <small class="text-muted">#remoteauthDisabledReason#</small>
+            </div>
+          <cfelse>
+            <input type="hidden" name="auth_type" value="local">
+            <div class="form-group">
+              <label><strong>Authentication Type</strong></label>
+              <select class="form-control" style="width: 100%;" disabled>
+                <option selected>Local</option>
+                <option disabled>Remote (Pro License Required)</option>
+              </select>
+              <small class="text-muted"><i class="fas fa-crown text-warning"></i> Remote Authentication requires a <strong>Pro License</strong>.</small>
+            </div>
+          </cfif>
+
           <label for="recipients"><strong>Recipient(s)</strong></label>
           <div class="form-group">
-              
-                
-                  <textarea class="form-control" name="recipient" rows="10" placeholder="Enter recipient e-mail address(es) each in its own line" required></textarea>
+
+
+                  <textarea class="form-control" name="recipient" id="recipientTextarea" rows="10" placeholder="Enter recipient e-mail address(es), one per line" required></textarea>
                   <div class="alert alert-warning mt-2">
                     <h5><i class="icon fas fa-clock"></i> Bulk Add Performance Notice</h5>
                     <p class="mb-1">Adding recipients requires creating LDAP accounts and configuring encryption settings for each entry. Large batches may take several minutes to process (e.g., 25 recipients takes under 6 minutes). Please wait for the loading indicator to finish and do not close or navigate away from the page until the operation completes.</p>
@@ -695,63 +783,9 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 <!--- DOWNLOAD MESSAGES  ENDS HERE --->
 
-<!--- AUTHENTICATION TYPE (Pro Edition + RemoteAuth Only) STARTS HERE --->
-<cfif remoteauthAvailable>
-
-<div class="form-group">
-  <label><strong>Authentication Type</strong></label>
-  <div class="alert alert-info">
-    <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
-    <p class="mb-0">Select <strong>Remote</strong> to authenticate recipients against an external AD/LDAP server. Recipients will use their existing organization credentials - no local password will be created.</p>
-  </div>
-  <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
-    <option value="local" selected>Local</option>
-    <option value="remote">Remote</option>
-  </select>
-</div>
-
-<!--- RemoteAuth Domain Selection (shown when Remote is selected) --->
-<div class="form-group mt-3" id="remoteauthDomainGroup" style="display:none;">
-  <label><strong>RemoteAuth Domain</strong></label>
-  <select class="form-control" name="remoteauth_domain" id="remoteauthDomain" style="width: 100%;">
-    <option value="">-- Select Domain --</option>
-    <cfloop array="#remoteauthDomains#" index="domainItem">
-      <cfoutput>
-      <option value="#domainItem.domain#" data-pattern="#HTMLEditFormat(domainItem.pattern)#">#domainItem.domain# (#domainItem.server#)</option>
-      </cfoutput>
-    </cfloop>
-  </select>
-  <small class="text-muted">Select the domain recipients will authenticate against</small>
-</div>
-
-<!--- DN Pattern Guidance (shown when a domain is selected) --->
-<div class="form-group mt-3" id="dnPatternGuidance" style="display:none;">
-  <div class="alert alert-secondary">
-    <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
-    <p>Recipients will be authenticated against the remote server using this DN pattern:</p>
-    <p><code id="dnPatternDisplay"></code></p>
-    <p class="mb-0"><small><strong>How placeholders are resolved from the recipient's email address:</strong><br>
-    For a recipient with email <em>jsmith@example.com</em>:<br>
-    <code>{username}</code> &rarr; <em>jsmith</em> (local part extracted automatically) &rarr; DN becomes <code>cn=jsmith,...</code><br>
-    <code>{email}</code> &rarr; <em>jsmith@example.com</em> (full address used as-is) &rarr; DN becomes <code>cn=jsmith@example.com,...</code></small></p>
-  </div>
-</div>
-
-<cfelseif isPro>
-<!--- Pro Edition but RemoteAuth not fully configured - show disabled toggle --->
-<div class="form-group">
-  <label><strong>Authentication Type</strong></label>
-  <select class="form-control" name="auth_type" id="authType" style="width: 100%;" disabled>
-    <option value="local" selected>Local</option>
-    <option value="remote">Remote</option>
-  </select>
-  <cfoutput><small class="text-muted">#remoteauthDisabledReason#</small></cfoutput>
-</div>
-
-<cfelse>
-<!--- Community Edition - no toggle --->
-<input type="hidden" name="auth_type" value="local">
-</cfif>
+<!--- AUTHENTICATION TYPE block lives at the top of the form (above the
+     Recipient textarea) so the textarea placeholder + help text can
+     adapt to the selected DN pattern. --->
 <!--- AUTHENTICATION TYPE ENDS HERE --->
 
 
@@ -958,6 +992,32 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
     }
   });
 
+  // Swap the recipient-textarea placeholder/help between plain-email and
+  // CSV (First,Last,Email) modes based on whether the currently-selected
+  // RemoteAuth DN pattern references {firstname} or {lastname}.
+  var PLAIN_PLACEHOLDER = 'Enter recipient e-mail address(es), one per line';
+  var CSV_PLACEHOLDER   = 'First,Last,Email — one recipient per line\nExample:\nJohn,Smith,john.smith@company.com\nJane,Doe,jane.doe@company.com\n\nPowerShell/CSVDE exports with headers also work:\n"GivenName","Surname","Mail"\n"John","Smith","john.smith@company.com"';
+  function updateRecipientTextareaMode(pattern) {
+    var needsCsv = /\{firstname\}|\{lastname\}/i.test(pattern || '');
+    $('#recipientTextarea').attr('placeholder', needsCsv ? CSV_PLACEHOLDER : PLAIN_PLACEHOLDER);
+    $('#csvFormatHelp').toggle(needsCsv);
+  }
+
+  // Update the Login Preview "Password" line based on auth type + domain
+  function updateLoginPreview() {
+    var authType = $('#authType').val() || 'local';
+    var $lpPw = $('#lpPassword');
+    if (!$lpPw.length) return;
+    if (authType === 'remote') {
+      var rdomain = $('#remoteauthDomain option:selected').text() || '';
+      rdomain = rdomain.replace(/\s*\(.+\)\s*$/, '');
+      if (!rdomain || rdomain === '-- Select Domain --') rdomain = 'the selected RemoteAuth domain';
+      $lpPw.html('The <strong>remote password</strong> from <code>' + rdomain + '</code> (their AD/LDAP account password).');
+    } else {
+      $lpPw.text('Each recipient sets their own via the "Reset password?" link on first login');
+    }
+  }
+
   // Show/hide RemoteAuth options when auth type is toggled
   $('#authType').on('change', function() {
     if ($(this).val() === 'remote') {
@@ -966,8 +1026,11 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
       $('#remoteauthDomainGroup').hide();
       $('#dnPatternGuidance').hide();
       $('#remoteauthDomain').val('');
+      updateRecipientTextareaMode('');
     }
+    updateLoginPreview();
   });
+  $(document).ready(updateLoginPreview);
 
   // Show DN pattern guidance when a domain is selected
   $('#remoteauthDomain').on('change', function() {
@@ -976,9 +1039,12 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
     if (pattern) {
       $('#dnPatternDisplay').text(pattern);
       $('#dnPatternGuidance').show();
+      updateRecipientTextareaMode(pattern);
     } else {
       $('#dnPatternGuidance').hide();
+      updateRecipientTextareaMode('');
     }
+    updateLoginPreview();
   });
 
   </script>

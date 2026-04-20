@@ -36,10 +36,37 @@ Returns:
 <!--- LDAP USERNAME IS THE EMAIL ADDRESS --->
 <cfset ldapUsername = LCase(recipientEmail)>
 
-<!--- EXTRACT NAME PARTS FROM EMAIL --->
+<!--- givenName/sn feed the seeAlso DN pattern via {firstname}/{lastname}
+     placeholders. When the remoteauth DN pattern requires them (typical
+     AD default), the admin supplies real values via CSV on the Add
+     Relay Recipients form (First,Last,Email per row). Those arrive here
+     as remoteFirstName/remoteLastName. Otherwise fall back to
+     email-derived values so the existing seeAlso logic keeps working
+     for {username}/{email}-style patterns. --->
 <cfset emailLocalPart = ListFirst(recipientEmail, "@")>
-<cfset ldapFirstName = emailLocalPart>
-<cfset ldapLastName = "User">
+<cfif isDefined("remoteFirstName") AND Len(Trim(remoteFirstName)) GT 0>
+    <cfset ldapFirstName = Trim(remoteFirstName)>
+<cfelse>
+    <cfset ldapFirstName = emailLocalPart>
+</cfif>
+<cfif isDefined("remoteLastName") AND Len(Trim(remoteLastName)) GT 0>
+    <cfset ldapLastName = Trim(remoteLastName)>
+<cfelse>
+    <cfset ldapLastName = "User">
+</cfif>
+
+<!--- displayName attribute for the LDAP entry. Decoupled from
+     givenName/sn where appropriate: prefer admin-entered First + Last
+     for display, fall back to First+Last, fall back to email local part. --->
+<cfif isDefined("remoteFirstName") AND Len(Trim(remoteFirstName)) GT 0
+   AND isDefined("remoteLastName")  AND Len(Trim(remoteLastName))  GT 0>
+    <cfset ldapDisplayName = Trim(remoteFirstName) & " " & Trim(remoteLastName)>
+<cfelseif isDefined("remoteFirstName") AND Len(Trim(remoteFirstName)) GT 0>
+    <cfset ldapDisplayName = Trim(remoteFirstName)>
+<cfelse>
+    <cfset ldapDisplayName = emailLocalPart>
+</cfif>
+
 <cfset ldapEmail = recipientEmail>
 
 <!--- SET THE REMOTEAUTH DOMAIN FOR THE LDAP TEMPLATE --->

@@ -1405,6 +1405,26 @@ SELECT  id, username, system from system_users where username = <cfqueryparam va
 
     <div class="box-body">
 
+<!--- LOGIN PREVIEW — updates live as admin fills the form so they
+     know exactly what the system user will type to log in. --->
+<cfoutput>
+<div class="alert alert-primary mb-3" id="loginPreview">
+  <h5 class="mb-2"><i class="icon fas fa-sign-in-alt"></i> Login Information (for this system user)</h5>
+  <div class="row">
+    <div class="col-md-4"><strong>URL</strong></div>
+    <div class="col-md-8"><code id="lpUrl">https://#cgi.http_host#/admin/</code></div>
+  </div>
+  <div class="row">
+    <div class="col-md-4"><strong>Username</strong></div>
+    <div class="col-md-8"><code id="lpUsername"><cfif Len(Trim(theUsername))>#encodeForHTML(theUsername)#<cfelse>username</cfif></code> <small class="text-muted">&mdash; the bare username you enter below (not an email)</small></div>
+  </div>
+  <div class="row">
+    <div class="col-md-4"><strong>Password</strong></div>
+    <div class="col-md-8" id="lpPassword"><cfif theAuthType EQ "remote">The remote password from the selected RemoteAuth domain<cfelse>The password you set below</cfif></div>
+  </div>
+</div>
+</cfoutput>
+
 <!--- AUTHENTICATION TYPE (Pro Edition Only) - PLACED AT TOP OF FORM --->
 <div class="form-group">
   <label><strong>Authentication Type</strong></label>
@@ -1695,6 +1715,38 @@ document.addEventListener('DOMContentLoaded', function() {
         // Run on page load
         updateFormForAuthType();
     }
+
+    // ============================================================
+    // LOGIN PREVIEW — keep in sync with username + auth type.
+    // URL is always /admin/ for system users.
+    // ============================================================
+    function updateLoginPreview() {
+        var usernameField = document.getElementById('username');
+        var username = usernameField ? usernameField.value.trim() : '';
+        var lpUsername = document.getElementById('lpUsername');
+        if (lpUsername) lpUsername.textContent = username || 'username';
+
+        var lpPassword = document.getElementById('lpPassword');
+        if (!lpPassword) return;
+        if (authTypeSelect && authTypeSelect.value === 'remote') {
+            var rdSelect = document.getElementById('remoteauthDomain');
+            var rdText = rdSelect && rdSelect.options[rdSelect.selectedIndex]
+                       ? rdSelect.options[rdSelect.selectedIndex].text
+                       : '';
+            rdText = rdText.replace(/\s*\(.+\)\s*$/, '');
+            if (!rdText || rdText === '-- Select Domain --') rdText = 'the selected RemoteAuth domain';
+            lpPassword.innerHTML = 'The <strong>remote password</strong> from <code>' + rdText + '</code> (their AD/LDAP account password).';
+        } else {
+            lpPassword.innerHTML = 'The <strong>local password</strong> you set below.';
+        }
+    }
+
+    var unameEl = document.getElementById('username');
+    if (unameEl) unameEl.addEventListener('input', updateLoginPreview);
+    if (authTypeSelect) authTypeSelect.addEventListener('change', updateLoginPreview);
+    var rdEl = document.getElementById('remoteauthDomain');
+    if (rdEl) rdEl.addEventListener('change', updateLoginPreview);
+    updateLoginPreview();
 });
 </script>
 <!--- SCRIPT TO SHOW/HIDE REMOTE AUTH DOMAIN AND PASSWORD FIELDS ENDS HERE --->

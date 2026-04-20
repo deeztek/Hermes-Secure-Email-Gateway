@@ -39,37 +39,157 @@ select policy_id, default_policy from spam_policies where default_policy='1'
 
 <cfinclude template="generate_customtrans.cfm">
 
+<!--- ====================================================================
+     CSV MODE DETECTION + PRE-PARSING
 
-<!---
-<cffile action = "write"
-file = "/opt/hermes/tmp/#customtrans3#_recipients"
-output = "#show_recipient#"> 
+     If the selected RemoteAuth domain's DN pattern contains
+     {firstname}/{lastname}, the recipient textarea expects CSV rather
+     than one-email-per-line. Parse the textarea into an array of
+     structs { email, firstName, lastName } with optional header-row
+     detection and column mapping.
 
-<cfoutput>
-textarea: #show_recipient#
-</cfoutput>
+     Supported CSV shapes (all work without admin editing):
+       * PowerShell Get-ADUser | Select GivenName,Surname,Mail | Export-Csv
+         (has header row, columns named GivenName/Surname/Mail)
+       * CSVDE (AD built-in) — has DN column first, then givenName/sn/mail
+         headers → DN column is ignored
+       * No header, positional: First,Last,Email
+     ==================================================================== --->
+<cfset csvModeNeeded = false>
+<cfset recipientRows = []>
 
+<cfif show_auth_type EQ "remote" AND show_remoteauth_domain NEQ "">
+    <cfquery name="getDnPattern" datasource="hermes">
+        SELECT remote_dn_pattern FROM remoteauth_mappings
+        WHERE domain_name = <cfqueryparam value="#show_remoteauth_domain#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif getDnPattern.recordcount GTE 1>
+        <cfset csvModeNeeded = (FindNoCase("{firstname}", getDnPattern.remote_dn_pattern) GT 0
+                             OR FindNoCase("{lastname}", getDnPattern.remote_dn_pattern) GT 0)>
+    </cfif>
+</cfif>
 
+<cfscript>
+    // Parse a single CSV line, honoring double-quoted fields (with "" as escaped quote).
+    function parseCsvLine(line) {
+        var result = [];
+        var field = "";
+        var inQuotes = false;
+        var i = 1;
+        var len = Len(arguments.line);
+        while (i <= len) {
+            var ch = Mid(arguments.line, i, 1);
+            if (ch == chr(34)) {
+                if (inQuotes && i < len && Mid(arguments.line, i + 1, 1) == chr(34)) {
+                    field &= chr(34);
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (ch == "," && !inQuotes) {
+                arrayAppend(result, Trim(field));
+                field = "";
+            } else {
+                field &= ch;
+            }
+            i++;
+        }
+        arrayAppend(result, Trim(field));
+        return result;
+    }
 
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_recipients" variable="therecipients">
---->
+    // Given header names, return column indices (1-based) for first/last/email.
+    // Unknown columns yield -1 so positional fallback can fill in.
+    function mapCsvColumns(headers) {
+        var m = { first: -1, last: -1, email: -1 };
+        for (var i = 1; i <= arrayLen(arguments.headers); i++) {
+            var h = LCase(Trim(arguments.headers[i]));
+            if (m.first == -1 && ListFindNoCase("givenname,firstname,first,given name,first name", h) GT 0) {
+                m.first = i;
+            } else if (m.last == -1 && ListFindNoCase("surname,sn,lastname,last,last name,family name", h) GT 0) {
+                m.last = i;
+            } else if (m.email == -1 && ListFindNoCase("mail,email,emailaddress,email address,e-mail", h) GT 0) {
+                m.email = i;
+            }
+        }
+        return m;
+    }
+</cfscript>
 
-    <!---
-    <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_recipients">
+<cfif csvModeNeeded>
+    <cfset _lines = ListToArray(show_recipient, chr(10), false)>
+    <cfset _colMap = { first: 1, last: 2, email: 3 }>
+    <cfset _headerSkip = false>
+    <cfset _firstDataSeen = false>
 
-    <cfif fileExists(FiletoDelete)>
-        <cffile action = "delete" file = "#FiletoDelete#"> 
-        <!--- /CFIF fileExists --->
+    <!--- Detect header on the first non-empty line: if none of its fields
+         parse as an email, treat it as a header and build the column map. --->
+    <cfloop array="#_lines#" index="_line">
+        <cfset _line = Trim(_line)>
+        <cfif _line EQ "" OR Left(_line, 1) EQ "##"><cfcontinue></cfif>
+        <cfset _parsed = parseCsvLine(_line)>
+        <cfset _hasEmailField = false>
+        <cfloop array="#_parsed#" index="_f">
+            <cfif IsValid("email", _f)>
+                <cfset _hasEmailField = true>
+                <cfbreak>
+            </cfif>
+        </cfloop>
+        <cfif NOT _hasEmailField>
+            <cfset _detected = mapCsvColumns(_parsed)>
+            <cfset _headerSkip = true>
+            <cfif _detected.first GT 0><cfset _colMap.first = _detected.first></cfif>
+            <cfif _detected.last GT 0><cfset _colMap.last = _detected.last></cfif>
+            <cfif _detected.email GT 0><cfset _colMap.email = _detected.email></cfif>
         </cfif>
+        <cfbreak>
+    </cfloop>
 
-    --->
+    <!--- Build the recipient rows --->
+    <cfloop array="#_lines#" index="_line">
+        <cfset _line = Trim(_line)>
+        <cfif _line EQ "" OR Left(_line, 1) EQ "##"><cfcontinue></cfif>
+        <cfif _headerSkip AND NOT _firstDataSeen>
+            <cfset _firstDataSeen = true>
+            <cfcontinue>
+        </cfif>
+        <cfset _firstDataSeen = true>
+        <cfset _parsed = parseCsvLine(_line)>
+        <cfset _maxIdx = Max(_colMap.first, Max(_colMap.last, _colMap.email))>
+        <cfif arrayLen(_parsed) GTE _maxIdx>
+            <cfset ArrayAppend(recipientRows, {
+                email:     LCase(_parsed[_colMap.email]),
+                firstName: _parsed[_colMap.first],
+                lastName:  _parsed[_colMap.last]
+            })>
+        <cfelse>
+            <!--- Malformed row — will surface as "invalid email" below for visibility. --->
+            <cfset ArrayAppend(recipientRows, {
+                email: LCase(_line),
+                firstName: "",
+                lastName:  ""
+            })>
+        </cfif>
+    </cfloop>
+<cfelse>
+    <!--- Traditional one-email-per-line mode --->
+    <cfloop list="#show_recipient#" index="_line" delimiters="#chr(10)#">
+        <cfset _line = Trim(_line)>
+        <cfif _line NEQ "">
+            <cfset ArrayAppend(recipientRows, {
+                email:     LCase(_line),
+                firstName: "",
+                lastName:  ""
+            })>
+        </cfif>
+    </cfloop>
+</cfif>
 
-<cfloop index="recipient" list="#show_recipient#" delimiters="#chr(10)#">
+<cfloop array="#recipientRows#" index="_row">
 
-    <cfoutput>
-    <cfset recipient = #LCase(recipient)#>
-    <cfset recipient = #trim(recipient)#>
-</cfoutput>
+    <cfset recipient = _row.email>
+    <cfset remoteFirstName = _row.firstName>
+    <cfset remoteLastName  = _row.lastName>
 
         <cfif #recipient# is not "">
         <cfset step=1>
