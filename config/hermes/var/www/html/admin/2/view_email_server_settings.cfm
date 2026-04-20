@@ -198,7 +198,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <strong>Auto-redirect to SSO:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. Recommended for normal operation.<br>
             <strong>SSO button only:</strong> Users see the Nextcloud login page with just the SSO button &mdash; username/password fields are hidden. Good for deployments where you want users to know SSO is required but don't want to auto-redirect.<br>
             <strong>Show full form:</strong> Users see the username/password form and the SSO button. Use temporarily for local Nextcloud admin maintenance.<br>
-            <em>In all modes, append <code>?direct=1</code> to the Nextcloud login URL to force-show the full form for local admin login.</em>
+            <em>In all modes, use <a href="/nc-admin-login" target="_blank"><code>/nc-admin-login</code></a> (also linked as "Nextcloud Admin" in the sidebar) for local Nextcloud admin login. The path is gated by Authelia and requires admin-group membership with 2FA.</em>
           </small>
         </div>
       </div>

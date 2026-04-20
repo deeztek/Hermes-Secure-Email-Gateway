@@ -271,7 +271,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/nc/login?direct=1" class="nav-link" target="_blank">
+              <a href="/nc-admin-login" class="nav-link" target="_blank">
                 <i class="nav-icon fas fa-cloud"></i>
                 <p>Nextcloud Admin <i class="fas fa-external-link-alt fa-xs"></i></p>
               </a>
