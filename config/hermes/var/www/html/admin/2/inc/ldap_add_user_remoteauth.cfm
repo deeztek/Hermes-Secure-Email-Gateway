@@ -97,6 +97,12 @@ via the remoteauth overlay. The seeAlso attribute points to the remote DN.
     <cffile action="delete" file="#fileToDelete#">
 </cfif>
 
+<!--- RE-INITIALIZE IF CFEXECUTE UNSET THE ERROR VARIABLE (Lucee behavior
+     with no stderr). Same pattern as ldap_add_user.cfm. --->
+<cfif NOT isDefined("ldapAddError")>
+    <cfset ldapAddError = "">
+</cfif>
+
 <!--- CHECK FOR ERRORS --->
 <cfif ldapAddError CONTAINS "Already exists">
     <cfset ldapUserExists = true>
