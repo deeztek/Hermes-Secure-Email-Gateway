@@ -19,10 +19,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!---
-SEND WELCOME EMAIL TO NEW RECIPIENT (REMOTE AUTH)
-Sends a welcome email to a newly created relay recipient that uses
-Remote Authentication. Instructs the user to log in with their existing
-organization credentials (no password reset needed).
+SEND WELCOME EMAIL TO NEW RELAY RECIPIENT (REMOTE AUTH)
+Minimal reference email for remote-auth relay recipients. Unlike the
+mailbox case, this email IS delivered to the recipient's actual (external)
+inbox via the relay chain, so they can read it without logging in first.
+We still skip detailed credential instructions because the Hermes-side
+username (full email) differs from the user's AD username — admins
+handle that out-of-band. The email's job is to explain what the Hermes
+user portal is for and how to reach it.
 
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
@@ -54,20 +58,19 @@ Requires the following variables to be set before including:
 
 <p>Hello <strong>#recipientName#</strong>,</p>
 
-<p>An account has been created for you on Hermes SEG.</p>
+<p>Your email address <strong>#recipientEmail#</strong> is now protected by Hermes SEG. Incoming mail passes through quarantine and delivery rules before reaching your regular mailbox.</p>
 
-<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
-    <h3 style="margin-top: 0; color: ##495057;">How to Log In</h3>
-    <p>You can log in using your <strong>existing organization credentials</strong> (the same username and password you use for your organization's network/email).</p>
-    <p><strong>To access your account:</strong></p>
-    <ol style="text-align: left;">
-        <li>Go to the login page: <a href="#loginUrl#">#loginUrl#</a></li>
-        <li>Enter your email address: <strong>#recipientEmail#</strong></li>
-        <li>Enter your <strong>existing organization password</strong></li>
-    </ol>
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 15px; margin: 20px 0; border-radius: 5px;">
+    <p style="margin: 0;">Your Hermes user portal uses your <strong>organization (AD/LDAP) password</strong> for authentication. Your administrator will provide your login username separately. If you need help, contact them directly.</p>
 </div>
 
-<p>Once you have logged in, you will be able to:</p>
+<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##495057;">User Portal</h3>
+    <p>Manage your quarantine, review and release held messages, and adjust your preferences:</p>
+    <p style="margin-bottom: 0;"><a href="#loginUrl#">#loginUrl#</a></p>
+</div>
+
+<p>Once logged in, you can:</p>
 <ul style="text-align: left;">
     <li>View your message quarantine</li>
     <li>Manage your email settings</li>

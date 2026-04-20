@@ -20,9 +20,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 SEND WELCOME EMAIL TO NEW MAILBOX USER (REMOTE AUTH)
-Sends a welcome email to a newly created mailbox user that uses
-Remote Authentication. Instructs the user to log in with their existing
-organization credentials (no password reset needed).
+Minimal reference email for remote-auth mailboxes. Intentionally omits
+any username/password instructions because:
+  - The Hermes mailbox username (full email) differs from the user's
+    AD/LDAP username, which would confuse them
+  - The admin is the right channel for first-time credential handoff;
+    we just note that the password is their organization password
+
+Focus is on reference info the user will want AFTER they're logged in:
+email client settings, user portal URL, webmail URL, help contact.
 
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
@@ -36,13 +42,14 @@ Requires the following variables to be set before including:
     SELECT parameter, value FROM system_settings WHERE parameter='postmaster'
 </cfquery>
 
-<!--- GET CONSOLE HOST FOR LOGIN LINK --->
+<!--- GET CONSOLE HOST FOR LINKS --->
 <cfquery name="getConsoleHost" datasource="hermes">
     SELECT parameter, value2 FROM parameters2 WHERE parameter='console.host' AND module='console'
 </cfquery>
 
 <cfset consoleHost = getConsoleHost.value2>
 <cfset loginUrl = "https://#consoleHost#/users">
+<cfset webmailUrl = "https://#consoleHost#/nc">
 
 <!--- SEND WELCOME EMAIL --->
 <cfmail from="#getPostmaster.value#" to="#recipientEmail#" server="hermes_postfix_dkim" port="10026" subject="[Hermes SEG] Welcome - Mailbox Created" type="html">
@@ -54,17 +61,10 @@ Requires the following variables to be set before including:
 
 <p>Hello <strong>#recipientName#</strong>,</p>
 
-<p>A mailbox has been created for you on Hermes SEG. Your email address is: <strong>#recipientEmail#</strong></p>
+<p>Your mailbox has been created on Hermes SEG. Your email address is: <strong>#recipientEmail#</strong></p>
 
-<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
-    <h3 style="margin-top: 0; color: ##495057;">How to Log In</h3>
-    <p>You can log in using your <strong>existing organization credentials</strong> (the same username and password you use for your organization's network/email).</p>
-    <p><strong>To access your account:</strong></p>
-    <ol style="text-align: left;">
-        <li>Go to the login page: <a href="#loginUrl#">#loginUrl#</a></li>
-        <li>Enter your email address: <strong>#recipientEmail#</strong></li>
-        <li>Enter your <strong>existing organization password</strong></li>
-    </ol>
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 15px; margin: 20px 0; border-radius: 5px;">
+    <p style="margin: 0;">Your mailbox uses your <strong>organization (AD/LDAP) password</strong> for authentication. Your administrator will provide your login username separately. If you need help, contact them directly.</p>
 </div>
 
 <div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
@@ -72,12 +72,20 @@ Requires the following variables to be set before including:
     <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
     <table style="text-align: left; width: 100%; border-collapse: collapse;">
         <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 993 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail#</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
     </table>
 </div>
 
-<p>Once you have logged in, you will be able to:</p>
+<div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##495057;">User Portal &amp; Webmail</h3>
+    <p><strong>User Portal</strong> &mdash; manage settings, quarantine, and held messages:<br>
+    <a href="#loginUrl#">#loginUrl#</a></p>
+    <p style="margin-bottom: 0;"><strong>Webmail</strong> &mdash; mail, calendar, contacts, files:<br>
+    <a href="#webmailUrl#">#webmailUrl#</a></p>
+</div>
+
+<p>Once logged in, you can:</p>
 <ul style="text-align: left;">
     <li>Send and receive email via your email client or webmail</li>
     <li>View your message quarantine</li>

@@ -505,25 +505,23 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 5. SEND WELCOME EMAIL (local auth only)
-     For remote-auth mailboxes we skip the welcome email entirely:
-     (a) the username/password instructions would be misleading — the
-         mailbox username (full email) differs from the AD username the
-         user already knows, and
-     (b) the message is delivered to the new mailbox itself, which the
-         user can't read until they've already logged in.
-     Admins need to communicate credentials out-of-band for remote auth;
-     the Login Preview callout on Add Mailbox shows them exactly what to
-     hand off. --->
+<!--- 5. SEND WELCOME EMAIL
+     - Local auth: full welcome email with credentials section (admin
+       set the password, which was communicated out-of-band).
+     - Remote auth: minimal reference email (no credentials — admin
+       handles username handoff, user uses their AD password). Useful
+       as a client-settings + portal-URL reference after first login. --->
 <cfset recipientName = displayName>
-<cfif form.auth_type EQ "local">
-    <cftry>
+<cftry>
+    <cfif form.auth_type EQ "remote">
+        <cfinclude template="send_mailbox_welcome_email_remoteauth.cfm">
+    <cfelse>
         <cfinclude template="send_mailbox_welcome_email.cfm">
-    <cfcatch type="any">
-        <!--- Welcome email failure is non-critical --->
-    </cfcatch>
-    </cftry>
-</cfif>
+    </cfif>
+<cfcatch type="any">
+    <!--- Welcome email failure is non-critical --->
+</cfcatch>
+</cftry>
 
 <!--- 6. CIPHERMAIL ENCRYPTION SETUP --->
 <cfif form.pdf_enabled EQ "1" OR form.smime_enabled EQ "1" OR form.pgp_enabled EQ "1">

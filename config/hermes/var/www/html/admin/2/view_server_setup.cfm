@@ -149,10 +149,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </div>
 
     <div class="callout callout-warning mb-3">
-      <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>
+      <p class="mb-1"><i class="icon fas fa-exclamation-triangle"></i>
         Changing the mail server settings will immediately update the Postfix configuration and reload the mail service. Changing the Host IP will regenerate the Nextcloud configuration.
         Ensure the hostname has a valid DNS A record and matching reverse DNS (PTR) record, or outgoing mail may be rejected by other servers.
       </p>
+      <p class="mb-0"><strong>Changing the Mail Server Hostname will break existing email client configurations</strong> that connect via the old FQDN. This includes:</p>
+      <ul class="mb-0">
+        <li>All external email clients (Thunderbird, Outlook, iOS Mail, etc.) &mdash; users will need to reconfigure IMAP/SMTP hostnames</li>
+        <li>CalDAV/CardDAV calendar/contact clients &mdash; need new server URLs</li>
+        <li>Nextcloud Mail profiles for <strong>remote-auth</strong> mailbox users (auto-discovered via external FQDN) &mdash; users will be re-prompted for their AD password and hostnames auto-update</li>
+        <li>Nextcloud Mail profiles for <strong>local-auth</strong> users are <strong>not</strong> affected (they use internal Docker hostnames)</li>
+      </ul>
+      <p class="mb-0 mt-2"><small>Only change this if necessary (e.g. migrating to a new domain). Plan to notify users and provide updated client setup instructions.</small></p>
     </div>
 
     <form method="post" autocomplete="off">
