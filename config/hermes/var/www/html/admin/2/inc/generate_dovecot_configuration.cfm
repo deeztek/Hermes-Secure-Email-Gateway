@@ -238,12 +238,12 @@ Called from: email_server_settings_action.cfm (after saving form values)
         "  }">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
 
-    <!--- ACL config: top-level setting in Dovecot 2.4 (not a block).
-         Points the shared-mailbox lookup at the `acldict` defined inside
-         dict_server above. In 2.3 this was `acl_dict { dict proxy {...} }`
-         but 2.4 removed that section syntax. --->
-    <cfset aclConfigBlock = "acl_shared_dict = proxy::acldict">
-    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", aclConfigBlock, "ALL")>
+    <!--- ACL config: in Dovecot 2.4 the shared-mailbox dict is auto-wired
+         by the `dict_map shared/shared-boxes/user/$to/$from` pattern on the
+         named dict inside dict_server — there is no explicit top-level
+         `acl_shared_dict` setting. The pattern itself tells the ACL plugin
+         which dict holds the "who has shared what with whom" index. --->
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", "", "ALL")>
 
     <!--- Shared namespace block.
          Dovecot 2.4 uses %{user}, %{user | domain}, %{user | username}
