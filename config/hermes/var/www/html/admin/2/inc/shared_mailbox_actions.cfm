@@ -219,6 +219,28 @@ Dispatches to the appropriate action based on form.action:
             )
         </cfquery>
 
+        <!--- 4b. BOOTSTRAP THE DOVECOT MAILDIR for the shared mailbox.
+             Dovecot's shared namespace only surfaces mailboxes that exist on
+             disk. New shared mailboxes have DB rows but no Maildir until mail
+             is delivered or someone logs in as the shared address — neither of
+             which happens automatically. Calling `doveadm mailbox create ...
+             INBOX` pre-creates the physical mailbox structure so members with
+             ACL rights can see it immediately in their IMAP clients. --->
+        <cftry>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec hermes_dovecot doveadm mailbox create -u #sharedAddress# INBOX"
+                variable="doveadmCreateResult"
+                errorVariable="doveadmCreateError"
+                timeout="30" />
+            <!--- Idempotent: doveadm returns non-zero if mailbox already exists,
+                 which is fine — we just want to ensure it's there. --->
+        <cfcatch type="any">
+            <!--- Non-fatal: creation failure leaves DB rows intact; the
+                 fallback (send an email to the shared address) will still
+                 bootstrap the Maildir via LMTP. --->
+        </cfcatch>
+        </cftry>
+
         <!--- 5. GRANT DEFAULT PERMISSIONS TO INITIAL MEMBERS (if any were selected).
              Each selected member gets the same permission set chosen on the Add modal.
              Members must belong to the same domain as the shared mailbox. --->
