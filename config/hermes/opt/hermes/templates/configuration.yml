@@ -109,14 +109,13 @@ access_control:
     # removed from the nginx location block), so there is nothing to bypass.
     # Nextcloud handles its own DAV authentication via app passwords.
 
-    # Admin bypass /nc/login?direct=1 — Authelia gate.
-    # The nginx location = /nc/login block only routes to auth.conf when
-    # ?direct=1 is in the query string (via @nc_login_gated named location).
-    # So Authelia only sees these admin-bypass requests; plain /nc/login
-    # never hits this rule. Default_policy=deny catches non-admin attempts.
+    # Admin bypass — locks /nc-admin-login (which nginx proxies internally
+    # to NC /login?direct=1) to admins with 2FA. No query-string matching,
+    # so no URL-encoding pitfalls with the Authelia rd= parameter.
+    # default_policy=deny catches non-admin attempts.
     - domain: hermes_access_control_domain
       resources:
-      - '^/nc/login\?.*\bdirect=1\b.*$'
+      - '^/nc-admin-login$'
       subject:
       - 'group:admins'
       policy: two_factor
