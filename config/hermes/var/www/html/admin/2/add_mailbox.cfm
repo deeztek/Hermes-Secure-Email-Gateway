@@ -255,27 +255,32 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
         </div>
 
-        <!--- REMOTE-AUTH DAV NOTICE — explains the app-password delivery
-             flow for CalDAV/CardDAV/WebDAV clients. Shown only when Remote
+        <!--- REMOTE-AUTH DAV + NC MAIL NOTICE — explains the cascading
+             effects of having no local password. Shown only when Remote
              is selected. Key points the admin must understand AND be able
              to explain to the user before the welcome email arrives: --->
         <div class="form-group mb-3" id="remoteAuthDavNotice" style="display:none;">
           <div class="alert alert-warning">
-            <h5 class="mb-2"><i class="icon fas fa-info-circle"></i> Calendar &amp; Contacts Sync for Remote-Auth Users</h5>
-            <p class="mb-2">Because this user will sign in with their <strong>organization (AD/LDAP) password via SSO/OIDC</strong>, Hermes never sees that password and can&rsquo;t use it for calendar/contacts sync clients that authenticate over HTTP Basic Auth (CalDAV, CardDAV, WebDAV).</p>
-            <p class="mb-2"><strong>What Hermes does automatically:</strong></p>
+            <h5 class="mb-2"><i class="icon fas fa-info-circle"></i> Calendar, Contacts &amp; Nextcloud Mail for Remote-Auth Users</h5>
+            <p class="mb-2">Because this user will sign in with their <strong>organization (AD/LDAP) password via SSO/OIDC</strong>, Hermes never sees that password. This has a few knock-on effects you and the user should be aware of:</p>
+
+            <p class="mb-1"><strong>1. DAV (Calendar / Contacts / Files sync)</strong></p>
             <ul class="mb-2">
-              <li>Generates a separate Nextcloud app password named &ldquo;<strong>Hermes System</strong>&rdquo; just for this user.</li>
-              <li>Emails the app password to the user&rsquo;s new mailbox, along with the CalDAV/CardDAV server URL, in the Welcome email.</li>
-              <li>If the user ever needs a new one, they can regenerate it from <strong>Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions</strong>, or you can use the <strong>Actions &rarr; Reset DAV Password</strong> option on this page.</li>
+              <li>Hermes auto-generates a Nextcloud app password named &ldquo;<strong>Hermes System</strong>&rdquo; and includes it in the Welcome email along with the CalDAV/CardDAV server URL.</li>
+              <li>The user enters that app password (NOT their organization password) into their sync client.</li>
+              <li><strong>Auto-configuration will NOT work</strong> for these clients &mdash; Thunderbird/Lightning, Apple Calendar, iOS Accounts, DAVx5, etc. will all fail their auto-discovery wizards because they try the organization password. The account must be set up <u>manually</u> with the app password and server URL from the Welcome email.</li>
+              <li>The user can regenerate their own token in <strong>Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions</strong>, or you can use <strong>Actions &rarr; Reset DAV Password</strong> on this page.</li>
             </ul>
-            <p class="mb-2"><strong>What the user needs to know:</strong></p>
+
+            <p class="mb-1"><strong>2. Nextcloud Mail (webmail)</strong></p>
             <ul class="mb-2">
-              <li>Their <strong>email</strong> (IMAP/SMTP) and <strong>webmail login</strong> keep using the organization password &mdash; unchanged.</li>
-              <li>The app password is <strong>only</strong> for calendar, contacts, and files sync clients (Thunderbird/Lightning, Apple Calendar, iOS Accounts, DAVx5 on Android, etc.).</li>
-              <li><strong>Auto-configuration will NOT work</strong> for these clients. Thunderbird&rsquo;s CalDAV/CardDAV auto-discovery, Apple&rsquo;s &ldquo;Add Account&rdquo; flow, and similar wizards will fail because they try to use the organization password. The user must <u>manually</u> configure the account with the app password and the server URL from the Welcome email.</li>
+              <li>Hermes does <strong>not</strong> pre-create the NC Mail profile for this user (no password to hand to NC).</li>
+              <li>On their first login to <strong>Webmail</strong>, the user will see NC Mail&rsquo;s <strong>&ldquo;Connect to mail account&rdquo;</strong> dialog.</li>
+              <li>They must enter their name, their email address, and their <strong>organization (AD/LDAP) password</strong> &mdash; the <u>same</u> password they just signed in with. Once entered, NC Mail will auto-discover the IMAP/SMTP server settings and provision the profile.</li>
+              <li>The &ldquo;Hermes System&rdquo; app password is <strong>not</strong> used here. Email (IMAP/SMTP) always authenticates with the organization password.</li>
             </ul>
-            <p class="mb-0"><small>Local-auth mailboxes don&rsquo;t have this limitation &mdash; their email password works for everything, including DAV auto-configuration.</small></p>
+
+            <p class="mb-0"><small><strong>Local-auth mailboxes don&rsquo;t have any of these limitations</strong> &mdash; their email password works for everything, NC Mail is pre-configured, and DAV auto-discovery works.</small></p>
           </div>
         </div>
 
