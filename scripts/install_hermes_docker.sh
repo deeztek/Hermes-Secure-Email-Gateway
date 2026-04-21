@@ -1159,7 +1159,7 @@ case "${1:-}" in
         # External Sites: "User Console" link in NC top menu
         if [[ -n "$NC_HOSTNAME" ]]; then
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites \
-                --value='{"1":{"id":1,"name":"User Console","url":"https://'"${NC_HOSTNAME}"'/users/","lang":"","type":"link","device":"","icon":"external.svg","groups":[],"redirect":false}}' >> "$LOG_FILE" 2>&1 \
+                --value='{"1":{"id":1,"name":"User Console","url":"https://'"${NC_HOSTNAME}"'/users/","lang":"","type":"link","device":"","icon":"external.svg","groups":[],"redirect":true}}' >> "$LOG_FILE" 2>&1 \
                 && log "  External Sites: User Console link configured" \
                 || log "  WARNING: Failed to set External Sites link"
         fi

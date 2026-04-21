@@ -372,7 +372,7 @@ update parameters2 set value2='disable', active='1', applied='2' where parameter
         fileWrite(extSitesScript,
             chr(35) & "!/bin/bash" & chr(10) &
             "docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites " &
-            "--value='{""1"":{""id"":1,""name"":""User Console"",""url"":""https://" & form.console_host & "/users/"",""lang"":"""",""type"":""link"",""device"":"""",""icon"":""external.svg"",""groups"":[],""redirect"":false}}'" & chr(10),
+            "--value='{""1"":{""id"":1,""name"":""User Console"",""url"":""https://" & form.console_host & "/users/"",""lang"":"""",""type"":""link"",""device"":"""",""icon"":""external.svg"",""groups"":[],""redirect"":true}}'" & chr(10),
             "utf-8");
     </cfscript>
     <cfexecute name="/bin/chmod" arguments="+x #extSitesScript#" timeout="10" />
