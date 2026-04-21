@@ -130,15 +130,37 @@ with raw occ output so silent failures are diagnosable.
     <!--- === CREATE / REGENERATE: generate a fresh token === --->
     <cfif ncAppPasswordAction EQ "create" OR ncAppPasswordAction EQ "regenerate">
 
-        <!--- Run occ user:auth-tokens:add WITHOUT --name (our NC version
-             doesn't accept that flag). The command prints the generated
-             plaintext token to stdout; we'll parse it. The token is named
-             with occ's default ("cli") which we rename below. --->
+        <!--- occ user:auth-tokens:add validates the user's local NC
+             password before creating the token. Remote-auth users have
+             no usable local password (OIDC is their login path), so we
+             set a fresh random one via occ user:resetpassword first,
+             then use it for the token call. The random password sticks
+             around in NC but is never consulted — OIDC takes over the
+             account on login and never checks the local hash. --->
+        <cfset tokenGenPassword = "Hermes" & createUUID() & createUUID()>
+
+        <cfset resetScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_reset_pwd.sh">
+        <cfscript>
+            fileWrite(resetScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                'docker exec -e OC_PASS="' & tokenGenPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & ncAppPasswordUser & '" 2>&1' & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #resetScript#" timeout="10" />
+        <cfexecute name="#resetScript#"
+            variable="resetResult"
+            errorVariable="resetError"
+            timeout="30" />
+        <cftry><cffile action="delete" file="#resetScript#"><cfcatch type="any"></cfcatch></cftry>
+
+        <!--- Now create the token with the password we just set. --name
+             is not supported by this NC version — tokens land with the
+             default CLI name and we rename them via DB UPDATE below. --->
         <cfset addScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_add_token.sh">
         <cfscript>
             fileWrite(addScript,
                 chr(35) & "!/bin/bash" & chr(10) &
-                'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add "' & ncAppPasswordUser & '" 2>&1' & chr(10),
+                'docker exec -e OC_PASS="' & tokenGenPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add --password-from-env "' & ncAppPasswordUser & '" 2>&1' & chr(10),
                 "utf-8");
         </cfscript>
         <cfexecute name="/bin/chmod" arguments="+x #addScript#" timeout="10" />
@@ -213,6 +235,8 @@ with raw occ output so silent failures are diagnosable.
         <cftry>
             <cfset logBody = "[" & DateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss") & "] " &
                 ncAppPasswordAction & " for " & ncAppPasswordUser & chr(10) &
+                "resetpassword STDOUT: " & Left(isDefined("resetResult") ? resetResult : "", 500) & chr(10) &
+                "resetpassword STDERR: " & Left(isDefined("resetError") ? resetError : "", 500) & chr(10) &
                 "occ STDOUT:" & chr(10) & Left(addResult, 2000) & chr(10) &
                 "occ STDERR:" & chr(10) & Left(isDefined("addError") ? addError : "", 2000) & chr(10) &
                 "Extracted token length: " & Len(extracted) & chr(10) &
