@@ -195,6 +195,7 @@ Removes a mailbox user from all systems:
     <cfcatch type="any">
         <!--- Per-mailbox sync failure is non-fatal; DB state is correct --->
     </cfcatch>
+    </cftry>
 </cfloop>
 
 <!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
