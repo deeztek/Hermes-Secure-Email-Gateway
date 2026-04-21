@@ -21,10 +21,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!---
 NEXTCLOUD APP PASSWORD MANAGEMENT
 Create / regenerate / delete a Nextcloud app password named "Hermes System"
-for a mailbox user. This token lets DAV clients (CalDAV, CardDAV, WebDAV)
+for a mailbox user. The token lets DAV clients (CalDAV, CardDAV, WebDAV)
 authenticate against NC even when the user has no local password — which is
-the case for remote-auth (OIDC-provisioned) mailboxes. Local-auth mailboxes
-don't need this since their NC local password already grants DAV access.
+the case for remote-auth (OIDC-provisioned) mailboxes.
 
 Required inputs:
   - ncAppPasswordAction : "create" | "regenerate" | "delete"
@@ -33,19 +32,20 @@ Required inputs:
 Outputs:
   - ncAppPassword       : plaintext token value (only set for create/regen success)
   - ncAppPasswordResult : "success" | "skipped" | "error: <reason>"
-  - ncAppPasswordError  : raw occ output on failure (may be empty)
+  - ncAppPasswordError  : raw occ / mysql output on failure
 
-Implementation notes:
-  - Uses the temp-shell-script + 2>&1 pattern. Lucee cfexecute's
-    `arguments` attribute splits on whitespace, which mangles args
-    that contain spaces (like --name="Hermes System"). Wrapping the
-    docker exec in a shell script lets the shell handle quoting
-    correctly.
-  - `2>&1` merges stderr into stdout so occ messages land in our
-    captured variable regardless of which stream occ writes to.
-  - Writes to /opt/hermes/tmp/nc_app_password_debug.log so failures
-    can be diagnosed after the fact. The log grows unbounded; rotate
-    manually if it ever matters.
+Why this is more involved than it looks:
+  Our NC's `occ user:auth-tokens:add` does not accept `--name` — tokens
+  are always created with the OCC binary's default name (typically "cli"
+  or "occ", depending on NC version). To get a stable, identifiable name
+  ("Hermes System") we let occ create the token, then UPDATE oc_authtoken
+  in the NC database to rename the most recently created token for that
+  user. The plaintext value printed by occ is the actual DAV credential;
+  we capture that and return it to the caller. The DB hash stays as NC
+  created it — we never touch it.
+
+Debug log: /opt/hermes/tmp/nc_app_password_debug.log records every attempt
+with raw occ output so silent failures are diagnosable.
 --->
 
 <cfparam name="ncAppPasswordAction" default="">
@@ -62,7 +62,9 @@ Implementation notes:
 
     <cfinclude template="generate_customtrans.cfm">
 
-    <!--- === DELETE/REGENERATE: purge existing "Hermes System" tokens === --->
+    <!--- === DELETE / REGENERATE: find and delete existing tokens named
+         "Hermes System" for this user. Uses occ user:auth-tokens:list
+         --output=json and matches on the `name` field. === --->
     <cfif ncAppPasswordAction EQ "delete" OR ncAppPasswordAction EQ "regenerate">
         <cftry>
             <cfset listScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_list_tokens.sh">
@@ -73,10 +75,7 @@ Implementation notes:
                     "utf-8");
             </cfscript>
             <cfexecute name="/bin/chmod" arguments="+x #listScript#" timeout="10" />
-            <cfexecute name="#listScript#"
-                variable="listResult"
-                errorVariable="listError"
-                timeout="30" />
+            <cfexecute name="#listScript#" variable="listResult" errorVariable="listError" timeout="30" />
             <cftry><cffile action="delete" file="#listScript#"><cfcatch type="any"></cfcatch></cftry>
 
             <cfif isDefined("listResult") AND Len(trim(listResult)) GT 0 AND IsJSON(trim(listResult))>
@@ -128,14 +127,18 @@ Implementation notes:
         </cftry>
     </cfif>
 
-    <!--- === CREATE/REGENERATE: generate a fresh token === --->
+    <!--- === CREATE / REGENERATE: generate a fresh token === --->
     <cfif ncAppPasswordAction EQ "create" OR ncAppPasswordAction EQ "regenerate">
 
+        <!--- Run occ user:auth-tokens:add WITHOUT --name (our NC version
+             doesn't accept that flag). The command prints the generated
+             plaintext token to stdout; we'll parse it. The token is named
+             with occ's default ("cli") which we rename below. --->
         <cfset addScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_add_token.sh">
         <cfscript>
             fileWrite(addScript,
                 chr(35) & "!/bin/bash" & chr(10) &
-                'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add "' & ncAppPasswordUser & '" --name="' & ncAppPasswordName & '" 2>&1' & chr(10),
+                'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add "' & ncAppPasswordUser & '" 2>&1' & chr(10),
                 "utf-8");
         </cfscript>
         <cfexecute name="/bin/chmod" arguments="+x #addScript#" timeout="10" />
@@ -147,30 +150,20 @@ Implementation notes:
 
         <cfif NOT isDefined("addResult")><cfset addResult = ""></cfif>
 
-        <!--- Parse the generated token. Possible occ output shapes we've
-             seen across NC versions:
-               "App password generated for <user>. Token: <TOKEN>"
-               "The following token is now active: <TOKEN>"
-               "<TOKEN>"                                  (just the token)
-               "Token created for <user>: <TOKEN>"
-             Heuristics (in order):
-               a) Look for any "token is:" / "token:" / ": <TOKEN>" marker
-                  followed by a whitespace-separated word matching an
-                  app-password shape (alnum, 20+ chars).
-               b) Any bare line that is itself an alnum 20+ char string.
-               c) Last whitespace-separated word on the last non-empty
-                  line that matches the alnum 20+ char shape. --->
+        <!--- Parse the plaintext token from occ output. Expected formats:
+               "app password created for <user>: <TOKEN>"
+               "<TOKEN>"
+             Scan each non-empty line right-to-left for the first word that
+             looks like an app password (alnum, 20+ chars). --->
         <cfset extracted = "">
         <cfif Len(trim(addResult)) GT 0>
             <cfset addLines = ListToArray(addResult, chr(10), false)>
             <cfloop from="#ArrayLen(addLines)#" to="1" step="-1" index="iLine">
                 <cfset line = trim(addLines[iLine])>
                 <cfif Len(line) EQ 0><cfcontinue></cfif>
-
                 <cfset words = ListToArray(line, " " & chr(9), false)>
                 <cfloop from="#ArrayLen(words)#" to="1" step="-1" index="iWord">
                     <cfset w = trim(words[iWord])>
-                    <!--- Strip trailing punctuation like "." or ":" --->
                     <cfset w = REReplace(w, "[[:punct:]]+$", "")>
                     <cfif Len(w) GTE 20 AND REFind("^[A-Za-z0-9]+$", w) GT 0>
                         <cfset extracted = w>
@@ -181,13 +174,50 @@ Implementation notes:
             </cfloop>
         </cfif>
 
-        <!--- Always write a debug log entry so failures can be diagnosed. --->
+        <cfset renameResult = "">
+        <cfset renameError = "">
+
+        <cfif Len(extracted) GT 0>
+            <!--- Token created. Rename the most recent oc_authtoken row
+                 for this user to "Hermes System" so we can find it later
+                 via occ user:auth-tokens:list. --->
+            <cftry>
+                <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncDbUser" charset="utf-8">
+                <cfset ncDbUser = Trim(ncDbUser)>
+                <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPass" charset="utf-8">
+                <cfset ncDbPass = Trim(ncDbPass)>
+
+                <cfset renameScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_rename.sh">
+                <cfscript>
+                    fileWrite(renameScript,
+                        chr(35) & "!/bin/bash" & chr(10) &
+                        "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -e """ &
+                        "UPDATE oc_authtoken SET name='" & ncAppPasswordName & "' WHERE uid='" & ncAppPasswordUser & "' ORDER BY id DESC LIMIT 1;" &
+                        """ 2>&1" & chr(10),
+                        "utf-8");
+                </cfscript>
+                <cfexecute name="/bin/chmod" arguments="+x #renameScript#" timeout="10" />
+                <cfexecute name="#renameScript#"
+                    variable="renameResult"
+                    errorVariable="renameError"
+                    timeout="30" />
+                <cftry><cffile action="delete" file="#renameScript#"><cfcatch type="any"></cfcatch></cftry>
+            <cfcatch type="any">
+                <cfset renameError = cfcatch.message & " / " & cfcatch.detail>
+            </cfcatch>
+            </cftry>
+        </cfif>
+
+        <!--- Debug log: always write an entry so silent failures are
+             diagnosable. --->
         <cftry>
             <cfset logBody = "[" & DateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss") & "] " &
                 ncAppPasswordAction & " for " & ncAppPasswordUser & chr(10) &
-                "STDOUT:" & chr(10) & Left(addResult, 2000) & chr(10) &
-                "STDERR:" & chr(10) & Left(isDefined("addError") ? addError : "", 2000) & chr(10) &
+                "occ STDOUT:" & chr(10) & Left(addResult, 2000) & chr(10) &
+                "occ STDERR:" & chr(10) & Left(isDefined("addError") ? addError : "", 2000) & chr(10) &
                 "Extracted token length: " & Len(extracted) & chr(10) &
+                "mysql rename STDOUT: " & Left(renameResult, 500) & chr(10) &
+                "mysql rename STDERR: " & Left(renameError, 500) & chr(10) &
                 "---" & chr(10)>
             <cffile action="append" file="#ncAppPasswordDebugLog#" output="#logBody#" charset="utf-8">
         <cfcatch type="any"></cfcatch>
