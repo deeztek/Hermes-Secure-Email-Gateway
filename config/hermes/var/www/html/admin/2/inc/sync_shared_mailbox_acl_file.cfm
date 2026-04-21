@@ -56,27 +56,35 @@ Behavior:
     WHERE sm.address = <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<!--- Build dovecot-acl file content. Each row: "user=<email> <rights>" --->
+<!--- Build dovecot-acl file content. Each row: "user=<email> <rights>".
+     Rights are a SINGLE CONCATENATED STRING of single-letter abbreviations
+     (RFC 4314 IMAP ACL). Space-separated full names (lookup, read, etc.)
+     are NOT accepted by Dovecot's vfile parser — it reads each letter of a
+     token as a separate right and chokes on 'o' in "lookup", for example.
+       l = lookup       r = read         s = write-seen  (\Seen flag)
+       w = write (flags except \Seen/\Deleted)           t = write-deleted
+       i = insert       p = post         e = expunge
+       k = create       x = delete (mbx) a = admin --->
 <cfset aclFileContent = "">
 <cfloop query="qAclPerms">
     <cfset userRights = "">
     <cfif qAclPerms.can_read EQ 1>
-        <cfset userRights = ListAppend(userRights, "lookup read write-seen", " ")>
+        <cfset userRights = userRights & "lrs">
     </cfif>
     <cfif qAclPerms.can_write EQ 1>
-        <cfset userRights = ListAppend(userRights, "write write-deleted", " ")>
+        <cfset userRights = userRights & "wt">
     </cfif>
     <cfif qAclPerms.can_delete EQ 1>
-        <cfset userRights = ListAppend(userRights, "expunge", " ")>
+        <cfset userRights = userRights & "e">
     </cfif>
     <cfif qAclPerms.can_insert EQ 1>
-        <cfset userRights = ListAppend(userRights, "insert", " ")>
+        <cfset userRights = userRights & "i">
     </cfif>
     <cfif qAclPerms.can_post EQ 1>
-        <cfset userRights = ListAppend(userRights, "post", " ")>
+        <cfset userRights = userRights & "p">
     </cfif>
     <cfif qAclPerms.can_admin EQ 1>
-        <cfset userRights = ListAppend(userRights, "admin", " ")>
+        <cfset userRights = userRights & "a">
     </cfif>
     <cfif Len(userRights) GT 0>
         <cfset aclFileContent = aclFileContent & "user=" & qAclPerms.username & " " & userRights & chr(10)>

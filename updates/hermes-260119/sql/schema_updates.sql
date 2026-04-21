@@ -1890,6 +1890,18 @@ CREATE TABLE IF NOT EXISTS dovecot_acl_shared (
     PRIMARY KEY (from_user, to_user)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Dovecot 2.4 iterates BOTH shared/shared-boxes/user/$to/$from AND
+-- shared/shared-boxes/anyone/$from on every session init. If there's
+-- no dict_map for the anyone/ path, the ACL plugin logs
+-- "Invalid/unmapped path" and fails share listing. Hermes doesn't
+-- expose "anyone" (public) shares, but the dict_map still has to
+-- resolve — it's backed by this permanently-empty table.
+CREATE TABLE IF NOT EXISTS dovecot_acl_shared_anyone (
+    from_user VARCHAR(255) NOT NULL,
+    dummy CHAR(1) DEFAULT '1',
+    PRIMARY KEY (from_user)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- User-managed folder sharing
 CREATE TABLE IF NOT EXISTS user_folder_shares (
     id INT AUTO_INCREMENT PRIMARY KEY,

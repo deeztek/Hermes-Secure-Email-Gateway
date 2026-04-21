@@ -271,6 +271,14 @@ Called from: email_server_settings_action.cfm (after saving form values)
         "      key_field to_user {" & chr(10) &
         "        value = $to" & chr(10) &
         "      }" & chr(10) &
+        "    }" & chr(10) & chr(10) &
+        "    dict_map shared/shared-boxes/anyone/$from {" & chr(10) &
+        "      sql_table = dovecot_acl_shared_anyone" & chr(10) &
+        "      value_field dummy {" & chr(10) &
+        "      }" & chr(10) &
+        "      key_field from_user {" & chr(10) &
+        "        value = $from" & chr(10) &
+        "      }" & chr(10) &
         "    }" & chr(10) &
         "  }">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
