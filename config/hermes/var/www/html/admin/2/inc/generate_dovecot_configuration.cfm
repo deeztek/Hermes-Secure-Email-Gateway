@@ -246,22 +246,13 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfif dov['sharing.enabled'] EQ "yes">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_enabled", "yes", "ALL")>
 
-    <!--- hermes_acl_dict_block was inside dict_server for the 2.3 shared
-         mailbox dict. In 2.4 the dict moved out of dict_server into the
-         new acl_sharing_map {} block, so we leave this placeholder empty. --->
-    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", "", "ALL")>
-
-    <!--- Top-level acl_driver = vfile + acl_sharing_map {} for the
-         shared-mailbox LISTING dict (SQL, against dovecot_acl_shared).
-         2.4 SQL dicts use driver = sql + sql_driver = mysql + a named
-         mysql <name> { host/user/password/dbname } sub-block — same as
-         the quotadict pattern that already works in this config. The
-         `dict mysql { connect = ... }` short form is 2.3-era and was
-         removed in 2.4. Inside key_field, use `value = $var` (not
-         `pattern = $var`); the dict_map's own name IS the pattern. --->
-    <cfset aclConfigBlock = "acl_driver = vfile" & chr(10) & chr(10) &
-        "acl_sharing_map {" & chr(10) &
-        "  dict aclshared {" & chr(10) &
+    <!--- The aclshared dict MUST live inside dict_server, not inline in
+         acl_sharing_map. SQL drivers are only loaded in the dict process;
+         the IMAP process references them via `dict proxy`. Defining the
+         dict inline in acl_sharing_map works only for file-based dicts.
+         Same pattern as quotadict (already in dict_server, referenced by
+         quota_clone via `dict proxy { name = quotadict }`). --->
+    <cfset aclDictBlock = "  dict aclshared {" & chr(10) &
         "    driver = sql" & chr(10) &
         "    sql_driver = mysql" & chr(10) & chr(10) &
         "    mysql aclshared {" & chr(10) &
@@ -281,6 +272,16 @@ Called from: email_server_settings_action.cfm (after saving form values)
         "        value = $to" & chr(10) &
         "      }" & chr(10) &
         "    }" & chr(10) &
+        "  }">
+    <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_dict_block", aclDictBlock, "ALL")>
+
+    <!--- Top-level acl_driver = vfile + acl_sharing_map {} referencing
+         the aclshared dict via proxy. The dict_map lives on the dict
+         definition in dict_server — no need to repeat it here. --->
+    <cfset aclConfigBlock = "acl_driver = vfile" & chr(10) & chr(10) &
+        "acl_sharing_map {" & chr(10) &
+        "  dict proxy {" & chr(10) &
+        "    name = aclshared" & chr(10) &
         "  }" & chr(10) &
         "}">
     <cfset dovecotConf = REReplace(dovecotConf, "hermes_acl_config_block", aclConfigBlock, "ALL")>
