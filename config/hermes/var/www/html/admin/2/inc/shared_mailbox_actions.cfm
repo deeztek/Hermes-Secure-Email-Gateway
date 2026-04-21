@@ -31,7 +31,7 @@ Dispatches to the appropriate action based on form.action:
 
 <!--- FEATURE GUARD: block creation/permission-add when sharing is disabled.
      Delete and remove-permission are allowed so admins can clean up. --->
-<cfif action is "add_shared_mailbox" OR action is "add_permission" OR action is "sync_all_acl_files">
+<cfif action is "add_shared_mailbox" OR action is "add_permission" OR action is "edit_permission" OR action is "sync_all_acl_files">
     <cfquery name="checkSharingEnabledForAction" datasource="hermes">
         SELECT value2 FROM parameters2
         WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
@@ -724,6 +724,162 @@ Dispatches to the appropriate action based on form.action:
 
         <!--- SUCCESS --->
         <cfset session.m = 3>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+
+    <cfcatch type="any">
+        <cfset session.m = 30>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfcatch>
+    </cftry>
+
+<!--- ====================================================================
+     EDIT PERMISSION (update existing member's rights in place)
+     ==================================================================== --->
+<cfelseif action is "edit_permission">
+
+    <!--- VALIDATE PERMISSION ID --->
+    <cfif NOT StructKeyExists(form, "permission_id") OR NOT IsNumeric(form.permission_id)>
+        <cfset session.m = 24>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfif>
+
+    <!--- GET EXISTING PERMISSION ROW --->
+    <cfquery name="getPermEdit" datasource="hermes">
+        SELECT smp.id, smp.shared_mailbox_id, smp.user_mailbox_id,
+               smp.username, smp.send_as,
+               sm.address AS shared_address
+        FROM shared_mailbox_permissions smp
+        INNER JOIN shared_mailboxes sm ON sm.id = smp.shared_mailbox_id
+        WHERE smp.id = <cfqueryparam value="#form.permission_id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+
+    <cfif getPermEdit.recordcount LT 1>
+        <cfset session.m = 24>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfif>
+
+    <!--- PARSE PERMISSION CHECKBOXES --->
+    <cfparam name="form.perm_read" default="0">
+    <cfparam name="form.perm_write" default="0">
+    <cfparam name="form.perm_delete" default="0">
+    <cfparam name="form.perm_insert" default="0">
+    <cfparam name="form.perm_post" default="0">
+    <cfparam name="form.perm_admin" default="0">
+    <cfparam name="form.perm_send_as" default="0">
+
+    <cfset canRead   = (form.perm_read EQ "1") ? 1 : 0>
+    <cfset canWrite  = (form.perm_write EQ "1") ? 1 : 0>
+    <cfset canDelete = (form.perm_delete EQ "1") ? 1 : 0>
+    <cfset canInsert = (form.perm_insert EQ "1") ? 1 : 0>
+    <cfset canPost   = (form.perm_post EQ "1") ? 1 : 0>
+    <cfset canAdmin  = (form.perm_admin EQ "1") ? 1 : 0>
+    <cfset sendAs    = (form.perm_send_as EQ "1") ? 1 : 0>
+
+    <cfif canRead EQ 0 AND canWrite EQ 0 AND canDelete EQ 0 AND canInsert EQ 0 AND canPost EQ 0 AND canAdmin EQ 0 AND sendAs EQ 0>
+        <cfset session.m = 25>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfif>
+
+    <cfset sharedAddress = getPermEdit.shared_address>
+    <cfset grantedUser = getPermEdit.username>
+    <cfset oldSendAs = getPermEdit.send_as>
+
+    <cftry>
+        <!--- 1. UPDATE shared_mailbox_permissions --->
+        <cfquery datasource="hermes">
+            UPDATE shared_mailbox_permissions
+            SET can_read   = <cfqueryparam value="#canRead#"   cfsqltype="cf_sql_tinyint">,
+                can_write  = <cfqueryparam value="#canWrite#"  cfsqltype="cf_sql_tinyint">,
+                can_delete = <cfqueryparam value="#canDelete#" cfsqltype="cf_sql_tinyint">,
+                can_insert = <cfqueryparam value="#canInsert#" cfsqltype="cf_sql_tinyint">,
+                can_post   = <cfqueryparam value="#canPost#"   cfsqltype="cf_sql_tinyint">,
+                can_admin  = <cfqueryparam value="#canAdmin#"  cfsqltype="cf_sql_tinyint">,
+                send_as    = <cfqueryparam value="#sendAs#"    cfsqltype="cf_sql_tinyint">
+            WHERE id = <cfqueryparam value="#form.permission_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+
+        <!--- 2. REWRITE dovecot_acl rows (dead in 2.4 but keep for consistency).
+             Simplest correct approach: delete all, re-insert per the new flags. --->
+        <cfquery datasource="hermes">
+            DELETE FROM dovecot_acl
+            WHERE username = <cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">
+            AND mailbox = <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+
+        <cfif canRead EQ 1>
+            <cfloop list="lookup,read,write-seen" index="rt">
+                <cfquery datasource="hermes">
+                    INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                    VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#rt#" cfsqltype="cf_sql_varchar">, 'yes')
+                </cfquery>
+            </cfloop>
+        </cfif>
+        <cfif canWrite EQ 1>
+            <cfloop list="write,write-deleted" index="rt">
+                <cfquery datasource="hermes">
+                    INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                    VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#rt#" cfsqltype="cf_sql_varchar">, 'yes')
+                </cfquery>
+            </cfloop>
+        </cfif>
+        <cfif canDelete EQ 1>
+            <cfquery datasource="hermes">
+                INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                        <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                        'expunge', 'yes')
+            </cfquery>
+        </cfif>
+        <cfif canInsert EQ 1>
+            <cfquery datasource="hermes">
+                INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                        <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                        'insert', 'yes')
+            </cfquery>
+        </cfif>
+        <cfif canPost EQ 1>
+            <cfquery datasource="hermes">
+                INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                        <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                        'post', 'yes')
+            </cfquery>
+        </cfif>
+        <cfif canAdmin EQ 1>
+            <cfquery datasource="hermes">
+                INSERT IGNORE INTO dovecot_acl (username, mailbox, right_name, value)
+                VALUES (<cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">,
+                        <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                        'admin', 'yes')
+            </cfquery>
+        </cfif>
+
+        <!--- 3. SYNC sender_login_maps based on new send_as flag.
+             Toggle each direction independently so the change to
+             send-as is reflected without touching unrelated maps. --->
+        <cfif sendAs EQ 1 AND oldSendAs NEQ 1>
+            <cfquery datasource="hermes">
+                INSERT IGNORE INTO sender_login_maps (sender, login_user)
+                VALUES (<cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">,
+                        <cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">)
+            </cfquery>
+        <cfelseif sendAs EQ 0 AND oldSendAs EQ 1>
+            <cfquery datasource="hermes">
+                DELETE FROM sender_login_maps
+                WHERE sender = <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
+                AND login_user = <cfqueryparam value="#grantedUser#" cfsqltype="cf_sql_varchar">
+            </cfquery>
+        </cfif>
+
+        <!--- 4. SYNC DOVECOT-ACL FILE (Dovecot 2.4 vfile driver) --->
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+
+        <cfset session.m = 6>
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
 
     <cfcatch type="any">

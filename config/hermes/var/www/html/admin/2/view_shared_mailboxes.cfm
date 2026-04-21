@@ -80,6 +80,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
 <cfelseif action is "add_permission">
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
+<cfelseif action is "edit_permission">
+  <cfinclude template="./inc/shared_mailbox_actions.cfm">
 <cfelseif action is "remove_permission">
   <cfinclude template="./inc/shared_mailbox_actions.cfm">
 <cfelseif action is "sync_all_acl_files">
@@ -117,6 +119,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Rebuilt Dovecot ACL files for #StructKeyExists(session, "acl_synced_count") ? session.acl_synced_count : 0# shared mailbox(es).</cfoutput>
     <cfset session.acl_synced_count = 0>
+  </div>
+<cfelseif m EQ 6>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    Permissions updated successfully.
   </div>
 <cfelseif m EQ 10>
   <div class="alert alert-danger alert-dismissible">
@@ -214,7 +222,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <li><strong>Send-As</strong> &mdash; when enabled, allows a member to send email from the shared mailbox address.</li>
     <li><strong>Auto-Subscribe</strong> &mdash; shared mailboxes appear automatically in each member's IMAP folder list.</li>
   </ul>
-  <p class="mb-0"><small>Shared mailboxes cannot log in directly. Access is managed through permissions granted to individual user mailboxes.</small></p>
+  <p class="mb-1"><small>Shared mailboxes cannot log in directly. Access is managed through permissions granted to individual user mailboxes.</small></p>
+  <hr class="my-2">
+  <p class="mb-0"><small><strong><i class="fas fa-sync-alt me-1"></i> Rebuild ACL Files</strong> &mdash; Dovecot stores each shared mailbox's per-user rights as an on-disk <code>dovecot-acl</code> file inside that mailbox's Maildir. Those files are written automatically whenever you add, edit, or remove a permission. Use this button to <strong>regenerate every file from the database in one pass</strong>. Run it once after upgrading to a new Dovecot release (to migrate existing permissions to the current on-disk format), or as a recovery step if members report they can&rsquo;t see or access a shared mailbox they should have rights on. Safe to run anytime &mdash; it rebuilds files from the database and never modifies the permission records themselves.</small></p>
 </div>
 
 <!--- FEATURE DISABLED BANNER --->
@@ -680,6 +690,68 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- EDIT PERMISSION MODAL --->
+<div class="modal fade" id="editPermissionModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="view_shared_mailboxes.cfm">
+        <input type="hidden" name="action" value="edit_permission">
+        <input type="hidden" name="permission_id" id="editPermId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-edit me-2"></i>Edit Permissions &mdash; <span id="editPermUsername"></span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3"><small>Changes are applied immediately to both the database and the Dovecot on-disk ACL file. The member does not need to reconnect their mail client.</small></p>
+          <div class="d-flex flex-wrap gap-3 mt-1">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_read" id="editPermRead" value="1">
+              <label class="form-check-label" for="editPermRead">Read</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_write" id="editPermWrite" value="1">
+              <label class="form-check-label" for="editPermWrite">Write</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_delete" id="editPermDelete" value="1">
+              <label class="form-check-label" for="editPermDelete">Delete</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_insert" id="editPermInsert" value="1">
+              <label class="form-check-label" for="editPermInsert">Insert</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_post" id="editPermPost" value="1">
+              <label class="form-check-label" for="editPermPost">Post</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_admin" id="editPermAdmin" value="1">
+              <label class="form-check-label" for="editPermAdmin">Admin</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="perm_send_as" id="editPermSendAs" value="1">
+              <label class="form-check-label" for="editPermSendAs">Send-As</label>
+            </div>
+          </div>
+          <small class="text-muted d-block mt-2">
+            <strong>Read</strong> = view messages |
+            <strong>Write</strong> = flag/mark messages |
+            <strong>Delete</strong> = expunge messages |
+            <strong>Insert</strong> = append/copy messages |
+            <strong>Post</strong> = submit messages |
+            <strong>Admin</strong> = manage ACLs |
+            <strong>Send-As</strong> = send from shared address
+          </small>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!--- REBUILD ACL FILES MODAL --->
 <div class="modal fade" id="rebuildAclFilesModal" tabindex="-1">
   <div class="modal-dialog">
@@ -815,7 +887,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           html += '<td>' + badge(p.can_post) + '</td>';
           html += '<td>' + badge(p.can_admin) + '</td>';
           html += '<td>' + badge(p.send_as) + '</td>';
-          html += '<td><button type="button" class="btn btn-sm btn-danger" title="Remove" onclick="confirmRemovePermission(' + p.id + ', \'' + escapeJsString(p.username) + '\')"><i class="fas fa-user-minus"></i></button></td>';
+          html += '<td>';
+          html += '<button type="button" class="btn btn-sm btn-primary me-1" title="Edit Permissions" onclick="openEditPermissionModal(' + p.id + ', \'' + escapeJsString(p.username) + '\', ' + (p.can_read == 1 ? 1 : 0) + ', ' + (p.can_write == 1 ? 1 : 0) + ', ' + (p.can_delete == 1 ? 1 : 0) + ', ' + (p.can_insert == 1 ? 1 : 0) + ', ' + (p.can_post == 1 ? 1 : 0) + ', ' + (p.can_admin == 1 ? 1 : 0) + ', ' + (p.send_as == 1 ? 1 : 0) + ')"><i class="fas fa-edit"></i></button>';
+          html += '<button type="button" class="btn btn-sm btn-danger" title="Remove" onclick="confirmRemovePermission(' + p.id + ', \'' + escapeJsString(p.username) + '\')"><i class="fas fa-user-minus"></i></button>';
+          html += '</td>';
           html += '</tr>';
         }
         $('#permissionsBody').html(html);
@@ -853,6 +928,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#removePermId').val(permId);
     $('#removePermUsername').text(username);
     new bootstrap.Modal(document.getElementById('removePermissionModal')).show();
+  }
+
+  // Open edit permission modal pre-filled with current rights
+  function openEditPermissionModal(permId, username, cRead, cWrite, cDelete, cInsert, cPost, cAdmin, sAs) {
+    $('#editPermId').val(permId);
+    $('#editPermUsername').text(username);
+    $('#editPermRead').prop('checked', cRead === 1);
+    $('#editPermWrite').prop('checked', cWrite === 1);
+    $('#editPermDelete').prop('checked', cDelete === 1);
+    $('#editPermInsert').prop('checked', cInsert === 1);
+    $('#editPermPost').prop('checked', cPost === 1);
+    $('#editPermAdmin').prop('checked', cAdmin === 1);
+    $('#editPermSendAs').prop('checked', sAs === 1);
+    // Close the parent permissions modal so the edit modal is on top cleanly
+    var permModal = bootstrap.Modal.getInstance(document.getElementById('permissionsModal'));
+    if (permModal) permModal.hide();
+    new bootstrap.Modal(document.getElementById('editPermissionModal')).show();
   }
 </script>
 

@@ -200,6 +200,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     LEFT JOIN user_settings us ON us.email = m.username
     LEFT JOIN recipient_certificates rc ON r.id = rc.user_id
     LEFT JOIN recipient_keystores rk ON r.id = rk.user_id
+    WHERE m.mailbox_type = 'user'
     GROUP BY m.id
     ORDER BY m.username ASC
 </cfquery>

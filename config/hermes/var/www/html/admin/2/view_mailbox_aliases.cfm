@@ -187,7 +187,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- GET ALL MAILBOXES FOR DELIVERS-TO DROPDOWN --->
 <cfquery name="getMailboxes" datasource="hermes">
-    SELECT username FROM mailboxes ORDER BY username ASC
+    SELECT username FROM mailboxes
+    WHERE mailbox_type = 'user'
+    ORDER BY username ASC
 </cfquery>
 
 <!--- ADD ALIAS BUTTON + DOMAIN FILTER --->

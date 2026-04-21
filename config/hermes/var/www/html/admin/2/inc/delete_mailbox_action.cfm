@@ -158,6 +158,45 @@ Removes a mailbox user from all systems:
     WHERE login_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
+<!--- 3b. CLEAN UP SHARED MAILBOX MEMBERSHIP.
+     If the deleted user had rights on any shared mailboxes, remove
+     their permission rows, the shared-namespace listing rows, and
+     dead 2.3-era dovecot_acl rows — then regenerate each affected
+     shared mailbox's vfile dovecot-acl file so the deleted user's
+     line is removed from disk. Without this the UI would keep
+     showing the deleted user as a member and a recreated user with
+     the same email would silently inherit the old rights. --->
+<cfquery name="getSharesToResync" datasource="hermes">
+    SELECT DISTINCT sm.address
+    FROM shared_mailbox_permissions smp
+    INNER JOIN shared_mailboxes sm ON sm.id = smp.shared_mailbox_id
+    WHERE smp.username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM shared_mailbox_permissions
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl_shared
+    WHERE to_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfloop query="getSharesToResync">
+    <cfset sharedAddress = getSharesToResync.address>
+    <cftry>
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+    <cfcatch type="any">
+        <!--- Per-mailbox sync failure is non-fatal; DB state is correct --->
+    </cfcatch>
+</cfloop>
+
 <!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
 <cfquery datasource="hermes">
     DELETE FROM mailbox_aliases
