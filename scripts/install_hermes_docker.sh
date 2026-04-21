@@ -1095,8 +1095,11 @@ case "${1:-}" in
             || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
 
         # Install apps
+        # files_sharing ships with core NC but is ensured enabled here
+        # so File → Share works on fresh installs. The share settings
+        # configured further down (same-domain isolation) depend on it.
         log "  Installing Nextcloud apps..."
-        for app in user_oidc mail calendar contacts external; do
+        for app in user_oidc mail calendar contacts external files_sharing; do
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:install "$app" --force >> "$LOG_FILE" 2>&1 \
                 && log "    Installed: $app" \
                 || log "    WARNING: $app install failed (may already be installed)"
