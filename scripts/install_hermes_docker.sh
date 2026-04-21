@@ -1094,15 +1094,23 @@ case "${1:-}" in
             && log "  Set default app to Mail" \
             || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
 
-        # Install apps
-        # files_sharing ships with core NC but is ensured enabled here
-        # so File → Share works on fresh installs. The share settings
-        # configured further down (same-domain isolation) depend on it.
-        log "  Installing Nextcloud apps..."
-        for app in user_oidc mail calendar contacts external files_sharing; do
+        # Install third-party apps from the app store
+        log "  Installing Nextcloud apps from app store..."
+        for app in user_oidc mail calendar contacts external; do
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:install "$app" --force >> "$LOG_FILE" 2>&1 \
                 && log "    Installed: $app" \
                 || log "    WARNING: $app install failed (may already be installed)"
+        done
+
+        # Enable core apps that ship with NC. These aren't in the app
+        # store so app:install would fail — app:enable is the correct
+        # command. The user-enumeration settings configured further
+        # down depend on files_sharing being on.
+        log "  Enabling core Nextcloud apps..."
+        for app in files_sharing; do
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:enable "$app" >> "$LOG_FILE" 2>&1 \
+                && log "    Enabled: $app" \
+                || log "    WARNING: Failed to enable $app (may already be enabled)"
         done
 
         # Disable unwanted default apps
