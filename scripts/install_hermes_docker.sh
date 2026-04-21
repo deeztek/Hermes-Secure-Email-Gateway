@@ -1126,6 +1126,25 @@ case "${1:-}" in
         fi
         log "  Theming configured"
 
+        # Cross-domain isolation for multi-tenant setups.
+        # Each mailbox domain gets its own NC group (created by
+        # mailbox_domain_add_action.cfm) and each user is only in their
+        # domain's group. Restricting share-dialog / Contacts-app user
+        # enumeration to shared groups therefore isolates users by
+        # domain. The "full_match" exception lets a user type an exact
+        # email from another domain if they deliberately want to share
+        # cross-domain, so the restriction isn't absolute — just the
+        # default autocomplete scope.
+        log "  Configuring Nextcloud cross-domain isolation..."
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:app:set core shareapi_allow_share_dialog_user_enumeration --value=yes >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:app:set core shareapi_restrict_user_enumeration_to_group --value=yes >> "$LOG_FILE" 2>&1
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:app:set core shareapi_restrict_user_enumeration_full_match --value=yes >> "$LOG_FILE" 2>&1 \
+            && log "  User enumeration restricted to same-domain groups (full email match allowed for cross-domain shares)" \
+            || log "  WARNING: Failed to set user enumeration restrictions"
+
         # External Sites: "User Console" link in NC top menu
         if [[ -n "$NC_HOSTNAME" ]]; then
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites \
