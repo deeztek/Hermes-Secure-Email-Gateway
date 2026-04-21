@@ -60,145 +60,84 @@ Sets after execution:
 
 <cfelseif ncProvisionAction EQ "create">
 
-    <cfif ncProvisionAuthType EQ "local">
+    <!--- Unified provisioning path: occ user:add for BOTH auth types.
+         Local-auth uses the mailbox's own password as the NC local
+         password (same value, enables DAV directly). Remote-auth uses
+         a generated random password the user never sees — OIDC takes
+         over the account on first login via soft_auto_provision, so the
+         local password is vestigial.
 
-        <!--- ============================================================
-             LOCAL AUTH PATH: occ user:add + occ user:setting email
-             ============================================================ --->
-        <cfif ncProvisionPassword EQ "">
-            <cfset ncProvisionResult = "skipped">
-            <cfset ncProvisionError = "No password provided for local auth">
-        <cfelse>
-            <cftry>
-                <cfinclude template="generate_customtrans.cfm">
-                <cfset provScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_provision.sh">
-                <cfscript>
-                    fileWrite(provScript,
-                        chr(35) & "!/bin/bash" & chr(10) &
-                        'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10) &
-                        'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10),
-                        "utf-8");
-                </cfscript>
-                <cfexecute name="/bin/chmod" arguments="+x #provScript#" timeout="10" />
-                <cfexecute name="#provScript#"
-                    variable="provResult"
-                    errorVariable="provError"
-                    timeout="30" />
-                <cftry><cffile action="delete" file="#provScript#"><cfcatch type="any"></cfcatch></cftry>
+         Why not user_oidc REST API for remote-auth anymore:
+         Users provisioned through user_oidc's REST API land in a
+         backend state where `occ user:resetpassword` silently fails and
+         `user:auth-tokens:add --password-from-env` can't validate any
+         password (the user effectively has no local password). That
+         breaks our ability to generate a DAV app password (the token
+         row's encrypted password ends up out of sync with the user's
+         actual stored password, so NC rejects it on every DAV request
+         with TokenPasswordExpiredException).
 
-                <cfscript>
-                    fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
-                        "Provision (local): " & ncProvisionUser & chr(10) &
-                        "Result: " & provResult & chr(10) &
-                        "Error: " & provError & chr(10) &
-                        "---" & chr(10),
-                        "utf-8");
-                </cfscript>
+         With occ user:add the user is in the Database backend with a
+         known password, all the app-password machinery works, and OIDC
+         login still takes over via soft_auto_provision (same mechanism
+         local-auth users use to transition to OIDC today). --->
+    <cfif ncProvisionAuthType NEQ "local" AND ncProvisionPassword EQ "">
+        <!--- Remote auth: generate a random password we'll use both for
+             NC user creation and for subsequent app-password flows.
+             Never disclosed to anyone. --->
+        <cfset ncProvisionPassword = "HermesRAND" & createUUID() & createUUID()>
+    </cfif>
 
-                <cfif FindNoCase("created successfully", provResult) OR FindNoCase("already exists", provResult)>
-                    <cfset ncProvisionResult = "success">
-                <cfelse>
-                    <cfset ncProvisionResult = "error">
-                    <cfset ncProvisionError = provResult>
-                </cfif>
-
-            <cfcatch type="any">
-                <cfset ncProvisionResult = "error">
-                <cfset ncProvisionError = cfcatch.message>
-            </cfcatch>
-            </cftry>
-        </cfif>
-
+    <cfif ncProvisionPassword EQ "">
+        <cfset ncProvisionResult = "skipped">
+        <cfset ncProvisionError = "No password provided and auth type not remote">
     <cfelse>
-
-        <!--- ============================================================
-             REMOTE AUTH PATH: user_oidc REST API pre-provisioning
-             Creates an OIDC-backed NC user with no local password. When
-             the user logs in via Authelia/OIDC, user_oidc sees the
-             existing account and takes over (soft_auto_provision=true).
-             ============================================================ --->
         <cftry>
-            <!--- Read NC admin credentials for Basic Auth to the OCS API --->
-            <cffile action="read" file="/opt/hermes/creds/nextcloud_admin_username" variable="ncAdminUser" charset="utf-8">
-            <cfset ncAdminUser = Trim(ncAdminUser)>
-            <cffile action="read" file="/opt/hermes/creds/nextcloud_admin_password" variable="ncAdminPass" charset="utf-8">
-            <cfset ncAdminPass = Trim(ncAdminPass)>
-
-            <!--- Look up the user_oidc provider ID for "Hermes_SEG".
-                 The API call needs the numeric provider ID, not the name. --->
-            <cfexecute name="/usr/local/bin/docker"
-                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider --output=json"
-                variable="providerListJson"
-                errorVariable="providerListError"
+            <cfinclude template="generate_customtrans.cfm">
+            <cfset provScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_provision.sh">
+            <cfscript>
+                fileWrite(provScript,
+                    chr(35) & "!/bin/bash" & chr(10) &
+                    'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10) &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10),
+                    "utf-8");
+            </cfscript>
+            <cfexecute name="/bin/chmod" arguments="+x #provScript#" timeout="10" />
+            <cfexecute name="#provScript#"
+                variable="provResult"
+                errorVariable="provError"
                 timeout="30" />
+            <cftry><cffile action="delete" file="#provScript#"><cfcatch type="any"></cfcatch></cftry>
 
-            <cfset providerId = "">
-            <cfif IsDefined("providerListJson") AND IsJSON(Trim(providerListJson))>
-                <cfset providers = DeserializeJSON(Trim(providerListJson))>
-                <cfif IsArray(providers)>
-                    <cfloop array="#providers#" index="p">
-                        <cfif IsStruct(p) AND StructKeyExists(p, "identifier") AND p.identifier EQ "Hermes_SEG">
-                            <cfset providerId = p.id>
-                        </cfif>
-                    </cfloop>
-                </cfif>
-            </cfif>
+            <cfscript>
+                fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
+                    "Provision (" & ncProvisionAuthType & "): " & ncProvisionUser & chr(10) &
+                    "Result: " & provResult & chr(10) &
+                    "Error: " & provError & chr(10) &
+                    "---" & chr(10),
+                    "utf-8");
+            </cfscript>
 
-            <cfif providerId EQ "">
-                <cfset ncProvisionResult = "error">
-                <cfset ncProvisionError = "Could not find Hermes_SEG provider ID">
-                <cfscript>
-                    fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
-                        "Provision (remote) ERROR: Provider not found" & chr(10) &
-                        "occ output: " & Left(providerListJson, 500) & chr(10) &
-                        "occ error: " & Left(providerListError, 500) & chr(10) &
-                        "---" & chr(10),
-                        "utf-8");
-                </cfscript>
-            <cfelse>
-                <!--- POST to user_oidc provisioning API. Uses hermes_nextcloud:80
-                     (Docker internal) without /nc/ prefix — /nc/ is the Nginx
-                     reverse-proxy path, not NC's own URL. --->
-                <cfhttp url="http://hermes_nextcloud:80/ocs/v2.php/apps/user_oidc/api/v1/user"
-                    method="POST"
-                    timeout="30"
-                    username="#ncAdminUser#"
-                    password="#ncAdminPass#">
-                    <cfhttpparam type="header" name="OCS-APIREQUEST" value="true">
-                    <cfhttpparam type="header" name="Content-Type" value="application/json">
-                    <cfhttpparam type="body" value='{"providerId":#providerId#,"userId":"#ncProvisionUser#","displayName":"#ncProvisionDisplayName#","email":"#ncProvisionEmail#"}'>
-                </cfhttp>
+            <cfif FindNoCase("created successfully", provResult) OR FindNoCase("already exists", provResult)>
+                <cfset ncProvisionResult = "success">
 
-                <cfscript>
-                    fileWrite("/opt/hermes/tmp/nc_provision_debug.log",
-                        "Provision (remote): " & ncProvisionUser & chr(10) &
-                        "Provider ID: " & providerId & chr(10) &
-                        "HTTP Status: " & cfhttp.statusCode & chr(10) &
-                        "Response: " & Left(cfhttp.fileContent, 500) & chr(10) &
-                        "---" & chr(10),
-                        "utf-8");
-                </cfscript>
-
-                <cfif cfhttp.statusCode CONTAINS "200">
-                    <cfset ncProvisionResult = "success">
-
-                    <!--- Generate the "Hermes System" DAV app password.
-                         Remote-auth users have no local NC password, so
-                         CalDAV/CardDAV/WebDAV clients need this token as
-                         their credential. The plaintext is returned in
-                         ncProvisionAppPassword for the caller to include
-                         in the welcome email (this is the only chance to
-                         capture it — NC won't show it again). --->
+                <!--- For remote-auth: generate the "Hermes System" DAV app
+                     password now that we have a known local password on
+                     the user. nextcloud_app_password.cfm will reset the
+                     local password to a fresh random value, then use that
+                     to create the token — all in the Database backend, so
+                     occ user:resetpassword works. --->
+                <cfif ncProvisionAuthType NEQ "local">
                     <cfset ncAppPasswordAction = "create">
                     <cfset ncAppPasswordUser = ncProvisionUser>
                     <cfinclude template="nextcloud_app_password.cfm">
                     <cfif ncAppPasswordResult EQ "success">
                         <cfset ncProvisionAppPassword = ncAppPassword>
                     </cfif>
-                <cfelse>
-                    <cfset ncProvisionResult = "error">
-                    <cfset ncProvisionError = "user_oidc API HTTP " & cfhttp.statusCode & ": " & Left(cfhttp.fileContent, 200)>
                 </cfif>
+            <cfelse>
+                <cfset ncProvisionResult = "error">
+                <cfset ncProvisionError = provResult>
             </cfif>
 
         <cfcatch type="any">
@@ -206,7 +145,6 @@ Sets after execution:
             <cfset ncProvisionError = cfcatch.message>
         </cfcatch>
         </cftry>
-
     </cfif>
 
 <cfelseif ncProvisionAction EQ "delete">
