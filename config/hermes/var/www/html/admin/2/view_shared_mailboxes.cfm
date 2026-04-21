@@ -198,6 +198,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     At least one permission must be selected.
   </div>
+<cfelseif m EQ 26>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Members must belong to the same domain as the shared mailbox.
+  </div>
 <cfelseif m EQ 30>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -793,6 +799,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
   var addPermUserTS;
+  var allUserMailboxes = [];  // Snapshot of the full mailbox list, used to re-filter by domain when the modal opens
 
   // Initialize DataTable and Tom Select
   $(document).ready(function() {
@@ -809,6 +816,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#domainFilter').on('change', function() {
       var val = $(this).val();
       table.column(3).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
+    });
+
+    // Snapshot the full mailbox list before TomSelect takes over the <select>
+    $('#addPermUserSelect option').each(function() {
+      var v = $(this).val();
+      if (v) {
+        allUserMailboxes.push({
+          id: v,
+          text: $(this).text(),
+          domain: $(this).data('domain')
+        });
+      }
     });
 
     // Tom Select for user mailbox dropdown in permissions modal
@@ -856,8 +875,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   function openPermissionsModal(sharedId, address, displayName) {
     $('#permModalAddress').text(address + ' (' + displayName + ')');
     $('#addPermSharedId').val(sharedId);
-    // Reset add permission form
+
+    // Re-populate the Add Member dropdown with only mailboxes in the same
+    // domain as this shared mailbox. Cross-domain members aren't permitted
+    // (matches the Add Shared Mailbox "initial members" design and is
+    // enforced server-side in add_permission).
+    var sharedDomain = (address.split('@')[1] || '').toLowerCase();
     addPermUserTS.clear();
+    addPermUserTS.clearOptions();
+    allUserMailboxes.forEach(function(mb) {
+      if (String(mb.domain).toLowerCase() === sharedDomain) {
+        addPermUserTS.addOption({ value: mb.id, text: mb.text });
+      }
+    });
+    addPermUserTS.refreshOptions(false);
+
     $('#permRead').prop('checked', true);
     $('#permWrite').prop('checked', true);
     $('#permDelete').prop('checked', false);

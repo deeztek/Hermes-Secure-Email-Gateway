@@ -540,7 +540,7 @@ Dispatches to the appropriate action based on form.action:
 
     <!--- GET USER MAILBOX DETAILS --->
     <cfquery name="getUserMailbox" datasource="hermes">
-        SELECT m.id, m.username
+        SELECT m.id, m.username, m.domain_id
         FROM mailboxes m
         WHERE m.id = <cfqueryparam value="#form.user_mailbox_id#" cfsqltype="cf_sql_integer">
         AND m.mailbox_type = 'user'
@@ -549,6 +549,16 @@ Dispatches to the appropriate action based on form.action:
 
     <cfif getUserMailbox.recordcount LT 1>
         <cfset session.m = 22>
+        <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
+    </cfif>
+
+    <!--- ENFORCE SAME-DOMAIN RULE (matches Add Shared Mailbox initial-member logic).
+         Cross-domain sharing isn't supported — the Dovecot shared namespace
+         query in acl_sharing_map looks up by username, not by domain, but the
+         UX contract is that members belong to the same domain as the shared
+         mailbox. Server-side check guards against stale/forged form posts. --->
+    <cfif getUserMailbox.domain_id NEQ getShared.domain_id>
+        <cfset session.m = 26>
         <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
     </cfif>
 
