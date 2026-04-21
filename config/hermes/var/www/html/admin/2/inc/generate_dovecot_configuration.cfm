@@ -253,23 +253,33 @@ Called from: email_server_settings_action.cfm (after saving form values)
 
     <!--- Top-level acl_driver = vfile + acl_sharing_map {} for the
          shared-mailbox LISTING dict (SQL, against dovecot_acl_shared).
-         The dict_map pattern `shared/shared-boxes/user/$to/$from` is the
-         canonical key Dovecot's ACL code uses internally to look up
-         "who has shared what with whom". --->
+         2.4 SQL dicts use driver = sql + sql_driver = mysql + a named
+         mysql <name> { host/user/password/dbname } sub-block — same as
+         the quotadict pattern that already works in this config. The
+         `dict mysql { connect = ... }` short form is 2.3-era and was
+         removed in 2.4. Inside key_field, use `value = $var` (not
+         `pattern = $var`); the dict_map's own name IS the pattern. --->
     <cfset aclConfigBlock = "acl_driver = vfile" & chr(10) & chr(10) &
         "acl_sharing_map {" & chr(10) &
-        "  dict mysql {" & chr(10) &
-        "    connect = host=hermes_db_server dbname=hermes user=" & dbUsername & " password=" & dbPassword & chr(10) &
-        "  }" & chr(10) & chr(10) &
-        "  dict_map shared/shared-boxes/user/$to/$from {" & chr(10) &
-        "    sql_table = dovecot_acl_shared" & chr(10) &
-        "    value_field dummy {" & chr(10) &
-        "    }" & chr(10) &
-        "    key_field from_user {" & chr(10) &
-        "      pattern = $from" & chr(10) &
-        "    }" & chr(10) &
-        "    key_field to_user {" & chr(10) &
-        "      pattern = $to" & chr(10) &
+        "  dict aclshared {" & chr(10) &
+        "    driver = sql" & chr(10) &
+        "    sql_driver = mysql" & chr(10) & chr(10) &
+        "    mysql aclshared {" & chr(10) &
+        "      host = hermes_db_server" & chr(10) &
+        "      user = " & dbUsername & chr(10) &
+        "      password = " & dbPassword & chr(10) &
+        "      dbname = hermes" & chr(10) &
+        "    }" & chr(10) & chr(10) &
+        "    dict_map shared/shared-boxes/user/$to/$from {" & chr(10) &
+        "      sql_table = dovecot_acl_shared" & chr(10) &
+        "      value_field dummy {" & chr(10) &
+        "      }" & chr(10) &
+        "      key_field from_user {" & chr(10) &
+        "        value = $from" & chr(10) &
+        "      }" & chr(10) &
+        "      key_field to_user {" & chr(10) &
+        "        value = $to" & chr(10) &
+        "      }" & chr(10) &
         "    }" & chr(10) &
         "  }" & chr(10) &
         "}">
