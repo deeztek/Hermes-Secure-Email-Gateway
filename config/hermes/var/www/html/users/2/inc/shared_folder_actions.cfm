@@ -193,6 +193,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             )
         </cfquery>
 
+        <!--- Write the per-folder vfile dovecot-acl file. Dovecot 2.4 only
+             enforces rights via these files; the dovecot_acl SQL rows
+             above are dead data in 2.4 (kept for audit / back-compat). --->
+        <cfset ownerUser = session.email>
+        <cfinclude template="sync_user_folder_acl_file.cfm">
+
         <cfset session.sfMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Folder shared successfully with #encodeForHTML(sharedWith)#.">
         <cfset session.sfMessageType = "success">
         <cflocation url="view_shared_folders.cfm" addtoken="no">
@@ -268,6 +274,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 AND to_user = <cfqueryparam value="#sharedWith#" cfsqltype="cf_sql_varchar">
             </cfquery>
         </cfif>
+
+        <!--- Rebuild the per-folder dovecot-acl file without the removed
+             share. After the DELETE above the sync will either shrink
+             the file to the remaining shares or produce an empty file
+             (which denies everyone except the owner). --->
+        <cfset ownerUser = session.email>
+        <cfset folderPath = getShare.folder_path>
+        <cfinclude template="sync_user_folder_acl_file.cfm">
 
         <cfset session.sfMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Folder share revoked successfully.">
         <cfset session.sfMessageType = "success">
