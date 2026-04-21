@@ -33,16 +33,19 @@ Required inputs:
 Outputs:
   - ncAppPassword       : plaintext token value (only set for create/regen success)
   - ncAppPasswordResult : "success" | "skipped" | "error: <reason>"
-  - ncAppPasswordError  : raw occ stderr on failure (may be empty)
+  - ncAppPasswordError  : raw occ output on failure (may be empty)
 
-"regenerate" = delete any existing "Hermes System" token(s) for the user
-then create a fresh one. Previous DAV clients configured with the old
-token stop working the moment the delete completes.
-
-All occ calls go through docker exec on hermes_nextcloud. Failures are
-non-fatal from the caller's perspective (the mailbox create/edit succeeds
-regardless); the caller should inspect ncAppPasswordResult to decide
-whether to surface a warning.
+Implementation notes:
+  - Uses the temp-shell-script + 2>&1 pattern. Lucee cfexecute's
+    `arguments` attribute splits on whitespace, which mangles args
+    that contain spaces (like --name="Hermes System"). Wrapping the
+    docker exec in a shell script lets the shell handle quoting
+    correctly.
+  - `2>&1` merges stderr into stdout so occ messages land in our
+    captured variable regardless of which stream occ writes to.
+  - Writes to /opt/hermes/tmp/nc_app_password_debug.log so failures
+    can be diagnosed after the fact. The log grows unbounded; rotate
+    manually if it ever matters.
 --->
 
 <cfparam name="ncAppPasswordAction" default="">
@@ -52,36 +55,48 @@ whether to surface a warning.
 <cfset ncAppPasswordResult = "skipped">
 <cfset ncAppPasswordError = "">
 <cfset ncAppPasswordName = "Hermes System">
+<cfset ncAppPasswordDebugLog = "/opt/hermes/tmp/nc_app_password_debug.log">
 
 <cfif ncAppPasswordAction NEQ "" AND ncAppPasswordUser NEQ "">
 <cftry>
 
+    <cfinclude template="generate_customtrans.cfm">
+
     <!--- === DELETE/REGENERATE: purge existing "Hermes System" tokens === --->
     <cfif ncAppPasswordAction EQ "delete" OR ncAppPasswordAction EQ "regenerate">
-        <cfset listResult = "">
-        <cfset listError = "">
         <cftry>
-            <cfexecute name="/usr/local/bin/docker"
-                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:list #ncAppPasswordUser# --output=json"
+            <cfset listScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_list_tokens.sh">
+            <cfscript>
+                fileWrite(listScript,
+                    chr(35) & "!/bin/bash" & chr(10) &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:list "' & ncAppPasswordUser & '" --output=json 2>&1' & chr(10),
+                    "utf-8");
+            </cfscript>
+            <cfexecute name="/bin/chmod" arguments="+x #listScript#" timeout="10" />
+            <cfexecute name="#listScript#"
                 variable="listResult"
                 errorVariable="listError"
                 timeout="30" />
+            <cftry><cffile action="delete" file="#listScript#"><cfcatch type="any"></cfcatch></cftry>
 
-            <cfif Len(trim(listResult)) GT 0>
+            <cfif isDefined("listResult") AND Len(trim(listResult)) GT 0 AND IsJSON(trim(listResult))>
                 <cftry>
-                    <cfset tokenList = DeserializeJSON(listResult)>
-                    <!--- Output shape varies by NC version: sometimes an array of
-                         token structs, sometimes an object keyed by token id.
-                         Handle both. --->
+                    <cfset tokenList = DeserializeJSON(trim(listResult))>
+
                     <cfif IsArray(tokenList)>
                         <cfloop array="#tokenList#" index="tokenData">
                             <cfif IsStruct(tokenData) AND StructKeyExists(tokenData, "name") AND tokenData.name EQ ncAppPasswordName AND StructKeyExists(tokenData, "id")>
                                 <cftry>
-                                    <cfexecute name="/usr/local/bin/docker"
-                                        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:delete #ncAppPasswordUser# #tokenData.id#"
-                                        variable="delResult"
-                                        errorVariable="delError"
-                                        timeout="30" />
+                                    <cfset delScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_del_" & tokenData.id & ".sh">
+                                    <cfscript>
+                                        fileWrite(delScript,
+                                            chr(35) & "!/bin/bash" & chr(10) &
+                                            'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:delete "' & ncAppPasswordUser & '" ' & tokenData.id & ' 2>&1' & chr(10),
+                                            "utf-8");
+                                    </cfscript>
+                                    <cfexecute name="/bin/chmod" arguments="+x #delScript#" timeout="10" />
+                                    <cfexecute name="#delScript#" variable="delResult" timeout="30" />
+                                    <cftry><cffile action="delete" file="#delScript#"><cfcatch type="any"></cfcatch></cftry>
                                 <cfcatch type="any"></cfcatch>
                                 </cftry>
                             </cfif>
@@ -91,81 +106,99 @@ whether to surface a warning.
                             <cfset tokenData = tokenList[tokenId]>
                             <cfif IsStruct(tokenData) AND StructKeyExists(tokenData, "name") AND tokenData.name EQ ncAppPasswordName>
                                 <cftry>
-                                    <cfexecute name="/usr/local/bin/docker"
-                                        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:delete #ncAppPasswordUser# #tokenId#"
-                                        variable="delResult"
-                                        errorVariable="delError"
-                                        timeout="30" />
+                                    <cfset delScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_del_" & tokenId & ".sh">
+                                    <cfscript>
+                                        fileWrite(delScript,
+                                            chr(35) & "!/bin/bash" & chr(10) &
+                                            'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:delete "' & ncAppPasswordUser & '" ' & tokenId & ' 2>&1' & chr(10),
+                                            "utf-8");
+                                    </cfscript>
+                                    <cfexecute name="/bin/chmod" arguments="+x #delScript#" timeout="10" />
+                                    <cfexecute name="#delScript#" variable="delResult" timeout="30" />
+                                    <cftry><cffile action="delete" file="#delScript#"><cfcatch type="any"></cfcatch></cftry>
                                 <cfcatch type="any"></cfcatch>
                                 </cftry>
                             </cfif>
                         </cfloop>
                     </cfif>
-                <cfcatch type="any">
-                    <!--- JSON parse error - no tokens or unexpected format. Skip. --->
-                </cfcatch>
+                <cfcatch type="any"></cfcatch>
                 </cftry>
             </cfif>
-        <cfcatch type="any">
-            <!--- List failed (user may not exist in NC yet). Fall through
-                 to create so a fresh token is generated even if list failed. --->
-        </cfcatch>
+        <cfcatch type="any"></cfcatch>
         </cftry>
     </cfif>
 
     <!--- === CREATE/REGENERATE: generate a fresh token === --->
     <cfif ncAppPasswordAction EQ "create" OR ncAppPasswordAction EQ "regenerate">
 
-        <cfset addResult = "">
-        <cfset addError = "">
-
-        <!--- NC generates a random 24-char token. We do NOT pass --password-from-env
-             because remote-auth users have no local password to sync with —
-             the token is a standalone DAV credential. --->
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add #ncAppPasswordUser# --name=#ncAppPasswordName#"
+        <cfset addScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_add_token.sh">
+        <cfscript>
+            fileWrite(addScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:auth-tokens:add "' & ncAppPasswordUser & '" --name="' & ncAppPasswordName & '" 2>&1' & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #addScript#" timeout="10" />
+        <cfexecute name="#addScript#"
             variable="addResult"
             errorVariable="addError"
             timeout="30" />
+        <cftry><cffile action="delete" file="#addScript#"><cfcatch type="any"></cfcatch></cftry>
 
-        <!--- Parse the generated password from stdout. Recent NC versions
-             print a line like "App password created for <user>. The token is: <TOKEN>"
-             or "Generated new app password: <TOKEN>". We grab the last
-             whitespace-separated token on the last non-empty line that
-             contains ":" or is 20+ chars on its own. --->
+        <cfif NOT isDefined("addResult")><cfset addResult = ""></cfif>
+
+        <!--- Parse the generated token. Possible occ output shapes we've
+             seen across NC versions:
+               "App password generated for <user>. Token: <TOKEN>"
+               "The following token is now active: <TOKEN>"
+               "<TOKEN>"                                  (just the token)
+               "Token created for <user>: <TOKEN>"
+             Heuristics (in order):
+               a) Look for any "token is:" / "token:" / ": <TOKEN>" marker
+                  followed by a whitespace-separated word matching an
+                  app-password shape (alnum, 20+ chars).
+               b) Any bare line that is itself an alnum 20+ char string.
+               c) Last whitespace-separated word on the last non-empty
+                  line that matches the alnum 20+ char shape. --->
         <cfset extracted = "">
         <cfif Len(trim(addResult)) GT 0>
             <cfset addLines = ListToArray(addResult, chr(10), false)>
             <cfloop from="#ArrayLen(addLines)#" to="1" step="-1" index="iLine">
                 <cfset line = trim(addLines[iLine])>
-                <cfif Len(line) EQ 0>
-                    <cfcontinue>
-                </cfif>
-                <!--- If the line has "token is:" or similar marker, grab the part after. --->
-                <cfif REFindNoCase("token\s+is\s*:", line) GT 0>
-                    <cfset extracted = trim(ListLast(line, ":"))>
-                    <cfbreak>
-                </cfif>
-                <!--- Otherwise, if the line itself looks like a bare token (no spaces, 20+ chars). --->
-                <cfif Len(line) GTE 20 AND REFind("^[A-Za-z0-9]+$", line) GT 0>
-                    <cfset extracted = line>
-                    <cfbreak>
-                </cfif>
-                <!--- Fallback: last whitespace-separated word on the line. --->
-                <cfset lastWord = trim(ListLast(line, " " & chr(9)))>
-                <cfif Len(lastWord) GTE 20 AND REFind("^[A-Za-z0-9]+$", lastWord) GT 0>
-                    <cfset extracted = lastWord>
-                    <cfbreak>
-                </cfif>
+                <cfif Len(line) EQ 0><cfcontinue></cfif>
+
+                <cfset words = ListToArray(line, " " & chr(9), false)>
+                <cfloop from="#ArrayLen(words)#" to="1" step="-1" index="iWord">
+                    <cfset w = trim(words[iWord])>
+                    <!--- Strip trailing punctuation like "." or ":" --->
+                    <cfset w = REReplace(w, "[[:punct:]]+$", "")>
+                    <cfif Len(w) GTE 20 AND REFind("^[A-Za-z0-9]+$", w) GT 0>
+                        <cfset extracted = w>
+                        <cfbreak>
+                    </cfif>
+                </cfloop>
+                <cfif Len(extracted) GT 0><cfbreak></cfif>
             </cfloop>
         </cfif>
+
+        <!--- Always write a debug log entry so failures can be diagnosed. --->
+        <cftry>
+            <cfset logBody = "[" & DateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss") & "] " &
+                ncAppPasswordAction & " for " & ncAppPasswordUser & chr(10) &
+                "STDOUT:" & chr(10) & Left(addResult, 2000) & chr(10) &
+                "STDERR:" & chr(10) & Left(isDefined("addError") ? addError : "", 2000) & chr(10) &
+                "Extracted token length: " & Len(extracted) & chr(10) &
+                "---" & chr(10)>
+            <cffile action="append" file="#ncAppPasswordDebugLog#" output="#logBody#" charset="utf-8">
+        <cfcatch type="any"></cfcatch>
+        </cftry>
 
         <cfif Len(extracted) GT 0>
             <cfset ncAppPassword = extracted>
             <cfset ncAppPasswordResult = "success">
         <cfelse>
             <cfset ncAppPasswordResult = "error: could not parse token from occ output">
-            <cfset ncAppPasswordError = addError & chr(10) & "STDOUT: " & addResult>
+            <cfset ncAppPasswordError = "STDOUT: " & Left(addResult, 500) & " / STDERR: " & Left(isDefined("addError") ? addError : "", 500)>
         </cfif>
 
     <cfelseif ncAppPasswordAction EQ "delete">
@@ -175,6 +208,14 @@ whether to surface a warning.
 <cfcatch type="any">
     <cfset ncAppPasswordResult = "error: " & cfcatch.message>
     <cfset ncAppPasswordError = cfcatch.detail>
+    <cftry>
+        <cffile action="append" file="#ncAppPasswordDebugLog#"
+            output="[#DateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss")#] EXCEPTION: #cfcatch.message# / #cfcatch.detail#
+---
+"
+            charset="utf-8">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
 </cfcatch>
 </cftry>
 </cfif>
