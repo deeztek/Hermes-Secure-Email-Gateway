@@ -151,6 +151,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Share your mailbox folders with other users in your domain. Shared folders will appear under the <strong>Shared/</strong> namespace in the recipient's email client. Common folder paths: <strong>INBOX</strong>, <strong>INBOX/Projects</strong>, <strong>Sent</strong>, <strong>Drafts</strong>.</p>
                 </div>
 
+                <div class="alert alert-info">
+                    <p class="mb-1"><i class="icon fas fa-info-circle"></i> <strong>If your recipient uses Nextcloud Mail (webmail):</strong></p>
+                    <p class="mb-0">NC Mail caches its folder list once when the account is first set up and won&rsquo;t automatically pick up folders that are shared later. If your recipient can&rsquo;t see a folder you&rsquo;ve shared with them, have them go to <strong>Webmail &rarr; Settings &rarr; Mail accounts</strong>, remove their account, and add it back &mdash; the fresh setup re-enumerates the full folder tree, including shared folders. <strong>Thunderbird and other IMAP clients</strong> don&rsquo;t have this limitation; they see shared folders as soon as they refresh their folder list (for Thunderbird: right-click the account &rarr; <em>Subscribe</em> &rarr; <em>Refresh</em>).</p>
+                </div>
+
                 <!--- SHARE A FOLDER FORM --->
                 <cfif getDomainUsers.recordcount GTE 1>
                 <div class="card card-outline card-secondary mb-3">
