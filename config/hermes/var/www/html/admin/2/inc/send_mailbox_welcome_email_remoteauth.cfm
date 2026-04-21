@@ -33,9 +33,14 @@ email client settings, user portal URL, webmail URL, help contact.
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
 - recipientName: The recipient's display name (optional, defaults to email)
+- recipientAppPassword: "Hermes System" NC app password for DAV clients
+                       (optional — if set, a DAV credentials block is
+                       added to the email). This is the only chance to
+                       deliver the token, since NC won't show it again.
 --->
 
 <cfparam name="recipientName" default="#recipientEmail#">
+<cfparam name="recipientAppPassword" default="">
 
 <!--- GET POSTMASTER EMAIL FOR FROM ADDRESS --->
 <cfquery name="getPostmaster" datasource="hermes">
@@ -50,6 +55,7 @@ Requires the following variables to be set before including:
 <cfset consoleHost = getConsoleHost.value2>
 <cfset loginUrl = "https://#consoleHost#/users">
 <cfset webmailUrl = "https://#consoleHost#/nc">
+<cfset davUrl = "https://#consoleHost#/nc/remote.php/dav">
 
 <!--- SEND WELCOME EMAIL --->
 <cfmail from="#getPostmaster.value#" to="#recipientEmail#" server="hermes_postfix_dkim" port="10026" subject="[Hermes SEG] Welcome - Mailbox Created" type="html">
@@ -76,6 +82,19 @@ Requires the following variables to be set before including:
         <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
     </table>
 </div>
+
+<cfif Len(Trim(recipientAppPassword)) GT 0>
+<div style="background-color: ##fff0f0; border: 1px solid ##f5a8a8; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##842029;">Calendar &amp; Contacts Sync Password (DAV)</h3>
+    <p>If you plan to sync your <strong>calendar, contacts, or files</strong> from Hermes to a desktop or mobile app (Thunderbird/Lightning, Apple Calendar, Apple Contacts, iOS Accounts, DAVx5 on Android, etc.), use the app-specific password below. It is NOT used for email (IMAP/SMTP) or for logging in to the website &mdash; those use your organization password.</p>
+    <table style="text-align: left; width: 100%; border-collapse: collapse;">
+        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail#</td></tr>
+        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>App Password:</strong></td><td style="padding: 4px 8px; font-family: monospace; word-break: break-all; background: ##fff; padding: 6px 8px; border: 1px dashed ##f5a8a8;">#recipientAppPassword#</td></tr>
+        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>Server URL:</strong></td><td style="padding: 4px 8px; font-family: monospace; word-break: break-all;">#davUrl#</td></tr>
+    </table>
+    <p style="margin-bottom: 0; margin-top: 12px; font-size: 13px; color: ##842029;"><strong>Please save this password somewhere safe.</strong> Hermes will not display it again. If you lose it, ask your administrator to reset your DAV password, or generate a new one yourself from Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions. You can safely delete this welcome email once your sync clients are configured.</p>
+</div>
+</cfif>
 
 <div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##495057;">User Portal &amp; Webmail</h3>

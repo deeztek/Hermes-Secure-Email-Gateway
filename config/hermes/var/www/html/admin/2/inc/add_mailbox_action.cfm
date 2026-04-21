@@ -514,6 +514,11 @@ Requires form variables:
 <cfset recipientName = displayName>
 <cftry>
     <cfif form.auth_type EQ "remote">
+        <!--- Pass the DAV app password generated during NC provisioning
+             through to the welcome email. Only populated for remote-auth
+             + NC-enabled; empty otherwise (welcome email skips the DAV
+             block when empty). --->
+        <cfset recipientAppPassword = (IsDefined("ncProvisionAppPassword")) ? ncProvisionAppPassword : "">
         <cfinclude template="send_mailbox_welcome_email_remoteauth.cfm">
     <cfelse>
         <cfinclude template="send_mailbox_welcome_email.cfm">

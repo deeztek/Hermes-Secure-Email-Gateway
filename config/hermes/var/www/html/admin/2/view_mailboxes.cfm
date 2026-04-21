@@ -75,10 +75,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/edit_mailbox_access_control_action.cfm">
 <cfelseif action is "delete_mailbox">
   <cfinclude template="./inc/delete_mailbox_action.cfm">
+<cfelseif action is "reset_dav_password">
+  <cfinclude template="./inc/reset_dav_password_action.cfm">
 </cfif>
 
 <!--- Edition check --->
 <cfset isPro = isDefined("session.edition") AND session.edition EQ "Pro">
+
+<!--- Console host (used by the Reset DAV Password result callout) --->
+<cfquery name="getConsoleHostForCallout" datasource="hermes">
+    SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'
+</cfquery>
 
 <!--- SUCCESS / ERROR MESSAGES --->
 <cfif m EQ 1>
@@ -166,6 +173,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Compromised Password</h4>
     This password has been found in a data breach and cannot be used. Please choose a different password.
+  </div>
+<cfelseif m EQ 40>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Not Applicable</h4>
+    Reset DAV Password only applies to <strong>remote-auth</strong> mailboxes. Local-auth mailboxes use the email password for DAV.
+  </div>
+<cfelseif m EQ 41>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Not Applicable</h4>
+    This mailbox does not have Nextcloud enabled, so there is no DAV password to reset.
+  </div>
+<cfelseif m EQ 42>
+  <cfset resetUserOnce = StructKeyExists(session, "resetDavUsername") ? session.resetDavUsername : "">
+  <cfset resetPassOnce = StructKeyExists(session, "resetDavPassword") ? session.resetDavPassword : "">
+  <cfset session.resetDavUsername = "">
+  <cfset session.resetDavPassword = "">
+  <cfoutput>
+  <div class="alert alert-warning">
+    <h4><i class="icon fas fa-key"></i> New DAV Password Generated</h4>
+    <p class="mb-2">A new &ldquo;Hermes System&rdquo; app password has been created for <strong>#HTMLEditFormat(resetUserOnce)#</strong>. Any CalDAV/CardDAV/WebDAV clients configured with the previous password will stop working until updated.</p>
+    <p class="mb-2"><strong>Deliver these credentials to the user out-of-band.</strong> Hermes will not display this password again after you leave this page.</p>
+    <table class="table table-sm table-bordered bg-white" style="max-width: 720px;">
+      <tr><th style="width: 140px;">Username</th><td><code>#HTMLEditFormat(resetUserOnce)#</code></td></tr>
+      <tr><th>App Password</th><td><code id="resetDavPwdField" style="word-break: break-all;">#HTMLEditFormat(resetPassOnce)#</code> <button type="button" class="btn btn-sm btn-outline-secondary ms-2" onclick="copyResetDavPwd()"><i class="fas fa-copy"></i> Copy</button></td></tr>
+      <tr><th>Server URL</th><td><code>https://<cfoutput query="getConsoleHostForCallout" maxrows="1">#HTMLEditFormat(value2)#</cfoutput>/nc/remote.php/dav</code></td></tr>
+    </table>
+    <p class="mb-0"><small>The user can also generate a fresh token themselves via <strong>Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions</strong>.</small></p>
+  </div>
+  </cfoutput>
+<cfelseif m EQ 43>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Reset Failed</h4>
+    <p class="mb-0">Could not regenerate the DAV password. <cfif StructKeyExists(session, "resetDavError")><cfoutput>Details: #HTMLEditFormat(session.resetDavError)#</cfoutput><cfset session.resetDavError = ""></cfif></p>
   </div>
 <cfelseif m EQ 100>
   <div class="alert alert-warning alert-dismissible">
@@ -317,6 +360,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="##" onclick="loadEditModal(#id#); return false;"><i class="fas fa-edit me-2"></i>Edit Options</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-shield-alt me-2"></i>Access Control</a></li>
+                <cfif auth_type EQ "remote" AND Val(mb_nextcloud) EQ 1>
+                  <li><a class="dropdown-item" href="##" onclick="confirmResetDavPassword(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-key me-2"></i>Reset DAV Password</a></li>
+                </cfif>
                 <li><hr class="dropdown-divider"></li>
                 <li><a class="dropdown-item text-danger" href="##" onclick="confirmDelete(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-trash me-2"></i>Delete</a></li>
               </ul>
@@ -676,6 +722,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- RESET DAV PASSWORD CONFIRMATION MODAL --->
+<div class="modal fade" id="resetDavPasswordModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="view_mailboxes.cfm">
+        <input type="hidden" name="action" value="reset_dav_password">
+        <input type="hidden" name="reset_mailbox_id" id="resetDavMailboxId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-key me-2"></i>Reset DAV Password</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>This will regenerate the &ldquo;Hermes System&rdquo; app password for <strong id="resetDavMailboxEmail"></strong>.</p>
+          <div class="alert alert-warning mb-2">
+            <p class="mb-1"><strong>What this affects:</strong></p>
+            <ul class="mb-0">
+              <li>Any CalDAV / CardDAV / WebDAV clients the user has configured with the <em>previous</em> Hermes System password will stop working until updated with the new one.</li>
+              <li>Their <strong>email</strong> (IMAP/SMTP) and <strong>webmail login</strong> are <u>not</u> affected &mdash; those use the organization (AD/LDAP) password.</li>
+            </ul>
+          </div>
+          <p class="mb-0"><small>Hermes does <strong>not</strong> email the new password. It will be displayed once on this page after the reset completes &mdash; copy it and deliver it to the user via your normal out-of-band channel (chat, ticket, phone).</small></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-key me-1"></i> Reset DAV Password</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
       </div>
     </div>
   </main>
@@ -841,6 +918,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       } catch(e) { /* silent - modal still works without warning */ }
     }, 'json');
     new bootstrap.Modal(document.getElementById('deleteMailboxModal')).show();
+  }
+
+  // Confirm reset DAV password (remote-auth + NC-enabled mailboxes only)
+  function confirmResetDavPassword(mailboxId, email) {
+    $('#resetDavMailboxId').val(mailboxId);
+    $('#resetDavMailboxEmail').text(email);
+    new bootstrap.Modal(document.getElementById('resetDavPasswordModal')).show();
+  }
+
+  // Copy the newly generated DAV password to clipboard from the result callout
+  function copyResetDavPwd() {
+    var el = document.getElementById('resetDavPwdField');
+    if (!el) return;
+    var text = el.innerText;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text);
+    } else {
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      var sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      document.execCommand('copy');
+      sel.removeAllRanges();
+    }
   }
 </script>
 

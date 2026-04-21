@@ -32,6 +32,11 @@ Requires the following variables before including:
 Sets after execution:
   - ncProvisionResult: "success", "error", or "skipped"
   - ncProvisionError: error message (if any)
+  - ncProvisionAppPassword: generated "Hermes System" DAV token
+    (only set for remote-auth on successful create; empty otherwise).
+    Caller should thread this into the welcome email — remote-auth
+    users have no local NC password and need this token for
+    CalDAV/CardDAV/WebDAV clients.
 --->
 
 <cfparam name="ncProvisionAction" default="">
@@ -48,6 +53,7 @@ Sets after execution:
 
 <cfset ncProvisionResult = "skipped">
 <cfset ncProvisionError = "">
+<cfset ncProvisionAppPassword = "">
 
 <cfif ncProvisionAction EQ "" OR ncProvisionUser EQ "">
     <!--- Nothing to do --->
@@ -175,6 +181,20 @@ Sets after execution:
 
                 <cfif cfhttp.statusCode CONTAINS "200">
                     <cfset ncProvisionResult = "success">
+
+                    <!--- Generate the "Hermes System" DAV app password.
+                         Remote-auth users have no local NC password, so
+                         CalDAV/CardDAV/WebDAV clients need this token as
+                         their credential. The plaintext is returned in
+                         ncProvisionAppPassword for the caller to include
+                         in the welcome email (this is the only chance to
+                         capture it — NC won't show it again). --->
+                    <cfset ncAppPasswordAction = "create">
+                    <cfset ncAppPasswordUser = ncProvisionUser>
+                    <cfinclude template="nextcloud_app_password.cfm">
+                    <cfif ncAppPasswordResult EQ "success">
+                        <cfset ncProvisionAppPassword = ncAppPassword>
+                    </cfif>
                 <cfelse>
                     <cfset ncProvisionResult = "error">
                     <cfset ncProvisionError = "user_oidc API HTTP " & cfhttp.statusCode & ": " & Left(cfhttp.fileContent, 200)>
