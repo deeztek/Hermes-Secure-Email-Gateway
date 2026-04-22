@@ -1922,79 +1922,11 @@ INSERT INTO parameters2 (module, parameter, value2, applied)
 SELECT 'dovecot', 'sharing.enabled', 'no', '1'
 WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'dovecot' AND parameter = 'sharing.enabled');
 
--- ============================================================================
--- Scheduled Tasks (Ofelia jobs) — DB-backed config
--- Source of truth for every Ofelia job. The admin UI reads/writes this
--- table; generate_ofelia_configuration.cfm renders /etc/ofelia/config.ini
--- from the table contents and restarts hermes_ofelia.
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS ofelia_jobs (
-    name VARCHAR(128) NOT NULL,
-    schedule VARCHAR(128) NOT NULL,
-    container VARCHAR(128) NOT NULL DEFAULT 'hermes_commandbox',
-    command TEXT NOT NULL,
-    no_overlap TINYINT(3) NOT NULL DEFAULT 0,
-    enabled TINYINT(3) NOT NULL DEFAULT 1,
-    description VARCHAR(512) NULL,
-    system TINYINT(3) NOT NULL DEFAULT 0,
-    config_synced TINYINT(3) NOT NULL DEFAULT 1,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-
--- Seed built-in Hermes jobs. Each is marked system=1 so the admin UI
--- prevents deletion (matches the additional_sans pattern). INSERT IGNORE
--- so re-running the migration is a no-op on rows that already exist
--- (admins may have edited schedules; don't clobber).
-
-INSERT IGNORE INTO ofelia_jobs (name, schedule, container, command, no_overlap, enabled, description, system) VALUES
-    ('renew-acme-certificate',
-     '0 05 12 * * *',
-     'hermes_commandbox',
-     '/opt/hermes/schedule/renew_acme_certificate.sh',
-     0, 1,
-     'Daily Let''s Encrypt certificate renewal via certbot.',
-     1),
-    ('hermes-message-cleanup',
-     '0 30 01 * * *',
-     'hermes_commandbox',
-     '/usr/bin/curl --silent http://localhost:8888/schedule/message_cleanup.cfm',
-     0, 1,
-     'Nightly cleanup of old Amavis quarantined messages based on retention settings.',
-     1),
-    ('hermes-update-check',
-     '0 30 04 * * *',
-     'hermes_commandbox',
-     '/opt/hermes/schedule/update_check.sh',
-     0, 1,
-     'Daily check for new Hermes SEG versions. Emails admins when updates are available.',
-     1),
-    ('hermes-quarantine-notify',
-     '@every 60s',
-     'hermes_commandbox',
-     '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_notify.cfm',
-     1, 1,
-     'Near-real-time quarantine notifications. Sends per-message emails to opted-in recipients as quarantined messages arrive.',
-     1),
-    ('acme-validate-ip',
-     '@every 1h',
-     'hermes_commandbox',
-     '/usr/bin/curl --silent http://localhost:8888/schedule/acme_validate_ip.cfm',
-     0, 1,
-     'Hourly DNS pre-flight for SAN certificates. Validates that each configured SAN resolves to this host and triggers reissuance when the SAN set has changed.',
-     1),
-    ('hermes-process-cert-queue',
-     '@every 60s',
-     'hermes_commandbox',
-     '/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm',
-     1, 1,
-     'Background processor for pending S/MIME certificate and PGP keyring generation jobs. Batches of 5 per tick.',
-     1);
-
 -- Audit log of manual "Run Now" invocations from view_scheduled_tasks.cfm.
 -- Ofelia's own scheduled executions are NOT captured here.
+-- ofelia_jobs table already exists from earlier migrations — we build on
+-- that schema (job_name, schedule, command, container, active, type, no_overlap)
+-- rather than create a parallel one.
 CREATE TABLE IF NOT EXISTS scheduled_job_runs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     job_name VARCHAR(255) NOT NULL,

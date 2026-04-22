@@ -24,26 +24,29 @@ Executes an Ofelia job on demand. Called via POST from
 view_scheduled_tasks.cfm's "Run Now" buttons.
 
 Input (form):
-  - job_name : name of the job to run (must match an ofelia_jobs.name)
+  - job_name : full bracketed job_name as stored in ofelia_jobs
+              (e.g. [job-exec "hermes-quarantine-notify"])
 
 Output:
   - Content-Type: application/json
   - { success, duration_ms, exit_code, output_summary, error }
 
 Execution strategy:
-  - Look up the job row in ofelia_jobs (DB is source of truth).
-  - If the command is `/usr/bin/curl --silent http://localhost:8888/...`
-    (the common pattern for calling a CFML endpoint), we issue a direct
-    <cfhttp> — faster and captures the response body for the modal.
-  - Otherwise, we <cfexecute> the command. Since Ofelia invokes
-    `docker exec hermes_commandbox <command>` and we ARE inside
-    hermes_commandbox, executing the command directly is equivalent.
+  - Look up the row in ofelia_jobs by job_name (exact match).
+  - If the command is /usr/bin/curl --silent http://localhost:8888/...
+    we issue <cfhttp> and capture the response body for the modal.
+  - Otherwise, <cfexecute> the command directly inside commandbox.
+    Since Ofelia itself invokes `docker exec hermes_commandbox <command>`
+    and we ARE inside hermes_commandbox, this is equivalent for most
+    jobs. A handful of jobs target different containers (e.g. the DMARC
+    job targets hermes_dmarc); for those we docker-exec into the right
+    container explicitly.
   - 300s ceiling for the manual-trigger path; Ofelia's scheduled run
     has no such cap.
 
-Every invocation appends a row to scheduled_job_runs, including failures.
-Disabled jobs are allowed — admins sometimes want to run a disabled job
-once without turning it on.
+Every invocation appends a row to scheduled_job_runs including failures.
+Disabled jobs (active='2') are still runnable — admins sometimes want a
+one-off run without flipping the flag.
 --->
 
 <cfcontent type="application/json" reset="true">
@@ -56,13 +59,13 @@ once without turning it on.
 <cfset targetJob = Trim(form.job_name)>
 
 <cfquery name="getJob" datasource="hermes">
-    SELECT name, command
+    SELECT job_name, command, container, active
     FROM ofelia_jobs
-    WHERE name = <cfqueryparam value="#targetJob#" cfsqltype="cf_sql_varchar">
+    WHERE job_name = <cfqueryparam value="#targetJob#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <cfif getJob.recordcount LT 1>
-    <cfoutput>#SerializeJSON({"success": false, "error": "Job not found: " & targetJob})#</cfoutput>
+    <cfoutput>#SerializeJSON({"success": false, "error": "Job not found in ofelia_jobs: " & targetJob})#</cfoutput>
     <cfabort>
 </cfif>
 
@@ -78,7 +81,7 @@ once without turning it on.
 <cfset runSuccess = false>
 
 <cftry>
-    <!--- Detect the common curl-localhost pattern: convert to cfhttp. --->
+    <!--- Curl-to-localhost pattern: route via cfhttp for clean body capture. --->
     <cfset curlMatch = REFind("^\s*/usr/bin/curl\s+(?:--silent\s+)?(http://[^\s]+)", getJob.command, 1, true)>
 
     <cfif IsStruct(curlMatch) AND curlMatch.pos[1] GT 0 AND ArrayLen(curlMatch.pos) GTE 2>
@@ -93,8 +96,20 @@ once without turning it on.
         <cfelse>
             <cfset runError = "HTTP " & cfhttp.statusCode>
         </cfif>
+    <cfelseif Trim(getJob.container) NEQ "hermes_commandbox" AND Len(Trim(getJob.container)) GT 0>
+        <!--- Target is a different container (e.g. hermes_dmarc). Proxy via
+             docker exec the same way Ofelia would. --->
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec #Trim(getJob.container)# #Trim(getJob.command)#"
+            variable="runOutput"
+            errorVariable="runStderr"
+            timeout="300" />
+        <cfif isDefined("runStderr") AND Len(Trim(runStderr)) GT 0>
+            <cfset runOutput = runOutput & chr(10) & "[STDERR] " & runStderr>
+        </cfif>
+        <cfset runSuccess = true>
     <cfelse>
-        <!--- Shell command: invoke directly. First word is the binary; rest is args. --->
+        <!--- Shell command, targets commandbox (us). Split on first whitespace. --->
         <cfset cmdParts = REReplace(Trim(getJob.command), "\s+", " ", "ALL")>
         <cfset spaceIdx = Find(" ", cmdParts)>
         <cfif spaceIdx GT 0>
@@ -112,7 +127,6 @@ once without turning it on.
         <cfif isDefined("runStderr") AND Len(Trim(runStderr)) GT 0>
             <cfset runOutput = runOutput & chr(10) & "[STDERR] " & runStderr>
         </cfif>
-        <cfset runExitCode = "0">
         <cfset runSuccess = true>
     </cfif>
 
