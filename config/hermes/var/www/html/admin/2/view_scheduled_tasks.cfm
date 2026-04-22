@@ -55,43 +55,65 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <div class="app-content">
       <div class="container-fluid">
 
-<!--- Load ofelia jobs from config.ini --->
-<cfinclude template="./inc/parse_ofelia_config.cfm">
+<!--- Every job lives in the ofelia_jobs table — source of truth.
+     The config file at /etc/ofelia/config.ini is generated from
+     this query via generate_ofelia_configuration.cfm whenever the
+     table changes. --->
+<cfquery name="getJobs" datasource="hermes">
+    SELECT name, schedule, container, command, no_overlap, enabled,
+           description, system, config_synced,
+           created_at, updated_at
+    FROM ofelia_jobs
+    ORDER BY name ASC
+</cfquery>
 
-<!--- Load last-run-at per job from our local history table --->
+<!--- Last manual "Run Now" per job for the Last Run column. --->
 <cfquery name="getLastRuns" datasource="hermes">
-  SELECT job_name, MAX(triggered_at) AS last_run_at
-  FROM scheduled_job_runs
-  GROUP BY job_name
+    SELECT job_name, MAX(triggered_at) AS last_run_at
+    FROM scheduled_job_runs
+    GROUP BY job_name
 </cfquery>
 
 <cfset lastRunMap = {}>
 <cfloop query="getLastRuns">
-  <cfset lastRunMap[getLastRuns.job_name] = getLastRuns.last_run_at>
+    <cfset lastRunMap[getLastRuns.job_name] = getLastRuns.last_run_at>
 </cfloop>
+
+<!--- Detect pending-sync state across the table for an optional banner. --->
+<cfquery name="getPendingCount" datasource="hermes">
+    SELECT COUNT(*) AS pending FROM ofelia_jobs WHERE config_synced = 0
+</cfquery>
+<cfset hasPendingChanges = (getPendingCount.pending GT 0)>
 
 <!-- Info callout -->
 <div class="alert alert-info alert-dismissible">
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   <h5><i class="icon fas fa-info-circle"></i> About Scheduled Tasks</h5>
-  <p class="mb-1">Hermes uses <strong>Ofelia</strong> to run periodic maintenance jobs (certificate renewal, quarantine reports, intrusion-prevention validation, etc.). This page lists every job defined in <code>/etc/ofelia/config.ini</code>, its schedule, and lets you trigger a one-off run on demand.</p>
+  <p class="mb-1">Hermes uses <strong>Ofelia</strong> to run periodic maintenance jobs (certificate renewal, quarantine notifications, intrusion-prevention validation, etc.). This page lists every job defined in the <code>ofelia_jobs</code> table and lets you trigger one-off runs on demand.</p>
   <ul class="mb-1">
-    <li><strong>Status</strong> &mdash; <span class="badge bg-success">Enabled</span> jobs run on their configured schedule; <span class="badge bg-secondary">Disabled</span> jobs are present in the config but commented out.</li>
-    <li><strong>Run Now</strong> &mdash; executes the job's command immediately, independent of the schedule. Works for both enabled and disabled jobs (useful for one-off re-runs of a disabled job without turning it on).</li>
+    <li><strong>Status</strong> &mdash; <span class="badge bg-success">Enabled</span> jobs run on their configured schedule; <span class="badge bg-secondary">Disabled</span> jobs are present in the config but skipped by Ofelia.</li>
+    <li><strong>Run Now</strong> &mdash; executes the job's command immediately, independent of the schedule. Works for both enabled and disabled jobs.</li>
     <li><strong>Last Run</strong> &mdash; shows the most recent <strong>manually-triggered</strong> run from this page. Ofelia's own scheduled executions are not recorded here.</li>
   </ul>
-  <p class="mb-0"><small>Output from each Run Now is captured and shown in a modal. Long-running jobs time out at 300 seconds in this view; the scheduled execution is unaffected.</small></p>
+  <p class="mb-0"><small>Output from each Run Now is captured (first 2KB) and shown in a modal. Long-running jobs time out at 300 seconds in this view; scheduled execution is unaffected.</small></p>
 </div>
+
+<cfif hasPendingChanges>
+<div class="alert alert-warning">
+  <h5><i class="icon fas fa-exclamation-triangle"></i> Pending configuration changes</h5>
+  <p class="mb-0">One or more job definitions have been edited but not yet applied to <code>/etc/ofelia/config.ini</code>. Ofelia is still running the previous configuration. (Enable/disable and edit UI coming in a later release; today these changes happen only via direct DB edits.)</p>
+</div>
+</cfif>
 
 <!-- Jobs table -->
 <div class="card">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-clock me-2"></i>Scheduled Tasks (<cfoutput>#ArrayLen(ofeliaJobs)#</cfoutput>)</h3>
+    <h3 class="card-title"><i class="fas fa-clock me-2"></i>Scheduled Tasks (<cfoutput>#getJobs.recordcount#</cfoutput>)</h3>
   </div>
   <div class="card-body">
-    <cfif ArrayLen(ofeliaJobs) EQ 0>
+    <cfif getJobs.recordcount EQ 0>
       <div class="alert alert-warning mb-0">
-        <i class="fas fa-exclamation-triangle"></i> No jobs found in <code>/etc/ofelia/config.ini</code>. Either the file is missing, empty, or contains no <code>[job-exec &quot;name&quot;]</code> blocks.
+        <i class="fas fa-exclamation-triangle"></i> No jobs in the <code>ofelia_jobs</code> table. Run the schema migration to seed the built-in jobs.
       </div>
     <cfelse>
       <div class="table-responsive">
@@ -99,6 +121,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <thead>
           <tr>
             <th>Name</th>
+            <th>Description</th>
             <th>Schedule</th>
             <th>Container</th>
             <th>Command</th>
@@ -108,23 +131,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </tr>
         </thead>
         <tbody>
-          <cfoutput>
-          <cfloop array="#ofeliaJobs#" index="job">
+          <cfoutput query="getJobs">
             <tr>
-              <td><code>#HTMLEditFormat(job.name)#</code></td>
-              <td><code>#HTMLEditFormat(job.schedule)#</code></td>
-              <td>#HTMLEditFormat(job.container)#</td>
-              <td><small style="word-break: break-all;"><code>#HTMLEditFormat(job.command)#</code></small></td>
+              <td><code>#HTMLEditFormat(name)#</code></td>
+              <td><small>#HTMLEditFormat(description)#</small></td>
+              <td><code>#HTMLEditFormat(schedule)#</code></td>
+              <td>#HTMLEditFormat(container)#</td>
+              <td><small style="word-break: break-all;"><code>#HTMLEditFormat(command)#</code></small></td>
               <td>
-                <cfif job.enabled>
+                <cfif Val(enabled) EQ 1>
                   <span class="badge bg-success">Enabled</span>
                 <cfelse>
                   <span class="badge bg-secondary">Disabled</span>
                 </cfif>
+                <cfif Val(no_overlap) EQ 1>
+                  <span class="badge bg-info" title="Ofelia's no-overlap flag — the job is skipped for that tick if the previous invocation is still running.">no-overlap</span>
+                </cfif>
               </td>
               <td>
-                <cfif StructKeyExists(lastRunMap, job.name)>
-                  <small>#DateFormat(lastRunMap[job.name], "yyyy-mm-dd")# #TimeFormat(lastRunMap[job.name], "HH:mm:ss")#</small>
+                <cfif StructKeyExists(lastRunMap, name)>
+                  <small>#DateFormat(lastRunMap[name], "yyyy-mm-dd")# #TimeFormat(lastRunMap[name], "HH:mm:ss")#</small>
                 <cfelse>
                   <small class="text-muted">&mdash;</small>
                 </cfif>
@@ -132,12 +158,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <td>
                 <button type="button"
                         class="btn btn-sm btn-primary run-now-btn"
-                        data-job-name="#HTMLEditFormat(job.name)#">
+                        data-job-name="#HTMLEditFormat(name)#">
                   <i class="fas fa-play"></i> Run Now
                 </button>
               </td>
             </tr>
-          </cfloop>
           </cfoutput>
         </tbody>
       </table>
@@ -157,7 +182,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <!-- Running spinner -->
         <div id="runResultRunning" class="text-center py-4">
           <div class="spinner-border text-primary" role="status">
             <span class="visually-hidden">Running...</span>
@@ -165,7 +189,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <p class="mt-3 mb-0 text-muted">Executing job... this may take a few seconds.</p>
         </div>
 
-        <!-- Result summary -->
         <div id="runResultSummary" style="display:none;">
           <div class="row mb-3">
             <div class="col-md-4">
@@ -209,7 +232,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       "pageLength": 25,
       "stateSave": true,
       "columnDefs": [
-        { "orderable": false, "targets": [3, 6] }
+        { "orderable": false, "targets": [1, 4, 7] }
       ]
     });
 
@@ -233,7 +256,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           $('#runResultDuration').text((r.duration_ms || 0) + ' ms');
           $('#runResultExitCode').text(r.exit_code || '—');
           $('#runResultOutput').text(r.output_summary || '(no output)');
-          // Reload the page after modal closes so "Last Run" column refreshes
           $('#runResultModal').one('hidden.bs.modal', function() { location.reload(); });
         })
         .fail(function(xhr) {

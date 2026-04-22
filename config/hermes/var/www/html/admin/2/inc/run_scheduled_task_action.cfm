@@ -24,26 +24,26 @@ Executes an Ofelia job on demand. Called via POST from
 view_scheduled_tasks.cfm's "Run Now" buttons.
 
 Input (form):
-  - job_name : name of the job to run (must match an entry in config.ini)
+  - job_name : name of the job to run (must match an ofelia_jobs.name)
 
 Output:
   - Content-Type: application/json
   - { success, duration_ms, exit_code, output_summary, error }
 
 Execution strategy:
+  - Look up the job row in ofelia_jobs (DB is source of truth).
   - If the command is `/usr/bin/curl --silent http://localhost:8888/...`
-    (the common Ofelia pattern for calling CFML endpoints), we issue a
-    direct <cfhttp> rather than shelling out to curl — faster and captures
-    the response body for the modal.
-  - Otherwise, we <cfexecute> the command inside this container. Since
-    Ofelia invokes `docker exec hermes_commandbox <command>` and we ARE
-    inside hermes_commandbox, executing the command directly is
-    equivalent.
-  - Runs synchronously with a 300s ceiling. Longer jobs time out in the
-    UI (their Ofelia-scheduled runs still work fine; this is just the
-    manual-trigger cap).
+    (the common pattern for calling a CFML endpoint), we issue a direct
+    <cfhttp> — faster and captures the response body for the modal.
+  - Otherwise, we <cfexecute> the command. Since Ofelia invokes
+    `docker exec hermes_commandbox <command>` and we ARE inside
+    hermes_commandbox, executing the command directly is equivalent.
+  - 300s ceiling for the manual-trigger path; Ofelia's scheduled run
+    has no such cap.
 
 Every invocation appends a row to scheduled_job_runs, including failures.
+Disabled jobs are allowed — admins sometimes want to run a disabled job
+once without turning it on.
 --->
 
 <cfcontent type="application/json" reset="true">
@@ -55,23 +55,18 @@ Every invocation appends a row to scheduled_job_runs, including failures.
 
 <cfset targetJob = Trim(form.job_name)>
 
-<!--- Parse ofelia config to locate the job and read its command --->
-<cfinclude template="parse_ofelia_config.cfm">
+<cfquery name="getJob" datasource="hermes">
+    SELECT name, command
+    FROM ofelia_jobs
+    WHERE name = <cfqueryparam value="#targetJob#" cfsqltype="cf_sql_varchar">
+</cfquery>
 
-<cfset jobRow = "">
-<cfloop array="#ofeliaJobs#" index="j">
-    <cfif j.name EQ targetJob>
-        <cfset jobRow = j>
-        <cfbreak>
-    </cfif>
-</cfloop>
-
-<cfif NOT IsStruct(jobRow)>
-    <cfoutput>#SerializeJSON({"success": false, "error": "Job not found in ofelia config: " & targetJob})#</cfoutput>
+<cfif getJob.recordcount LT 1>
+    <cfoutput>#SerializeJSON({"success": false, "error": "Job not found: " & targetJob})#</cfoutput>
     <cfabort>
 </cfif>
 
-<cfif Len(Trim(jobRow.command)) EQ 0>
+<cfif Len(Trim(getJob.command)) EQ 0>
     <cfoutput>#SerializeJSON({"success": false, "error": "Job has no command defined"})#</cfoutput>
     <cfabort>
 </cfif>
@@ -80,13 +75,14 @@ Every invocation appends a row to scheduled_job_runs, including failures.
 <cfset runOutput = "">
 <cfset runExitCode = "0">
 <cfset runError = "">
+<cfset runSuccess = false>
 
 <cftry>
     <!--- Detect the common curl-localhost pattern: convert to cfhttp. --->
-    <cfset curlMatch = REFind("^\s*/usr/bin/curl\s+(?:--silent\s+)?(http://[^\s]+)", jobRow.command, 1, true)>
+    <cfset curlMatch = REFind("^\s*/usr/bin/curl\s+(?:--silent\s+)?(http://[^\s]+)", getJob.command, 1, true)>
 
     <cfif IsStruct(curlMatch) AND curlMatch.pos[1] GT 0 AND ArrayLen(curlMatch.pos) GTE 2>
-        <cfset targetUrl = Mid(jobRow.command, curlMatch.pos[2], curlMatch.len[2])>
+        <cfset targetUrl = Mid(getJob.command, curlMatch.pos[2], curlMatch.len[2])>
         <cfhttp url="#targetUrl#" method="GET" timeout="300" throwonerror="no">
             <cfhttpparam type="header" name="User-Agent" value="Hermes-Scheduled-Tasks-RunNow">
         </cfhttp>
@@ -95,12 +91,11 @@ Every invocation appends a row to scheduled_job_runs, including failures.
         <cfif cfhttp.statusCode CONTAINS "200">
             <cfset runSuccess = true>
         <cfelse>
-            <cfset runSuccess = false>
             <cfset runError = "HTTP " & cfhttp.statusCode>
         </cfif>
     <cfelse>
         <!--- Shell command: invoke directly. First word is the binary; rest is args. --->
-        <cfset cmdParts = REReplace(Trim(jobRow.command), "\s+", " ", "ALL")>
+        <cfset cmdParts = REReplace(Trim(getJob.command), "\s+", " ", "ALL")>
         <cfset spaceIdx = Find(" ", cmdParts)>
         <cfif spaceIdx GT 0>
             <cfset cmdBin = Left(cmdParts, spaceIdx - 1)>
@@ -131,7 +126,6 @@ Every invocation appends a row to scheduled_job_runs, including failures.
 
 <cfset durationMs = getTickCount() - startTick>
 
-<!--- Trim output for storage (2KB cap) --->
 <cfset storedOutput = Left(runOutput, 2048)>
 
 <cfset triggeredBy = StructKeyExists(session, "adminUsername") ? session.adminUsername :
