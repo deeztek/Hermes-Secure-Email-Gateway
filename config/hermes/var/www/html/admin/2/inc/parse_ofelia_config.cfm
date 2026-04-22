@@ -102,8 +102,8 @@ and ends at the next `[...]` header or a blank line.
     <cfloop array="#allLines#" index="rawLine">
         <cfset trimmed = Trim(rawLine)>
 
-        <cfset isJobHeader = (REFind("^#*\s*\[job-exec\s+""", trimmed) GT 0)>
-        <cfset isOtherHeader = (NOT isJobHeader) AND (REFind("^#*\s*\[", trimmed) GT 0)>
+        <cfset isJobHeader = (REFind("^##*\s*\[job-exec\s+""", trimmed) GT 0)>
+        <cfset isOtherHeader = (NOT isJobHeader) AND (REFind("^##*\s*\[", trimmed) GT 0)>
 
         <cfif isJobHeader>
             <!--- New job header closes any previous block --->
