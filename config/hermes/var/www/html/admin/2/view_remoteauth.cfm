@@ -777,6 +777,25 @@ $(document).ready(function() {
     </div>
 </div>
 
+<!-- DNS Resolution Prerequisite Card -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark">
+        <h3 class="card-title"><i class="fas fa-exclamation-triangle"></i> Prerequisite: DNS Resolution for Internal AD/LDAP Hostnames</h3>
+    </div>
+    <div class="card-body">
+        <p>If your AD/LDAP server hostname is resolvable only <strong>inside your internal network</strong> (e.g., <code>homedc01.corp.example.com</code>, <code>dc01.internal</code>, or anything on a split-horizon/private DNS zone), Hermes will not be able to reach it out of the box. The <code>hermes_ldap</code> container resolves hostnames through Hermes&rsquo;s internal Unbound DNS resolver, which by default queries public recursive DNS — it will not know about your internal-only names and RemoteAuth bind operations will fail with <code>remoteauth_bind operations error</code>.</p>
+        <p><strong>Fix before creating a mapping:</strong></p>
+        <ol class="mb-3">
+            <li>Go to <a href="view_dns_resolver.cfm">System &rarr; DNS Resolver</a>.</li>
+            <li>Add a <strong>DNS Local Record</strong> pointing your AD/LDAP server&rsquo;s FQDN to its actual IP address (e.g., <code>homedc01.corp.example.com</code> &rarr; <code>10.0.0.12</code>).</li>
+            <li>Save and let Unbound reload.</li>
+        </ol>
+        <p class="mb-2"><strong>Verify from inside the LDAP container:</strong></p>
+<pre class="bg-light p-2 mb-3 small"><code>docker exec hermes_ldap getent hosts &lt;ad-hostname&gt;</code></pre>
+        <p class="mb-0"><small class="text-muted"><i class="fas fa-info-circle"></i> Publicly-resolvable hostnames (e.g., if your AD lives at a hostname with a real A record in public DNS) don&rsquo;t need a Local Record &mdash; skip this step. Test with the command above; if it returns an IP, you&rsquo;re already good.</small></p>
+    </div>
+</div>
+
 <!-- Global Settings Card -->
 <div class="card mb-4">
     <div class="card-header">
