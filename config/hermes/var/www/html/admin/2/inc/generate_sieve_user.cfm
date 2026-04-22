@@ -212,7 +212,7 @@ Requires: sieveUsername variable to be set before including.
     <cfset useDateGuard = ArrayLen(dateTests) GT 0>
     <cfset useDomainGuard = (NOT vacationExternal) AND ArrayLen(vacationInternalDomains) GT 0>
 
-    <cfset indent = "">
+    <cfset outerIndent = "">
     <cfif useDateGuard>
         <cfif ArrayLen(dateTests) EQ 1>
             <cfset ArrayAppend(sieveLines, "if " & dateTests[1] & " {")>
@@ -222,42 +222,49 @@ Requires: sieveUsername variable to be set before including.
             <cfset ArrayAppend(sieveLines, "    " & dateTests[2])>
             <cfset ArrayAppend(sieveLines, ") {")>
         </cfif>
-        <cfset indent = "    ">
+        <cfset outerIndent = "    ">
     </cfif>
 
+    <!--- Auto-reply block: the vacation action itself is gated by the
+         optional domain guard. The domain guard limits WHO gets a reply
+         (default: only senders from locally hosted domains, to avoid
+         leaking OOO messages to spammers and prevent mail loops), but it
+         does NOT gate the discard below — those are independent concerns. --->
+    <cfset vacIndent = outerIndent>
     <cfif useDomainGuard>
         <cfset domQuoted = []>
         <cfloop array="#vacationInternalDomains#" index="d">
             <cfset ArrayAppend(domQuoted, '"' & sieveEscape(d) & '"')>
         </cfloop>
-        <cfset ArrayAppend(sieveLines, indent & 'if address :domain :is "From" [#ArrayToList(domQuoted, ", ")#] {')>
-        <cfset indent = indent & "    ">
+        <cfset ArrayAppend(sieveLines, outerIndent & 'if address :domain :is "From" [#ArrayToList(domQuoted, ", ")#] {')>
+        <cfset vacIndent = outerIndent & "    ">
     </cfif>
 
-    <cfset ArrayAppend(sieveLines, indent & "vacation")>
-    <cfset ArrayAppend(sieveLines, indent & "    :days #vacationDays#")>
+    <cfset ArrayAppend(sieveLines, vacIndent & "vacation")>
+    <cfset ArrayAppend(sieveLines, vacIndent & "    :days #vacationDays#")>
     <cfif addrParam NEQ "">
-        <cfset ArrayAppend(sieveLines, indent & "    " & addrParam)>
+        <cfset ArrayAppend(sieveLines, vacIndent & "    " & addrParam)>
     </cfif>
-    <cfset ArrayAppend(sieveLines, indent & '    :subject "#sieveEscape(vacationSubject)#"')>
-    <cfset ArrayAppend(sieveLines, indent & '    "#sieveEscape(vacationBody)#";')>
-
-    <cfif vacationDiscard>
-        <!--- discard alone only cancels the implicit INBOX keep - any user
-             fileinto/redirect rules below would still run. Add stop; so the
-             personal script halts entirely after the auto-reply, matching
-             the user's "delete all incoming during vacation" intent.
-             Note: the global sieve_before script (e.g. spam to Spam folder)
-             has already run and is unaffected; stop only halts the current
-             personal script. --->
-        <cfset ArrayAppend(sieveLines, indent & "discard;")>
-        <cfset ArrayAppend(sieveLines, indent & "stop;")>
-    </cfif>
+    <cfset ArrayAppend(sieveLines, vacIndent & '    :subject "#sieveEscape(vacationSubject)#"')>
+    <cfset ArrayAppend(sieveLines, vacIndent & '    "#sieveEscape(vacationBody)#";')>
 
     <cfif useDomainGuard>
-        <cfset indent = ReplaceNoCase(indent, "    ", "", "one")>
-        <cfset ArrayAppend(sieveLines, indent & "}")>
+        <cfset ArrayAppend(sieveLines, outerIndent & "}")>
     </cfif>
+
+    <!--- Discard-while-away block: fires for EVERY message during the
+         vacation window, independent of sender. Domain guard does not
+         apply here — "delete incoming during vacation" is a blanket
+         intent; if it were gated by the internal-sender check it would
+         skip the 99% of incoming mail that originates externally.
+         discard cancels the implicit INBOX keep; stop halts the personal
+         script so no user fileinto/redirect rules run afterward. The
+         global sieve_before script has already run and is unaffected. --->
+    <cfif vacationDiscard>
+        <cfset ArrayAppend(sieveLines, outerIndent & "discard;")>
+        <cfset ArrayAppend(sieveLines, outerIndent & "stop;")>
+    </cfif>
+
     <cfif useDateGuard>
         <cfset ArrayAppend(sieveLines, "}")>
     </cfif>
