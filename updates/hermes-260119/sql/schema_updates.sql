@@ -1921,3 +1921,17 @@ CREATE TABLE IF NOT EXISTS user_folder_shares (
 INSERT INTO parameters2 (module, parameter, value2, applied)
 SELECT 'dovecot', 'sharing.enabled', 'no', '1'
 WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'dovecot' AND parameter = 'sharing.enabled');
+
+-- Scheduled Tasks admin page: audit log of on-demand "Run Now" invocations
+-- of Ofelia jobs. Ofelia's own scheduled executions are NOT captured here;
+-- only manual runs triggered from view_scheduled_tasks.cfm.
+CREATE TABLE IF NOT EXISTS scheduled_job_runs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    job_name VARCHAR(255) NOT NULL,
+    triggered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    triggered_by VARCHAR(255) NULL,
+    duration_ms INT NULL,
+    exit_code VARCHAR(32) NULL,
+    output_summary TEXT NULL,
+    KEY idx_job_name_triggered (job_name, triggered_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
