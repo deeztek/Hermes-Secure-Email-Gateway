@@ -126,10 +126,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <p class="mb-0"><small><strong>Let's Encrypt SAN limit:</strong> Each domain certificate supports a maximum of <strong>100 SANs</strong>. With <strong><cfoutput>#getSanPrefixes.recordcount#</cfoutput></strong> prefixes configured, each domain's certificate uses <strong><cfoutput>#getSanPrefixes.recordcount + 1#</cfoutput> SANs</strong> (1 for the domain + <cfoutput>#getSanPrefixes.recordcount#</cfoutput> prefixes), leaving room for up to <strong><cfoutput>#99 - getSanPrefixes.recordcount#</cfoutput></strong> additional prefixes.</small></p>
 </div>
 
-<p>
-  <a href="view_mailbox_domains.cfm" class="btn btn-secondary" role="button"><i class="fa fa-undo fa-lg"></i>&nbsp;&nbsp;Back to Domains</a>
-</p>
-
 <!--- ADD SAN PREFIX FORM --->
 <div class="card col-sm-8 mb-3">
   <div class="card-header">
