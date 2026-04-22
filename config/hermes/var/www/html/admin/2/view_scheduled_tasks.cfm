@@ -96,11 +96,11 @@ do NOT write here — enable/disable/edit is future tier work.
   <h5><i class="icon fas fa-info-circle"></i> About Scheduled Tasks</h5>
   <p class="mb-1">Hermes uses <strong>Ofelia</strong> to run periodic maintenance jobs (certificate renewal, quarantine notifications, DMARC reports, intrusion-prevention validation, etc.). This page lists every job in the <code>ofelia_jobs</code> table and lets you trigger a one-off run on demand.</p>
   <ul class="mb-1">
-    <li><strong>Status</strong> &mdash; <span class="badge bg-success">Enabled</span> jobs (<code>active = 1</code>) run on their configured schedule; <span class="badge bg-secondary">Disabled</span> jobs (<code>active = 2</code>) are present in the table but skipped by Ofelia.</li>
+    <li><strong>Status toggle</strong> &mdash; flip the switch to enable/disable a job. Changes are written to <code>ofelia_jobs.active</code> and <code>/etc/ofelia/config.ini</code> is regenerated and <code>hermes_ofelia</code> is restarted immediately. <span class="badge bg-success">Enabled</span> jobs run on schedule; <span class="badge bg-secondary">Disabled</span> jobs stay in the config (commented out) but are skipped by Ofelia.</li>
     <li><strong>Run Now</strong> &mdash; executes the job's command immediately, independent of the schedule. Works for both enabled and disabled jobs.</li>
     <li><strong>Last Run</strong> &mdash; shows the most recent <strong>manually-triggered</strong> run from this page. Ofelia's own scheduled executions are not recorded here.</li>
   </ul>
-  <p class="mb-0"><small>Job definitions are edited elsewhere (e.g., the Malware Feeds settings page edits the <code>hermes-fangfrisch-refresh</code> schedule). Enable/disable and create-new controls on this page are future work.</small></p>
+  <p class="mb-0"><small>Schedule/command editing lives on a few feature-specific pages (e.g., the Malware Feeds settings page edits the <code>hermes-fangfrisch-refresh</code> schedule). Inline schedule edits and create-new controls on this page are future work.</small></p>
 </div>
 
 <!-- Jobs table -->
@@ -138,11 +138,24 @@ do NOT write here — enable/disable/edit is future tier work.
               <td>#HTMLEditFormat(container)#</td>
               <td><small style="word-break: break-all;"><code>#HTMLEditFormat(command)#</code></small></td>
               <td>
-                <cfif Trim(active) EQ "1">
-                  <span class="badge bg-success">Enabled</span>
-                <cfelse>
-                  <span class="badge bg-secondary">Disabled</span>
-                </cfif>
+                <div class="form-check form-switch d-inline-block me-2">
+                  <input class="form-check-input job-toggle"
+                         type="checkbox"
+                         role="switch"
+                         id="toggle-#hash(job_name)#"
+                         data-job-name="#HTMLEditFormat(job_name)#"
+                         data-display-name="#HTMLEditFormat(displayName)#"
+                         <cfif Trim(active) EQ "1">checked</cfif>>
+                  <label class="form-check-label" for="toggle-#hash(job_name)#">
+                    <span class="toggle-state-label">
+                      <cfif Trim(active) EQ "1">
+                        <span class="badge bg-success">Enabled</span>
+                      <cfelse>
+                        <span class="badge bg-secondary">Disabled</span>
+                      </cfif>
+                    </span>
+                  </label>
+                </div>
                 <cfif Val(no_overlap) EQ 1>
                   <span class="badge bg-info" title="Ofelia's no-overlap flag &mdash; a tick is skipped if the previous invocation is still running.">no-overlap</span>
                 </cfif>
@@ -234,6 +247,70 @@ do NOT write here — enable/disable/edit is future tier work.
       "columnDefs": [
         { "orderable": false, "targets": [4, 7] }
       ]
+    });
+
+    // Jobs where disabling could cause operational pain — prompt for confirmation.
+    // Names here should match the display-friendly (between-quotes) form.
+    var criticalJobs = [
+      'renew-acme-certificate',
+      'hermes-update-check',
+      'hermes-process-cert-queue',
+      'hermes-quarantine-notify'
+    ];
+
+    // Enable/disable toggle handler
+    $('#scheduledTasksTable').on('change', '.job-toggle', function() {
+      var $toggle = $(this);
+      var jobName = $toggle.data('job-name');
+      var displayName = $toggle.data('display-name');
+      var newState = $toggle.is(':checked') ? '1' : '2';
+      var labelSpan = $toggle.closest('.form-switch').find('.toggle-state-label');
+      var originallyChecked = !$toggle.is(':checked');  // pre-change state
+
+      // Warn when disabling a job on the critical list.
+      if (newState === '2' && criticalJobs.indexOf(displayName) !== -1) {
+        if (!confirm(
+          'Disabling "' + displayName + '" may cause operational issues ' +
+          '(certificate renewal / update checks / cert queue / quarantine notifications ' +
+          'are core to Hermes operation). Continue?'
+        )) {
+          $toggle.prop('checked', originallyChecked);
+          return;
+        }
+      }
+
+      // Disable the toggle while the request is in flight
+      $toggle.prop('disabled', true);
+      labelSpan.html('<span class="badge bg-warning text-dark">Saving...</span>');
+
+      $.post('./inc/toggle_ofelia_job_action.cfm', { job_name: jobName, new_state: newState })
+        .done(function(data) {
+          var r = (typeof data === 'string') ? JSON.parse(data) : data;
+          if (r.success) {
+            if (newState === '1') {
+              labelSpan.html('<span class="badge bg-success">Enabled</span>');
+            } else {
+              labelSpan.html('<span class="badge bg-secondary">Disabled</span>');
+            }
+          } else {
+            // Revert toggle and show error
+            $toggle.prop('checked', originallyChecked);
+            labelSpan.html(originallyChecked
+              ? '<span class="badge bg-success">Enabled</span>'
+              : '<span class="badge bg-secondary">Disabled</span>');
+            alert('Toggle failed: ' + (r.error || 'unknown error'));
+          }
+        })
+        .fail(function(xhr) {
+          $toggle.prop('checked', originallyChecked);
+          labelSpan.html(originallyChecked
+            ? '<span class="badge bg-success">Enabled</span>'
+            : '<span class="badge bg-secondary">Disabled</span>');
+          alert('Toggle request failed: HTTP ' + xhr.status);
+        })
+        .always(function() {
+          $toggle.prop('disabled', false);
+        });
     });
 
     $('#scheduledTasksTable').on('click', '.run-now-btn', function() {
