@@ -961,62 +961,20 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================================
--- OFELIA_JOBS TABLE: Disable legacy quarantine report jobs
--- (replaced by hermes-quarantine-notify, see GitHub issue #180)
--- Inserts are for new installs that may not have these rows yet.
+-- OFELIA_JOBS TABLE: Remove legacy quarantine report jobs
+-- Superseded by hermes-quarantine-notify since 2026-03-28 (#180). Previous
+-- migration steps here INSERTed the legacy rows as disabled (active='2')
+-- and UPDATEd any active ones to disabled. Now dropping the rows outright
+-- since the replacement has been in production long enough.
+-- Idempotent — DELETE is a no-op on installs where the rows don't exist.
 -- ============================================================================
-INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
-SELECT '[job-exec "hermes-quarantine-report-2-hours"]',
-       '@every 2h',
-       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=2',
-       'hermes_commandbox',
-       '2',
-       'system'
-WHERE NOT EXISTS (
-    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-2-hours"]'
-);
-
-INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
-SELECT '[job-exec "hermes-quarantine-report-4-hours"]',
-       '@every 4h',
-       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=4',
-       'hermes_commandbox',
-       '2',
-       'system'
-WHERE NOT EXISTS (
-    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-4-hours"]'
-);
-
-INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
-SELECT '[job-exec "hermes-quarantine-report-8-hours"]',
-       '@every 8h',
-       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report.cfm?frequency=8',
-       'hermes_commandbox',
-       '2',
-       'system'
-WHERE NOT EXISTS (
-    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-8-hours"]'
-);
-
-INSERT INTO ofelia_jobs (job_name, schedule, command, container, active, type)
-SELECT '[job-exec "hermes-quarantine-report-daily"]',
-       '0 30 12 * * *',
-       '/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_report_daily.cfm',
-       'hermes_commandbox',
-       '2',
-       'system'
-WHERE NOT EXISTS (
-    SELECT 1 FROM ofelia_jobs WHERE job_name = '[job-exec "hermes-quarantine-report-daily"]'
-);
-
--- Disable legacy quarantine report jobs for existing installs that may have them active
-UPDATE ofelia_jobs SET active = '2'
+DELETE FROM ofelia_jobs
 WHERE job_name IN (
     '[job-exec "hermes-quarantine-report-2-hours"]',
     '[job-exec "hermes-quarantine-report-4-hours"]',
     '[job-exec "hermes-quarantine-report-8-hours"]',
     '[job-exec "hermes-quarantine-report-daily"]'
-) AND active = '1';
+);
 
 
 -- ============================================================
