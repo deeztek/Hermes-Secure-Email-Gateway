@@ -117,8 +117,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Rebuilt Dovecot ACL files for #StructKeyExists(session, "acl_synced_count") ? session.acl_synced_count : 0# shared mailbox(es).</cfoutput>
+    <cfoutput>Rebuilt Dovecot ACL files for #StructKeyExists(session, "acl_synced_count") ? session.acl_synced_count : 0# shared mailbox(es) and #StructKeyExists(session, "user_folder_synced_count") ? session.user_folder_synced_count : 0# user folder share(s).</cfoutput>
     <cfset session.acl_synced_count = 0>
+    <cfset session.user_folder_synced_count = 0>
   </div>
 <cfelseif m EQ 6>
   <div class="alert alert-success alert-dismissible">
@@ -230,7 +231,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </ul>
   <p class="mb-1"><small>Shared mailboxes cannot log in directly. Access is managed through permissions granted to individual user mailboxes.</small></p>
   <hr class="my-2">
-  <p class="mb-0"><small><strong><i class="fas fa-sync-alt me-1"></i> Rebuild ACL Files</strong> &mdash; Dovecot stores each shared mailbox's per-user rights as an on-disk <code>dovecot-acl</code> file inside that mailbox's Maildir. Those files are written automatically whenever you add, edit, or remove a permission. Use this button to <strong>regenerate every file from the database in one pass</strong>. Run it once after upgrading to a new Dovecot release (to migrate existing permissions to the current on-disk format), or as a recovery step if members report they can&rsquo;t see or access a shared mailbox they should have rights on. Safe to run anytime &mdash; it rebuilds files from the database and never modifies the permission records themselves.</small></p>
+  <p class="mb-0"><small><strong><i class="fas fa-sync-alt me-1"></i> Rebuild ACL Files</strong> &mdash; Dovecot stores each shared mailbox&rsquo;s per-user rights as an on-disk <code>dovecot-acl</code> file inside that mailbox&rsquo;s Maildir. Those files are written automatically whenever you add, edit, or remove a permission (and also when users share folders from their own mailbox via the User Portal). Use this button to <strong>regenerate every file from the database in one pass</strong> &mdash; covers both <strong>admin-managed shared mailboxes</strong> and <strong>user-initiated folder shares</strong>. Run it once after upgrading to a new Dovecot release (to migrate existing permissions to the current on-disk format), or as a recovery step if someone reports they can&rsquo;t see or access a shared mailbox / folder they should have rights on. Safe to run anytime &mdash; it rebuilds files from the database and never modifies the permission records themselves.</small></p>
 </div>
 
 <!--- FEATURE DISABLED BANNER --->
@@ -769,12 +770,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p>This will regenerate the on-disk <code>dovecot-acl</code> file for every shared mailbox from the current permissions in the database.</p>
+          <p>This will regenerate the on-disk <code>dovecot-acl</code> file for <strong>every admin-managed shared mailbox</strong> (<code>shared_mailbox_permissions</code>) <strong>and every user-initiated folder share</strong> (<code>user_folder_shares</code>) from the current state of the database.</p>
           <p class="mb-2"><strong>When to use this:</strong></p>
           <ul class="mb-2">
             <li>After upgrading to a Dovecot 2.4 release (first run &mdash; migrates existing permissions to the new vfile driver).</li>
-            <li>If members report they cannot see or access a shared mailbox they should have permissions on.</li>
-            <li>If you&rsquo;ve manually edited the <code>shared_mailbox_permissions</code> table.</li>
+            <li>If a member reports they cannot see or access a shared mailbox or folder they should have permissions on.</li>
+            <li>If you&rsquo;ve manually edited the <code>shared_mailbox_permissions</code> or <code>user_folder_shares</code> tables.</li>
           </ul>
           <p class="text-muted mb-0"><small>Safe to run anytime &mdash; it rebuilds files from the database and does not modify permission records.</small></p>
         </div>

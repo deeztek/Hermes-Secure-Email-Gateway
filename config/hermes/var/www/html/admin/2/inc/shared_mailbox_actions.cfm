@@ -972,12 +972,14 @@ Dispatches to the appropriate action based on form.action:
 
 <!--- ====================================================================
      SYNC ALL ACL FILES (one-shot migration / healing)
-     Iterates every shared mailbox and rebuilds its dovecot-acl file from
-     shared_mailbox_permissions. Used to backfill files after the 2.3→2.4
-     driver change, or to heal drift if a sync previously failed.
+     Iterates BOTH admin-managed shared mailboxes AND user-managed
+     folder shares and rebuilds each one's vfile dovecot-acl file from
+     the DB. Used to backfill files after the 2.3→2.4 driver change, or
+     to heal drift if a sync previously failed.
      ==================================================================== --->
 <cfelseif action is "sync_all_acl_files">
 
+    <!--- Pass 1: admin-managed shared mailboxes --->
     <cfquery name="getAllShared" datasource="hermes">
         SELECT address FROM shared_mailboxes ORDER BY address ASC
     </cfquery>
@@ -994,8 +996,31 @@ Dispatches to the appropriate action based on form.action:
         </cftry>
     </cfloop>
 
+    <!--- Pass 2: user-managed folder shares. Distinct (owner, folder)
+         pairs — multiple recipients of the same folder all share one
+         vfile dovecot-acl file, so one sync call per pair is enough. --->
+    <cfquery name="getAllUserFolderShares" datasource="hermes">
+        SELECT DISTINCT owner_username, folder_path
+        FROM user_folder_shares
+        ORDER BY owner_username, folder_path
+    </cfquery>
+
+    <cfset userFolderSyncedCount = 0>
+    <cfloop query="getAllUserFolderShares">
+        <cfset ownerUser  = getAllUserFolderShares.owner_username>
+        <cfset folderPath = getAllUserFolderShares.folder_path>
+        <cftry>
+            <cfinclude template="sync_user_folder_acl_file.cfm">
+            <cfset userFolderSyncedCount = userFolderSyncedCount + 1>
+        <cfcatch type="any">
+            <!--- Per-folder failure is non-fatal; continue --->
+        </cfcatch>
+        </cftry>
+    </cfloop>
+
     <cfset session.m = 5>
     <cfset session.acl_synced_count = aclSyncedCount>
+    <cfset session.user_folder_synced_count = userFolderSyncedCount>
     <cflocation url="view_shared_mailboxes.cfm" addtoken="no">
 
 </cfif>
