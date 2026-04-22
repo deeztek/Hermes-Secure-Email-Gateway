@@ -79,6 +79,89 @@ do NOT write here — enable/disable/edit is future tier work.
     ORDER BY type, job_name
 </cfquery>
 
+<!--- Converts Ofelia schedule strings into human-readable form.
+     Ofelia accepts either cron-style (6 fields: sec min hr dom mon dow)
+     or @every <duration>. Anything we can't cleanly humanize falls
+     through to the raw string. --->
+<cfscript>
+    function humanizeOfeliaSchedule(rawSched) {
+        var s = trim(rawSched);
+        if (s eq "") return "—";
+
+        // @every <duration>  -> "Every N <unit>"
+        if (reFindNoCase("^@every\s+", s)) {
+            var dur = trim(replaceNoCase(s, "@every", "", "one"));
+            var m = reFind("^(\d+)([smhd])$", dur, 1, true);
+            if (isStruct(m) and arrayLen(m.pos) gte 3 and m.pos[1] gt 0) {
+                var n = val(mid(dur, m.pos[2], m.len[2]));
+                var unit = mid(dur, m.pos[3], m.len[3]);
+                var unitName = "";
+                switch (unit) {
+                    case "s": unitName = (n eq 1) ? "second" : "seconds"; break;
+                    case "m": unitName = (n eq 1) ? "minute" : "minutes"; break;
+                    case "h": unitName = (n eq 1) ? "hour"   : "hours";   break;
+                    case "d": unitName = (n eq 1) ? "day"    : "days";    break;
+                }
+                if (n eq 1) return "Every " & unitName;
+                return "Every " & n & " " & unitName;
+            }
+            return "Every " & dur;
+        }
+
+        // 6-field cron: sec min hr dom mon dow
+        var fields = listToArray(reReplace(s, "\s+", " ", "ALL"), " ");
+        if (arrayLen(fields) eq 6) {
+            var secF = fields[1];
+            var minF = fields[2];
+            var hrF  = fields[3];
+            var domF = fields[4];
+            var monF = fields[5];
+            var dowF = fields[6];
+
+            var allStars = (domF eq "*" and monF eq "*");
+            var numericTime = (isNumeric(secF) and isNumeric(minF) and isNumeric(hrF));
+
+            if (allStars and dowF eq "*" and numericTime) {
+                return "Daily at " & numberFormat(val(hrF), "00") & ":" & numberFormat(val(minF), "00");
+            }
+
+            if (allStars and dowF neq "*" and numericTime) {
+                var dowNames = {
+                    "0": "Sunday", "1": "Monday", "2": "Tuesday",
+                    "3": "Wednesday", "4": "Thursday", "5": "Friday",
+                    "6": "Saturday"
+                };
+                if (structKeyExists(dowNames, dowF)) {
+                    return dowNames[dowF] & "s at " &
+                        numberFormat(val(hrF), "00") & ":" & numberFormat(val(minF), "00");
+                }
+            }
+
+            if (domF neq "*" and monF eq "*" and dowF eq "*" and
+                isNumeric(domF) and numericTime) {
+                return "Monthly on day " & domF & " at " &
+                    numberFormat(val(hrF), "00") & ":" & numberFormat(val(minF), "00");
+            }
+        }
+
+        // 5-field cron (no seconds): min hr dom mon dow
+        if (arrayLen(fields) eq 5) {
+            var minF5 = fields[1];
+            var hrF5  = fields[2];
+            var domF5 = fields[3];
+            var monF5 = fields[4];
+            var dowF5 = fields[5];
+            if (domF5 eq "*" and monF5 eq "*" and dowF5 eq "*"
+                and isNumeric(minF5) and isNumeric(hrF5)) {
+                return "Daily at " & numberFormat(val(hrF5), "00") & ":" & numberFormat(val(minF5), "00");
+            }
+        }
+
+        // Fallback to raw
+        return s;
+    }
+</cfscript>
+
 <cfquery name="getLastRuns" datasource="hermes">
     SELECT job_name, MAX(triggered_at) AS last_run_at
     FROM scheduled_job_runs
@@ -134,7 +217,9 @@ do NOT write here — enable/disable/edit is future tier work.
             <tr>
               <td><code>#HTMLEditFormat(displayName)#</code></td>
               <td><small>#HTMLEditFormat(type)#</small></td>
-              <td><code>#HTMLEditFormat(schedule)#</code></td>
+              <td>
+                <span title="Raw: #HTMLEditFormat(schedule)#">#HTMLEditFormat(humanizeOfeliaSchedule(schedule))#</span>
+              </td>
               <td>#HTMLEditFormat(container)#</td>
               <td><small style="word-break: break-all;"><code>#HTMLEditFormat(command)#</code></small></td>
               <td>
