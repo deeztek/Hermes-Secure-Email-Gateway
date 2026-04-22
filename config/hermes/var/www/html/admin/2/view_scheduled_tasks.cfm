@@ -169,7 +169,7 @@ do NOT write here — enable/disable/edit is future tier work.
               </td>
               <td>
                 <button type="button"
-                        class="btn btn-sm btn-primary run-now-btn"
+                        class="btn btn-sm btn-primary run-now-btn text-nowrap"
                         data-job-name="#HTMLEditFormat(job_name)#"
                         data-display-name="#HTMLEditFormat(displayName)#">
                   <i class="fas fa-play"></i> Run Now
