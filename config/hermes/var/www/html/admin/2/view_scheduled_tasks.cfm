@@ -156,9 +156,6 @@ do NOT write here — enable/disable/edit is future tier work.
                     </span>
                   </label>
                 </div>
-                <cfif Val(no_overlap) EQ 1>
-                  <span class="badge bg-info" title="Ofelia's no-overlap flag &mdash; a tick is skipped if the previous invocation is still running.">no-overlap</span>
-                </cfif>
               </td>
               <td>
                 <cfif StructKeyExists(lastRunMap, job_name)>
