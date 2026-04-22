@@ -52,10 +52,10 @@ and ends at the next `[...]` header or a blank line.
             job.name = mid(headerLine, nameMatch.pos[2], nameMatch.len[2]);
         }
 
-        // Header commented => block disabled
+        // Header commented => block disabled.
+        // Note: "##" in a cfscript string literal IS a single `#` char
+        // (CFML escapes `#` as `##` inside string context).
         if (left(trim(headerLine), 1) EQ "##") {
-            job.enabled = false;
-        } else if (left(trim(headerLine), 1) EQ "#") {
             job.enabled = false;
         }
 
@@ -65,9 +65,9 @@ and ends at the next `[...]` header or a blank line.
             var t = trim(line);
             if (t EQ "") continue;
 
-            // Strip leading # for key=value parsing
+            // Strip leading # (escaped as ##) for key=value parsing
             var unc = t;
-            while (left(unc, 1) EQ "#") {
+            while (left(unc, 1) EQ "##") {
                 unc = trim(mid(unc, 2, len(unc)));
             }
 
