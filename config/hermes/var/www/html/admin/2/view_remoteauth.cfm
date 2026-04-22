@@ -783,7 +783,7 @@ $(document).ready(function() {
         <h3 class="card-title"><i class="fas fa-exclamation-triangle"></i> Prerequisite: DNS Resolution for Internal AD/LDAP Hostnames</h3>
     </div>
     <div class="card-body">
-        <p>If your AD/LDAP server hostname is resolvable only <strong>inside your internal network</strong> (e.g., <code>homedc01.corp.example.com</code>, <code>dc01.internal</code>, or anything on a split-horizon/private DNS zone), Hermes will not be able to reach it out of the box. The <code>hermes_ldap</code> container resolves hostnames through Hermes&rsquo;s internal Unbound DNS resolver, which by default queries public recursive DNS — it will not know about your internal-only names and RemoteAuth bind operations will fail with <code>remoteauth_bind operations error</code>.</p>
+        <p>If your AD/LDAP server hostname is resolvable only <strong>inside your internal network</strong> (e.g., <code>homedc01.corp.example.com</code>, <code>dc01.internal</code>, or anything on a split-horizon/private DNS zone), Hermes will not be able to reach it out of the box. The <code>hermes_ldap</code> container resolves hostnames through Hermes&rsquo;s internal Unbound DNS resolver, which by default queries public recursive DNS &mdash; it will not know about your internal-only names and RemoteAuth bind operations will fail with <code>remoteauth_bind operations error</code>.</p>
         <p><strong>Fix before creating a mapping:</strong></p>
         <ol class="mb-3">
             <li>Go to <a href="view_dns_resolver.cfm">System &rarr; DNS Resolver</a>.</li>
