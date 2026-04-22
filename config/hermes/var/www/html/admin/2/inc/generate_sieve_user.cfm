@@ -136,7 +136,6 @@ Requires: sieveUsername variable to be set before including.
         <cfquery name="getInternalDomains" datasource="hermes">
             SELECT DISTINCT LCASE(domain) AS domain
             FROM domains
-            WHERE active = 1
             ORDER BY domain
         </cfquery>
         <cfloop query="getInternalDomains">
