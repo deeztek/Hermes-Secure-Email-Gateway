@@ -41,13 +41,17 @@ Guards:
     to disable everything.
 --->
 
-<cfcontent type="application/json" reset="true">
+<!--- Collect the final JSON response in a variable so stray output
+     from cfincluded generators (ofelia_generate_config.cfm +
+     restart_ofelia.cfm) doesn't pollute the response body. We reset
+     the output buffer just before emitting to guarantee the client
+     sees ONLY the JSON payload. --->
+<cfset responsePayload = "">
 
 <cfif NOT StructKeyExists(form, "job_name") OR Trim(form.job_name) EQ ""
    OR NOT StructKeyExists(form, "new_state") OR (Trim(form.new_state) NEQ "1" AND Trim(form.new_state) NEQ "2")>
-    <cfoutput>#SerializeJSON({"success": false, "error": "job_name and new_state ('1' or '2') are required"})#</cfoutput>
-    <cfabort>
-</cfif>
+    <cfset responsePayload = SerializeJSON({"success": false, "error": "job_name and new_state ('1' or '2') are required"})>
+<cfelse>
 
 <cfset targetJob = Trim(form.job_name)>
 <cfset newState = Trim(form.new_state)>
@@ -58,9 +62,8 @@ Guards:
 </cfquery>
 
 <cfif getJob.recordcount LT 1>
-    <cfoutput>#SerializeJSON({"success": false, "error": "Job not found: " & targetJob})#</cfoutput>
-    <cfabort>
-</cfif>
+    <cfset responsePayload = SerializeJSON({"success": false, "error": "Job not found: " & targetJob})>
+<cfelse>
 
 <cftry>
     <cfquery datasource="hermes">
@@ -70,15 +73,17 @@ Guards:
     </cfquery>
 
     <!--- Regenerate /etc/ofelia/config.ini from the table and restart
-         hermes_ofelia. The existing include handles both. --->
-    <cfinclude template="ofelia_generate_config.cfm">
+         hermes_ofelia. Swallow any output from the generator +
+         restart includes via cfsavecontent so the response body stays
+         pure JSON. --->
+    <cfsavecontent variable="_regenOutput">
+        <cfinclude template="ofelia_generate_config.cfm">
+    </cfsavecontent>
 
-    <cfoutput>#SerializeJSON({"success": true, "new_state": newState})#</cfoutput>
+    <cfset responsePayload = SerializeJSON({"success": true, "new_state": newState})>
 
 <cfcatch type="any">
-    <!--- Best-effort rollback of the active flag if the regen failed.
-         If this too fails, the DB and config.ini are out of sync;
-         the admin can re-toggle to resync. --->
+    <!--- Best-effort rollback of the active flag if the regen failed. --->
     <cfset rollbackState = (newState EQ "1") ? "2" : "1">
     <cftry>
         <cfquery datasource="hermes">
@@ -89,10 +94,17 @@ Guards:
     <cfcatch type="any"></cfcatch>
     </cftry>
 
-    <cfoutput>#SerializeJSON({
+    <cfset responsePayload = SerializeJSON({
         "success": false,
         "error": "Toggle saved but config regeneration failed: " & cfcatch.message,
         "detail": cfcatch.detail
-    })#</cfoutput>
+    })>
 </cfcatch>
 </cftry>
+
+</cfif>
+</cfif>
+
+<!--- Reset the output buffer RIGHT BEFORE emitting so any whitespace
+     or transient output from the cfincluded generator is discarded. --->
+<cfcontent type="application/json" reset="true"><cfoutput>#responsePayload#</cfoutput>
