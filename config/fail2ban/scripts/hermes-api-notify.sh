@@ -48,8 +48,18 @@ if [ -z "$HERMES_USERNAME" ] || [ -z "$HERMES_PASSWORD" ]; then
     exit 1
 fi
 
+# Resolve the MySQL/MariaDB client binary. Alpine ships both names in the
+# mariadb-client package on newer versions, but older images only have
+# mysql. If neither is present the image was built without mariadb-client
+# (see dockerfiles/fail2ban/Dockerfile) — rebuild required.
+MYSQL_BIN=$(command -v mariadb 2>/dev/null || command -v mysql 2>/dev/null)
+if [ -z "$MYSQL_BIN" ]; then
+    echo "[$DATE] ERROR: No mariadb/mysql client binary found in PATH. Rebuild the hermes-fail2ban image so mariadb-client is installed." >> /scripts/api-notify.log
+    exit 1
+fi
+
 # Get API token from database
-THETOKEN=$(mariadb -h $DB_IP -P 3306 -u $HERMES_USERNAME -p$HERMES_PASSWORD hermes -se "SELECT token FROM api_tokens WHERE name='Fail2ban' AND system='1' AND active='1'" 2>/dev/null)
+THETOKEN=$($MYSQL_BIN -h $DB_IP -P 3306 -u $HERMES_USERNAME -p$HERMES_PASSWORD hermes -se "SELECT token FROM api_tokens WHERE name='Fail2ban' AND system='1' AND active='1'" 2>/dev/null)
 
 echo "[$DATE] Token result: '${THETOKEN:0:8}...'" >> /scripts/api-notify.log
 
