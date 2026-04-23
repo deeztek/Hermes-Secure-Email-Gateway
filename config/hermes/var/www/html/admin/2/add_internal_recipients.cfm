@@ -636,10 +636,12 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
                 <h5><i class="icon fas fa-sitemap"></i> DN Pattern</h5>
                 <p>Recipients will be authenticated against the remote server using this DN pattern:</p>
                 <p><code id="dnPatternDisplay"></code></p>
-                <p class="mb-1"><small><strong>Placeholder resolution for each recipient:</strong><br>
-                <code>{username}</code> &rarr; local part of email (e.g. <em>jsmith</em>)<br>
-                <code>{email}</code> &rarr; full email (e.g. <em>jsmith@example.com</em>)<br>
-                <code>{firstname}</code> / <code>{lastname}</code> &rarr; First/Last Name from the CSV row (see below)</small></p>
+                <p class="mb-1"><small><strong>Placeholder resolution for each recipient:</strong></small></p>
+                <ul class="mb-1" id="dnPatternPlaceholderList">
+                  <li id="phUsername" style="display:none;"><small><code>{username}</code> &rarr; local part of email (e.g. <em>jsmith</em>)</small></li>
+                  <li id="phEmail" style="display:none;"><small><code>{email}</code> &rarr; full email (e.g. <em>jsmith@example.com</em>)</small></li>
+                  <li id="phFirstLast" style="display:none;"><small><code>{firstname}</code> / <code>{lastname}</code> &rarr; First/Last Name from the CSV row (see below)</small></li>
+                </ul>
                 <div id="csvFormatHelp" style="display:none;">
                   <hr>
                   <p class="mb-1"><strong>CSV Format required for this DN pattern.</strong> Paste one recipient per line as <code>First,Last,Email</code>. Common AD/LDAP exports are accepted as-is:</p>
@@ -996,11 +998,16 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
   // CSV (First,Last,Email) modes based on whether the currently-selected
   // RemoteAuth DN pattern references {firstname} or {lastname}.
   var PLAIN_PLACEHOLDER = 'Enter recipient e-mail address(es), one per line';
-  var CSV_PLACEHOLDER   = 'First,Last,Email — one recipient per line\nExample:\nJohn,Smith,john.smith@company.com\nJane,Doe,jane.doe@company.com\n\nPowerShell/CSVDE exports with headers also work:\n"GivenName","Surname","Mail"\n"John","Smith","john.smith@company.com"';
+  var CSV_PLACEHOLDER   = 'First,Last,Email - one recipient per line\nExample:\nJohn,Smith,john.smith@company.com\nJane,Doe,jane.doe@company.com\n\nPowerShell/CSVDE exports with headers also work:\n"GivenName","Surname","Mail"\n"John","Smith","john.smith@company.com"';
   function updateRecipientTextareaMode(pattern) {
-    var needsCsv = /\{firstname\}|\{lastname\}/i.test(pattern || '');
+    var p = pattern || '';
+    var needsCsv = /\{firstname\}|\{lastname\}/i.test(p);
     $('#recipientTextarea').attr('placeholder', needsCsv ? CSV_PLACEHOLDER : PLAIN_PLACEHOLDER);
     $('#csvFormatHelp').toggle(needsCsv);
+    // Show only the placeholder rows that the selected DN pattern actually uses
+    $('#phUsername').toggle(/\{username\}/i.test(p));
+    $('#phEmail').toggle(/\{email\}/i.test(p));
+    $('#phFirstLast').toggle(needsCsv);
   }
 
   // Update the Login Preview "Password" line based on auth type + domain
