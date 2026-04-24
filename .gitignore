@@ -167,6 +167,7 @@ config/hermes/opt/hermes/conf_files/local.cf.*
 # PLAN FILES (internal development only)
 # ===========================================
 .claude/plans/
+.claude/settings.local.json
 claude_conversation.md
 
 # Manifest generation scripts (internal workflow, not distributed)

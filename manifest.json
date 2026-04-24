@@ -1,6 +1,6 @@
 {
   "version": "260119",
-  "generated": "2026-04-15T12:42:39Z",
+  "generated": "2026-04-22T11:49:54Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -12,7 +12,7 @@
     "admin/2/inc/setsession.cfm": "ec9d81ac28d04f5f33f7cb43cc41fd251a3b72146cab788b152b7f5310e8b131",
     "admin/2/inc/add_serial_number.cfm": "ceedccaccb2dc940b18258d7da08202dfbe8d9a3a1f645bf547dd7af4c9c5d05",
     "admin/2/inc/manifest_verify.cfm": "38f4ea4a91a60ba0daf59afa89e213500a09cf599122dbc2a126d408aedeee42",
-    "admin/2/view_remoteauth.cfm": "4f600d6912caed4283e056935bc767e74405205a3ae9396e92f841ce447e3cce",
+    "admin/2/view_remoteauth.cfm": "8f2e4afbc357c76951db035793278a84c47083a74438d658d36f4b4ccf990111",
     "admin/2/edit_remoteauth_mapping.cfm": "54da48ee176e94fa2721788db370b480e0c07db5905af0dc2b7a0b1a525cb2a7",
     "admin/2/view_intrusion_prevention.cfm": "34bf01bae7ef6b8f58f530ad31ac5cf8c7a7ecac49809b8ae842f5b63302f98f",
     "admin/2/view_console_firewall.cfm": "23b8de82283ee91f730503f6fa4fb50ec41de30ec9a8f99d7cacbcd7eac4bf8b",
@@ -20,5 +20,5 @@
     "admin/2/view_antivirus_signature_feeds.cfm": "96382d593b0ac0793cec0dc9d8b1f00062d9634a9a676d66d53de25e6a608fa4",
     "admin/2/edit_antivirus_signature_feed.cfm": "4241126bad6fbac37899376527385ca8d5c3415681deb71d8d8b9643243c310b"
   },
-  "fingerprint": "489dea1bdfea0c2e66ab91828e929fc6f06d3d289ecf32f598a1039bff13bbec"
+  "fingerprint": "02d2ed372db54520756d358611aea99b88211a58a435d89b1270c390770a6e23"
 }
