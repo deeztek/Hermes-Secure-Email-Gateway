@@ -106,134 +106,117 @@ file = "/opt/hermes/tmp/#customtrans3#_updatefile"
 output = "#getlatestlocal.build##chr(64)##dev#" addnewline="no">
   
 
-  <cftry> 
+  <cfset opensslEncryptFailed = false>
+
+  <cftry>
 
   <cfexecute name = "/usr/bin/openssl"
     arguments="rsautl -encrypt -inkey /opt/hermes/ssl/public.pem -pubin -in /opt/hermes/tmp/#customtrans3#_updatefile -out /opt/hermes/tmp/#customtrans3#_updatefile.ssl"
     timeout = "60">
     </cfexecute>
-    
-    <cfcatch type="any">
- 
-        <cfset m="/inc/check_system_update.cfm: Error running /usr/bin/openssl">
-        <cfinclude template="error.cfm">
-        <cfabort>
 
+    <cfcatch type="any">
+
+        <cfset opensslEncryptFailed = true>
+        <cflog file="hermes_update_check" type="error"
+          text="check_system_update.cfm openssl rsautl failure: #cfcatch.message#">
 
     </cfcatch>
     </cftry>
 
 <!--- GENERATE/ENCRYPT UPDATEFILE WITH PUBLIC KEY ENDS HERE --->
 
+<!--- An error reaching the update server must NOT break the dashboard.
+     Any failure (DNS/TLS/HTTP) is treated as a degraded state: cache the
+     diagnostic message for operator visibility, log it, and let the page
+     continue to render with hermesupdate = "UPDATE CHECK UNAVAILABLE". --->
+<cfset updateCheckFailed = opensslEncryptFailed>
+
+<cfif opensslEncryptFailed>
+  <cffile action = "write"
+    file = "/opt/hermes/updates/check_system_update_http_status.txt"
+    output = "openssl rsautl encrypt failed (see hermes_update_check log)" addnewline="no">
+</cfif>
+
 <cftry>
 
-<!--- POST TO UPDATE SERVER STARTS HERE --->
+<!--- POST TO UPDATE SERVER STARTS HERE. Skip the POST entirely if the
+     encrypted request payload could not be produced. --->
+
+<cfif NOT opensslEncryptFailed>
 
 <CFHTTP METHOD="Post" URL="https://updates.deeztek.com/update_comm.cfm" timeout="60">
-      
+
   <CFHTTPPARAM TYPE="File"
           NAME="#customtrans3#_updatefile.ssl"
           FILE="/opt/hermes/tmp/#customtrans3#_updatefile.ssl">
-          
+
   <CFHTTPPARAM TYPE="Formfield"
           VALUE="#customtrans3#"
           NAME="customtrans">
-          
+
   </CFHTTP>
-  
+
+</cfif>
+
   <cfcatch type="any">
 
-    <cfif #cfcatch.message# contains "invalid call of the function listGetAt">
+    <cfset updateCheckFailed = true>
 
-<!--- WRITE UPDATE HTTP STATUS TO /opt/hermes/updates/check_system_update_http_status.txt --->
-<cffile action = "write"
-file = "/opt/hermes/updates/check_system_update_http_status.txt"
-output = "#trim(cfcatch.message)#" addnewline="no">
-    
-    <cfoutput>
-      <cfset m="/inc/check_system_update.cfm: Error reaching update server. Error was: #cfcatch.message#. Ensure updates.deeztek.com is accessible via ports 80 and 443 with no SSL interception.">
-    </cfoutput>
-      <cfinclude template="error.cfm">
-      <cfabort>
-    
-    <!-- /CFIF cfcatch.message -->
-    </cfif>
-    
-    
+    <cffile action = "write"
+      file = "/opt/hermes/updates/check_system_update_http_status.txt"
+      output = "#trim(cfcatch.message)#" addnewline="no">
+
+    <cflog file="hermes_update_check" type="error"
+      text="check_system_update.cfm CFHTTP exception: #cfcatch.message#">
+
     </cfcatch>
-    
-    
+
+
     </cftry>
 
 
 
       <!--- POST TO UPDATE SERVER ENDS HERE --->
-      
+
+<!--- Always clean up the encrypted request payload and its plaintext
+     sibling, regardless of outcome. --->
+<cfset updatefile="/opt/hermes/tmp/#customtrans3#_updatefile">
+<cfif fileExists(updatefile)>
+  <cffile action = "delete" file = "#updatefile#">
+</cfif>
+<cfset updatefile_ssl="/opt/hermes/tmp/#customtrans3#_updatefile.ssl">
+<cfif fileExists(updatefile_ssl)>
+  <cffile action = "delete" file = "#updatefile_ssl#">
+</cfif>
+
      <!--- PARSE HTTP STATUS CODE STARTS HERE --->
 
-      <cfif #cfhttp.status_code# EQ "200">
+<cfif updateCheckFailed>
 
-<!--- WRITE UPDATE HTTP STATUS TO /opt/hermes/updates/check_system_update_http_status.txt --->
-<cffile action = "write"
-file = "/opt/hermes/updates/check_system_update_http_status.txt"
-output = "#cfhttp.statuscode#" addnewline="no">
+  <!--- CFHTTP threw — status file was already written in the catch. --->
+  <cfset hermesupdate = "UPDATE CHECK UNAVAILABLE">
 
-      <!--- DELETE /opt/hermes/tmp/#form.customtrans#_updatefile --->
-       <cfset updatefile="/opt/hermes/tmp/#customtrans3#_updatefile">
-      <cfif fileExists(updatefile)>
-      
-      <cffile action = "delete" file = "#updatefile#">
-      
-      <!-- /CFIF fileExists(updatefile)> -->
-      </cfif>
-      
-      <!--- DELETE /opt/hermes/tmp/#form.customtrans#_updatefile.ssl --->
-      <cfset updatefile_ssl="/opt/hermes/tmp/#customtrans3#_updatefile.ssl">
-      <cfif fileExists(updatefile_ssl)>
-      
-      <cffile action = "delete" file = "#updatefile_ssl#">
-      
-      <!-- /CFIF fileExists(updatefile_ssl)> -->
-      </cfif>
+<cfelseif #cfhttp.status_code# EQ "200">
 
- 
-     <cfelse>
+  <cffile action = "write"
+    file = "/opt/hermes/updates/check_system_update_http_status.txt"
+    output = "#cfhttp.statuscode#" addnewline="no">
 
- <!--- DELETE /opt/hermes/tmp/#form.customtrans#_updatefile --->
- <cfset updatefile="/opt/hermes/tmp/#customtrans3#_updatefile">
- <cfif fileExists(updatefile)>
- 
- <cffile action = "delete" file = "#updatefile#">
- 
- <!-- /CFIF fileExists(updatefile)> -->
- </cfif>
- 
- <!--- DELETE /opt/hermes/tmp/#form.customtrans#_updatefile.ssl --->
- <cfset updatefile_ssl="/opt/hermes/tmp/#customtrans3#_updatefile.ssl">
- <cfif fileExists(updatefile_ssl)>
- 
- <cffile action = "delete" file = "#updatefile_ssl#">
- 
- <!-- /CFIF fileExists(updatefile_ssl)> -->
- </cfif>
-  
-<!--- WRITE UPDATE HTTP STATUS TO /opt/hermes/updates/check_system_update_http_status.txt --->
-<cffile action = "write"
-file = "/opt/hermes/updates/check_system_update_http_status.txt"
-output = "#cfhttp.statuscode#" addnewline="no">
+<cfelse>
 
-<cfoutput>
-  <cfset m="/inc/check_system_update.cfm: HTTP Status Code: #cfhttp.statuscode#">
-</cfoutput>
+  <cffile action = "write"
+    file = "/opt/hermes/updates/check_system_update_http_status.txt"
+    output = "#cfhttp.statuscode#" addnewline="no">
 
-  <cfinclude template="error.cfm">
+  <cflog file="hermes_update_check" type="error"
+    text="check_system_update.cfm non-200 from updates server: #cfhttp.statuscode#">
 
-  <cfabort>  
+  <cfset updateCheckFailed = true>
+  <cfset hermesupdate = "UPDATE CHECK UNAVAILABLE">
 
-
-
-      <!--- /CFIF #cfhttp.status_code# --->
-      </cfif>
+  <!--- /CFIF #cfhttp.status_code# --->
+  </cfif>
 
 
       
@@ -241,7 +224,12 @@ output = "#cfhttp.statuscode#" addnewline="no">
 <!--- PARSE HTTP STATUS CODE ENDS HERE --->
 
 
-        
+<!--- Only parse the server response body when we actually got a 200.
+     On any failure we've already set hermesupdate = "UPDATE CHECK
+     UNAVAILABLE" above and must not touch cfhttp.FileContent (which
+     may be empty or undefined). --->
+<cfif NOT updateCheckFailed>
+
 <!--- SET STATUS VARIABLE --->
 
 <cfset status = "#trim(ListGetAt(cfhttp.FileContent, 1, "#chr(64)#"))#">
@@ -351,6 +339,9 @@ output = "#status##chr(64)#" addnewline="no">
 
 <!--- /CFIF #status# --->
       </cfif>
+
+<!--- /CFIF NOT updateCheckFailed (response-body parse guard) --->
+</cfif>
 
 
     
