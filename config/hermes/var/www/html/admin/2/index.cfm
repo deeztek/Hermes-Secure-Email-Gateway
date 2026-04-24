@@ -65,6 +65,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
     <div class="content">
       <div class="container-fluid">
 
+        <!---
         <div class="alert alert-warning alert-dismissible">
           <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
              
@@ -72,6 +73,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
           <!--- /DIV class="alert alert-warning alert-dismissible" --->
           </div>
+        --->
       
 <!--- Database credential injection into config files is now handled by
      /opt/hermes/scripts/rotate_db_credentials.sh which is called by the
