@@ -716,7 +716,7 @@ a, a:hover{
             <div class="mb-3">
                 <label class="form-label"><strong>Postmaster E-mail Address</strong></label>
                 <cfoutput>
-                <input type="text" name="postmaster" class="postmaster form-control" id="postmaster" placeholder="Enter Postmaster E-mail Address" value="#get_postmaster.value#" autocomplete="off">
+                <input type="email" name="postmaster" class="postmaster form-control" id="postmaster" placeholder="Enter Postmaster E-mail Address" value="#get_postmaster.value#" autocomplete="off" required>
                 </cfoutput>
             </div>
 

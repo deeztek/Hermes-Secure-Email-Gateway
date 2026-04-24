@@ -28,41 +28,75 @@ cat /dev/null > ${WORK_DIR}/opendmarc.dat >> "$LOG_FILE" 2>&1
 /bin/chown -R opendmarc:opendmarc ${WORK_DIR}/ >> "$LOG_FILE" 2>&1
 
 ERR=$?
+
+# Guard: skip SMTP notification if POSTMASTER is not a valid email address.
+# Prevents queue pollution with undeliverable bare-local-part addresses.
+case "$POSTMASTER" in
+    *@*.*) POSTMASTER_VALID=1 ;;
+    *)     POSTMASTER_VALID=0 ;;
+esac
+
 if [ $ERR != 0 ]; then
     THEERROR=$(($THEERROR+$ERR))
 
-    # Send error notification via Perl Net::SMTP (sendemail not available in hermes_dmarc container)
-    perl -MNet::SMTP -e '
-        my $smtp = Net::SMTP->new("'"$SMTP_SERVER"':'"$SMTP_PORT"'", Timeout => 30) or exit 1;
-        $smtp->mail("'"$POSTMASTER"'");
-        $smtp->to("'"$POSTMASTER"'");
-        $smtp->data();
-        $smtp->datasend("From: '"$POSTMASTER"'\n");
-        $smtp->datasend("To: '"$POSTMASTER"'\n");
-        $smtp->datasend("Subject: [Hermes SEG] ['"$REPORT_ORG"'] DMARC Reports Error\n");
-        $smtp->datasend("\n");
-        $smtp->datasend("Hermes SEG DMARC Reports for ['"$REPORT_ORG"'] did not execute successfully. Error reported was '"$THEERROR"'.\n");
-        $smtp->dataend();
-        $smtp->quit();
-    ' 2>> "$LOG_FILE"
+    if [ "$POSTMASTER_VALID" = "1" ]; then
+        # Pass values via environment to avoid Perl's @array interpolation on
+        # email addresses (e.g. postmaster@deeztek.net would lose @deeztek).
+        POSTMASTER_ARG="$POSTMASTER" \
+        REPORT_ORG_ARG="$REPORT_ORG" \
+        SMTP_SERVER_ARG="$SMTP_SERVER" \
+        SMTP_PORT_ARG="$SMTP_PORT" \
+        THEERROR_ARG="$THEERROR" \
+        perl -MNet::SMTP -e '
+            my $pm   = $ENV{POSTMASTER_ARG};
+            my $org  = $ENV{REPORT_ORG_ARG};
+            my $host = $ENV{SMTP_SERVER_ARG};
+            my $port = $ENV{SMTP_PORT_ARG};
+            my $err  = $ENV{THEERROR_ARG};
+            my $smtp = Net::SMTP->new("$host:$port", Timeout => 30) or exit 1;
+            $smtp->mail($pm);
+            $smtp->to($pm);
+            $smtp->data();
+            $smtp->datasend("From: $pm\n");
+            $smtp->datasend("To: $pm\n");
+            $smtp->datasend("Subject: [Hermes SEG] [$org] DMARC Reports Error\n");
+            $smtp->datasend("\n");
+            $smtp->datasend("Hermes SEG DMARC Reports for [$org] did not execute successfully. Error reported was $err.\n");
+            $smtp->dataend();
+            $smtp->quit();
+        ' 2>> "$LOG_FILE"
+    else
+        echo "WARNING: POSTMASTER ($POSTMASTER) is not a valid email address; skipping error notification." >> "$LOG_FILE"
+    fi
 
     /bin/rm -f "$LOG_FILE"
     exit 1
 else
-    # Send success notification via Perl Net::SMTP
-    perl -MNet::SMTP -e '
-        my $smtp = Net::SMTP->new("'"$SMTP_SERVER"':'"$SMTP_PORT"'", Timeout => 30) or exit 0;
-        $smtp->mail("'"$POSTMASTER"'");
-        $smtp->to("'"$POSTMASTER"'");
-        $smtp->data();
-        $smtp->datasend("From: '"$POSTMASTER"'\n");
-        $smtp->datasend("To: '"$POSTMASTER"'\n");
-        $smtp->datasend("Subject: [Hermes SEG] ['"$REPORT_ORG"'] DMARC Reports Success\n");
-        $smtp->datasend("\n");
-        $smtp->datasend("Hermes SEG DMARC Reports for ['"$REPORT_ORG"'] executed successfully.\n");
-        $smtp->dataend();
-        $smtp->quit();
-    ' 2>> "$LOG_FILE"
+    if [ "$POSTMASTER_VALID" = "1" ]; then
+        POSTMASTER_ARG="$POSTMASTER" \
+        REPORT_ORG_ARG="$REPORT_ORG" \
+        SMTP_SERVER_ARG="$SMTP_SERVER" \
+        SMTP_PORT_ARG="$SMTP_PORT" \
+        perl -MNet::SMTP -e '
+            my $pm   = $ENV{POSTMASTER_ARG};
+            my $org  = $ENV{REPORT_ORG_ARG};
+            my $host = $ENV{SMTP_SERVER_ARG};
+            my $port = $ENV{SMTP_PORT_ARG};
+            my $smtp = Net::SMTP->new("$host:$port", Timeout => 30) or exit 0;
+            $smtp->mail($pm);
+            $smtp->to($pm);
+            $smtp->data();
+            $smtp->datasend("From: $pm\n");
+            $smtp->datasend("To: $pm\n");
+            $smtp->datasend("Subject: [Hermes SEG] [$org] DMARC Reports Success\n");
+            $smtp->datasend("\n");
+            $smtp->datasend("Hermes SEG DMARC Reports for [$org] executed successfully.\n");
+            $smtp->dataend();
+            $smtp->quit();
+        ' 2>> "$LOG_FILE"
+    else
+        echo "WARNING: POSTMASTER ($POSTMASTER) is not a valid email address; skipping success notification." >> "$LOG_FILE"
+    fi
 fi
 
 /bin/rm -f "$LOG_FILE"
