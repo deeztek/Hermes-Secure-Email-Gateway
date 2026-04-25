@@ -90,6 +90,35 @@ generate_password() {
     openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32
 }
 
+# Test whether (user, password) authenticates against MariaDB.
+# Returns 0 on success, non-zero on failure. Uses SELECT 1 — read-only.
+test_auth() {
+    local user="$1" pass="$2"
+    docker exec hermes_db_server mysql -u "$user" -p"$pass" -e "SELECT 1" >/dev/null 2>&1
+}
+
+# Restore a single user to its old password, both in the DB and in the creds
+# file. Called when a post-rotation auth test fails. Config-file backups
+# (.bak.YYYYMMDD) are left in place — operator must restore those manually
+# since the .bak names alone don't tell us which were touched in this run.
+rollback_user() {
+    local user="$1" old_pass="$2" creds_file="$3"
+    log_warn "  Rolling back ${user} to old password..."
+    if docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
+        "ALTER USER '${user}'@'%' IDENTIFIED BY '${old_pass}'; FLUSH PRIVILEGES;" 2>/dev/null; then
+        log_info "  ALTER USER rolled back for ${user}"
+    else
+        log_error "  ALTER USER rollback FAILED for ${user} — manual intervention required"
+    fi
+    if [[ -n "$creds_file" ]] && [[ -f "$creds_file" ]]; then
+        echo -n "$old_pass" > "$creds_file"
+        chmod 600 "$creds_file"
+        log_info "  Restored ${creds_file} to old password"
+    fi
+    log_warn "  Config file changes (.bak.* siblings on disk) were NOT auto-restored."
+    log_warn "  Run 'find ${HERMES_ROOT}/config -name \"*.bak.$(date +%Y%m%d)\"' to see them."
+}
+
 check_prerequisites() {
     # Check we're in the right directory
     if [[ ! -f "${HERMES_ROOT}/docker-compose.yml" ]]; then
@@ -346,6 +375,56 @@ if [[ "$DRY_RUN" == false ]]; then
 fi
 echo ""
 
+# ============================================================================
+# PRE-FLIGHT AUTH TESTS
+# ============================================================================
+# Verify the script CAN do its job before it tries to:
+#   1. Root password works (otherwise we can't ALTER USER)
+#   2. Each current service password works (otherwise system state is already
+#      inconsistent — config files vs DB don't match — and rotating would
+#      paper over that). Bail BEFORE touching any file.
+
+log_info "Running pre-flight auth tests..."
+
+if ! test_auth root "${MYSQL_ROOT_PASS}"; then
+    log_error "Pre-flight: root authentication FAILED"
+    log_error "Cannot proceed without working root credentials"
+    log_error "Verify ${CREDS_DIR}/mysql_root_password is correct"
+    exit 1
+fi
+log_info "  ✓ root authentication OK"
+
+if [[ "$ROTATE_HERMES" == true ]]; then
+    if ! test_auth "${NEW_HERMES_USER}" "${OLD_HERMES_PASS}"; then
+        log_error "Pre-flight: current hermes password does not authenticate"
+        log_error "System state is inconsistent (creds file vs DB don't match)"
+        log_error "Aborting before any changes are made."
+        exit 1
+    fi
+    log_info "  ✓ Current hermes credentials OK"
+fi
+
+if [[ "$ROTATE_CIPHERMAIL" == true ]]; then
+    if ! test_auth "${NEW_CIPHERMAIL_USER}" "${OLD_CIPHERMAIL_PASS}"; then
+        log_error "Pre-flight: current ciphermail password does not authenticate"
+        log_error "System state is inconsistent. Aborting."
+        exit 1
+    fi
+    log_info "  ✓ Current ciphermail credentials OK"
+fi
+
+if [[ "$ROTATE_SYSLOG" == true ]]; then
+    if ! test_auth "${NEW_SYSLOG_USER}" "${OLD_SYSLOG_PASS}"; then
+        log_error "Pre-flight: current syslog password does not authenticate"
+        log_error "System state is inconsistent. Aborting."
+        exit 1
+    fi
+    log_info "  ✓ Current syslog credentials OK"
+fi
+
+log_info "Pre-flight checks passed."
+echo ""
+
 # Calculate total steps based on what's selected
 TOTAL_STEPS=1  # Always have restart step
 [[ "$ROTATE_HERMES" == true ]] && TOTAL_STEPS=$((TOTAL_STEPS + 3))    # Postfix + Amavis + Dovecot
@@ -479,12 +558,22 @@ if [[ "$ROTATE_HERMES" == true ]]; then
     if [[ "$DRY_RUN" == true ]]; then
         echo "  Would update: ${CREDS_DIR}/hermes_password"
         echo "  Would run: ALTER USER '${NEW_HERMES_USER}'@'%' IDENTIFIED BY '***'"
+        echo "  Would verify new password authenticates"
     else
         echo -n "$NEW_HERMES_PASS" > "${CREDS_DIR}/hermes_password"
         chmod 600 "${CREDS_DIR}/hermes_password"
         docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
             "ALTER USER '${NEW_HERMES_USER}'@'%' IDENTIFIED BY '${NEW_HERMES_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
-        log_info "  MariaDB password rotated for user: ${NEW_HERMES_USER}"
+        # Post-rotation auth test — verify the new password actually works.
+        # Catches: silent ALTER USER no-op (host pattern mismatch), grant
+        # propagation lag, anything else that would only surface as
+        # post-restart auth failures.
+        if ! test_auth "${NEW_HERMES_USER}" "${NEW_HERMES_PASS}"; then
+            log_error "  Post-rotation auth test FAILED for ${NEW_HERMES_USER}"
+            rollback_user "${NEW_HERMES_USER}" "${OLD_HERMES_PASS}" "${CREDS_DIR}/hermes_password"
+            exit 1
+        fi
+        log_info "  ✓ MariaDB password rotated and verified for user: ${NEW_HERMES_USER}"
     fi
 fi
 
@@ -492,12 +581,18 @@ if [[ "$ROTATE_CIPHERMAIL" == true ]]; then
     if [[ "$DRY_RUN" == true ]]; then
         echo "  Would update: ${CREDS_DIR}/ciphermail_password"
         echo "  Would run: ALTER USER '${NEW_CIPHERMAIL_USER}'@'%' IDENTIFIED BY '***'"
+        echo "  Would verify new password authenticates"
     else
         echo -n "$NEW_CIPHERMAIL_PASS" > "${CREDS_DIR}/ciphermail_password"
         chmod 600 "${CREDS_DIR}/ciphermail_password"
         docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
             "ALTER USER '${NEW_CIPHERMAIL_USER}'@'%' IDENTIFIED BY '${NEW_CIPHERMAIL_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
-        log_info "  MariaDB password rotated for user: ${NEW_CIPHERMAIL_USER}"
+        if ! test_auth "${NEW_CIPHERMAIL_USER}" "${NEW_CIPHERMAIL_PASS}"; then
+            log_error "  Post-rotation auth test FAILED for ${NEW_CIPHERMAIL_USER}"
+            rollback_user "${NEW_CIPHERMAIL_USER}" "${OLD_CIPHERMAIL_PASS}" "${CREDS_DIR}/ciphermail_password"
+            exit 1
+        fi
+        log_info "  ✓ MariaDB password rotated and verified for user: ${NEW_CIPHERMAIL_USER}"
     fi
 fi
 
@@ -505,12 +600,18 @@ if [[ "$ROTATE_SYSLOG" == true ]]; then
     if [[ "$DRY_RUN" == true ]]; then
         echo "  Would update: ${CREDS_DIR}/syslog_password"
         echo "  Would run: ALTER USER '${NEW_SYSLOG_USER}'@'%' IDENTIFIED BY '***'"
+        echo "  Would verify new password authenticates"
     else
         echo -n "$NEW_SYSLOG_PASS" > "${CREDS_DIR}/syslog_password"
         chmod 600 "${CREDS_DIR}/syslog_password"
         docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
             "ALTER USER '${NEW_SYSLOG_USER}'@'%' IDENTIFIED BY '${NEW_SYSLOG_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
-        log_info "  MariaDB password rotated for user: ${NEW_SYSLOG_USER}"
+        if ! test_auth "${NEW_SYSLOG_USER}" "${NEW_SYSLOG_PASS}"; then
+            log_error "  Post-rotation auth test FAILED for ${NEW_SYSLOG_USER}"
+            rollback_user "${NEW_SYSLOG_USER}" "${OLD_SYSLOG_PASS}" "${CREDS_DIR}/syslog_password"
+            exit 1
+        fi
+        log_info "  ✓ MariaDB password rotated and verified for user: ${NEW_SYSLOG_USER}"
     fi
 fi
 
