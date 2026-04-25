@@ -56,7 +56,11 @@ if [[ -z "${HERMES_ROOT:-}" ]]; then
     fi
 fi
 
-CREDS_DIR="/opt/hermes/creds"
+# NOTE: /opt/hermes/creds is the path INSIDE the commandbox container
+# (bind-mounted from the host). This script runs ON the host, so we must
+# use the host path rooted at HERMES_ROOT, the same way install_hermes_docker.sh
+# does at scripts/install_hermes_docker.sh:39.
+CREDS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/creds"
 CONF_FILES="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files"
 
 # Host-side config paths (volume mounts)
