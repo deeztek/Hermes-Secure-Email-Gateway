@@ -39,9 +39,22 @@ set -euo pipefail
 # CONFIGURATION
 # ============================================================================
 
-# Detect Hermes root (parent of scripts/)
+# Self-locate Hermes root by walking up from script location until we
+# find docker-compose.yml. Robust to install path AND to wherever this
+# script lives in the repo tree (currently config/hermes/opt/hermes/scripts/,
+# 5 levels deep). Allow HERMES_ROOT env var to override for unusual setups.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HERMES_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [[ -z "${HERMES_ROOT:-}" ]]; then
+    HERMES_ROOT="$SCRIPT_DIR"
+    while [[ "$HERMES_ROOT" != "/" ]] && [[ ! -f "$HERMES_ROOT/docker-compose.yml" ]]; do
+        HERMES_ROOT="$(dirname "$HERMES_ROOT")"
+    done
+    if [[ "$HERMES_ROOT" == "/" ]]; then
+        echo "ERROR: Could not locate docker-compose.yml in any parent of $SCRIPT_DIR" >&2
+        echo "Set HERMES_ROOT environment variable manually and retry." >&2
+        exit 1
+    fi
+fi
 
 CREDS_DIR="/opt/hermes/creds"
 CONF_FILES="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files"
