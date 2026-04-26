@@ -180,7 +180,7 @@ Implementation notes:
             <key>IncomingPassword</key>
             <string>#xImapPass#</string>
 
-            <!-- Outgoing (SMTP, port 465, implicit TLS via #210) -->
+            <!-- Outgoing (SMTP, port 465, implicit TLS via ##210) -->
             <key>OutgoingMailServerHostName</key>
             <string>#xMailHost#</string>
             <key>OutgoingMailServerPortNumber</key>

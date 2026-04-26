@@ -48,7 +48,7 @@ Optional: display (defaults to email), inline=1 (display XML in browser instead 
 Example:
   ?email=bob@deeztek.com&display=Bob+Smith&imap=secret&dav=secret&host=mail.deeztek.com
 
-Phase 1 of #224. Hand-invoke for DEV testing only.</cfoutput>
+Phase 1 of ##224. Hand-invoke for DEV testing only.</cfoutput>
     <cfabort>
 </cfif>
 
