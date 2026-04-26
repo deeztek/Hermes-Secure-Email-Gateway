@@ -1895,3 +1895,20 @@ CREATE TABLE IF NOT EXISTS scheduled_job_runs (
     output_summary TEXT NULL,
     KEY idx_job_name_triggered (job_name, triggered_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- One-time download tokens for the mobile device setup wizard (#224).
+-- Wizard generates the signed mobileconfig, stores it in payload_blob,
+-- emits a token. QR-encoded URL hits /users/2/get_mobileconfig.cfm?token=<t>,
+-- endpoint validates token (exists + unused + not expired), serves the
+-- payload, marks used_at. Ofelia job purges expired/used rows daily.
+CREATE TABLE IF NOT EXISTS mobile_setup_tokens (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    token VARCHAR(64) NOT NULL,
+    user_email VARCHAR(255) NOT NULL,
+    payload_blob LONGBLOB NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,
+    used_at DATETIME NULL,
+    UNIQUE KEY uq_mst_token (token),
+    KEY idx_mst_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
