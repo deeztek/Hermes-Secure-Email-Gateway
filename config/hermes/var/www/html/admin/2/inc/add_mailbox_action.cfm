@@ -436,18 +436,31 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4c. NEXTCLOUD PRE-PROVISION USER. Create a local NC user with the same
-     password as the mailbox. DAV auth (CalDAV/CardDAV) works with the
-     email password directly — no app passwords needed. When the user
-     logs in via OIDC, user_oidc takes over the existing account
-     (soft_auto_provision=true). --->
+<!--- 4c. NEXTCLOUD PRE-PROVISION USER. Create a local NC user with a
+     RANDOM local password that nobody knows (#197 Phase 1).
+     Previously this was set to the org password, which created a silent
+     back-channel: NC's DAV endpoint would have accepted the org password
+     for CalDAV/CardDAV, defeating the point of app passwords. Setting it
+     random eliminates that. The local NC password isn't used for anything
+     a user holds — they reach NC via OIDC (Authelia), and DAV/IMAP go
+     through their app passwords. The "Rotate NC Internal Password" admin
+     action regenerates this value as defense-in-depth.
+     See docs/admin/authentication/01-credential-model.md. --->
 <cfif form.nextcloud_enabled EQ "1">
     <cftry>
         <cfset ncProvisionAction = "create">
         <cfset ncProvisionUser = recipientEmail>
         <cfset ncProvisionDisplayName = displayName>
         <cfset ncProvisionEmail = recipientEmail>
-        <cfset ncProvisionPassword = trim(form.password)>
+
+        <!--- Generate a 30-char random NC local password (never disclosed,
+             never reused). --->
+        <cfset _ncLocalAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789">
+        <cfset _ncLocalAlphabetLen = Len(_ncLocalAlphabet)>
+        <cfset ncProvisionPassword = "">
+        <cfloop from="1" to="30" index="_ncLocalIdx">
+            <cfset ncProvisionPassword &= Mid(_ncLocalAlphabet, RandRange(1, _ncLocalAlphabetLen, "SHA1PRNG"), 1)>
+        </cfloop>
         <!--- Branch on auth type: local uses occ user:add (password required
              for DAV), remote uses user_oidc REST API pre-provisioning (no
              local password — user is OIDC-backed, DAV not available). --->
@@ -483,20 +496,90 @@ Requires form variables:
     </cftry>
 </cfif>
 
+<!--- 4d-bis. PRE-CREATE DEFAULT NC DAV RESOURCES. Nextcloud creates the
+     default "Personal" calendar and "Contacts" address book lazily on
+     the user's first NC web login — they don't exist at user-add time.
+     Creating them eagerly here means TB autoconfig + RFC 6764 SRV
+     discovery sees both on day 1, so users don't have to log into NC
+     before setting up Thunderbird (otherwise TB shows only NC's
+     system-shared books and no calendar). Non-fatal: if either fails,
+     NC will still create them lazily on first web login. --->
+<cfif form.nextcloud_enabled EQ "1">
+    <cftry>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ dav:create-calendar #recipientEmail# personal"
+            timeout="30" />
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ dav:create-addressbook #recipientEmail# contacts"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Non-fatal --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- 4e. (App password removed — DAV auth uses the local NC password
      created in step 4c via occ user:add. No separate app password needed.) --->
+
+<!--- 4h. INITIAL SETUP APP PASSWORD ("Hermes System" #197 Phase 1).
+     IMAP/SMTP auth now goes through Dovecot's lua passdb against the
+     app_passwords table — the org password no longer works for mail
+     clients. Mint a system app password here so the welcome email can
+     hand it to the user; they can revoke it once they've configured
+     their devices with their own per-device app passwords.
+     Applies to both local- and remote-auth mailboxes (both need a
+     Dovecot-readable credential to authenticate IMAP/SMTP). --->
+<cfset initialAppPasswordPlain = "">
+<cftry>
+    <cfset _appPwAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789">
+    <cfset _appPwLen = Len(_appPwAlphabet)>
+    <cfset initialAppPasswordPlain = "">
+    <cfloop from="1" to="30" index="_appPwIdx">
+        <cfset initialAppPasswordPlain &= Mid(_appPwAlphabet, RandRange(1, _appPwLen, "SHA1PRNG"), 1)>
+    </cfloop>
+
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_dovecot doveadm pw -s ARGON2ID -p #initialAppPasswordPlain#"
+        variable="initialAppPasswordHash"
+        timeout="60" />
+    <cfset initialAppPasswordHash = Trim(initialAppPasswordHash)>
+
+    <cfif initialAppPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", initialAppPasswordHash)>
+        <cfthrow message="doveadm pw returned unexpected output: #initialAppPasswordHash#">
+    </cfif>
+
+    <cfquery datasource="hermes">
+        INSERT INTO app_passwords (username, label, password, is_system)
+        VALUES (
+            <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+            <cfqueryparam value="Hermes System" cfsqltype="cf_sql_varchar">,
+            <cfqueryparam value="#initialAppPasswordHash#" cfsqltype="cf_sql_varchar">,
+            <cfqueryparam value="1" cfsqltype="cf_sql_tinyint">
+        )
+    </cfquery>
+<cfcatch type="any">
+    <!--- Non-fatal: mailbox creation succeeds even if app pw mint fails.
+         Admin can mint manually from the per-mailbox app password page.
+         Empty plain text disables NC Mail provisioning below. --->
+    <cfset initialAppPasswordPlain = "">
+</cfcatch>
+</cftry>
 
 <!--- 4f. NEXTCLOUD MAIL ACCOUNT. Create an email account in the Nextcloud
      Mail app so the user can send/receive through webmail. Uses Docker
      internal networking (IMAP: hermes_dovecot:143, SMTP:
-     hermes_postfix_dkim:25, no TLS - traffic stays on Docker network). --->
-<cfif form.nextcloud_enabled EQ "1" AND trim(form.password) NEQ "">
+     hermes_postfix_dkim:25, no TLS - traffic stays on Docker network).
+     Password is the "Hermes System" app password minted in step 4h —
+     NOT the org password (which Dovecot's lua passdb no longer accepts).
+     Applies to both local- and remote-auth (drops the form.password
+     check so remote-auth users now also get NC Mail provisioned). --->
+<cfif form.nextcloud_enabled EQ "1" AND initialAppPasswordPlain NEQ "">
     <cftry>
         <cfset ncMailAction = "create">
         <cfset ncMailUser = recipientEmail>
         <cfset ncMailName = displayName>
         <cfset ncMailEmail = recipientEmail>
-        <cfset ncMailPassword = trim(form.password)>
+        <cfset ncMailPassword = initialAppPasswordPlain>
         <cfinclude template="nextcloud_mail_account.cfm">
     <cfcatch type="any">
         <!--- Non-fatal: mailbox works without webmail profile.

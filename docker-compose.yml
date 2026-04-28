@@ -786,14 +786,6 @@ volumes:
       device: /mnt/data/commandbox/serverhome
 
 
-  openldap_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/data/openldap
-
- 
   ldap_data:
     driver: local
     driver_opts:

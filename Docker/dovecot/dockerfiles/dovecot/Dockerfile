@@ -31,6 +31,8 @@ RUN apt-get update && \
         dovecot-sieve \
         dovecot-ldap \
         dovecot-mysql \
+        dovecot-lua \
+        lua-sql-mysql \
         default-mysql-client \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*

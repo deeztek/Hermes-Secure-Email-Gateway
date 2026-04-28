@@ -358,6 +358,50 @@ Called from: email_server_settings_action.cfm (after saving form values)
 </cfcatch>
 </cftry>
 
+<!--- ===== LUA PASSDB SCRIPT (auth_app_passwords.lua, #197) ===========
+     The Dovecot Lua passdb script needs the same DB credentials as
+     dovecot.conf. Render its template the same way: substitute creds,
+     write to temp, dos2unix, copy into /etc/dovecot/. See
+     docs/admin/authentication/01-credential-model.md for design. --->
+
+<cffile action="read" file="/opt/hermes/templates/auth_app_passwords.lua" variable="luaConf" charset="utf-8">
+
+<cfset luaConf = REReplace(luaConf, "hermes_db_username", dbUsername, "ALL")>
+<cfset luaConf = REReplace(luaConf, "hermes_db_password", dbPassword, "ALL")>
+
+<cfscript>
+    fileWrite("/opt/hermes/tmp/" & customtrans3 & "_auth_app_passwords.lua", luaConf, "utf-8");
+</cfscript>
+
+<cftry>
+    <cfexecute name="/usr/bin/dos2unix"
+        arguments="/opt/hermes/tmp/#customtrans3#_auth_app_passwords.lua"
+        timeout="60" />
+<cfcatch type="any">
+    <cfset m="generate_dovecot_configuration.cfm: Error running dos2unix on Lua temp file">
+    <cfinclude template="error.cfm">
+    <cfabort>
+</cfcatch>
+</cftry>
+
+<cftry>
+    <cffile action="copy"
+        source="/opt/hermes/tmp/#customtrans3#_auth_app_passwords.lua"
+        destination="/etc/dovecot/auth_app_passwords.lua">
+<cfcatch type="any">
+    <cfset m="generate_dovecot_configuration.cfm: Error copying Lua script to /etc/dovecot/auth_app_passwords.lua">
+    <cfinclude template="error.cfm">
+    <cfabort>
+</cfcatch>
+</cftry>
+
+<cftry>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_auth_app_passwords.lua">
+<cfcatch type="any">
+    <!--- Non-fatal --->
+</cfcatch>
+</cftry>
+
 <!--- RELOAD DOVECOT to pick up new config --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"

@@ -241,6 +241,15 @@ Removes a mailbox user from all systems:
     WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
+<!--- 4h. DELETE APP PASSWORDS (#197 Phase 1).
+     Hard-delete all rows (active + revoked) so a re-created mailbox at
+     the same email cannot silently inherit any prior credentials. NC's
+     oc_authtoken side is wiped by `occ user:delete` in step 4d. --->
+<cfquery datasource="hermes">
+    DELETE FROM app_passwords
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
 <!--- 5. DELETE USER SIEVE RULES + ON-DISK SCRIPT FILES.
      ON DELETE CASCADE on sieve_rule_conditions/sieve_rule_actions handles
      the child rows automatically when the parent sieve_rules row is deleted. --->

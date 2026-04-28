@@ -33,14 +33,15 @@ email client settings, user portal URL, webmail URL, help contact.
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
 - recipientName: The recipient's display name (optional, defaults to email)
-- recipientAppPassword: "Hermes System" NC app password for DAV clients
-                       (optional — if set, a DAV credentials block is
-                       added to the email). This is the only chance to
-                       deliver the token, since NC won't show it again.
+
+After #197 Phase 1, this email no longer carries any credential.
+The "Hermes System" app password is internal plumbing for NC Mail and
+is never disclosed. Users generate their own per-device app passwords
+from the user portal on demand. The web login uses their organization
+(AD/LDAP) password, communicated by the admin out-of-band.
 --->
 
 <cfparam name="recipientName" default="#recipientEmail#">
-<cfparam name="recipientAppPassword" default="">
 
 <!--- GET POSTMASTER EMAIL FOR FROM ADDRESS --->
 <cfquery name="getPostmaster" datasource="hermes">
@@ -73,28 +74,43 @@ Requires the following variables to be set before including:
     <p style="margin: 0;">Your mailbox uses your <strong>organization (AD/LDAP) password</strong> for authentication. Your administrator will provide your login username separately. If you need help, contact them directly.</p>
 </div>
 
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##805500;">Setting Up Email on Your Phone or Computer</h3>
+    <p style="margin: 0 0 10px 0;">Your organization (AD/LDAP) password works for the website only. For your email apps (phone, tablet, Thunderbird, Outlook, Apple Mail, etc.), you need an <strong>app password</strong>.</p>
+    <ol style="margin: 0 0 10px 18px; padding: 0;">
+        <li style="margin: 4px 0;">Sign in to the user portal: <a href="#loginUrl#">#loginUrl#</a></li>
+        <li style="margin: 4px 0;">Click <strong>My App Passwords</strong> in the sidebar</li>
+        <li style="margin: 4px 0;">Click <strong>Create App Password</strong>, label it for the device (&ldquo;iPhone&rdquo;, &ldquo;Thunderbird&rdquo;, etc.)</li>
+        <li style="margin: 4px 0;">Copy the password it shows you (it's shown only once)</li>
+        <li style="margin: 4px 0;">Paste it into your email app along with your full email address</li>
+    </ol>
+    <p style="margin: 0; font-size: 13px; color: ##555;">It's recommended that each app password be device-specific, so if a device is lost or stolen you can revoke just that one without affecting any of your other devices or your website login.</p>
+</div>
+
 <div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##004085;">Email Client Settings</h3>
     <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
     <table style="text-align: left; width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 993 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 993 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
         <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Password:</strong></td><td style="padding: 4px 8px;"><em>An app password from the user portal (above)</em></td></tr>
     </table>
 </div>
 
-<cfif Len(Trim(recipientAppPassword)) GT 0>
-<div style="background-color: ##fff0f0; border: 1px solid ##f5a8a8; padding: 20px; margin: 20px 0; border-radius: 5px;">
-    <h3 style="margin-top: 0; color: ##842029;">Calendar &amp; Contacts Sync Password (DAV)</h3>
-    <p>If you plan to sync your <strong>calendar, contacts, or files</strong> from Hermes to a desktop or mobile app (Thunderbird/Lightning, Apple Calendar, Apple Contacts, iOS Accounts, DAVx5 on Android, etc.), use the app-specific password below. It is NOT used for email (IMAP/SMTP) or for logging in to the website &mdash; those use your organization password.</p>
-    <table style="text-align: left; width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail#</td></tr>
-        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>App Password:</strong></td><td style="padding: 4px 8px; font-family: monospace; word-break: break-all; background: ##fff; padding: 6px 8px; border: 1px dashed ##f5a8a8;">#recipientAppPassword#</td></tr>
-        <tr><td style="padding: 4px 8px; vertical-align: top;"><strong>Server URL:</strong></td><td style="padding: 4px 8px; font-family: monospace; word-break: break-all;">#davUrl#</td></tr>
-    </table>
-    <p style="margin-bottom: 0; margin-top: 12px; font-size: 13px; color: ##842029;"><strong>Please save this password somewhere safe.</strong> Hermes will not display it again. If you lose it, ask your administrator to reset your DAV password, or generate a new one yourself from Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions. You can safely delete this welcome email once your sync clients are configured.</p>
+<!--- (Pre-#197 there was a separate DAV password section here, sourced
+     from an NC oc_authtoken minted at provisioning. After #197 Phase 1
+     the credential story is consolidated: a single user-generated app
+     password covers IMAP/SMTP, and after Phase 1b mirrors to oc_authtoken
+     it will also cover CalDAV/CardDAV. Until 1b ships, DAV setup for
+     remote-auth users still goes through Webmail &rarr; Personal Settings
+     &rarr; Security &rarr; Devices & sessions for an NC-side app
+     password. The "Setting Up Email" section above already directs
+     users to the right place for IMAP/SMTP. --->
+
+<div style="background-color: ##eef9f0; border: 1px solid ##b7e0c2; padding: 15px; margin: 20px 0; border-radius: 5px;">
+    <p style="margin: 0; font-size: 13px;"><strong>Calendar / Contacts on devices:</strong> until full Calendar/Contacts (DAV) integration ships, configure those clients (DAVx5 on Android, Apple Calendar/Contacts on iOS, Thunderbird Lightning, etc.) with an app password generated from inside Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions. Server URL: <code>#davUrl#</code></p>
 </div>
-</cfif>
 
 <div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##495057;">User Portal &amp; Webmail</h3>

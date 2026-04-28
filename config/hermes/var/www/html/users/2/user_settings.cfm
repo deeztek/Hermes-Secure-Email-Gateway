@@ -573,9 +573,9 @@ $(document).ready(function() {
             </div>
             <div class="card-body">
                 <cfif session.theGroups CONTAINS "mailboxes">
-                <div class="alert alert-warning">
-                    <p class="mb-2"><i class="icon fas fa-exclamation-triangle"></i><strong>Important:</strong> Two-Factor Authentication only protects web-based logins (User Console and Webmail). It does <strong>not</strong> protect email client connections.</p>
-                    <p class="mb-0">Due to protocol limitations, IMAP, POP3, SMTP, CalDAV, and CardDAV clients authenticate with your password alone. If your password is compromised, an attacker can access your mailbox, calendar, and contacts through any email client regardless of your 2FA status. Protect your account by using a strong, unique password.</p>
+                <div class="alert alert-info">
+                    <p class="mb-2"><i class="icon fas fa-info-circle"></i><strong>About 2FA and your email apps:</strong> Two-Factor Authentication protects your web logins (the User Console and Webmail).</p>
+                    <p class="mb-0">Email apps on your phones, tablets, and desktop clients (Mail, Thunderbird, Outlook, Calendar, Contacts) use <strong>app passwords</strong> instead of your main password &mdash; manage them under <a href="view_app_passwords.cfm">My App Passwords</a>. It's recommended that each app password be device-specific, so if a device is lost or stolen you can revoke just that one without affecting any of your other devices or your main login.</p>
                 </div>
                 </cfif>
 

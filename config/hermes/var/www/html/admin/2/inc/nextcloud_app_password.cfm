@@ -20,14 +20,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!---
 NEXTCLOUD APP PASSWORD MANAGEMENT
-Create / regenerate / delete a Nextcloud app password named "Hermes System"
+Create / regenerate / delete a Nextcloud app password (oc_authtoken row)
 for a mailbox user. The token lets DAV clients (CalDAV, CardDAV, WebDAV)
-authenticate against NC even when the user has no local password — which is
-the case for remote-auth (OIDC-provisioned) mailboxes.
+authenticate against NC, regardless of auth type. After #197 Phase 1b
+this is the mirror target for every user-generated Hermes app password.
 
 Required inputs:
   - ncAppPasswordAction : "create" | "regenerate" | "delete"
   - ncAppPasswordUser   : Nextcloud username (the mailbox email)
+
+Optional inputs:
+  - ncAppPasswordName   : Token label (default "Hermes System"). Set per-call
+                          to the user's Hermes app-password label so the NC
+                          token shows the same name in NC's Personal Settings
+                          &rarr; Devices & sessions.
 
 Outputs:
   - ncAppPassword       : plaintext token value (only set for create/regen success)
@@ -38,11 +44,17 @@ Why this is more involved than it looks:
   Our NC's `occ user:auth-tokens:add` does not accept `--name` — tokens
   are always created with the OCC binary's default name (typically "cli"
   or "occ", depending on NC version). To get a stable, identifiable name
-  ("Hermes System") we let occ create the token, then UPDATE oc_authtoken
-  in the NC database to rename the most recently created token for that
-  user. The plaintext value printed by occ is the actual DAV credential;
-  we capture that and return it to the caller. The DB hash stays as NC
+  we let occ create the token, then UPDATE oc_authtoken in the NC
+  database to rename the most recently created token for that user. The
+  plaintext value printed by occ is the actual DAV credential; we
+  capture that and return it to the caller. The DB hash stays as NC
   created it — we never touch it.
+
+  Side effect: occ user:auth-tokens:add requires verifying the user's
+  oc_users.password, so this helper also resets that to a fresh random
+  on every call. That is consistent with our defense-in-depth model
+  (oc_users.password is not used by anything user-facing) and effectively
+  rotates the NC internal password as a free side benefit.
 
 Debug log: /opt/hermes/tmp/nc_app_password_debug.log records every attempt
 with raw occ output so silent failures are diagnosable.
@@ -50,11 +62,12 @@ with raw occ output so silent failures are diagnosable.
 
 <cfparam name="ncAppPasswordAction" default="">
 <cfparam name="ncAppPasswordUser"   default="">
+<cfparam name="ncAppPasswordName"   default="Hermes System">
 
 <cfset ncAppPassword = "">
+<cfset ncAppPasswordTokenId = "">
 <cfset ncAppPasswordResult = "skipped">
 <cfset ncAppPasswordError = "">
-<cfset ncAppPasswordName = "Hermes System">
 <cfset ncAppPasswordDebugLog = "/opt/hermes/tmp/nc_app_password_debug.log">
 
 <cfif ncAppPasswordAction NEQ "" AND ncAppPasswordUser NEQ "">
@@ -224,6 +237,30 @@ with raw occ output so silent failures are diagnosable.
                     errorVariable="renameError"
                     timeout="30" />
                 <cftry><cffile action="delete" file="#renameScript#"><cfcatch type="any"></cfcatch></cftry>
+
+                <!--- Capture the renamed row's id so callers can store it
+                     for clean revocation later. -se = silent + no headers,
+                     so the entire output is just the id (or empty). --->
+                <cfset idLookupScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_idlookup.sh">
+                <cfscript>
+                    fileWrite(idLookupScript,
+                        chr(35) & "!/bin/bash" & chr(10) &
+                        "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -se """ &
+                        "SELECT id FROM oc_authtoken WHERE uid='" & ncAppPasswordUser & "' AND name='" & ncAppPasswordName & "' ORDER BY id DESC LIMIT 1;" &
+                        """ 2>&1" & chr(10),
+                        "utf-8");
+                </cfscript>
+                <cfexecute name="/bin/chmod" arguments="+x #idLookupScript#" timeout="10" />
+                <cfset idLookupResult = "">
+                <cfexecute name="#idLookupScript#"
+                    variable="idLookupResult"
+                    timeout="30" />
+                <cftry><cffile action="delete" file="#idLookupScript#"><cfcatch type="any"></cfcatch></cftry>
+
+                <cfset _idLookupTrimmed = Trim(idLookupResult)>
+                <cfif IsNumeric(_idLookupTrimmed)>
+                    <cfset ncAppPasswordTokenId = _idLookupTrimmed>
+                </cfif>
             <cfcatch type="any">
                 <cfset renameError = cfcatch.message & " / " & cfcatch.detail>
             </cfcatch>

@@ -5,7 +5,9 @@ Mozilla autoconfig endpoint for Thunderbird / K-9 Mail / other clients.
 
 Clients GET with ?emailaddress=joe@example.com to this endpoint (proxied
 by nginx from https://autoconfig.<domain>/mail/config-v1.1.xml).
-We respond with IMAP + SMTP server settings for the mailbox domain.
+We respond with IMAP, POP3, SMTP, and CalDAV settings for the mailbox
+domain. CardDAV is intentionally NOT advertised here — see the warning
+above the <calendar> block below.
 
 Returns 404 if the domain is not configured as a mailbox domain.
 --->
@@ -67,7 +69,20 @@ Returns 404 if the domain is not configured as a mailbox domain.
   <cfset mailHost = cgi.http_host>
 </cfif>
 
-<!--- Mozilla Thunderbird autoconfig XML format --->
+<!--- Mozilla Thunderbird autoconfig XML format.
+
+     DO NOT add an <addressBook type="carddav"> block to this response.
+     Thunderbird's <addressBook> autoconfig parsing is broken: when the
+     block is present, TB silently drops it AND suppresses fallback to
+     RFC 6764 SRV-based CardDAV discovery. The "Connect your linked
+     services" page after mail-account creation will then offer no
+     CardDAV auto-prompt, even though .well-known/carddav redirects and
+     the NC backend are working correctly. Removing the block lets TB
+     fall through to the _carddavs._tcp.<domain> SRV + TXT records
+     (advertised in the DNS guide at view_mailbox_domains.cfm), which
+     it consumes correctly. We keep <calendar> here because TB's
+     <calendar> parsing actually works, but CardDAV MUST come via SRV.
+     Validated 2026-04-28 against #197 with TB 128. --->
 <cfset responseXml = '<?xml version="1.0" encoding="UTF-8"?>' & Chr(10) &
   '<clientConfig version="1.1">' & Chr(10) &
   '  <emailProvider id="' & encodeForXML(emailDomain) & '">' & Chr(10) &
@@ -99,11 +114,6 @@ Returns 404 if the domain is not configured as a mailbox domain.
   '      <authentication>password-cleartext</authentication>' & Chr(10) &
   '      <username>%EMAILADDRESS%</username>' & Chr(10) &
   '    </outgoingServer>' & Chr(10) &
-  '    <addressBook type="carddav">' & Chr(10) &
-  '      <username>%EMAILADDRESS%</username>' & Chr(10) &
-  '      <authentication>http-basic</authentication>' & Chr(10) &
-  '      <serverURL>https://' & encodeForXML(mailHost) & '/nc/remote.php/dav/addressbooks/users/%EMAILADDRESS%/</serverURL>' & Chr(10) &
-  '    </addressBook>' & Chr(10) &
   '    <calendar type="caldav">' & Chr(10) &
   '      <username>%EMAILADDRESS%</username>' & Chr(10) &
   '      <authentication>http-basic</authentication>' & Chr(10) &

@@ -1,0 +1,33 @@
+# Hermes SEG Documentation
+
+This directory holds the human-facing documentation for Hermes Secure Email Gateway. It is the **source of truth** for the BookStack documentation site. Each markdown file here is destined to become a BookStack Page; folders become Chapters; top-level sections become Books.
+
+## Layout
+
+| Folder | BookStack Book | Audience |
+|---|---|---|
+| `admin/` | Admin Guide | System administrators running a Hermes deployment |
+| `users/` | User Guide | End users (mailbox owners) using the system |
+| `install/` | Installation | Operators standing up a fresh Hermes install |
+| `api/` | API Reference | Developers integrating with the Hermes Internal API (#222) |
+
+Sub-folders inside each Book correspond to BookStack Chapters. Files inside a Chapter folder are Pages, ordered by their numeric prefix (`01-…`, `02-…`).
+
+## Conventions
+
+- **Filename prefixes** drive sort order on BookStack import. Always prefix with two digits.
+- **Single H1 per file** — that becomes the BookStack page title. No YAML frontmatter (BookStack ignores it).
+- **Internal links** use repo-relative paths so they work on GitLab/GitHub during preview. They will need to be re-pointed once on first BookStack import.
+- **Images** live in `docs/images/`. ASCII diagrams travel best — prefer them over rendered diagrams when feasible.
+- **No emojis** in technical documentation.
+- **Mermaid blocks** render on GitLab but BookStack does not. They are tolerated for now; will be re-rendered as drawio on import.
+
+## Existing dev memos
+
+Three implementation memos predate this structure and live at the docs root:
+
+- `DOVECOT-2.4-MIGRATION.md`
+- `DOVECOT-MAILBOX-IMPLEMENTATION-PLAN.md`
+- `URL-SAFE-LINKS-IMPLEMENTATION.md`
+
+These are developer notes, not BookStack-destined. They will eventually move under `docs/internal/` or be archived.

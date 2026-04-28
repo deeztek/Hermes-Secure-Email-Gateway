@@ -1912,3 +1912,37 @@ CREATE TABLE IF NOT EXISTS mobile_setup_tokens (
     UNIQUE KEY uq_mst_token (token),
     KEY idx_mst_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- App passwords for device/client authentication (#197 Phase 1).
+-- One row per device/client credential. Dovecot's passdb sql query returns
+-- ALL non-revoked rows for the username; Dovecot tries each hash until one
+-- matches. Multi-active is by design — lets a user add a new device's
+-- password before retiring the old one (zero-downtime device swap).
+--
+-- username matches mailboxes.username (full email) and Dovecot's %u.
+-- password stores a Dovecot-prefixed hash, e.g. {ARGON2ID}$argon2id$v=19$...
+--   Dovecot detects the scheme from the prefix.
+-- last_used_at is reserved (column exists, not populated in Phase 1).
+-- nc_token_id reserves the join point for Phase 2 NC oc_authtoken mirror.
+-- Cleanup of rows on mailbox delete is handled in delete_mailbox_action.cfm
+-- (no FK kept here so the table survives mailbox table migrations).
+CREATE TABLE IF NOT EXISTS app_passwords (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at DATETIME NULL,
+    revoked_at DATETIME NULL,
+    nc_token_id VARCHAR(64) NULL,
+    is_system TINYINT(1) NOT NULL DEFAULT 0,
+    KEY idx_app_pw_user_active (username, revoked_at),
+    KEY idx_app_pw_revoked (revoked_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Add is_system to existing installs (idempotent — IF NOT EXISTS).
+-- Marks rows that are administrative plumbing (e.g. "Hermes System" pw
+-- used for NC Mail's IMAP credential). Filtered out of the user portal
+-- list so users don't see/revoke them; admin can still manage them.
+ALTER TABLE app_passwords
+  ADD COLUMN IF NOT EXISTS is_system TINYINT(1) NOT NULL DEFAULT 0;

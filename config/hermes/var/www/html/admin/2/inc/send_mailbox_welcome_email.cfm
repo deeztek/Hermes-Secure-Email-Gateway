@@ -19,9 +19,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!---
-SEND WELCOME EMAIL TO NEW MAILBOX USER
-Sends a welcome email to a newly created mailbox user with instructions
-to reset their password and configure their email client.
+SEND WELCOME EMAIL TO NEW MAILBOX USER (LOCAL AUTH)
+
+After #197 Phase 1, this email no longer carries any credential — the
+"Hermes System" app password is internal plumbing for NC Mail and is
+never disclosed. Users generate their own per-device app passwords from
+the user portal on demand. For LOCAL-auth mailboxes, the admin sets the
+user's login password in the create-mailbox form and communicates it to
+the user out-of-band (Slack, in person, etc.), as before. For
+REMOTE-auth mailboxes, see send_mailbox_welcome_email_remoteauth.cfm —
+in that case the user logs in with their existing external AD/LDAP
+password.
 
 Requires the following variables to be set before including:
 - recipientEmail: The recipient's email address
@@ -57,17 +65,32 @@ Requires the following variables to be set before including:
 
 <div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##805500;">Your Login Credentials</h3>
-    <p style="margin: 0 0 8px 0;"><strong>Username:</strong> Your full email address &mdash; <code>#recipientEmail#</code> &mdash; for <em>all</em> login methods (webmail, user portal, email clients).</p>
-    <p style="margin: 0;"><strong>Password:</strong> Provided to you separately by your administrator.</p>
+    <p style="margin: 0 0 8px 0;"><strong>Username:</strong> Your full email address &mdash; <code>#recipientEmail#</code></p>
+    <p style="margin: 0 0 8px 0;"><strong>Web login password</strong> &mdash; for the user portal and webmail in your browser. Provided to you separately by your administrator.</p>
+    <p style="margin: 0;"><strong>App password</strong> &mdash; for email apps on your phone, tablet, and desktop email clients. <em>You create this yourself</em> from the user portal &mdash; see the section below.</p>
+</div>
+
+<div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <h3 style="margin-top: 0; color: ##805500;">Setting Up Email on Your Phone or Computer</h3>
+    <p style="margin: 0 0 10px 0;">Your login password works for the website only. For your email apps (phone, tablet, Thunderbird, Outlook, Apple Mail, etc.), you need an <strong>app password</strong>.</p>
+    <ol style="margin: 0 0 10px 18px; padding: 0;">
+        <li style="margin: 4px 0;">Sign in to the user portal: <a href="#loginUrl#">#loginUrl#</a></li>
+        <li style="margin: 4px 0;">Click <strong>My App Passwords</strong> in the sidebar</li>
+        <li style="margin: 4px 0;">Click <strong>Create App Password</strong>, label it for the device (&ldquo;iPhone&rdquo;, &ldquo;Thunderbird&rdquo;, etc.)</li>
+        <li style="margin: 4px 0;">Copy the password it shows you (it's shown only once)</li>
+        <li style="margin: 4px 0;">Paste it into your email app along with your full email address</li>
+    </ol>
+    <p style="margin: 0; font-size: 13px; color: ##555;">It's recommended that each app password be device-specific, so if a device is lost or stolen you can revoke just that one without affecting any of your other devices or your website login.</p>
 </div>
 
 <div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##004085;">Email Client Settings</h3>
     <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
     <table style="text-align: left; width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 993 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# - Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 993 (SSL/TLS)</td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
         <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
+        <tr><td style="padding: 4px 8px;"><strong>Password:</strong></td><td style="padding: 4px 8px;"><em>An app password from the user portal (above)</em></td></tr>
     </table>
 </div>
 

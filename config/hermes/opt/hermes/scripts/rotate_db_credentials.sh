@@ -67,6 +67,7 @@ CONF_FILES="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files"
 POSTFIX_DIR="${HERMES_ROOT}/config/postfix-dkim/etc/postfix"
 AMAVIS_50_USER="${HERMES_ROOT}/config/mail_filter/etc/amavis/conf.d/50-user"
 DOVECOT_CONF="${HERMES_ROOT}/config/dovecot-2.4/conf/dovecot.conf"
+DOVECOT_LUA="${HERMES_ROOT}/config/dovecot-2.4/conf/auth_app_passwords.lua"
 CIPHERMAIL_CONN="${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml"
 CIPHERMAIL_CFG="${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml"
 
@@ -505,6 +506,24 @@ if [[ "$ROTATE_HERMES" == true ]]; then
         log_info "  Updated Dovecot dovecot.conf"
     else
         log_warn "  ${DOVECOT_CONF} not found — skipping"
+    fi
+
+    # --- DOVECOT auth_app_passwords.lua (#197 passdb lua script) ---
+    # The Lua passdb script holds the same DB password as a string literal
+    # (DB_PASS = "..."). Pattern match is anchored with the literal prefix
+    # to avoid collateral matches.
+    next_step "Updating Dovecot auth_app_passwords.lua credentials..."
+
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "  Would sed-replace credentials in: ${DOVECOT_LUA}"
+    elif [[ -f "$DOVECOT_LUA" ]]; then
+        cp "$DOVECOT_LUA" "${DOVECOT_LUA}.bak.$(date +%Y%m%d)"
+        sed -i \
+            -e "s|local DB_PASS = \"${OLD_HERMES_PASS}\"|local DB_PASS = \"${NEW_HERMES_PASS}\"|g" \
+            "$DOVECOT_LUA"
+        log_info "  Updated Dovecot auth_app_passwords.lua"
+    else
+        log_warn "  ${DOVECOT_LUA} not found — skipping"
     fi
 fi
 
