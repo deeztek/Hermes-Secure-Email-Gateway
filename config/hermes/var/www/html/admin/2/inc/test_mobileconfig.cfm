@@ -29,34 +29,33 @@ NOT FOR PRODUCTION USE. Phase 2 replaces this with a token-protected
 endpoint behind the wizard.
 --->
 
-<cfparam name="url.email"   default="">
-<cfparam name="url.display" default="">
-<cfparam name="url.imap"    default="">
-<cfparam name="url.dav"     default="">
-<cfparam name="url.host"    default="">
-<cfparam name="url.inline"  default="0">
+<cfparam name="url.email"    default="">
+<cfparam name="url.display"  default="">
+<cfparam name="url.password" default="">
+<cfparam name="url.host"     default="">
+<cfparam name="url.inline"   default="0">
 
 <!--- Quick guard: must have all required params --->
-<cfif url.email EQ "" OR url.imap EQ "" OR url.dav EQ "" OR url.host EQ "">
+<cfif url.email EQ "" OR url.password EQ "" OR url.host EQ "">
     <cfcontent reset="true">
     <cfheader name="Content-Type" value="text/plain; charset=utf-8">
     <cfoutput>test_mobileconfig.cfm — missing required URL params.
 
-Required: email, imap, dav, host
+Required: email, password (single app password — used for IMAP/SMTP/CalDAV/CardDAV per ##197 Phase 1b), host
 Optional: display (defaults to email), inline=1 (display XML in browser instead of downloading)
 
 Example:
-  ?email=bob@deeztek.com&display=Bob+Smith&imap=secret&dav=secret&host=mail.deeztek.com
+  ?email=bob@deeztek.com&display=Bob+Smith&password=APP-PASSWORD&host=mail.deeztek.com
 
-Phase 1 of ##224. Hand-invoke for DEV testing only.</cfoutput>
+##224 Phase 2 hand-invoke harness for DEV testing only. Will be
+superseded by the user-portal wizard.</cfoutput>
     <cfabort>
 </cfif>
 
 <!--- Map URL params → generator's expected variable names --->
 <cfset mcUserEmail    = Trim(url.email)>
 <cfset mcDisplayName  = Trim(url.display)>
-<cfset mcImapPassword = url.imap>
-<cfset mcDavPassword  = url.dav>
+<cfset mcAppPassword  = url.password>
 <cfset mcMailHost     = Trim(url.host)>
 
 <cfinclude template="generate_mobileconfig.cfm">
@@ -72,11 +71,18 @@ detail: #mcError#
     <cfabort>
 </cfif>
 
-<!--- On success, either inline-display or trigger a download --->
+<!--- On success, either inline-display or trigger a download. When
+     signed, return the binary CMS envelope; otherwise fall back to
+     the raw XML. --->
 <cfif url.inline EQ "1">
     <cfcontent reset="true">
     <cfheader name="Content-Type" value="text/plain; charset=utf-8">
-    <cfoutput>#mcXml#</cfoutput>
+    <cfoutput>signing note: #mcSigningNote#
+
+#mcXml#</cfoutput>
+<cfelseif mcIsSigned>
+    <cfheader name="Content-Disposition" value="attachment; filename=""hermes-#LCase(mcUserEmail)#.mobileconfig""">
+    <cfcontent reset="true" type="application/x-apple-aspen-config" variable="mcSignedBytes">
 <cfelse>
     <cfcontent reset="true" type="application/x-apple-aspen-config; charset=utf-8">
     <cfheader name="Content-Disposition" value="attachment; filename=""hermes-#LCase(mcUserEmail)#.mobileconfig""">

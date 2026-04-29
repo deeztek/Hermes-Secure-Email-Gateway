@@ -17,7 +17,16 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
     <cfelse>
 
-<!--- CHECK IF IPv4 ADDRESS ---> 
+<!--- Normalize: trim whitespace and strip any trailing dots (DNS zone-
+     file FQDN syntax). The dot is valid in zone files but breaks mail
+     clients that display the value (Outlook for Mac is one). Strip at
+     the input boundary so the canonical clean form lands in the DB and
+     downstream consumers (autoconfig.cfm, autodiscover.cfm, nginx
+     vhost generation, NC theming URL, OIDC discovery URI, etc.) all
+     see the same hostname. --->
+<cfset form.console_host = REReplace(Trim(form.console_host), "\.+$", "")>
+
+<!--- CHECK IF IPv4 ADDRESS --->
 <cfif REFind("[0-9]",form.console_host) gt 0 AND REFind("[.]",form.console_host)>
 
 <!--- VALIDATE IPV4 --->

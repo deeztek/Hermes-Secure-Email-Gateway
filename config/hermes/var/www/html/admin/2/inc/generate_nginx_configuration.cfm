@@ -17,37 +17,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <!--- GENERATE NGINX HERMES-SSL.CONF STARTS HERE --->
 
-<cfif #console_certificate.value2# is "">
-
-<cfset certpath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
-<cfset keypath = "/etc/ssl/private/ssl-cert-snakeoil.key">
-
-<cfelseif #console_certificate.value2# is "1">
-
-  <cfset certpath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
-  <cfset keypath = "/etc/ssl/private/ssl-cert-snakeoil.key">
-
-<cfelse>
-
-<cfquery name="getcertificate" datasource="hermes">
-select id, type, file_name from system_certificates where id=<cfqueryparam value = #console_certificate.value2# CFSQLType = "CF_SQL_INTEGER">
-</cfquery>
-
-<cfif #getcertificate.type# is "Imported">
-
-<cfset certpath = "/opt/hermes/ssl/#getcertificate.file_name#_hermes.bundle.pem">
-<cfset keypath = "/opt/hermes/ssl/#getcertificate.file_name#_hermes.key">
-
-<cfelseif #getcertificate.type# is "Acme">
-    
-<cfset certpath = "/etc/letsencrypt/live/#getcertificate.file_name#/fullchain.pem">
-<cfset keypath = "/etc/letsencrypt/live/#getcertificate.file_name#/privkey.pem">
-    
-<!--- /CFIF #getcertificate.type# is --->
-</cfif>
-
-<!--- /CFIF #console_certificate.value2# is --->
-</cfif>
+<!--- Resolve active cert paths via the shared helper. Single source of
+     truth for all "where does the active cert live on disk" decisions —
+     also used by the mobileconfig signer and any future cert-touching
+     code. Sets hermesCertNginxPath / hermesCertKeyPath / etc. --->
+<cfinclude template="get_active_cert_paths.cfm">
+<cfset certpath = hermesCertNginxPath>
+<cfset keypath = hermesCertKeyPath>
 
 <cffile action="read" file="/opt/hermes/templates/hermes-ssl.conf" variable="nginx">
  
@@ -400,17 +376,23 @@ file = "/opt/hermes/tmp/#customtrans3#_hermes-mailbox-ssl.conf"
 output = "#REReplace("#nginx_mailbox#","hermes_server_name","#theSubdomains#","ALL")#" addnewline="no">
 
 
-<cfif #getcertificate.type# is "Imported">
+<!--- Per-mailbox-domain cert — read from getcertdetails (the data source
+     for THIS loop iteration, populated above at line 339). The previous
+     code referenced getcertificate here, which was the console-level
+     cert from the (now-refactored) first block; it worked by accident
+     when console and per-domain cert types matched. The keypath line
+     additionally had a copy-paste typo using getcertificate.file_name
+     instead of getcertdetails.file_name. Both fixed here. --->
+<cfif #getcertdetails.type# is "Imported">
 
 <cfset certpath = "/opt/hermes/ssl/#getcertdetails.file_name#_hermes.bundle.pem">
-<cfset keypath = "/opt/hermes/ssl/#getcertificate.file_name#_hermes.key">
+<cfset keypath = "/opt/hermes/ssl/#getcertdetails.file_name#_hermes.key">
 
-<cfelseif #getcertificate.type# is "Acme">
-    
+<cfelseif #getcertdetails.type# is "Acme">
+
 <cfset certpath = "/etc/letsencrypt/live/#getcertdetails.file_name#/fullchain.pem">
 <cfset keypath = "/etc/letsencrypt/live/#getcertdetails.file_name#/privkey.pem">
-    
-<!--- /CFIF #getcertificate.type# is --->
+
 </cfif>
 
 

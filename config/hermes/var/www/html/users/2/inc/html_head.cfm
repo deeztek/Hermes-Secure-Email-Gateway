@@ -362,9 +362,13 @@ document.addEventListener('click', function(e) {
   }
 });
 
-  // Show preloader on form submit
+  // Show preloader on form submit. Forms with class="no-preloader"
+  // opt out — used for forms whose response is a file download, since
+  // browsers don't navigate to attachment responses and the spinner
+  // would never dismiss.
   document.querySelectorAll('form').forEach(function(form) {
     form.addEventListener('submit', function() {
+      if (form.classList.contains('no-preloader')) return;
       const preloader = document.querySelector('.preloader');
       if (preloader) {
         preloader.style.display = 'flex';
@@ -374,8 +378,19 @@ document.addEventListener('click', function(e) {
   });
 });
 
+// Track if a no-preloader form was just submitted, so the beforeunload
+// handler below skips re-showing the spinner.
+var _skipPreloader = false;
+document.addEventListener('submit', function(e) {
+  var form = e.target;
+  if (form && form.classList && form.classList.contains('no-preloader')) {
+    _skipPreloader = true;
+  }
+}, true);
+
 // Show preloader on page unload (browser navigation)
 window.addEventListener('beforeunload', function() {
+  if (_skipPreloader) { _skipPreloader = false; return; }
   const preloader = document.querySelector('.preloader');
   if (preloader) {
     preloader.style.display = 'flex';

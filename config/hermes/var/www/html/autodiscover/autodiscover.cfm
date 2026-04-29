@@ -77,6 +77,12 @@ Returns 404 if the email's domain is not configured as a mailbox domain.
   <cfset mailHost = cgi.http_host>
 </cfif>
 
+<!--- Strip trailing dot (DNS zone-file FQDN form) — Outlook on macOS
+     trips on this and reports the server as unreachable. Source value
+     should be a hostname, not a fully-qualified DNS name with the
+     terminal '.', but defend in case it's stored that way. --->
+<cfset mailHost = REReplace(Trim(mailHost), "\.+$", "")>
+
 <!--- Build autodiscover response XML --->
 <cfset responseXml = '<?xml version="1.0" encoding="utf-8"?>' & Chr(10) &
   '<Autodiscover xmlns="http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006">' & Chr(10) &

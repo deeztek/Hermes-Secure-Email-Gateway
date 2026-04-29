@@ -18,49 +18,55 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!---
-GENERATE iOS MOBILECONFIG (Phase 1 — unsigned XML, no token storage)
+GENERATE iOS MOBILECONFIG (#197 + #224 Phase 2)
 
-Builds an Apple .mobileconfig (XML plist) bundling IMAP / SMTP / CalDAV /
-CardDAV configuration for one mailbox user. Profile signing is deferred to
-a later phase — output here is unsigned plist XML.
+Builds an Apple .mobileconfig (Apple plist) bundling IMAP / SMTP / CalDAV /
+CardDAV configuration for one mailbox user. Output is signed via openssl
+cms using the active console certificate (Imported third-party OR Acme/LE,
+selected via inc/get_active_cert_paths.cfm). If the active cert is the
+Ubuntu snakeoil fallback, signing is skipped (signing with a non-trusted
+cert produces a profile worse than unsigned — iOS shows "Not Verified"
+instead of just "Verification not possible").
 
 Required inputs (caller sets in variables scope):
-  - mcUserEmail        : the mailbox's full email (e.g., bob@deeztek.com).
-                         Used as username in all four payloads.
-  - mcDisplayName      : human-friendly name shown in iOS account list
-                         (free text, e.g., "Bob Smith - Deeztek").
-  - mcImapPassword     : password to embed in IMAP + SMTP payloads.
-                         Local-auth: the user's mailbox password.
-                         Remote-auth: their org password (Dovecot's LDAP
-                         backend forwards to external AD/LDAP).
-  - mcDavPassword      : password to embed in CalDAV + CardDAV payloads.
-                         Local-auth: same value as mcImapPassword.
-                         Remote-auth: NC app password (DAV can't speak OIDC,
-                         so the org password won't work here).
-  - mcMailHost         : mail server hostname (Hermes console host).
-                         Used for IMAP, SMTP, CalDAV, CardDAV connect.
+  - mcUserEmail     : the mailbox's full email (e.g., bob@deeztek.com).
+                      Used as username in all four payloads.
+  - mcDisplayName   : human-friendly name shown in iOS account list
+                      (free text, e.g., "Bob Smith - Deeztek").
+  - mcAppPassword   : the user's app password (one credential, all four
+                      protocols, per #197 Phase 1b). Embedded in IMAP,
+                      SMTP, CalDAV, and CardDAV payloads.
+  - mcMailHost      : mail server hostname (Hermes console host).
+                      Used for IMAP, SMTP, CalDAV, CardDAV connect.
 
 Outputs:
-  - mcXml              : the raw plist XML string on success
-  - mcResult           : "success" | "error: <reason>"
-  - mcError            : detail message on error
+  - mcResult        : "success" | "error: <reason>"
+  - mcError         : detail message on error
+  - mcXml           : the raw plist XML string (always set on success)
+  - mcIsSigned      : true if mcSignedBytes contains a CMS-signed binary
+                      mobileconfig; false if signing was skipped/failed
+                      (caller should serve mcXml unmodified in that case)
+  - mcSignedBytes   : binary CMS-signed mobileconfig (when mcIsSigned)
+  - mcSigningNote   : human-readable note about why signing did or did
+                      not happen — for diagnostic logging only
 
 Implementation notes:
   PayloadUUIDs are deterministic per (install-id, user, payload-type) so
   iOS recognizes a re-install as an UPDATE to the existing profile rather
-  than a parallel install. We derive a stable id from mcUserEmail for v1;
-  full install-id integration comes when wired into the wizard flow.
+  than a parallel install. We derive a stable id from mcUserEmail for v1.
 --->
 
 <cfparam name="mcUserEmail"    default="">
 <cfparam name="mcDisplayName"  default="">
-<cfparam name="mcImapPassword" default="">
-<cfparam name="mcDavPassword"  default="">
+<cfparam name="mcAppPassword"  default="">
 <cfparam name="mcMailHost"     default="">
 
-<cfset mcResult = "">
-<cfset mcError  = "">
-<cfset mcXml    = "">
+<cfset mcResult       = "">
+<cfset mcError        = "">
+<cfset mcXml          = "">
+<cfset mcIsSigned     = false>
+<cfset mcSignedBytes  = "">
+<cfset mcSigningNote  = "">
 
 <!--- Validate inputs --->
 <cfif mcUserEmail EQ "" OR NOT IsValid("email", mcUserEmail)>
@@ -73,9 +79,9 @@ Implementation notes:
     <cfset mcError  = "mcMailHost (mail server hostname) must be supplied">
     <cfexit>
 </cfif>
-<cfif mcImapPassword EQ "" OR mcDavPassword EQ "">
-    <cfset mcResult = "error: passwords missing">
-    <cfset mcError  = "both mcImapPassword and mcDavPassword must be supplied">
+<cfif mcAppPassword EQ "">
+    <cfset mcResult = "error: app password missing">
+    <cfset mcError  = "mcAppPassword must be supplied">
     <cfexit>
 </cfif>
 <cfif mcDisplayName EQ "">
@@ -111,8 +117,7 @@ Implementation notes:
 
 <cfset xUserEmail   = esc(mcUserEmail)>
 <cfset xDisplayName = esc(mcDisplayName)>
-<cfset xImapPass    = esc(mcImapPassword)>
-<cfset xDavPass     = esc(mcDavPassword)>
+<cfset xAppPass     = esc(mcAppPassword)>
 <cfset xMailHost    = esc(mcMailHost)>
 
 <!--- Build the plist. Indentation matters only for readability; iOS parses
@@ -178,7 +183,7 @@ Implementation notes:
             <key>IncomingMailServerUsername</key>
             <string>#xUserEmail#</string>
             <key>IncomingPassword</key>
-            <string>#xImapPass#</string>
+            <string>#xAppPass#</string>
 
             <!-- Outgoing (SMTP, port 465, implicit TLS via ##210) -->
             <key>OutgoingMailServerHostName</key>
@@ -232,7 +237,7 @@ Implementation notes:
             <key>CalDAVUsername</key>
             <string>#xUserEmail#</string>
             <key>CalDAVPassword</key>
-            <string>#xDavPass#</string>
+            <string>#xAppPass#</string>
         </dict>
 
         <!-- CardDAV account (Nextcloud) -->
@@ -263,12 +268,91 @@ Implementation notes:
             <key>CardDAVUsername</key>
             <string>#xUserEmail#</string>
             <key>CardDAVPassword</key>
-            <string>#xDavPass#</string>
+            <string>#xAppPass#</string>
         </dict>
 
     </array>
 </dict>
 </plist>
 </cfoutput></cfsavecontent>
+
+<!--- ============================================================
+     SIGN the profile with the active console certificate via
+     openssl cms. iOS validates the signature against its built-in
+     trust store; for publicly-issued certs (Let's Encrypt or properly
+     imported third-party) the user sees "Verified" in green instead
+     of "Verification not possible" in red.
+
+     If the active cert is the snakeoil fallback (admin hasn't
+     configured a real cert yet), skip signing — signing with a
+     non-trusted leaf produces a profile that's strictly worse than
+     unsigned in terms of UX.
+
+     openssl cms -sign needs:
+       -signer  : leaf cert only (no chain)
+       -inkey   : matching private key
+       -certfile: intermediate chain (optional but improves chain
+                  validation on iOS — Apple builds the chain from the
+                  signature's certificates, so embedding intermediates
+                  makes it self-contained)
+       -in      : the unsigned XML (we just built mcXml)
+       -out     : signed binary CMS envelope
+       -outform DER : binary output (Apple expects this format)
+       -nodetach: include the original content inside the signature
+                  (Apple expects a "fully signed" profile, not a
+                  detached signature)
+     ============================================================ --->
+
+<cfinclude template="get_active_cert_paths.cfm">
+
+<cfif hermesCertIsSnakeoil>
+    <cfset mcSigningNote = "Signing skipped: active console cert is the Ubuntu snakeoil fallback (no publicly-trusted cert configured). Profile will be served as unsigned XML.">
+<cfelse>
+    <cftry>
+        <cfinclude template="generate_customtrans.cfm">
+
+        <!--- Stage the unsigned XML on disk so openssl can read it. --->
+        <cfset _mcUnsignedPath = "/opt/hermes/tmp/" & customtrans3 & "_mc_unsigned.mobileconfig">
+        <cffile action="write" file="#_mcUnsignedPath#" output="#mcXml#" charset="utf-8">
+
+        <cfset _mcSignedPath = "/opt/hermes/tmp/" & customtrans3 & "_mc_signed.mobileconfig">
+        <cfset _mcSignScript = "/opt/hermes/tmp/" & customtrans3 & "_mc_sign.sh">
+        <cfscript>
+            fileWrite(_mcSignScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "openssl cms -sign " &
+                "-signer """ & hermesCertSignerPath & """ " &
+                "-inkey """ & hermesCertKeyPath & """ " &
+                "-certfile """ & hermesCertChainPath & """ " &
+                "-in """ & _mcUnsignedPath & """ " &
+                "-out """ & _mcSignedPath & """ " &
+                "-outform DER " &
+                "-nodetach 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_mcSignScript#" timeout="10" />
+        <cfset _mcSignResult = "">
+        <cfset _mcSignError  = "">
+        <cfexecute name="#_mcSignScript#"
+            variable="_mcSignResult"
+            errorVariable="_mcSignError"
+            timeout="60" />
+        <cftry><cffile action="delete" file="#_mcSignScript#"><cfcatch type="any"></cfcatch></cftry>
+
+        <cfif FileExists(_mcSignedPath)>
+            <cffile action="readbinary" file="#_mcSignedPath#" variable="mcSignedBytes">
+            <cfset mcIsSigned = true>
+            <cfset mcSigningNote = "Signed with " & hermesCertType & " cert. openssl cms exited cleanly. Output size: " & ArrayLen(mcSignedBytes) & " bytes.">
+            <cftry><cffile action="delete" file="#_mcSignedPath#"><cfcatch type="any"></cfcatch></cftry>
+        <cfelse>
+            <cfset mcSigningNote = "Signing FAILED: openssl cms produced no output file. STDOUT: " & Left(_mcSignResult, 300) & " / STDERR: " & Left(_mcSignError, 300) & ". Falling back to unsigned XML.">
+        </cfif>
+
+        <cftry><cffile action="delete" file="#_mcUnsignedPath#"><cfcatch type="any"></cfcatch></cftry>
+    <cfcatch type="any">
+        <cfset mcSigningNote = "Signing threw: " & cfcatch.message & " / " & cfcatch.detail & ". Falling back to unsigned XML.">
+    </cfcatch>
+    </cftry>
+</cfif>
 
 <cfset mcResult = "success">

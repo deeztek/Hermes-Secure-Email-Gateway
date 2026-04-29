@@ -69,6 +69,11 @@ Returns 404 if the domain is not configured as a mailbox domain.
   <cfset mailHost = cgi.http_host>
 </cfif>
 
+<!--- Strip trailing dot (DNS zone-file FQDN form). Outlook on macOS
+     trips on this; defend at emission so neither autodiscover nor
+     autoconfig pass the raw value through if it's stored that way. --->
+<cfset mailHost = REReplace(Trim(mailHost), "\.+$", "")>
+
 <!--- Mozilla Thunderbird autoconfig XML format.
 
      DO NOT add an <addressBook type="carddav"> block to this response.
