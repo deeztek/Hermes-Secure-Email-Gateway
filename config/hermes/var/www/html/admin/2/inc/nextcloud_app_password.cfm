@@ -166,9 +166,21 @@ with raw occ output so silent failures are diagnosable.
             timeout="30" />
         <cftry><cffile action="delete" file="#resetScript#"><cfcatch type="any"></cfcatch></cftry>
 
+        <!--- Read NC DB credentials once, reused below by the rename
+             + id-lookup queries. --->
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncDbUser" charset="utf-8">
+        <cfset ncDbUser = Trim(ncDbUser)>
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPass" charset="utf-8">
+        <cfset ncDbPass = Trim(ncDbPass)>
+
         <!--- Now create the token with the password we just set. --name
              is not supported by this NC version — tokens land with the
-             default CLI name and we rename them via DB UPDATE below. --->
+             default CLI name and we rename them via DB UPDATE below.
+             occ user:auth-tokens:add only emits the plaintext on stdout
+             when it has actually committed the oc_authtoken row; failed
+             inserts throw and exit non-zero. So a successfully extracted
+             plaintext IS the proof of row creation — no separate
+             pre/post-flight count check needed. --->
         <cfset addScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_add_token.sh">
         <cfscript>
             fileWrite(addScript,
@@ -185,81 +197,127 @@ with raw occ output so silent failures are diagnosable.
 
         <cfif NOT isDefined("addResult")><cfset addResult = ""></cfif>
 
-        <!--- Parse the plaintext token from occ output. Expected formats:
-               "app password created for <user>: <TOKEN>"
-               "<TOKEN>"
-             Scan each non-empty line right-to-left for the first word that
-             looks like an app password (alnum, 20+ chars). --->
+        <!--- Parse the plaintext token from occ output. Anchored on the
+             literal "app password" marker so we never grab random alnum
+             strings from other places in the output (warnings, debug
+             noise, etc). NC versions emit one of these two formats:
+               1. "app password created for <user>: <TOKEN>"   (older)
+               2. "app password:" newline "<TOKEN>"            (current)
+             The "(?: created for [^:]+)?" group makes the suffix
+             optional; "\s*" after the colon consumes whitespace AND
+             newlines (Java regex \s matches \n). Capture group 1 is
+             the token. If the marker isn't present OR the captured
+             token is shorter than 20 chars, extracted stays empty and
+             the rest of the flow surfaces an error. --->
         <cfset extracted = "">
-        <cfif Len(trim(addResult)) GT 0>
-            <cfset addLines = ListToArray(addResult, chr(10), false)>
-            <cfloop from="#ArrayLen(addLines)#" to="1" step="-1" index="iLine">
-                <cfset line = trim(addLines[iLine])>
-                <cfif Len(line) EQ 0><cfcontinue></cfif>
-                <cfset words = ListToArray(line, " " & chr(9), false)>
-                <cfloop from="#ArrayLen(words)#" to="1" step="-1" index="iWord">
-                    <cfset w = trim(words[iWord])>
-                    <cfset w = REReplace(w, "[[:punct:]]+$", "")>
-                    <cfif Len(w) GTE 20 AND REFind("^[A-Za-z0-9]+$", w) GT 0>
-                        <cfset extracted = w>
-                        <cfbreak>
-                    </cfif>
-                </cfloop>
-                <cfif Len(extracted) GT 0><cfbreak></cfif>
-            </cfloop>
+        <cfset _addMatch = REFind("app password(?: created for [^:]+)?:\s*([A-Za-z0-9]{20,})", addResult, 1, true)>
+        <cfif IsArray(_addMatch.pos) AND ArrayLen(_addMatch.pos) GTE 2 AND _addMatch.pos[2] GT 0>
+            <cfset extracted = Mid(addResult, _addMatch.pos[2], _addMatch.len[2])>
         </cfif>
 
         <cfset renameResult = "">
         <cfset renameError = "">
+        <cfset hashLookupResult = "">
 
         <cfif Len(extracted) GT 0>
-            <!--- Token created. Rename the most recent oc_authtoken row
-                 for this user to "Hermes System" so we can find it later
-                 via occ user:auth-tokens:list. --->
+            <!--- VERIFICATION: independently confirm the extracted plaintext
+                 corresponds to a real oc_authtoken row, by computing
+                 SHA-512(plaintext + NC_secret) ourselves and looking it
+                 up directly. NC stores oc_authtoken.token as that hex
+                 hash (PublicKeyTokenProvider::hashToken in NC source).
+                 If our computed hash doesn't match any row, either the
+                 extraction picked nonsense from stdout, or occ silently
+                 failed to commit despite emitting plaintext, or NC's
+                 token-hashing scheme changed. Any of those cases must
+                 abort — we cannot rely on a token id we can't verify. --->
             <cftry>
-                <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncDbUser" charset="utf-8">
-                <cfset ncDbUser = Trim(ncDbUser)>
-                <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPass" charset="utf-8">
-                <cfset ncDbPass = Trim(ncDbPass)>
-
-                <cfset renameScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_rename.sh">
+                <!--- 1. Read NC's instance secret via occ. Bare command
+                     (no 2>&1) so cfexecute can separate stdout (the
+                     secret) from stderr (any deprecation warnings). --->
+                <cfset secretScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_get_secret.sh">
                 <cfscript>
-                    fileWrite(renameScript,
+                    fileWrite(secretScript,
                         chr(35) & "!/bin/bash" & chr(10) &
-                        "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -e """ &
-                        "UPDATE oc_authtoken SET name='" & ncAppPasswordName & "' WHERE uid='" & ncAppPasswordUser & "' ORDER BY id DESC LIMIT 1;" &
+                        "docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:get secret" & chr(10),
+                        "utf-8");
+                </cfscript>
+                <cfexecute name="/bin/chmod" arguments="+x #secretScript#" timeout="10" />
+                <cfset secretResult = "">
+                <cfset secretError = "">
+                <cfexecute name="#secretScript#"
+                    variable="secretResult"
+                    errorVariable="secretError"
+                    timeout="30" />
+                <cftry><cffile action="delete" file="#secretScript#"><cfcatch type="any"></cfcatch></cftry>
+
+                <cfset ncSecret = Trim(isDefined("secretResult") ? secretResult : "")>
+
+                <cfif Len(ncSecret) EQ 0>
+                    <cfthrow message="Could not read NC instance secret via `occ config:system:get secret`. STDOUT empty. STDERR: #Left(secretError, 300)#">
+                </cfif>
+
+                <!--- 2. Compute SHA-512(plaintext + secret) using Java
+                     MessageDigest. NC stores the hex result lowercase
+                     in oc_authtoken.token. Lucee's Hash() differs
+                     across versions, hence the explicit Java call. --->
+                <cfset _md = createObject("java", "java.security.MessageDigest").getInstance("SHA-512")>
+                <cfset _md.update(JavaCast("string", extracted & ncSecret).getBytes("UTF-8"))>
+                <cfset _hashBytes = _md.digest()>
+                <cfset _bigInt = createObject("java", "java.math.BigInteger").init(JavaCast("int", 1), _hashBytes)>
+                <cfset expectedTokenHash = LCase(_bigInt.toString(JavaCast("int", 16)))>
+                <!--- Left-pad to 128 hex chars (SHA-512 = 64 bytes). --->
+                <cfloop condition="Len(expectedTokenHash) LT 128">
+                    <cfset expectedTokenHash = "0" & expectedTokenHash>
+                </cfloop>
+
+                <!--- 3. Look up the row by exact (uid, token) match. The
+                     hash is hex chars only, safe to embed in single-
+                     quoted SQL. Use `mariadb` not `mysql` to avoid the
+                     deprecation warning that would corrupt stdout. --->
+                <cfset hashLookupScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_hashlookup.sh">
+                <cfscript>
+                    fileWrite(hashLookupScript,
+                        chr(35) & "!/bin/bash" & chr(10) &
+                        "docker exec hermes_db_server mariadb -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -se """ &
+                        "SELECT id FROM oc_authtoken WHERE uid='" & ncAppPasswordUser & "' AND token='" & expectedTokenHash & "';" &
                         """ 2>&1" & chr(10),
                         "utf-8");
                 </cfscript>
-                <cfexecute name="/bin/chmod" arguments="+x #renameScript#" timeout="10" />
-                <cfexecute name="#renameScript#"
-                    variable="renameResult"
-                    errorVariable="renameError"
-                    timeout="30" />
-                <cftry><cffile action="delete" file="#renameScript#"><cfcatch type="any"></cfcatch></cftry>
+                <cfexecute name="/bin/chmod" arguments="+x #hashLookupScript#" timeout="10" />
+                <cfexecute name="#hashLookupScript#" variable="hashLookupResult" timeout="30" />
+                <cftry><cffile action="delete" file="#hashLookupScript#"><cfcatch type="any"></cfcatch></cftry>
 
-                <!--- Capture the renamed row's id so callers can store it
-                     for clean revocation later. -se = silent + no headers,
-                     so the entire output is just the id (or empty). --->
-                <cfset idLookupScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_idlookup.sh">
-                <cfscript>
-                    fileWrite(idLookupScript,
-                        chr(35) & "!/bin/bash" & chr(10) &
-                        "docker exec hermes_db_server mysql -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -se """ &
-                        "SELECT id FROM oc_authtoken WHERE uid='" & ncAppPasswordUser & "' AND name='" & ncAppPasswordName & "' ORDER BY id DESC LIMIT 1;" &
-                        """ 2>&1" & chr(10),
-                        "utf-8");
-                </cfscript>
-                <cfexecute name="/bin/chmod" arguments="+x #idLookupScript#" timeout="10" />
-                <cfset idLookupResult = "">
-                <cfexecute name="#idLookupScript#"
-                    variable="idLookupResult"
-                    timeout="30" />
-                <cftry><cffile action="delete" file="#idLookupScript#"><cfcatch type="any"></cfcatch></cftry>
+                <!--- Scan output line-by-line for a numeric id; tolerates
+                     any stderr noise that 2>&1 may have merged in. --->
+                <cfloop array="#ListToArray(Trim(hashLookupResult), chr(10), false)#" index="_idLine">
+                    <cfset _idLine = Trim(_idLine)>
+                    <cfif IsNumeric(_idLine) AND Len(_idLine) GT 0>
+                        <cfset ncAppPasswordTokenId = _idLine>
+                        <cfbreak>
+                    </cfif>
+                </cfloop>
 
-                <cfset _idLookupTrimmed = Trim(idLookupResult)>
-                <cfif IsNumeric(_idLookupTrimmed)>
-                    <cfset ncAppPasswordTokenId = _idLookupTrimmed>
+                <!--- 4. Optional: rename for UX so the token shows up
+                     with a meaningful name in NC's UI (Personal Settings
+                     > Security > Devices & sessions). Only runs if the
+                     hash lookup succeeded — we now know the exact id,
+                     so no race-vulnerable "ORDER BY id DESC LIMIT 1". --->
+                <cfif IsNumeric(ncAppPasswordTokenId)>
+                    <cfset renameScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_token_rename.sh">
+                    <cfscript>
+                        fileWrite(renameScript,
+                            chr(35) & "!/bin/bash" & chr(10) &
+                            "docker exec hermes_db_server mariadb -u """ & ncDbUser & """ -p""" & ncDbPass & """ nextcloud -e """ &
+                            "UPDATE oc_authtoken SET name='" & ncAppPasswordName & "' WHERE id=" & ncAppPasswordTokenId & ";" &
+                            """ 2>&1" & chr(10),
+                            "utf-8");
+                    </cfscript>
+                    <cfexecute name="/bin/chmod" arguments="+x #renameScript#" timeout="10" />
+                    <cfexecute name="#renameScript#"
+                        variable="renameResult"
+                        errorVariable="renameError"
+                        timeout="30" />
+                    <cftry><cffile action="delete" file="#renameScript#"><cfcatch type="any"></cfcatch></cftry>
                 </cfif>
             <cfcatch type="any">
                 <cfset renameError = cfcatch.message & " / " & cfcatch.detail>
@@ -268,7 +326,9 @@ with raw occ output so silent failures are diagnosable.
         </cfif>
 
         <!--- Debug log: always write an entry so silent failures are
-             diagnosable. --->
+             diagnosable. Records the hash-lookup output so an admin
+             can immediately tell whether the extracted plaintext was
+             real or noise (empty result = noise). --->
         <cftry>
             <cfset logBody = "[" & DateTimeFormat(now(), "yyyy-mm-dd HH:nn:ss") & "] " &
                 ncAppPasswordAction & " for " & ncAppPasswordUser & chr(10) &
@@ -277,19 +337,37 @@ with raw occ output so silent failures are diagnosable.
                 "occ STDOUT:" & chr(10) & Left(addResult, 2000) & chr(10) &
                 "occ STDERR:" & chr(10) & Left(isDefined("addError") ? addError : "", 2000) & chr(10) &
                 "Extracted token length: " & Len(extracted) & chr(10) &
-                "mysql rename STDOUT: " & Left(renameResult, 500) & chr(10) &
-                "mysql rename STDERR: " & Left(renameError, 500) & chr(10) &
+                "Hash lookup STDOUT: " & Left(hashLookupResult, 500) & chr(10) &
+                "ncAppPasswordTokenId: " & ncAppPasswordTokenId & chr(10) &
+                "Rename STDOUT: " & Left(renameResult, 500) & chr(10) &
+                "Rename STDERR: " & Left(renameError, 500) & chr(10) &
                 "---" & chr(10)>
             <cffile action="append" file="#ncAppPasswordDebugLog#" output="#logBody#" charset="utf-8">
         <cfcatch type="any"></cfcatch>
         </cftry>
 
-        <cfif Len(extracted) GT 0>
+        <!--- Success requires both:
+             1. extracted plaintext from occ stdout — caught by the
+                anchored regex on the literal "app password created for"
+                marker. If occ output didn't have that marker, extracted
+                stays empty and we abort.
+             2. ncAppPasswordTokenId populated — set only when our
+                computed SHA-512(plaintext + secret) hash actually
+                matches a row in oc_authtoken. If extraction grabbed
+                noise, or the secret read failed, or NC never committed
+                the row, this lookup fails and we abort.
+             Both conditions independently catch a different class of
+             failure. Any failure surfaces a specific error so callers
+             don't silently INSERT a NULL nc_token_id and orphan the row. --->
+        <cfif Len(extracted) GT 0 AND IsNumeric(ncAppPasswordTokenId)>
             <cfset ncAppPassword = extracted>
             <cfset ncAppPasswordResult = "success">
-        <cfelse>
-            <cfset ncAppPasswordResult = "error: could not parse token from occ output">
+        <cfelseif Len(extracted) EQ 0>
+            <cfset ncAppPasswordResult = "error: occ output did not contain expected 'app password created for ...' marker">
             <cfset ncAppPasswordError = "STDOUT: " & Left(addResult, 500) & " / STDERR: " & Left(isDefined("addError") ? addError : "", 500)>
+        <cfelse>
+            <cfset ncAppPasswordResult = "error: extracted plaintext does not match any oc_authtoken row (hash lookup empty)">
+            <cfset ncAppPasswordError = "Hash lookup STDOUT: " & Left(hashLookupResult, 300) & " / Rename STDERR: " & Left(renameError, 300)>
         </cfif>
 
     <cfelseif ncAppPasswordAction EQ "delete">

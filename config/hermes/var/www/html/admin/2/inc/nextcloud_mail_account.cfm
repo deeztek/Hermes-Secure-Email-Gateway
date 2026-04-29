@@ -45,8 +45,38 @@ Sets after execution:
                  <smtp-user> <smtp-password> <auth-method>
     --->
     <cftry>
-        <!--- Use temp script to handle special characters in password/name --->
         <cfinclude template="generate_customtrans.cfm">
+
+        <!--- Read NC DB creds for pre/post-flight verification. --->
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncMailDbUser" charset="utf-8">
+        <cfset ncMailDbUser = Trim(ncMailDbUser)>
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncMailDbPass" charset="utf-8">
+        <cfset ncMailDbPass = Trim(ncMailDbPass)>
+
+        <!--- 1. PRE-FLIGHT: count existing oc_mail_accounts rows for
+             this user + email. Should usually be 0 for a fresh mailbox
+             but tolerates reprovisioning. --->
+        <cfset _mailPreScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_mail_pre.sh">
+        <cfscript>
+            fileWrite(_mailPreScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & ncMailDbUser & """ -p""" & ncMailDbPass & """ nextcloud -se """ &
+                "SELECT COUNT(*) FROM oc_mail_accounts WHERE user_id='" & ncMailUser & "' AND email='" & ncMailEmail & "';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_mailPreScript#" timeout="10" />
+        <cfset _mailPreResult = "">
+        <cfexecute name="#_mailPreScript#" variable="_mailPreResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_mailPreScript#"><cfcatch type="any"></cfcatch></cftry>
+        <cfset _mailPreCount = -1>
+        <cfloop array="#ListToArray(Trim(_mailPreResult), chr(10), false)#" index="_mLine">
+            <cfset _mLine = Trim(_mLine)>
+            <cfif IsNumeric(_mLine)><cfset _mailPreCount = _mLine><cfbreak></cfif>
+        </cfloop>
+
+        <!--- 2. CREATE the mail account via occ. Use temp script to
+             handle special characters in password/name. --->
         <cfset ncMailScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_mail_create.sh">
         <cfset ncMailCmd = 'docker exec -u www-data hermes_nextcloud php /var/www/html/occ mail:account:create "' &
                 ncMailUser & '" "' & ncMailName & '" "' & ncMailEmail &
@@ -56,7 +86,6 @@ Sets after execution:
             fileWrite(ncMailScript,
                 chr(35) & "!/bin/bash" & chr(10) & ncMailCmd & chr(10),
                 "utf-8");
-            // Debug log
             fileWrite("/opt/hermes/tmp/nc_mail_debug.log",
                 "Action: " & ncMailAction & chr(10) &
                 "User: " & ncMailUser & chr(10) &
@@ -64,7 +93,8 @@ Sets after execution:
                 "Email: " & ncMailEmail & chr(10) &
                 "Password length: " & Len(ncMailPassword) & chr(10) &
                 "Script: " & ncMailScript & chr(10) &
-                "Command: " & ncMailCmd & chr(10),
+                "Command: " & ncMailCmd & chr(10) &
+                "Pre-flight oc_mail_accounts count: " & _mailPreCount & chr(10),
                 "utf-8");
         </cfscript>
         <cfexecute name="/bin/chmod" arguments="+x #ncMailScript#" timeout="10" />
@@ -72,20 +102,44 @@ Sets after execution:
             variable="ncMailOccResult"
             errorVariable="ncMailOccError"
             timeout="30" />
+        <cffile action="delete" file="#ncMailScript#">
+
+        <!--- 3. POST-FLIGHT: count again. Must equal _mailPreCount + 1
+             for the create to be considered successful — independent of
+             what occ wrote to stdout/stderr. --->
+        <cfset _mailPostScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_mail_post.sh">
+        <cfscript>
+            fileWrite(_mailPostScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & ncMailDbUser & """ -p""" & ncMailDbPass & """ nextcloud -se """ &
+                "SELECT COUNT(*) FROM oc_mail_accounts WHERE user_id='" & ncMailUser & "' AND email='" & ncMailEmail & "';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_mailPostScript#" timeout="10" />
+        <cfset _mailPostResult = "">
+        <cfexecute name="#_mailPostScript#" variable="_mailPostResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_mailPostScript#"><cfcatch type="any"></cfcatch></cftry>
+        <cfset _mailPostCount = -1>
+        <cfloop array="#ListToArray(Trim(_mailPostResult), chr(10), false)#" index="_mLine">
+            <cfset _mLine = Trim(_mLine)>
+            <cfif IsNumeric(_mLine)><cfset _mailPostCount = _mLine><cfbreak></cfif>
+        </cfloop>
+
         <cfscript>
             fileAppend("/opt/hermes/tmp/nc_mail_debug.log",
-                "Result: " & ncMailOccResult & chr(10) &
-                "Error: " & ncMailOccError & chr(10) &
+                "occ STDOUT: " & ncMailOccResult & chr(10) &
+                "occ STDERR: " & ncMailOccError & chr(10) &
+                "Post-flight oc_mail_accounts count: " & _mailPostCount & chr(10) &
                 "---" & chr(10),
                 "utf-8");
         </cfscript>
-        <cffile action="delete" file="#ncMailScript#">
 
-        <cfif FindNoCase("error", ncMailOccError) OR FindNoCase("exception", ncMailOccError)>
-            <cfset ncMailResult = "error">
-            <cfset ncMailError = ncMailOccError>
-        <cfelse>
+        <cfif _mailPreCount GTE 0 AND _mailPostCount EQ _mailPreCount + 1>
             <cfset ncMailResult = "success">
+        <cfelse>
+            <cfset ncMailResult = "error">
+            <cfset ncMailError = "occ mail:account:create did not commit a row. preflight=" & _mailPreCount & ", postflight=" & _mailPostCount & " (expected preflight+1). occ STDOUT: " & Left(ncMailOccResult, 300) & " / occ STDERR: " & Left(ncMailOccError, 300)>
         </cfif>
     <cfcatch type="any">
         <cfset ncMailResult = "error">

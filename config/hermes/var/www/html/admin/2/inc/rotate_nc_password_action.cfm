@@ -62,14 +62,56 @@ See docs/admin/authentication/01-credential-model.md.
 <!--- Use the established temp shell script pattern (matches
      edit_mailbox_action.cfm and nextcloud_app_password.cfm). occ reads
      the password from OC_PASS env var via --password-from-env so the
-     plaintext doesn't appear in argv. --->
+     plaintext doesn't appear in argv.
+
+     VERIFICATION: don't trust occ's stdout — independently confirm the
+     hash in oc_users.password actually changed. Pre-flight SELECT before
+     occ runs, post-flight SELECT after. Both must succeed AND the post-
+     flight hash MUST differ from the pre-flight hash. NC uses per-user
+     salt (bcrypt/argon2id) so we can't predict the new hash exactly —
+     "did it change?" is the appropriate independent check. --->
 <cfinclude template="generate_customtrans.cfm">
-<cfset ncRotScript = "/opt/hermes/tmp/" & customtrans3 & "_rotate_nc_pw.sh">
 
 <cfset ncRotResult = "">
 <cfset ncRotError = "">
+<cfset ncRotPreHash = "">
+<cfset ncRotPostHash = "">
 
 <cftry>
+    <!--- Read NC DB credentials. Reused for both pre- and post-flight
+         SELECTs. --->
+    <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncRotDbUser" charset="utf-8">
+    <cfset ncRotDbUser = Trim(ncRotDbUser)>
+    <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncRotDbPass" charset="utf-8">
+    <cfset ncRotDbPass = Trim(ncRotDbPass)>
+
+    <!--- 1. PRE-FLIGHT: capture current oc_users.password hash. --->
+    <cfset ncRotPreScript = "/opt/hermes/tmp/" & customtrans3 & "_rotate_nc_pre.sh">
+    <cfscript>
+        fileWrite(ncRotPreScript,
+            chr(35) & "!/bin/bash" & chr(10) &
+            "docker exec hermes_db_server mariadb -u """ & ncRotDbUser & """ -p""" & ncRotDbPass & """ nextcloud -se """ &
+            "SELECT password FROM oc_users WHERE uid='" & getMailboxRot.username & "';" &
+            """ 2>&1" & chr(10),
+            "utf-8");
+    </cfscript>
+    <cfexecute name="/bin/chmod" arguments="+x #ncRotPreScript#" timeout="10" />
+    <cfset _preResult = "">
+    <cfexecute name="#ncRotPreScript#" variable="_preResult" timeout="30" />
+    <cftry><cffile action="delete" file="#ncRotPreScript#"><cfcatch type="any"></cfcatch></cftry>
+
+    <!--- Trim and pick the longest line. mariadb -se returns the value
+         alone; if any noise leaked in, the hash will be the longest line
+         (NC bcrypt/argon2id hashes are dozens of chars long). --->
+    <cfloop array="#ListToArray(Trim(_preResult), chr(10), false)#" index="_phLine">
+        <cfset _phLine = Trim(_phLine)>
+        <cfif Len(_phLine) GT Len(ncRotPreHash)>
+            <cfset ncRotPreHash = _phLine>
+        </cfif>
+    </cfloop>
+
+    <!--- 2. ROTATE via occ. --->
+    <cfset ncRotScript = "/opt/hermes/tmp/" & customtrans3 & "_rotate_nc_pw.sh">
     <cfscript>
         fileWrite(ncRotScript,
             chr(35) & "!/bin/bash" & chr(10) &
@@ -78,25 +120,49 @@ See docs/admin/authentication/01-credential-model.md.
     </cfscript>
     <cfexecute name="/bin/chmod" arguments="+x #ncRotScript#" timeout="10" />
     <cfexecute name="#ncRotScript#" variable="ncRotResult" errorVariable="ncRotError" timeout="60" />
+    <!--- Always clean up the temp script (contains plaintext password
+         literal — must not linger). --->
+    <cftry><cffile action="delete" file="#ncRotScript#"><cfcatch type="any"></cfcatch></cftry>
+
+    <!--- 3. POST-FLIGHT: capture new oc_users.password hash. --->
+    <cfset ncRotPostScript = "/opt/hermes/tmp/" & customtrans3 & "_rotate_nc_post.sh">
+    <cfscript>
+        fileWrite(ncRotPostScript,
+            chr(35) & "!/bin/bash" & chr(10) &
+            "docker exec hermes_db_server mariadb -u """ & ncRotDbUser & """ -p""" & ncRotDbPass & """ nextcloud -se """ &
+            "SELECT password FROM oc_users WHERE uid='" & getMailboxRot.username & "';" &
+            """ 2>&1" & chr(10),
+            "utf-8");
+    </cfscript>
+    <cfexecute name="/bin/chmod" arguments="+x #ncRotPostScript#" timeout="10" />
+    <cfset _postResult = "">
+    <cfexecute name="#ncRotPostScript#" variable="_postResult" timeout="30" />
+    <cftry><cffile action="delete" file="#ncRotPostScript#"><cfcatch type="any"></cfcatch></cftry>
+
+    <cfloop array="#ListToArray(Trim(_postResult), chr(10), false)#" index="_phLine">
+        <cfset _phLine = Trim(_phLine)>
+        <cfif Len(_phLine) GT Len(ncRotPostHash)>
+            <cfset ncRotPostHash = _phLine>
+        </cfif>
+    </cfloop>
 <cfcatch type="any">
-    <cfset ncRotError = cfcatch.message>
+    <cfset ncRotError = cfcatch.message & " / " & cfcatch.detail>
 </cfcatch>
 </cftry>
 
-<!--- Always clean up the temp script (contains plaintext password
-     literal — must not linger). --->
-<cftry>
-    <cffile action="delete" file="#ncRotScript#">
-<cfcatch type="any"></cfcatch>
-</cftry>
-
-<!--- occ user:resetpassword prints "Successfully reset password for <user>"
-     on success. Anything else = failure. Be liberal in matching. --->
-<cfif FindNoCase("Successfully reset", ncRotResult) GT 0>
+<!--- VERIFY: post-flight hash must be non-empty AND must differ from
+     the pre-flight hash. If either condition fails, the rotation did
+     NOT take effect regardless of what occ printed. Surface the actual
+     state to the admin instead of a string-match assumption. --->
+<cfif Len(ncRotPostHash) GT 0 AND ncRotPostHash NEQ ncRotPreHash>
     <cfset session.rotateNcUser = getMailboxRot.username>
     <cfset session.m = 53>
 <cfelse>
-    <cfset session.rotateNcError = Trim(ncRotResult & " " & ncRotError)>
+    <cfif Len(ncRotPostHash) EQ 0>
+        <cfset session.rotateNcError = "Post-rotation SELECT returned no oc_users.password value. occ STDOUT: " & Left(ncRotResult, 300) & " / occ STDERR: " & Left(ncRotError, 300)>
+    <cfelse>
+        <cfset session.rotateNcError = "Hash unchanged after occ user:resetpassword (still equals pre-rotation value). occ may have failed silently. occ STDOUT: " & Left(ncRotResult, 300)>
+    </cfif>
     <cfset session.m = 54>
 </cfif>
 

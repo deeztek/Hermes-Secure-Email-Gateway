@@ -216,6 +216,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
 
+      <!--- HOW MAILBOX CREDENTIALS WORK — auth-agnostic. Brief tactical
+           reminder so admins onboarding their first mailbox understand
+           what the user will and won't be able to do with the password
+           shown above, without having to read the credential model doc. --->
+      <div class="alert alert-secondary mb-3">
+        <h5 class="mb-2"><i class="icon fas fa-key"></i> How mailbox credentials work</h5>
+        <ul class="mb-0" style="padding-left: 1.2em;">
+          <li>The password above is for <strong>web logins only</strong> &mdash; <code>/users</code> portal and <code>/nc</code> webmail.</li>
+          <li><strong>Mail clients</strong> (Thunderbird, Apple Mail, Outlook, iOS, etc.) and <strong>DAV clients</strong> (CalDAV/CardDAV) need an <strong>app password</strong>. The user generates one per device from <code>/users &rarr; My App Passwords</code>; the same plaintext authenticates IMAP, SMTP, CalDAV, and CardDAV. The login password is rejected by all four protocols by design.</li>
+          <li><strong>Auto-discovery</strong> works for IMAP/SMTP/CalDAV/CardDAV when the per-domain DNS records are in place (see Email Server &rarr; Domains &rarr; DNS Guide).</li>
+          <li><strong>Nextcloud Mail webmail</strong> is provisioned automatically at mailbox creation &mdash; the user does not need to enter IMAP/SMTP server settings manually.</li>
+        </ul>
+      </div>
+
       <!--- AUTHENTICATION TYPE (top of form — fields below adapt to selection) --->
       <cfif remoteauthAvailable>
         <div class="form-group mb-3">
@@ -255,32 +269,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </div>
         </div>
 
-        <!--- REMOTE-AUTH DAV + NC MAIL NOTICE — explains the cascading
-             effects of having no local password. Shown only when Remote
-             is selected. Key points the admin must understand AND be able
-             to explain to the user before the welcome email arrives: --->
+        <!--- REMOTE-AUTH NOTICE — under the unified credential model
+             (#197 Phase 1 + 1b) the remote-auth user experience is
+             functionally identical to local-auth. The only practical
+             difference is where the web-login password lives. This
+             notice exists to flag that delegation so admins know what
+             they can/can't help the user with. --->
         <div class="form-group mb-3" id="remoteAuthDavNotice" style="display:none;">
-          <div class="alert alert-warning">
-            <h5 class="mb-2"><i class="icon fas fa-info-circle"></i> Calendar, Contacts &amp; Nextcloud Mail for Remote-Auth Users</h5>
-            <p class="mb-2">Because this user will sign in with their <strong>organization (AD/LDAP) password via SSO/OIDC</strong>, Hermes never sees that password. This has a few knock-on effects you and the user should be aware of:</p>
-
-            <p class="mb-1"><strong>1. DAV (Calendar / Contacts / Files sync)</strong></p>
-            <ul class="mb-2">
-              <li>Hermes auto-generates a Nextcloud app password named &ldquo;<strong>Hermes System</strong>&rdquo; and includes it in the Welcome email along with the CalDAV/CardDAV server URL.</li>
-              <li>The user enters that app password (NOT their organization password) into their sync client.</li>
-              <li><strong>Auto-configuration will NOT work</strong> for these clients &mdash; Thunderbird/Lightning, Apple Calendar, iOS Accounts, DAVx5, etc. will all fail their auto-discovery wizards because they try the organization password. The account must be set up <u>manually</u> with the app password and server URL from the Welcome email.</li>
-              <li>The user can regenerate their own token in <strong>Webmail &rarr; Personal Settings &rarr; Security &rarr; Devices &amp; sessions</strong>, or you can use <strong>Actions &rarr; Reset DAV Password</strong> on this page.</li>
-            </ul>
-
-            <p class="mb-1"><strong>2. Nextcloud Mail (webmail)</strong></p>
-            <ul class="mb-2">
-              <li>Hermes does <strong>not</strong> pre-create the NC Mail profile for this user (no password to hand to NC).</li>
-              <li>On their first login to <strong>Webmail</strong>, the user will see NC Mail&rsquo;s <strong>&ldquo;Connect to mail account&rdquo;</strong> dialog.</li>
-              <li>They must enter their name, their email address, and their <strong>organization (AD/LDAP) password</strong> &mdash; the <u>same</u> password they just signed in with. Once entered, NC Mail will auto-discover the IMAP/SMTP server settings and provision the profile.</li>
-              <li>The &ldquo;Hermes System&rdquo; app password is <strong>not</strong> used here. Email (IMAP/SMTP) always authenticates with the organization password.</li>
-            </ul>
-
-            <p class="mb-0"><small><strong>Local-auth mailboxes don&rsquo;t have any of these limitations</strong> &mdash; their email password works for everything, NC Mail is pre-configured, and DAV auto-discovery works.</small></p>
+          <div class="alert alert-info">
+            <h5 class="mb-2"><i class="icon fas fa-info-circle"></i> What's different about Remote-Auth</h5>
+            <p class="mb-2">Remote-auth users sign in to <code>/users</code> and <code>/nc</code> with their <strong>organization (AD/LDAP) password via SSO/OIDC</strong>. Hermes never sees that password &mdash; it lives entirely in your AD/LDAP. Everything else (NC Mail, app passwords, auto-discovery) works the same as local-auth.</p>
+            <p class="mb-0"><small><strong>Practical implication for admins:</strong> you cannot recover or reset the user's web-login password from Hermes &mdash; that's owned by your AD/LDAP. You <em>can</em> still revoke per-device app passwords and rotate the NC internal password from the Actions menu on this page.</small></p>
           </div>
         </div>
 

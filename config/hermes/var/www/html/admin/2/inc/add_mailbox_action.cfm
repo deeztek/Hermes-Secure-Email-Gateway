@@ -480,55 +480,139 @@ Requires form variables:
     </cftry>
 </cfif>
 
-<!--- 4d. NEXTCLOUD DOMAIN GROUP. Add the user to the NC group for their
-     domain (e.g., deeztek.com). The group was created when the mailbox
-     domain was added. --->
+<!--- 4d / 4d-bis: NC group membership + default DAV resources, both
+     verified by independent SQL post-flight. Don't trust occ exit code
+     or stdout — verify the side effects landed in the database.
+     Failures here aren't aborts (mailbox itself is provisioned), but
+     are surfaced via session.ncProvisionError so the admin sees them. --->
 <cfif form.nextcloud_enabled EQ "1">
     <cftry>
+        <cfinclude template="generate_customtrans.cfm">
+
+        <!--- Read NC DB creds once for all post-flight checks below. --->
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="_ncDbUser4d" charset="utf-8">
+        <cfset _ncDbUser4d = Trim(_ncDbUser4d)>
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="_ncDbPass4d" charset="utf-8">
+        <cfset _ncDbPass4d = Trim(_ncDbPass4d)>
+
+        <cfset _ncProvisionWarnings = "">
+
+        <!--- ===== 4d. DOMAIN GROUP MEMBERSHIP =====
+             Add user to NC group for their domain (cross-domain isolation
+             relies on this). Verify by SELECT on oc_group_user. --->
         <cfexecute name="/usr/local/bin/docker"
             arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:adduser #getDomain.domain# #recipientEmail#"
             variable="ncGroupAddResult"
             errorVariable="ncGroupAddError"
             timeout="30" />
-    <cfcatch type="any">
-        <!--- Non-fatal --->
-    </cfcatch>
-    </cftry>
-</cfif>
 
-<!--- 4d-bis. PRE-CREATE DEFAULT NC DAV RESOURCES. Nextcloud creates the
-     default "Personal" calendar and "Contacts" address book lazily on
-     the user's first NC web login — they don't exist at user-add time.
-     Creating them eagerly here means TB autoconfig + RFC 6764 SRV
-     discovery sees both on day 1, so users don't have to log into NC
-     before setting up Thunderbird (otherwise TB shows only NC's
-     system-shared books and no calendar). Non-fatal: if either fails,
-     NC will still create them lazily on first web login. --->
-<cfif form.nextcloud_enabled EQ "1">
-    <cftry>
+        <cfset _groupCheckScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_group_check.sh">
+        <cfscript>
+            fileWrite(_groupCheckScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & _ncDbUser4d & """ -p""" & _ncDbPass4d & """ nextcloud -se """ &
+                "SELECT COUNT(*) FROM oc_group_user WHERE gid='" & getDomain.domain & "' AND uid='" & recipientEmail & "';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_groupCheckScript#" timeout="10" />
+        <cfset _groupCheckResult = "">
+        <cfexecute name="#_groupCheckScript#" variable="_groupCheckResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_groupCheckScript#"><cfcatch type="any"></cfcatch></cftry>
+        <cfset _groupCheckCount = -1>
+        <cfloop array="#ListToArray(Trim(_groupCheckResult), chr(10), false)#" index="_gLine">
+            <cfset _gLine = Trim(_gLine)>
+            <cfif IsNumeric(_gLine)><cfset _groupCheckCount = _gLine><cfbreak></cfif>
+        </cfloop>
+        <cfif _groupCheckCount NEQ 1>
+            <cfset _ncProvisionWarnings &= "Group membership not verified (SELECT count=" & _groupCheckCount & ", expected 1) for " & recipientEmail & " in " & getDomain.domain & ". occ STDOUT: " & Left(ncGroupAddResult, 200) & ". Cross-domain isolation may not be enforced for this user. ">
+        </cfif>
+
+        <!--- ===== 4d-bis. DEFAULT NC DAV RESOURCES =====
+             Pre-create default "personal" calendar and "contacts"
+             address book so TB autoconfig + RFC 6764 SRV discovery
+             finds them on day 1. NC otherwise creates them lazily on
+             first web login. Verify via oc_calendars and oc_addressbooks.
+
+             Note: NC stores these with principaluri =
+             'principals/users/<email>'. The URI segment matches what we
+             passed to occ ("personal" / "contacts"). --->
         <cfexecute name="/usr/local/bin/docker"
             arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ dav:create-calendar #recipientEmail# personal"
+            variable="_calCreateResult"
+            errorVariable="_calCreateError"
             timeout="30" />
+
+        <cfset _calCheckScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_cal_check.sh">
+        <cfscript>
+            fileWrite(_calCheckScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & _ncDbUser4d & """ -p""" & _ncDbPass4d & """ nextcloud -se """ &
+                "SELECT COUNT(*) FROM oc_calendars WHERE principaluri='principals/users/" & recipientEmail & "' AND uri='personal';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_calCheckScript#" timeout="10" />
+        <cfset _calCheckResult = "">
+        <cfexecute name="#_calCheckScript#" variable="_calCheckResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_calCheckScript#"><cfcatch type="any"></cfcatch></cftry>
+        <cfset _calCheckCount = -1>
+        <cfloop array="#ListToArray(Trim(_calCheckResult), chr(10), false)#" index="_cLine">
+            <cfset _cLine = Trim(_cLine)>
+            <cfif IsNumeric(_cLine)><cfset _calCheckCount = _cLine><cfbreak></cfif>
+        </cfloop>
+        <cfif _calCheckCount LT 1>
+            <cfset _ncProvisionWarnings &= "Default 'personal' calendar not verified (SELECT count=" & _calCheckCount & ") for " & recipientEmail & ". TB autoconfig will fall back to NC's lazy create on first web login. occ STDOUT: " & Left(_calCreateResult, 200) & ". ">
+        </cfif>
+
         <cfexecute name="/usr/local/bin/docker"
             arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ dav:create-addressbook #recipientEmail# contacts"
+            variable="_abCreateResult"
+            errorVariable="_abCreateError"
             timeout="30" />
+
+        <cfset _abCheckScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_ab_check.sh">
+        <cfscript>
+            fileWrite(_abCheckScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & _ncDbUser4d & """ -p""" & _ncDbPass4d & """ nextcloud -se """ &
+                "SELECT COUNT(*) FROM oc_addressbooks WHERE principaluri='principals/users/" & recipientEmail & "' AND uri='contacts';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_abCheckScript#" timeout="10" />
+        <cfset _abCheckResult = "">
+        <cfexecute name="#_abCheckScript#" variable="_abCheckResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_abCheckScript#"><cfcatch type="any"></cfcatch></cftry>
+        <cfset _abCheckCount = -1>
+        <cfloop array="#ListToArray(Trim(_abCheckResult), chr(10), false)#" index="_aLine">
+            <cfset _aLine = Trim(_aLine)>
+            <cfif IsNumeric(_aLine)><cfset _abCheckCount = _aLine><cfbreak></cfif>
+        </cfloop>
+        <cfif _abCheckCount LT 1>
+            <cfset _ncProvisionWarnings &= "Default 'contacts' address book not verified (SELECT count=" & _abCheckCount & ") for " & recipientEmail & ". TB autoconfig will fall back to NC's lazy create on first web login. occ STDOUT: " & Left(_abCreateResult, 200) & ". ">
+        </cfif>
+
+        <cfif Len(_ncProvisionWarnings) GT 0>
+            <cfset session.ncProvisionWarnings = _ncProvisionWarnings>
+        </cfif>
     <cfcatch type="any">
-        <!--- Non-fatal --->
+        <cfset session.ncProvisionWarnings = "NC group/DAV provisioning threw: " & cfcatch.message & " / " & cfcatch.detail>
     </cfcatch>
     </cftry>
 </cfif>
 
-<!--- 4e. (App password removed — DAV auth uses the local NC password
-     created in step 4c via occ user:add. No separate app password needed.) --->
-
-<!--- 4h. INITIAL SETUP APP PASSWORD ("Hermes System" #197 Phase 1).
-     IMAP/SMTP auth now goes through Dovecot's lua passdb against the
-     app_passwords table — the org password no longer works for mail
-     clients. Mint a system app password here so the welcome email can
-     hand it to the user; they can revoke it once they've configured
-     their devices with their own per-device app passwords.
+<!--- 4h. HERMES SYSTEM APP PASSWORD (#197 Phase 1).
+     Mint a system app password (is_system=1, label "Hermes System").
+     Used by NC Mail as the IMAP credential to talk to Dovecot — step
+     4f below provisions an oc_mail_accounts row using this plaintext.
+     The user never sees it; the welcome email does NOT carry it
+     (welcome email under Phase 1 carries no credentials at all — see
+     send_mailbox_welcome_email.cfm and the credential model doc).
+     Hidden from the user portal via the is_system flag so users can't
+     accidentally revoke it and break webmail.
      Applies to both local- and remote-auth mailboxes (both need a
-     Dovecot-readable credential to authenticate IMAP/SMTP). --->
+     Dovecot-readable credential for NC Mail to authenticate IMAP). --->
 <cfset initialAppPasswordPlain = "">
 <cftry>
     <cfset _appPwAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789">

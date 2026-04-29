@@ -146,7 +146,42 @@ Without it, the user couldn't read mail through the `/nc` Mail app on day 1, bec
 2. Their login password no longer works for IMAP (it never reaches Dovecot under the new model).
 3. NC Mail needs *some* credential to authenticate IMAP on the server side — there's no SSO from NC Mail down into Dovecot in this stack.
 
-The Hermes System pw is that credential. NC Mail stores it (encrypted) in NC's own `mail_accounts` table at provisioning time, and decrypts + uses it whenever it polls IMAP. The user never sees it, never types it, and never knows it exists.
+The Hermes System app password is that credential. The user never sees it, never types it, and never knows it exists.
+
+### Where it lives — two stores, two roles
+
+The Hermes System credential is held in two databases at the same time, each playing a different role:
+
+| Location | Form | Used by | Role |
+|---|---|---|---|
+| `hermes.app_passwords` (`is_system = 1`) | ARGON2ID **hash** | Dovecot's Lua passdb | **Validation store.** Dovecot password-verifies incoming IMAP/SMTP attempts against this hash. This is "the credential" — its source of truth. |
+| `nextcloud.oc_mail_accounts` | NC-encrypted **plaintext** | NC Mail (the webmail app inside Nextcloud) | **Operational copy.** NC Mail decrypts this on each poll and presents `email + plaintext` to Dovecot. It does *not* authenticate against `oc_authtoken` — `oc_mail_accounts` is a separate NC Mail table for stored mail-server credentials. |
+
+```
+       hermes.app_passwords (hashed, is_system=1)  ◄── validation
+                  │
+                  │  Dovecot's lua passdb reads here
+                  ▼
+        ┌──────────────────────┐
+        │   hermes_dovecot     │ accepts IMAP/SMTP if hash matches
+        └──────────────────────┘
+                  ▲
+                  │  IMAP/SMTP login attempt
+                  │  (email + plaintext)
+                  │
+        ┌──────────────────────┐
+        │   NC Mail (in NC)    │
+        └──────────────────────┘
+                  ▲
+                  │  decrypts on each poll, sends to Dovecot
+                  │
+       nextcloud.oc_mail_accounts (encrypted plaintext)  ◄── stash
+```
+
+Two important consequences:
+
+- **Deleting the `app_passwords` row instantly disables NC Mail.** NC Mail's stored plaintext becomes garbage that never validates. Dovecot rejects every poll attempt. Webmail starts erroring.
+- **Hermes System is *not* an `oc_authtoken` row.** That's a different NC table used for NC's own session/DAV authentication. NC Mail authenticates *to Dovecot* (an external IMAP server from NC's perspective), not *to NC*, so it has no business in `oc_authtoken`. Only user-generated app passwords (Phase 1b dual-write) live in `oc_authtoken`.
 
 ### Why it's hidden from the user portal
 
