@@ -85,17 +85,6 @@ Requires the following variables to be set before including:
     <p style="margin: 0; font-size: 13px; color: ##555;">It's recommended that each app password be device-specific, so if a device is lost or stolen you can revoke just that one without affecting any of your other devices or your website login.</p>
 </div>
 
-<div style="background-color: ##f0f7ff; border: 1px solid ##b8daff; padding: 20px; margin: 20px 0; border-radius: 5px;">
-    <h3 style="margin-top: 0; color: ##004085;">Email Client Settings</h3>
-    <p>Most modern email clients (Thunderbird, Outlook, iOS Mail) will auto-configure when you enter your email address. If manual setup is needed:</p>
-    <table style="text-align: left; width: 100%; border-collapse: collapse;">
-        <tr><td style="padding: 4px 8px;"><strong>Incoming (IMAP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 993 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Outgoing (SMTP):</strong></td><td style="padding: 4px 8px;">#consoleHost# &mdash; Port 587 (STARTTLS) or Port 465 (SSL/TLS)</td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Username:</strong></td><td style="padding: 4px 8px;">#recipientEmail# <em>(your full email address)</em></td></tr>
-        <tr><td style="padding: 4px 8px;"><strong>Password:</strong></td><td style="padding: 4px 8px;"><em>An app password from the user portal (above)</em></td></tr>
-    </table>
-</div>
-
 <div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##495057;">User Portal</h3>
     <p>You can manage your email settings, view quarantined messages, and release held messages from the user portal:</p>

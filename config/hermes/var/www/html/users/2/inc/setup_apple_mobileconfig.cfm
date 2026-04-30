@@ -28,14 +28,14 @@ work happens in the action handler.
         </ul>
       </div>
       <div class="card-footer">
-        <!--- Established Hermes download pattern (claude_conversation.md
-             3/25/2025 entry): form targets a hidden iframe so the
-             current page never navigates, plus class="no-preloader"
-             so the global Hermes spinner doesn't fire on submit. The
-             iframe receives the binary; the browser intercepts it as
-             a download per the Content-Disposition: attachment header.
-             Same pattern PGP / S/MIME / CSR downloads use. --->
-        <form method="post" action="setup_devices.cfm?device=apple" target="downloadFrame" class="no-preloader">
+        <!--- Form posts to the action handler which now redirects to a
+             result page (Phase 2c — was a binary download in Phase 2a).
+             That means we want a normal form submit / page navigation,
+             NOT the hidden-iframe download pattern. The global preloader
+             firing during the redirect is fine — profile generation +
+             signing can take a few seconds, and the spinner gives the
+             user feedback that something is happening. --->
+        <form method="post" action="setup_devices.cfm?device=apple">
           <input type="hidden" name="action" value="generate_apple_profile">
 
           <div class="row">
@@ -73,9 +73,4 @@ work happens in the action handler.
   </div>
 </div>
 
-<!--- Hidden iframe target for the Generate Profile form. Form's
-     target="downloadFrame" routes the response here so the parent
-     page never navigates; browser intercepts the Content-Disposition:
-     attachment as a download. Established Hermes download pattern. --->
-<iframe name="downloadFrame" style="display:none;"></iframe>
 </cfoutput>

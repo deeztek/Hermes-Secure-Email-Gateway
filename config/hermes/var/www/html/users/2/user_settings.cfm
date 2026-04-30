@@ -628,8 +628,13 @@ $(document).ready(function() {
             </div>
         </div>
 
-        <!--- RECOVERY EMAIL SECTION (MAILBOX USERS ONLY) --->
-        <cfif session.theGroups CONTAINS "mailboxes">
+        <!--- RECOVERY EMAIL SECTION (LOCAL-AUTH MAILBOX USERS ONLY)
+
+             Remote-auth (SSO) users authenticate against an external IdP,
+             so a local recovery email cannot reset their password — hide
+             the entire section. session.auth_type is set in Application.cfc
+             from the recipients table; "remote" = SSO. --->
+        <cfif session.theGroups CONTAINS "mailboxes" AND (NOT StructKeyExists(session, "auth_type") OR session.auth_type NEQ "remote")>
 
         <div class="card card-outline card-primary mb-4">
             <div class="card-header">

@@ -1906,12 +1906,20 @@ CREATE TABLE IF NOT EXISTS mobile_setup_tokens (
     token VARCHAR(64) NOT NULL,
     user_email VARCHAR(255) NOT NULL,
     payload_blob LONGBLOB NULL,
+    filename VARCHAR(255) NULL,
+    content_type VARCHAR(100) NULL,
     created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,
     used_at DATETIME NULL,
     UNIQUE KEY uq_mst_token (token),
     KEY idx_mst_expires (expires_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Idempotent column adds for installs that already have the table.
+ALTER TABLE mobile_setup_tokens
+  ADD COLUMN IF NOT EXISTS filename VARCHAR(255) NULL;
+ALTER TABLE mobile_setup_tokens
+  ADD COLUMN IF NOT EXISTS content_type VARCHAR(100) NULL;
 
 -- App passwords for device/client authentication (#197 Phase 1).
 -- One row per device/client credential. Dovecot's passdb sql query returns

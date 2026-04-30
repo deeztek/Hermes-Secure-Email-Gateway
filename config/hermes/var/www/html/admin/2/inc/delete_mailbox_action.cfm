@@ -198,6 +198,73 @@ Removes a mailbox user from all systems:
     </cftry>
 </cfloop>
 
+<!--- 3c. CLEAN UP USER FOLDER SHARES (distinct from shared_mailboxes).
+     The user_folder_shares table is the canonical source for the
+     /users/2/view_shared_folders.cfm UI. Step 3b above handled the
+     dovecot_acl side broadly (recipient-side deletes) but NEVER
+     touched user_folder_shares — so a re-created mailbox at the same
+     email would still show ghost shares pointing at the deleted user.
+     Also plugs two owner-side gaps step 3b didn't cover: dovecot_acl
+     rows on folders OWNED by the deleted user, and dovecot_acl_shared
+     rows where the deleted user was the from_user. Finally rebuilds
+     each surviving owner's per-folder vfile dovecot-acl so the
+     deleted user is removed from disk too. --->
+
+<!--- Capture (owner, folder) pairs of shares TO the deleted user so
+     we can rebuild those vfiles after the share rows are gone. --->
+<cfquery name="getUserFolderSharesAsRecipient" datasource="hermes">
+    SELECT DISTINCT owner_username, folder_path
+    FROM user_folder_shares
+    WHERE shared_with_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Delete share rows where deleted user was RECIPIENT — fixes the
+     screenshot bug where the owner's UI kept showing a share to a
+     long-gone user. --->
+<cfquery datasource="hermes">
+    DELETE FROM user_folder_shares
+    WHERE shared_with_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Delete share rows where deleted user was OWNER. Their maildir is
+     about to be wiped (step 6), but the share rows would have lingered
+     and the recipient's UI would have kept listing a ghost owner. --->
+<cfquery datasource="hermes">
+    DELETE FROM user_folder_shares
+    WHERE owner_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Mirror of step 3b's to_user delete: drop dovecot_acl_shared rows
+     where the deleted user was the FROM side. --->
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl_shared
+    WHERE from_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Drop dovecot_acl rows on folders OWNED by the deleted user.
+     Step 3b's WHERE username=recipient deleted rows where the deleted
+     user was the recipient of an ACL grant; this catches the mirror
+     case (rows whose mailbox identifier starts with "<deleted-user>/"). --->
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl
+    WHERE mailbox LIKE <cfqueryparam value="#recipient#/%" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Resync each surviving owner's vfile so the deleted user's line is
+     removed from /srv/mail/.../dovecot-acl. Must run AFTER the
+     user_folder_shares deletes above — sync_user_folder_acl_file.cfm
+     rebuilds the file from the current table state. --->
+<cfloop query="getUserFolderSharesAsRecipient">
+    <cfset ownerUser  = getUserFolderSharesAsRecipient.owner_username>
+    <cfset folderPath = getUserFolderSharesAsRecipient.folder_path>
+    <cftry>
+        <cfinclude template="sync_user_folder_acl_file.cfm">
+    <cfcatch type="any">
+        <!--- Per-folder sync failure is non-fatal; DB state is correct --->
+    </cfcatch>
+    </cftry>
+</cfloop>
+
 <!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
 <cfquery datasource="hermes">
     DELETE FROM mailbox_aliases

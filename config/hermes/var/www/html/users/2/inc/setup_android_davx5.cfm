@@ -1,15 +1,25 @@
 <!---
-SETUP DEVICES — ANDROID DAVx5 BRANCH (#224 Phase 2b — placeholder)
+SETUP DEVICES — ANDROID (#224 Phase 2b)
 
-Manual-instructions template for Android using DAVx5 (CalDAV/CardDAV)
-plus an email app of choice. Full content lands in Phase 2b once the
-manual-instructions UI pattern is fleshed out from the Apple branch.
+Android path: DAVx5 for Calendar + Contacts (CalDAV/CardDAV), plus a
+mail app for IMAP/SMTP. K-9 Mail and Thunderbird for Android are the
+same client (Thunderbird for Android is K-9's official rebrand). Both
+autodiscover IMAP/SMTP cleanly from the Hermes autoconfig endpoint —
+verified working — so users only enter email + app password.
 
-For now: point the user at My App Passwords and the credential-model
-basics so they can set up Android manually with the right values.
+One app password covers all four protocols. Same plaintext goes into
+the mail app and into DAVx5.
 --->
 
+<cfquery name="getAndroidMailHost" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE module = 'console' AND parameter = 'console.host'
+</cfquery>
+<cfset mailHost = (getAndroidMailHost.recordcount GTE 1 AND Trim(getAndroidMailHost.value2) NEQ "") ? Trim(getAndroidMailHost.value2) : cgi.http_host>
+
 <cfoutput>
+<cfset davBaseUrl = "https://#mailHost#/nc/remote.php/dav/">
+
 <div class="row mb-3">
   <div class="col-12">
     <a href="setup_devices.cfm" class="btn btn-link p-0 mb-2"><i class="fas fa-arrow-left"></i> Pick a different device</a>
@@ -18,27 +28,51 @@ basics so they can set up Android manually with the right values.
         <h3 class="card-title m-0"><i class="fab fa-android"></i> Android &mdash; DAVx5 + email app</h3>
       </div>
       <div class="card-body">
-        <div class="alert alert-warning mb-3">
-          <h6 class="mb-1"><i class="icon fas fa-tools"></i> Step-by-step instructions coming soon</h6>
-          <p class="mb-0">The full DAVx5 / Android email walkthrough is being polished. In the meantime, the manual setup below will get you running.</p>
-        </div>
+        <p>On Android you'll use two apps: <strong>DAVx5</strong> for Calendar and Contacts, plus <strong>K-9 Mail</strong> (also published as <strong>Thunderbird for Android</strong> &mdash; same app, just rebranded) for email. The mail app autodiscovers all the server settings, so you only type your email address and app password.</p>
 
-        <h5>Manual setup &mdash; one app password covers everything</h5>
-        <ol class="mb-3">
-          <li>Open <a href="view_app_passwords.cfm">My App Passwords</a> and create one. Label it for the device (e.g. "Android" or "Pixel 8"). <strong>Copy the plaintext shown once</strong> &mdash; you'll need it below.</li>
-          <li>Install <a href="https://www.davx5.com/" target="_blank" rel="noopener">DAVx5</a> from F-Droid or Google Play.</li>
-          <li>In DAVx5, add a new account &rarr; <em>Login with URL and username</em>. Enter:
-            <ul>
-              <li><strong>Base URL:</strong> <code>https://###cgi.http_host###/nc/remote.php/dav/</code></li>
-              <li><strong>Username:</strong> your full email address</li>
-              <li><strong>Password:</strong> the app password you just created</li>
-            </ul>
-          </li>
-          <li>For email, install an Android email app (K-9 Mail, FairEmail, or Thunderbird for Android). Configure with the server settings from the autoconfig endpoint at <code>https://autoconfig.&lt;your-domain&gt;/mail/config-v1.1.xml?emailaddress=YOU@DOMAIN</code> (most apps will auto-discover when you enter your email).</li>
-          <li>For email password: use the <strong>same app password</strong> from step 1. One credential, all four protocols.</li>
+        <ul class="mb-3">
+          <li><strong>Mail (IMAP + SMTP):</strong> K-9 Mail / Thunderbird for Android (autoconfig)</li>
+          <li><strong>Calendar + Contacts (CalDAV + CardDAV):</strong> DAVx5</li>
+          <li><strong>One credential:</strong> the same app password works for all four protocols</li>
+        </ul>
+
+        <h5>Step 1 &mdash; Mint an app password for this device</h5>
+        <ol>
+          <li>Open <a href="view_app_passwords.cfm">My App Passwords</a> and create one labeled for the phone or tablet (e.g. <em>Pixel 8</em>).</li>
+          <li><strong>Copy the plaintext shown once</strong> &mdash; you'll paste it into both DAVx5 and the mail app below.</li>
         </ol>
 
-        <p class="mb-0"><small><strong>Note on Nextcloud SSO:</strong> If your phone also has the Nextcloud Files app installed, DAVx5 has a "Login from Nextcloud Files app" option. That will work, but it creates a separate DAV-only credential outside My App Passwords. The manual setup above keeps everything visible in one place.</small></p>
+        <h5>Step 2 &mdash; Install your apps</h5>
+        <ol>
+          <li>Install <a href="https://www.davx5.com/" target="_blank" rel="noopener">DAVx5</a> from F-Droid or Google Play.</li>
+          <li>Install <a href="https://k9mail.app/" target="_blank" rel="noopener">K-9 Mail</a> <em>or</em> <a href="https://www.thunderbird.net/en-US/mobile/" target="_blank" rel="noopener">Thunderbird for Android</a> (same app, rebranded &mdash; pick whichever name you prefer).</li>
+        </ol>
+
+        <h5>Step 3 &mdash; Set up email (K-9 / Thunderbird for Android)</h5>
+        <ol>
+          <li>Open the mail app and choose <em>Add account</em> (or <em>New account</em>).</li>
+          <li>Enter your full email address and the app password from Step 1.</li>
+          <li>The app discovers IMAP and SMTP automatically. Tap <em>Done</em>.</li>
+        </ol>
+
+        <h5>Step 4 &mdash; Set up Calendar and Contacts (DAVx5)</h5>
+        <ol>
+          <li>Open DAVx5 and tap the <em>+</em> button &rarr; <strong>Login with URL and username</strong>.</li>
+          <li>Fill in:
+            <ul>
+              <li><strong>Base URL:</strong> <code>#davBaseUrl#</code></li>
+              <li><strong>Username:</strong> your full email address</li>
+              <li><strong>Password:</strong> the same app password from Step 1</li>
+            </ul>
+          </li>
+          <li>Tap <em>Login</em>. DAVx5 will discover your calendars and address books.</li>
+          <li>On the next screen, enable Calendar and Contacts sync. Grant DAVx5 the system permissions when prompted &mdash; that's how the calendar and contacts you sync show up in Android's built-in Calendar and Contacts apps.</li>
+        </ol>
+
+        <div class="alert alert-info mb-0">
+          <h6 class="mb-1"><i class="icon fas fa-info-circle"></i> Note on DAVx5 + Nextcloud Files app</h6>
+          <p class="mb-0">If you also have the Nextcloud Files Android app installed, DAVx5 offers a <em>Login from Nextcloud Files app</em> shortcut. That works, but it creates a separate device-token credential outside <a href="view_app_passwords.cfm">My App Passwords</a>. The manual setup above keeps everything visible and revocable in one place.</p>
+        </div>
       </div>
     </div>
   </div>

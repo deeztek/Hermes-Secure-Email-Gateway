@@ -59,8 +59,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </nav>
 <!--end::Header-->
 
-<!--- SECONDARY EMAIL NAGGING BANNER FOR MAILBOX USERS --->
-<cfif session.theGroups CONTAINS "mailboxes">
+<!--- SECONDARY EMAIL NAGGING BANNER FOR LOCAL-AUTH MAILBOX USERS
+
+    Skip the nag for remote-auth (SSO) users — their password lives in
+    an external IdP, so a local recovery email here would not let them
+    reset anything. session.auth_type is set in Application.cfc from the
+    recipients table; "remote" = SSO, anything else = local. --->
+<cfif session.theGroups CONTAINS "mailboxes" AND (NOT StructKeyExists(session, "auth_type") OR session.auth_type NEQ "remote")>
     <cfif NOT StructKeyExists(session, "secondary_email_verified") OR session.secondary_email_verified NEQ 1>
         <div class="alert alert-warning alert-dismissible d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
             <div class="container-fluid d-flex justify-content-center align-items-center">

@@ -133,6 +133,19 @@ the url: https://#ConsoleHost#</cfoutput>
   <cfset session.secondary_email = getusersettings.secondary_email>
   <cfset session.secondary_email_verified = getusersettings.secondary_email_verified>
 
+  <!--- Auth type (local vs remote/SSO). Used to suppress the
+       password-recovery-email nag for remote-auth users — their
+       password lives in an external IdP, so a recovery email here
+       would do nothing. Defaults to empty if no recipients row. --->
+  <cfquery name="getauthtype" datasource="hermes">
+  select auth_type from recipients where recipient = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif getauthtype.recordcount GTE 1>
+    <cfset session.auth_type = getauthtype.auth_type>
+  <cfelse>
+    <cfset session.auth_type = "">
+  </cfif>
+
 <!--- /CFIF #getusersettings.recordcount# --->
 </cfif>
 

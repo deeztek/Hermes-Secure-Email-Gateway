@@ -128,29 +128,33 @@ existing rows is intentionally not offered.
   </div>
 </div>
 
+<!--- Card layout: icon block centered above title, title + description
+     centered below. AdminLTE applies float to .card-title in some
+     contexts, so we wrap it with d-block w-100 to neutralize that and
+     keep the whole card content flow vertical. --->
 <div class="row">
 
-  <!-- Apple: iPhone / iPad / macOS -->
+  <!-- Apple: iPhone / iPad / Mac (native Apple apps) -->
   <div class="col-md-4 col-sm-6 mb-3">
     <a href="setup_devices.cfm?device=apple" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fab fa-apple fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">iPhone, iPad, or macOS</h5>
+          <div class="mb-3"><i class="fab fa-apple fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">iPhone, iPad, or Mac (Apple apps)</h5>
           <p class="card-text text-muted mb-0">Apple Mail, Calendar, and Contacts &mdash; all in one downloadable profile.</p>
         </div>
       </div>
     </a>
   </div>
 
-  <!-- Android: DAVx5 + email client -->
+  <!-- Android: DAVx5 + K-9 Mail / Thunderbird for Android (autoconfig) -->
   <div class="col-md-4 col-sm-6 mb-3">
     <a href="setup_devices.cfm?device=android-davx5" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fab fa-android fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">Android (DAVx5 + email)</h5>
-          <p class="card-text text-muted mb-0">Step-by-step setup for DAVx5 (Calendar/Contacts) and an Android email app.</p>
+          <div class="mb-3"><i class="fab fa-android fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Android</h5>
+          <p class="card-text text-muted mb-0">DAVx5 for Calendar &amp; Contacts, plus K-9 Mail / Thunderbird for Android (autoconfig).</p>
         </div>
       </div>
     </a>
@@ -161,22 +165,35 @@ existing rows is intentionally not offered.
     <a href="setup_devices.cfm?device=thunderbird" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fas fa-envelope fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">Thunderbird (Windows/Mac/Linux)</h5>
+          <div class="mb-3"><i class="fas fa-envelope fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Thunderbird (Windows/Mac/Linux)</h5>
           <p class="card-text text-muted mb-0">Auto-discovery handles email, calendar, and contacts in one go.</p>
         </div>
       </div>
     </a>
   </div>
 
-  <!-- Outlook -->
+  <!-- Outlook for Windows -->
   <div class="col-md-4 col-sm-6 mb-3">
     <a href="setup_devices.cfm?device=outlook" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fas fa-envelope-open-text fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">Microsoft Outlook (Windows)</h5>
-          <p class="card-text text-muted mb-0">Outlook autodiscover + CalDAV Synchronizer for calendar &amp; contacts.</p>
+          <div class="mb-3"><i class="fab fa-windows fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Microsoft Outlook (Windows)</h5>
+          <p class="card-text text-muted mb-0">Outlook autodiscover for mail; CalDAV Synchronizer (built-in Nextcloud preset) for calendar &amp; contacts.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <!-- Outlook for Mac (split — Outlook for Mac has no native CalDAV/CardDAV) -->
+  <div class="col-md-4 col-sm-6 mb-3">
+    <a href="setup_devices.cfm?device=outlook-mac" class="text-decoration-none">
+      <div class="card h-100">
+        <div class="card-body text-center">
+          <div class="mb-3"><i class="fab fa-apple fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Microsoft Outlook (Mac)</h5>
+          <p class="card-text text-muted mb-0">Outlook autodiscover for mail; macOS Calendar &amp; Contacts apps for calendar / contacts (Outlook for Mac has no DAV support).</p>
         </div>
       </div>
     </a>
@@ -187,8 +204,8 @@ existing rows is intentionally not offered.
     <a href="setup_devices.cfm?device=linux" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fab fa-linux fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">Linux desktop</h5>
+          <div class="mb-3"><i class="fab fa-linux fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Linux desktop</h5>
           <p class="card-text text-muted mb-0">Evolution, KMail, or any other client &mdash; manual settings reference.</p>
         </div>
       </div>
@@ -200,8 +217,8 @@ existing rows is intentionally not offered.
     <a href="setup_devices.cfm?device=webonly" class="text-decoration-none">
       <div class="card h-100">
         <div class="card-body text-center">
-          <i class="fas fa-globe fa-3x mb-3 text-body"></i>
-          <h5 class="card-title">Web only</h5>
+          <div class="mb-3"><i class="fas fa-globe fa-3x text-body"></i></div>
+          <h5 class="card-title d-block w-100 text-center mb-2">Web only</h5>
           <p class="card-text text-muted mb-0">Skip client setup &mdash; use webmail at <code>/nc</code>.</p>
         </div>
       </div>
@@ -217,6 +234,9 @@ existing rows is intentionally not offered.
     <cfcase value="apple">
         <cfinclude template="./inc/setup_apple_mobileconfig.cfm">
     </cfcase>
+    <cfcase value="apple-result">
+        <cfinclude template="./inc/setup_apple_result.cfm">
+    </cfcase>
     <cfcase value="android-davx5">
         <cfinclude template="./inc/setup_android_davx5.cfm">
     </cfcase>
@@ -225,6 +245,9 @@ existing rows is intentionally not offered.
     </cfcase>
     <cfcase value="outlook">
         <cfinclude template="./inc/setup_outlook.cfm">
+    </cfcase>
+    <cfcase value="outlook-mac">
+        <cfinclude template="./inc/setup_outlook_mac.cfm">
     </cfcase>
     <cfcase value="linux">
         <cfinclude template="./inc/setup_linux.cfm">

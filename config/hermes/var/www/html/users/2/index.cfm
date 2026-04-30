@@ -304,7 +304,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfoutput>
 </cfif>
 
-<!--- ===== QUICK LINKS - matches sidebar order exactly ===== --->
+<!--- ===== QUICK LINKS - mirrors sidebar exactly =====
+
+    Whatever the sidebar shows, this should show. Order and visibility
+    rules match main_sidebar.cfm: Shared Folders is gated on the
+    sharing.enabled parameter; Webmail link is gated on the user being
+    in the nextcloud group. --->
+
+<cfif isMailboxUser>
+    <cfquery name="getQuickLinksSharing" datasource="hermes">
+        SELECT value2 FROM parameters2
+        WHERE module = 'dovecot' AND parameter = 'sharing.enabled'
+    </cfquery>
+    <cfset quickLinksSharingEnabled = (getQuickLinksSharing.recordcount GTE 1 AND getQuickLinksSharing.value2 EQ "yes")>
+<cfelse>
+    <cfset quickLinksSharingEnabled = false>
+</cfif>
+
 <div class="card card-outline card-primary mb-4">
     <div class="card-header">
         <h3 class="card-title"><i class="fas fa-th-large me-2"></i>Quick Links</h3>
@@ -333,15 +349,39 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
             <cfif isMailboxUser>
             <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_app_passwords.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-key me-2"></i>My App Passwords
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="setup_devices.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-mobile-alt me-2"></i>Set Up Your Devices
+                </a>
+            </div>
+            <div class="col-md-4 col-sm-6 mb-3">
                 <a href="view_sieve_rules.cfm" class="btn btn-outline-primary btn-block w-100">
                     <i class="fas fa-filter me-2"></i>Mail Filters
                 </a>
             </div>
             <div class="col-md-4 col-sm-6 mb-3">
-                <a href="/users/2/preload_nc_login.cfm" class="btn btn-outline-primary btn-block w-100">
-                    <i class="fas fa-inbox me-2"></i>Login to Webmail
+                <a href="view_vacation.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-paper-plane me-2"></i>Vacation Auto-Reply
                 </a>
             </div>
+            <cfif quickLinksSharingEnabled>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_shared_folders.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-share-alt me-2"></i>Shared Folders
+                </a>
+            </div>
+            </cfif>
+            <cfif session.theGroups CONTAINS "nextcloud">
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="/users/2/preload_nc_login.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-inbox me-2"></i>Webmail &amp; Apps
+                </a>
+            </div>
+            </cfif>
             </cfif>
         </div>
     </div>

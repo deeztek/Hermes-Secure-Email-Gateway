@@ -77,6 +77,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/delete_mailbox_action.cfm">
 <cfelseif action is "rotate_nc_password">
   <cfinclude template="./inc/rotate_nc_password_action.cfm">
+<cfelseif action is "resend_mobile_setup">
+  <cfinclude template="./inc/admin_resend_mobile_setup_action.cfm">
 </cfif>
 
 <!--- Edition check --->
@@ -206,6 +208,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fas fa-exclamation-triangle"></i> Password Check Unavailable</h4>
     Unable to verify password against breach database. Please try again later.
+  </div>
+<cfelseif m EQ 80>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Setup profile sent</h4>
+    <p class="mb-0">A mobile setup profile email was sent to <strong><cfoutput>#HTMLEditFormat(StructKeyExists(session, "adminResendTarget") ? session.adminResendTarget : "")#</cfoutput></strong>. The link expires in 30 minutes and works only once.</p>
+    <cfset session.adminResendTarget = "">
+  </div>
+<cfelseif m EQ 81>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Mailbox not found</h4>
+    Could not send mobile setup profile &mdash; the selected mailbox could not be found or is not an active user mailbox.
+  </div>
+<cfelseif m EQ 82>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Setup profile generation failed</h4>
+    <p class="mb-0"><cfif StructKeyExists(session, "adminResendError")><cfoutput>#HTMLEditFormat(session.adminResendError)#</cfoutput><cfset session.adminResendError = ""><cfelse>An unknown error occurred while generating the setup profile.</cfif></p>
+  </div>
+<cfelseif m EQ 83>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fas fa-exclamation-triangle"></i> Setup profile staged but email failed</h4>
+    <p class="mb-0">The setup profile was generated successfully but the notification email could not be sent. <cfif StructKeyExists(session, "adminResendError")><cfoutput>Details: #HTMLEditFormat(session.adminResendError)#</cfoutput><cfset session.adminResendError = ""></cfif></p>
   </div>
 </cfif>
 
@@ -352,6 +379,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-shield-alt me-2"></i>Access Control</a></li>
                 <li><a class="dropdown-item" href="view_mailbox_app_passwords.cfm?mailbox_id=#id#"><i class="fas fa-key me-2"></i>Manage App Passwords</a></li>
+                <li><a class="dropdown-item" href="##" onclick="confirmResendMobileSetup(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</a></li>
                 <cfif Val(mb_nextcloud) EQ 1>
                   <li><a class="dropdown-item" href="##" onclick="confirmRotateNcPassword(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-sync-alt me-2"></i>Rotate NC Internal Password</a></li>
                 </cfif>
@@ -745,6 +773,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- SEND MOBILE SETUP PROFILE CONFIRMATION MODAL (#224 Phase 2c) --->
+<div class="modal fade" id="resendMobileSetupModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="view_mailboxes.cfm">
+        <input type="hidden" name="action" value="resend_mobile_setup">
+        <input type="hidden" name="mailbox_id" id="resendMobileSetupMailboxId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>This will email a one-time setup link to <strong id="resendMobileSetupEmail"></strong> with a signed Apple <code>.mobileconfig</code> profile that configures Mail, Calendar, and Contacts.</p>
+          <div class="alert alert-info mb-2">
+            <p class="mb-1"><strong>What this does:</strong></p>
+            <ul class="mb-0">
+              <li>Creates a fresh app password (visible to the user in <em>My App Passwords</em> as &ldquo;Mobile setup &lt;today's date&gt;&rdquo;).</li>
+              <li>Generates and signs an iOS/macOS configuration profile with that password embedded.</li>
+              <li>Emails the user a link &mdash; clicking it opens a page where they can scan a QR with their phone <em>or</em> download to install on the current device.</li>
+            </ul>
+          </div>
+          <p class="mb-0"><small>The link expires in 30 minutes and works only once. Useful for non-technical users or anyone who can't sign in to the user portal themselves.</small></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane me-1"></i> Send</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
 <!--- (Reset DAV Password modal removed in #197 Phase 1b — superseded
      by per-mailbox app password mgmt + automatic NC oc_authtoken
      mirroring. The "Manage App Passwords" row action handles all
@@ -922,6 +982,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#rotateNcMailboxId').val(mailboxId);
     $('#rotateNcMailboxEmail').text(email);
     new bootstrap.Modal(document.getElementById('rotateNcPasswordModal')).show();
+  }
+
+  // Confirm resend mobile setup profile (#224 Phase 2c)
+  function confirmResendMobileSetup(mailboxId, email) {
+    $('#resendMobileSetupMailboxId').val(mailboxId);
+    $('#resendMobileSetupEmail').text(email);
+    new bootstrap.Modal(document.getElementById('resendMobileSetupModal')).show();
   }
 </script>
 

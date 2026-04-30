@@ -144,8 +144,11 @@ facing explanation that this UI corresponds to.
   <div class="callout callout-warning">
     <h4><i class="fa fa-key"></i>&nbsp;&nbsp;Your new app password</h4>
     <p>Below is the password for <strong><cfoutput>#HTMLEditFormat(oneShotLabel)#</cfoutput></strong>.
-       <strong>Copy it now</strong> &mdash; once you leave this page or refresh,
-       it cannot be retrieved. Even an administrator cannot recover it.</p>
+       <strong>Copy it now</strong> or <strong>scan the QR code with your mobile device</strong>
+       &mdash; once you leave this page or refresh, it cannot be retrieved. Even an
+       administrator cannot recover it.</p>
+
+    <!-- Plaintext + Copy button -->
     <div class="input-group" style="max-width: 600px;">
       <input type="text" id="newAppPasswordField" readonly
              class="form-control font-monospace"
@@ -155,7 +158,45 @@ facing explanation that this UI corresponds to.
       </button>
     </div>
     <p class="mt-2 mb-0"><small>If you lose this password, just revoke this row and create a new one.</small></p>
+
+    <!-- Big OR divider between text password and QR -->
+    <div class="d-flex align-items-center my-4" style="max-width: 600px;">
+      <hr class="flex-grow-1 border-2">
+      <span class="mx-3 fs-4 fw-bold text-muted">OR</span>
+      <hr class="flex-grow-1 border-2">
+    </div>
+
+    <!--- QR (Phase 2d): encodes ONLY the plaintext password string,
+         nothing else. Scan from a phone QR scanner → text appears in
+         clipboard / "open" prompt → user pastes into the device's
+         email / DAVx5 / etc. Helpful for the manual-setup paths
+         (Android, Outlook for Windows, anything that asks for the
+         password on a different device than the one minting it). --->
+    <div class="d-flex flex-column align-items-center text-center" style="max-width: 600px; background: ##fff; border: 1px solid ##dee2e6; border-radius: 6px; padding: 16px;">
+      <p class="mb-3"><i class="fas fa-mobile-alt me-1"></i> <strong>Scan to copy on your phone</strong></p>
+      <div id="appPwQr"></div>
+      <small class="text-muted mt-3">Your phone's QR scanner will offer to copy the password.</small>
+    </div>
   </div>
+
+  <!--- qrcode-generator (Kazuhiko Arase, MIT). Only loaded on the rare
+       page render that has a freshly-minted plaintext to display, so
+       the cost is paid exactly once per password creation. --->
+  <cfoutput>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+  <script>
+    (function() {
+      var pw = "#JSStringFormat(oneShotPlain)#";
+      // Just the password string — no scheme, no URL. The user's phone
+      // QR scanner shows the text and offers Copy. Type 0 = auto, 'M'
+      // = ~15% error correction (resilient to camera angle/lighting).
+      var qr = qrcode(0, 'M');
+      qr.addData(pw);
+      qr.make();
+      document.getElementById('appPwQr').innerHTML = qr.createSvgTag({ cellSize: 5, margin: 2 });
+    })();
+  </script>
+  </cfoutput>
 </cfif>
 
 <div class="alert alert-info alert-dismissible">
