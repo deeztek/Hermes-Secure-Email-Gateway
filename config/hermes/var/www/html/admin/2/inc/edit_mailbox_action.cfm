@@ -36,9 +36,13 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
 <!--- GET EXISTING MAILBOX --->
 <cfquery name="getMailbox" datasource="hermes">
-    SELECT m.id, m.username, m.domain_id, m.nextcloud_enabled AS prev_nextcloud_enabled, d.domain
+    SELECT m.id, m.username, m.domain_id,
+           m.nextcloud_enabled AS prev_nextcloud_enabled,
+           r.enforce_mfa       AS prev_enforce_mfa,
+           d.domain
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id
+    LEFT  JOIN recipients r ON r.recipient = m.username
     WHERE m.id = <cfqueryparam value="#form.mailbox_id#" cfsqltype="cf_sql_integer">
 </cfquery>
 
@@ -111,6 +115,12 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cfset form.edit_nextcloud_enabled = 0>
 </cfif>
 
+<!--- VALIDATE 2FA ENFORCEMENT (#225) --->
+<cfparam name="form.edit_enforce_mfa" default="0">
+<cfif form.edit_enforce_mfa NEQ "0" AND form.edit_enforce_mfa NEQ "1">
+    <cfset form.edit_enforce_mfa = 0>
+</cfif>
+
 <!--- Require a password when enabling Nextcloud on a user that didn't have it.
      The password is needed to create the email profile in the NC Mail app.
      Without it the user would see an empty Mail app with no account. --->
@@ -119,22 +129,28 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cflocation url="view_mailboxes.cfm" addtoken="no">
 </cfif>
 
-<!--- UPDATE MAILBOXES TABLE --->
+<!--- UPDATE MAILBOXES TABLE.
+     enforce_mfa is on recipients, not mailboxes — see UPDATE recipients
+     below. --->
 <cfquery datasource="hermes">
     UPDATE mailboxes
-    SET name = <cfqueryparam value="#editDisplayName#" cfsqltype="cf_sql_varchar">,
-        quota = <cfqueryparam value="#editQuotaBytes#" cfsqltype="cf_sql_bigint">,
-        active = <cfqueryparam value="#form.edit_active#" cfsqltype="cf_sql_integer">,
+    SET name              = <cfqueryparam value="#editDisplayName#"             cfsqltype="cf_sql_varchar">,
+        quota             = <cfqueryparam value="#editQuotaBytes#"              cfsqltype="cf_sql_bigint">,
+        active            = <cfqueryparam value="#form.edit_active#"            cfsqltype="cf_sql_integer">,
         nextcloud_enabled = <cfqueryparam value="#form.edit_nextcloud_enabled#" cfsqltype="cf_sql_tinyint">,
         modified = NOW()
     WHERE id = <cfqueryparam value="#form.mailbox_id#" cfsqltype="cf_sql_integer">
 </cfquery>
 
-<!--- UPDATE RECIPIENTS TABLE --->
+<!--- UPDATE RECIPIENTS TABLE.
+     policy_id is the existing per-recipient access policy.
+     enforce_mfa is the per-recipient 2FA enforcement flag (#225) —
+     canonical for both mailbox and relay flows. --->
 <cfquery datasource="hermes">
     UPDATE recipients
-    SET policy_id = <cfqueryparam value="#form.edit_policy#" cfsqltype="cf_sql_integer">
-    WHERE recipient = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
+    SET policy_id   = <cfqueryparam value="#form.edit_policy#"      cfsqltype="cf_sql_integer">,
+        enforce_mfa = <cfqueryparam value="#form.edit_enforce_mfa#" cfsqltype="cf_sql_tinyint">
+    WHERE recipient = <cfqueryparam value="#getMailbox.username#"   cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <!--- UPDATE USER_SETTINGS TABLE --->
@@ -224,6 +240,41 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cfcatch type="any">
         <!--- Non-fatal: the mailbox row was already updated, admin can
              retry by re-toggling. --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 2FA ENFORCEMENT — LDAP CASCADE (#225).
+     Asymmetric on purpose:
+       0 → 1 (admin enforces): cascade to LDAP — move the user to
+            cn=two_factor so Authelia's existing access-control rules
+            require 2FA at next access, auto-enrolling the device on
+            first hit.
+       1 → 0 (admin un-enforces): NO LDAP change. The user may have
+            voluntarily enabled 2FA from user_settings.cfm; un-enforce
+            means "no longer required," not "remove their 2FA." If the
+            user wants to drop 2FA after un-enforce, they can toggle it
+            off themselves from user_settings.cfm (which is now
+            unblocked because enforce_mfa = 0).
+     Idempotent on benign errors. --->
+<cfif Val(form.edit_enforce_mfa) EQ 1 AND Val(getMailbox.prev_enforce_mfa) EQ 0>
+    <cftry>
+        <cfquery name="getLdapUsernameForMfa" datasource="hermes">
+            SELECT ldap_username FROM user_settings
+            WHERE email = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+        <cfif getLdapUsernameForMfa.recordcount GTE 1 AND getLdapUsernameForMfa.ldap_username NEQ "">
+            <cfset ldapUsername = getLdapUsernameForMfa.ldap_username>
+        <cfelse>
+            <cfset ldapUsername = LCase(getMailbox.username)>
+        </cfif>
+
+        <cfset ldapOldAccessControl = "one_factor">
+        <cfset ldapNewAccessControl = "two_factor">
+        <cfinclude template="ldap_change_user_access_control.cfm">
+    <cfcatch type="any">
+        <!--- Non-fatal: the recipients row was already updated. Admin can
+             retry by re-flipping the checkbox. --->
     </cfcatch>
     </cftry>
 </cfif>

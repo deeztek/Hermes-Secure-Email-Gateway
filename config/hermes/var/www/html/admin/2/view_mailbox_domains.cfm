@@ -82,6 +82,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   SELECT d.id AS domain_id, d.domain,
          d.default_quota_mb, d.catchall_mailbox,
          d.nextcloud_enabled, d.nextcloud_group,
+         d.enforce_mfa,
          md.mailbox_certificate,
          sc.friendly_name AS cert_friendly_name,
          sc.type AS cert_type,
@@ -393,16 +394,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
 
-      <div class="row align-items-center">
-        <div class="col-md-6">
-          <div class="form-check form-switch">
-            <input class="form-check-input" type="checkbox" name="nextcloud_enabled" id="add_nextcloud_enabled" value="1">
-            <label class="form-check-label" for="add_nextcloud_enabled">
-              <strong>Enable Nextcloud webmail for this domain</strong>
-            </label>
-          </div>
-        </div>
-        <div class="col-md-6 text-md-end">
+      <div class="form-check form-switch mb-2">
+        <input class="form-check-input" type="checkbox" name="nextcloud_enabled" id="add_nextcloud_enabled" value="1">
+        <label class="form-check-label" for="add_nextcloud_enabled">
+          <strong>Enable Nextcloud webmail for this domain</strong>
+        </label>
+      </div>
+
+      <div class="form-check form-switch mb-3">
+        <input class="form-check-input" type="checkbox" name="enforce_mfa" id="add_enforce_mfa" value="1">
+        <label class="form-check-label" for="add_enforce_mfa">
+          <strong>Require Two-Factor Authentication for this domain</strong>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="col-12 text-md-end">
           <button type="submit" class="btn btn-primary">
             <i class="fas fa-plus"></i> Add Domain
           </button>
@@ -430,6 +437,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>Default Quota</th>
           <th>Catch-All</th>
           <th>Nextcloud</th>
+          <th>2FA</th>
           <th>DKIM</th>
           <th>Actions</th>
         </tr>
@@ -486,6 +494,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <span class="badge bg-success">Enabled</span>
               <cfelse>
                 <span class="badge bg-secondary">Disabled</span>
+              </cfif>
+            </td>
+            <td>
+              <cfif enforce_mfa is 1>
+                <span class="badge bg-success">Required</span>
+              <cfelse>
+                <span class="badge bg-secondary">Optional</span>
               </cfif>
             </td>
             <td>
@@ -610,12 +625,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
             </div>
 
-            <div class="form-check form-switch mb-2">
+            <div class="form-check form-switch mb-1">
               <input class="form-check-input" type="checkbox" name="nextcloud_enabled" id="edit_nextcloud_enabled" value="1">
               <label class="form-check-label" for="edit_nextcloud_enabled">
                 <strong>Enable Nextcloud webmail for this domain</strong>
               </label>
             </div>
+            <p class="form-text text-muted mb-3 ms-4 ps-1"><i class="fas fa-info-circle me-1"></i> Default for <strong>new</strong> mailboxes added to this domain. Toggling this does <strong>not</strong> change Nextcloud access for existing mailboxes &mdash; use the per-mailbox <em>Edit Options</em> dialog to adjust an individual user.</p>
+
+            <div class="form-check form-switch mb-1">
+              <input class="form-check-input" type="checkbox" name="enforce_mfa" id="edit_enforce_mfa" value="1">
+              <label class="form-check-label" for="edit_enforce_mfa">
+                <strong>Require Two-Factor Authentication for this domain</strong>
+              </label>
+            </div>
+            <p class="form-text text-muted mb-0 ms-4 ps-1"><i class="fas fa-info-circle me-1"></i> Default for <strong>new</strong> mailboxes added to this domain. Toggling this does <strong>not</strong> change 2FA enforcement for existing mailboxes &mdash; use the per-mailbox <em>Edit Options</em> dialog to adjust an individual user.</p>
 
           </div>
         </div>
@@ -676,8 +700,8 @@ $(document).ready(function() {
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[0, 'asc']],
     columnDefs: [
-      { orderable: false, targets: [7] },
-      { searchable: false, targets: [6] }
+      { orderable: false, targets: [8] },
+      { searchable: false, targets: [7] }
     ]
   });
 
@@ -715,6 +739,7 @@ function openEditModal(mailboxDomainId) {
       document.getElementById('edit_default_quota_gb').value = (data.default_quota_mb / 1024).toFixed(2).replace(/\.?0+$/, '');
       document.getElementById('edit_catchall_mailbox').value = data.catchall_mailbox || '';
       document.getElementById('edit_nextcloud_enabled').checked = (data.nextcloud_enabled == 1);
+      document.getElementById('edit_enforce_mfa').checked = (data.enforce_mfa == 1);
 
       // Determine cert mode
       if (data.cert_type === 'Acme') {

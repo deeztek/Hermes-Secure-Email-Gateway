@@ -554,6 +554,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
 
+          <!--- 2FA enforcement (#225) --->
+          <div class="form-group mb-3">
+            <label><strong>Two-Factor Authentication</strong></label>
+            <select class="form-control" name="edit_enforce_mfa" id="editEnforceMfa">
+              <option value="0">Disable</option>
+              <option value="1">Enable</option>
+            </select>
+            <small class="form-text text-muted"><i class="fas fa-info-circle me-1"></i>When enabled, this user is placed in the LDAP <code>cn=two_factor</code> group. Authelia will require a second factor at the user's next sign-in and walk them through device enrollment automatically.</small>
+          </div>
+
           <!--- Timezone --->
           <div class="form-group mb-3">
             <label><strong>Timezone</strong></label>
@@ -869,6 +879,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         editNextcloudOriginal = String(mb.nextcloud_enabled || '0');
         $('#editNextcloudHint').hide();
         $('#editNextcloudDeleteGroup').hide();
+        $('#editEnforceMfa').val(mb.enforce_mfa || '0');
         $('#ncKeepAccount').prop('checked', true);
         if (editTimezoneTS) {
           editTimezoneTS.setValue(mb.timezone || '');

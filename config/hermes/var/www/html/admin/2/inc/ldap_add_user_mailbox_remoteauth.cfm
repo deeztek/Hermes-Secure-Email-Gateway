@@ -85,8 +85,16 @@ Returns:
         <cfset ldapUserCreated = true>
     </cfif>
 
-    <!--- ADD USER TO MAILBOX GROUPS --->
-    <cfset ldapAccessControl = "one_factor">
+    <!--- ADD USER TO MAILBOX GROUPS.
+         The caller may pre-set ldapAccessControl to "two_factor" for
+         enforce_mfa=1 mailboxes (#225); otherwise default to one_factor.
+         Authelia's existing access-control rules pick up the group
+         membership at next access and force device enrollment if
+         the user is in cn=two_factor with no registered device. --->
+    <cfparam name="ldapAccessControl" type="string" default="one_factor">
+    <cfif ldapAccessControl NEQ "one_factor" AND ldapAccessControl NEQ "two_factor">
+        <cfset ldapAccessControl = "one_factor">
+    </cfif>
     <cfinclude template="ldap_add_user_groups_mailbox.cfm">
 
     <!--- UPDATE USER_SETTINGS WITH LDAP USERNAME --->

@@ -19,6 +19,7 @@ Used by view_mailbox_domains.cfm edit modal.
   SELECT d.id, d.domain,
          d.default_quota_mb, d.catchall_mailbox,
          d.nextcloud_enabled, d.nextcloud_group,
+         d.enforce_mfa,
          md.mailbox_certificate,
          sc.type AS cert_type,
          sc.friendly_name AS cert_friendly_name
@@ -43,7 +44,8 @@ Used by view_mailbox_domains.cfm edit modal.
   "default_quota_mb"    = getdomain.default_quota_mb,
   "catchall_mailbox"    = getdomain.catchall_mailbox,
   "nextcloud_enabled"   = getdomain.nextcloud_enabled,
-  "nextcloud_group"     = getdomain.nextcloud_group
+  "nextcloud_group"     = getdomain.nextcloud_group,
+  "enforce_mfa"         = getdomain.enforce_mfa
 }>
 
 <cfoutput>#SerializeJSON(resp)#</cfoutput>

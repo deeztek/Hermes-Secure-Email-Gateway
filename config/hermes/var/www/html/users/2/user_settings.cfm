@@ -292,6 +292,23 @@ $(document).ready(function() {
             <cflocation url="user_settings.cfm" addtoken="no">
         </cfif>
 
+        <!--- ADMIN-ENFORCEMENT GATE (#225).
+             If the admin has set recipients.enforce_mfa = 1 for this user,
+             they cannot disable their own 2FA from the user portal. The
+             form-level button is rendered locked when enforced; this
+             server-side check defends against a hand-crafted POST. --->
+        <cfif form.mfa_setting EQ "disable">
+            <cfquery name="getEnforceMfaForToggle" datasource="hermes">
+                SELECT enforce_mfa FROM recipients
+                WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
+            </cfquery>
+            <cfif getEnforceMfaForToggle.recordcount GTE 1 AND Val(getEnforceMfaForToggle.enforce_mfa) EQ 1>
+                <cfset session.mfaMessage = "<h4><i class='icon fa fa-lock'></i> Locked by your administrator</h4>Your administrator requires Two-Factor Authentication on your account. You cannot disable it.">
+                <cfset session.mfaMessageType = "warning">
+                <cflocation url="user_settings.cfm" addtoken="no">
+            </cfif>
+        </cfif>
+
         <!--- GET LDAP USERNAME FOR THIS USER --->
         <cfquery name="getLdapUsernameMfa" datasource="hermes">
             SELECT ldap_username FROM user_settings WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
@@ -537,6 +554,17 @@ $(document).ready(function() {
 
         <!--- TWO-FACTOR AUTHENTICATION SECTION (ALL USERS) --->
         <!--- Query LDAP directly for accurate 2FA status (session may be stale) --->
+        <!--- Admin-side enforcement flag (#225). When 1, the user cannot
+             disable their own 2FA from this portal — the toggle button
+             below renders locked, and the toggle_mfa action handler also
+             rejects a hand-crafted disable POST. Reading from recipients
+             (canonical column for both mailbox and relay users). --->
+        <cfquery name="getEnforceMfa" datasource="hermes">
+            SELECT enforce_mfa FROM recipients
+            WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
+        </cfquery>
+        <cfset mfaEnforcedByAdmin = (getEnforceMfa.recordcount GTE 1 AND Val(getEnforceMfa.enforce_mfa) EQ 1)>
+
         <cfset mfaEnabled = false>
         <cftry>
             <!--- Get the user's LDAP username --->
@@ -601,10 +629,23 @@ $(document).ready(function() {
                         <cfelse>
                             <span class="form-control text-danger fw-bold"><i class="fas fa-times-circle me-1"></i> Disabled</span>
                         </cfif>
+                        <cfif mfaEnforcedByAdmin>
+                            <span class="input-group-text text-bg-secondary">
+                                <i class="fas fa-lock me-1"></i> Required by your administrator
+                            </span>
+                        </cfif>
                     </div>
                 </div>
 
-                <cfif mfaEnabled>
+                <cfif mfaEnforcedByAdmin>
+                    <!--- Admin enforces 2FA — toggle is locked. Button rendered
+                         disabled so the user can see why it's not actionable. --->
+                    <button type="button" class="btn btn-outline-secondary" disabled
+                            title="Your administrator requires 2FA on your account. You cannot disable it.">
+                        <i class="fas fa-lock me-1"></i> Disable 2FA (locked by administrator)
+                    </button>
+                    <p class="form-text text-muted mt-2 mb-0"><i class="fas fa-info-circle me-1"></i> Your administrator has set Two-Factor Authentication as required for your account. You cannot disable it from here. If you need to change a registered device (TOTP, security key, Duo), contact your administrator.</p>
+                <cfelseif mfaEnabled>
                     <form method="post" action="user_settings.cfm" onsubmit="return confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.');">
                         <input type="hidden" name="action" value="toggle_mfa">
                         <input type="hidden" name="mfa_setting" value="disable">

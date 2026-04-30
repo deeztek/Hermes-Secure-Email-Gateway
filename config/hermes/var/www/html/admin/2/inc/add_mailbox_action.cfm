@@ -295,6 +295,15 @@ Requires form variables:
     <cfset form.nextcloud_enabled = 0>
 </cfif>
 
+<!--- VALIDATE 2FA ENFORCEMENT TOGGLE (#225).
+     Read by ldap_add_user_mailbox{,_remoteauth}.cfm to choose
+     cn=one_factor vs cn=two_factor at LDAP creation time. --->
+<cfparam name="form.enforce_mfa" default="0">
+<cfif form.enforce_mfa NEQ "0" AND form.enforce_mfa NEQ "1">
+    <cfset form.enforce_mfa = 0>
+</cfif>
+<cfset ldapAccessControl = (form.enforce_mfa EQ "1") ? "two_factor" : "one_factor">
+
 <!--- VALIDATE S/MIME OPTIONS (if enabled) --->
 <cfparam name="form.ca" default="">
 <cfparam name="form.validity" default="1825">
@@ -346,7 +355,7 @@ Requires form variables:
     INSERT INTO recipients
     (policy_id, recipient, status, configured, pdf_enabled, smime_enabled, pgp_enabled,
      smime_mode, digital_sign, validity, encryption, algorithm,
-     auth_type, remoteauth_domain, recipient_type)
+     auth_type, remoteauth_domain, recipient_type, enforce_mfa)
     VALUES
     (<cfqueryparam value="#form.policy#" cfsqltype="cf_sql_integer">,
      <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
@@ -359,7 +368,8 @@ Requires form variables:
      '1825', '4096', 'sha512',
      <cfqueryparam value="#form.auth_type#" cfsqltype="cf_sql_varchar">,
      <cfif form.remoteauth_domain NEQ ""><cfqueryparam value="#form.remoteauth_domain#" cfsqltype="cf_sql_varchar"><cfelse>NULL</cfif>,
-     'mailbox')
+     'mailbox',
+     <cfqueryparam value="#form.enforce_mfa#" cfsqltype="cf_sql_tinyint">)
 </cfquery>
 
 <!--- 1b. INSERT INTO MADDR TABLE (Amavis address tracking, required for user portal session) --->
@@ -387,7 +397,9 @@ Requires form variables:
      <cfqueryparam value="#trim(form.timezone)#" cfsqltype="cf_sql_varchar" null="#(NOT StructKeyExists(form, 'timezone') OR trim(form.timezone) IS '')#">)
 </cfquery>
 
-<!--- 3. INSERT INTO MAILBOXES TABLE (Dovecot userdb) --->
+<!--- 3. INSERT INTO MAILBOXES TABLE (Dovecot userdb).
+     enforce_mfa lives on recipients (see step 1 above), not mailboxes,
+     because the same column drives both mailbox and relay flows. --->
 <cfquery name="insertMailbox" datasource="hermes">
     INSERT INTO mailboxes
     (domain_id, username, name, quota, active, nextcloud_enabled, created, modified)

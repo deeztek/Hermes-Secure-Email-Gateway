@@ -84,3 +84,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
     </cfif>
 </cfif>
+
+<!--- 2FA NAGGING BANNER FOR MAILBOX USERS NOT YET IN cn=two_factor (#225)
+
+    Visual pattern matches the secondary-email nag above. Condition is
+    just session.theGroups membership — group plumbing is already in
+    place from the user-side toggle in user_settings.cfm and the
+    admin-side enforce_mfa flow in add/edit_mailbox_action.cfm.
+
+    Banner self-resolves whether the user enabled it themselves OR an
+    admin enforced it (both end states put them in cn=two_factor and
+    Authelia's existing rules then walk them through device enrollment
+    on next access — no separate enrollment URL needed). --->
+<cfif session.theGroups CONTAINS "mailboxes" AND NOT (session.theGroups CONTAINS "two_factor")>
+    <div class="alert alert-warning alert-dismissible d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
+        <div class="container-fluid d-flex justify-content-center align-items-center">
+            <i class="fas fa-shield-alt fa-lg me-3"></i>
+            <div>
+                <strong>Protect your account with Two-Factor Authentication:</strong>
+                <span class="ms-1">You haven't enabled 2FA yet. <a href="user_settings.cfm" class="alert-link">Click here to enable it</a> &mdash; you'll be guided through device setup the next time you sign in.</span>
+            </div>
+            <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    </div>
+</cfif>

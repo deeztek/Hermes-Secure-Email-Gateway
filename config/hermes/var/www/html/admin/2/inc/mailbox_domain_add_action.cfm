@@ -96,6 +96,7 @@ Expects:
 
 <cfparam name="form.catchall_mailbox" default="">
 <cfparam name="form.nextcloud_enabled" default="0">
+<cfparam name="form.enforce_mfa"       default="0">
 
 <!--- Resolve certificate id --->
 <cfif form.cert_mode IS "auto">
@@ -180,11 +181,12 @@ Expects:
 </cfquery>
 
 <!--- Insert domains row with type='mailbox' + all mailbox metadata --->
-<cfset ncEnabled = (form.nextcloud_enabled IS "1") ? 1 : 0>
+<cfset ncEnabled  = (form.nextcloud_enabled IS "1") ? 1 : 0>
+<cfset enforceMfa = (form.enforce_mfa       IS "1") ? 1 : 0>
 <cfquery datasource="hermes">
   INSERT INTO domains
     (domain, transport_id, senders_id, recipients_id, action_taken, type,
-     default_quota_mb, catchall_mailbox, nextcloud_enabled,
+     default_quota_mb, catchall_mailbox, nextcloud_enabled, enforce_mfa,
      created_at, updated_at)
   VALUES (
     <cfqueryparam cfsqltype="cf_sql_varchar" value="#domain_name#">,
@@ -196,6 +198,7 @@ Expects:
     <cfqueryparam cfsqltype="cf_sql_integer" value="#quotaMb#">,
     <cfqueryparam cfsqltype="cf_sql_varchar" value="#trim(form.catchall_mailbox)#" null="#(trim(form.catchall_mailbox) IS '')#">,
     <cfqueryparam cfsqltype="cf_sql_tinyint" value="#ncEnabled#">,
+    <cfqueryparam cfsqltype="cf_sql_tinyint" value="#enforceMfa#">,
     <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">,
     <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">
   )

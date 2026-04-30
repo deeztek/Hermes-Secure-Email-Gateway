@@ -1266,6 +1266,12 @@ ALTER TABLE domains
   ADD COLUMN IF NOT EXISTS nextcloud_enabled TINYINT(1) NOT NULL DEFAULT 0 AFTER catchall_mailbox;
 ALTER TABLE domains
   ADD COLUMN IF NOT EXISTS nextcloud_group VARCHAR(255) NULL AFTER nextcloud_enabled;
+-- Per-domain 2FA enforcement default (#225). Read by add_mailbox.cfm
+-- as the default for the per-mailbox enforce_mfa checkbox; admins can
+-- override per mailbox. Toggling this does NOT cascade to existing
+-- mailboxes — same convention as nextcloud_enabled.
+ALTER TABLE domains
+  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(1) NOT NULL DEFAULT 0 AFTER nextcloud_group;
 ALTER TABLE domains
   ADD COLUMN IF NOT EXISTS created_at DATETIME NULL AFTER nextcloud_group;
 ALTER TABLE domains
@@ -1341,6 +1347,26 @@ ALTER TABLE mailboxes DROP COLUMN IF EXISTS password;
 -- Add per-mailbox Nextcloud toggle (defaults to domain setting on creation)
 ALTER TABLE mailboxes
   ADD COLUMN IF NOT EXISTS nextcloud_enabled TINYINT(3) NOT NULL DEFAULT 0 AFTER active;
+
+-- Per-recipient 2FA enforcement flag (#225). Lives on recipients (not
+-- mailboxes) because both mailbox AND relay users share the recipients
+-- table; this lets the same column drive both flows. Defaults to the
+-- domain's enforce_mfa on creation; admin can override in Add/Edit
+-- dialogs. When 1, the new/edited user is placed in cn=two_factor
+-- LDAP group instead of cn=one_factor, and Authelia's existing
+-- access-control rules force 2FA at next access (auto-enrolling the
+-- device on first hit). Going 0→1 cascades to the LDAP group;
+-- going 1→0 leaves the LDAP group alone (user may have voluntarily
+-- enabled 2FA in user_settings.cfm and we don't want to take it away
+-- on admin un-enforce). user_settings.cfm's user-side toggle is gated
+-- by this flag — when 1, the user cannot disable their own 2FA.
+ALTER TABLE recipients
+  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(1) NOT NULL DEFAULT 0 AFTER recipient_type;
+
+-- Drop the earlier-iteration mailboxes.enforce_mfa column. It was
+-- replaced by recipients.enforce_mfa once the relay flow was scoped in.
+-- IF EXISTS makes this a no-op on installs that never had it.
+ALTER TABLE mailboxes DROP COLUMN IF EXISTS enforce_mfa;
 
 -- ============================================================================
 -- Email Server > Aliases (#200)

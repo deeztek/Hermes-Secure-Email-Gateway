@@ -97,17 +97,24 @@ re-validation).
 </cfif>
 <cfset quotaMb = Round(form.default_quota_gb * 1024)>
 
-<cfparam name="form.catchall_mailbox" default="">
+<cfparam name="form.catchall_mailbox"  default="">
 <cfparam name="form.nextcloud_enabled" default="0">
-<cfset ncEnabled = (form.nextcloud_enabled IS "1") ? 1 : 0>
+<cfparam name="form.enforce_mfa"       default="0">
+<cfset ncEnabled  = (form.nextcloud_enabled IS "1") ? 1 : 0>
+<cfset enforceMfa = (form.enforce_mfa       IS "1") ? 1 : 0>
 
-<!--- Update mailbox metadata on domains row --->
+<!--- Update mailbox metadata on domains row.
+     enforce_mfa here is the DOMAIN-level default for new mailboxes. It
+     does NOT cascade to existing mailboxes — same convention as
+     nextcloud_enabled. The disclaimer in the Edit Domain modal makes
+     this explicit to admins. --->
 <cfquery datasource="hermes">
   UPDATE domains
-  SET default_quota_mb = <cfqueryparam cfsqltype="cf_sql_integer" value="#quotaMb#">,
-      catchall_mailbox = <cfqueryparam cfsqltype="cf_sql_varchar" value="#trim(form.catchall_mailbox)#" null="#(trim(form.catchall_mailbox) IS '')#">,
-      nextcloud_enabled = <cfqueryparam cfsqltype="cf_sql_tinyint" value="#ncEnabled#">,
-      updated_at = <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">
+  SET default_quota_mb  = <cfqueryparam cfsqltype="cf_sql_integer"   value="#quotaMb#">,
+      catchall_mailbox  = <cfqueryparam cfsqltype="cf_sql_varchar"   value="#trim(form.catchall_mailbox)#" null="#(trim(form.catchall_mailbox) IS '')#">,
+      nextcloud_enabled = <cfqueryparam cfsqltype="cf_sql_tinyint"   value="#ncEnabled#">,
+      enforce_mfa       = <cfqueryparam cfsqltype="cf_sql_tinyint"   value="#enforceMfa#">,
+      updated_at        = <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">
   WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.domain_id#">
 </cfquery>
 

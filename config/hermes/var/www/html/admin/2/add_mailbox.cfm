@@ -106,7 +106,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- GET MAILBOX DOMAINS --->
 <cfquery name="getMailboxDomains" datasource="hermes">
-    SELECT id, domain, default_quota_mb, nextcloud_enabled FROM domains WHERE type = 'mailbox' ORDER BY domain ASC
+    SELECT id, domain, default_quota_mb, nextcloud_enabled, enforce_mfa FROM domains WHERE type = 'mailbox' ORDER BY domain ASC
 </cfquery>
 
 <!--- CHECK IF ANY MAILBOX DOMAINS EXIST --->
@@ -327,7 +327,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <span class="input-group-text">@</span>
           <select class="form-control" name="domain_id" id="domainSelect" required>
             <cfloop query="getMailboxDomains">
-              <option value="#id#" data-quota="#default_quota_mb#" data-nextcloud="#nextcloud_enabled#">#domain#</option>
+              <option value="#id#" data-quota="#default_quota_mb#" data-nextcloud="#nextcloud_enabled#" data-enforce-mfa="#enforce_mfa#">#domain#</option>
             </cfloop>
           </select>
         </div>
@@ -449,6 +449,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <select class="form-control" name="nextcloud_enabled" id="nextcloudEnabled" style="width: 100%">
           <option value="0">Disable</option>
           <option value="1"<cfif getMailboxDomains.nextcloud_enabled EQ 1> selected</cfif>>Enable</option>
+        </select>
+      </div>
+
+      <!--- 2FA ENFORCEMENT (#225) --->
+      <div class="form-group mb-3">
+        <label><strong>Two-Factor Authentication</strong></label>
+        <div class="alert alert-info">
+          <i class="icon fas fa-info-circle"></i>
+          When enabled, this user is placed in the LDAP <code>cn=two_factor</code> group. Authelia will require a second factor at next sign-in and walk the user through TOTP / WebAuthn / Duo enrollment automatically. Default is inherited from the domain setting.
+        </div>
+        <select class="form-control" name="enforce_mfa" id="enforceMfa" style="width: 100%">
+          <option value="0">Disable</option>
+          <option value="1"<cfif getMailboxDomains.enforce_mfa EQ 1> selected</cfif>>Enable</option>
         </select>
       </div>
 
@@ -602,6 +615,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     }
     var nc = selected.data('nextcloud');
     $('#nextcloudEnabled').val(nc == 1 ? '1' : '0');
+    var mfa = selected.data('enforce-mfa');
+    $('#enforceMfa').val(mfa == 1 ? '1' : '0');
   });
 
   // Generate random password (16 chars, alphanumeric only)
