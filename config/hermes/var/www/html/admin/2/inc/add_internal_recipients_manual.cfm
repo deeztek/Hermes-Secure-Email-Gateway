@@ -265,9 +265,9 @@ select policy_id, default_policy from spam_policies where default_policy='1'
         
         <cfquery name="insert" datasource="hermes">
         insert into recipients
-        (policy_id, recipient, status, configured, pdf_enabled, smime_enabled, pgp_enabled, smime_mode, digital_sign, validity, encryption, algorithm, auth_type, remoteauth_domain)
+        (policy_id, recipient, status, configured, pdf_enabled, smime_enabled, pgp_enabled, smime_mode, digital_sign, validity, encryption, algorithm, auth_type, remoteauth_domain, enforce_mfa)
         values
-        ('#show_policy#', '#recipient#', 'OK', '2', '#show_pdf_enabled#', '#show_smime_enabled#', '#show_pgp_enabled#', '1', '#show_sign#', '1825', '4096', 'sha512', <cfqueryparam value="#show_auth_type#" cfsqltype="cf_sql_varchar">, <cfif show_remoteauth_domain NEQ ""><cfqueryparam value="#show_remoteauth_domain#" cfsqltype="cf_sql_varchar"><cfelse>NULL</cfif>)
+        ('#show_policy#', '#recipient#', 'OK', '2', '#show_pdf_enabled#', '#show_smime_enabled#', '#show_pgp_enabled#', '1', '#show_sign#', '1825', '4096', 'sha512', <cfqueryparam value="#show_auth_type#" cfsqltype="cf_sql_varchar">, <cfif show_remoteauth_domain NEQ ""><cfqueryparam value="#show_remoteauth_domain#" cfsqltype="cf_sql_varchar"><cfelse>NULL</cfif>, <cfqueryparam value="#show_enforce_mfa#" cfsqltype="cf_sql_tinyint">)
         </cfquery>
         </cfoutput>
                 
@@ -282,7 +282,13 @@ select policy_id, default_policy from spam_policies where default_policy='1'
 
     <!--- INSERT INTO USER_SETTINGS ENDS HERE --->
 
-    <!--- CREATE LDAP USER FOR RECIPIENT STARTS HERE --->
+    <!--- CREATE LDAP USER FOR RECIPIENT STARTS HERE.
+         New users always land in cn=one_factor regardless of show_enforce_mfa.
+         The admin policy bit (recipients.enforce_mfa) is persisted from the
+         INSERT above; the user must click Enable themselves in their Account
+         Settings to actually move into cn=two_factor. Same pattern as Add
+         Mailbox (#225 Phase 1.5) so the two flows share one mental model.
+         (#225 Phase 2) --->
     <cfset recipientEmail = recipient>
     <cfif show_auth_type EQ "remote">
         <!--- Remote Auth: creates LDAP user with seeAlso/associatedDomain, no password --->

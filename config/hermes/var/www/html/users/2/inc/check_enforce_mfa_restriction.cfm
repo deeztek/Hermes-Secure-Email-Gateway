@@ -51,8 +51,11 @@ Caller pattern (inside the page's main content area):
     </cfif>
 
 Conditions to be restricted:
-  1. User is a mailbox user (cn=mailboxes group). Relays are out of
-     scope for #225 Phase 1; Phase 2 will mirror this for relay users.
+  1. User is a mailbox user (cn=mailboxes) OR a relay recipient
+     (cn=relays). #225 Phase 2 extended this to relays so the
+     bootstrap UX is consistent across both groups: admin enforces,
+     user sees urgent banner, only Account Settings remains
+     accessible until the user clicks Enable 2FA themselves.
   2. recipients.enforce_mfa = 1.
   3. User is NOT yet in cn=two_factor LDAP group.
 
@@ -64,7 +67,7 @@ remote-groups header).
 <cfset enforceMfaRestricted = false>
 <cfset enforceMfaRestrictionReason = "">
 
-<cfif session.theGroups CONTAINS "mailboxes" AND NOT (session.theGroups CONTAINS "two_factor")>
+<cfif (session.theGroups CONTAINS "mailboxes" OR session.theGroups CONTAINS "relays") AND NOT (session.theGroups CONTAINS "two_factor")>
     <cfquery name="checkEnforceMfaRestriction" datasource="hermes">
         SELECT enforce_mfa FROM recipients
         WHERE recipient = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">

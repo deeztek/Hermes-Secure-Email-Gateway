@@ -128,8 +128,36 @@
     </cfquery>
 
     <cfif getLdapUsername.recordcount GTE 1 AND getLdapUsername.ldap_username NEQ "">
+        <cfset ldapUsername = getLdapUsername.ldap_username>
+
+        <!--- DELETE AUTHELIA TOTP + WEBAUTHN DEVICES.
+             Without this, recipient delete leaves orphaned rows in
+             authelia.totp_configurations / authelia.webauthn_devices.
+             A re-created recipient at the same email would silently
+             inherit the prior owner's 2FA enrollments. Failure is
+             non-fatal (e.g., user had nothing enrolled — Authelia
+             returns non-zero) since the desired end-state ("no
+             devices") is achieved either way. --->
         <cftry>
-            <cfset ldapUsername = getLdapUsername.ldap_username>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /config/configuration.yml"
+                variable="atTotpDelResult"
+                errorVariable="atTotpDelErr"
+                timeout="30">
+            </cfexecute>
+        <cfcatch type="any"></cfcatch>
+        </cftry>
+        <cftry>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --all --config /config/configuration.yml"
+                variable="atWaDelResult"
+                errorVariable="atWaDelErr"
+                timeout="30">
+            </cfexecute>
+        <cfcatch type="any"></cfcatch>
+        </cftry>
+
+        <cftry>
             <cfinclude template="ldap_delete_user_relay.cfm">
         <cfcatch type="any">
             <!--- Log error but continue with deletion - LDAP cleanup is non-critical --->

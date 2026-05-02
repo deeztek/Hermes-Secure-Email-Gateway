@@ -129,3 +129,52 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
     </cfif>
 </cfif>
+
+<!--- 2FA NAGGING BANNER FOR RELAY RECIPIENTS NOT YET IN cn=two_factor (##225 Phase 2)
+
+    Relay recipients have unmediated access to their upstream mailbox, so
+    no app-layer page gate is needed (mailbox-side Phase 1.5 complexity).
+    The banner is purely informational + actionable: tells the user 2FA
+    is required (urgent) or recommended (soft) and points them at
+    Account Settings.
+
+    Note: when admin enforces via Edit Options, the relay-side LDAP
+    cascade in edit_internal_recipients.cfm already moves the user to
+    cn=two_factor at LDAP — but session.theGroups is the cached snapshot
+    from sign-in, so a mid-session user still sees this banner until
+    they next refresh the session (sign out + back in, or
+    refresh_interval up to 5 min). The banner IS the indicator that
+    something happened. --->
+<cfif session.theGroups CONTAINS "relays" AND NOT (session.theGroups CONTAINS "two_factor")>
+    <cfquery name="getEnforceMfaForRelayBanner" datasource="hermes">
+        SELECT enforce_mfa FROM recipients
+        WHERE recipient = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfset relayBannerEnforceMfa = (getEnforceMfaForRelayBanner.recordcount GTE 1 AND Val(getEnforceMfaForRelayBanner.enforce_mfa) EQ 1)>
+
+    <cfif relayBannerEnforceMfa>
+        <!--- URGENT: admin enforces, user is not yet in cn=two_factor in
+             this session. Non-dismissible. --->
+        <div class="alert alert-warning d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
+            <div class="container-fluid d-flex justify-content-center align-items-center">
+                <i class="fas fa-shield-alt fa-lg me-3"></i>
+                <div>
+                    <strong>Action required:</strong>
+                    <span class="ms-1">Your administrator requires Two-Factor Authentication. <a href="user_settings.cfm" class="alert-link">Enable 2FA now</a> &mdash; your portal access is limited until you do.</span>
+                </div>
+            </div>
+        </div>
+    <cfelse>
+        <!--- SOFT: voluntary, dismissible. --->
+        <div class="alert alert-warning alert-dismissible d-flex align-items-center mb-0 rounded-0 border-start-0 border-end-0" role="alert">
+            <div class="container-fluid d-flex justify-content-center align-items-center">
+                <i class="fas fa-shield-alt fa-lg me-3"></i>
+                <div>
+                    <strong>Protect your account with Two-Factor Authentication:</strong>
+                    <span class="ms-1">You haven't enabled 2FA yet. <a href="user_settings.cfm" class="alert-link">Click here to enable it</a> &mdash; you'll be guided through device setup when you sign back in.</span>
+                </div>
+                <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </cfif>
+</cfif>

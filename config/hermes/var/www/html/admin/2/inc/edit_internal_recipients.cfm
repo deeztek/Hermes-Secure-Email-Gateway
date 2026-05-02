@@ -1,6 +1,6 @@
 
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
 
 This file is part of Hermes Secure Email Gateway Community Edition.
 
@@ -19,30 +19,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <cfinclude template="generate_customtrans.cfm">
-    
-    <!--- EDIT RECIPIENTS STARTS HERE --->
 
-    <cfquery name="editrecipients" datasource="hermes">
-        update recipients 
-        set 
-        policy_id = '#form.policy#'
-        where recipient = '#recipient#'
-        </cfquery>
-   
+<!--- EDIT RECIPIENTS STARTS HERE.
+     enforce_mfa is the admin policy bit only — no LDAP cascade fires here.
+     The user must click Enable in their Account Settings (user_settings.cfm)
+     to actually move into cn=two_factor. Same pattern as the mailbox flow
+     (Phase 1.5) so the two pages share one mental model. (#225 Phase 2) --->
+<cfquery name="editrecipients" datasource="hermes">
+    UPDATE recipients
+    SET policy_id    = <cfqueryparam value="#form.policy#"      cfsqltype="cf_sql_integer">,
+        enforce_mfa  = <cfqueryparam value="#form.enforce_mfa#" cfsqltype="cf_sql_tinyint">
+    WHERE recipient  = <cfqueryparam value="#recipient#"        cfsqltype="cf_sql_varchar">
+</cfquery>
+<!--- EDIT RECIPIENT ENDS HERE --->
 
-     <!--- EDIT RECIPIENT ENDS HERE --->
-
-    <!--- EDIT USER_SETTINGS STARTS HERE --->
-
-    <cfquery name="editusersettings" datasource="hermes">
-        update user_settings 
-        set 
-        report_enabled = '#form.reports#',
-        train_bayes = '#form.train_bayes#', 
-        download_msg = '#form.download_msg#'
-        where email = '#recipient#'
-        </cfquery>
-
-          <!--- EDIT USER_SETTINGS ENDS HERE --->
-
-
+<!--- EDIT USER_SETTINGS STARTS HERE --->
+<cfquery name="editusersettings" datasource="hermes">
+    UPDATE user_settings
+    SET report_enabled = <cfqueryparam value="#form.reports#"      cfsqltype="cf_sql_varchar">,
+        train_bayes    = <cfqueryparam value="#form.train_bayes#"  cfsqltype="cf_sql_tinyint">,
+        download_msg   = <cfqueryparam value="#form.download_msg#" cfsqltype="cf_sql_tinyint">
+    WHERE email        = <cfqueryparam value="#recipient#"         cfsqltype="cf_sql_varchar">
+</cfquery>
+<!--- EDIT USER_SETTINGS ENDS HERE --->

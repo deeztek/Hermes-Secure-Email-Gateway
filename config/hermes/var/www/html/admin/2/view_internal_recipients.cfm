@@ -89,18 +89,53 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
 
+  // Edit Options click handler.
+  // Single selection: AJAX pre-fill the modal with the recipient's current
+  // settings, including enforce_mfa (#225 Phase 2). Multi-selection: legacy
+  // bulk-edit path with no pre-fill (form defaults will apply on submit).
   $(document).ready(function() {
     $("#editoptions").click(function() {
       var editrecipient = [];
       $.each($("input[name='id']:checked"), function() {
         editrecipient.push($(this).val());
       });
-      $('#editoptions_modal').modal('show').on('shown.bs.modal', function() {
-      $("#editoptionsid").html('<input type="hidden" name="recipient_id" value=' + editrecipient + '>');
-      });
+      if (editrecipient.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+      }
+      if (editrecipient.length === 1) {
+        // Single-select: hide bulk warning, AJAX pre-fill the form with the
+        // recipient's current values, then open the modal.
+        $('#editoptionsBulkWarning').hide();
+        var theRecipientId = editrecipient[0];
+        $.post('./inc/get_int_recipient_json.cfm', { id: theRecipientId }, function(data) {
+          try {
+            var rec = (typeof data === 'string') ? JSON.parse(data) : data;
+            if (rec.error) { alert('Error: ' + rec.error); return; }
+            $("#editoptions_modal select[name='policy']").val(rec.policy_id).trigger('change');
+            $("#editoptions_modal select[name='reports']").val(rec.report_enabled);
+            $("#editoptions_modal select[name='train_bayes']").val(String(rec.train_bayes));
+            $("#editoptions_modal select[name='download_msg']").val(String(rec.download_msg));
+            $("#editoptions_modal select[name='enforce_mfa']").val(String(rec.enforce_mfa || 0));
+            $("#editoptionsid").html('<input type="hidden" name="recipient_id" value="' + theRecipientId + '">');
+            $('#editoptions_modal').modal('show');
+          } catch (e) {
+            alert('Error loading recipient data.');
+          }
+        });
+      } else {
+        // Multi-select: show the bulk-edit warning and open the modal with
+        // the static form defaults. Submitting applies those defaults to
+        // every selected recipient.
+        $('#editoptionsBulkCount').text(editrecipient.length);
+        $('#editoptionsBulkWarning').show();
+        $('#editoptions_modal').modal('show').on('shown.bs.modal', function() {
+          $("#editoptionsid").html('<input type="hidden" name="recipient_id" value=' + editrecipient + '>');
+        });
+      }
     });
   });
-  
+
   </script>
 
 <script>
@@ -127,8 +162,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $.each($("input[name='id']:checked"), function() {
         editrecipient.push($(this).val());
       });
+      if (editrecipient.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+      }
       $('#editaccesscontrol_modal').modal('show').on('shown.bs.modal', function() {
-      $("#editaccesscontrolid").html('<input type="hidden" name="recipient_id" value=' + editrecipient + '>');
+        $("#editaccesscontrolid").html('<input type="hidden" name="recipient_id" value=' + editrecipient + '>');
       });
     });
   });
@@ -657,10 +696,21 @@ a, a:hover{
           --->
 
           <form name="edit_options" method="post" action="">
-    
+
             <input type="hidden" name="action" value="editoptions">
             <div id="editoptionsid"></div>
-         
+
+            <!--- Bulk-edit warning. Only shown by JS when 2+ recipients are
+                 selected. In bulk mode the form fields are static defaults
+                 (not per-row values) and submitting OVERWRITES every field
+                 on every selected recipient. Single-select gets the AJAX
+                 pre-fill instead. (##225 Phase 2) --->
+            <div id="editoptionsBulkWarning" class="alert alert-danger" style="display:none;">
+              <h5 class="mb-2"><i class="fas fa-exclamation-triangle me-2"></i>Bulk edit &mdash; <span id="editoptionsBulkCount">0</span> recipients selected</h5>
+              <p class="mb-2">The fields below are <strong>not pre-filled from each recipient's current settings</strong> &mdash; they show the form's default values. Submitting will <strong>OVERWRITE every field on every selected recipient</strong> with whatever you see now.</p>
+              <p class="mb-0"><strong>Two-Factor Authentication:</strong> if you leave it at <em>Disable</em>, recipients who currently have it enabled will have <code>recipients.enforce_mfa</code> reset to 0. The user will <strong>not</strong> be removed from <code>cn=two_factor</code> automatically (the LDAP cascade only fires on 0&rarr;1 transitions). To strip an existing enrollment, use the <strong>Reset 2FA Devices</strong> modal with the &quot;also remove from two-factor&quot; checkbox. To edit a single recipient with their current values pre-filled, select <strong>only one row</strong>.</p>
+            </div>
+
                <!--- RECIPIENT POLICY STARTS HERE --->
 
                <cfquery name="getdefaultpolicy" datasource="hermes">
@@ -746,26 +796,34 @@ a, a:hover{
       <h5><i class="icon fas fa-exclamation-triangle"></i> Warning!</h5>
       <p>Enabling can expose recipients to malware</p>
       </div>
-    <select class="form-control" name="download_msg" data-placeholder="download_msg" style="width: 100%">                  
+    <select class="form-control" name="download_msg" data-placeholder="download_msg" style="width: 100%">
     <option value="0" selected="selected">Disable</option>
     <option value="1">Enable</option>
-    
-    </select> 
-    </div>
-    
-    
-    <!--- DOWNLOAD MESSAGES  ENDS HERE --->
-    
-       
-         
 
-  
+    </select>
+    </div>
+
+
+    <!--- DOWNLOAD MESSAGES  ENDS HERE --->
+
+    <!--- 2FA ENFORCEMENT (##225 Phase 2) --->
+    <div class="form-group mb-3">
+      <label><strong>Two-Factor Authentication</strong></label>
+      <select class="form-control" name="enforce_mfa" style="width: 100%">
+        <option value="0" selected="selected">Disable</option>
+        <option value="1">Enable</option>
+      </select>
+      <small class="form-text text-muted"><i class="fas fa-info-circle me-1"></i>When enabled, the recipient sees an urgent banner in their portal directing them to Account Settings to enable 2FA themselves. After they click <em>Enable</em>, Authelia walks them through device registration (TOTP, security key, or Duo Push) on their next sign-in; the verification email is delivered to their existing upstream mailbox.</small>
+    </div>
+    <!--- /2FA ENFORCEMENT --->
+
+
             <input type="submit" class="btn btn-danger" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
-  
+
               </form>
         </div>
         <div class="modal-footer">
-      
+
           <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Cancel</button>
         </div>
       </div>
@@ -773,52 +831,50 @@ a, a:hover{
     </div>
     <!--- EDIT OPTIONS MODAL HTML ENDS HERE --->
 
-    <!--- EDIT ACCESS CONTROL MODAL HTML STARTS HERE --->
+    <!--- RESET 2FA DEVICES MODAL HTML STARTS HERE (##225 Phase 2).
+         Replaces the old "Recipient Access Control" modal. The
+         one_factor/two_factor radio is gone &mdash; the canonical admin
+         policy is the Two-Factor Authentication select on Edit Options.
+         This modal is now single-purpose: clear Authelia TOTP/WebAuthn
+         devices for the selected recipient(s). The nuclear-option
+         checkbox additionally moves the user back to cn=one_factor for
+         a full 2FA reset (admin override of voluntary enrollment, etc.).
+         Form action name kept as "editaccesscontrol" so the existing
+         dispatcher and ##editaccesscontrol_modal id don't need a
+         rename cascade. --->
 
-  <div class="modal fade" id="editaccesscontrol_modal" tabindex="-1" role="dialog" aria-labelledby="editAccessControlModalLabel" aria-hidden="true">
+  <div class="modal fade" id="editaccesscontrol_modal" tabindex="-1" role="dialog" aria-labelledby="resetTwoFactorDevicesModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
         <div class="modal-header alert-primary">
-            <h4 class="modal-title"><i class="fas fa-shield-alt me-2"></i>Recipient Access Control</h4>
+            <h4 class="modal-title"><i class="fas fa-mobile-alt me-2"></i>Reset 2FA Devices</h4>
         </div>
 
         <div class="modal-body">
-
-          <div class="alert alert-info">
-            <p class="mb-0"><i class="icon fas fa-info-circle"></i>Configure two-factor authentication requirements for selected recipient(s). Changes take effect on their next login.</p>
-          </div>
 
           <form name="edit_accesscontrol" method="post" action="">
 
             <input type="hidden" name="action" value="editaccesscontrol">
             <div id="editaccesscontrolid"></div>
 
-            <div class="form-group mb-3">
-              <label><strong>Access Control Policy</strong></label>
-              <select class="form-control" name="access_control" data-placeholder="access_control" style="width: 100%">
-                <option value="one_factor">One Factor (Password Only)</option>
-                <option value="two_factor">Two Factor (Password + 2FA)</option>
-              </select>
-              <small class="text-muted">Two Factor requires recipients to configure TOTP, Duo Push, or WebAuthn on their next login.</small>
+            <p>Reset Two-Factor Authentication devices for the selected recipient(s)?</p>
+
+            <div class="alert alert-warning mb-3">
+              <p class="mb-2"><i class="fas fa-exclamation-triangle me-1"></i> This deletes all <strong>TOTP and WebAuthn</strong> devices registered to the selected recipient(s) in Authelia. They will be guided through device re-registration on their next sign-in.</p>
+              <p class="mb-0"><i class="fas fa-info-circle me-1"></i> <strong>Does not affect Duo Push.</strong> Duo enrollments are managed through the <a href="https://admin.duosecurity.com" target="_blank" rel="noopener">Duo Admin Console</a>.</p>
             </div>
 
-            <hr>
-
-            <div class="form-group mb-3">
-              <label><strong>Delete 2FA Devices</strong></label>
-              <div class="alert alert-warning">
-                <p class="mb-2"><i class="icon fas fa-exclamation-triangle"></i>Check this box to delete all <strong>TOTP and WebAuthn</strong> devices for the selected recipient(s). They will need to re-register their 2FA devices on next login.</p>
-                <p class="mb-0"><i class="icon fas fa-info-circle"></i><strong>Note:</strong> This does <strong>not</strong> affect Duo Push enrollments. Duo Push devices are managed through the <a href="https://admin.duosecurity.com" target="_blank">Duo Admin Console</a>.</p>
-              </div>
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="delete_2fa_devices" value="1" id="delete2faCheck">
-                <label class="form-check-label" for="delete2faCheck">
-                  Delete TOTP and WebAuthn devices for selected recipient(s)
+            <div class="border rounded p-3 bg-light mb-3">
+              <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" name="also_remove_from_two_factor" id="acRelayAlsoRemove2faGroup" value="1">
+                <label class="form-check-label" for="acRelayAlsoRemove2faGroup">
+                  <strong>Also remove user from the 2FA group <span class="badge bg-danger ms-1">Nuclear</span></strong>
                 </label>
               </div>
+              <p class="mb-0 mt-2 small text-muted">By default this modal only deletes registered devices &mdash; the user stays under 2FA enforcement and re-registers on next login. Check this option to <strong>also move the user out of <code>cn=two_factor</code> back to <code>cn=one_factor</code></strong>. Use this when the user must restart 2FA from scratch (admin override of a voluntary enrollment, full account reset). If the per-recipient <em>Two-Factor Authentication</em> policy in Edit Options is still <em>Enable</em>, the cascade will move the user back to <code>cn=two_factor</code> on the next save.</p>
             </div>
 
-            <input type="submit" class="btn btn-primary" name="" value="Submit" class="form-control primary" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
+            <input type="submit" class="btn btn-warning" value="Reset Devices" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">
 
           </form>
         </div>
@@ -828,7 +884,7 @@ a, a:hover{
       </div>
     </div>
   </div>
-  <!--- EDIT ACCESS CONTROL MODAL HTML ENDS HERE --->
+  <!--- RESET 2FA DEVICES MODAL HTML ENDS HERE --->
 
 
       <cfif #action# is "deleterecipient">
@@ -996,8 +1052,19 @@ a, a:hover{
   
   <!--- /CFIF StructKeyExists(form, "download_msg") --->
   </cfif>
-  
-  
+
+  <!--- FORM.ENFORCE_MFA (##225 Phase 2) --->
+  <cfif NOT StructKeyExists(form, "enforce_mfa")>
+    <cfset m="Edit Relay Recipients: form.enforce_mfa does not exist">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+  <cfelseif form.enforce_mfa NEQ "0" AND form.enforce_mfa NEQ "1">
+    <cfset m="Edit Relay Recipients: form.enforce_mfa is not 0 or 1">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+  </cfif>
+
+
   <!--- FORM.RECIPIENT_ID --->
     <cfif NOT StructKeyExists(form, "recipient_id")>
 
@@ -1297,6 +1364,27 @@ a, a:hover{
 
 <cfelseif #action# is "editaccesscontrol">
 
+<!---
+RESET 2FA DEVICES ACTION HANDLER (##225 Phase 2).
+Was previously the "edit access control" handler with a one_factor /
+two_factor radio. That radio is gone &mdash; the canonical admin policy
+is the enforce_mfa select on Edit Options, and the LDAP cascade fires
+from edit_internal_recipients.cfm on a 0->1 transition.
+
+Two modes:
+- DEFAULT: clear TOTP and WebAuthn devices in Authelia so the user
+  re-registers on next sign-in. "User lost their phone" recovery.
+- NUCLEAR (form.also_remove_from_two_factor=1): also remove the user
+  from cn=two_factor LDAP group, moving them back to cn=one_factor.
+  Used for admin override of a voluntary enrollment, or full account
+  reset. The per-recipient enforce_mfa policy is left alone &mdash; if
+  it's still 1, the cascade in edit_internal_recipients.cfm will move
+  the user back to cn=two_factor on the next save.
+
+(Form action name kept as "editaccesscontrol" so the dispatcher and
+modal markup don't need a rename cascade.)
+--->
+
 <!--- VALIDATE PARAMETERS --->
 <cfif NOT StructKeyExists(form, "recipient_id")>
   <cfset session.m = 1>
@@ -1310,21 +1398,11 @@ a, a:hover{
   </cfif>
 </cfif>
 
-<!--- VALIDATE ACCESS_CONTROL PARAMETER --->
-<cfif NOT StructKeyExists(form, "access_control")>
-  <cfset m="Edit Relay Recipients: form.access_control does not exist">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-<cfelseif form.access_control NEQ "one_factor" AND form.access_control NEQ "two_factor">
-  <cfset m="Edit Relay Recipients: form.access_control is not one_factor or two_factor">
-  <cfinclude template="./inc/error.cfm">
-  <cfabort>
-</cfif>
+<cfparam name="form.also_remove_from_two_factor" default="0">
 
 <!--- PROCESS EACH RECIPIENT --->
 <cfloop index="i" list="#theCustId#" delimiters=",">
   <cfif IsValid("integer", i)>
-    <!--- GET RECIPIENT INFO --->
     <cfquery name="getrecipient" datasource="hermes">
       SELECT r.id, r.recipient, us.ldap_username
       FROM recipients r
@@ -1333,56 +1411,56 @@ a, a:hover{
     </cfquery>
 
     <cfif getrecipient.recordcount GTE 1>
-      <!--- GET LDAP USERNAME FOR THIS RECIPIENT --->
       <cfif getrecipient.ldap_username NEQ "">
         <cfset ldapUsername = getrecipient.ldap_username>
       <cfelse>
-        <!--- Username is the email address --->
         <cfset ldapUsername = LCase(getrecipient.recipient)>
       </cfif>
 
-      <!--- CHANGE ACCESS CONTROL GROUP IN LDAP --->
-      <cfset ldapNewAccessControl = form.access_control>
-      <cfif form.access_control EQ "one_factor">
-        <cfset ldapOldAccessControl = "two_factor">
-      <cfelse>
-        <cfset ldapOldAccessControl = "one_factor">
-      </cfif>
-
+      <!--- DELETE TOTP DEVICES via Authelia CLI. Failure is non-critical
+           (e.g., user had no TOTP enrolled &mdash; Authelia returns
+           non-zero); the desired end-state ("no TOTP devices") is
+           achieved either way. --->
       <cftry>
-        <cfinclude template="./inc/ldap_change_user_access_control.cfm">
-      <cfcatch type="any">
-        <!--- Log error but continue processing --->
-      </cfcatch>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /config/configuration.yml"
+            variable="totpDeleteResult"
+            errorVariable="totpDeleteError"
+            timeout="30">
+        </cfexecute>
+      <cfcatch type="any"></cfcatch>
       </cftry>
 
-      <!--- DELETE 2FA DEVICES IF REQUESTED --->
-      <cfif StructKeyExists(form, "delete_2fa_devices") AND form.delete_2fa_devices EQ "1">
-        <cftry>
-          <!--- Delete TOTP devices via docker exec --->
-          <cfexecute name="/usr/local/bin/docker"
-              arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /config/configuration.yml"
-              timeout="30"
-              variable="totpDeleteResult"
-              errorVariable="totpDeleteError">
-          </cfexecute>
+      <!--- DELETE WEBAUTHN DEVICES via Authelia CLI. Same non-critical
+           handling as TOTP. --->
+      <cftry>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --all --config /config/configuration.yml"
+            variable="webauthnDeleteResult"
+            errorVariable="webauthnDeleteError"
+            timeout="30">
+        </cfexecute>
+      <cfcatch type="any"></cfcatch>
+      </cftry>
 
-          <!--- Delete WebAuthn devices via docker exec --->
-          <cfexecute name="/usr/local/bin/docker"
-              arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --config /config/configuration.yml --all"
-              timeout="30"
-              variable="webauthnDeleteResult"
-              errorVariable="webauthnDeleteError">
-          </cfexecute>
+      <!--- NUCLEAR OPTION: also remove user from cn=two_factor LDAP
+           group. The ldap_change_user_access_control.cfm helper is
+           idempotent on benign errors (e.g., user wasn't in two_factor
+           to begin with). The per-recipient enforce_mfa policy is left
+           alone &mdash; the editoptions cascade will re-add them to
+           cn=two_factor on the next save if the policy is still 1. --->
+      <cfif form.also_remove_from_two_factor EQ "1">
+        <cftry>
+          <cfset ldapOldAccessControl = "two_factor">
+          <cfset ldapNewAccessControl = "one_factor">
+          <cfinclude template="./inc/ldap_change_user_access_control.cfm">
         <cfcatch type="any">
-          <!--- Log error but continue processing --->
+          <!--- Non-critical: device clear above already happened. --->
         </cfcatch>
         </cftry>
       </cfif>
 
-    <!--- /CFIF getrecipient.recordcount GTE 1 --->
     </cfif>
-  <!--- /CFIF IsValid("integer", i) --->
   </cfif>
 </cfloop>
 
@@ -1455,7 +1533,7 @@ a, a:hover{
             <button type="button" id="editoptions" class="btn btn-primary"><i class="fa fa-edit me-1"></i>Edit Options</button>
             <button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock me-1"></i>Edit Encryption</button>
             <button type="button" id="editbackend" class="btn btn-primary"><i class="fas fa-server me-1"></i>Edit Backend</button>
-            <button type="button" id="editaccesscontrol" class="btn btn-primary"><i class="fas fa-shield-alt me-1"></i>Access Control</button>
+            <button type="button" id="editaccesscontrol" class="btn btn-primary"><i class="fas fa-mobile-alt me-1"></i>Reset 2FA Devices</button>
             <button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i>Delete</button>
         </div>
 
@@ -1479,7 +1557,7 @@ a, a:hover{
 <cfquery name="getrecipients" datasource="hermes">
   select recipients.id, recipients.id as theID, recipients.id as theOtherID, recipients.recipient,
     recipients.backend_server, recipients.backend_port, recipients.backend_tls,
-    recipients.auth_type, recipients.remoteauth_domain,
+    recipients.auth_type, recipients.remoteauth_domain, recipients.enforce_mfa,
     policy.policy_name, user_settings.report_enabled as report_enabled, if(user_settings.train_bayes = 1, 'YES', 'NO') as train_bayes, if(user_settings.download_msg = 1, 'YES', 'NO') as download_msg, if(recipients.pdf_enabled = 1, 'YES', 'NO') as pdf_enabled, if(recipients.smime_enabled = '1', 'YES', 'NO') as smime_enabled, if(recipients.pgp_enabled = 1, 'YES', 'NO') as pgp_enabled, if(recipients.digital_sign = '1', 'YES', 'NO') as digital_sign, if(recipient_certificates.user_id is NULL, 'NO', 'YES') as cert, if(recipient_keystores.user_id is NULL, 'NO', 'YES') as keystore, COALESCE(user_settings.ldap_username, '') as ldap_username
   from recipients LEFT JOIN policy ON recipients.policy_id = policy.id LEFT JOIN recipient_certificates ON recipients.id = recipient_certificates.user_id  LEFT JOIN recipient_keystores ON recipients.id = recipient_keystores.user_id  LEFT JOIN user_settings ON recipients.recipient = user_settings.email where recipients.domain is NULL and (recipients.recipient_type = 'relay' or recipients.recipient_type is null) group by recipients.id
 
@@ -1526,7 +1604,24 @@ a, a:hover{
             <td>#recipient#</td>
             <td><cfif auth_type EQ "remote"><span class="badge bg-primary" title="#remoteauth_domain#"><i class="fas fa-cloud me-1"></i>REMOTE</span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
             <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
-            <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
+            <td><!--- 2FA column: two orthogonal states, two independent pills.
+                  "Enrolled" reads cn=two_factor LDAP membership (user has
+                  registered a 2FA device — Authelia challenges them at
+                  sign-in). "Required" reads recipients.enforce_mfa (admin
+                  policy — set via Edit Options). A user can be enrolled
+                  voluntarily without admin enforcement, and admin can
+                  enforce without the user yet being enrolled, so the two
+                  must be displayed independently. (##225 Phase 1.5 + Phase 2) --->
+              <cfif isTwoFactor>
+                <span class="badge bg-success me-1" title="User has registered a 2FA device (TOTP, security key, or Duo Push). Authelia challenges them at sign-in."><i class="fas fa-shield-alt me-1"></i>Enrolled</span>
+              </cfif>
+              <cfif Val(enforce_mfa) EQ 1>
+                <span class="badge bg-warning text-dark" title="Admin requires 2FA &mdash; set via Edit Options. Independent of enrollment state."><i class="fas fa-exclamation-triangle me-1"></i>Required</span>
+              </cfif>
+              <cfif NOT isTwoFactor AND Val(enforce_mfa) NEQ 1>
+                <span class="text-muted">&mdash;</span>
+              </cfif>
+            </td>
             <td>#policy_name#</td>
             <td><cfif report_enabled NEQ "NO"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif train_bayes EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>

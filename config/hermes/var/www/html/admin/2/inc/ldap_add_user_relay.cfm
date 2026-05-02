@@ -65,8 +65,12 @@ Returns:
         <cfset ldapUserCreated = true>
     </cfif>
 
-    <!--- ADD USER TO RELAY GROUPS --->
-    <cfset ldapAccessControl = "one_factor">
+    <!--- ADD USER TO RELAY GROUPS. Caller can pre-set ldapAccessControl
+         to "two_factor" to enroll the user under 2FA enforcement at
+         creation time (#225 Phase 2). Defaults to "one_factor" otherwise. --->
+    <cfif NOT isDefined("ldapAccessControl") OR ldapAccessControl EQ "">
+        <cfset ldapAccessControl = "one_factor">
+    </cfif>
     <cfinclude template="ldap_add_user_groups_relay.cfm">
 
     <!--- UPDATE USER_SETTINGS WITH LDAP USERNAME --->

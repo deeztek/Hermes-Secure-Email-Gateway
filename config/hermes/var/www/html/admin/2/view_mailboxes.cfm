@@ -401,22 +401,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td><cfif auth_type EQ "remote"><span class="badge bg-primary" title="#HTMLEditFormat(remoteauth_domain)#"><i class="fas fa-cloud me-1"></i>REMOTE</span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
-          <td><!--- 2FA column (#225 Phase 1.5).
-                Shows BOTH the user's actual LDAP state AND the admin
-                policy. Three distinct states, not two:
-                - 2FA               : user is enrolled (cn=two_factor)
-                - Required          : admin enforces (recipients.enforce_mfa=1)
-                                      but user hasn't self-enrolled yet —
-                                      portal is in restricted bootstrap
-                                      mode for them
-                - Password          : no policy, no enrollment
+          <td><!--- 2FA column: two orthogonal states, two independent pills.
+                "Enrolled" reads cn=two_factor LDAP membership (user has
+                registered a 2FA device — Authelia challenges them at
+                sign-in). "Required" reads recipients.enforce_mfa (admin
+                policy — set via Edit Options). A user can be enrolled
+                voluntarily without admin enforcement, and admin can
+                enforce without the user yet being enrolled, so the two
+                must be displayed independently. (#225 Phase 1.5 + Phase 2)
             --->
             <cfif isTwoFactor>
-                <span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span>
-            <cfelseif Val(enforce_mfa) EQ 1>
-                <span class="badge bg-warning text-dark" title="Admin requires 2FA — user has not enabled it yet. Their portal is restricted to bootstrap features until they enable 2FA themselves."><i class="fas fa-exclamation-triangle me-1"></i>Required</span>
-            <cfelse>
-                <span class="badge bg-secondary">Password</span>
+              <span class="badge bg-success me-1" title="User has registered a 2FA device (TOTP, security key, or Duo Push). Authelia challenges them at sign-in."><i class="fas fa-shield-alt me-1"></i>Enrolled</span>
+            </cfif>
+            <cfif Val(enforce_mfa) EQ 1>
+              <span class="badge bg-warning text-dark" title="Admin requires 2FA &mdash; set via Edit Options. Independent of enrollment state."><i class="fas fa-exclamation-triangle me-1"></i>Required</span>
+            </cfif>
+            <cfif NOT isTwoFactor AND Val(enforce_mfa) NEQ 1>
+              <span class="text-muted">&mdash;</span>
             </cfif>
           </td>
           <td>#HTMLEditFormat(policy_name)#</td>

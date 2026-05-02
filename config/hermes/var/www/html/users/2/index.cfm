@@ -111,6 +111,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ===== GATHER STATS ===== --->
 
+<!--- Catch-all detection. Mirrors view_message_history.cfm so the dashboard
+     stat cards count the same messages the user can see on the history
+     page. If this user is the destination ("maps") for any catch-all
+     virtual_recipient (e.g., "@domain.tld" → user), build the LIKE
+     patterns we'll OR into both stat queries below. Without this, a
+     relay recipient that catches a domain's mail via a virtual_recipient
+     would see message history entries that aren't reflected in the
+     "Quarantined (24h)" / "Total Messages (24h)" cards. --->
+<cfset catchAllDomainsForCards = "">
+<cfif isDefined("session.email") AND session.email NEQ "">
+    <cfquery name="checkCatchAllForCards" datasource="hermes">
+        SELECT virtual_address
+        FROM virtual_recipients
+        WHERE virtual_address LIKE '@%'
+        AND maps = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfloop query="checkCatchAllForCards">
+        <cfset catchAllDomainsForCards = ListAppend(catchAllDomainsForCards, "%" & checkCatchAllForCards.virtual_address)>
+    </cfloop>
+</cfif>
+<cfset hasCatchAllForCards = (Len(catchAllDomainsForCards) GT 0)>
+
 <!--- Quarantined messages (last 24 hours - matches view_message_history default window) --->
 <cfset quarantineCount = 0>
 <cfif isDefined("session.owner") AND session.owner GT 0>
@@ -118,9 +140,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
         FROM msgs
         INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        <cfif hasCatchAllForCards>
+            INNER JOIN maddr ON msgrcpt.rid = maddr.id
+        </cfif>
+        WHERE msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
         AND msgs.content IN ('S','V','B','U')
+        AND (
+            msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+            <cfif hasCatchAllForCards>
+                OR (
+                    (
+                        <cfset _qIdx = 0>
+                        <cfloop list="#catchAllDomainsForCards#" index="_qPattern">
+                            <cfset _qIdx = _qIdx + 1>
+                            <cfif _qIdx GT 1> OR </cfif>
+                            maddr.email LIKE <cfqueryparam value="#_qPattern#" cfsqltype="cf_sql_varchar">
+                        </cfloop>
+                    )
+                    AND maddr.email NOT IN (
+                        SELECT recipient FROM recipients WHERE domain IS NULL
+                    )
+                )
+            </cfif>
+        )
     </cfquery>
     <cfif getQuarantineCount.recordcount GTE 1>
         <cfset quarantineCount = getQuarantineCount.cnt>
@@ -134,8 +176,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         SELECT COUNT(DISTINCT msgs.mail_id) AS cnt
         FROM msgs
         INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-        WHERE msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
-        AND msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        <cfif hasCatchAllForCards>
+            INNER JOIN maddr ON msgrcpt.rid = maddr.id
+        </cfif>
+        WHERE msgs.time_iso >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+        AND (
+            msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
+            <cfif hasCatchAllForCards>
+                OR (
+                    (
+                        <cfset _tIdx = 0>
+                        <cfloop list="#catchAllDomainsForCards#" index="_tPattern">
+                            <cfset _tIdx = _tIdx + 1>
+                            <cfif _tIdx GT 1> OR </cfif>
+                            maddr.email LIKE <cfqueryparam value="#_tPattern#" cfsqltype="cf_sql_varchar">
+                        </cfloop>
+                    )
+                    AND maddr.email NOT IN (
+                        SELECT recipient FROM recipients WHERE domain IS NULL
+                    )
+                )
+            </cfif>
+        )
     </cfquery>
     <cfif getTotalMessages.recordcount GTE 1>
         <cfset totalMessages = getTotalMessages.cnt>

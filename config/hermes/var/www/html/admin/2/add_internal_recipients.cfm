@@ -187,7 +187,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 </cfif>
 
 <!--- SHOW_DOWNLOAD_MSG --->
-<cfparam name = "show_download_msg" default = ""> 
+<cfparam name = "show_download_msg" default = "">
 
 <cfif StructKeyExists(form, "download_msg")>
 
@@ -205,6 +205,18 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 </cfif>
 
 <!--- /CFIF StructKeyExists(form, "download_msg") --->
+</cfif>
+
+<!--- SHOW_ENFORCE_MFA (##225 Phase 2) --->
+<cfparam name="show_enforce_mfa" default="0">
+<cfif StructKeyExists(form, "enforce_mfa")>
+    <cfif form.enforce_mfa EQ "0" OR form.enforce_mfa EQ "1">
+        <cfset show_enforce_mfa = form.enforce_mfa>
+    <cfelse>
+        <cfset m="Add Relay Recipients: form.enforce_mfa is not 0 or 1">
+        <cfinclude template="./inc/error.cfm">
+        <cfabort>
+    </cfif>
 </cfif>
 
 <!--- SHOW_PDF_ENABLED --->
@@ -784,6 +796,20 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
 
 
 <!--- DOWNLOAD MESSAGES  ENDS HERE --->
+
+<!--- 2FA ENFORCEMENT (##225 Phase 2) --->
+<div class="form-group">
+  <label><strong>Two-Factor Authentication</strong></label>
+  <div class="alert alert-info">
+    <i class="icon fas fa-info-circle"></i>
+    When enabled, the recipient(s) see an urgent banner on first portal sign-in directing them to Account Settings to enable 2FA themselves. After they click <em>Enable</em>, Authelia walks them through device registration (TOTP, security key, or Duo Push); the verification email is delivered to their existing upstream mailbox.
+  </div>
+  <select class="form-control" name="enforce_mfa" style="width: 100%">
+    <option value="0" selected="selected">Disable</option>
+    <option value="1">Enable</option>
+  </select>
+</div>
+<!--- /2FA ENFORCEMENT --->
 
 <!--- AUTHENTICATION TYPE block lives at the top of the form (above the
      Recipient textarea) so the textarea placeholder + help text can
