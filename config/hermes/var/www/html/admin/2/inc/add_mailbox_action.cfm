@@ -295,14 +295,23 @@ Requires form variables:
     <cfset form.nextcloud_enabled = 0>
 </cfif>
 
-<!--- VALIDATE 2FA ENFORCEMENT TOGGLE (#225).
-     Read by ldap_add_user_mailbox{,_remoteauth}.cfm to choose
-     cn=one_factor vs cn=two_factor at LDAP creation time. --->
+<!--- VALIDATE 2FA ENFORCEMENT FLAG (#225).
+     Stored on recipients.enforce_mfa as the admin-policy bit. Does NOT
+     touch LDAP at create time — new users always go into cn=one_factor.
+     The bootstrap problem (Authelia's 2FA enrollment requires email
+     verification, but a fresh mailbox has no working mail client yet)
+     is solved by app-layer restriction instead: when enforce_mfa=1 and
+     the user is not yet in cn=two_factor, the user portal limits them
+     to the bootstrap surfaces (Account Settings, My App Passwords,
+     Set Up Your Devices, Webmail) so they can mint an app password,
+     read the welcome email in their mail client, then come back and
+     click Enable 2FA themselves. See
+     /users/2/inc/check_enforce_mfa_restriction.cfm. --->
 <cfparam name="form.enforce_mfa" default="0">
 <cfif form.enforce_mfa NEQ "0" AND form.enforce_mfa NEQ "1">
     <cfset form.enforce_mfa = 0>
 </cfif>
-<cfset ldapAccessControl = (form.enforce_mfa EQ "1") ? "two_factor" : "one_factor">
+<cfset ldapAccessControl = "one_factor">
 
 <!--- VALIDATE S/MIME OPTIONS (if enabled) --->
 <cfparam name="form.ca" default="">

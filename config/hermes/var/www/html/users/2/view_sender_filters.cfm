@@ -132,7 +132,11 @@ a, a:hover{
     <div class="content">
       <div class="container-fluid">
 
-    
+    <!--- 2FA enforce-mfa restriction gate (#225 Phase 1.5) --->
+    <cfinclude template="./inc/check_enforce_mfa_restriction.cfm">
+    <cfif enforceMfaRestricted>
+      <cfinclude template="./inc/restricted_access_panel.cfm">
+    <cfelse>
 
   <cfparam name = "m" default = "0">
   <cfif StructKeyExists(session, "m")>
@@ -662,6 +666,7 @@ a, a:hover{
 
     
     
+    </cfif><!-- /.enforceMfaRestricted -->
   </div><!-- /.container-fluid -->
 </div>
 <!-- /.content -->

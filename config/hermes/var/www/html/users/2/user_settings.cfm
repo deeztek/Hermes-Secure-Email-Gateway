@@ -352,6 +352,25 @@ $(document).ready(function() {
                     <cfset session.theGroups = ListAppend(session.theGroups, "two_factor")>
                 </cfif>
                 <cfset session.mfaMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Two-Factor Authentication has been enabled. You will be prompted to set up your authenticator app on your next login.">
+
+                <!--- Force Authelia to re-read LDAP group membership
+                     immediately by routing through Authelia's logout
+                     endpoint at /logout (the same one /users/logout.cfm
+                     uses). Authelia destroys the session and redirects
+                     to rd=, which then hits Authelia auth_request with
+                     no session, bouncing the user to the login page.
+                     After re-login the cn=two_factor policy applies
+                     and Authelia routes through 2FA enrollment.
+                     Webmail (NC) keeps its own session — that tab
+                     stays logged in for reading the verification
+                     email. --->
+                <cfquery name="getConsoleHostForMfa" datasource="hermes">
+                    SELECT value2 FROM parameters2
+                    WHERE parameter='console.host' AND module='console'
+                </cfquery>
+                <cfset mfaConsoleHost = (getConsoleHostForMfa.recordcount GTE 1 AND Trim(getConsoleHostForMfa.value2) NEQ "") ? Trim(getConsoleHostForMfa.value2) : cgi.http_host>
+                <cfset session.mfaMessageType = "success">
+                <cflocation url="/logout?rd=https://#mfaConsoleHost#/users/2/user_settings.cfm" addtoken="no">
             <cfelse>
                 <!--- Remove two_factor and add one_factor --->
                 <cfset twoFactorPos = ListFindNoCase(session.theGroups, "two_factor")>
@@ -630,22 +649,97 @@ $(document).ready(function() {
                             <span class="form-control text-danger fw-bold"><i class="fas fa-times-circle me-1"></i> Disabled</span>
                         </cfif>
                         <cfif mfaEnforcedByAdmin>
-                            <span class="input-group-text text-bg-secondary">
+                            <span class="input-group-text text-bg-warning">
                                 <i class="fas fa-lock me-1"></i> Required by your administrator
                             </span>
                         </cfif>
                     </div>
                 </div>
 
-                <cfif mfaEnforcedByAdmin>
-                    <!--- Admin enforces 2FA — toggle is locked. Button rendered
-                         disabled so the user can see why it's not actionable. --->
+                <!--- Four-state UI for the 2FA toggle (#225 Phase 1.5):
+                     1. Admin enforces + already enabled: locked Disable button
+                     2. Admin enforces + NOT enabled (bootstrap): prominent Enable + restriction explainer
+                     3. Voluntary + enabled: normal Disable button
+                     4. Voluntary + not enabled: recommended Enable button --->
+
+                <cfif mfaEnforcedByAdmin AND mfaEnabled>
+                    <!--- (1) Admin enforces and user is in cn=two_factor.
+                         Note this covers BOTH "just clicked Enable" and
+                         "fully enrolled long ago" — without a query to
+                         Authelia's DB we can't tell them apart, so we
+                         show the post-Enable steps as a contextual
+                         reminder ("if you haven't yet"). Already-enrolled
+                         users mentally skip; mid-enrollment users use
+                         it as their guide. Locked-Disable button stays
+                         the primary action. --->
+                    <div class="alert alert-info mb-3">
+                        <h6 class="mb-2"><i class="icon fas fa-info-circle me-1"></i> If you haven't yet completed enrollment</h6>
+                        <p class="mb-2">2FA is enabled on your account, but Authelia walks you through device registration the first time it sees you in the 2FA group. If you haven't done that yet:</p>
+                        <ol class="mb-2">
+                            <li class="mb-1">Make sure <a href="/users/2/preload_nc_login.cfm" target="_blank" rel="noopener" class="alert-link">Webmail</a> is open in another tab &mdash; you'll need it to read the verification email Authelia sends during enrollment.</li>
+                            <li class="mb-1">Within a few minutes, Authelia will prompt you to register a device as you click around the portal. (To trigger immediately, sign out + sign back in &mdash; your Webmail tab stays logged in.)</li>
+                            <li class="mb-1">Click <em>Register your first device</em>. The verification email lands in your Webmail tab &mdash; switch over, open it, click the link.</li>
+                            <li class="mb-0">Register a 2FA device (authenticator app / security key / Duo Push). Done.</li>
+                        </ol>
+                        <p class="mb-0"><small>If you've already enrolled, ignore this &mdash; you're set.</small></p>
+                    </div>
                     <button type="button" class="btn btn-outline-secondary" disabled
                             title="Your administrator requires 2FA on your account. You cannot disable it.">
                         <i class="fas fa-lock me-1"></i> Disable 2FA (locked by administrator)
                     </button>
                     <p class="form-text text-muted mt-2 mb-0"><i class="fas fa-info-circle me-1"></i> Your administrator has set Two-Factor Authentication as required for your account. You cannot disable it from here. If you need to change a registered device (TOTP, security key, Duo), contact your administrator.</p>
+
+                <cfelseif mfaEnforcedByAdmin AND NOT mfaEnabled>
+                    <!--- (2) BOOTSTRAP STATE: admin enforces but user has not
+                         yet enabled. The rest of the user portal is
+                         restricted until they click Enable. Loud UI with
+                         the precise 5-step flow that works around the
+                         chicken-and-egg of needing to read the Authelia
+                         identity-verification email DURING the enrollment
+                         flow itself. The trick is to open Webmail FIRST
+                         (while still on a one_factor session, so /nc is
+                         still accessible), then enable 2FA, then sign
+                         out / back in. The Webmail tab keeps working
+                         because Nextcloud's OIDC integration maintains
+                         its own NC-side session that persists across
+                         the Authelia re-auth. --->
+                    <div class="alert alert-warning mb-3">
+                        <h5 class="mb-2"><i class="icon fas fa-shield-alt me-1"></i> Action required: enable 2FA to unlock your portal</h5>
+                        <p class="mb-2">Your administrator requires Two-Factor Authentication. Your portal access is limited to <strong>Account Settings</strong>, <strong>My App Passwords</strong>, <strong>Set Up Your Devices</strong>, and <strong>Webmail &amp; Apps</strong> until you enable it.</p>
+                        <p class="mb-2"><strong>How to enable 2FA &mdash; follow these steps in order:</strong></p>
+                        <ol class="mb-0">
+                            <li class="mb-1"><strong>Open Webmail in a new browser tab</strong> &mdash; <a href="/users/2/preload_nc_login.cfm" target="_blank" rel="noopener" class="alert-link">click here to open it now</a>. <strong>Keep that tab open</strong>; you'll need it to read the verification email during enrollment.</li>
+                            <li class="mb-1">Come back to this page and click <strong>Enable 2FA now</strong> below. You'll be sent back to the sign-in page automatically.</li>
+                            <li class="mb-1">Sign back in. Authelia will walk you through registering a 2FA device. A verification email arrives in your Webmail tab &mdash; switch to that tab, open the email, click the link.</li>
+                            <li class="mb-0">Register a 2FA device (authenticator app / security key / Duo Push). The portal unlocks automatically once enrolled.</li>
+                        </ol>
+                    </div>
+                    <form method="post" action="user_settings.cfm">
+                        <input type="hidden" name="action" value="toggle_mfa">
+                        <input type="hidden" name="mfa_setting" value="enable">
+                        <button type="submit" class="btn btn-warning btn-lg">
+                            <i class="fas fa-shield-alt me-1"></i> Enable 2FA now
+                        </button>
+                    </form>
+                    <p class="form-text text-muted mt-2 mb-0"><small>Make sure Webmail is open in another tab <em>before</em> clicking Enable.</small></p>
+
                 <cfelseif mfaEnabled>
+                    <!--- (3) Voluntary + enabled. Same post-Enable reminder
+                         as state (1) since we can't tell apart "just
+                         enabled" from "fully enrolled" without an
+                         Authelia DB query. Already-enrolled users
+                         mentally skip; mid-enrollment users use it. --->
+                    <div class="alert alert-info mb-3">
+                        <h6 class="mb-2"><i class="icon fas fa-info-circle me-1"></i> If you haven't yet completed enrollment</h6>
+                        <p class="mb-2">2FA is enabled on your account, but Authelia walks you through device registration the first time it sees you in the 2FA group. If you haven't done that yet:</p>
+                        <ol class="mb-2">
+                            <li class="mb-1">Make sure <a href="/users/2/preload_nc_login.cfm" target="_blank" rel="noopener" class="alert-link">Webmail</a> is open in another tab &mdash; you'll need it to read the verification email Authelia sends during enrollment.</li>
+                            <li class="mb-1">Within a few minutes, Authelia will prompt you to register a device as you click around the portal. (To trigger immediately, sign out + sign back in &mdash; your Webmail tab stays logged in.)</li>
+                            <li class="mb-1">Click <em>Register your first device</em>. The verification email lands in your Webmail tab &mdash; switch over, open it, click the link.</li>
+                            <li class="mb-0">Register a 2FA device (authenticator app / security key / Duo Push). Done.</li>
+                        </ol>
+                        <p class="mb-0"><small>If you've already enrolled, ignore this &mdash; you're set.</small></p>
+                    </div>
                     <form method="post" action="user_settings.cfm" onsubmit="return confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.');">
                         <input type="hidden" name="action" value="toggle_mfa">
                         <input type="hidden" name="mfa_setting" value="disable">
@@ -653,18 +747,30 @@ $(document).ready(function() {
                             <i class="fas fa-shield-alt me-1"></i> Disable 2FA
                         </button>
                     </form>
+
                 <cfelse>
+                    <!--- (4) Voluntary + not enabled. Same 5-step bootstrap
+                         flow as state (2) but with softer "Recommended"
+                         framing instead of "Action required." --->
                     <div class="alert alert-success mb-3">
-                        <i class="fas fa-lightbulb me-2"></i>
-                        <strong>Recommended:</strong> Enable 2FA to protect your account from unauthorized access. After enabling, you will be prompted to set up your authenticator app on your next login.
+                        <h6 class="mb-2"><i class="fas fa-lightbulb me-1"></i> Recommended: enable 2FA to protect your account</h6>
+                        <p class="mb-2">2FA adds a second factor (authenticator app, security key, or Duo Push) to your web sign-in.</p>
+                        <p class="mb-2"><strong>How to enable 2FA &mdash; follow these steps in order:</strong></p>
+                        <ol class="mb-0">
+                            <li class="mb-1"><strong>Open Webmail in a new browser tab</strong> &mdash; <a href="/users/2/preload_nc_login.cfm" target="_blank" rel="noopener" class="alert-link">click here to open it now</a>. <strong>Keep that tab open</strong>; you'll need it to read the verification email during enrollment.</li>
+                            <li class="mb-1">Come back to this page and click <strong>Enable 2FA</strong> below. You'll be sent back to the sign-in page automatically.</li>
+                            <li class="mb-1">Sign back in. Authelia will walk you through registering a 2FA device. A verification email arrives in your Webmail tab &mdash; switch to that tab, open the email, click the link.</li>
+                            <li class="mb-0">Register a 2FA device (authenticator app / security key / Duo Push). Done.</li>
+                        </ol>
                     </div>
                     <form method="post" action="user_settings.cfm">
                         <input type="hidden" name="action" value="toggle_mfa">
                         <input type="hidden" name="mfa_setting" value="enable">
-                        <button type="submit" class="btn btn-success">
+                        <button type="submit" class="btn btn-success btn-lg">
                             <i class="fas fa-shield-alt me-1"></i> Enable 2FA
                         </button>
                     </form>
+                    <p class="form-text text-muted mt-2 mb-0"><small>Make sure Webmail is open in another tab <em>before</em> clicking Enable.</small></p>
                 </cfif>
             </div>
         </div>

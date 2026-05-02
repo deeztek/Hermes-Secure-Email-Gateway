@@ -19,9 +19,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!---
-EDIT MAILBOX ACCESS CONTROL ACTION HANDLER
-Changes the LDAP access control group (one_factor/two_factor) for a mailbox user.
-Optionally deletes TOTP and WebAuthn devices via Authelia CLI.
+RESET 2FA DEVICES ACTION HANDLER (#225 Phase 1.5)
+
+Was previously the "edit access control" handler with a one_factor /
+two_factor radio. That radio is gone — the canonical admin policy
+surface is the enforce_mfa checkbox in Edit Options, and LDAP group
+membership is driven by the user's own toggle in user_settings.cfm.
+
+Two modes:
+- DEFAULT: clear TOTP and WebAuthn devices in Authelia so the user
+  re-registers on next sign-in. "User lost their phone" recovery.
+- NUCLEAR (form.also_remove_from_two_factor=1): also remove the user
+  from cn=two_factor LDAP group, moving them back to cn=one_factor.
+  Forces the user out of 2FA regardless of whether they self-enrolled
+  before. Used for admin override of a voluntary enrollment, or full
+  account reset. The per-mailbox enforce_mfa policy is left alone —
+  if it's still 1, the user re-enters the bootstrap flow on next
+  portal visit.
+
+(Form action name kept as "edit_mailbox_access_control" so the
+view_mailboxes.cfm dispatcher and modal markup don't need a rename
+cascade. Filename / dispatcher renaming is a future cleanup.)
 --->
 
 <!--- VALIDATE MAILBOX ID --->
@@ -36,14 +54,6 @@ Optionally deletes TOTP and WebAuthn devices via Authelia CLI.
     <cflocation url="view_mailboxes.cfm" addtoken="no">
 </cfif>
 
-<!--- VALIDATE ACCESS CONTROL --->
-<cfparam name="form.access_control" default="one_factor">
-<cfif form.access_control NEQ "one_factor" AND form.access_control NEQ "two_factor">
-    <cfset m="Edit Mailbox Access Control: invalid access_control value">
-    <cfinclude template="error.cfm">
-    <cfabort>
-</cfif>
-
 <cfset recipientEmail = trim(form.recipient_email)>
 
 <!--- VERIFY MAILBOX EXISTS --->
@@ -56,68 +66,61 @@ Optionally deletes TOTP and WebAuthn devices via Authelia CLI.
     <cflocation url="view_mailboxes.cfm" addtoken="no">
 </cfif>
 
-<!--- GET LDAP USERNAME --->
+<!--- GET LDAP USERNAME (for Authelia CLI calls) --->
 <cfparam name="form.ldap_username" default="">
 <cfset ldapUsername = form.ldap_username>
 <cfif ldapUsername EQ "">
     <cfset ldapUsername = LCase(recipientEmail)>
 </cfif>
 
-<!--- DETERMINE CURRENT ACCESS CONTROL BY CHECKING LDAP GROUP MEMBERSHIP --->
-<!--- Default to one_factor if we can't determine --->
-<cfset ldapOldAccessControl = "one_factor">
-
-<!--- Try to check if user is in two_factor group --->
+<!--- DELETE TOTP DEVICES via Authelia CLI. Failure is non-critical
+     (e.g., user had no TOTP enrolled — Authelia returns non-zero); the
+     UI still reports success because the desired end-state ("no TOTP
+     devices") is achieved either way. --->
 <cftry>
-    <cfinclude template="generate_customtrans.cfm">
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -b cn=two_factor,ou=groups,dc=hermes,dc=local -LLL member"
-        variable="ldapSearchResult"
-        errorVariable="ldapSearchError"
+        arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /config/configuration.yml"
+        variable="totpResult"
+        errorVariable="totpError"
         timeout="30">
     </cfexecute>
-    <cfif ldapSearchResult CONTAINS "cn=#ldapUsername#,ou=users">
-        <cfset ldapOldAccessControl = "two_factor">
-    </cfif>
 <cfcatch type="any">
-    <!--- Can't determine current group, default to one_factor --->
+    <!--- Non-critical --->
 </cfcatch>
 </cftry>
 
-<!--- CHANGE LDAP ACCESS CONTROL GROUP --->
-<cfset ldapNewAccessControl = form.access_control>
-<cfinclude template="ldap_change_user_access_control.cfm">
+<!--- DELETE WEBAUTHN DEVICES via Authelia CLI. Same non-critical
+     handling as TOTP. --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --all --config /config/configuration.yml"
+        variable="webauthnResult"
+        errorVariable="webauthnError"
+        timeout="30">
+    </cfexecute>
+<cfcatch type="any">
+    <!--- Non-critical --->
+</cfcatch>
+</cftry>
 
-<!--- DELETE 2FA DEVICES IF REQUESTED --->
-<cfparam name="form.delete_2fa_devices" default="0">
-<cfif form.delete_2fa_devices EQ "1">
-
-    <!--- Delete TOTP devices via Authelia CLI --->
+<!--- NUCLEAR OPTION: also remove user from cn=two_factor LDAP group.
+     Driven by the opt-in checkbox on the Reset 2FA Devices modal.
+     Forces the user out of 2FA enforcement at the LDAP layer
+     regardless of whether they self-enrolled before. The
+     ldap_change_user_access_control.cfm helper is idempotent on
+     benign errors (e.g., user wasn't in two_factor to begin with).
+     The per-mailbox enforce_mfa policy is left alone — if it's still
+     1, the user re-enters the bootstrap flow on next portal visit. --->
+<cfparam name="form.also_remove_from_two_factor" default="0">
+<cfif form.also_remove_from_two_factor EQ "1">
     <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec hermes_authelia authelia storage user totp delete #ldapUsername# --config /etc/authelia/configuration.yml"
-            variable="totpResult"
-            errorVariable="totpError"
-            timeout="30">
-        </cfexecute>
+        <cfset ldapOldAccessControl = "two_factor">
+        <cfset ldapNewAccessControl = "one_factor">
+        <cfinclude template="ldap_change_user_access_control.cfm">
     <cfcatch type="any">
-        <!--- TOTP deletion failure is non-critical --->
+        <!--- Non-critical: device clear above already happened --->
     </cfcatch>
     </cftry>
-
-    <!--- Delete WebAuthn devices via Authelia CLI --->
-    <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="exec hermes_authelia authelia storage user webauthn delete #ldapUsername# --all --config /etc/authelia/configuration.yml"
-            variable="webauthnResult"
-            errorVariable="webauthnError"
-            timeout="30">
-        </cfexecute>
-    <cfcatch type="any">
-        <!--- WebAuthn deletion failure is non-critical --->
-    </cfcatch>
-    </cftry>
-
 </cfif>
 
 <!--- SUCCESS --->

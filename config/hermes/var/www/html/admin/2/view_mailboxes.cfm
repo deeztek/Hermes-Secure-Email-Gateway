@@ -133,7 +133,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
-    Access control updated successfully.
+    2FA devices reset. The user will be prompted to re-register on their next sign-in.
   </div>
 <cfelseif m EQ 15>
   <div class="alert alert-danger alert-dismissible">
@@ -242,7 +242,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            m.nextcloud_enabled AS mb_nextcloud,
            d.domain, d.default_quota_mb,
            r.id AS recipient_id, r.id AS theID, r.id AS theOtherID,
-           r.policy_id, r.auth_type, r.remoteauth_domain,
+           r.policy_id, r.auth_type, r.remoteauth_domain, r.enforce_mfa,
            IF(r.pdf_enabled = 1, 'YES', 'NO') AS pdf_enabled,
            IF(r.smime_enabled = '1', 'YES', 'NO') AS smime_enabled,
            IF(r.pgp_enabled = 1, 'YES', 'NO') AS pgp_enabled,
@@ -377,7 +377,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="##" onclick="loadEditModal(#id#); return false;"><i class="fas fa-edit me-2"></i>Edit Options</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
-                <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-shield-alt me-2"></i>Access Control</a></li>
+                <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Reset 2FA Devices</a></li>
                 <li><a class="dropdown-item" href="view_mailbox_app_passwords.cfm?mailbox_id=#id#"><i class="fas fa-key me-2"></i>Manage App Passwords</a></li>
                 <li><a class="dropdown-item" href="##" onclick="confirmResendMobileSetup(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</a></li>
                 <cfif Val(mb_nextcloud) EQ 1>
@@ -401,7 +401,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td><cfif auth_type EQ "remote"><span class="badge bg-primary" title="#HTMLEditFormat(remoteauth_domain)#"><i class="fas fa-cloud me-1"></i>REMOTE</span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
-          <td><cfif isTwoFactor><span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span><cfelse><span class="badge bg-secondary">Password</span></cfif></td>
+          <td><!--- 2FA column (#225 Phase 1.5).
+                Shows BOTH the user's actual LDAP state AND the admin
+                policy. Three distinct states, not two:
+                - 2FA               : user is enrolled (cn=two_factor)
+                - Required          : admin enforces (recipients.enforce_mfa=1)
+                                      but user hasn't self-enrolled yet —
+                                      portal is in restricted bootstrap
+                                      mode for them
+                - Password          : no policy, no enrollment
+            --->
+            <cfif isTwoFactor>
+                <span class="badge bg-success"><i class="fas fa-shield-alt me-1"></i>2FA</span>
+            <cfelseif Val(enforce_mfa) EQ 1>
+                <span class="badge bg-warning text-dark" title="Admin requires 2FA — user has not enabled it yet. Their portal is restricted to bootstrap features until they enable 2FA themselves."><i class="fas fa-exclamation-triangle me-1"></i>Required</span>
+            <cfelse>
+                <span class="badge bg-secondary">Password</span>
+            </cfif>
+          </td>
           <td>#HTMLEditFormat(policy_name)#</td>
           <td><cfif report_enabled NEQ "NO"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
           <td><cfif train_bayes EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
@@ -561,7 +578,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <option value="0">Disable</option>
               <option value="1">Enable</option>
             </select>
-            <small class="form-text text-muted"><i class="fas fa-info-circle me-1"></i>When enabled, this user is placed in the LDAP <code>cn=two_factor</code> group. Authelia will require a second factor at the user's next sign-in and walk them through device enrollment automatically.</small>
+            <small class="form-text text-muted"><i class="fas fa-info-circle me-1"></i>When enabled, the user's web portal access becomes limited to <strong>Account Settings</strong>, <strong>My App Passwords</strong>, <strong>Set Up Your Devices</strong>, and <strong>Webmail &amp; Apps</strong> until they enable 2FA themselves. A banner directs them to Account Settings. After they click <em>Enable 2FA</em>, Authelia walks them through device registration (TOTP, security key, or Duo Push) on their next sign-in. Email, calendar, and contacts apps continue to work normally throughout &mdash; only the web portal is gated.</small>
           </div>
 
           <!--- Timezone --->
@@ -646,6 +663,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ================================================================
      ACCESS CONTROL MODAL
      ================================================================ --->
+<!--- RESET 2FA DEVICES MODAL (#225 Phase 1.5).
+     Was previously the "Recipient Access Control" modal with a radio
+     for one_factor vs two_factor. That radio is now redundant — Edit
+     Options' enforce_mfa checkbox is the canonical admin policy, and
+     LDAP group membership is driven by the user's own toggle in
+     user_settings.cfm.
+
+     Two modes:
+     - DEFAULT: clear TOTP + WebAuthn devices so the user re-registers
+       on next sign-in. "User lost their phone" recovery path.
+     - NUCLEAR (opt-in checkbox): also remove from cn=two_factor LDAP
+       group. Forces the user back into the bootstrap flow regardless
+       of whether they self-enrolled before — useful for "admin
+       overrides the user's voluntary 2FA" cases or full account
+       reset where re-enrollment must be re-consented to. --->
 <div class="modal fade" id="accessControlModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -654,45 +686,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <input type="hidden" name="mailbox_id" id="acMailboxId">
         <input type="hidden" name="recipient_email" id="acRecipientEmail">
         <input type="hidden" name="ldap_username" id="acLdapUsername">
+        <input type="hidden" name="delete_2fa_devices" value="1">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-shield-alt me-2"></i>Recipient Access Control</h5>
+          <h5 class="modal-title"><i class="fas fa-mobile-alt me-2"></i>Reset 2FA Devices</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
 
-          <div class="alert alert-info">
-            <i class="icon fas fa-info-circle"></i>
-            Configure two-factor authentication requirements for selected recipient(s). Changes take effect on their next login.
+          <p>Reset Two-Factor Authentication devices for <strong id="acRecipientLabel"></strong>?</p>
+
+          <div class="alert alert-warning mb-3">
+            <p class="mb-2"><i class="fas fa-exclamation-triangle me-1"></i> This deletes all <strong>TOTP and WebAuthn</strong> devices registered to this user in Authelia. They will be guided through device re-registration on their next sign-in.</p>
+            <p class="mb-0"><i class="fas fa-info-circle me-1"></i> <strong>Does not affect Duo Push.</strong> Duo enrollments are managed through the <a href="https://admin.duosecurity.com" target="_blank" rel="noopener">Duo Admin Console</a>.</p>
           </div>
 
-          <div class="form-group mb-3">
-            <label><strong>Access Control Policy</strong></label>
-            <select class="form-control" name="access_control" id="acAccessControl">
-              <option value="one_factor">One Factor (Password Only)</option>
-              <option value="two_factor">Two Factor (Password + 2FA)</option>
-            </select>
-            <small class="text-muted">Two Factor requires recipients to configure TOTP, Duo Push, or WebAuthn on their next login.</small>
-            <div class="alert alert-warning mt-2 py-2 small mb-0">
-              <i class="fas fa-exclamation-triangle me-1"></i> <strong>Important:</strong> Two-factor authentication protects the User Console and Nextcloud Webmail login only. Due to protocol limitations, IMAP, POP3, SMTP, CalDAV, and CardDAV clients authenticate with the password alone. If a user's password is compromised, an attacker can access the mailbox via any email client regardless of 2FA status.
+          <div class="border rounded p-3 bg-light">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" name="also_remove_from_two_factor" id="acAlsoRemove2faGroup" value="1">
+              <label class="form-check-label" for="acAlsoRemove2faGroup">
+                <strong>Also remove user from the 2FA group <span class="badge bg-danger ms-1">Nuclear</span></strong>
+              </label>
             </div>
-          </div>
-
-          <div class="form-group mb-3">
-            <label><strong>Delete 2FA Devices</strong></label>
-            <div class="alert alert-warning">
-              <p><i class="fas fa-exclamation-triangle me-1"></i>Check this box to delete all <strong>TOTP and WebAuthn</strong> devices for the selected recipient(s). They will need to re-register their 2FA devices on next login.</p>
-              <p class="mb-0"><i class="fas fa-info-circle me-1"></i><strong>Note:</strong> This does <strong>not</strong> affect Duo Push enrollments. Duo Push devices are managed through the <a href="https://admin.duosecurity.com" target="_blank">Duo Admin Console</a>.</p>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" name="delete_2fa_devices" id="acDelete2fa" value="1">
-              <label class="form-check-label" for="acDelete2fa">Delete TOTP and WebAuthn devices for selected recipient(s)</label>
-            </div>
+            <p class="mb-0 mt-2 small text-muted">By default this modal only deletes registered devices &mdash; the user stays under 2FA enforcement and re-registers on next login. Check this option to <strong>also move the user out of <code>cn=two_factor</code> back to <code>cn=one_factor</code></strong>. Use this when the user must restart 2FA from scratch (e.g., admin override of a voluntary enrollment, or a full account reset). If the per-mailbox <em>Two-Factor Authentication</em> policy in Edit Options is still <em>Enable</em>, the user will be sent through the bootstrap flow on their next portal visit.</p>
           </div>
 
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Access Control</button>
+          <button type="submit" class="btn btn-warning"><i class="fas fa-redo me-1"></i> Reset Devices</button>
         </div>
       </form>
     </div>
@@ -941,12 +962,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     new bootstrap.Modal(document.getElementById('editEncryptionModal')).show();
   }
 
-  // Load Access Control modal
+  // Load Reset 2FA Devices modal (#225 Phase 1.5)
   function loadAccessControlModal(mailboxId, email, ldapUsername) {
     $('#acMailboxId').val(mailboxId);
     $('#acRecipientEmail').val(email);
     $('#acLdapUsername').val(ldapUsername || email);
-    $('#acDelete2fa').prop('checked', false);
+    $('#acRecipientLabel').text(email);
     new bootstrap.Modal(document.getElementById('accessControlModal')).show();
   }
 

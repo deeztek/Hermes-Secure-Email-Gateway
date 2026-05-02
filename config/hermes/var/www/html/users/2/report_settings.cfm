@@ -71,8 +71,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <div class="content">
       <div class="container-fluid">
 
-    
-    
+    <!--- 2FA enforce-mfa restriction gate (#225 Phase 1.5).
+         When admin enforces 2FA but user has not yet enabled it, render
+         the bootstrap-explainer panel instead of this page's content. --->
+    <cfinclude template="./inc/check_enforce_mfa_restriction.cfm">
+    <cfif enforceMfaRestricted>
+      <cfinclude template="./inc/restricted_access_panel.cfm">
+    <cfelse>
+
   <cfparam name = "m" default = "0">
   <cfif StructKeyExists(session, "m")>
   <cfif session.m is not "">
@@ -221,6 +227,7 @@ select report_enabled from user_settings where email = '#session.email#'
         </div>
     
     
+    </cfif><!-- /.enforceMfaRestricted -->
   </div><!-- /.container-fluid -->
 </div>
 <!-- /.content -->

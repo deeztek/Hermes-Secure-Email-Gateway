@@ -457,7 +457,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <label><strong>Two-Factor Authentication</strong></label>
         <div class="alert alert-info">
           <i class="icon fas fa-info-circle"></i>
-          When enabled, this user is placed in the LDAP <code>cn=two_factor</code> group. Authelia will require a second factor at next sign-in and walk the user through TOTP / WebAuthn / Duo enrollment automatically. Default is inherited from the domain setting.
+          When enabled, the user's web portal access is limited to <strong>Account Settings</strong>, <strong>My App Passwords</strong>, <strong>Set Up Your Devices</strong>, and <strong>Webmail &amp; Apps</strong> until they enable 2FA themselves. A banner on every page directs them to Account Settings. After they click <em>Enable 2FA</em> there, Authelia walks them through device registration (TOTP, security key, or Duo Push) on their next sign-in. Email, calendar, and contacts apps continue to work normally throughout &mdash; only the web portal is gated. Default is inherited from the domain setting.
         </div>
         <select class="form-control" name="enforce_mfa" id="enforceMfa" style="width: 100%">
           <option value="0">Disable</option>

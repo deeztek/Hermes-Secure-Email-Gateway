@@ -1270,8 +1270,14 @@ ALTER TABLE domains
 -- as the default for the per-mailbox enforce_mfa checkbox; admins can
 -- override per mailbox. Toggling this does NOT cascade to existing
 -- mailboxes — same convention as nextcloud_enabled.
+-- Note: TINYINT(3) (not TINYINT(1)) so JDBC returns Integer, not
+-- Boolean — Lucee + DBeaver both display TINYINT(1) zeros as blank
+-- cells which read as NULL (see feedback memo on TINYINT/Boolean).
 ALTER TABLE domains
-  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(1) NOT NULL DEFAULT 0 AFTER nextcloud_group;
+  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(3) NOT NULL DEFAULT 0 AFTER nextcloud_group;
+-- Idempotent widening for installs that already added the column as
+-- TINYINT(1) before the convention was settled.
+ALTER TABLE domains MODIFY COLUMN enforce_mfa TINYINT(3) NOT NULL DEFAULT 0;
 ALTER TABLE domains
   ADD COLUMN IF NOT EXISTS created_at DATETIME NULL AFTER nextcloud_group;
 ALTER TABLE domains
@@ -1352,16 +1358,26 @@ ALTER TABLE mailboxes
 -- mailboxes) because both mailbox AND relay users share the recipients
 -- table; this lets the same column drive both flows. Defaults to the
 -- domain's enforce_mfa on creation; admin can override in Add/Edit
--- dialogs. When 1, the new/edited user is placed in cn=two_factor
--- LDAP group instead of cn=one_factor, and Authelia's existing
--- access-control rules force 2FA at next access (auto-enrolling the
--- device on first hit). Going 0→1 cascades to the LDAP group;
--- going 1→0 leaves the LDAP group alone (user may have voluntarily
--- enabled 2FA in user_settings.cfm and we don't want to take it away
--- on admin un-enforce). user_settings.cfm's user-side toggle is gated
--- by this flag — when 1, the user cannot disable their own 2FA.
+-- dialogs.
+--
+-- Phase 1.5 model: this is a POLICY flag only. It does not flip the
+-- user's cn=one_factor / cn=two_factor LDAP group — the user's own
+-- toggle in user_settings.cfm does that. While this flag is 1 and the
+-- user is not yet in cn=two_factor, the user portal restricts them to
+-- bootstrap surfaces (Account Settings, My App Passwords, Set Up Your
+-- Devices, Webmail) so they can set up a mail client, read the welcome
+-- email, then come back to enable 2FA themselves. user_settings.cfm's
+-- Disable toggle is gated by this flag — when 1, the user cannot
+-- disable their own 2FA.
+--
+-- Note: TINYINT(3) (not TINYINT(1)) so JDBC returns Integer, not
+-- Boolean — Lucee + DBeaver both display TINYINT(1) zeros as blank
+-- cells which read as NULL (see feedback memo on TINYINT/Boolean).
 ALTER TABLE recipients
-  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(1) NOT NULL DEFAULT 0 AFTER recipient_type;
+  ADD COLUMN IF NOT EXISTS enforce_mfa TINYINT(3) NOT NULL DEFAULT 0 AFTER recipient_type;
+-- Idempotent widening for installs that already added the column as
+-- TINYINT(1) before the convention was settled.
+ALTER TABLE recipients MODIFY COLUMN enforce_mfa TINYINT(3) NOT NULL DEFAULT 0;
 
 -- Drop the earlier-iteration mailboxes.enforce_mfa column. It was
 -- replaced by recipients.enforce_mfa once the relay flow was scoped in.

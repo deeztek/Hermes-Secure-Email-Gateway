@@ -244,40 +244,17 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     </cftry>
 </cfif>
 
-<!--- 2FA ENFORCEMENT — LDAP CASCADE (#225).
-     Asymmetric on purpose:
-       0 → 1 (admin enforces): cascade to LDAP — move the user to
-            cn=two_factor so Authelia's existing access-control rules
-            require 2FA at next access, auto-enrolling the device on
-            first hit.
-       1 → 0 (admin un-enforces): NO LDAP change. The user may have
-            voluntarily enabled 2FA from user_settings.cfm; un-enforce
-            means "no longer required," not "remove their 2FA." If the
-            user wants to drop 2FA after un-enforce, they can toggle it
-            off themselves from user_settings.cfm (which is now
-            unblocked because enforce_mfa = 0).
-     Idempotent on benign errors. --->
-<cfif Val(form.edit_enforce_mfa) EQ 1 AND Val(getMailbox.prev_enforce_mfa) EQ 0>
-    <cftry>
-        <cfquery name="getLdapUsernameForMfa" datasource="hermes">
-            SELECT ldap_username FROM user_settings
-            WHERE email = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
-        </cfquery>
-        <cfif getLdapUsernameForMfa.recordcount GTE 1 AND getLdapUsernameForMfa.ldap_username NEQ "">
-            <cfset ldapUsername = getLdapUsernameForMfa.ldap_username>
-        <cfelse>
-            <cfset ldapUsername = LCase(getMailbox.username)>
-        </cfif>
+<!--- 2FA ENFORCEMENT FLAG (#225) — POLICY ONLY, NO LDAP CASCADE.
+     The admin checkbox writes recipients.enforce_mfa above. It does
+     NOT touch the user's cn=one_factor / cn=two_factor LDAP group.
+     LDAP group membership is driven only by the user's own toggle in
+     user_settings.cfm — that's the path through which they consent to
+     and complete Authelia's 2FA enrollment. Until the user clicks
+     Enable 2FA, the user portal restricts them to bootstrap surfaces
+     so they can set up a mail client, read the welcome email, and
+     then come back to enable 2FA. See
+     /users/2/inc/check_enforce_mfa_restriction.cfm. --->
 
-        <cfset ldapOldAccessControl = "one_factor">
-        <cfset ldapNewAccessControl = "two_factor">
-        <cfinclude template="ldap_change_user_access_control.cfm">
-    <cfcatch type="any">
-        <!--- Non-fatal: the recipients row was already updated. Admin can
-             retry by re-flipping the checkbox. --->
-    </cfcatch>
-    </cftry>
-</cfif>
 
 <!--- CHANGE PASSWORD (if provided, local auth only) --->
 <cfparam name="form.edit_password" default="">
