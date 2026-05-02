@@ -37,7 +37,8 @@ RUN apt-get update && \
     clamav-daemon \
     spamassassin \
     razor \
-    pyzor && \
+    pyzor \
+    altermime && \
     adduser clamav amavis && \
     mkdir -p /mnt/data/amavis && \
     wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z -P /tmp && \

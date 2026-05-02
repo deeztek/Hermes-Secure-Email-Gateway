@@ -1996,3 +1996,35 @@ CREATE TABLE IF NOT EXISTS app_passwords (
 -- list so users don't see/revoke them; admin can still manage them.
 ALTER TABLE app_passwords
   ADD COLUMN IF NOT EXISTS is_system TINYINT(1) NOT NULL DEFAULT 0;
+
+-- ============================================================================
+-- DISCLAIMERS (#214) — outbound email disclaimers via altermime + Amavis
+-- One row per (scope, scope_key). Scope is domain / relay; key is the
+-- domain name or full relay-recipient email address. Resolution at send
+-- time is most-specific-first: relay-recipient row wins over domain row.
+--
+-- Mailbox scope was removed by design — per-mailbox personal text is
+-- the user's responsibility via the (separate) User Signatures feature
+-- in /users/2/. Disclaimers are admin policy only.
+--
+-- enabled is TINYINT(3) to avoid Lucee/MariaDB JDBC TINYINT(1) -> Boolean
+-- coercion (per feedback_tinyint_boolean memory).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS disclaimers (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    scope       ENUM('domain','relay') NOT NULL,
+    scope_key   VARCHAR(255) NOT NULL,
+    enabled     TINYINT(3) NOT NULL DEFAULT 1,
+    position    ENUM('append','prepend') NOT NULL DEFAULT 'append',
+    body_text   TEXT NULL,
+    body_html   TEXT NULL,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_scope (scope, scope_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Idempotent migration for installs that ran the original 3-value enum
+-- (domain / mailbox / relay). Drop any mailbox rows that were created
+-- during early testing, then shrink the enum. Safe to re-run.
+DELETE FROM disclaimers WHERE scope = 'mailbox';
+ALTER TABLE disclaimers MODIFY COLUMN scope ENUM('domain','relay') NOT NULL;
+

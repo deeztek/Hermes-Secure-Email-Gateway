@@ -414,6 +414,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </li>
         <!--- CONTENT CHECKS ENDS HERE --->
 
+        <!--- EMAIL POLICIES STARTS HERE (##214). Pro-edition feature; the
+             sidebar entry renders for all editions but the pages enforce
+             a license check. Future home for outbound DLP, attachment
+             rules, and an eventual migration target for parts of Content
+             Checks. --->
+        <li class="nav-item">
+          <a href="##" class="nav-link">
+            <i class="nav-icon fas fa-clipboard-list"></i>
+            <p>
+              <strong>Email Policies</strong>
+              <i class="nav-arrow bi bi-chevron-right"></i>
+            </p>
+          </a>
+          <ul class="nav nav-treeview">
+            <li class="nav-item">
+              <a href="view_disclaimers.cfm" class="nav-link">
+                <i class="nav-icon fas fa-file-signature"></i>
+                <p>Disclaimers</p>
+              </a>
+            </li>
+          </ul>
+        </li>
+        <!--- EMAIL POLICIES ENDS HERE --->
+
         <!--- ENCRYPTION STARTS HERE --->
         <li class="nav-item">
           <a href="##" class="nav-link">
