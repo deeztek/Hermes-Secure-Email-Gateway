@@ -17,44 +17,119 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <title>Hermes SEG | Email Policies | Edit Disclaimer</title>
 <cfinclude template="./inc/html_head.cfm" />
 
+<!--- Quill 2.x WYSIWYG editor for the HTML disclaimer body. Loaded from
+     jsdelivr (same CDN pattern Hermes uses for qrcode-generator on the
+     My App Passwords page). MIT-licensed, no API key, no self-host. --->
+<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js"></script>
+
+<style>
+    /* Match Quill editor height and surface it on white so it stands out
+       against the bg-body-tertiary page background. */
+    .ql-container { min-height: 220px; background: ##fff; }
+    .ql-toolbar   { background: ##f8f9fa; }
+</style>
+
 <script>
 $(document).ready(function() {
-    // Scope dropdown drives which scope_key select is visible.
-    // Three selects are rendered server-side (one per source table)
-    // and we toggle them based on the chosen scope. The non-visible
-    // ones get their `disabled` attr set so they don't post values.
+    // ─── Scope dropdown drives which scope_key select is visible ────────
     function syncScopeKeyVisibility() {
         var scope = $('#scope').val();
-        var allKeys = ['domain', 'relay'];
-        allKeys.forEach(function(k) {
+        ['domain', 'relay'].forEach(function(k) {
             var $wrap = $('#scopeKeyWrap_' + k);
             var $sel  = $('#scope_key_' + k);
-            if (k === scope) {
-                $wrap.show();
-                $sel.prop('disabled', false);
-            } else {
-                $wrap.hide();
-                $sel.prop('disabled', true);
-            }
+            if (k === scope) { $wrap.show(); $sel.prop('disabled', false); }
+            else             { $wrap.hide(); $sel.prop('disabled', true); }
         });
     }
     $('#scope').on('change', syncScopeKeyVisibility);
     syncScopeKeyVisibility();
 
-    // Preview: render an example email with the disclaimer applied.
-    // Pure client-side, no server roundtrip. Demonstrates the
-    // append/prepend position. Uses body_html if provided, otherwise
-    // body_text rendered as <pre>.
+    // ─── Quill editor ───────────────────────────────────────────────────
+    var quill = new Quill('#quill_editor', {
+        theme: 'snow',
+        placeholder: 'Type your disclaimer here…',
+        modules: {
+            toolbar: [
+                [{ 'header': [1, 2, 3, false] }],
+                ['bold', 'italic', 'underline', 'strike'],
+                [{ 'color': [] }, { 'background': [] }],
+                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                ['blockquote', 'link'],
+                ['clean']
+            ]
+        }
+    });
+    // Pre-populate from the hidden textarea (its value is the stored HTML).
+    var existingHtml = $('#body_html').val();
+    if (existingHtml) { quill.root.innerHTML = existingHtml; }
+
+    // HTML -> plain text helper. Preserves block-level newlines, drops tags,
+    // collapses 3+ newlines to 2. Good enough for the auto-derived
+    // text/plain part of multipart mail; "edit separately" toggle below
+    // lets admins override for fine-grained control.
+    function htmlToText(html) {
+        var div = document.createElement('div');
+        div.innerHTML = html;
+        div.querySelectorAll('br').forEach(function(br) { br.replaceWith('\n'); });
+        div.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li').forEach(function(el) { el.append('\n'); });
+        return (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
+    }
+    function quillIsEmpty() {
+        var h = quill.root.innerHTML;
+        return (h === '' || h === '<p><br></p>');
+    }
+
+    // ─── Auto-detect "edit text separately" on load ─────────────────────
+    // If the stored plain-text version differs from what auto-derive would
+    // produce, the admin intentionally customized it — surface the toggle
+    // ON so they don't lose that customization on save.
+    var existingText = ($('#body_text').val() || '').trim();
+    var derivedText  = existingHtml ? htmlToText(existingHtml).trim() : '';
+    if (existingText && existingText !== derivedText) {
+        $('#editTextSeparately').prop('checked', true);
+        $('#textBodyWrap').show();
+    }
+
+    // ─── Toggle behavior ────────────────────────────────────────────────
+    $('#editTextSeparately').on('change', function() {
+        if ($(this).is(':checked')) {
+            // Reveal the textarea. If it's empty, seed it with the current
+            // auto-derived text so the admin has a starting point to edit.
+            if (!$('#body_text').val().trim() && !quillIsEmpty()) {
+                $('#body_text').val(htmlToText(quill.root.innerHTML));
+            }
+            $('#textBodyWrap').show();
+        } else {
+            $('#textBodyWrap').hide();
+        }
+    });
+
+    // ─── On submit: sync Quill -> hidden textarea + auto-derive text ───
+    $('form[name="edit_disclaimer"]').on('submit', function() {
+        var html  = quill.root.innerHTML;
+        var empty = quillIsEmpty();
+        $('#body_html').val(empty ? '' : html);
+        if (!$('#editTextSeparately').is(':checked')) {
+            $('#body_text').val(empty ? '' : htmlToText(html));
+        }
+    });
+
+    // ─── Preview ────────────────────────────────────────────────────────
     $('#previewBtn').on('click', function() {
-        var bodyText = $('#body_text').val() || '';
-        var bodyHtml = $('#body_html').val() || '';
+        var html  = quill.root.innerHTML;
+        var empty = quillIsEmpty();
+        var bodyHtml = empty ? '' : html;
+        var bodyText = $('#editTextSeparately').is(':checked')
+            ? ($('#body_text').val() || '')
+            : (empty ? '' : htmlToText(html));
         var position = $('#position').val();
         var sample = '<p>This is the original email body that the user composed. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>';
         var disclaimerHtml;
         if (bodyHtml.trim().length > 0) {
-            disclaimerHtml = '<div style="margin-top:1em;padding-top:0.5em;border-top:1px solid #ccc;font-size:0.9em;color:##555;">' + bodyHtml + '</div>';
+            disclaimerHtml = '<div style="margin-top:1em;padding-top:0.5em;border-top:1px solid ##ccc;font-size:0.9em;color:##555;">' + bodyHtml + '</div>';
         } else if (bodyText.trim().length > 0) {
-            disclaimerHtml = '<pre style="margin-top:1em;padding-top:0.5em;border-top:1px solid #ccc;font-size:0.85em;color:##555;white-space:pre-wrap;">' + $('<div>').text(bodyText).html() + '</pre>';
+            disclaimerHtml = '<pre style="margin-top:1em;padding-top:0.5em;border-top:1px solid ##ccc;font-size:0.85em;color:##555;white-space:pre-wrap;">' + $('<div>').text(bodyText).html() + '</pre>';
         } else {
             disclaimerHtml = '<em class="text-muted">(disclaimer is empty)</em>';
         }
@@ -147,10 +222,19 @@ $(document).ready(function() {
 <cfquery name="getScopeKeyDomains" datasource="hermes">
     SELECT domain FROM domains ORDER BY domain ASC
 </cfquery>
+<!--- Relay recipients only. Exclude:
+       - rows in the mailboxes table (covers legacy installs where some
+         mailbox rows have recipient_type=NULL — without this clause the
+         dropdown leaks mailbox addresses)
+       - domain-level rows (recipients.domain IS NOT NULL marks them) --->
 <cfquery name="getScopeKeyRelays" datasource="hermes">
-    SELECT recipient FROM recipients
-    WHERE recipient_type = 'relay' OR recipient_type IS NULL
-    ORDER BY recipient ASC
+    SELECT r.recipient
+    FROM recipients r
+    LEFT JOIN mailboxes m ON m.username = r.recipient
+    WHERE (r.recipient_type = 'relay' OR r.recipient_type IS NULL)
+      AND r.domain IS NULL
+      AND m.id IS NULL
+    ORDER BY r.recipient ASC
 </cfquery>
 
 <div class="row">
@@ -164,7 +248,7 @@ $(document).ready(function() {
     </div>
     <div class="card-body">
 
-    <form method="post" action="save_disclaimer_action.cfm">
+    <form name="edit_disclaimer" id="disclaimerForm" method="post" action="save_disclaimer_action.cfm">
         <cfoutput>
         <input type="hidden" name="id" value="#isEdit ? Val(url.id) : 0#">
         </cfoutput>
@@ -235,22 +319,34 @@ $(document).ready(function() {
             <small class="form-text text-muted">Append is the standard pattern (footer-style). Prepend is unusual but supported for legal/regulatory headers.</small>
         </div>
 
-        <!-- Plain text body -->
+        <!-- Body (Quill WYSIWYG editor for HTML; plain-text auto-derived) -->
         <div class="form-group mb-3">
+            <label class="form-label"><strong>Body</strong></label>
+            <div id="quill_editor"></div>
+            <!-- Hidden textarea — Quill writes its HTML here on form submit. -->
+            <cfoutput>
+            <textarea id="body_html" name="body_html" style="display:none;">#HTMLEditFormat(existingHtml)#</textarea>
+            </cfoutput>
+            <small class="form-text text-muted mt-2">Format your disclaimer using the toolbar. The HTML version is used on the <code>text/html</code> part of multipart messages; the plain-text version (auto-derived from this HTML by default) is used on the <code>text/plain</code> part.</small>
+        </div>
+
+        <!-- "Edit text separately" toggle. Hidden by default — only visible
+             on edit if the stored text differs from the auto-derived version. -->
+        <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" id="editTextSeparately">
+            <label class="form-check-label" for="editTextSeparately">
+                <strong>Edit plain-text version separately</strong>
+                <small class="text-muted ms-1">(advanced &mdash; auto-derived from HTML by default)</small>
+            </label>
+        </div>
+
+        <!-- Plain-text body, hidden by default; revealed by the toggle above. -->
+        <div class="form-group mb-3" id="textBodyWrap" style="display:none;">
             <label class="form-label"><strong>Plain-Text Body</strong></label>
             <cfoutput>
             <textarea class="form-control font-monospace" id="body_text" name="body_text" rows="6" placeholder="-- &##10;CONFIDENTIAL: This message and any attachments are confidential...">#HTMLEditFormat(existingText)#</textarea>
             </cfoutput>
-            <small class="form-text text-muted">Used on plain-text-only messages and as the fallback for the text part of multipart messages.</small>
-        </div>
-
-        <!-- HTML body -->
-        <div class="form-group mb-3">
-            <label class="form-label"><strong>HTML Body <span class="text-muted fw-normal">(optional)</span></strong></label>
-            <cfoutput>
-            <textarea class="form-control font-monospace" id="body_html" name="body_html" rows="6" placeholder="&lt;hr&gt;&##10;&lt;p style=&quot;font-size:0.9em;color:##555&quot;&gt;CONFIDENTIAL: This message and any attachments...&lt;/p&gt;">#HTMLEditFormat(existingHtml)#</textarea>
-            </cfoutput>
-            <small class="form-text text-muted">Used on the HTML part of multipart messages. Leave blank to use the plain-text body for both parts.</small>
+            <small class="form-text text-muted">Use this when the plain-text version needs different formatting than the auto-derived version (specific line wraps, ASCII separators, exact wording variations for compliance/regulatory text).</small>
         </div>
 
         <!-- Buttons -->

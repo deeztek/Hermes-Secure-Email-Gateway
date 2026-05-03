@@ -108,40 +108,34 @@ $(document).ready(function() {
     <cfset session.disclaimer_msg_type = "">
 </cfif>
 
-<!-- FILTER BAR + ADD BUTTON CARD -->
-<div class="card card-outline card-primary mb-4">
+<!-- DISCLAIMERS LIST CARD -->
+<div class="card card-primary card-outline mb-4">
     <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-filter me-2"></i>Filter</h3>
+        <h3 class="card-title m-0"><i class="fas fa-file-signature me-2"></i>Disclaimers</h3>
     </div>
     <div class="card-body">
-        <div class="row g-3 align-items-end">
-            <div class="col-sm-4">
-                <label class="form-label"><strong>Scope</strong></label>
-                <select id="filterScope" class="form-select">
+
+        <!-- Toolbar: primary action on the left, scope filter on the right.
+             The DataTables built-in search box renders inside the table
+             below at top-right. -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+            <a href="edit_disclaimer.cfm" class="btn btn-primary">
+                <i class="fas fa-plus me-1"></i> Add Disclaimer
+            </a>
+            <div class="d-flex align-items-center gap-2">
+                <label for="filterScope" class="form-label mb-0 small"><strong>Filter by Scope:</strong></label>
+                <select id="filterScope" class="form-select form-select-sm" style="width: auto;">
                     <option value="">All</option>
                     <option value="domain">Domain</option>
                     <option value="relay">Relay Recipient</option>
                 </select>
             </div>
-            <div class="col-sm-8 text-sm-end">
-                <a href="edit_disclaimer.cfm" class="btn btn-primary">
-                    <i class="fas fa-plus me-1"></i> Add Disclaimer
-                </a>
-            </div>
         </div>
-        <small class="text-muted d-block mt-2">
+        <small class="text-muted d-block mb-3">
             <i class="fas fa-info-circle me-1"></i>
-            Use the Scope dropdown to narrow the list. Use the table's own search box (top-right of the grid) to filter by scope key (domain or address).
+            Use the Scope dropdown to narrow the list. Use the table's own search box (top-right of the grid) to filter by scope key.
         </small>
-    </div>
-</div>
 
-<!-- DISCLAIMERS LIST CARD -->
-<div class="card card-primary card-outline mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-file-signature me-2"></i>Disclaimers</h3>
-    </div>
-    <div class="card-body">
         <cfif getDisclaimers.recordcount LT 1>
             <div class="alert alert-info mb-0">
                 <i class="fas fa-info-circle me-1"></i>
@@ -191,7 +185,7 @@ $(document).ready(function() {
                                     <i class="fas fa-edit"></i>
                                 </a>
                                 <button type="button" class="btn btn-sm btn-danger"
-                                    onclick="if(confirm('Delete the #scope# disclaimer for ' + #JSStringFormat(scope_key)# + '?')) { window.location='disclaimer_delete.cfm?id=#id#'; }"
+                                    onclick="if(confirm('Delete the #scope# disclaimer for #JSStringFormat(scope_key)#?')) { window.location='disclaimer_delete.cfm?id=#id#'; }"
                                     title="Delete">
                                     <i class="fas fa-trash-alt"></i>
                                 </button>

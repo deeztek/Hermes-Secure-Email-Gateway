@@ -93,10 +93,17 @@ reload that actually wire the disclaimer into the outbound mail flow.
         </cfquery>
     </cfcase>
     <cfcase value="relay">
+        <!--- Mirror the dropdown filter in edit_disclaimer.cfm — exclude
+             rows that exist in the mailboxes table so a hand-crafted
+             POST with a mailbox address can't persist as a relay row. --->
         <cfquery name="checkScopeKey" datasource="hermes">
-            SELECT id FROM recipients
-            WHERE recipient = <cfqueryparam value="#effectiveScopeKey#" cfsqltype="cf_sql_varchar">
-              AND (recipient_type = 'relay' OR recipient_type IS NULL)
+            SELECT r.id
+            FROM recipients r
+            LEFT JOIN mailboxes m ON m.username = r.recipient
+            WHERE r.recipient = <cfqueryparam value="#effectiveScopeKey#" cfsqltype="cf_sql_varchar">
+              AND (r.recipient_type = 'relay' OR r.recipient_type IS NULL)
+              AND r.domain IS NULL
+              AND m.id IS NULL
         </cfquery>
     </cfcase>
 </cfswitch>
