@@ -32,7 +32,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <script>
 $(document).ready(function() {
-    // ─── Scope dropdown drives which scope_key select is visible ────────
+    // --- Scope dropdown drives which scope_key select is visible --------
     function syncScopeKeyVisibility() {
         var scope = $('#scope').val();
         ['domain', 'relay'].forEach(function(k) {
@@ -45,10 +45,10 @@ $(document).ready(function() {
     $('#scope').on('change', syncScopeKeyVisibility);
     syncScopeKeyVisibility();
 
-    // ─── Quill editor ───────────────────────────────────────────────────
+    // --- Quill editor ---------------------------------------------------
     var quill = new Quill('#quill_editor', {
         theme: 'snow',
-        placeholder: 'Type your disclaimer here…',
+        placeholder: 'Type your disclaimer here...',
         modules: {
             toolbar: [
                 [{ 'header': [1, 2, 3, false] }],
@@ -80,9 +80,9 @@ $(document).ready(function() {
         return (h === '' || h === '<p><br></p>');
     }
 
-    // ─── Auto-detect "edit text separately" on load ─────────────────────
+    // --- Auto-detect "edit text separately" on load ---------------------
     // If the stored plain-text version differs from what auto-derive would
-    // produce, the admin intentionally customized it — surface the toggle
+    // produce, the admin intentionally customized it -- surface the toggle
     // ON so they don't lose that customization on save.
     var existingText = ($('#body_text').val() || '').trim();
     var derivedText  = existingHtml ? htmlToText(existingHtml).trim() : '';
@@ -91,7 +91,7 @@ $(document).ready(function() {
         $('#textBodyWrap').show();
     }
 
-    // ─── Toggle behavior ────────────────────────────────────────────────
+    // --- Toggle behavior ------------------------------------------------
     $('#editTextSeparately').on('change', function() {
         if ($(this).is(':checked')) {
             // Reveal the textarea. If it's empty, seed it with the current
@@ -105,7 +105,7 @@ $(document).ready(function() {
         }
     });
 
-    // ─── On submit: sync Quill -> hidden textarea + auto-derive text ───
+    // --- On submit: sync Quill -> hidden textarea + auto-derive text ---
     $('form[name="edit_disclaimer"]').on('submit', function() {
         var html  = quill.root.innerHTML;
         var empty = quillIsEmpty();
@@ -115,7 +115,7 @@ $(document).ready(function() {
         }
     });
 
-    // ─── Preview ────────────────────────────────────────────────────────
+    // --- Preview --------------------------------------------------------
     $('#previewBtn').on('click', function() {
         var html  = quill.root.innerHTML;
         var empty = quillIsEmpty();
@@ -224,7 +224,7 @@ $(document).ready(function() {
 </cfquery>
 <!--- Relay recipients only. Exclude:
        - rows in the mailboxes table (covers legacy installs where some
-         mailbox rows have recipient_type=NULL — without this clause the
+         mailbox rows have recipient_type=NULL -- without this clause the
          dropdown leaks mailbox addresses)
        - domain-level rows (recipients.domain IS NOT NULL marks them) --->
 <cfquery name="getScopeKeyRelays" datasource="hermes">
@@ -323,14 +323,14 @@ $(document).ready(function() {
         <div class="form-group mb-3">
             <label class="form-label"><strong>Body</strong></label>
             <div id="quill_editor"></div>
-            <!-- Hidden textarea — Quill writes its HTML here on form submit. -->
+            <!-- Hidden textarea -- Quill writes its HTML here on form submit. -->
             <cfoutput>
             <textarea id="body_html" name="body_html" style="display:none;">#HTMLEditFormat(existingHtml)#</textarea>
             </cfoutput>
             <small class="form-text text-muted mt-2">Format your disclaimer using the toolbar. The HTML version is used on the <code>text/html</code> part of multipart messages; the plain-text version (auto-derived from this HTML by default) is used on the <code>text/plain</code> part.</small>
         </div>
 
-        <!-- "Edit text separately" toggle. Hidden by default — only visible
+        <!-- "Edit text separately" toggle. Hidden by default -- only visible
              on edit if the stored text differs from the auto-derived version. -->
         <div class="form-check form-switch mb-3">
             <input class="form-check-input" type="checkbox" id="editTextSeparately">
@@ -352,8 +352,8 @@ $(document).ready(function() {
         <!-- Buttons -->
         <div class="d-flex gap-2 mt-4">
             <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save</button>
-            <button type="button" class="btn btn-outline-secondary" id="previewBtn"><i class="fas fa-eye me-1"></i> Preview</button>
-            <a href="view_disclaimers.cfm" class="btn btn-outline-secondary"><i class="fas fa-times me-1"></i> Cancel</a>
+            <button type="button" class="btn btn-info" id="previewBtn"><i class="fas fa-eye me-1"></i> Preview</button>
+            <a href="view_disclaimers.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Cancel</a>
         </div>
     </form>
 

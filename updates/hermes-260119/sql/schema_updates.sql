@@ -2028,3 +2028,56 @@ CREATE TABLE IF NOT EXISTS disclaimers (
 DELETE FROM disclaimers WHERE scope = 'mailbox';
 ALTER TABLE disclaimers MODIFY COLUMN scope ENUM('domain','relay') NOT NULL;
 
+-- ============================================================================
+-- BODY MILTER (#214) — register hermes_body_milter:8893 as a child of
+-- smtpd_milters and non_smtpd_milters in the parameters table so
+-- generate_postfix_configuration.cfm picks it up alongside OpenDKIM and
+-- OpenDMARC. The body milter applies disclaimers (#214) and is the
+-- intended host for #226 signatures, #228 banners, and Link Guard.
+--
+-- order1 = 3.1 places it AFTER OpenDKIM (typically 1.x) and OpenDMARC
+-- (typically 2.x) in the smtpd_milters list so the body milter sees
+-- the DKIM/DMARC verification results before deciding whether to skip
+-- on a pre-existing DKIM-Signature header.
+--
+-- enabled=1, applied=1 means active by default. The milter is safe to
+-- always run because:
+--   - milter_default_action=accept means a milter outage doesn't block mail
+--   - With no map entries configured, the milter passes mail through unmodified
+--
+-- Idempotent (INSERT ... WHERE NOT EXISTS).
+-- ============================================================================
+INSERT INTO parameters (
+    parameter, name, module, editable, conf_file,
+    parent, parent_name, child, order1, enabled, applied
+)
+SELECT
+    'inet:hermes_body_milter:8893',
+    'Hermes Body Milter',
+    'postfix', 1, 'main.cf',
+    CAST(p.id AS CHAR), 'smtpd_milters', 1, 0.5, 1, 1
+FROM parameters p
+WHERE p.parameter = 'smtpd_milters' AND p.child = 2
+  AND NOT EXISTS (
+    SELECT 1 FROM parameters c
+    WHERE c.parameter = 'inet:hermes_body_milter:8893'
+      AND c.parent_name = 'smtpd_milters'
+  );
+
+INSERT INTO parameters (
+    parameter, name, module, editable, conf_file,
+    parent, parent_name, child, order1, enabled, applied
+)
+SELECT
+    'inet:hermes_body_milter:8893',
+    'Hermes Body Milter',
+    'postfix', 1, 'main.cf',
+    CAST(p.id AS CHAR), 'non_smtpd_milters', 1, 3.1, 1, 1
+FROM parameters p
+WHERE p.parameter = 'non_smtpd_milters' AND p.child = 2
+  AND NOT EXISTS (
+    SELECT 1 FROM parameters c
+    WHERE c.parameter = 'inet:hermes_body_milter:8893'
+      AND c.parent_name = 'non_smtpd_milters'
+  );
+

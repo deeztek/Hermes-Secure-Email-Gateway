@@ -23,6 +23,7 @@ declare -A IMAGES=(
     ["hermes-dmarc"]="opendmarc"
     ["hermes-dovecot"]="dovecot"
     ["hermes-unbound"]="unbound"
+    ["hermes-body-milter"]="body_milter"
 )
 
 # Check Docker is available

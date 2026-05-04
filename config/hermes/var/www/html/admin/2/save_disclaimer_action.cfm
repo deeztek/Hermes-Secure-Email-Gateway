@@ -12,7 +12,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 SAVE DISCLAIMER ACTION HANDLER (#214 Phase 2).
 
 INSERT or UPDATE the disclaimers row from the edit_disclaimer.cfm form.
-Scope is immutable after create — UPDATE keeps the original scope from
+Scope is immutable after create -- UPDATE keeps the original scope from
 the row and ignores form.scope. Scope key is validated against the
 appropriate source table on each save.
 
@@ -93,7 +93,7 @@ reload that actually wire the disclaimer into the outbound mail flow.
         </cfquery>
     </cfcase>
     <cfcase value="relay">
-        <!--- Mirror the dropdown filter in edit_disclaimer.cfm — exclude
+        <!--- Mirror the dropdown filter in edit_disclaimer.cfm -- exclude
              rows that exist in the mailboxes table so a hand-crafted
              POST with a mailbox address can't persist as a relay row. --->
         <cfquery name="checkScopeKey" datasource="hermes">
@@ -123,7 +123,7 @@ reload that actually wire the disclaimer into the outbound mail flow.
 
 <!--- PERSIST. Use ON DUPLICATE KEY UPDATE so the unique (scope,scope_key)
      constraint can't be violated by an admin who creates two rows for
-     the same target — the second creation just overwrites the body. --->
+     the same target -- the second creation just overwrites the body. --->
 <cfif isEdit>
     <cfquery datasource="hermes">
         UPDATE disclaimers
@@ -156,8 +156,16 @@ reload that actually wire the disclaimer into the outbound mail flow.
 </cfif>
 <cfset session.disclaimer_msg_type = "success">
 
-<!--- Phase 3 will hook the Amavis config regenerator + altermime file
-     writer here, AFTER the DB write succeeds. For now, the row exists
-     in the table but the outbound mail flow is unaffected. --->
+<!--- Phase 3: regenerate per-scope disclaimer files + reload Amavis
+     so the change takes effect on outbound mail. Fails non-fatally -
+     the DB row is committed regardless, and the next save will retry
+     the regen. The user-facing message is augmented to surface the
+     reload status. --->
+<cfinclude template="./inc/disclaimer_write_and_reload.cfm" />
+
+<cfif structKeyExists(session, "disclaimerApplySuccess") AND NOT session.disclaimerApplySuccess>
+    <cfset session.disclaimer_msg = session.disclaimer_msg & " <br><strong>Warning:</strong> the database row was saved but the body-milter config write failed (#HTMLEditFormat(session.disclaimerApplyError)#). The next successful save will retry; existing disclaimers continue to apply until then.">
+    <cfset session.disclaimer_msg_type = "warning">
+</cfif>
 
 <cflocation url="view_disclaimers.cfm" addtoken="no">

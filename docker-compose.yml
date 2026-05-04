@@ -309,6 +309,7 @@ services:
       - ./config/postfix-dkim/etc/postfix-policyd-spf-python:/etc/postfix-policyd-spf-python
       - ./config/opendmarc/etc/opendmarc:/etc/opendmarc
       - ./config/mail_filter/etc/amavis:/etc/amavis #Amavis config (mynetworks, white/black lists)
+      - ./config/body_milter/etc/hermes/body_milter:/etc/hermes/body_milter #Body milter config (#214 disclaimers, future signatures/banners/linkguard) - CFML writes maps + per-scope files; the milter container mtime-watches and reloads
       - ./config/mail_filter/etc/spamassassin:/etc/spamassassin #SpamAssassin config (local.cf)
       - ./config/mail_filter/etc/clamav:/etc/clamav #ClamAV config (clamd.conf)
       - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf #Fangfrisch config (malware feeds)
@@ -453,6 +454,31 @@ services:
       - mail_filter_data_fangfrisch:/var/lib/fangfrisch
       - amavis_data:/mnt/data/amavis
 
+    environment:
+      - TZ=${TIMEZONE}
+
+  hermes_body_milter:
+    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-body-milter:${HERMES_DOCKER_IMG_VERSION}
+    container_name: hermes_body_milter
+    logging:
+      options:
+        max-size: 10m
+    dns:
+      - ${IPV4SUBNET}.117
+    restart: unless-stopped
+    networks:
+      hermes_net_ext:
+        ipv4_address: ${IPV4SUBNET}.119
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+      - "${HERMES_HOSTNAME}:${HOST_IP}"
+    volumes:
+      # Modifier configuration root. CFML regenerator writes here; the
+      # milter mtime-watches each map and reloads on change.
+      - ./config/body_milter/etc/hermes/body_milter:/etc/hermes/body_milter
+      # Read-only access to postfix's relay_domains (canonical "is this
+      # a local domain?" lookup, used to determine outbound vs inbound).
+      - ./config/postfix-dkim/etc/postfix/relay_domains:/etc/postfix/relay_domains:ro
     environment:
       - TZ=${TIMEZONE}
 

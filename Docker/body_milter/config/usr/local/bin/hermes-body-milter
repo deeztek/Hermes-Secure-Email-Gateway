@@ -1,0 +1,604 @@
+#!/usr/bin/env python3
+"""
+hermes-body-milter
+==================
+
+Postfix milter that applies admin-defined body modifications to mail in
+flight. v1 ships only the Disclaimer modifier (#214); the framework is
+designed so User Signatures (#226), External Banner (#228), and Link
+Guard (future) slot in as additional Modifier subclasses without
+touching the dispatcher.
+
+------------------------------------------------------------------------
+Pipeline position
+------------------------------------------------------------------------
+
+  Postfix smtpd   ->   Amavis  ->  Ciphermail  ->  Postfix :10026  ->  external
+        |
+        +-- smtpd_milters chain:
+              1. OpenDKIM    (existing)
+              2. OpenDMARC   (existing)
+              3. THIS MILTER (inet:hermes_body_milter:8893)
+
+Body modification happens at smtpd time, BEFORE content_filter routes
+to Amavis. By the time Amavis sees the message, the modification is
+already baked in. Amavis processes a normal-looking message; no
+internal-state coupling, no temp-file race.
+
+OpenDKIM signs at the :10026 re-injection AFTER all of the above, so
+Hermes' own DKIM covers the modified body. Ciphermail signs/encrypts
+server-side after amavis, so its signature also covers the modified
+body. Recipients get a valid signature AND any added text.
+
+------------------------------------------------------------------------
+Configuration root: /etc/hermes/body_milter/
+------------------------------------------------------------------------
+
+  disclaimers/disclaimer_by_sender         sender -> option name map (#214)
+  disclaimers/files/<option>.txt           plain-text disclaimer
+  disclaimers/files/<option>.html          html disclaimer
+  signatures/...                           #226, future
+  banners/...                              #228, future
+  linkguard/...                            future
+
+Each Modifier owns its subdirectory. Adding a new modifier means a new
+subdirectory, no path migrations.
+
+------------------------------------------------------------------------
+Failure modes (all "pass through unmodified", never lose mail)
+------------------------------------------------------------------------
+
+  - Map missing or unreadable                -> no match, pass through
+  - Sender doesn't match map                 -> pass through
+  - Modifier-specific skip condition matches -> pass through, log reason
+  - MIME parse exception in modifier         -> log + pass through
+  - Modifier raises any other exception      -> log + pass through
+  - replacebody() raises                     -> log + pass through
+
+Postfix's milter_default_action = accept ensures that even a milter
+crash leaves mail flowing unmodified. Worst case is a missed
+modification, never a delivery outage.
+
+------------------------------------------------------------------------
+Map auto-reload
+------------------------------------------------------------------------
+
+Each map self-stats on every lookup and reloads when its file's mtime
+changes. CFML regenerator just writes the file; the milter notices on
+the next message. No SIGHUP, no IPC.
+
+------------------------------------------------------------------------
+Postfix-side configuration (in main.cf)
+------------------------------------------------------------------------
+
+  smtpd_milters       = ... existing ... inet:hermes_body_milter:8893
+  non_smtpd_milters   = $smtpd_milters
+  milter_default_action = accept
+  milter_protocol     = 6
+"""
+
+import logging
+import os
+import re
+import sys
+import threading
+import traceback
+from email import message_from_bytes, policy as email_policy
+from email.message import Message
+from typing import List, Optional, Tuple
+
+import Milter
+from bs4 import BeautifulSoup
+
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+CONFIG_ROOT = '/etc/hermes/body_milter'
+LISTEN_SOCKET = 'inet:8893'
+
+SENTINEL = 'HERMES_DISCLAIMER_V1'
+
+# Source-of-truth for "is this domain local?". Postfix already maintains
+# this file as the relay_domains lookup; we read it directly to determine
+# inbound vs outbound vs internal direction.
+LOCAL_DOMAINS_FILE = '/etc/postfix/relay_domains'
+
+
+# Skip-condition regexes. Operate on the raw RFC 5322 header section as
+# bytes (line-folded headers are unfolded before the search at runtime).
+RE_SMIME_SIGNED = re.compile(
+    rb'Content-Type:\s*multipart/signed[^\n]*?protocol="application/(pkcs7-signature|x-pkcs7-signature)"',
+    re.I | re.S,
+)
+RE_SMIME_OPAQUE = re.compile(
+    rb'Content-Type:\s*application/(pkcs7-mime|x-pkcs7-mime)', re.I,
+)
+RE_PGP_SIGNED = re.compile(
+    rb'Content-Type:\s*multipart/signed[^\n]*?protocol="application/pgp-signature"',
+    re.I | re.S,
+)
+RE_PGP_ENCRYPTED = re.compile(
+    rb'Content-Type:\s*multipart/encrypted[^\n]*?protocol="application/pgp-encrypted"',
+    re.I | re.S,
+)
+RE_PGP_INLINE = re.compile(rb'-----BEGIN PGP (SIGNED MESSAGE|MESSAGE)-----')
+RE_DKIM_HEADER = re.compile(rb'^DKIM-Signature\s*:', re.I | re.M)
+
+
+log = logging.getLogger('hermes_body_milter')
+
+
+# ---------------------------------------------------------------------------
+# Local-domain detection (drives direction = inbound | outbound | internal)
+# ---------------------------------------------------------------------------
+
+class LocalDomains:
+    """
+    Caches the set of local domains, refreshed when the file's mtime changes.
+
+    Postfix's relay_domains file format is one domain per line; this is
+    the canonical "domains we accept mail FOR" set, which doubles as the
+    "is this sender from one of our domains" set for outbound detection.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._domains = set()
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            try:
+                with open(self.path, 'r') as f:
+                    domains = set()
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        parts = line.split()
+                        if parts:
+                            domains.add(parts[0].lower())
+                    self._domains = domains
+                    self._mtime = m
+                    log.info('local domains: %d entries from %s', len(domains), self.path)
+            except IOError as e:
+                log.warning('cannot load local domains from %s: %s', self.path, e)
+
+    def contains(self, domain: str) -> bool:
+        self.refresh()
+        return domain.lower() in self._domains
+
+
+local_domains = LocalDomains(LOCAL_DOMAINS_FILE)
+
+
+# ---------------------------------------------------------------------------
+# Reusable mtime-watching map loader
+# ---------------------------------------------------------------------------
+
+class SenderMap:
+    """
+    Tab- or whitespace-delimited "<sender>\\t<option_name>" map.
+    <sender> is either a full email address (full match) or "@<domain>"
+    (domain wildcard). Most-specific match wins. Self-refreshes on
+    mtime change.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._map: dict = {}
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            new_map = {}
+            try:
+                with open(self.path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            new_map[parts[0].lower()] = parts[1]
+                self._map = new_map
+                self._mtime = m
+                log.info('reloaded %s: %d entries', self.path, len(new_map))
+            except IOError as e:
+                log.warning('cannot load %s: %s', self.path, e)
+
+    def lookup(self, sender: str) -> Optional[str]:
+        self.refresh()
+        sender = sender.lower()
+        m = self._map.get(sender)
+        if m is None and '@' in sender:
+            domain = sender.split('@', 1)[1]
+            m = self._map.get('@' + domain)
+        return m
+
+
+# ---------------------------------------------------------------------------
+# Per-message context (built once at end-of-message)
+# ---------------------------------------------------------------------------
+
+class MessageContext:
+    def __init__(self, sender: str, recipients: List[str],
+                 raw_headers: bytes, body_bytes: bytes):
+        self.sender = sender.lower()
+        self.recipients = [r.lower() for r in recipients]
+        self.raw_headers = self._unfold(raw_headers)
+        self.body_bytes = body_bytes
+        self.modified = False
+        self.direction = self._detect_direction()
+        # Lazy-parsed full MIME message (built only if a modifier asks)
+        self._email_msg: Optional[Message] = None
+
+    @property
+    def sender_domain(self) -> str:
+        return self.sender.split('@', 1)[1] if '@' in self.sender else ''
+
+    @staticmethod
+    def _unfold(raw: bytes) -> bytes:
+        """RFC 5322 header line-folding: a continuation line begins with
+        WSP. Unfold so multi-line Content-Type headers match cleanly."""
+        return re.sub(rb'\r?\n[ \t]+', b' ', raw)
+
+    def _detect_direction(self) -> str:
+        if not self.sender:
+            return 'unknown'
+        sender_local = local_domains.contains(self.sender_domain)
+        recip_local = any(
+            local_domains.contains(r.split('@', 1)[1]) if '@' in r else False
+            for r in self.recipients
+        )
+        if sender_local and not recip_local:
+            return 'outbound'
+        if not sender_local and recip_local:
+            return 'inbound'
+        if sender_local and recip_local:
+            return 'internal'
+        return 'unknown'
+
+    def email_message(self) -> Message:
+        """Lazy-parse the full MIME message. Modifiers that need MIME
+        traversal call this; modifiers that only inspect headers/body
+        bytes don't pay the parse cost."""
+        if self._email_msg is None:
+            full = self.raw_headers + b'\r\n' + self.body_bytes
+            self._email_msg = message_from_bytes(full, policy=email_policy.SMTP)
+        return self._email_msg
+
+    def serialize_body(self) -> bytes:
+        """Re-serialize the (possibly modified) MIME message and return
+        only the body portion (everything after the header/body
+        separator). Milter's replacebody() expects the body bytes."""
+        msg = self.email_message()
+        full = msg.as_bytes(policy=email_policy.SMTP)
+        sep = full.find(b'\r\n\r\n')
+        if sep != -1:
+            return full[sep + 4:]
+        sep = full.find(b'\n\n')
+        if sep != -1:
+            return full[sep + 2:]
+        return full
+
+    # ----- skip-condition helpers (used by Modifier base class) -----
+
+    def headers_have_signed_envelope(self) -> Tuple[bool, str]:
+        """True if S/MIME or PGP envelope is present in the headers."""
+        if RE_SMIME_SIGNED.search(self.raw_headers):
+            return True, 'S/MIME signed (multipart/signed)'
+        if RE_SMIME_OPAQUE.search(self.raw_headers):
+            return True, 'S/MIME (application/pkcs7-mime)'
+        if RE_PGP_SIGNED.search(self.raw_headers):
+            return True, 'PGP/MIME signed'
+        if RE_PGP_ENCRYPTED.search(self.raw_headers):
+            return True, 'PGP/MIME encrypted'
+        return False, ''
+
+    def headers_have_dkim(self) -> bool:
+        return bool(RE_DKIM_HEADER.search(self.raw_headers))
+
+    def body_has_pgp_inline(self) -> bool:
+        return bool(RE_PGP_INLINE.search(self.body_bytes[:32768]))
+
+    def body_has_sentinel(self) -> bool:
+        return SENTINEL.encode() in self.body_bytes[:65536]
+
+
+# ---------------------------------------------------------------------------
+# Modifier framework
+# ---------------------------------------------------------------------------
+
+class Modifier:
+    """
+    Subclass and override applies_to() and modify(). Standard skip rules
+    are checked by the dispatcher via standard_skip_check(); override
+    individual skip_on_* class attributes to tune behavior.
+
+    Each instance is constructed once at startup and reused for every
+    message; instances must be safe to call from the milter callback
+    thread.
+    """
+    name = 'abstract'
+    direction = 'both'           # 'outbound', 'inbound', 'both'
+    skip_on_signed = True        # skip if S/MIME or PGP envelope is present
+    skip_on_pgp_inline = True    # skip if body contains "BEGIN PGP ..." block
+    skip_on_dkim = True          # skip if pre-existing DKIM-Signature header
+    skip_on_sentinel = True      # skip if Hermes sentinel is already in body
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        """Return True if this modifier wants to run on this message.
+        Direction filter is applied first; subclasses extend with their
+        own conditions (e.g. sender-map lookup, recipient checks)."""
+        if self.direction != 'both' and ctx.direction != self.direction:
+            return False
+        return True
+
+    def standard_skip_check(self, ctx: MessageContext) -> Optional[str]:
+        """Returns None to proceed; a reason string to skip with logging."""
+        if self.skip_on_signed:
+            sig, reason = ctx.headers_have_signed_envelope()
+            if sig:
+                return reason
+        if self.skip_on_pgp_inline and ctx.body_has_pgp_inline():
+            return 'PGP inline in body'
+        if self.skip_on_dkim and ctx.headers_have_dkim():
+            return 'pre-existing DKIM-Signature'
+        if self.skip_on_sentinel and ctx.body_has_sentinel():
+            return 'sentinel marker already present'
+        return None
+
+    def modify(self, ctx: MessageContext) -> None:
+        """Mutate ctx.email_message() in place; set ctx.modified = True
+        if any change was made."""
+        raise NotImplementedError
+
+
+# ---------------------------------------------------------------------------
+# DisclaimerModifier (the only modifier shipped in v1)
+# ---------------------------------------------------------------------------
+
+class DisclaimerModifier(Modifier):
+    """Append admin-defined disclaimer text to outbound mail.
+
+    Map: /etc/hermes/body_milter/disclaimers/disclaimer_by_sender
+    Files: /etc/hermes/body_milter/disclaimers/files/<option>.{txt,html}
+
+    Match: outbound + sender matches map (full address before @domain).
+    Skip: signed envelope, PGP inline, pre-existing DKIM (preserve
+          upstream-signed mail going through a relay user), sentinel.
+    """
+    name = 'disclaimer'
+    direction = 'outbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = True
+    skip_on_sentinel = True
+
+    DIR = os.path.join(CONFIG_ROOT, 'disclaimers')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'disclaimer_by_sender')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self.map.lookup(ctx.sender) is not None
+
+    def modify(self, ctx: MessageContext) -> None:
+        option = self.map.lookup(ctx.sender)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('disclaimer: refusing unsafe option name %r', option)
+            return
+
+        txt_path = os.path.join(self.FILES_DIR, option + '.txt')
+        html_path = os.path.join(self.FILES_DIR, option + '.html')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('disclaimer: missing per-scope files for %r', option)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_disc = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_disc = f.read().decode('utf-8', 'replace')
+        except IOError as e:
+            log.warning('disclaimer: cannot read per-scope files: %s', e)
+            return
+
+        msg = ctx.email_message()
+        applied = self._append_to_parts(msg, txt_disc, html_disc)
+        if applied:
+            ctx.modified = True
+            log.info('disclaimer applied: sender=%s option=%s parts=%d direction=%s',
+                     ctx.sender, option, applied, ctx.direction)
+        else:
+            log.info('disclaimer: no text/plain or text/html parts to modify (sender=%s)',
+                     ctx.sender)
+
+    def _append_to_parts(self, msg: Message, txt: str, html: str) -> int:
+        """Walk the MIME tree, append disclaimers to text/plain and
+        text/html leaf parts. Returns the count of parts modified."""
+        applied = 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    part.set_content(payload + '\n\n' + txt + '\n')
+                    applied += 1
+                except Exception:
+                    log.warning('disclaimer: text/plain modify failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new = self._inject_html(payload, html)
+                    part.set_content(new, subtype='html')
+                    applied += 1
+                except Exception:
+                    log.warning('disclaimer: text/html modify failed:\n%s',
+                                traceback.format_exc())
+        return applied
+
+    def _inject_html(self, body_html: str, disclaimer_html: str) -> str:
+        """Insert disclaimer_html as the last child of <body>; if no
+        <body> tag is present, append at the end of the document."""
+        try:
+            soup = BeautifulSoup(body_html, 'html.parser')
+            body = soup.find('body')
+            disc_fragment = BeautifulSoup(disclaimer_html, 'html.parser')
+            if body is not None:
+                body.append(disc_fragment)
+            else:
+                soup.append(disc_fragment)
+            return str(soup)
+        except Exception as e:
+            log.warning('disclaimer: html parse failed, falling back to append: %s', e)
+            return body_html + '\n' + disclaimer_html
+
+
+# ---------------------------------------------------------------------------
+# Active modifier registry. v1 = DisclaimerModifier only.
+#
+# To add User Signatures (#226), External Banner (#228), or Link Guard:
+# subclass Modifier, populate the appropriate config files under
+# /etc/hermes/body_milter/<feature>/, and append an instance to this list.
+# The dispatcher needs no changes.
+# ---------------------------------------------------------------------------
+
+MODIFIERS: List[Modifier] = [
+    DisclaimerModifier(),
+]
+
+
+# ---------------------------------------------------------------------------
+# Milter callback class
+# ---------------------------------------------------------------------------
+
+class HermesBodyMilter(Milter.Base):
+    def __init__(self):
+        self._sender = ''
+        self._recipients: List[str] = []
+        self._raw_headers = bytearray()
+        self._body_chunks: List[bytes] = []
+
+    @staticmethod
+    def _strip_brackets(addr: str) -> str:
+        return addr.strip().lstrip('<').rstrip('>')
+
+    @Milter.noreply
+    def envfrom(self, mailfrom, *unused):
+        self._sender = self._strip_brackets(mailfrom)
+        self._recipients = []
+        self._raw_headers = bytearray()
+        self._body_chunks = []
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def envrcpt(self, to, *unused):
+        self._recipients.append(self._strip_brackets(to))
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def header(self, name, val):
+        try:
+            line = f'{name}: {val}\r\n'.encode('utf-8', 'replace')
+            self._raw_headers.extend(line)
+        except Exception:
+            pass
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def eoh(self):
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def body(self, blk):
+        self._body_chunks.append(blk)
+        return Milter.CONTINUE
+
+    def eom(self):
+        try:
+            ctx = MessageContext(
+                sender=self._sender or '',
+                recipients=self._recipients,
+                raw_headers=bytes(self._raw_headers),
+                body_bytes=b''.join(self._body_chunks),
+            )
+
+            for mod in MODIFIERS:
+                try:
+                    if not mod.applies_to(ctx):
+                        continue
+                    skip = mod.standard_skip_check(ctx)
+                    if skip:
+                        log.info('%s skipped: %s (sender=%s, direction=%s)',
+                                 mod.name, skip, ctx.sender, ctx.direction)
+                        continue
+                    mod.modify(ctx)
+                except Exception:
+                    log.error('%s raised exception:\n%s',
+                              mod.name, traceback.format_exc())
+                    continue
+
+            if ctx.modified:
+                try:
+                    new_body = ctx.serialize_body()
+                    self.replacebody(new_body)
+                except Exception:
+                    log.error('replacebody failed:\n%s', traceback.format_exc())
+        except Exception:
+            log.error('eom dispatcher crashed:\n%s', traceback.format_exc())
+
+        return Milter.CONTINUE
+
+    def abort(self):
+        return Milter.CONTINUE
+
+    def close(self):
+        return Milter.CONTINUE
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+        stream=sys.stderr,
+    )
+    log.info('hermes-body-milter starting on %s', LISTEN_SOCKET)
+    log.info('active modifiers: %s', [m.name for m in MODIFIERS])
+
+    Milter.factory = HermesBodyMilter
+    Milter.set_flags(Milter.CHGBODY | Milter.CHGHDRS | Milter.ADDHDRS)
+    Milter.runmilter('hermes_body_milter', LISTEN_SOCKET, timeout=60)
+    log.info('hermes-body-milter exiting')
+
+
+if __name__ == '__main__':
+    main()

@@ -40,6 +40,13 @@ service clamav-daemon start
 echo "Staring ClamAV Freshclam"
 service clamav-freshclam start
 
+# amavisd refuses to load any /etc/amavis/conf.d/* file not owned by
+# root:root (see Amavis::Conf hardening). Volume-mounted files from the
+# host can land with non-root ownership; normalize before start so a
+# fresh upload doesn't break the container.
+echo "Normalizing ownership on Amavis config files"
+chown root:root /etc/amavis/conf.d/* 2>/dev/null || true
+
 echo "Starting Amavis"
 service amavis start
 

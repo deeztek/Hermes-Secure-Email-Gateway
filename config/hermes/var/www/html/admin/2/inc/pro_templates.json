@@ -20,6 +20,7 @@
         "admin/2/view_disclaimers.cfm",
         "admin/2/edit_disclaimer.cfm",
         "admin/2/save_disclaimer_action.cfm",
-        "admin/2/disclaimer_delete.cfm"
+        "admin/2/disclaimer_delete.cfm",
+        "admin/2/inc/disclaimer_write_and_reload.cfm"
     ]
 }

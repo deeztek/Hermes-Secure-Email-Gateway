@@ -20,6 +20,7 @@ IMAGES=(
     "hermes-dmarc"
     "hermes-dovecot"
     "hermes-unbound"
+    "hermes-body-milter"
 )
 
 # Check Docker is available

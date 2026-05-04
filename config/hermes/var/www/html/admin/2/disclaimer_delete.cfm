@@ -53,4 +53,15 @@ Phase 3 will additionally remove the per-scope file from
 <cfset session.disclaimer_msg = "<strong>Deleted.</strong> " & HTMLEditFormat(getRow.scope) & " disclaimer for " & HTMLEditFormat(getRow.scope_key) & " removed.">
 <cfset session.disclaimer_msg_type = "success">
 
+<!--- Phase 3: regenerate per-scope disclaimer files + reload Amavis.
+     The wipe-and-rewrite pattern in disclaimer_write_and_reload.cfm
+     guarantees the deleted row's .txt/.html files are removed and the
+     map entry is dropped. --->
+<cfinclude template="./inc/disclaimer_write_and_reload.cfm" />
+
+<cfif structKeyExists(session, "disclaimerApplySuccess") AND NOT session.disclaimerApplySuccess>
+    <cfset session.disclaimer_msg = session.disclaimer_msg & " <br><strong>Warning:</strong> the database row was deleted but the body-milter config write failed (#HTMLEditFormat(session.disclaimerApplyError)#). The stale disclaimer file may still apply to outbound mail until the next successful save retries.">
+    <cfset session.disclaimer_msg_type = "warning">
+</cfif>
+
 <cflocation url="view_disclaimers.cfm" addtoken="no">
