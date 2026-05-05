@@ -641,6 +641,54 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
             <p class="form-text text-muted mb-0 ms-4 ps-1"><i class="fas fa-info-circle me-1"></i> Default for <strong>new</strong> mailboxes added to this domain. Toggling this does <strong>not</strong> change 2FA enforcement for existing mailboxes &mdash; use the per-mailbox <em>Edit Options</em> dialog to adjust an individual user.</p>
 
+            <!--- ============================================================
+                 Organization Information (#226)
+                 Per-domain metadata used by (Pro) auto-generated user
+                 signatures as {{org.name}}, {{org.phone}}, {{org.address}},
+                 {{org.website}}, {{org.logo}}. All optional. Community-tier
+                 metadata; admins may also reference these manually in their
+                 disclaimer or signature Quill editors.
+                 ============================================================ --->
+            <hr>
+
+            <h6 class="mb-2"><i class="fas fa-building me-1"></i>Organization Information</h6>
+            <p class="form-text text-muted mb-3"><i class="fas fa-info-circle me-1"></i> Used by user signatures as <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code>, <code>{{org.website}}</code>, <code>{{org.logo}}</code> placeholders. All fields optional.</p>
+
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label class="form-label"><strong>Organization Name</strong></label>
+                <input type="text" class="form-control" name="org_name" id="edit_org_name" maxlength="255" placeholder="e.g. Acme Inc.">
+              </div>
+              <div class="col-md-6 mb-3">
+                <label class="form-label"><strong>Organization Phone</strong></label>
+                <input type="text" class="form-control" name="org_phone" id="edit_org_phone" maxlength="64" placeholder="e.g. +1 555 555 0100">
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label"><strong>Organization Address</strong></label>
+              <textarea class="form-control" name="org_address" id="edit_org_address" rows="3" placeholder="123 Main Street&#10;Suite 400&#10;Anytown, CA 90210"></textarea>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label"><strong>Organization Website</strong></label>
+              <input type="text" class="form-control" name="org_website" id="edit_org_website" maxlength="255" placeholder="https://www.example.com">
+            </div>
+
+            <!--- org_logo_path UI deferred to a follow-up integrating with
+                 #230 image pipeline. Column exists so we can populate
+                 it later without another migration. --->
+
+            <hr>
+
+            <div class="form-check form-switch mb-1">
+              <input class="form-check-input" type="checkbox" name="allow_user_signatures" id="edit_allow_user_signatures" value="1">
+              <label class="form-check-label" for="edit_allow_user_signatures">
+                <strong>Allow users in this domain to manage their own signatures</strong>
+              </label>
+            </div>
+            <p class="form-text text-muted mb-0 ms-4 ps-1"><i class="fas fa-info-circle me-1"></i> When on, users see a Signature page in <code>/users/2/</code>. When off, the page is hidden and any user-edited signature rows for this domain are ignored at send time.</p>
+
           </div>
         </div>
         <div class="modal-footer">
@@ -740,6 +788,12 @@ function openEditModal(mailboxDomainId) {
       document.getElementById('edit_catchall_mailbox').value = data.catchall_mailbox || '';
       document.getElementById('edit_nextcloud_enabled').checked = (data.nextcloud_enabled == 1);
       document.getElementById('edit_enforce_mfa').checked = (data.enforce_mfa == 1);
+      // #226 org info + per-domain user-portal signature toggle
+      document.getElementById('edit_org_name').value = data.org_name || '';
+      document.getElementById('edit_org_phone').value = data.org_phone || '';
+      document.getElementById('edit_org_address').value = data.org_address || '';
+      document.getElementById('edit_org_website').value = data.org_website || '';
+      document.getElementById('edit_allow_user_signatures').checked = (data.allow_user_signatures == 1);
 
       // Determine cert mode
       if (data.cert_type === 'Acme') {

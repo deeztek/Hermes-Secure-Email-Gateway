@@ -20,6 +20,8 @@ Used by view_mailbox_domains.cfm edit modal.
          d.default_quota_mb, d.catchall_mailbox,
          d.nextcloud_enabled, d.nextcloud_group,
          d.enforce_mfa,
+         d.org_name, d.org_phone, d.org_address, d.org_website,
+         d.org_logo_path, d.allow_user_signatures,
          md.mailbox_certificate,
          sc.type AS cert_type,
          sc.friendly_name AS cert_friendly_name
@@ -36,16 +38,22 @@ Used by view_mailbox_domains.cfm edit modal.
 </cfif>
 
 <cfset resp = {
-  "id"                  = getdomain.id,
-  "domain"              = getdomain.domain,
-  "cert_id"             = getdomain.mailbox_certificate,
-  "cert_type"           = getdomain.cert_type,
-  "cert_friendly_name"  = getdomain.cert_friendly_name,
-  "default_quota_mb"    = getdomain.default_quota_mb,
-  "catchall_mailbox"    = getdomain.catchall_mailbox,
-  "nextcloud_enabled"   = getdomain.nextcloud_enabled,
-  "nextcloud_group"     = getdomain.nextcloud_group,
-  "enforce_mfa"         = getdomain.enforce_mfa
+  "id"                    = getdomain.id,
+  "domain"                = getdomain.domain,
+  "cert_id"               = getdomain.mailbox_certificate,
+  "cert_type"             = getdomain.cert_type,
+  "cert_friendly_name"    = getdomain.cert_friendly_name,
+  "default_quota_mb"      = getdomain.default_quota_mb,
+  "catchall_mailbox"      = getdomain.catchall_mailbox,
+  "nextcloud_enabled"     = getdomain.nextcloud_enabled,
+  "nextcloud_group"       = getdomain.nextcloud_group,
+  "enforce_mfa"           = getdomain.enforce_mfa,
+  "org_name"              = getdomain.org_name,
+  "org_phone"             = getdomain.org_phone,
+  "org_address"           = getdomain.org_address,
+  "org_website"           = getdomain.org_website,
+  "org_logo_path"         = getdomain.org_logo_path,
+  "allow_user_signatures" = getdomain.allow_user_signatures
 }>
 
 <cfoutput>#SerializeJSON(resp)#</cfoutput>
