@@ -2081,3 +2081,66 @@ WHERE p.parameter = 'non_smtpd_milters' AND p.child = 2
       AND c.parent_name = 'non_smtpd_milters'
   );
 
+-- ============================================================================
+-- DOMAIN ORG INFO (#226 prerequisite) - per-domain organization metadata
+-- used in (Pro) auto-generated user signature templates as {{org.name}},
+-- {{org.phone}}, {{org.address}}, {{org.website}}, {{org.logo}}.
+--
+-- Community-tier metadata (no licensing gate): admins can populate these
+-- fields on any edition. The fields become useful when:
+--   - Pro auto-generated user signatures (#226 Pro tier) substitutes them
+--     into the per-domain template, OR
+--   - Admins manually copy org info into custom signatures via Quill.
+--
+-- All columns NULL-able and optional.
+-- ============================================================================
+
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS org_name      VARCHAR(255) NULL AFTER domain;
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS org_phone     VARCHAR(64)  NULL AFTER org_name;
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS org_address   TEXT         NULL AFTER org_phone;
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS org_website   VARCHAR(255) NULL AFTER org_address;
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS org_logo_path VARCHAR(255) NULL AFTER org_website;
+ALTER TABLE domains
+    ADD COLUMN IF NOT EXISTS allow_user_signatures TINYINT(3) NOT NULL DEFAULT 0
+        AFTER org_logo_path;
+
+-- allow_user_signatures: Community-tier per-domain checkbox for "Allow
+-- users to manage their own signatures via the /users/2/ portal".
+-- Default 0 (off); admins opt in per domain. When off, the user-portal
+-- signature page is hidden for users in that domain and any user-edited
+-- signature rows are ignored at send time.
+
+-- ============================================================================
+-- USER SIGNATURES (#226) - per-mailbox-user signature content + flag
+--
+-- One row per mailbox user that has a signature configured. Username
+-- column matches the mailboxes.username column (full email address).
+--
+-- Source column distinguishes user-edited rows ('user') from Pro auto-
+-- generated rows ('ldap'). When BOTH allow_user_signatures (per-domain
+-- Community toggle) AND ldap_autogen_enabled (per-domain Pro toggle, to
+-- be added when Pro tier ships) are on for a user's domain:
+--   - The Pro nightly auto-gen job stamps source='ldap' rows
+--   - If a user manually edits via the portal, the row updates with
+--     source='user' and the next auto-gen pass SKIPS that row
+--   - Admin UI surfaces overrides with a "Reset to LDAP" button
+--
+-- enabled is TINYINT(3) per the Lucee/MariaDB JDBC TINYINT(1)->Boolean
+-- coercion gotcha (per feedback_tinyint_boolean memory).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_signatures (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    username    VARCHAR(255) NOT NULL,
+    enabled     TINYINT(3) NOT NULL DEFAULT 1,
+    source      ENUM('user','ldap') NOT NULL DEFAULT 'user',
+    body_text   TEXT NULL,
+    body_html   LONGTEXT NULL,
+    updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+

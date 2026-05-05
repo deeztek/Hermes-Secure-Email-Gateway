@@ -173,9 +173,35 @@ Expects: form.domain_id, form.domain_name, form.delivery_method, form.recipient_
   WHERE id = <cfqueryparam value="#theSenderID#" cfsqltype="cf_sql_integer">
 </cfquery>
 
+<!--- Org info fields (#226). All optional Community-tier metadata -
+     used by Pro auto-generated user signatures as {{org.*}}
+     placeholders. Trim and clamp to schema-declared max lengths. --->
+<cfparam name="form.org_name"      default="">
+<cfparam name="form.org_phone"     default="">
+<cfparam name="form.org_address"   default="">
+<cfparam name="form.org_website"   default="">
+<cfparam name="form.org_logo_path" default="">
+<cfset orgName    = Left(Trim(form.org_name),      255)>
+<cfset orgPhone   = Left(Trim(form.org_phone),      64)>
+<cfset orgAddress = Trim(form.org_address)>
+<cfset orgWebsite = Left(Trim(form.org_website),   255)>
+<cfset orgLogoPath = Left(Trim(form.org_logo_path), 255)>
+
+<!--- allow_user_signatures: HTML checkbox. Present with value=1 means
+     ON (admin opted in), absent means OFF. Default 0. --->
+<cfparam name="form.allow_user_signatures" default="0">
+<cfset allowUserSignaturesFlag = (Trim(form.allow_user_signatures) EQ "1") ? 1 : 0>
+
 <!--- Update domain --->
 <cfquery datasource="hermes">
-  UPDATE domains SET domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#domain_name#">
+  UPDATE domains SET
+    domain                = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#domain_name#">,
+    org_name              = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgName#"           null="#(orgName EQ '')#">,
+    org_phone             = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgPhone#"          null="#(orgPhone EQ '')#">,
+    org_address           = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#orgAddress#"        null="#(orgAddress EQ '')#">,
+    org_website           = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgWebsite#"        null="#(orgWebsite EQ '')#">,
+    org_logo_path         = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgLogoPath#"       null="#(orgLogoPath EQ '')#">,
+    allow_user_signatures = <cfqueryparam cfsqltype="cf_sql_tinyint"     value="#allowUserSignaturesFlag#">
   WHERE id = <cfqueryparam value="#theDomainID#" cfsqltype="cf_sql_integer">
 </cfquery>
 

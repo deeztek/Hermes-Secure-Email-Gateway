@@ -656,7 +656,149 @@ class DisclaimerModifier(Modifier):
 # The dispatcher needs no changes.
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# SignatureModifier (#226) - per-mailbox-user personal signature applied
+# to outbound mail. Sender-keyed against signature_by_sender.
+# Inherits the same MIME-restructuring + cid: image attachment that
+# DisclaimerModifier uses (via MessageContext.attach_image).
+# ---------------------------------------------------------------------------
+
+class SignatureModifier(Modifier):
+    """Append a per-mailbox-user signature to outbound mail.
+
+    Map: /etc/hermes/body_milter/signatures/signature_by_sender
+    Per-user dir: /etc/hermes/body_milter/signatures/files/<option>/
+        body.txt           plain-text signature
+        body.html          html signature (may have cid: image refs)
+        images/N.png       inline images referenced by cid: (#230)
+
+    The CFML signature regenerator filters out users whose domain has
+    allow_user_signatures=0, OR whose row is enabled=0, OR whose row
+    is source='ldap' but the user has manually overridden via the
+    user-portal editor (Pro-tier conflict resolution). If a sender's
+    full address is in the map, the signature applies; if not, no
+    signature.
+
+    Match: outbound + sender's full address matches map.
+    Skip: signed envelope, PGP inline, pre-existing DKIM.
+    """
+    name = 'signature'
+    direction = 'outbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = True
+
+    DIR = os.path.join(CONFIG_ROOT, 'signatures')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'signature_by_sender')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+    CID_REF_RE = re.compile(r'cid:(signature_[\w.-]+_img_\d+)')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self.map.lookup(ctx.sender) is not None
+
+    def modify(self, ctx: MessageContext) -> None:
+        option = self.map.lookup(ctx.sender)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('signature: refusing unsafe option name %r', option)
+            return
+
+        option_dir = os.path.join(self.FILES_DIR, option)
+        txt_path = os.path.join(option_dir, 'body.txt')
+        html_path = os.path.join(option_dir, 'body.html')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('signature: missing per-user files for %r at %s',
+                        option, option_dir)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_sig = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_sig = f.read().decode('utf-8', 'replace')
+        except IOError as e:
+            log.warning('signature: cannot read per-user files: %s', e)
+            return
+
+        msg = ctx.email_message()
+        plain_n, html_n = self._append_to_parts(msg, txt_sig, html_sig)
+        if plain_n or html_n:
+            ctx.modified = True
+            log.info('signature applied: sender=%s option=%s plain=%d html=%d direction=%s',
+                     ctx.sender, option, plain_n, html_n, ctx.direction)
+            if html_n:
+                self._queue_cid_images(ctx, option_dir, html_sig)
+        else:
+            log.info('signature: no text/plain or text/html parts to modify (sender=%s)',
+                     ctx.sender)
+
+    # _append_to_parts and _inject_html mirror DisclaimerModifier's; the
+    # behavior is identical so we just delegate (cleaner refactor would
+    # hoist these to a shared mixin once #228 also wants them).
+    def _append_to_parts(self, msg: Message, txt: str,
+                         html: str) -> Tuple[int, int]:
+        return DisclaimerModifier._append_to_parts(self, msg, txt, html)
+
+    def _inject_html(self, body_html: str, sig_html: str) -> str:
+        return DisclaimerModifier._inject_html(self, body_html, sig_html)
+
+    def _queue_cid_images(self, ctx: MessageContext,
+                          option_dir: str, html_sig: str) -> None:
+        """Find cid: refs in the html signature; for each, locate the
+        matching image file under <option_dir>/images/ and queue it on
+        ctx for attachment at serialize time. cid: refs follow the
+        pattern signature_<option>_img_<N> to avoid collisions with
+        DisclaimerModifier's cid: namespace."""
+        cid_refs = list(set(self.CID_REF_RE.findall(html_sig)))
+        if not cid_refs:
+            return
+        images_dir = os.path.join(option_dir, 'images')
+        if not os.path.isdir(images_dir):
+            log.warning('signature: html has %d cid refs but %s is missing',
+                        len(cid_refs), images_dir)
+            return
+        for cid in cid_refs:
+            m = re.search(r'_img_(\d+)$', cid)
+            if not m:
+                continue
+            idx = m.group(1)
+            file_path = None
+            for ext in ('png', 'jpg', 'jpeg', 'gif'):
+                candidate = os.path.join(images_dir, f'{idx}.{ext}')
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+            if file_path is None:
+                log.warning('signature: cid %s referenced in html but no '
+                            'matching image file in %s', cid, images_dir)
+                continue
+            ctx.attach_image(cid, file_path)
+            log.info('signature: queued inline image cid=%s file=%s',
+                     cid, file_path)
+
+
+# ---------------------------------------------------------------------------
+# Active modifier list. Order matters because each modifier appends its
+# content to the message; later modifiers append AFTER earlier ones.
+#
+# For outbound mail the typical layered output is:
+#
+#     [user body]
+#     [user signature]            <-- SignatureModifier appends first
+#     [domain disclaimer]         <-- DisclaimerModifier appends after
+#
+# Adding new modifiers (#228 banner, future Link Guard) is a one-line
+# append to this list - no dispatcher changes.
+# ---------------------------------------------------------------------------
+
 MODIFIERS: List[Modifier] = [
+    SignatureModifier(),
     DisclaimerModifier(),
 ]
 

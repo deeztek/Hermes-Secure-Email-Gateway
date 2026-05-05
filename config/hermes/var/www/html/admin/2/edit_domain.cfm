@@ -188,7 +188,10 @@ select applied from system_users where applied = '2'
 </cfif> 
 
 <cfquery name="getdomain" datasource="hermes">
-select id, domain, transport_id, senders_id, action_taken, recipients_id from domains where id = <cfqueryparam value = #theDomainID# CFSQLType = "CF_SQL_INTEGER">
+select id, domain, transport_id, senders_id, action_taken, recipients_id,
+       org_name, org_phone, org_address, org_website, org_logo_path,
+       allow_user_signatures
+  from domains where id = <cfqueryparam value = #theDomainID# CFSQLType = "CF_SQL_INTEGER">
 </cfquery>
 
 <cfif #getdomain.recordcount# LT 1>
@@ -1226,6 +1229,88 @@ select parameter, parent, child from parameters where parent='#getrelayhostid.id
     <!--- /CFIF #destination_authentication# is --->
     </cfif>
 
+
+      <!--- ============================================================
+           Organization Information (#226)
+           Per-domain metadata used by Pro auto-generated user
+           signatures as {{org.name}}, {{org.phone}}, {{org.address}},
+           {{org.website}}. Logo path may reference an image embedded
+           inline via cid: in the signature template.
+           All fields optional. Community-tier metadata (no licensing
+           gate) -- the Pro feature is the auto-gen template that
+           consumes these fields.
+           ============================================================ --->
+      <div class="card card-outline card-info mt-4">
+          <div class="card-header">
+              <h3 class="card-title m-0"><i class="fas fa-building me-2"></i>Organization Information</h3>
+          </div>
+          <div class="card-body">
+              <small class="form-text text-muted mb-3 d-block">
+                  Used in (Pro) auto-generated user signatures as <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code>, <code>{{org.website}}</code>, <code>{{org.logo}}</code>. All optional. Admins may also reference these manually in their disclaimer or signature Quill editors.
+              </small>
+
+              <div class="form-group mb-3">
+                  <label for="org_name"><strong>Organization Name</strong></label>
+                  <cfoutput>
+                  <input type="text" class="form-control" id="org_name" name="org_name"
+                         maxlength="255" autocomplete="off"
+                         placeholder="e.g. Acme Inc."
+                         value="#HTMLEditFormat(getdomain.org_name ?: '')#">
+                  </cfoutput>
+              </div>
+
+              <div class="form-group mb-3">
+                  <label for="org_phone"><strong>Organization Phone</strong></label>
+                  <cfoutput>
+                  <input type="text" class="form-control" id="org_phone" name="org_phone"
+                         maxlength="64" autocomplete="off"
+                         placeholder="e.g. +1 555 555 0100"
+                         value="#HTMLEditFormat(getdomain.org_phone ?: '')#">
+                  </cfoutput>
+              </div>
+
+              <div class="form-group mb-3">
+                  <label for="org_address"><strong>Organization Address</strong></label>
+                  <cfoutput>
+                  <textarea class="form-control" id="org_address" name="org_address"
+                            rows="3"
+                            placeholder="e.g. 123 Main Street&#10;Suite 400&#10;Anytown, CA 90210">#HTMLEditFormat(getdomain.org_address ?: '')#</textarea>
+                  </cfoutput>
+              </div>
+
+              <div class="form-group mb-3">
+                  <label for="org_website"><strong>Organization Website</strong></label>
+                  <cfoutput>
+                  <input type="text" class="form-control" id="org_website" name="org_website"
+                         maxlength="255" autocomplete="off"
+                         placeholder="e.g. https://www.example.com"
+                         value="#HTMLEditFormat(getdomain.org_website ?: '')#">
+                  </cfoutput>
+              </div>
+
+              <!--- org_logo_path UI deferred to a follow-up: file upload
+                   integrating with #230's image pipeline. For now the
+                   column exists so admins can populate it later without
+                   another migration. --->
+
+              <hr class="my-3">
+
+              <div class="form-check form-switch">
+                  <cfoutput>
+                  <input class="form-check-input" type="checkbox"
+                         id="allow_user_signatures" name="allow_user_signatures"
+                         value="1"
+                         <cfif Val(getdomain.allow_user_signatures) EQ 1>checked</cfif>>
+                  </cfoutput>
+                  <label class="form-check-label" for="allow_user_signatures">
+                      <strong>Allow users to manage their own signatures</strong>
+                  </label>
+              </div>
+              <small class="form-text text-muted">
+                  When on, users in this domain see a Signature page in <code>/users/2/</code> and can edit their own personal signature. When off, the page is hidden and any user-edited signature rows for users in this domain are ignored at send time. Independent of the Pro auto-generation setting.
+              </small>
+          </div>
+      </div>
 
       <div class="box-footer">
 
