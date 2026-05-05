@@ -56,7 +56,7 @@ $(document).ready(function() {
                 [{ 'color': [] }, { 'background': [] }],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],
                 [{ 'align': [] }],
-                ['blockquote', 'link'],
+                ['blockquote', 'link', 'image'],
                 ['clean']
             ]
         }
@@ -328,7 +328,15 @@ $(document).ready(function() {
             <cfoutput>
             <textarea id="body_html" name="body_html" style="display:none;">#HTMLEditFormat(existingHtml)#</textarea>
             </cfoutput>
-            <small class="form-text text-muted mt-2">Format your disclaimer using the toolbar. The HTML version is used on the <code>text/html</code> part of multipart messages; the plain-text version (auto-derived from this HTML by default) is used on the <code>text/plain</code> part.</small>
+            <small class="form-text text-muted mt-2">
+                Format your disclaimer using the toolbar. The HTML version is used on the <code>text/html</code> part of multipart messages; the plain-text version (auto-derived from this HTML by default) is used on the <code>text/plain</code> part.
+            </small>
+            <small class="form-text text-muted mt-1">
+                <i class="fas fa-image me-1"></i><strong>Inline images:</strong>
+                paste or upload PNG, JPEG, or GIF images directly into the editor. They are extracted to <code>cid:</code> attachments on save and embedded inline in outbound mail.
+                Limits: <strong>5 images max</strong>, <strong>200 KB per image</strong>, <strong>1 MB total</strong>.
+                SVG and WebP are not supported. The plain-text version of the disclaimer omits images.
+            </small>
         </div>
 
         <!-- "Edit text separately" toggle. Hidden by default -- only visible

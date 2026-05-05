@@ -118,6 +118,65 @@ reload that actually wire the disclaimer into the outbound mail flow.
     <cfset form.position = "append">
 </cfif>
 
+<!--- #230 image validation. Quill embeds pasted/uploaded images as
+     base64 inline data: URLs in body_html. We enforce safety limits
+     here BEFORE the DB write so an admin who pastes a 10 MB PNG (or
+     a SVG with embedded scripts, or 50 tiny icons) is told no without
+     bloating every outbound message that gets this disclaimer.
+
+     Limits:
+       - Max 200 KB per image (after base64 decode)
+       - Max 5 images per disclaimer
+       - Max 1 MB total across all images
+       - Allowed types: png, jpeg, gif
+       - SVG and webp explicitly rejected (security and MUA-support gaps).
+
+     Decoded size approximation: base64 chars produce 3 bytes per 4 chars.
+     Slight overcount due to padding; close enough for limit enforcement. --->
+<cfset MAX_IMG_SIZE_BYTES = 200 * 1024>
+<cfset MAX_IMG_COUNT = 5>
+<cfset MAX_TOTAL_SIZE_BYTES = 1024 * 1024>
+<cfset ALLOWED_IMG_FORMATS = "png,jpeg,jpg,gif">
+
+<cfset imgValidationPattern = "<img\s+[^>]*src\s*=\s*[""']data:image/([\w+-]+);base64,([^""']+)[""'][^>]*>">
+<cfset imgValidationMatches = REMatchNoCase(imgValidationPattern, form.body_html)>
+
+<cfif ArrayLen(imgValidationMatches) GT MAX_IMG_COUNT>
+    <cfset session.disclaimer_msg = "<strong>Save failed.</strong> Too many images (" & ArrayLen(imgValidationMatches) & " > limit of " & MAX_IMG_COUNT & "). Reduce the image count and try again.">
+    <cfset session.disclaimer_msg_type = "danger">
+    <cflocation url="view_disclaimers.cfm" addtoken="no">
+</cfif>
+
+<cfset totalImgSize = 0>
+<cfloop array="#imgValidationMatches#" index="imgTagToCheck">
+    <cfset capturedCheck = ReFindNoCase(imgValidationPattern, imgTagToCheck, 1, true)>
+    <cfif ArrayLen(capturedCheck.pos) GTE 3 AND capturedCheck.pos[2] GT 0>
+        <cfset checkFormat = LCase(Mid(imgTagToCheck, capturedCheck.pos[2], capturedCheck.len[2]))>
+        <cfset checkB64    = Mid(imgTagToCheck, capturedCheck.pos[3], capturedCheck.len[3])>
+
+        <cfif NOT ListFind(ALLOWED_IMG_FORMATS, checkFormat)>
+            <cfset session.disclaimer_msg = "<strong>Save failed.</strong> Image type <code>" & HTMLEditFormat(checkFormat) & "</code> is not allowed. Allowed types: PNG, JPEG, GIF. SVG and WebP are rejected for security and recipient-compatibility reasons.">
+            <cfset session.disclaimer_msg_type = "danger">
+            <cflocation url="view_disclaimers.cfm" addtoken="no">
+        </cfif>
+
+        <cfset decodedBytes = Int((Len(checkB64) * 3) / 4)>
+        <cfif decodedBytes GT MAX_IMG_SIZE_BYTES>
+            <cfset session.disclaimer_msg = "<strong>Save failed.</strong> Image too large: " & NumberFormat(decodedBytes / 1024, "9.9") & " KB exceeds the " & (MAX_IMG_SIZE_BYTES / 1024) & " KB per-image limit.">
+            <cfset session.disclaimer_msg_type = "danger">
+            <cflocation url="view_disclaimers.cfm" addtoken="no">
+        </cfif>
+
+        <cfset totalImgSize = totalImgSize + decodedBytes>
+    </cfif>
+</cfloop>
+
+<cfif totalImgSize GT MAX_TOTAL_SIZE_BYTES>
+    <cfset session.disclaimer_msg = "<strong>Save failed.</strong> Total image size " & NumberFormat(totalImgSize / 1024, "9.9") & " KB exceeds the " & (MAX_TOTAL_SIZE_BYTES / 1024) & " KB total limit. Use smaller or fewer images.">
+    <cfset session.disclaimer_msg_type = "danger">
+    <cflocation url="view_disclaimers.cfm" addtoken="no">
+</cfif>
+
 <!--- NORMALIZE enabled (checkbox: present + value=1 means on, absent means off) --->
 <cfset enabledFlag = (form.enabled EQ "1") ? 1 : 0>
 

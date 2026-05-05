@@ -9,19 +9,28 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 --->
 
 <!---
-DISCLAIMER WRITE (#214 Phase 3).
+DISCLAIMER WRITE (#214 Phase 3 + #230 image support layout).
 
 Regenerates the body_milter disclaimer file set from the disclaimers
 table. The hermes_body_milter container watches these files via
 mtime polling and reloads automatically on the next message it
 processes - no force-reload, no docker exec, no service signal.
 
-  /etc/hermes/body_milter/disclaimers/files/<option>.txt    plain-text
-  /etc/hermes/body_milter/disclaimers/files/<option>.html   html
-  /etc/hermes/body_milter/disclaimers/disclaimer_by_sender  sender->option map
+Layout (one subdirectory per disclaimer):
 
-Where <option> is "domain_<sanitized_domain>" or
-"relay_<sanitized_address>" (non-alphanumerics replaced with _).
+  /etc/hermes/body_milter/disclaimers/disclaimer_by_sender
+       sender->option-name map (one line: "<sender>\t<option>")
+
+  /etc/hermes/body_milter/disclaimers/files/<option>/
+      body.txt           plain-text disclaimer
+      body.html          html disclaimer (may contain cid: refs after #230)
+      images/            per-disclaimer inline images for cid: references
+          1.png          (#230 - populated by save action when admin
+          2.jpg           pastes/uploads images into the Quill editor)
+          ...
+
+Where <option> is "domain_<sanitized_domain>" or "relay_<sanitized_address>"
+(non-alphanumerics replaced with _).
 
 Pipeline placement: this fires AFTER the DB write in
 save_disclaimer_action.cfm and disclaimer_delete.cfm. The body milter
@@ -42,7 +51,7 @@ session.disclaimerApplyError holds the error message if false.
 <cftry>
 
 <!--- Pull all enabled disclaimers. Disabled rows are skipped - no
-     map entry, no file written, milter never matches them. --->
+     map entry, no subdirectory written, milter never matches them. --->
 <cfquery name="getDisclaimers" datasource="hermes">
     SELECT scope, scope_key, position, body_text, body_html
     FROM disclaimers
@@ -50,39 +59,36 @@ session.disclaimerApplyError holds the error message if false.
     ORDER BY scope ASC, scope_key ASC
 </cfquery>
 
-<!--- WIPE the per-scope files (NOT the directory itself) before
-     regenerating. Catches deletions and scope_key renames in a single
-     sweep so we never leak stale files. The directory itself is a
-     Docker bind-mount target shared with hermes_body_milter; deleting
-     and recreating the directory orphans the milter's view. Targeted
-     file deletes preserve the dir inode. --->
-<cfif NOT DirectoryExists("/etc/hermes/body_milter/disclaimers/files")>
-    <cfdirectory action="create" directory="/etc/hermes/body_milter/disclaimers/files" mode="755" />
-<cfelse>
-    <cfset existingFiles = DirectoryList("/etc/hermes/body_milter/disclaimers/files", false, "name")>
-    <cfloop array="#existingFiles#" index="oldFile">
-        <cfif Right(oldFile, 4) EQ ".txt" OR Right(oldFile, 5) EQ ".html">
-            <cffile action="delete" file="/etc/hermes/body_milter/disclaimers/files/#oldFile#" />
-        </cfif>
-    </cfloop>
+<cfset filesDir = "/etc/hermes/body_milter/disclaimers/files">
+
+<!--- Ensure the parent files/ directory exists. The directory itself
+     is part of the body_milter bind mount; we only manage subdirs
+     inside it. --->
+<cfif NOT DirectoryExists(filesDir)>
+    <cfdirectory action="create" directory="#filesDir#" mode="755" />
 </cfif>
 
-<!--- Reply-chain dedup is intentionally NOT done. Industry norm
-     (Exclaimer, Crossware, CodeTwo, M365 transport rules) is to
-     stamp every outbound message regardless of quoted history. The
-     compliance argument is stronger for non-dedup: many regimes
-     (HIPAA, GDPR data-controller notice, financial-services disclosure)
-     treat each transmission as requiring its own disclaimer. Modern
-     MUAs collapse quoted history by default so the cosmetic argument
-     for dedup is weak. --->
+<!--- Wipe per-disclaimer subdirectories before regenerating. Catches
+     deletions and scope_key renames in a single sweep so we never
+     leak stale files (or stale image binaries from a prior version
+     of the disclaimer that referenced different cid:s). The per-option
+     subdirs are regular subdirectories inside the bind mount (not
+     mount points themselves), so recursive delete is safe and does
+     not orphan the milter's view. The .gitkeep file at the parent
+     level is preserved (we only delete subdirectories of type=Dir). --->
+<cfset existingItems = DirectoryList(filesDir, false, "query")>
+<cfloop query="existingItems">
+    <cfif existingItems.type EQ "Dir">
+        <cfdirectory action="delete" directory="#filesDir#/#existingItems.name#" recurse="yes" />
+    </cfif>
+</cfloop>
 
-
-<!--- Build the map content while looping. --->
+<!--- Build the map content while looping the per-disclaimer rows. --->
 <cfset mapLines = "">
 
 <cfloop query="getDisclaimers">
 
-    <!--- Option-name (filename) and sender key (lookup):
+    <!--- Option-name (subdirectory name) and sender key (lookup key):
            Domain scope -> option=domain_<safe>, sender=@<domain>
            Relay scope  -> option=relay_<safe>,  sender=<full_address>
          Non-alphanumeric chars in the source key are replaced with _
@@ -97,8 +103,9 @@ session.disclaimerApplyError holds the error message if false.
 
     <!--- Auto-derive plain-text part if the admin didn't supply a
          separate body_text via the Quill "edit plain-text separately"
-         toggle. Strip <br>/<p>/<li> to newlines, drop other tags,
-         collapse runs of newlines. --->
+         toggle. Strip <br>/<p>/<li> to newlines, drop other tags
+         (including <img cid:...> references which don't translate to
+         text), collapse runs of newlines. --->
     <cfif Trim(body_text) EQ "">
         <cfset txt = ReReplaceNoCase(body_html, "<br\s*/?>", Chr(10), "all")>
         <cfset txt = ReReplaceNoCase(txt, "</p>|</li>", Chr(10), "all")>
@@ -109,14 +116,60 @@ session.disclaimerApplyError holds the error message if false.
         <cfset txt = body_text>
     </cfif>
 
-    <!--- Plain-text and HTML disclaimer bodies, ready for the milter
-         to append to the corresponding MIME parts. No sentinel marker
-         (we don't dedup reply chains, see comment above). --->
     <cfset txtOut = txt & Chr(10)>
-    <cfset htmlOut = body_html & Chr(10)>
 
-    <cffile action="write" file="/etc/hermes/body_milter/disclaimers/files/#optionName#.txt"  output="#txtOut#"  charset="utf-8" addnewline="no">
-    <cffile action="write" file="/etc/hermes/body_milter/disclaimers/files/#optionName#.html" output="#htmlOut#" charset="utf-8" addnewline="no">
+    <!--- Create the per-disclaimer subdirectory + images/ subdirectory. --->
+    <cfset optionDir = filesDir & "/" & optionName>
+    <cfdirectory action="create" directory="#optionDir#" mode="755" />
+    <cfdirectory action="create" directory="#optionDir#/images" mode="755" />
+
+    <!--- #230: extract base64 inline images from body_html, write each
+         to images/<N>.<ext>, rewrite the <img> tag in HTML to reference
+         cid:disclaimer_<option>_img_<N>. The milter then attaches each
+         image as a multipart/related part with matching Content-ID.
+
+         DB stores body_html with base64 data: URLs (admin-editor
+         convenience: Quill displays inline preview of pasted images
+         without round-tripping through the server). Each save
+         regenerates the on-disk file set fresh: extracts images,
+         rewrites HTML with cid: refs. The base64 stays in DB only.
+
+         Image filename uses 1-based index in the order Quill emitted
+         them. Extension derived from the data: URL's media type. --->
+    <cfset imageIndex = 0>
+    <cfset rewrittenHtml = body_html>
+    <cfset imgPattern = "<img\s+[^>]*src\s*=\s*[""']data:image/(png|jpeg|jpg|gif);base64,([^""']+)[""'][^>]*>">
+    <cfset imgMatches = REMatchNoCase(imgPattern, body_html)>
+    <cfloop array="#imgMatches#" index="imgTag">
+        <cfset imageIndex = imageIndex + 1>
+        <!--- Re-match against the matched substring to capture groups. --->
+        <cfset captured = ReFindNoCase(imgPattern, imgTag, 1, true)>
+        <cfif ArrayLen(captured.pos) GTE 3 AND captured.pos[2] GT 0>
+            <cfset imgFormat = LCase(Mid(imgTag, captured.pos[2], captured.len[2]))>
+            <cfset b64data   = Mid(imgTag, captured.pos[3], captured.len[3])>
+            <cfset ext = imgFormat>
+            <cfif ext EQ "jpeg"><cfset ext = "jpg"></cfif>
+
+            <cfset binData = ToBinary(b64data)>
+            <cfset imgFilename = imageIndex & "." & ext>
+            <cffile action="write"
+                    file="#optionDir#/images/#imgFilename#"
+                    output="#binData#">
+
+            <cfset cid = "disclaimer_" & optionName & "_img_" & imageIndex>
+            <cfset newTag = "<img src=""cid:" & cid & """>">
+            <!--- Replace the FIRST occurrence in rewrittenHtml. Multiple
+                 identical base64 tags (same image pasted twice) are
+                 handled correctly because each loop iteration replaces
+                 the first remaining instance with a fresh cid. --->
+            <cfset rewrittenHtml = Replace(rewrittenHtml, imgTag, newTag, "one")>
+        </cfif>
+    </cfloop>
+
+    <cfset htmlOut = rewrittenHtml & Chr(10)>
+
+    <cffile action="write" file="#optionDir#/body.txt"  output="#txtOut#"  charset="utf-8" addnewline="no">
+    <cffile action="write" file="#optionDir#/body.html" output="#htmlOut#" charset="utf-8" addnewline="no">
 
     <cfset mapLines = mapLines & senderKey & Chr(9) & optionName & Chr(10)>
 </cfloop>
@@ -128,9 +181,7 @@ session.disclaimerApplyError holds the error message if false.
 
 <!--- No force-reload needed. The body milter mtime-watches the map
      and per-scope files; the file write above is enough to make the
-     change take effect on the next message. Compare to the legacy
-     amavis approach (#214 Phase 3 v1) which required a force-reload
-     via docker exec - that's gone, simpler, and impossible to desync. --->
+     change take effect on the next message. --->
 
 <cfset session.disclaimerApplySuccess = true>
 <cfset session.disclaimerApplyError = "">

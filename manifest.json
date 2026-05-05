@@ -1,6 +1,6 @@
 {
   "version": "260119",
-  "generated": "2026-05-05T12:36:24Z",
+  "generated": "2026-05-05T14:56:58Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -20,10 +20,10 @@
     "admin/2/view_antivirus_signature_feeds.cfm": "96382d593b0ac0793cec0dc9d8b1f00062d9634a9a676d66d53de25e6a608fa4",
     "admin/2/edit_antivirus_signature_feed.cfm": "4241126bad6fbac37899376527385ca8d5c3415681deb71d8d8b9643243c310b",
     "admin/2/view_disclaimers.cfm": "87a7543d38852208d2a87098f70c69e04fe04f472b150d892a289e111b28718e",
-    "admin/2/edit_disclaimer.cfm": "a468ff7ae063a13dcd0ca3f3329313f6993344e049c541040f787e113e3706b2",
+    "admin/2/edit_disclaimer.cfm": "449ea0c44ca04d826b8afc8553dd28e8db0a1515dd60265f532fc9e9f04ddaac",
     "admin/2/save_disclaimer_action.cfm": "6f73743868008a070c65b9a13ee62fa92d4e4663f1fc123277d4559b4f0e8475",
     "admin/2/disclaimer_delete.cfm": "97892cbe2074169ac0e49599818ede83e8d918eef0603e53b1298f2d47b90700",
-    "admin/2/inc/disclaimer_write_and_reload.cfm": "1c1e90846dcbc53a7932187d719a005fe51ce97a1f260fce604a12a9c59b2d4a"
+    "admin/2/inc/disclaimer_write_and_reload.cfm": "11bd10412163be9d4c5818ef3289ba6dd0a8c24ed5b8d7f34f856262664187d3"
   },
-  "fingerprint": "c176019e5d8842a83f6f5e8fe43df1c8cb5fc59d5f75557c6ccd4589954159cf"
+  "fingerprint": "a15b90927b638ed4a67d1ac23b4ef154b03c5bc48939ed600a48d62f6b8a96b8"
 }

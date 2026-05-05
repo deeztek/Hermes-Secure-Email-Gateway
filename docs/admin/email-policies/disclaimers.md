@@ -106,16 +106,62 @@ In every failure case, mail keeps flowing. Worst case is a missed disclaimer, ne
 The CFML include `inc/disclaimer_write_and_reload.cfm` runs after every save or delete and rewrites the entire on-disk state from the `disclaimers` table:
 
 ```
-/etc/hermes/body_milter/disclaimers/files/<option>.txt   plain-text disclaimer
-/etc/hermes/body_milter/disclaimers/files/<option>.html  html disclaimer
-/etc/hermes/body_milter/disclaimers/disclaimer_by_sender sender → option map
+/etc/hermes/body_milter/disclaimers/disclaimer_by_sender   sender → option map
+/etc/hermes/body_milter/disclaimers/files/<option>/
+    body.txt          plain-text disclaimer
+    body.html         html disclaimer (may have <img src="cid:..."> refs)
+    images/
+        1.png         per-disclaimer inline images (#230)
+        2.jpg
+        ...
 ```
 
 Where `<option>` is `domain_<safe>` or `relay_<safe>` (non-alphanumeric chars in the source key are replaced with `_`).
 
-The files directory is wiped (`.txt`/`.html` only — preserve `.gitkeep`) and rewritten each time. There is no incremental update — this guarantees deleted rows and renamed scope keys never leave stale files behind.
+Each disclaimer gets its own subdirectory. The files directory is wiped (per-option subdirectories deleted recursively, but the parent `files/` directory and its `.gitkeep` are preserved) and rewritten on every save. There is no incremental update — this guarantees deleted rows and renamed scope keys never leave stale files (or stale image binaries) behind.
 
-**No reload step needed.** The body milter mtime-watches each map file on every message and reloads when it changes. The CFML `cffile` write to the map file is enough to make the change take effect on the next message processed by the milter. (Compare to the retired amavis approach which required a `force-reload` via `docker exec` after each change.)
+**No reload step needed.** The body milter mtime-watches each map file on every message and reloads when it changes. The CFML `cffile` write to the map file is enough to make the change take effect on the next message processed by the milter.
+
+## Inline images (#230)
+
+Admins can paste or upload images directly into the Quill editor when authoring a disclaimer. Supported formats: **PNG, JPEG, GIF**. SVG and WebP are explicitly rejected (security and recipient-compatibility reasons). Limits enforced at save time:
+
+- **5 images max** per disclaimer
+- **200 KB per image** (after base64 decode)
+- **1 MB total** across all images in a single disclaimer
+
+If any limit is exceeded, the save is rejected with a specific error explaining what failed. Admins can reduce image count or size and re-save.
+
+**How it works:**
+
+1. Quill embeds pasted/uploaded images as base64 inline `<img src="data:image/...;base64,...">` in the HTML body. The base64 representation is what's stored in the `disclaimers.body_html` column.
+2. At save time, the regenerator parses `body_html` for `data:` URLs, decodes each base64 blob, writes the binary as `<option>/images/<N>.<ext>`, and rewrites the HTML in `<option>/body.html` to use `<img src="cid:disclaimer_<option>_img_<N>">` references.
+3. At message-send time, the body milter reads `body.html`, walks `<img src="cid:...">` references, and attaches each referenced image as an `image/<format>` MIME part with `Content-ID: <disclaimer_<option>_img_<N>>` and `Content-Disposition: inline`.
+4. The milter wraps the message as `multipart/related` so the recipient MUA resolves cid references against the inline parts.
+
+**MIME structure transformation** (representative example):
+
+```
+Original outbound:
+  multipart/alternative
+    text/plain
+    text/html (no images)
+
+After milter (with disclaimer including 1 image):
+  multipart/related
+    multipart/alternative
+      text/plain  (with text disclaimer appended; images omitted from text)
+      text/html   (with html disclaimer + <img src="cid:...">)
+    image/png
+      Content-ID: <disclaimer_..._img_1>
+      Content-Disposition: inline
+```
+
+This structure renders inline in all major MUAs (Gmail, Outlook, Apple Mail, Thunderbird, mobile clients).
+
+**The plain-text version of the disclaimer omits images entirely** — base64 inline images don't translate to text, and recipients viewing the message in plain-text mode see the disclaimer text without any image markers.
+
+**Hermes' own DKIM signature covers the modified body** (including the multipart/related wrap and image parts), because OpenDKIM signs at the postfix `:10026` re-injection step — downstream of the body milter. The signature validates against what the recipient receives.
 
 ## Auto-derive of plain-text part
 
