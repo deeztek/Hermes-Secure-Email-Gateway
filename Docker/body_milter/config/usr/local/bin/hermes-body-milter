@@ -98,8 +98,6 @@ from bs4 import BeautifulSoup
 CONFIG_ROOT = '/etc/hermes/body_milter'
 LISTEN_SOCKET = 'inet:8893'
 
-SENTINEL = 'HERMES_DISCLAIMER_V1'
-
 # Source-of-truth for "is this domain local?". Postfix already maintains
 # this file as the relay_domains lookup; we read it directly to determine
 # inbound vs outbound vs internal direction.
@@ -316,9 +314,6 @@ class MessageContext:
     def body_has_pgp_inline(self) -> bool:
         return bool(RE_PGP_INLINE.search(self.body_bytes[:32768]))
 
-    def body_has_sentinel(self) -> bool:
-        return SENTINEL.encode() in self.body_bytes[:65536]
-
 
 # ---------------------------------------------------------------------------
 # Modifier framework
@@ -339,7 +334,6 @@ class Modifier:
     skip_on_signed = True        # skip if S/MIME or PGP envelope is present
     skip_on_pgp_inline = True    # skip if body contains "BEGIN PGP ..." block
     skip_on_dkim = True          # skip if pre-existing DKIM-Signature header
-    skip_on_sentinel = True      # skip if Hermes sentinel is already in body
 
     def applies_to(self, ctx: MessageContext) -> bool:
         """Return True if this modifier wants to run on this message.
@@ -359,8 +353,6 @@ class Modifier:
             return 'PGP inline in body'
         if self.skip_on_dkim and ctx.headers_have_dkim():
             return 'pre-existing DKIM-Signature'
-        if self.skip_on_sentinel and ctx.body_has_sentinel():
-            return 'sentinel marker already present'
         return None
 
     def modify(self, ctx: MessageContext) -> None:
@@ -381,14 +373,16 @@ class DisclaimerModifier(Modifier):
 
     Match: outbound + sender matches map (full address before @domain).
     Skip: signed envelope, PGP inline, pre-existing DKIM (preserve
-          upstream-signed mail going through a relay user), sentinel.
+          upstream-signed mail going through a relay user).
+    No reply-chain dedup - every outbound message gets a fresh
+    disclaimer, matching industry norm (Exclaimer, Crossware, M365
+    transport rules) and compliance posture.
     """
     name = 'disclaimer'
     direction = 'outbound'
     skip_on_signed = True
     skip_on_pgp_inline = True
     skip_on_dkim = True
-    skip_on_sentinel = True
 
     DIR = os.path.join(CONFIG_ROOT, 'disclaimers')
     FILES_DIR = os.path.join(DIR, 'files')

@@ -55,6 +55,7 @@ $(document).ready(function() {
                 ['bold', 'italic', 'underline', 'strike'],
                 [{ 'color': [] }, { 'background': [] }],
                 [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                [{ 'align': [] }],
                 ['blockquote', 'link'],
                 ['clean']
             ]
@@ -350,10 +351,10 @@ $(document).ready(function() {
         </div>
 
         <!-- Buttons -->
-        <div class="d-flex gap-2 mt-4">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save me-1"></i> Save</button>
-            <button type="button" class="btn btn-info" id="previewBtn"><i class="fas fa-eye me-1"></i> Preview</button>
-            <a href="view_disclaimers.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Cancel</a>
+        <div class="d-flex gap-2 mt-4 align-items-stretch">
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
+            <button type="button" class="btn btn-outline-primary" id="previewBtn"><i class="fas fa-eye"></i> Preview</button>
+            <a href="view_disclaimers.cfm" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
         </div>
     </form>
 

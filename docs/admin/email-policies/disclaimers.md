@@ -73,16 +73,18 @@ The risk is mail that arrives at Hermes **already DKIM-signed by an upstream MTA
 
 The body milter treats a pre-existing `DKIM-Signature:` header the same way as a sealed S/MIME or PGP envelope and skips the disclaimer. Since Hermes' own DKIM signs at `:10026` (downstream of this milter), any DKIM-Signature header present at the milter's point in the pipeline came from somewhere upstream of Hermes.
 
-## Reply-chain dedup
+## Reply-chain handling — no dedup, by design
 
-Each generated disclaimer file ends with the sentinel marker:
+The milter does **not** detect or skip messages that already carry a previous disclaimer in their quoted history. Every outbound message gets a fresh disclaimer applied — including replies inside a long thread.
 
-```
-[HERMES_DISCLAIMER_V1]              ← in the .txt part
-<!-- HERMES_DISCLAIMER_V1 -->       ← in the .html part
-```
+This matches industry norm: commercial server-side disclaimer / signature platforms (Exclaimer, Crossware, CodeTwo, Microsoft 365 transport rules) all stamp every outbound without dedup. The reasoning:
 
-When a recipient replies and the original disclaimer is quoted in the reply body, the milter detects the marker on the next outbound trip and skips that message. Without this, every round-trip would stack another disclaimer copy.
+- **Compliance.** Many regulatory regimes (HIPAA email confidentiality, GDPR data-controller notices, financial-services disclosure) treat each transmission as requiring its own disclaimer. Stamping only the first message in a thread arguably leaves later replies non-compliant.
+- **Self-contained messages.** If a recipient forwards a reply (with quoted history) to a third party, the disclaimer is preserved per-message in the forwarded text.
+- **Predictable behavior.** Operators don't have to explain "sometimes the disclaimer shows, sometimes it doesn't."
+- **Cosmetic concern is weak.** Modern MUAs (Gmail, Outlook, Apple Mail) collapse quoted history by default, so stacked disclaimers in long threads are rarely visible to readers.
+
+Earlier iterations of #214 included a sentinel-marker dedup mechanism (`[HD]` / `<!-- HERMES_DISCLAIMER_V1 -->`). That was removed during DEV testing in favor of the industry-norm pattern.
 
 ## Position: append vs prepend
 

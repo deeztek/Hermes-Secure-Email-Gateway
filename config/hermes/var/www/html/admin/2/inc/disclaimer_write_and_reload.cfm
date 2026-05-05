@@ -30,9 +30,10 @@ modifying the body at message ingress. OpenDKIM at :10026 signs the
 final composed message, so Hermes' DKIM covers the disclaimer. See
 docs/admin/email-policies/disclaimers.md for full pipeline notes.
 
-Reply-chain dedup is via the HERMES_DISCLAIMER_V1 sentinel marker
-embedded in every generated file. The milter detects the marker and
-skips when it's already present in the body.
+No reply-chain dedup. Every outbound message gets a fresh disclaimer
+applied, matching industry norm (Exclaimer, Crossware, CodeTwo, M365
+transport rules) and compliance posture - many regulatory regimes
+treat each transmission as requiring its own disclaimer.
 
 Sets session.disclaimerApplySuccess = true/false.
 session.disclaimerApplyError holds the error message if false.
@@ -66,10 +67,15 @@ session.disclaimerApplyError holds the error message if false.
     </cfloop>
 </cfif>
 
-<!--- Sentinel marker baked into every file. The body_milter detects
-     this string in subsequent messages and skips so reply chains
-     don't accumulate duplicate disclaimers. --->
-<cfset sentinel = "HERMES_DISCLAIMER_V1">
+<!--- Reply-chain dedup is intentionally NOT done. Industry norm
+     (Exclaimer, Crossware, CodeTwo, M365 transport rules) is to
+     stamp every outbound message regardless of quoted history. The
+     compliance argument is stronger for non-dedup: many regimes
+     (HIPAA, GDPR data-controller notice, financial-services disclosure)
+     treat each transmission as requiring its own disclaimer. Modern
+     MUAs collapse quoted history by default so the cosmetic argument
+     for dedup is weak. --->
+
 
 <!--- Build the map content while looping. --->
 <cfset mapLines = "">
@@ -103,12 +109,11 @@ session.disclaimerApplyError holds the error message if false.
         <cfset txt = body_text>
     </cfif>
 
-    <!--- Append the sentinel as visible text in the plain-text part
-         (square-bracketed for visibility) and as an HTML comment in
-         the html part (invisible to the recipient). Both forms match
-         the same way in the milter's body_has_sentinel() check. --->
-    <cfset txtOut = txt & Chr(10) & Chr(10) & "[" & sentinel & "]" & Chr(10)>
-    <cfset htmlOut = body_html & Chr(10) & "<!-- " & sentinel & " -->" & Chr(10)>
+    <!--- Plain-text and HTML disclaimer bodies, ready for the milter
+         to append to the corresponding MIME parts. No sentinel marker
+         (we don't dedup reply chains, see comment above). --->
+    <cfset txtOut = txt & Chr(10)>
+    <cfset htmlOut = body_html & Chr(10)>
 
     <cffile action="write" file="/etc/hermes/body_milter/disclaimers/files/#optionName#.txt"  output="#txtOut#"  charset="utf-8" addnewline="no">
     <cffile action="write" file="/etc/hermes/body_milter/disclaimers/files/#optionName#.html" output="#htmlOut#" charset="utf-8" addnewline="no">
