@@ -29,7 +29,7 @@ cert produces a profile worse than unsigned — iOS shows "Not Verified"
 instead of just "Verification not possible").
 
 Required inputs (caller sets in variables scope):
-  - mcUserEmail     : the mailbox's full email (e.g., bob@deeztek.com).
+  - mcUserEmail     : the mailbox's full email (e.g., bob@domain.tld).
                       Used as username in all four payloads.
   - mcDisplayName   : human-friendly name shown in iOS account list
                       (free text, e.g., "Bob Smith - Deeztek").

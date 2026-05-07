@@ -20,7 +20,6 @@ SENSITIVE_PATHS=(
     "*/opt/hermes/keys/*"
     "*/opt/hermes/ssl/*"
     "*/opt/hermes/CA/*"
-    "*/opt/hermes/root_ca/*"
     "*/opt/hermes/creds/*"
     "*/opt/hermes/dkim/keys/*"
     "*/opt/hermes/apache_certs/*"

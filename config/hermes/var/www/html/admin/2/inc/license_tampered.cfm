@@ -51,7 +51,7 @@ Displayed when template integrity check fails
             <ol class="mb-4">
                 <li class="mb-2">Reinstall Hermes SEG Pro Edition from the official source</li>
                 <li class="mb-2">Restore from a known-good backup</li>
-                <li class="mb-2">Contact <a href="mailto:support@deeztek.com">support@deeztek.com</a> for assistance</li>
+                <li class="mb-2">Contact <a href="mailto:support@hermesseg.io">support@hermesseg.io</a> for assistance</li>
             </ol>
         </div>
 
@@ -65,7 +65,7 @@ Displayed when template integrity check fails
             <a href="https://docs.deeztek.com/books/hermes-seg-general-documentation" class="btn btn-outline-secondary" target="_blank">
                 <i class="fas fa-book me-1"></i> Documentation
             </a>
-            <a href="mailto:support@deeztek.com" class="btn btn-outline-primary">
+            <a href="mailto:support@hermesseg.io" class="btn btn-outline-primary">
                 <i class="fas fa-envelope me-1"></i> Contact Support
             </a>
         </div>

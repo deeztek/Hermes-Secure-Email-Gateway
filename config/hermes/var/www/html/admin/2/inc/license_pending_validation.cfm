@@ -64,7 +64,7 @@ Displayed when server is unreachable and no baseline fingerprint has been establ
             <a href="/admin/2/logout.cfm" class="btn btn-primary">
                 <i class="fas fa-redo me-1"></i> Log Out and Retry
             </a>
-            <a href="mailto:support@deeztek.com" class="btn btn-outline-secondary">
+            <a href="mailto:support@hermesseg.io" class="btn btn-outline-secondary">
                 <i class="fas fa-envelope me-1"></i> Contact Support
             </a>
         </div>

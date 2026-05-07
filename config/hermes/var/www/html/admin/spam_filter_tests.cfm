@@ -268,7 +268,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted
                               </tr>
                               <tr valign="top" align="left">
                                 <td height="25"></td>
-                                <td width="25"><a target="_self" href="javascript:openpopup_27b5('https://www.deeztek.com/documentation/hermes-seg-documentation/hermes-seg-administrator-guide/content-checks/custom-antispam-filter-tests/')"><img id="Picture2" height="25" width="25" src="./help.png" border="0" alt="Online Help" title="Online Help"></a></td>
+                                <td width="25"><a target="_self" href="javascript:openpopup_27b5('https://www.hermesseg.io')"><img id="Picture2" height="25" width="25" src="./help.png" border="0" alt="Online Help" title="Online Help"></a></td>
                               </tr>
                             </table>
                           </td>

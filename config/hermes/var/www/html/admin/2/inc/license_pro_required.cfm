@@ -42,8 +42,8 @@ Required variable:
                     <h5><i class="fas fa-info-circle me-2"></i>How to Upgrade</h5>
                     <p class="mb-2">To unlock Pro features, please contact:</p>
                     <ul class="mb-0">
-                        <li>Email: <a href="mailto:sales@deeztek.com">sales@deeztek.com</a></li>
-                        <li>Website: <a href="https://www.deeztek.com" target="_blank">www.deeztek.com</a></li>
+                        <li>Email: <a href="mailto:sales@hermesseg.io">sales@hermesseg.io</a></li>
+                        <li>Website: <a href="https://www.hermesseg.io" target="_blank">www.hermesseg.io</a></li>
                     </ul>
                 </div>
 

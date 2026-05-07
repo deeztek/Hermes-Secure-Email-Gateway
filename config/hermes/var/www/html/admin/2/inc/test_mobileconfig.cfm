@@ -13,11 +13,11 @@ valid Apple plist XML that iOS will accept, before the wizard UI exists.
 Usage from a browser (admin UI session, after Authelia login):
 
   /admin/2/inc/test_mobileconfig.cfm
-      ?email=bob@deeztek.com
+      ?email=bob@domain.tld
       &display=Bob+Smith
       &imap=<actual-imap-password>
       &dav=<actual-dav-password>
-      &host=mail.deeztek.com
+      &host=mail.domain.tld
       [&inline=1]            <- show in browser instead of downloading
 
 Without `inline=1` the response sets Content-Type to
@@ -45,7 +45,7 @@ Required: email, password (single app password — used for IMAP/SMTP/CalDAV/Car
 Optional: display (defaults to email), inline=1 (display XML in browser instead of downloading)
 
 Example:
-  ?email=bob@deeztek.com&display=Bob+Smith&password=APP-PASSWORD&host=mail.deeztek.com
+  ?email=bob@domain.tld&display=Bob+Smith&password=APP-PASSWORD&host=mail.domain.tld
 
 ##224 Phase 2 hand-invoke harness for DEV testing only. Will be
 superseded by the user-portal wizard.</cfoutput>

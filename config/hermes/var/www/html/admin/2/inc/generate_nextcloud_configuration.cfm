@@ -36,7 +36,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncDbPassword">
 <cfset ncDbPassword = Trim(ncDbPassword)>
 
-<!--- DERIVE MAIL DOMAIN FROM CONSOLE HOST (e.g., smtp-dev.deeztek.com → deeztek.com) --->
+<!--- DERIVE MAIL DOMAIN FROM CONSOLE HOST (e.g., smtp-dev.domain.tld -> domain.tld) --->
 <cfset ncMailDomain = ListRest(consoleHost, ".")>
 
 <!--- GET HOST IP from parameters2 (managed from Server Setup page) --->

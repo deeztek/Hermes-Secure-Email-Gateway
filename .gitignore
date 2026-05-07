@@ -118,9 +118,7 @@ Docker/common/opt/hermes/ssl/*
 
 # All CA directories (contain private keys and certs)
 config/hermes/opt/hermes/CA/
-config/hermes/opt/hermes/root_ca/
 Docker/common/opt/hermes/CA/
-Docker/common/opt/hermes/root_ca/
 
 # Lucee password
 config/commandbox/opt/CommandBox/web-contexts/*/WEB-INF/lucee-server/context/password.txt

@@ -1,6 +1,6 @@
 {
   "version": "260119",
-  "generated": "2026-05-05T14:56:58Z",
+  "generated": "2026-05-07T18:13:02Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -8,7 +8,7 @@
     "schedule/acme_validate_ip.cfm": "93a5826890106214abce74a9077608c96d77e882a91790b38a09cfbd05545389",
     "schedule/generate_smtp_sni.cfm": "07cb8658dbc06250764386333696bc7c7df63279c0eb85b5abce3a58f966252d",
     "admin/2/inc/license_check.cfm": "07585ba63546e088a1c9b96ba09ad07910f2f5320abc0d13563ca2be7afcdc49",
-    "admin/2/inc/license_invalid.cfm": "bd3dc27eabf4eb5b4bcc0267368dd9dbc5424a26bcfc9a4039229ce367a76e7c",
+    "admin/2/inc/license_invalid.cfm": "dafbe635856064026969556c4f3bf2545602587a342b6532f4efca48fc6ed28d",
     "admin/2/inc/setsession.cfm": "ec9d81ac28d04f5f33f7cb43cc41fd251a3b72146cab788b152b7f5310e8b131",
     "admin/2/inc/add_serial_number.cfm": "ceedccaccb2dc940b18258d7da08202dfbe8d9a3a1f645bf547dd7af4c9c5d05",
     "admin/2/inc/manifest_verify.cfm": "38f4ea4a91a60ba0daf59afa89e213500a09cf599122dbc2a126d408aedeee42",
@@ -20,10 +20,10 @@
     "admin/2/view_antivirus_signature_feeds.cfm": "96382d593b0ac0793cec0dc9d8b1f00062d9634a9a676d66d53de25e6a608fa4",
     "admin/2/edit_antivirus_signature_feed.cfm": "4241126bad6fbac37899376527385ca8d5c3415681deb71d8d8b9643243c310b",
     "admin/2/view_disclaimers.cfm": "87a7543d38852208d2a87098f70c69e04fe04f472b150d892a289e111b28718e",
-    "admin/2/edit_disclaimer.cfm": "449ea0c44ca04d826b8afc8553dd28e8db0a1515dd60265f532fc9e9f04ddaac",
-    "admin/2/save_disclaimer_action.cfm": "6f73743868008a070c65b9a13ee62fa92d4e4663f1fc123277d4559b4f0e8475",
+    "admin/2/edit_disclaimer.cfm": "213c3a54da5dcbfbf900a9f52e286843c0a9b799030df7be7321611f0b7b2889",
+    "admin/2/save_disclaimer_action.cfm": "eed59faf1c0ef2f3332baf2b7b13ef768f043d7a9078759719fb5afc1d1102fa",
     "admin/2/disclaimer_delete.cfm": "97892cbe2074169ac0e49599818ede83e8d918eef0603e53b1298f2d47b90700",
-    "admin/2/inc/disclaimer_write_and_reload.cfm": "11bd10412163be9d4c5818ef3289ba6dd0a8c24ed5b8d7f34f856262664187d3"
+    "admin/2/inc/disclaimer_write_and_reload.cfm": "7fba23fba2811bc4ec3a00d83b269653d86458214eb2c303dd29f101caba1db5"
   },
-  "fingerprint": "a15b90927b638ed4a67d1ac23b4ef154b03c5bc48939ed600a48d62f6b8a96b8"
+  "fingerprint": "99c2a6c4c80726a158e4e11f67fa7f63d40a459bfcf135d610412685037bc343"
 }
