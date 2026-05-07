@@ -63,11 +63,16 @@ work happens in the action handler.
   <div class="col-12">
     <div class="alert alert-info mb-0">
       <h6 class="mb-2"><i class="icon fas fa-info-circle"></i> Installing the profile</h6>
+      <p class="mb-2">After clicking <strong>Generate Setup Profile</strong> you'll see two ways to get the file onto your Apple device. Pick whichever fits where you are:</p>
+      <ul class="mb-2">
+        <li><strong>Scan the QR code</strong> with the camera on the iPhone, iPad, or Mac you want to set up &mdash; quickest if the wizard is open on a different machine. The device fetches the profile directly over your network.</li>
+        <li><strong>Download on this device</strong> &mdash; click the download button to save the <code>.mobileconfig</code> locally; if you ran the wizard from a desktop and need it on a phone instead, AirDrop or email the saved file across.</li>
+      </ul>
+      <p class="mb-1"><strong>Then on the device:</strong></p>
       <ol class="mb-0">
-        <li>Open the downloaded <code>.mobileconfig</code> file on your iPhone, iPad, or Mac (email it to yourself, AirDrop it, or download it directly on the device).</li>
         <li><strong>iPhone / iPad:</strong> Settings &rarr; General &rarr; VPN &amp; Device Management &rarr; tap the profile &rarr; Install.</li>
         <li><strong>macOS:</strong> System Settings &rarr; Privacy &amp; Security &rarr; Profiles &rarr; double-click the profile &rarr; Install.</li>
-        <li>If iOS prompts for a password during install, paste it from the profile note (or simply tap Skip — iOS will pull it from the profile automatically in many cases).</li>
+        <li>If iOS prompts for a password during install, paste it from the profile note (or simply tap Skip &mdash; iOS will pull it from the profile automatically in many cases).</li>
       </ol>
     </div>
   </div>
