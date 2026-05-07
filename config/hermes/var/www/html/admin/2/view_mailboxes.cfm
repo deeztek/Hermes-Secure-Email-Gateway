@@ -492,6 +492,70 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <input type="text" class="form-control" name="edit_display_name" id="editDisplayName">
           </div>
 
+          <!---
+            Personal Information (#226). Pro-only fields used by signature
+            placeholder substitution ({{user.first_name}}, {{user.title}},
+            {{user.phone}}, etc.) and by department signature resolution.
+            Visible but disabled in Community with an upsell badge; same
+            pattern as the domain Organization Information card. Action
+            handler skips the UPDATE on Community so existing values
+            survive a Pro->Community downgrade.
+          --->
+          <div class="form-group mb-3">
+            <a class="d-block text-decoration-none collapsed" data-bs-toggle="collapse"
+               href="#editPersonalInfo" role="button" aria-expanded="false">
+              <i class="fas fa-chevron-right me-1"></i>
+              <strong>Personal Information</strong>
+              <span class="text-muted small ms-1">(used in organizational signatures)</span>
+              <cfif isPro>
+                <span class="badge bg-success ms-2">PRO</span>
+              <cfelse>
+                <span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock"></i> PRO</span>
+              </cfif>
+            </a>
+            <div class="collapse mt-2 ps-3 border-start" id="editPersonalInfo">
+              <cfif NOT isPro>
+                <div class="alert alert-warning py-2 mb-3 small">
+                  <i class="fas fa-star text-warning me-1"></i>
+                  <strong>Available in Pro Edition.</strong>
+                  Personal information is used for signature placeholder substitution
+                  (<code>{{user.first_name}}</code>, <code>{{user.title}}</code>, etc.)
+                  and department-based signature templates.
+                  <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
+                </div>
+              </cfif>
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label small mb-1">First Name</label>
+                  <input type="text" class="form-control" name="edit_first_name" id="editFirstName" maxlength="64" <cfif NOT isPro>disabled</cfif>>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label small mb-1">Last Name</label>
+                  <input type="text" class="form-control" name="edit_last_name" id="editLastName" maxlength="64" <cfif NOT isPro>disabled</cfif>>
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Title</label>
+                <input type="text" class="form-control" name="edit_title" id="editTitle" maxlength="128" placeholder="e.g. Senior Engineer" <cfif NOT isPro>disabled</cfif>>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-2">
+                  <label class="form-label small mb-1">Phone</label>
+                  <input type="text" class="form-control" name="edit_phone" id="editPhone" maxlength="64" placeholder="e.g. +1 555 555 0100" <cfif NOT isPro>disabled</cfif>>
+                </div>
+                <div class="col-md-6 mb-2">
+                  <label class="form-label small mb-1">Mobile</label>
+                  <input type="text" class="form-control" name="edit_mobile" id="editMobile" maxlength="64" <cfif NOT isPro>disabled</cfif>>
+                </div>
+              </div>
+              <div class="mb-2">
+                <label class="form-label small mb-1">Department</label>
+                <input type="text" class="form-control" name="edit_department" id="editDepartment" maxlength="64" placeholder="e.g. Sales, Engineering" <cfif NOT isPro>disabled</cfif>>
+                <small class="text-muted">Determines which signature template applies. Leave blank to use the domain default.</small>
+              </div>
+            </div>
+          </div>
+
           <!--- Quota --->
           <div class="form-group mb-3">
             <label><strong>Mailbox Quota (GB)</strong></label>
@@ -891,6 +955,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $('#editMailboxId').val(mb.id);
         $('#editEmail').val(mb.username);
         $('#editDisplayName').val(mb.name);
+        $('#editFirstName').val(mb.first_name || '');
+        $('#editLastName').val(mb.last_name || '');
+        $('#editTitle').val(mb.title || '');
+        $('#editPhone').val(mb.phone || '');
+        $('#editMobile').val(mb.mobile || '');
+        $('#editDepartment').val(mb.department || '');
         $('#editQuotaGb').val(mb.quota_gb);
         $('#editActive').val(mb.active);
         $('#editPolicy').val(mb.policy_id);

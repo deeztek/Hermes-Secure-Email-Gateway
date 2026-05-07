@@ -115,6 +115,26 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cfset form.edit_nextcloud_enabled = 0>
 </cfif>
 
+<!--- PERSONAL INFORMATION (#226). Pro-only fields used by signature
+     placeholder substitution. On Community we skip the UPDATE columns
+     entirely so a tampered form post can't write data, and existing
+     values survive a Pro->Community downgrade. --->
+<cfset editIsPro = isDefined("session.edition") AND session.edition EQ "Pro">
+<cfif editIsPro>
+    <cfparam name="form.edit_first_name" default="">
+    <cfparam name="form.edit_last_name"  default="">
+    <cfparam name="form.edit_title"      default="">
+    <cfparam name="form.edit_phone"      default="">
+    <cfparam name="form.edit_mobile"     default="">
+    <cfparam name="form.edit_department" default="">
+    <cfset editFirstName  = Left(Trim(form.edit_first_name), 64)>
+    <cfset editLastName   = Left(Trim(form.edit_last_name),  64)>
+    <cfset editTitle      = Left(Trim(form.edit_title),     128)>
+    <cfset editPhone      = Left(Trim(form.edit_phone),      64)>
+    <cfset editMobile     = Left(Trim(form.edit_mobile),     64)>
+    <cfset editDepartment = Left(Trim(form.edit_department), 64)>
+</cfif>
+
 <!--- VALIDATE 2FA ENFORCEMENT (#225) --->
 <cfparam name="form.edit_enforce_mfa" default="0">
 <cfif form.edit_enforce_mfa NEQ "0" AND form.edit_enforce_mfa NEQ "1">
@@ -138,6 +158,14 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
         quota             = <cfqueryparam value="#editQuotaBytes#"              cfsqltype="cf_sql_bigint">,
         active            = <cfqueryparam value="#form.edit_active#"            cfsqltype="cf_sql_integer">,
         nextcloud_enabled = <cfqueryparam value="#form.edit_nextcloud_enabled#" cfsqltype="cf_sql_tinyint">,
+        <cfif editIsPro>
+        first_name        = <cfqueryparam value="#editFirstName#"  cfsqltype="cf_sql_varchar" null="#(editFirstName  EQ '')#">,
+        last_name         = <cfqueryparam value="#editLastName#"   cfsqltype="cf_sql_varchar" null="#(editLastName   EQ '')#">,
+        title             = <cfqueryparam value="#editTitle#"      cfsqltype="cf_sql_varchar" null="#(editTitle      EQ '')#">,
+        phone             = <cfqueryparam value="#editPhone#"      cfsqltype="cf_sql_varchar" null="#(editPhone      EQ '')#">,
+        mobile            = <cfqueryparam value="#editMobile#"     cfsqltype="cf_sql_varchar" null="#(editMobile     EQ '')#">,
+        department        = <cfqueryparam value="#editDepartment#" cfsqltype="cf_sql_varchar" null="#(editDepartment EQ '')#">,
+        </cfif>
         modified = NOW()
     WHERE id = <cfqueryparam value="#form.mailbox_id#" cfsqltype="cf_sql_integer">
 </cfquery>

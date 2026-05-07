@@ -28,6 +28,14 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
        against the bg-body-tertiary page background. */
     .ql-container { min-height: 220px; background: ##fff; }
     .ql-toolbar   { background: ##f8f9fa; }
+    /* Visual cue: clicked image gets a thick blue ring + glow so it's
+       unambiguously highlighted. Drives which image the width-picker
+       buttons resize. */
+    .ql-editor img.quill-image-selected {
+        outline: 3px solid ##0d6efd;
+        outline-offset: 3px;
+        box-shadow: 0 0 0 1px ##fff, 0 4px 16px rgba(13,110,253,0.45);
+    }
 </style>
 
 <script>
@@ -64,6 +72,93 @@ $(document).ready(function() {
     // Pre-populate from the hidden textarea (its value is the stored HTML).
     var existingHtml = $('#body_html').val();
     if (existingHtml) { quill.root.innerHTML = existingHtml; }
+
+    // Image width picker. Quill 2.x has no native resize handles; this
+    // is the lightweight alternative (click image, pick size). Bind on
+    // both 'click' and 'mousedown' (capture phase) so we catch the
+    // image hit before any internal Quill handling re-renders the DOM.
+    // Use closest('img') so a click on a child element of the image
+    // still resolves correctly. Sets inline style="width:..." on the
+    // img; disclaimer_write_and_reload.cfm preserves the style
+    // attribute through the cid: rewrite at save time.
+    var lastClickedImage = null;
+    function clearImageSelection() {
+        quill.root.querySelectorAll('img.quill-image-selected')
+            .forEach(function(img) { img.classList.remove('quill-image-selected'); });
+        lastClickedImage = null;
+        updateSelectionStatus();
+    }
+    function updateSelectionStatus() {
+        var $s = $('#imageSelectionStatus');
+        if (!$s.length) return;
+        if (lastClickedImage) {
+            var cur = lastClickedImage.style.width || 'auto';
+            $s.removeClass('text-muted').addClass('text-primary fw-semibold')
+              .html('<i class="fas fa-check-circle me-1"></i>Image selected (current width: ' + cur + ')');
+        } else {
+            $s.removeClass('text-primary fw-semibold').addClass('text-muted')
+              .html('<i class="fas fa-info-circle me-1"></i>No image selected &mdash; click an image in the editor first');
+        }
+    }
+    function selectImage(img) {
+        clearImageSelection();
+        img.classList.add('quill-image-selected');
+        lastClickedImage = img;
+        updateSelectionStatus();
+    }
+    function imageFromEvent(e) {
+        var t = e.target;
+        if (!t) return null;
+        if (t.tagName === 'IMG') return t;
+        return (t.closest && t.closest('img')) || null;
+    }
+    function editorClickHandler(e) {
+        var img = imageFromEvent(e);
+        if (img && quill.root.contains(img)) {
+            selectImage(img);
+        } else if (quill.root.contains(e.target)) {
+            clearImageSelection();
+        }
+    }
+    quill.root.addEventListener('mousedown', editorClickHandler, true);
+    quill.root.addEventListener('click',     editorClickHandler, true);
+    updateSelectionStatus();
+
+    function applyWidth(w) {
+        if (!lastClickedImage) {
+            alert('Click on an image in the editor first to resize it.');
+            return;
+        }
+        if (w === 'auto' || w === '') {
+            lastClickedImage.style.width = '';
+            lastClickedImage.style.height = '';
+        } else {
+            lastClickedImage.style.width = w;
+            lastClickedImage.style.height = 'auto';
+        }
+        updateSelectionStatus();
+    }
+    $('.quill-image-width').on('click', function() {
+        applyWidth($(this).data('width'));
+    });
+    $('#customImageWidthBtn').on('click', function() {
+        if (!lastClickedImage) {
+            alert('Click on an image in the editor first to resize it.');
+            return;
+        }
+        var v = parseInt($('#customImageWidth').val(), 10);
+        if (isNaN(v) || v < 10 || v > 2000) {
+            alert('Enter a width between 10 and 2000 pixels.');
+            return;
+        }
+        applyWidth(v + 'px');
+    });
+    $('#customImageWidth').on('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            $('#customImageWidthBtn').click();
+        }
+    });
 
     // HTML -> plain text helper. Preserves block-level newlines, drops tags,
     // collapses 3+ newlines to 2. Good enough for the auto-derived
@@ -108,6 +203,9 @@ $(document).ready(function() {
 
     // --- On submit: sync Quill -> hidden textarea + auto-derive text ---
     $('form[name="edit_disclaimer"]').on('submit', function() {
+        // Strip the visual selection class from any image so it doesn't
+        // leak into the stored html / outbound mail.
+        clearImageSelection();
         var html  = quill.root.innerHTML;
         var empty = quillIsEmpty();
         $('#body_html').val(empty ? '' : html);
@@ -324,6 +422,31 @@ $(document).ready(function() {
         <div class="form-group mb-3">
             <label class="form-label"><strong>Body</strong></label>
             <div id="quill_editor"></div>
+
+            <!-- Image width picker. Click an image in the editor to
+                 select it (a blue ring + glow appears), then pick a
+                 preset width or type a custom value. Stored as inline
+                 style="width:..." on the img tag and preserved through
+                 the cid: rewrite at save time. -->
+            <div class="mt-2 mb-2">
+                <small class="d-block mb-1 text-muted" id="imageSelectionStatus">
+                    <i class="fas fa-info-circle me-1"></i>No image selected &mdash; click an image in the editor first
+                </small>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <small class="text-muted me-1"><i class="fas fa-image me-1"></i> Width:</small>
+                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="100px">100 px</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="150px">150 px</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="200px">200 px</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="300px">300 px</button>
+                    <div class="input-group input-group-sm" style="width:170px;">
+                        <input type="number" class="form-control" id="customImageWidth" min="10" max="2000" placeholder="Custom" aria-label="Custom width in pixels">
+                        <span class="input-group-text">px</span>
+                        <button type="button" class="btn btn-outline-secondary" id="customImageWidthBtn">Apply</button>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="auto">Reset</button>
+                </div>
+            </div>
+
             <!-- Hidden textarea -- Quill writes its HTML here on form submit. -->
             <cfoutput>
             <textarea id="body_html" name="body_html" style="display:none;">#HTMLEditFormat(existingHtml)#</textarea>

@@ -103,20 +103,25 @@ re-validation).
 <cfset ncEnabled  = (form.nextcloud_enabled IS "1") ? 1 : 0>
 <cfset enforceMfa = (form.enforce_mfa       IS "1") ? 1 : 0>
 
-<!--- #226: org info + per-domain user-portal signature toggle. All
-     fields optional Community-tier metadata used by user signatures
-     as {{org.*}} placeholders. Trim and clamp to schema lengths;
-     NULL on empty so the column reads back as NULL not "". --->
-<cfparam name="form.org_name"               default="">
-<cfparam name="form.org_phone"              default="">
-<cfparam name="form.org_address"            default="">
-<cfparam name="form.org_website"            default="">
+<!--- #226: per-domain user-portal signature toggle (both tiers) +
+     org info (Pro-only). The toggle gates the user-portal editor in
+     either tier; org placeholders ({{org.name}} etc.) only resolve in
+     Pro. Org fields are skipped from the UPDATE on Community so a
+     tampered form post can't write data, and existing values survive
+     a Pro->Community downgrade. --->
 <cfparam name="form.allow_user_signatures"  default="0">
-<cfset orgName    = Left(Trim(form.org_name),     255)>
-<cfset orgPhone   = Left(Trim(form.org_phone),     64)>
-<cfset orgAddress = Trim(form.org_address)>
-<cfset orgWebsite = Left(Trim(form.org_website),  255)>
 <cfset allowUserSignaturesFlag = (Trim(form.allow_user_signatures) EQ "1") ? 1 : 0>
+
+<cfif isPro>
+  <cfparam name="form.org_name"     default="">
+  <cfparam name="form.org_phone"    default="">
+  <cfparam name="form.org_address"  default="">
+  <cfparam name="form.org_website"  default="">
+  <cfset orgName    = Left(Trim(form.org_name),     255)>
+  <cfset orgPhone   = Left(Trim(form.org_phone),     64)>
+  <cfset orgAddress = Trim(form.org_address)>
+  <cfset orgWebsite = Left(Trim(form.org_website),  255)>
+</cfif>
 
 <!--- Update mailbox metadata on domains row.
      enforce_mfa here is the DOMAIN-level default for new mailboxes. It
@@ -125,16 +130,18 @@ re-validation).
      this explicit to admins. --->
 <cfquery datasource="hermes">
   UPDATE domains
-  SET default_quota_mb       = <cfqueryparam cfsqltype="cf_sql_integer"     value="#quotaMb#">,
-      catchall_mailbox       = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#trim(form.catchall_mailbox)#" null="#(trim(form.catchall_mailbox) IS '')#">,
-      nextcloud_enabled      = <cfqueryparam cfsqltype="cf_sql_tinyint"     value="#ncEnabled#">,
-      enforce_mfa            = <cfqueryparam cfsqltype="cf_sql_tinyint"     value="#enforceMfa#">,
+  SET default_quota_mb       = <cfqueryparam cfsqltype="cf_sql_integer"   value="#quotaMb#">,
+      catchall_mailbox       = <cfqueryparam cfsqltype="cf_sql_varchar"   value="#trim(form.catchall_mailbox)#" null="#(trim(form.catchall_mailbox) IS '')#">,
+      nextcloud_enabled      = <cfqueryparam cfsqltype="cf_sql_tinyint"   value="#ncEnabled#">,
+      enforce_mfa            = <cfqueryparam cfsqltype="cf_sql_tinyint"   value="#enforceMfa#">,
+      <cfif isPro>
       org_name               = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgName#"    null="#(orgName    EQ '')#">,
       org_phone              = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgPhone#"   null="#(orgPhone   EQ '')#">,
       org_address            = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#orgAddress#" null="#(orgAddress EQ '')#">,
       org_website            = <cfqueryparam cfsqltype="cf_sql_varchar"     value="#orgWebsite#" null="#(orgWebsite EQ '')#">,
-      allow_user_signatures  = <cfqueryparam cfsqltype="cf_sql_tinyint"     value="#allowUserSignaturesFlag#">,
-      updated_at             = <cfqueryparam cfsqltype="cf_sql_timestamp"   value="#Now()#">
+      </cfif>
+      allow_user_signatures  = <cfqueryparam cfsqltype="cf_sql_tinyint"   value="#allowUserSignaturesFlag#">,
+      updated_at             = <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">
   WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.domain_id#">
 </cfquery>
 

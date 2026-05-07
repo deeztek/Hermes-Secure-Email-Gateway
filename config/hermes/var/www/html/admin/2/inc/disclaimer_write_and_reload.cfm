@@ -135,10 +135,16 @@ session.disclaimerApplyError holds the error message if false.
          rewrites HTML with cid: refs. The base64 stays in DB only.
 
          Image filename uses 1-based index in the order Quill emitted
-         them. Extension derived from the data: URL's media type. --->
+         them. Extension derived from the data: URL's media type.
+
+         Replaces JUST the src attribute inside each <img>, preserving
+         other attributes (style, width, height, alt, class) so the
+         editor's width picker inline style="width:200px" survives
+         the rewrite. --->
     <cfset imageIndex = 0>
     <cfset rewrittenHtml = body_html>
     <cfset imgPattern = "<img\s+[^>]*src\s*=\s*[""']data:image/(png|jpeg|jpg|gif);base64,([^""']+)[""'][^>]*>">
+    <cfset srcAttrPattern = "src\s*=\s*[""']data:image/(?:png|jpeg|jpg|gif);base64,[^""']+[""']">
     <cfset imgMatches = REMatchNoCase(imgPattern, body_html)>
     <cfloop array="#imgMatches#" index="imgTag">
         <cfset imageIndex = imageIndex + 1>
@@ -157,12 +163,15 @@ session.disclaimerApplyError holds the error message if false.
                     output="#binData#">
 
             <cfset cid = "disclaimer_" & optionName & "_img_" & imageIndex>
-            <cfset newTag = "<img src=""cid:" & cid & """>">
+            <cfset newSrc = "src=""cid:" & cid & """">
+            <!--- Replace only the src attribute inside this img tag,
+                 keeping other attributes (style, width, alt) intact. --->
+            <cfset newImgTag = REReplaceNoCase(imgTag, srcAttrPattern, newSrc, "one")>
             <!--- Replace the FIRST occurrence in rewrittenHtml. Multiple
                  identical base64 tags (same image pasted twice) are
                  handled correctly because each loop iteration replaces
                  the first remaining instance with a fresh cid. --->
-            <cfset rewrittenHtml = Replace(rewrittenHtml, imgTag, newTag, "one")>
+            <cfset rewrittenHtml = Replace(rewrittenHtml, imgTag, newImgTag, "one")>
         </cfif>
     </cfloop>
 

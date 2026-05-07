@@ -25,6 +25,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset sidebarSharingEnabled = (getSidebarSharingEnabled.recordcount GTE 1 AND getSidebarSharingEnabled.value2 EQ "yes")>
 
+<!--- #226: Personal Signature link visibility. Gated on the user's
+     domain.allow_user_signatures flag - if the admin disabled
+     user-managed signatures for this domain, the link is hidden and
+     view_signature.cfm renders a locked-out screen on direct hit. --->
+<cfquery name="getSidebarSignaturesEnabled" datasource="hermes">
+    SELECT d.allow_user_signatures
+    FROM mailboxes m
+    INNER JOIN domains d ON m.domain_id = d.id
+    WHERE m.username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
+</cfquery>
+<cfset sidebarSignaturesEnabled = (getSidebarSignaturesEnabled.recordcount GTE 1 AND Val(getSidebarSignaturesEnabled.allow_user_signatures) EQ 1)>
+
 <cfoutput>
 <!--begin::Sidebar-->
 <aside class="app-sidebar bg-body-secondary shadow" data-bs-theme="dark">
@@ -96,6 +108,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Vacation Auto-Reply</strong></p>
           </a>
         </li>
+        <cfif sidebarSignaturesEnabled>
+        <li class="nav-item">
+          <a href="view_signature.cfm" class="nav-link">
+            <i class="nav-icon fas fa-signature"></i>
+            <p><strong>Personal Signature</strong></p>
+          </a>
+        </li>
+        </cfif>
         <cfif sidebarSharingEnabled>
         <li class="nav-item">
           <a href="view_shared_folders.cfm" class="nav-link">

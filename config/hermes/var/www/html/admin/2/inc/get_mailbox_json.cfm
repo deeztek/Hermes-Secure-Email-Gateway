@@ -33,6 +33,7 @@ Expects: form.id (mailbox.id)
 
 <cfquery name="getMailbox" datasource="hermes">
     SELECT m.id, m.username, m.name, m.quota, m.active, m.domain_id, m.nextcloud_enabled,
+           m.first_name, m.last_name, m.title, m.phone, m.mobile, m.department,
            r.enforce_mfa,
            d.domain, d.default_quota_mb,
            r.id AS recipient_id, r.policy_id, r.auth_type, r.remoteauth_domain,
@@ -70,7 +71,13 @@ Expects: form.id (mailbox.id)
     "download_msg": "#JSStringFormat(getMailbox.download_msg)#",
     "nextcloud_enabled": #getMailbox.nextcloud_enabled#,
     "enforce_mfa": #getMailbox.enforce_mfa#,
-    "timezone": "#JSStringFormat(getMailbox.timezone)#"
+    "timezone": "#JSStringFormat(getMailbox.timezone)#",
+    "first_name": "#JSStringFormat(getMailbox.first_name)#",
+    "last_name": "#JSStringFormat(getMailbox.last_name)#",
+    "title": "#JSStringFormat(getMailbox.title)#",
+    "phone": "#JSStringFormat(getMailbox.phone)#",
+    "mobile": "#JSStringFormat(getMailbox.mobile)#",
+    "department": "#JSStringFormat(getMailbox.department)#"
 }
 </cfprocessingdirective>
 </cfoutput>

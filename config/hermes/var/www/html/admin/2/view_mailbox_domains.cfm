@@ -276,7 +276,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <p class="mb-0">
     Upgrade to <strong>Pro Edition</strong> to automatically manage Let's Encrypt SAN certificates for
     your mailbox domains &mdash; zero-touch validation, issuance, and renewal.
-    <a href="https://www.deeztek.com/hermes-secure-email-gateway/" target="_blank">Learn More &rarr;</a>
+    <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
   </p>
 </div>
 </cfif>
@@ -361,7 +361,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="alert alert-warning mt-2 mb-0 py-2 small ms-4">
               <i class="fas fa-star text-warning"></i>
               <strong>Upgrade to Pro Edition</strong> to unlock automatic certificate management.
-              <a href="https://www.deeztek.com/hermes-secure-email-gateway/" target="_blank">Learn More &rarr;</a>
+              <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
             </div>
             </cfif>
           </div>
@@ -406,6 +406,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <label class="form-check-label" for="add_enforce_mfa">
           <strong>Require Two-Factor Authentication for this domain</strong>
         </label>
+      </div>
+
+      <div class="alert alert-info py-2 mb-3 small">
+        <i class="fas fa-info-circle me-1"></i>
+        <strong>Optional settings available after creation.</strong>
+        Click <em>Edit</em> on the domain row below to control whether users can manage their own email signatures<cfif isPro>, and to add organization information (name, phone, address, website) for signature placeholder substitution</cfif>.
       </div>
 
       <div class="row">
@@ -643,36 +649,51 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
             <!--- ============================================================
                  Organization Information (#226)
-                 Per-domain metadata used by (Pro) auto-generated user
-                 signatures as {{org.name}}, {{org.phone}}, {{org.address}},
-                 {{org.website}}, {{org.logo}}. All optional. Community-tier
-                 metadata; admins may also reference these manually in their
-                 disclaimer or signature Quill editors.
+                 Per-domain metadata used by Pro signature placeholder
+                 substitution: {{org.name}}, {{org.phone}}, {{org.address}},
+                 {{org.website}}, {{org.logo}}. Pro-only feature; inputs are
+                 disabled in Community with an upsell badge.
                  ============================================================ --->
             <hr>
 
-            <h6 class="mb-2"><i class="fas fa-building me-1"></i>Organization Information</h6>
-            <p class="form-text text-muted mb-3"><i class="fas fa-info-circle me-1"></i> Used by user signatures as <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code>, <code>{{org.website}}</code>, <code>{{org.logo}}</code> placeholders. All fields optional.</p>
+            <h6 class="mb-2">
+              <i class="fas fa-building me-1"></i>Organization Information
+              <cfif isPro>
+                <span class="badge bg-success ms-2">PRO</span>
+              <cfelse>
+                <span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock"></i> PRO</span>
+              </cfif>
+            </h6>
+            <cfif isPro>
+              <p class="form-text text-muted mb-3"><i class="fas fa-info-circle me-1"></i> Used by signature placeholders <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code>, <code>{{org.website}}</code>, <code>{{org.logo}}</code>. All fields optional.</p>
+            <cfelse>
+              <div class="alert alert-warning py-2 mb-3 small">
+                <i class="fas fa-star text-warning me-1"></i>
+                <strong>Available in Pro Edition.</strong>
+                Organization information is used for signature placeholder substitution and LDAP auto-generated signatures.
+                <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
+              </div>
+            </cfif>
 
             <div class="row">
               <div class="col-md-6 mb-3">
                 <label class="form-label"><strong>Organization Name</strong></label>
-                <input type="text" class="form-control" name="org_name" id="edit_org_name" maxlength="255" placeholder="e.g. Acme Inc.">
+                <input type="text" class="form-control" name="org_name" id="edit_org_name" maxlength="255" placeholder="e.g. Acme Inc." <cfif NOT isPro>disabled</cfif>>
               </div>
               <div class="col-md-6 mb-3">
                 <label class="form-label"><strong>Organization Phone</strong></label>
-                <input type="text" class="form-control" name="org_phone" id="edit_org_phone" maxlength="64" placeholder="e.g. +1 555 555 0100">
+                <input type="text" class="form-control" name="org_phone" id="edit_org_phone" maxlength="64" placeholder="e.g. +1 555 555 0100" <cfif NOT isPro>disabled</cfif>>
               </div>
             </div>
 
             <div class="mb-3">
               <label class="form-label"><strong>Organization Address</strong></label>
-              <textarea class="form-control" name="org_address" id="edit_org_address" rows="3" placeholder="123 Main Street&#10;Suite 400&#10;Anytown, CA 90210"></textarea>
+              <textarea class="form-control" name="org_address" id="edit_org_address" rows="3" placeholder="123 Main Street&#10;Suite 400&#10;Anytown, CA 90210" <cfif NOT isPro>disabled</cfif>></textarea>
             </div>
 
             <div class="mb-3">
               <label class="form-label"><strong>Organization Website</strong></label>
-              <input type="text" class="form-control" name="org_website" id="edit_org_website" maxlength="255" placeholder="https://www.example.com">
+              <input type="text" class="form-control" name="org_website" id="edit_org_website" maxlength="255" placeholder="https://www.example.com" <cfif NOT isPro>disabled</cfif>>
             </div>
 
             <!--- org_logo_path UI deferred to a follow-up integrating with

@@ -567,6 +567,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
       </div>
 
+      <cfif isPro>
+      <div class="alert alert-info py-2 mb-3 small">
+        <i class="fas fa-info-circle me-1"></i>
+        <strong>Optional settings available after creation.</strong>
+        Click <em>Edit Options</em> on the mailbox row to add personal information
+        (first/last name, title, phone, mobile, department) used in organizational email signatures.
+      </div>
+      </cfif>
+
       <!--- SUBMIT --->
       <div class="box-footer">
         <input type="submit" class="btn btn-primary" value="Create Mailbox" onclick="this.disabled=true;this.value='Please wait...';this.form.submit();">

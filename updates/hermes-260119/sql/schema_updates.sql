@@ -2144,3 +2144,27 @@ CREATE TABLE IF NOT EXISTS user_signatures (
     UNIQUE KEY uniq_username (username)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================================================
+-- MAILBOX PERSONAL-INFO COLUMNS (#226) - signature placeholder sources
+--
+-- Optional fields used by Pro signature placeholder substitution
+-- ({{user.first_name}}, {{user.title}}, {{user.phone}}, etc.) and by
+-- the department-signature lookup (department).
+--
+-- mailboxes.name (display name) already exists and remains the canonical
+-- source for {{user.name}} - these new columns are supplementary and
+-- all NULL-allowed so existing rows keep working unchanged.
+--
+-- department drives signature resolution: milter looks up
+-- domain_signatures WHERE (domain_id, department_label = mailboxes.department).
+-- NULL department falls through to the domain-default signature.
+-- Manual admin assignment in both tiers; no LDAP attribute pull (the
+-- payoff didn't justify the extra code path - see project notes).
+-- ============================================================================
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS first_name VARCHAR(64)  NULL;
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS last_name  VARCHAR(64)  NULL;
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS title      VARCHAR(128) NULL;
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS phone      VARCHAR(64)  NULL;
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS mobile     VARCHAR(64)  NULL;
+ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS department VARCHAR(64)  NULL;
+
