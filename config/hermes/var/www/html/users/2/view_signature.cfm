@@ -357,9 +357,13 @@ $(document).ready(function() {
         </div>
       </div>
 
-      <!--- Hidden textareas - Quill writes to these on submit --->
-      <textarea id="body_html" name="body_html" style="display:none;"><cfoutput>#existingBodyHtml#</cfoutput></textarea>
-      <textarea id="body_text" name="body_text" style="display:none;"><cfoutput>#existingBodyText#</cfoutput></textarea>
+      <!--- Hidden textareas - Quill writes to these on submit. Body
+           values must be HTMLEditFormat-encoded so a stored
+           </textarea> in the body can't break out of the textarea and
+           inject script on the next page render (self-XSS guard,
+           mirrors edit_disclaimer.cfm). --->
+      <textarea id="body_html" name="body_html" style="display:none;"><cfoutput>#HTMLEditFormat(existingBodyHtml)#</cfoutput></textarea>
+      <textarea id="body_text" name="body_text" style="display:none;"><cfoutput>#HTMLEditFormat(existingBodyText)#</cfoutput></textarea>
 
       <p class="form-text text-muted mt-2">
         <i class="fas fa-image me-1"></i><strong>Inline images:</strong>
