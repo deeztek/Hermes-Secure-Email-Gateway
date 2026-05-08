@@ -154,6 +154,20 @@ session.signatureApplyError holds the error message if false.
         </cfif>
     </cfloop>
 
+    <!--- Tighten paragraph margins. Quill 2.x normalizes inline <br>
+         line breaks into separate <p> blocks; default browser margins
+         on <p> (~1em top + bottom) create visible gaps between
+         contact-info lines that should render compact in the mail
+         client. Inject inline style="margin:0.4em 0;" on every <p>
+         that doesn't already have a style attribute (templates that
+         hardcode their own paragraph styles are preserved). Done
+         server-side so the spacing is baked into the delivered html
+         and survives mail clients that strip <style> blocks. --->
+    <cfset rewrittenHtml = REReplaceNoCase(rewrittenHtml,
+        "<p>",
+        "<p style=""margin:0.4em 0;"">",
+        "all")>
+
     <cfset htmlOut = rewrittenHtml & Chr(10)>
 
     <cffile action="write" file="#userDir#/body.txt"  output="#txtOut#"  charset="utf-8" addnewline="no">

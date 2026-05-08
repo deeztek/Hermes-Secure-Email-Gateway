@@ -85,6 +85,13 @@ Save flow:
 <style>
     .ql-container { min-height: 220px; background: ##fff; }
     .ql-toolbar   { background: ##f8f9fa; }
+    /* Quill 2.x normalizes <br> into paragraph breaks; default browser
+       <p> margins (1em top + bottom) make contact-info lines render
+       far apart in the editor. Tighten the in-editor spacing here;
+       the same tightening is applied via inline style at save time
+       (signature_write_and_reload.cfm) for delivered mail, and via
+       the previewSigHtml JS helper for the Preview pane. */
+    .ql-editor p { margin: 0.4em 0; }
     /* Visual cue: clicked image gets a thick blue ring + glow + a
        checkmark badge so it's unambiguously highlighted. Quill's own
        click handling can be subtle, so we make the selection state
@@ -104,6 +111,11 @@ $(document).ready(function() {
         theme: 'snow',
         placeholder: 'Type your signature here...',
         modules: {
+            // Quill 2.x native table module. Toolbar has no built-in
+            // button for it; we ship dedicated insert-size buttons
+            // below the editor so users get explicit 2x2 / 2x3 / 3x3
+            // / 3x4 picks instead of always-default 1x1.
+            table: true,
             toolbar: [
                 [{ 'header': [1, 2, 3, false] }],
                 ['bold', 'italic', 'underline', 'strike'],
@@ -215,14 +227,209 @@ $(document).ready(function() {
         }
     });
 
+    // Table inserter. Routes to Quill 2.x's native table module.
+    // Insertion happens at the current cursor position; Quill handles
+    // wrapping/positioning. Resize / merge cells aren't part of the
+    // native module -- if users ask for them later we layer on a
+    // third-party module.
+    $('.insert-table').on('click', function() {
+        var rows = parseInt($(this).data('rows'), 10);
+        var cols = parseInt($(this).data('cols'), 10);
+        var tableModule = quill.getModule('table');
+        if (!tableModule) {
+            alert('Table support is not loaded. Reload the page and try again.');
+            return;
+        }
+        // Make sure Quill has focus + a valid cursor position; without
+        // a current selection the table module silently no-ops.
+        if (!quill.getSelection()) {
+            quill.focus();
+            quill.setSelection(quill.getLength(), 0);
+        }
+        tableModule.insertTable(rows, cols);
+    });
+
+    // Signature template gallery. Curated starter layouts that load
+    // into the editor with one click.
+    //
+    // Quill 2.x is a rich-text editor, not an HTML layout tool: it
+    // normalizes pasted HTML against its own format model and strips
+    // inline styles on <a>/<td>, padding, borders, and structural
+    // CSS it doesn't recognize. So templates here use ONLY formats
+    // Quill preserves: <p>, <br>, <strong>, <em>, plain <a href>,
+    // <img>, lists. No styled buttons (they render as plain links
+    // anyway after Quill normalizes), no <table>-based layouts (Quill's
+    // native table module has its own structure that pasted tables
+    // don't match), no inline-block social badges. Logos and other
+    // visual assets enter through Quill's image upload toolbar button,
+    // not via template-shipped placeholders.
+    //
+    // Templates use literal placeholder text ("Your Name", "you@domain.tld")
+    // instead of {{user.*}} / {{org.*}} so they work in both tiers --
+    // Pro placeholder substitution is only available at milter render
+    // time, so a Community user picking a template would otherwise see
+    // literal {{user.*}} in their delivered mail. Pro users who want
+    // auto-fill swap the literals for placeholders manually.
+    //
+    // Phase 2 Organizational Signatures will support richer layouts
+    // (two-column, styled buttons, custom HTML) via server-side template
+    // rendering that bypasses Quill's normalization.
+    var signatureTemplates = {
+        minimal: {
+            label: 'Minimal -- name + contact only',
+            html: '<p><strong>Your Name</strong></p>' +
+                  '<p>Your Title</p>' +
+                  '<p>Email: <a href="mailto:you@domain.tld">you@domain.tld</a><br>' +
+                  'Phone: +1 555 555 0100</p>'
+        },
+        with_logo: {
+            label: 'With logo placeholder',
+            html: '<p><em>(Click the image button in the toolbar above to insert your logo here)</em></p>' +
+                  '<p><strong>Your Name</strong></p>' +
+                  '<p>Your Title<br>Your Organization</p>' +
+                  '<p>Email: <a href="mailto:you@domain.tld">you@domain.tld</a><br>' +
+                  'Phone: +1 555 555 0100<br>' +
+                  'Web: <a href="https://www.example.com">www.example.com</a></p>'
+        },
+        with_meeting: {
+            label: 'With Schedule-a-Meeting link',
+            html: '<p><strong>Your Name</strong> &mdash; Your Title</p>' +
+                  '<p>Email: <a href="mailto:you@domain.tld">you@domain.tld</a><br>' +
+                  'Phone: +1 555 555 0100</p>' +
+                  '<p>Book time on my calendar: <a href="https://calendly.com/your-handle">https://calendly.com/your-handle</a></p>'
+        },
+        with_social: {
+            label: 'With social media icons',
+            html: '<p><strong>Your Name</strong></p>' +
+                  '<p>Your Title | Your Organization</p>' +
+                  '<p>Email: <a href="mailto:you@domain.tld">you@domain.tld</a><br>' +
+                  'Phone: +1 555 555 0100</p>' +
+                  '<p>' +
+                  '<a href="https://linkedin.com/in/your-handle"><img src="{{ICON:linkedin}}" alt="LinkedIn" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://x.com/your-handle"><img src="{{ICON:x}}" alt="X" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://github.com/your-handle"><img src="{{ICON:github}}" alt="GitHub" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://instagram.com/your-handle"><img src="{{ICON:instagram}}" alt="Instagram" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://facebook.com/your-handle"><img src="{{ICON:facebook}}" alt="Facebook" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://www.example.com"><img src="{{ICON:globe}}" alt="Website" width="24" height="24"></a>' +
+                  '</p>'
+        },
+        comprehensive: {
+            label: 'Comprehensive -- logo + contact + meeting + social',
+            html: '<p><em>(Click the image button in the toolbar above to insert your logo here)</em></p>' +
+                  '<p><strong>Your Name</strong></p>' +
+                  '<p>Your Title<br>Your Organization</p>' +
+                  '<p>Email: <a href="mailto:you@domain.tld">you@domain.tld</a><br>' +
+                  'Office: +1 555 555 0100<br>' +
+                  'Mobile: +1 555 555 0101</p>' +
+                  '<p>Web: <a href="https://www.example.com">www.example.com</a><br>' +
+                  'Address: 123 Main St, Anytown, ST 12345</p>' +
+                  '<p>Book a call: <a href="https://calendly.com/your-handle">https://calendly.com/your-handle</a></p>' +
+                  '<p>' +
+                  '<a href="https://linkedin.com/in/your-handle"><img src="{{ICON:linkedin}}" alt="LinkedIn" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://x.com/your-handle"><img src="{{ICON:x}}" alt="X" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://github.com/your-handle"><img src="{{ICON:github}}" alt="GitHub" width="24" height="24" style="margin-right:4px;"></a>' +
+                  '<a href="https://www.example.com"><img src="{{ICON:globe}}" alt="Website" width="24" height="24"></a>' +
+                  '</p>'
+        }
+    };
+
+    // Async loader. Templates may contain {{ICON:slug}} placeholders
+    // referencing PNGs in /users/2/inc/social_icons/. We fetch each
+    // referenced icon, convert the bytes to a base64 data: URL via
+    // FileReader, and substitute into the template HTML. Quill then
+    // sees an <img src="data:image/png;base64,..."> which it preserves
+    // through its image format, and signature_write_and_reload.cfm's
+    // existing extractor turns it into a cid: ref + multipart/related
+    // attachment at save time.
+    //
+    // Failures (404 missing icon, network error) leave the placeholder
+    // empty -- the template still loads, the icon just doesn't appear.
+    // That's a graceful degrade so a missing icon never blocks the
+    // user from saving.
+    function resolveIconPlaceholders(html) {
+        var matches = html.match(/\{\{ICON:([\w-]+)\}\}/g);
+        if (!matches || matches.length === 0) {
+            return Promise.resolve(html);
+        }
+        var unique = Array.from(new Set(matches.map(function(m) {
+            return m.match(/\{\{ICON:([\w-]+)\}\}/)[1];
+        })));
+        var fetches = unique.map(function(slug) {
+            return fetch('/users/2/inc/social_icons/' + slug + '.png')
+                .then(function(r) { return r.ok ? r.blob() : null; })
+                .then(function(blob) {
+                    if (!blob) return [slug, null];
+                    return new Promise(function(resolve, reject) {
+                        var reader = new FileReader();
+                        reader.onload = function() { resolve([slug, reader.result]); };
+                        reader.onerror = function() { resolve([slug, null]); };
+                        reader.readAsDataURL(blob);
+                    });
+                })
+                .catch(function() { return [slug, null]; });
+        });
+        return Promise.all(fetches).then(function(pairs) {
+            var resolved = html;
+            pairs.forEach(function(pair) {
+                var slug = pair[0];
+                var dataUrl = pair[1];
+                var pattern = new RegExp('\\{\\{ICON:' + slug + '\\}\\}', 'g');
+                resolved = resolved.replace(pattern, dataUrl || '');
+            });
+            return resolved;
+        });
+    }
+
+    $('#templatePicker').on('change', function() {
+        var key = $(this).val();
+        if (!key || !signatureTemplates[key]) { return; }
+        var current = quill.getText().trim();
+        var hasContent = current.length > 0;
+        if (hasContent && !confirm('Replace the current signature with this template? This cannot be undone.')) {
+            $(this).val('');
+            return;
+        }
+        var $picker = $(this);
+        $picker.prop('disabled', true);
+        resolveIconPlaceholders(signatureTemplates[key].html).then(function(html) {
+            try {
+                var delta = quill.clipboard.convert({ html: html });
+                quill.setContents(delta, 'silent');
+            } catch (e) {
+                console.error('Template load failed for', key, e);
+                alert('Template "' + key + '" failed: ' + e.message);
+            } finally {
+                $picker.val('').prop('disabled', false);
+            }
+        }).catch(function(err) {
+            console.error('Icon placeholder resolution failed:', err);
+            $picker.val('').prop('disabled', false);
+        });
+    });
+
+    // Inject inline margin:0.4em on every <p> without an existing
+    // style attribute. Mirrors the server-side transformation in
+    // signature_write_and_reload.cfm so the Preview pane and the
+    // delivered mail render with consistent tight paragraph spacing.
+    // Done as a string transformation rather than via DOM manipulation
+    // so it operates on Quill's exact innerHTML output.
+    function tightenParagraphSpacing(html) {
+        return html.replace(/<p(\s[^>]*)?>/g, function(match, attrs) {
+            if (attrs && attrs.indexOf('style=') !== -1) {
+                return match;  // already styled, leave it alone
+            }
+            return '<p style="margin:0.4em 0;"' + (attrs || '') + '>';
+        });
+    }
+
     // Preview: render the current signature inline below a fake message
     // body so the user sees the final composed look (signature is ~10%
     // smaller and grey-toned, mirroring the disclaimer preview pattern).
     $('#previewBtn').on('click', function() {
         var html  = quill.root.innerHTML;
         var empty = quillIsEmpty();
-        var sigHtml = empty ? '' : html;
-        var sample = '<p>Hi,</p><p>Thanks for getting back to me. I will follow up with the details shortly.</p>';
+        var sigHtml = empty ? '' : tightenParagraphSpacing(html);
+        var sample = '<p style="margin:0.4em 0;">Hi,</p><p style="margin:0.4em 0;">Thanks for getting back to me. I will follow up with the details shortly.</p>';
         var combined;
         if (sigHtml.trim().length > 0) {
             combined = sample + '<div style="margin-top:1em;padding-top:0.5em;border-top:1px solid ##ccc;font-size:0.9em;color:##555;">' + sigHtml + '</div>';
@@ -331,7 +538,38 @@ $(document).ready(function() {
       </div>
 
       <label class="form-label"><strong>Signature</strong></label>
+
+      <!--- Template gallery. Curated starter layouts that load into
+           the editor with one click. Pick before customizing; resets
+           the dropdown after each pick so re-selecting the same
+           template works. --->
+      <div class="mb-2 d-flex align-items-center gap-2 flex-wrap">
+        <label for="templatePicker" class="form-label small mb-0 me-1">
+          <i class="fas fa-magic me-1"></i> Start from a template:
+        </label>
+        <select class="form-select form-select-sm" id="templatePicker" style="max-width:320px;">
+          <option value="">&mdash; Choose a template &mdash;</option>
+          <option value="minimal">Minimal &mdash; name + contact only</option>
+          <option value="with_logo">With logo placeholder</option>
+          <option value="with_meeting">With Schedule-a-Meeting link</option>
+          <option value="with_social">With social media icons</option>
+          <option value="comprehensive">Comprehensive &mdash; logo + contact + meeting + social</option>
+        </select>
+        <small class="text-muted">Replaces current content. Customize the placeholder text + URLs after loading.</small>
+      </div>
+
       <div id="quill_editor"></div>
+
+      <!--- Table inserter. Quill 2.x's native table button isn't part
+           of the standard toolbar, so we surface common sizes as
+           explicit buttons below the editor. --->
+      <div class="mt-2 mb-2 d-flex align-items-center gap-2 flex-wrap">
+        <small class="text-muted me-1"><i class="fas fa-table me-1"></i> Insert table:</small>
+        <button type="button" class="btn btn-sm btn-outline-secondary insert-table" data-rows="2" data-cols="2">2 &times; 2</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary insert-table" data-rows="2" data-cols="3">2 &times; 3</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary insert-table" data-rows="3" data-cols="3">3 &times; 3</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary insert-table" data-rows="3" data-cols="4">3 &times; 4</button>
+      </div>
 
       <!--- Image width picker. Click an image in the editor to select
            it (a blue ring + glow appears), then pick a preset width or
@@ -368,7 +606,7 @@ $(document).ready(function() {
       <p class="form-text text-muted mt-2">
         <i class="fas fa-image me-1"></i><strong>Inline images:</strong>
         paste or upload PNG, JPEG, or GIF images directly into the editor. They are embedded
-        inline in outbound mail. Limits: <strong>5 images max</strong>, <strong>200 KB per image</strong>,
+        inline in outbound mail. Limits: <strong>10 images max</strong>, <strong>200 KB per image</strong>,
         <strong>1 MB total</strong>. SVG and WebP are not supported.
       </p>
 

@@ -67,7 +67,10 @@ we reject it instead of trusting the form action exposed by the page.
 
      Decoded size approximation: base64 chars produce 3 bytes per 4 chars. --->
 <cfset MAX_IMG_SIZE_BYTES = 200 * 1024>
-<cfset MAX_IMG_COUNT = 5>
+<!--- Bumped to 10 (was 5) so users can pair a logo with up to 4-6
+     social-media icons + a headshot without hitting the cap. The
+     1 MB total budget below still bounds outbound message bloat. --->
+<cfset MAX_IMG_COUNT = 10>
 <cfset MAX_TOTAL_SIZE_BYTES = 1024 * 1024>
 <cfset ALLOWED_IMG_FORMATS = "png,jpeg,jpg,gif">
 
