@@ -434,6 +434,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>Disclaimers</p>
               </a>
             </li>
+            <li class="nav-item">
+              <a href="view_org_signatures.cfm" class="nav-link">
+                <i class="nav-icon fas fa-id-card"></i>
+                <p>
+                  Org Signatures
+                  <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
+                  </cfif>
+                </p>
+              </a>
+            </li>
           </ul>
         </li>
         <!--- EMAIL POLICIES ENDS HERE --->

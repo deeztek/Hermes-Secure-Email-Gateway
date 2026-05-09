@@ -2168,3 +2168,39 @@ ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS phone      VARCHAR(64)  NULL;
 ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS mobile     VARCHAR(64)  NULL;
 ALTER TABLE mailboxes ADD COLUMN IF NOT EXISTS department VARCHAR(64)  NULL;
 
+-- ============================================================================
+-- ORGANIZATIONAL SIGNATURES (#226 Phase 2A) - admin-managed Pro templates
+--
+-- Per-domain default + optional per-department variants. Each row points
+-- at one of the bundled templates under
+-- /admin/2/inc/org_signature_templates/<template_key>.cfm and stores the
+-- admin's form-field values in fields_json.
+--
+-- rendered_html is the pre-substituted HTML with {{user.*}}/{{org.*}}/
+-- {{dept.*}} placeholders still in place. The body milter substitutes
+-- those at message render time against the recipient's mailboxes.* and
+-- domains.org_* rows. Admin save = full re-render; CLI script can
+-- regenerate all org_signatures of a given template_key when a template
+-- file is updated.
+--
+-- (domain_id, department_label) is unique. department_label IS NULL is
+-- the domain default; non-NULL rows match mailboxes.department for
+-- per-department overrides. MariaDB treats NULLs as distinct in unique
+-- keys, so multiple per-department rows + one default coexist cleanly.
+--
+-- enabled is TINYINT(3) per the Lucee/MariaDB JDBC TINYINT(1)->Boolean
+-- coercion gotcha (per feedback_tinyint_boolean memory).
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS org_signatures (
+    id               INT AUTO_INCREMENT PRIMARY KEY,
+    domain_id        INT NOT NULL,
+    department_label VARCHAR(64) NULL,
+    template_key     VARCHAR(64) NOT NULL,
+    fields_json      LONGTEXT NOT NULL,
+    rendered_html    LONGTEXT NOT NULL,
+    enabled          TINYINT(3) NOT NULL DEFAULT 1,
+    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_domain_dept (domain_id, department_label)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+
