@@ -5,13 +5,13 @@ This file is part of Hermes Secure Email Gateway Pro Edition.
 --->
 
 <!---
-DELETE ORGANIZATIONAL SIGNATURE ACTION (#226 Phase 2A).
+DELETE ORGANIZATIONAL SIGNATURE ACTION (#226 Phase 2A + 2B).
 
-GET ?id=N -> delete the row, redirect to view_org_signatures.cfm.
-Confirmation happens client-side on the list page (window.confirm).
-
-Phase 2B will additionally remove the per-row file from the body
-milter signatures dir + regenerate the resolution map + reload.
+GET ?id=N -> delete the row, wipe its per-option dir under
+/etc/hermes/body_milter/signatures/files/, regenerate
+signature_by_sender + sender_data.json, redirect to
+view_org_signatures.cfm. Confirmation happens client-side on the
+list page (window.confirm).
 --->
 
 <cfinclude template="./inc/license_check.cfm" />
@@ -48,6 +48,16 @@ milter signatures dir + regenerate the resolution map + reload.
 <cfquery datasource="hermes">
     DELETE FROM org_signatures WHERE id = <cfqueryparam value="#url.id#" cfsqltype="cf_sql_integer">
 </cfquery>
+
+<!--- Phase 2B body-milter wiring: wipe the per-option dir + rebuild
+     the resolution map. Order matters: write_files / delete_files
+     first so the regen step sees the fresh on-disk state, then
+     signature_regen_map points the map at fallback (dept -> default
+     -> none) for any mailboxes that lost their signature. --->
+<cfset orgSignatureDeleteRowId = url.id>
+<cfinclude template="inc/org_signature_delete_files.cfm" />
+<cfset signatureRegenSilent = true>
+<cfinclude template="inc/signature_regen_map.cfm" />
 
 <cfset variantLabel = Len(getRow.department_label) ? ("'" & getRow.department_label & "' department") : "domain default">
 <cfset session.org_sig_msg = "<strong>Deleted.</strong> " & HTMLEditFormat(variantLabel) & " signature for " & HTMLEditFormat(getRow.domain) & " removed.">

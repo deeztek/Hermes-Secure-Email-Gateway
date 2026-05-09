@@ -78,6 +78,7 @@ Postfix-side configuration (in main.cf)
   milter_protocol     = 6
 """
 
+import json
 import logging
 import os
 import re
@@ -230,6 +231,75 @@ class SenderMap:
             domain = sender.split('@', 1)[1]
             m = self._map.get('@' + domain)
         return m
+
+
+# ---------------------------------------------------------------------------
+# Sender placeholder-substitution data map (#226 Phase 2B)
+# ---------------------------------------------------------------------------
+
+class SenderDataMap:
+    """
+    JSON-keyed sender -> {namespace.field: value} substitution dict.
+    Self-refreshes on mtime change.
+
+    Source file format (written by the CFML resolver):
+        {
+          "alice@example.com": {
+            "user.first_name": "Alice",
+            "user.last_name":  "Smith",
+            "org.name":        "Acme",
+            ...
+          },
+          ...
+        }
+
+    Modifiers call lookup(sender) to get a dict for the sender
+    (empty dict if no entry), then pass it to
+    Modifier._substitute_placeholders() to fill {{user.*}} /
+    {{org.*}} / {{dept.*}} tokens in the on-disk signature template.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._map: dict = {}
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            try:
+                with open(self.path, 'r') as f:
+                    parsed = json.load(f)
+            except (IOError, ValueError) as e:
+                log.warning('cannot load %s: %s', self.path, e)
+                return
+            if not isinstance(parsed, dict):
+                log.warning('sender_data: %s did not parse as object', self.path)
+                return
+            # Lowercase BOTH sender keys (outer) and namespace.field
+            # keys (inner). Lucee 5's SerializeJSON uppercases struct
+            # keys by default, so the JSON file we read has keys like
+            # "USER.FIRST_NAME"; the milter substitutes against
+            # lowercase token names, so normalize on load. Drop entries
+            # whose value isn't an object (defensive).
+            new_map = {}
+            for k, v in parsed.items():
+                if isinstance(v, dict):
+                    new_map[k.lower()] = {
+                        ik.lower(): iv for ik, iv in v.items()
+                    }
+            self._map = new_map
+            self._mtime = m
+            log.info('reloaded %s: %d entries', self.path, len(new_map))
+
+    def lookup(self, sender: str) -> dict:
+        self.refresh()
+        return self._map.get(sender.lower(), {})
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +546,83 @@ class Modifier:
         if any change was made."""
         raise NotImplementedError
 
+    # -----------------------------------------------------------------
+    # Placeholder substitution helper (#226 Phase 2B)
+    # -----------------------------------------------------------------
+    # Token shape: {{namespace.field}} where namespace is a short
+    # identifier (user, org, dept, ...) and field is the data attribute
+    # within that namespace. Reusable across modifiers - any future
+    # modifier (External Sender Banner #228, Link Guard, etc.) can call
+    # _substitute_placeholders against its own SenderDataMap-backed
+    # data dict.
+    PLACEHOLDER_RE = re.compile(r'\{\{\s*([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\s*\}\}', re.IGNORECASE)
+
+    def _substitute_placeholders(self, text: str, data: dict) -> str:
+        """Replace {{namespace.field}} tokens in text with values from
+        data. Tokens whose key is missing in data resolve to empty
+        string so missing personal-info fields render as blank rather
+        than literal {{user.title}} in delivered mail.
+
+        Case-insensitive match; data keys are expected lowercase
+        'namespace.field' format (the CFML resolver writes them that
+        way)."""
+        if not text or '{{' not in text:
+            return text
+
+        def repl(m: 're.Match') -> str:
+            key = (m.group(1) + '.' + m.group(2)).lower()
+            val = data.get(key, '')
+            return val if isinstance(val, str) else str(val)
+
+        return self.PLACEHOLDER_RE.sub(repl, text)
+
+    # Pattern for "label-only" leaf divs after substitution. Matches
+    # things like "M:", "Phone:", "Tel: " - a short word/letters,
+    # optional whitespace, a colon, optional trailing whitespace, and
+    # nothing else. Bound by the regex to under 12 chars so we don't
+    # accidentally drop a div whose body happens to contain a colon
+    # (e.g. a long disclaimer "Note: this message is...").
+    _LABEL_ONLY_RE = re.compile(r'^\s*[A-Za-z]{1,12}\s*:\s*$')
+
+    def _drop_empty_contact_lines(self, html: str) -> str:
+        """Walk substituted HTML and drop leaf <div> elements that:
+          - contain no text content at all (a {{user.title}} that
+            substituted to empty in a div with no label), OR
+          - contain only a label-prefix like "M:" or "Phone:" (the
+            placeholder substituted to empty but the label is still
+            there), OR
+          - contain only separators / punctuation, no alphanumerics
+            (a pipe-joined contact line where every value substituted
+            to empty leaves "|  |  |" behind).
+
+        Skips divs that hold meaningful media or block layout
+        (img, table, ul, ol, hr) so we don't accidentally drop a
+        logo-bearing or layout cell. <a>, <span>, <strong> etc. are
+        treated as inline content - if their text content is also
+        empty/label-only the parent div drops."""
+        if not html or '<div' not in html.lower():
+            return html
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+        except Exception:
+            return html
+        for div in list(soup.find_all('div')):
+            # Preserve any div that contains structural / media content.
+            if div.find(['img', 'table', 'ul', 'ol', 'hr']):
+                continue
+            text = div.get_text(strip=True)
+            if not text:
+                div.decompose()
+                continue
+            if self._LABEL_ONLY_RE.match(text):
+                div.decompose()
+                continue
+            # No letters or digits anywhere - the content collapsed to
+            # punctuation / separators only. Drop.
+            if not re.search(r'[A-Za-z0-9]', text):
+                div.decompose()
+        return str(soup)
+
 
 # ---------------------------------------------------------------------------
 # DisclaimerModifier (the only modifier shipped in v1)
@@ -691,12 +838,14 @@ class SignatureModifier(Modifier):
     DIR = os.path.join(CONFIG_ROOT, 'signatures')
     FILES_DIR = os.path.join(DIR, 'files')
     MAP_PATH = os.path.join(DIR, 'signature_by_sender')
+    DATA_PATH = os.path.join(DIR, 'sender_data.json')
 
     SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
     CID_REF_RE = re.compile(r'cid:(signature_[\w.-]+_img_\d+)')
 
     def __init__(self):
         self.map = SenderMap(self.MAP_PATH)
+        self.data_map = SenderDataMap(self.DATA_PATH)
 
     def applies_to(self, ctx: MessageContext) -> bool:
         if not super().applies_to(ctx):
@@ -725,6 +874,40 @@ class SignatureModifier(Modifier):
         except IOError as e:
             log.warning('signature: cannot read per-user files: %s', e)
             return
+
+        # #226 Phase 2B: substitute {{user.*}} / {{org.*}} / {{dept.*}}
+        # placeholders against the sender's data. Personal Sigs typically
+        # contain no placeholders (user types literal text) so this is a
+        # no-op for them. Org Sigs store admin-form-rendered html with
+        # {{...}} tokens still in place; this is where they get filled
+        # in per recipient.
+        #
+        # Run substitution even if sender_data.lookup() returned {}
+        # so unknown placeholders cleanly resolve to "" instead of
+        # leaking literal {{org.name}} into delivered mail (race
+        # window between map and JSON reload, or sender not yet in
+        # the regenerated data file).
+        sender_data = self.data_map.lookup(ctx.sender)
+        txt_sig = self._substitute_placeholders(txt_sig, sender_data)
+        html_sig = self._substitute_placeholders(html_sig, sender_data)
+
+        # Drop now-empty contact lines. The CFML template's <cfif> gates
+        # only see the literal {{user.mobile}} string at admin save time
+        # (length > 0, so the line is rendered). The milter substitutes
+        # to empty here, leaving either a fully empty <div> or a
+        # label-only <div> like "<div><span>M:</span> </div>". The
+        # sanitizer drops both shapes so recipients don't see orphan
+        # labels.
+        html_sig = self._drop_empty_contact_lines(html_sig)
+
+        # Visual separation between the message body and the signature.
+        # Plain text gets two newlines via _append_to_parts; HTML needs
+        # an explicit spacer because BeautifulSoup's body.append puts
+        # the signature directly after the last child of <body> with
+        # no margin. Wrapping in a div with margin-top renders as a
+        # blank line in every major MUA. Only applies to signatures -
+        # disclaimers run in their own Modifier and don't get this.
+        html_sig = '<div style="margin-top:24px;">' + html_sig + '</div>'
 
         msg = ctx.email_message()
         plain_n, html_n = self._append_to_parts(msg, txt_sig, html_sig)

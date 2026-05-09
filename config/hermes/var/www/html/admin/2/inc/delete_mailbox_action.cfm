@@ -365,6 +365,16 @@ Removes a mailbox user from all systems:
     DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
 </cfquery>
 
+<!--- #226 Phase 2B: drop the deleted mailbox from signature_by_sender
+     and sender_data.json so the milter no longer carries a stale
+     reference. Soft-fail; deletion shouldn't block on body milter
+     state. --->
+<cftry>
+    <cfset signatureRegenSilent = true>
+    <cfinclude template="signature_regen_map.cfm">
+<cfcatch type="any"></cfcatch>
+</cftry>
+
 <!--- SUCCESS --->
 <cfset session.m = 3>
 <cflocation url="view_mailboxes.cfm" addtoken="no">

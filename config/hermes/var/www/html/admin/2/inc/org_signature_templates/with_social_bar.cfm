@@ -21,34 +21,37 @@ template = {
     description: "Vertical contact stack with a prominent horizontal social media icon strip at the bottom.",
     thumbnail:   "with_social_bar.png",
     fields: [
-        { name: "user_name",      label: "Name",          type: "text",  default: "",
+        { name: "user_name", autoFill: true,      label: "Name",          type: "text",  default: "{{user.first_name}} {{user.last_name}}",
           placeholder: "Jane Smith" },
-        { name: "user_title",     label: "Title",         type: "text",  default: "",
+        { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
 
         { name: "logo_url",       label: "Logo",          type: "image", default: "",
           help: "Upload a small logo to show inline above the name (PNG, JPG, GIF, or SVG, up to 1 MB). Leave blank for a logo-less layout." },
+        { name: "logo_width",     label: "Logo width (px)", type: "text", default: "120",
+          placeholder: "120",
+          help: "Width in pixels. Outlook ignores max-width CSS so an explicit value is required." },
 
         { name: "accent_color",   label: "Accent color",  type: "color", default: "##d97706",
           help: "Used for the divider line, social bar background, and CTA button." },
 
         { name: "show_phone",     label: "Show phone",    type: "checkbox", default: true },
-        { name: "user_phone",     label: "Phone",         type: "text",  default: "",
+        { name: "user_phone", autoFill: true,     label: "Phone",         type: "text",  default: "{{user.phone}}",
           placeholder: "+1 (555) 123-4567",
           showIf: "show_phone" },
 
         { name: "show_email",     label: "Show email",    type: "checkbox", default: true },
-        { name: "user_email",     label: "Email",         type: "email", default: "",
+        { name: "user_email", autoFill: true,     label: "Email",         type: "email", default: "{{user.email}}",
           placeholder: "name@example.com",
           showIf: "show_email" },
 
         { name: "show_website",   label: "Show website",  type: "checkbox", default: true },
-        { name: "org_website",    label: "Website",       type: "url",   default: "",
+        { name: "org_website", autoFill: true,    label: "Website",       type: "url",   default: "{{org.website}}",
           placeholder: "https://www.example.com",
           showIf: "show_website" },
 
         { name: "show_address",   label: "Show address",  type: "checkbox", default: false },
-        { name: "org_address",    label: "Address",       type: "text",  default: "",
+        { name: "org_address", autoFill: true,    label: "Address",       type: "text",  default: "{{org.address}}",
           placeholder: "123 Main St, Suite 200, Springfield IL 62701",
           showIf: "show_address" },
 
@@ -80,7 +83,8 @@ template = {
 <cfif IsDefined("renderTemplate") AND renderTemplate>
 <cfoutput><div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:##222;line-height:1.45;max-width:480px;">
 <cfif Len(Trim(fields.logo_url))>
-<div style="margin-bottom:6px;"><img src="#fields.logo_url#" alt="Logo" style="max-width:120px;max-height:40px;height:auto;display:block;" /></div>
+<cfset socBarLogoW = Val(fields.logo_width) GT 0 ? Val(fields.logo_width) : 120>
+<div style="margin-bottom:6px;"><img src="#fields.logo_url#" alt="Logo" width="#socBarLogoW#" style="width:#socBarLogoW#px;height:auto;display:block;border:0;" /></div>
 </cfif>
 <div style="font-size:17px;font-weight:bold;color:##111;">#fields.user_name#</div>
 <cfif Len(Trim(fields.user_title))>

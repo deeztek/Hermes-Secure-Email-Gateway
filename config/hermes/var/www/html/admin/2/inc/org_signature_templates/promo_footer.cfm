@@ -23,26 +23,26 @@ template = {
     description: "Contact block on top, click-through promotional image below. Signature-as-marketing-asset.",
     thumbnail:   "promo_footer.png",
     fields: [
-        { name: "user_name",      label: "Name",          type: "text",  default: "",
+        { name: "user_name", autoFill: true,      label: "Name",          type: "text",  default: "{{user.first_name}} {{user.last_name}}",
           placeholder: "Jane Smith" },
-        { name: "user_title",     label: "Title",         type: "text",  default: "",
+        { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
 
         { name: "accent_color",   label: "Accent color",  type: "color", default: "##d97706",
           help: "Used for the divider line, label colors, and CTA accents." },
 
         { name: "show_phone",     label: "Show phone",    type: "checkbox", default: true },
-        { name: "user_phone",     label: "Phone",         type: "text",  default: "",
+        { name: "user_phone", autoFill: true,     label: "Phone",         type: "text",  default: "{{user.phone}}",
           placeholder: "+1 (555) 123-4567",
           showIf: "show_phone" },
 
         { name: "show_email",     label: "Show email",    type: "checkbox", default: true },
-        { name: "user_email",     label: "Email",         type: "email", default: "",
+        { name: "user_email", autoFill: true,     label: "Email",         type: "email", default: "{{user.email}}",
           placeholder: "name@example.com",
           showIf: "show_email" },
 
         { name: "show_website",   label: "Show website",  type: "checkbox", default: true },
-        { name: "org_website",    label: "Website",       type: "url",   default: "",
+        { name: "org_website", autoFill: true,    label: "Website",       type: "url",   default: "{{org.website}}",
           placeholder: "https://www.example.com",
           showIf: "show_website" },
 

@@ -24,39 +24,42 @@ template = {
     description: "Logo on the left, accent bar, contact details on the right. Clean and professional.",
     thumbnail:   "modern_card.png",
     fields: [
-        { name: "user_name",      label: "Name",          type: "text",  default: "",
+        { name: "user_name", autoFill: true,      label: "Name",          type: "text",  default: "{{user.first_name}} {{user.last_name}}",
           placeholder: "Jane Smith" },
-        { name: "user_title",     label: "Title",         type: "text",  default: "",
+        { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
 
         { name: "logo_url",       label: "Logo",          type: "image", default: "",
           help: "Upload a logo (PNG, JPG, GIF, or SVG, up to 1 MB). Leave blank to render without a logo." },
+        { name: "logo_width",     label: "Logo width (px)", type: "text", default: "120",
+          placeholder: "120",
+          help: "Width in pixels. Outlook ignores max-width CSS so an explicit value is required. Default 120 fits the card layout; raise for a more prominent logo." },
 
         { name: "accent_color",   label: "Accent color",  type: "color", default: "##d97706",
           help: "Pick from the brand palette or enter a custom hex code. Used for the divider, label colors, CTA button, and small accents." },
 
         { name: "show_phone",     label: "Show phone",    type: "checkbox", default: true },
-        { name: "user_phone",     label: "Phone",         type: "text",  default: "",
+        { name: "user_phone", autoFill: true,     label: "Phone",         type: "text",  default: "{{user.phone}}",
           placeholder: "+1 (555) 123-4567",
           showIf: "show_phone" },
 
         { name: "show_mobile",    label: "Show mobile",   type: "checkbox", default: false },
-        { name: "user_mobile",    label: "Mobile",        type: "text",  default: "",
+        { name: "user_mobile", autoFill: true,    label: "Mobile",        type: "text",  default: "{{user.mobile}}",
           placeholder: "+1 (555) 987-6543",
           showIf: "show_mobile" },
 
         { name: "show_email",     label: "Show email",    type: "checkbox", default: true },
-        { name: "user_email",     label: "Email",         type: "email", default: "",
+        { name: "user_email", autoFill: true,     label: "Email",         type: "email", default: "{{user.email}}",
           placeholder: "name@example.com",
           showIf: "show_email" },
 
         { name: "show_website",   label: "Show website",  type: "checkbox", default: true },
-        { name: "org_website",    label: "Website",       type: "url",   default: "",
+        { name: "org_website", autoFill: true,    label: "Website",       type: "url",   default: "{{org.website}}",
           placeholder: "https://www.example.com",
           showIf: "show_website" },
 
         { name: "show_address",   label: "Show address",  type: "checkbox", default: false },
-        { name: "org_address",    label: "Address",       type: "text",  default: "",
+        { name: "org_address", autoFill: true,    label: "Address",       type: "text",  default: "{{org.address}}",
           placeholder: "123 Main St, Suite 200, Springfield IL 62701",
           showIf: "show_address" },
 
@@ -105,7 +108,8 @@ template = {
 <tr>
 <cfif hasLogo>
 <td valign="top" style="padding:0 16px 0 0;border-right:3px solid #fields.accent_color#;">
-<img src="#fields.logo_url#" alt="Logo" style="max-width:120px;height:auto;display:block;" />
+<cfset modernLogoW = Val(fields.logo_width) GT 0 ? Val(fields.logo_width) : 120>
+<img src="#fields.logo_url#" alt="Logo" width="#modernLogoW#" style="width:#modernLogoW#px;height:auto;display:block;border:0;" />
 </td>
 </cfif>
 <td valign="top" style="padding:0 0 0 #rightPad#;">

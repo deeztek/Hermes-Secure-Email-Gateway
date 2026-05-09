@@ -22,39 +22,42 @@ template = {
     description: "Personal contact on the left, organization block + CTA on the right. Polished, business-card style.",
     thumbnail:   "two_column_pro.png",
     fields: [
-        { name: "user_name",      label: "Name",          type: "text",  default: "",
+        { name: "user_name", autoFill: true,      label: "Name",          type: "text",  default: "{{user.first_name}} {{user.last_name}}",
           placeholder: "Jane Smith" },
-        { name: "user_title",     label: "Title",         type: "text",  default: "",
+        { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
 
         { name: "logo_url",       label: "Logo",          type: "image", default: "",
           help: "Upload a logo (PNG, JPG, GIF, or SVG, up to 1 MB). Leave blank to render without a logo." },
+        { name: "logo_width",     label: "Logo width (px)", type: "text", default: "140",
+          placeholder: "140",
+          help: "Width in pixels. Outlook ignores max-width CSS so an explicit value is required." },
 
         { name: "accent_color",   label: "Accent color",  type: "color", default: "##d97706",
           help: "Used for the divider, label colors, and CTA button." },
 
         { name: "show_phone",     label: "Show phone",    type: "checkbox", default: true },
-        { name: "user_phone",     label: "Phone",         type: "text",  default: "",
+        { name: "user_phone", autoFill: true,     label: "Phone",         type: "text",  default: "{{user.phone}}",
           placeholder: "+1 (555) 123-4567",
           showIf: "show_phone" },
 
         { name: "show_mobile",    label: "Show mobile",   type: "checkbox", default: false },
-        { name: "user_mobile",    label: "Mobile",        type: "text",  default: "",
+        { name: "user_mobile", autoFill: true,    label: "Mobile",        type: "text",  default: "{{user.mobile}}",
           placeholder: "+1 (555) 987-6543",
           showIf: "show_mobile" },
 
         { name: "show_email",     label: "Show email",    type: "checkbox", default: true },
-        { name: "user_email",     label: "Email",         type: "email", default: "",
+        { name: "user_email", autoFill: true,     label: "Email",         type: "email", default: "{{user.email}}",
           placeholder: "name@example.com",
           showIf: "show_email" },
 
         { name: "show_website",   label: "Show website",  type: "checkbox", default: true },
-        { name: "org_website",    label: "Website",       type: "url",   default: "",
+        { name: "org_website", autoFill: true,    label: "Website",       type: "url",   default: "{{org.website}}",
           placeholder: "https://www.example.com",
           showIf: "show_website" },
 
         { name: "show_address",   label: "Show address",  type: "checkbox", default: true },
-        { name: "org_address",    label: "Address",       type: "text",  default: "",
+        { name: "org_address", autoFill: true,    label: "Address",       type: "text",  default: "{{org.address}}",
           placeholder: "123 Main St, Suite 200, Springfield IL 62701",
           showIf: "show_address" },
 
@@ -107,7 +110,8 @@ template = {
 <!--- RIGHT COLUMN: organization block + CTA --->
 <td valign="top" style="padding:0 0 0 18px;min-width:220px;">
 <cfif Len(Trim(fields.logo_url))>
-<div style="margin-bottom:8px;"><img src="#fields.logo_url#" alt="Logo" style="max-width:140px;max-height:50px;height:auto;" /></div>
+<cfset twoColLogoW = Val(fields.logo_width) GT 0 ? Val(fields.logo_width) : 140>
+<div style="margin-bottom:8px;"><img src="#fields.logo_url#" alt="Logo" width="#twoColLogoW#" style="width:#twoColLogoW#px;height:auto;display:block;border:0;" /></div>
 </cfif>
 <cfif fields.show_website AND Len(Trim(fields.org_website))>
 <div style="margin:3px 0;"><a href="#fields.org_website#" style="color:#fields.accent_color#;text-decoration:none;font-weight:bold;">#Replace(Replace(fields.org_website, 'https://', '', 'one'), 'http://', '', 'one')#</a></div>

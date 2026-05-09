@@ -174,35 +174,16 @@ session.signatureApplyError holds the error message if false.
     <cffile action="write" file="#userDir#/body.html" output="#htmlOut#" charset="utf-8" addnewline="no">
 </cfif>
 
-<!--- Rebuild the full signature_by_sender map from all enabled rows
-     with non-empty content. This catches:
-       - the current save (added/removed/edited)
-       - any other user's row that was deleted out-of-band but still
-         had a stale map entry from before
-     The map is small (one line per user) so a full rebuild on each
-     save is cheap and keeps the file-system view authoritative. --->
-<cfquery name="getAllEnabled" datasource="hermes">
-    SELECT username, body_text, body_html
-    FROM user_signatures
-    WHERE enabled = 1
-      AND (body_html IS NOT NULL OR body_text IS NOT NULL)
-    ORDER BY username ASC
-</cfquery>
-
-<cfset mapLines = "">
-<cfloop query="getAllEnabled">
-    <cfif Trim(body_html) NEQ "" OR Trim(body_text) NEQ "">
-        <cfset rowOption = "user_" & ReReplaceNoCase(Replace(username, "@", "_at_", "all"), "[^A-Za-z0-9_]", "_", "all")>
-        <cfset mapLines = mapLines & username & Chr(9) & rowOption & Chr(10)>
-    </cfif>
-</cfloop>
-
-<!--- Always write the map file even when empty. The milter mtime-stats
-     this path on every message and treats absence as a load failure. --->
-<cffile action="write" file="#mapFile#" output="#mapLines#" charset="utf-8" addnewline="no">
-
-<cfset session.signatureApplySuccess = true>
-<cfset session.signatureApplyError = "">
+<!--- Delegate the map + sender_data rebuild to the shared #226
+     Phase 2B resolver. It walks all enabled mailboxes, picks the
+     winning signature per sender (Personal -> Dept Org -> Default
+     Org -> none), writes signature_by_sender + sender_data.json,
+     and self-heals any org_<id> dir that wins for at least one
+     mailbox. The personal-sig file write above is unchanged; this
+     just replaces the inline map-only rebuild with the unified
+     resolver so user toggling enabled=0 cleanly cascades to the
+     org-sig fallback. --->
+<cfinclude template="../../admin/2/inc/signature_regen_map.cfm">
 
 <cfcatch type="any">
     <cfset session.signatureApplySuccess = false>

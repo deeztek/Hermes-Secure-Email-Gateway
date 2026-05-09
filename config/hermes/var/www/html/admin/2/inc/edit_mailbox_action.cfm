@@ -401,6 +401,21 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     </cftry>
 </cfif>
 
+<!--- #226 Phase 2B: any change to first_name/last_name/title/phone/
+     mobile/department feeds the body milter's substitution layer
+     (sender_data.json), and a department change can shift the
+     resolver winner (default Org Sig -> dept Org Sig). Rebuild map
+     + sender_data on every mailbox edit. Cheap (one query per
+     supporting table, no per-mailbox file writes unless an org sig
+     wins). --->
+<cfif editIsPro>
+    <cftry>
+        <cfset signatureRegenSilent = true>
+        <cfinclude template="signature_regen_map.cfm">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
+</cfif>
+
 <!--- SUCCESS --->
 <cfset session.m = 2>
 <cflocation url="view_mailboxes.cfm" addtoken="no">

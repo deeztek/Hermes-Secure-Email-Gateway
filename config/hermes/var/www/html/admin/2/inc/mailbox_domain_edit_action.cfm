@@ -169,6 +169,14 @@ re-validation).
 <!--- Re-sync mailbox_sans so cert bindings and subdomains match the edit --->
 <cfinclude template="./sync_mailbox_sans.cfm">
 
+<!--- #226 Phase 2B: any change to allow_user_signatures or the org_*
+     columns shifts the resolver winner per mailbox and changes the
+     {{org.*}} substitution data, so rebuild the body milter map and
+     sender_data.json. Cheap (one query per table, no per-mailbox
+     file writes unless an org sig wins). --->
+<cfset signatureRegenSilent = true>
+<cfinclude template="./signature_regen_map.cfm">
+
 <!--- Regenerate Nginx config (restart happens via preload page) --->
 <cfinclude template="./generate_nginx_configuration.cfm">
 

@@ -173,6 +173,10 @@ exactly what save_org_signature_action.cfm will store.
     ORDER BY domain ASC
 </cfquery>
 
+<!--- Per-domain dept name lists (sourced from mailboxes.department).
+     Sets variables.deptOptionsByDomain + deptOptionsByDomainJson. --->
+<cfinclude template="./inc/get_dept_options.cfm" />
+
 <!--- Load every available template's metadata so the gallery + form
      generator have it client-side without round-tripping. --->
 <cfinclude template="./inc/org_signature_template_loader.cfm" />
@@ -253,10 +257,27 @@ exactly what save_org_signature_action.cfm will store.
                 </div>
                 <div class="col-md-6 mb-3">
                     <label class="form-label"><strong>Department</strong> <small class="text-muted">(optional)</small></label>
-                    <input type="text" class="form-control" name="department_label" id="form_department_label" maxlength="64"
-                           placeholder="e.g. Sales, Support, HR"
-                           value="<cfoutput>#(isEdit ? HTMLEditFormat(existingRow.department_label) : '')#</cfoutput>">
-                    <p class="field-help mt-1 mb-0">Leave blank for the domain default. Non-blank values match <code>mailboxes.department</code> exactly at send time.</p>
+                    <select class="form-select" name="department_label" id="form_department_label">
+                        <option value="">&mdash; Domain default (all mailboxes) &mdash;</option>
+                        <!--- Server-side pre-populate covers both edit-mode and
+                             restore-after-dupe (existingRow gets populated in
+                             both flows). Pure add-mode falls through to the
+                             empty list and JS fills options on domain change. --->
+                        <cfif StructKeyExists(existingRow, "domain_id") AND IsNumeric(existingRow.domain_id) AND Val(existingRow.domain_id) GT 0>
+                            <cfset deptInitDomKey = ToString(Val(existingRow.domain_id))>
+                            <cfset deptInitList = StructKeyExists(variables.deptOptionsByDomain, deptInitDomKey) ? variables.deptOptionsByDomain[deptInitDomKey] : []>
+                            <cfset deptInitCurrent = StructKeyExists(existingRow, "department_label") ? Trim(existingRow.department_label) : "">
+                            <cfoutput>
+                                <cfloop array="#deptInitList#" index="dOpt">
+                                    <option value="#HTMLEditFormat(dOpt)#" <cfif Compare(deptInitCurrent, dOpt) EQ 0>selected</cfif>>#HTMLEditFormat(dOpt)#</option>
+                                </cfloop>
+                                <cfif Len(deptInitCurrent) AND NOT ArrayContains(deptInitList, deptInitCurrent)>
+                                    <option value="#HTMLEditFormat(deptInitCurrent)#" selected>#HTMLEditFormat(deptInitCurrent)# (no mailboxes)</option>
+                                </cfif>
+                            </cfoutput>
+                        </cfif>
+                    </select>
+                    <p class="field-help mt-1 mb-0">Leave blank for the domain default. Only departments with at least one assigned mailbox appear here &mdash; assign mailboxes to a new department first via <em>Email Server &rsaquo; Mailboxes &rsaquo; Edit Options &rsaquo; Personal Information</em>.</p>
                 </div>
             </div>
 
@@ -324,8 +345,16 @@ exactly what save_org_signature_action.cfm will store.
             </button>
         </div>
         <div class="card-body">
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                <strong>What you're seeing:</strong> the preview is a static render with the
+                <code>{{user.*}}</code>, <code>{{org.*}}</code>, and <code>{{dept.*}}</code>
+                placeholders left in place. At send time the body milter replaces each one
+                with the recipient's mailbox + domain data, so every user gets a personalized
+                version of this signature on their outbound mail. The visible
+                <code>{{...}}</code> tokens never reach the recipient.
+            </div>
             <iframe id="previewFrame" sandbox="allow-same-origin"></iframe>
-            <p class="field-help mt-2 mb-0"><i class="fas fa-info-circle me-1"></i> Preview shows the rendered HTML with placeholder text where <code>{{user.*}}</code>, <code>{{org.*}}</code>, and <code>{{dept.*}}</code> will be substituted at send time.</p>
         </div>
     </div>
 
@@ -368,6 +397,34 @@ function normalizeKeys(v) {
 const TEMPLATES = normalizeKeys(<cfoutput>#SerializeJSON(allTemplates)#</cfoutput>);
 const EXISTING_FIELDS = normalizeKeys(<cfoutput>#SerializeJSON(existingFields)#</cfoutput>);
 const IS_EDIT = <cfoutput>#(isEdit ? 'true' : 'false')#</cfoutput>;
+
+// Per-domain dept name lists from mailboxes.department. Keyed by
+// domain_id (numeric string). Lucee uppercases struct keys but the
+// keys are digits so that's a no-op here. Array values preserve case.
+const DEPT_OPTIONS_BY_DOMAIN = <cfoutput>#variables.deptOptionsByDomainJson#</cfoutput>;
+
+// Repopulate the department <select> when the domain selector
+// changes. Preserves the current selection if it's still valid for
+// the new domain, otherwise resets to "Domain default".
+function repopulateDeptSelect(domainId) {
+    const sel = document.getElementById('form_department_label');
+    if (!sel) return;
+    const previous = sel.value;
+    sel.innerHTML = '<option value="">&mdash; Domain default (all mailboxes) &mdash;</option>';
+    const opts = (DEPT_OPTIONS_BY_DOMAIN || {})[String(domainId)] || [];
+    opts.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d;
+        opt.textContent = d;
+        sel.appendChild(opt);
+    });
+    if (previous && opts.indexOf(previous) !== -1) {
+        sel.value = previous;
+    }
+}
+document.getElementById('form_domain_id').addEventListener('change', function () {
+    repopulateDeptSelect(this.value);
+});
 // Set whenever existingRow has a template_key - covers both DB-loaded
 // edit mode and form-restore-after-save-failure (where original mode
 // could have been Add or Edit). The auto-select / field pre-fill below
@@ -417,11 +474,59 @@ function renderFields(tmpl) {
     // field's own default.
     const stored = (tmpl.key === INITIAL_TEMPLATE_KEY) ? EXISTING_FIELDS : (fieldsByTemplate[tmpl.key] || {});
 
+    // #226 Phase 2B: auto-filled fields ({{user.*}} from the mailbox row,
+    // {{org.*}} from the domain row) are collapsed by default. The
+    // "Override auto-filled fields" toggle expands them for the rare
+    // cases that need literal text instead of substitution (shared
+    // mailbox without personal info, seasonal URL override, etc).
+    // Default = collapsed -> placeholders flow through to the rendered
+    // html unchanged and the milter substitutes per-recipient at send.
+    const hasAutoFill = tmpl.fields.some(function (f) { return f.autofill; });
+    if (hasAutoFill) {
+        const toggleWrap = document.createElement('div');
+        toggleWrap.className = 'border rounded p-3 mb-3 bg-body-tertiary';
+        toggleWrap.innerHTML =
+            '<div class="form-check form-switch m-0">' +
+                '<input class="form-check-input" type="checkbox" id="overrideAutoFill">' +
+                '<label class="form-check-label fw-semibold" for="overrideAutoFill">' +
+                    'Override auto-filled fields' +
+                '</label>' +
+            '</div>' +
+            '<p class="field-help mt-2 mb-0">' +
+                'Name, Title, Phone, Mobile, Email auto-fill from each mailbox; ' +
+                'Website and Address auto-fill from the domain. Toggle this on only ' +
+                'if you need to override one of them with literal text (e.g. shared ' +
+                'mailboxes, seasonal URLs).' +
+            '</p>';
+        container.appendChild(toggleWrap);
+
+        // Inline callout shown alongside the auto-fill fields (toggle on
+        // -> visible). Explains why the admin sees {{...}} placeholders
+        // as default values when they expand the override section.
+        const callout = document.createElement('div');
+        callout.className = 'alert alert-info mb-3 auto-fill-field';
+        callout.style.display = 'none';
+        callout.innerHTML =
+            '<i class="fas fa-info-circle me-2"></i>' +
+            'The <code>{{user.*}}</code> and <code>{{org.*}}</code> values you see ' +
+            'below are <strong>placeholders</strong>, not literal text. The body milter ' +
+            'replaces them with each recipient\'s mailbox + domain data at send time, ' +
+            'so every user gets a personalized signature. Replace with literal text ' +
+            'only if you genuinely need a fixed override.';
+        container.appendChild(callout);
+    }
+
     tmpl.fields.forEach(function (field) {
         const wrap = document.createElement('div');
         wrap.className = 'mb-3 field-row';
         wrap.dataset.fieldName = field.name;
         if (field.showIf) wrap.dataset.showIf = field.showIf;
+        if (field.autofill) {
+            wrap.classList.add('auto-fill-field');
+            // Default-hidden; applyShowIfGating() flips display when the
+            // override toggle is on.
+            wrap.style.display = 'none';
+        }
 
         const label = document.createElement('label');
         label.className = 'form-label';
@@ -551,11 +656,36 @@ function renderFields(tmpl) {
 }
 
 function applyShowIfGating() {
-    document.querySelectorAll('.field-row').forEach(function (row) {
-        if (!row.dataset.showIf) return;
+    // #226 Phase 2B: two visibility concerns to coordinate.
+    // 1) Auto-fill rows (and the inline callout sharing the class):
+    //    gated by the "Override auto-filled fields" master toggle, and
+    //    THEN by per-field showIf (a hidden phone field still respects
+    //    show_phone after override is on).
+    // 2) Plain field rows: pure showIf gating (or always-visible if
+    //    they have no showIf).
+    const overrideToggle = document.getElementById('overrideAutoFill');
+    const overrideOn = !!(overrideToggle && overrideToggle.checked);
+
+    document.querySelectorAll('.auto-fill-field').forEach(function (el) {
+        if (!overrideOn) {
+            el.style.display = 'none';
+            return;
+        }
+        if (!el.dataset.showIf) {
+            el.style.display = '';
+            return;
+        }
+        const target = document.querySelector('#fld_' + el.dataset.showIf);
+        el.style.display = (target && target.checked) ? '' : 'none';
+    });
+
+    document.querySelectorAll('.field-row:not(.auto-fill-field)').forEach(function (row) {
+        if (!row.dataset.showIf) {
+            row.style.display = '';
+            return;
+        }
         const target = document.querySelector('#fld_' + row.dataset.showIf);
-        const visible = target && target.checked;
-        row.style.display = visible ? '' : 'none';
+        row.style.display = (target && target.checked) ? '' : 'none';
     });
 }
 
@@ -723,7 +853,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const v = (el.value || '').trim();
             if (!v) return; // empty is fine for optional fields
             let bad = false;
-            if (el.type === 'url') {
+            // #226 Phase 2B: skip strict url/email format validation
+            // when the value contains a {{namespace.field}} placeholder.
+            // Substitution happens at send time, so the final delivered
+            // value can't be format-checked here.
+            const hasPlaceholder = /\{\{[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*\}\}/i.test(v);
+            if (hasPlaceholder) {
+                // accept; resolved at send time
+            } else if (el.type === 'url') {
                 if (!/^https?:\/\/[^\s]+$/i.test(v)) bad = true;
             } else if (el.type === 'email') {
                 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) bad = true;

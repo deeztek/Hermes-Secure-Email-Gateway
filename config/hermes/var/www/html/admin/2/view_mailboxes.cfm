@@ -237,6 +237,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- QUERY ALL MAILBOXES --->
+<!--- #226 Phase 2B: per-domain dept name list, used by the Edit
+     Mailbox modal's department datalist (typeahead). Sets
+     variables.deptOptionsByDomain + deptOptionsByDomainJson. --->
+<cfinclude template="./inc/get_dept_options.cfm" />
+
 <cfquery name="getMailboxes" datasource="hermes">
     SELECT m.id, m.username, m.name, m.quota, m.active, m.created, m.modified, m.domain_id,
            m.nextcloud_enabled AS mb_nextcloud,
@@ -550,7 +555,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </div>
               <div class="mb-2">
                 <label class="form-label small mb-1">Department</label>
-                <input type="text" class="form-control" name="edit_department" id="editDepartment" maxlength="64" placeholder="e.g. Sales, Engineering" <cfif NOT isPro>disabled</cfif>>
+                <input type="text" class="form-control" name="edit_department" id="editDepartment" maxlength="64" placeholder="e.g. Sales, Engineering" list="editDeptDataList" autocomplete="off" <cfif NOT isPro>disabled</cfif>>
+                <datalist id="editDeptDataList"></datalist>
+                <small class="form-text text-muted">Type a new department or pick an existing one for this domain.</small>
                 <small class="text-muted">Determines which signature template applies. Leave blank to use the domain default.</small>
               </div>
             </div>
@@ -917,6 +924,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </body>
 
 <script>
+  // #226 Phase 2B: per-domain dept name lists from
+  // SELECT DISTINCT mailboxes.department. Used by the Edit Mailbox
+  // modal to populate the dept input's datalist (typeahead). Lucee
+  // SerializeJSON uppercases struct keys but the keys are numeric
+  // domain ids so no lower-casing needed; values preserve case.
+  window.DEPT_OPTIONS_BY_DOMAIN = <cfoutput>#variables.deptOptionsByDomainJson#</cfoutput>;
+
   // Initialize DataTable
   $(document).ready(function() {
     var table = $('#mailboxesTable').DataTable({
@@ -961,6 +975,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $('#editPhone').val(mb.phone || '');
         $('#editMobile').val(mb.mobile || '');
         $('#editDepartment').val(mb.department || '');
+        // #226 Phase 2B: populate the dept datalist with this
+        // mailbox's domain depts. Free-text input still - admin can
+        // type a new dept name or pick an existing one.
+        (function () {
+          var dl = document.getElementById('editDeptDataList');
+          if (!dl) return;
+          dl.innerHTML = '';
+          var opts = (window.DEPT_OPTIONS_BY_DOMAIN || {})[String(mb.domain_id)] || [];
+          opts.forEach(function (d) {
+              var o = document.createElement('option');
+              o.value = d;
+              dl.appendChild(o);
+          });
+        })();
         $('#editQuotaGb').val(mb.quota_gb);
         $('#editActive').val(mb.active);
         $('#editPolicy').val(mb.policy_id);

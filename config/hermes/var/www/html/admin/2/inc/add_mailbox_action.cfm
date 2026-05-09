@@ -789,6 +789,16 @@ Requires form variables:
     </cfif>
 </cfif>
 
+<!--- #226 Phase 2B: refresh body milter map + sender_data so the new
+     mailbox picks up domain-default Org Sig (or department Org Sig)
+     immediately. Soft-fail if the body milter dirs aren't mounted on
+     this host so add-mailbox stays usable in non-mail environments. --->
+<cftry>
+    <cfset signatureRegenSilent = true>
+    <cfinclude template="signature_regen_map.cfm">
+<cfcatch type="any"></cfcatch>
+</cftry>
+
 <!--- SUCCESS --->
 <cfset session.m = 1>
 <cflocation url="view_mailboxes.cfm" addtoken="no">

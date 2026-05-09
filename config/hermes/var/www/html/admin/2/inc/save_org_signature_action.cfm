@@ -157,6 +157,7 @@ For now we just write the row; the milter wiring is a separate step.
             enabled          = <cfqueryparam value="#enabledFlag#"  cfsqltype="cf_sql_tinyint">
         WHERE id = <cfqueryparam value="#rowId#" cfsqltype="cf_sql_integer">
     </cfquery>
+    <cfset savedRowId = rowId>
     <cfset session.org_sig_msg = "<strong>Saved.</strong> Organizational Signature updated.">
 <cfelse>
     <cfquery datasource="hermes" result="ins">
@@ -171,12 +172,22 @@ For now we just write the row; the milter wiring is a separate step.
             <cfqueryparam value="#enabledFlag#"  cfsqltype="cf_sql_tinyint">
         )
     </cfquery>
+    <cfset savedRowId = ins.GENERATED_KEY>
     <cfset session.org_sig_msg = "<strong>Saved.</strong> Organizational Signature created.">
 </cfif>
 <cfset session.org_sig_msg_type = "success">
 
-<!--- Phase 2B: write per-row file to body milter signatures dir +
-     regenerate resolution map. For now the row is in the database
-     and the milter pipeline will pick it up once that wiring lands. --->
+<!--- Phase 2B body-milter wiring:
+     1. Render this row's per-option dir (body.html + body.txt + cid:
+        images). If the row was just disabled, write_files wipes the
+        dir cleanly.
+     2. Rebuild signature_by_sender + sender_data.json from current
+        table state. Picks up the new row, drops references to a
+        just-disabled row, and self-heals any other org sig dir that
+        wins for at least one mailbox. --->
+<cfset orgSignatureWriteRowId = savedRowId>
+<cfinclude template="org_signature_write_files.cfm" />
+<cfset signatureRegenSilent = true>
+<cfinclude template="signature_regen_map.cfm" />
 
 <cflocation url="../view_org_signatures.cfm" addtoken="no">
