@@ -2055,7 +2055,7 @@ SELECT
     'inet:hermes_body_milter:8893',
     'Hermes Body Milter',
     'postfix', 1, 'main.cf',
-    CAST(p.id AS CHAR), 'smtpd_milters', 1, 0.5, 1, 1
+    CAST(p.id AS CHAR), 'smtpd_milters', 1, 3.1, 1, 1
 FROM parameters p
 WHERE p.parameter = 'smtpd_milters' AND p.child = 2
   AND NOT EXISTS (
@@ -2063,6 +2063,17 @@ WHERE p.parameter = 'smtpd_milters' AND p.child = 2
     WHERE c.parameter = 'inet:hermes_body_milter:8893'
       AND c.parent_name = 'smtpd_milters'
   );
+
+-- Idempotent retro-fix: existing installs may have order1=0.5 from the
+-- earlier (buggy) migration that placed body_milter FIRST in smtpd_milters
+-- and/or non_smtpd_milters. The intended behavior (per the comment block
+-- above) is body_milter LAST so OpenDMARC verifies the original body
+-- before banner injection on inbound mail. See GitHub issue #232.
+UPDATE parameters
+   SET order1 = 3.1
+ WHERE parameter = 'inet:hermes_body_milter:8893'
+   AND parent_name IN ('smtpd_milters', 'non_smtpd_milters')
+   AND order1 = 0.5;
 
 INSERT INTO parameters (
     parameter, name, module, editable, conf_file,

@@ -119,7 +119,7 @@ cleanup_reinject unix  n       -       -       -       0       cleanup
 
 10026 inet  n       -       n       -       10      smtpd -v
             -o content_filter=
-            -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks,no_milters
+            -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks
             -o smtpd_helo_restrictions=
             -o smtpd_client_restrictions=
             -o smtpd_sender_restrictions=
