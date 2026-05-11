@@ -93,10 +93,26 @@ $(document).ready(function() {
      exists in its source table and badge rows whose scope_key has been
      deleted. --->
 <cfquery name="getDisclaimers" datasource="hermes">
-    SELECT id, scope, scope_key, enabled, position, body_text, body_html, updated_at
+    SELECT id, scope, scope_key, enabled, position, template_key, updated_at
     FROM disclaimers
     ORDER BY scope ASC, scope_key ASC
 </cfquery>
+
+<!--- Build a template_key -> human-readable name map once so the row
+     loop can show the chosen template without re-including each
+     template file per row. --->
+<cfinclude template="./inc/disclaimer_template_loader.cfm" />
+<cfset templateNameMap = {}>
+<cfloop array="#variables.disclaimerTemplateRegistry#" index="tmplKey">
+    <cfset tmplPath = variables.disclaimerTemplateDir & tmplKey & ".cfm">
+    <cfif FileExists(tmplPath)>
+        <cfset template = {}>
+        <cfinclude template="inc/disclaimer_templates/#tmplKey#.cfm" />
+        <cfif StructKeyExists(template, "key") AND StructKeyExists(template, "name")>
+            <cfset templateNameMap[template.key] = template.name>
+        </cfif>
+    </cfif>
+</cfloop>
 
 <!--- ALERTS / SESSION MESSAGE --->
 <cfif structKeyExists(session, "disclaimer_msg") AND session.disclaimer_msg NEQ "">
@@ -146,12 +162,13 @@ $(document).ready(function() {
             <table id="disclaimersTable" class="table table-bordered table-hover table-striped" style="width:100%">
                 <thead>
                     <tr>
-                        <th style="width: 12%">Scope</th>
+                        <th style="width: 11%">Scope</th>
                         <th>Scope Key</th>
-                        <th style="width: 10%">Enabled</th>
-                        <th style="width: 10%">Position</th>
-                        <th style="width: 16%">Updated</th>
-                        <th style="width: 14%">Actions</th>
+                        <th style="width: 18%">Template</th>
+                        <th style="width: 9%">Enabled</th>
+                        <th style="width: 9%">Position</th>
+                        <th style="width: 14%">Updated</th>
+                        <th style="width: 12%">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -165,6 +182,15 @@ $(document).ready(function() {
                                 </cfswitch>
                             </td>
                             <td><code>#HTMLEditFormat(scope_key)#</code></td>
+                            <td>
+                                <cfif Len(Trim(template_key)) AND StructKeyExists(templateNameMap, template_key)>
+                                    <span class="text-muted">#HTMLEditFormat(templateNameMap[template_key])#</span>
+                                <cfelseif Len(Trim(template_key))>
+                                    <code class="text-warning">#HTMLEditFormat(template_key)#</code>
+                                <cfelse>
+                                    <span class="text-muted fst-italic">(no template)</span>
+                                </cfif>
+                            </td>
                             <td>
                                 <cfif Val(enabled) EQ 1>
                                     <span class="badge bg-success">Enabled</span>

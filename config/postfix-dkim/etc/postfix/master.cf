@@ -128,7 +128,7 @@ cleanup_reinject unix  n       -       -       -       0       cleanup
             -o smtpd_authorized_xforward_hosts=127.0.0.0/8
             -o smtpd_authorized_xclient_hosts=127.0.0.0/8
             -o cleanup_service_name=cleanup_reinject
-            -o smtpd_milters=inet:localhost:8891
+            -o smtpd_milters=inet:localhost:8892
 
 # injection port for mail sent by djigzo web gui
 10027 inet  n       -       -       -       10      smtpd -v

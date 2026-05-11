@@ -17,229 +17,56 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <title>Hermes SEG | Email Policies | Edit Disclaimer</title>
 <cfinclude template="./inc/html_head.cfm" />
 
-<!--- Quill 2.x WYSIWYG editor for the HTML disclaimer body. Loaded from
-     jsdelivr (same CDN pattern Hermes uses for qrcode-generator on the
-     My App Passwords page). MIT-licensed, no API key, no self-host. --->
-<link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.min.js"></script>
-
 <style>
-    /* Match Quill editor height and surface it on white so it stands out
-       against the bg-body-tertiary page background. */
-    .ql-container { min-height: 220px; background: ##fff; }
-    .ql-toolbar   { background: ##f8f9fa; }
-    /* Visual cue: clicked image gets a thick blue ring + glow so it's
-       unambiguously highlighted. Drives which image the width-picker
-       buttons resize. */
-    .ql-editor img.quill-image-selected {
-        outline: 3px solid ##0d6efd;
-        outline-offset: 3px;
-        box-shadow: 0 0 0 1px ##fff, 0 4px 16px rgba(13,110,253,0.45);
+    /* Template gallery card styling. Mirrors edit_external_banner.cfm
+       and edit_org_signature.cfm so all three modifier admin pages
+       share the same visual language. */
+    .template-card {
+        cursor: pointer;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+        border: 2px solid transparent;
     }
+    .template-card:hover {
+        border-color: #adb5bd;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .template-card.is-selected {
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 1px #0d6efd, 0 4px 16px rgba(13,110,253,0.25);
+    }
+    .template-card .thumb-wrap {
+        background: #f8f9fa;
+        border-bottom: 1px solid #dee2e6;
+        height: 100px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    .template-card .thumb-wrap img {
+        max-width: 100%;
+        max-height: 100%;
+        object-fit: contain;
+    }
+    .template-card .thumb-wrap .placeholder {
+        color: #6c757d;
+        font-family: monospace;
+        font-size: 0.85em;
+    }
+    .field-help { font-size: 0.85em; color: #6c757d; }
+
+    #previewFrame {
+        width: 100%;
+        min-height: 240px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        background: #fff;
+        transition: opacity 0.15s ease;
+    }
+    #previewFrame.preview-stale { opacity: 0.55; }
 </style>
-
-<script>
-$(document).ready(function() {
-    // --- Scope dropdown drives which scope_key select is visible --------
-    function syncScopeKeyVisibility() {
-        var scope = $('#scope').val();
-        ['domain', 'relay'].forEach(function(k) {
-            var $wrap = $('#scopeKeyWrap_' + k);
-            var $sel  = $('#scope_key_' + k);
-            if (k === scope) { $wrap.show(); $sel.prop('disabled', false); }
-            else             { $wrap.hide(); $sel.prop('disabled', true); }
-        });
-    }
-    $('#scope').on('change', syncScopeKeyVisibility);
-    syncScopeKeyVisibility();
-
-    // --- Quill editor ---------------------------------------------------
-    var quill = new Quill('#quill_editor', {
-        theme: 'snow',
-        placeholder: 'Type your disclaimer here...',
-        modules: {
-            toolbar: [
-                [{ 'header': [1, 2, 3, false] }],
-                ['bold', 'italic', 'underline', 'strike'],
-                [{ 'color': [] }, { 'background': [] }],
-                [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                [{ 'align': [] }],
-                ['blockquote', 'link', 'image'],
-                ['clean']
-            ]
-        }
-    });
-    // Pre-populate from the hidden textarea (its value is the stored HTML).
-    var existingHtml = $('#body_html').val();
-    if (existingHtml) { quill.root.innerHTML = existingHtml; }
-
-    // Image width picker. Quill 2.x has no native resize handles; this
-    // is the lightweight alternative (click image, pick size). Bind on
-    // both 'click' and 'mousedown' (capture phase) so we catch the
-    // image hit before any internal Quill handling re-renders the DOM.
-    // Use closest('img') so a click on a child element of the image
-    // still resolves correctly. Sets inline style="width:..." on the
-    // img; disclaimer_write_and_reload.cfm preserves the style
-    // attribute through the cid: rewrite at save time.
-    var lastClickedImage = null;
-    function clearImageSelection() {
-        quill.root.querySelectorAll('img.quill-image-selected')
-            .forEach(function(img) { img.classList.remove('quill-image-selected'); });
-        lastClickedImage = null;
-        updateSelectionStatus();
-    }
-    function updateSelectionStatus() {
-        var $s = $('#imageSelectionStatus');
-        if (!$s.length) return;
-        if (lastClickedImage) {
-            var cur = lastClickedImage.style.width || 'auto';
-            $s.removeClass('text-muted').addClass('text-primary fw-semibold')
-              .html('<i class="fas fa-check-circle me-1"></i>Image selected (current width: ' + cur + ')');
-        } else {
-            $s.removeClass('text-primary fw-semibold').addClass('text-muted')
-              .html('<i class="fas fa-info-circle me-1"></i>No image selected &mdash; click an image in the editor first');
-        }
-    }
-    function selectImage(img) {
-        clearImageSelection();
-        img.classList.add('quill-image-selected');
-        lastClickedImage = img;
-        updateSelectionStatus();
-    }
-    function imageFromEvent(e) {
-        var t = e.target;
-        if (!t) return null;
-        if (t.tagName === 'IMG') return t;
-        return (t.closest && t.closest('img')) || null;
-    }
-    function editorClickHandler(e) {
-        var img = imageFromEvent(e);
-        if (img && quill.root.contains(img)) {
-            selectImage(img);
-        } else if (quill.root.contains(e.target)) {
-            clearImageSelection();
-        }
-    }
-    quill.root.addEventListener('mousedown', editorClickHandler, true);
-    quill.root.addEventListener('click',     editorClickHandler, true);
-    updateSelectionStatus();
-
-    function applyWidth(w) {
-        if (!lastClickedImage) {
-            alert('Click on an image in the editor first to resize it.');
-            return;
-        }
-        if (w === 'auto' || w === '') {
-            lastClickedImage.style.width = '';
-            lastClickedImage.style.height = '';
-        } else {
-            lastClickedImage.style.width = w;
-            lastClickedImage.style.height = 'auto';
-        }
-        updateSelectionStatus();
-    }
-    $('.quill-image-width').on('click', function() {
-        applyWidth($(this).data('width'));
-    });
-    $('#customImageWidthBtn').on('click', function() {
-        if (!lastClickedImage) {
-            alert('Click on an image in the editor first to resize it.');
-            return;
-        }
-        var v = parseInt($('#customImageWidth').val(), 10);
-        if (isNaN(v) || v < 10 || v > 2000) {
-            alert('Enter a width between 10 and 2000 pixels.');
-            return;
-        }
-        applyWidth(v + 'px');
-    });
-    $('#customImageWidth').on('keypress', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            $('#customImageWidthBtn').click();
-        }
-    });
-
-    // HTML -> plain text helper. Preserves block-level newlines, drops tags,
-    // collapses 3+ newlines to 2. Good enough for the auto-derived
-    // text/plain part of multipart mail; "edit separately" toggle below
-    // lets admins override for fine-grained control.
-    function htmlToText(html) {
-        var div = document.createElement('div');
-        div.innerHTML = html;
-        div.querySelectorAll('br').forEach(function(br) { br.replaceWith('\n'); });
-        div.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li').forEach(function(el) { el.append('\n'); });
-        return (div.textContent || div.innerText || '').replace(/\n{3,}/g, '\n\n').trim();
-    }
-    function quillIsEmpty() {
-        var h = quill.root.innerHTML;
-        return (h === '' || h === '<p><br></p>');
-    }
-
-    // --- Auto-detect "edit text separately" on load ---------------------
-    // If the stored plain-text version differs from what auto-derive would
-    // produce, the admin intentionally customized it -- surface the toggle
-    // ON so they don't lose that customization on save.
-    var existingText = ($('#body_text').val() || '').trim();
-    var derivedText  = existingHtml ? htmlToText(existingHtml).trim() : '';
-    if (existingText && existingText !== derivedText) {
-        $('#editTextSeparately').prop('checked', true);
-        $('#textBodyWrap').show();
-    }
-
-    // --- Toggle behavior ------------------------------------------------
-    $('#editTextSeparately').on('change', function() {
-        if ($(this).is(':checked')) {
-            // Reveal the textarea. If it's empty, seed it with the current
-            // auto-derived text so the admin has a starting point to edit.
-            if (!$('#body_text').val().trim() && !quillIsEmpty()) {
-                $('#body_text').val(htmlToText(quill.root.innerHTML));
-            }
-            $('#textBodyWrap').show();
-        } else {
-            $('#textBodyWrap').hide();
-        }
-    });
-
-    // --- On submit: sync Quill -> hidden textarea + auto-derive text ---
-    $('form[name="edit_disclaimer"]').on('submit', function() {
-        // Strip the visual selection class from any image so it doesn't
-        // leak into the stored html / outbound mail.
-        clearImageSelection();
-        var html  = quill.root.innerHTML;
-        var empty = quillIsEmpty();
-        $('#body_html').val(empty ? '' : html);
-        if (!$('#editTextSeparately').is(':checked')) {
-            $('#body_text').val(empty ? '' : htmlToText(html));
-        }
-    });
-
-    // --- Preview --------------------------------------------------------
-    $('#previewBtn').on('click', function() {
-        var html  = quill.root.innerHTML;
-        var empty = quillIsEmpty();
-        var bodyHtml = empty ? '' : html;
-        var bodyText = $('#editTextSeparately').is(':checked')
-            ? ($('#body_text').val() || '')
-            : (empty ? '' : htmlToText(html));
-        var position = $('#position').val();
-        var sample = '<p>This is the original email body that the user composed. Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>';
-        var disclaimerHtml;
-        if (bodyHtml.trim().length > 0) {
-            disclaimerHtml = '<div style="margin-top:1em;padding-top:0.5em;border-top:1px solid ##ccc;font-size:0.9em;color:##555;">' + bodyHtml + '</div>';
-        } else if (bodyText.trim().length > 0) {
-            disclaimerHtml = '<pre style="margin-top:1em;padding-top:0.5em;border-top:1px solid ##ccc;font-size:0.85em;color:##555;white-space:pre-wrap;">' + $('<div>').text(bodyText).html() + '</pre>';
-        } else {
-            disclaimerHtml = '<em class="text-muted">(disclaimer is empty)</em>';
-        }
-        var combined = (position === 'prepend') ? disclaimerHtml + sample : sample + disclaimerHtml;
-        $('#previewPanelBody').html(combined);
-        $('#previewPanel').show();
-    });
-    $('#previewCloseBtn').on('click', function() { $('#previewPanel').hide(); });
-});
-</script>
 </head>
+
 <body class="layout-fixed sidebar-expand-lg bg-body-tertiary">
 <div class="app-wrapper">
 
@@ -251,14 +78,14 @@ $(document).ready(function() {
     <div class="container-fluid">
         <div class="row mb-2">
             <div class="col-sm-6">
-                <h1 class="m-0">Edit Disclaimer</h1>
+                <h1 class="m-0" id="pageTitle">New Disclaimer</h1>
             </div>
             <div class="col-sm-6">
                 <ol class="breadcrumb float-sm-end">
                     <li class="breadcrumb-item"><a href="index.cfm">Home</a></li>
                     <li class="breadcrumb-item"><a href="##">Email Policies</a></li>
                     <li class="breadcrumb-item"><a href="view_disclaimers.cfm">Disclaimers</a></li>
-                    <li class="breadcrumb-item active">Edit</li>
+                    <li class="breadcrumb-item active" id="crumbMode">Add</li>
                 </ol>
             </div>
         </div>
@@ -268,9 +95,7 @@ $(document).ready(function() {
 <section class="content">
 <div class="container-fluid">
 
-<!--- PRO EDITION LICENSE CHECK (##214). license_check.cfm handles
-     specialized states first; license_pro_required.cfm fires only if
-     the license is healthy but edition is Community. --->
+<!--- PRO EDITION LICENSE CHECK (#214 / #235). --->
 <cfinclude template="./inc/license_check.cfm" />
 
 <cfif NOT isDefined("session.edition") OR session.edition NEQ "Pro">
@@ -287,16 +112,20 @@ $(document).ready(function() {
 <cfparam name="url.id" default="0">
 <cfset isEdit = (IsNumeric(url.id) AND Val(url.id) GT 0)>
 
-<cfset existingScope    = "">
-<cfset existingScopeKey = "">
-<cfset existingEnabled  = 1>
-<cfset existingPosition = "append">
-<cfset existingText     = "">
-<cfset existingHtml     = "">
+<cfset existingRow = {
+    id:            0,
+    scope:         "",
+    scope_key:     "",
+    enabled:       1,
+    position:      "append",
+    template_key:  "",
+    fields_json:   ""
+}>
+<cfset existingFields = {}>
 
 <cfif isEdit>
     <cfquery name="getDisclaimer" datasource="hermes">
-        SELECT id, scope, scope_key, enabled, position, body_text, body_html
+        SELECT id, scope, scope_key, enabled, position, template_key, fields_json
         FROM disclaimers
         WHERE id = <cfqueryparam value="#url.id#" cfsqltype="cf_sql_integer">
     </cfquery>
@@ -305,27 +134,68 @@ $(document).ready(function() {
         <cfset session.disclaimer_msg_type = "warning">
         <cflocation url="view_disclaimers.cfm" addtoken="no">
     </cfif>
-    <cfset existingScope    = getDisclaimer.scope>
-    <cfset existingScopeKey = getDisclaimer.scope_key>
-    <cfset existingEnabled  = Val(getDisclaimer.enabled)>
-    <cfset existingPosition = getDisclaimer.position>
-    <cfset existingText     = getDisclaimer.body_text>
-    <cfset existingHtml     = getDisclaimer.body_html>
+    <cfset existingRow = {
+        id:            getDisclaimer.id,
+        scope:         getDisclaimer.scope,
+        scope_key:     getDisclaimer.scope_key,
+        enabled:       Val(getDisclaimer.enabled),
+        position:      getDisclaimer.position,
+        template_key:  getDisclaimer.template_key,
+        fields_json:   getDisclaimer.fields_json
+    }>
+    <cfif Len(Trim(existingRow.fields_json))>
+        <cftry>
+            <cfset existingFields = DeserializeJSON(existingRow.fields_json)>
+            <cfcatch type="any">
+                <cfset existingFields = {}>
+            </cfcatch>
+        </cftry>
+    </cfif>
 </cfif>
 
-<!--- POPULATE SCOPE_KEY DROPDOWN OPTIONS. Three queries, one per scope.
-     All loaded at render time so the JS scope-swap is pure show/hide.
-     Disabled rows are still listed (admin may want to maintain a
-     disclaimer for a temporarily-disabled mailbox); the dropdown is
-     not the place to enforce that. --->
+<!--- Restore form data after a server-side validation redirect. --->
+<cfif structKeyExists(session, "disclaimer_form_restore") AND IsStruct(session.disclaimer_form_restore) AND structKeyExists(session.disclaimer_form_restore, "template_key") AND Len(session.disclaimer_form_restore.template_key)>
+    <cfset restoreData = session.disclaimer_form_restore>
+    <cfset existingRow.template_key = restoreData.template_key>
+    <cfset restoreTmplPath = "">
+    <cfinclude template="./inc/disclaimer_template_loader.cfm" />
+    <cfif ArrayContains(variables.disclaimerTemplateRegistry, restoreData.template_key)>
+        <cfset restoreTmplPath = variables.disclaimerTemplateDir & restoreData.template_key & ".cfm">
+    </cfif>
+    <cfif Len(restoreTmplPath) AND FileExists(restoreTmplPath)>
+        <cfset template = {}>
+        <cfinclude template="inc/disclaimer_templates/#restoreData.template_key#.cfm" />
+        <cfloop array="#template.fields#" index="rf">
+            <cfset rk = "field_" & rf.name>
+            <cfif structKeyExists(restoreData, rk)>
+                <cfif rf.type EQ "checkbox">
+                    <cfset existingFields[rf.name] = (restoreData[rk] EQ "1")>
+                <cfelse>
+                    <cfset existingFields[rf.name] = restoreData[rk]>
+                </cfif>
+            </cfif>
+        </cfloop>
+    </cfif>
+    <cfset StructDelete(session, "disclaimer_form_restore")>
+</cfif>
+
+<!--- Flash message from prior save attempt. --->
+<cfset flashMsg = "">
+<cfset flashType = "danger">
+<cfif structKeyExists(session, "disclaimer_msg") AND Len(session.disclaimer_msg)>
+    <cfset flashMsg = session.disclaimer_msg>
+    <cfset flashType = structKeyExists(session, "disclaimer_msg_type") ? session.disclaimer_msg_type : "danger">
+    <cfset StructDelete(session, "disclaimer_msg")>
+    <cfset StructDelete(session, "disclaimer_msg_type")>
+</cfif>
+
+<!--- POPULATE SCOPE_KEY DROPDOWN OPTIONS. Same queries the prior Quill
+     UI used. Domain-scope = disclaimer for all addresses in a mailbox
+     domain; relay-scope = override for a specific relay-recipient
+     address. --->
 <cfquery name="getScopeKeyDomains" datasource="hermes">
     SELECT domain FROM domains ORDER BY domain ASC
 </cfquery>
-<!--- Relay recipients only. Exclude:
-       - rows in the mailboxes table (covers legacy installs where some
-         mailbox rows have recipient_type=NULL -- without this clause the
-         dropdown leaks mailbox addresses)
-       - domain-level rows (recipients.domain IS NOT NULL marks them) --->
 <cfquery name="getScopeKeyRelays" datasource="hermes">
     SELECT r.recipient
     FROM recipients r
@@ -336,182 +206,461 @@ $(document).ready(function() {
     ORDER BY r.recipient ASC
 </cfquery>
 
-<div class="row">
-<div class="col-12 col-lg-9 col-xl-8">
+<!--- Load every template's metadata for the gallery + JS bootstrap. --->
+<cfinclude template="./inc/disclaimer_template_loader.cfm" />
 
-<div class="card card-outline card-primary mb-4">
-    <div class="card-header">
-        <h3 class="card-title"><i class="fas fa-file-signature me-2"></i>
-            <cfif isEdit>Edit Disclaimer<cfelse>New Disclaimer</cfif>
-        </h3>
+<cfset allTemplates = []>
+<cfloop array="#variables.disclaimerTemplateRegistry#" index="tmplKey">
+    <cfset tmplPath = variables.disclaimerTemplateDir & tmplKey & ".cfm">
+    <cfif FileExists(tmplPath)>
+        <cfset template = {}>
+        <cfinclude template="inc/disclaimer_templates/#tmplKey#.cfm" />
+        <cfif StructKeyExists(template, "key")>
+            <cfset thumbPath = variables.disclaimerTemplateDir & "thumbnails/" & template.thumbnail>
+            <cfset template.thumbnailExists = FileExists(thumbPath)>
+            <cfset ArrayAppend(allTemplates, template)>
+        </cfif>
+    </cfif>
+</cfloop>
+
+<cfif flashMsg NEQ "">
+    <div class="alert alert-<cfoutput>#flashType#</cfoutput> alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <cfoutput>#flashMsg#</cfoutput>
     </div>
-    <div class="card-body">
+</cfif>
 
-    <form name="edit_disclaimer" id="disclaimerForm" method="post" action="save_disclaimer_action.cfm">
-        <cfoutput>
-        <input type="hidden" name="id" value="#isEdit ? Val(url.id) : 0#">
-        </cfoutput>
+<form id="disclaimerForm" method="post" action="save_disclaimer_action.cfm" novalidate>
+    <input type="hidden" name="mode"         id="form_mode"         value="<cfoutput>#(isEdit ? 'edit' : 'add')#</cfoutput>">
+    <input type="hidden" name="id"           id="form_id"           value="<cfoutput>#existingRow.id#</cfoutput>">
+    <input type="hidden" name="template_key" id="form_template_key" value="<cfoutput>#HTMLEditFormat(existingRow.template_key)#</cfoutput>">
 
-        <!-- Scope -->
-        <div class="form-group mb-3">
-            <label class="form-label"><strong>Scope</strong></label>
-            <cfoutput>
-            <select class="form-select" id="scope" name="scope" <cfif isEdit>disabled</cfif>>
-                <option value="domain"  <cfif existingScope EQ "domain"> selected</cfif>>Domain</option>
-                <option value="relay"   <cfif existingScope EQ "relay">  selected</cfif>>Relay Recipient</option>
-            </select>
-            <cfif isEdit>
-                <!--- A disabled select doesn't post; mirror as hidden input. --->
-                <input type="hidden" name="scope" value="#existingScope#">
-            </cfif>
-            </cfoutput>
-            <small class="form-text text-muted">
-                <cfif isEdit>
-                    <i class="fas fa-lock me-1"></i> Scope is locked after creation. Delete and re-create to change scope.
-                <cfelse>
-                    Domain disclaimers apply to all addresses in the domain. Relay-recipient disclaimers override the domain default for one specific upstream sender. Most-specific wins at send time. Per-mailbox personalization is handled by user signatures, not disclaimers.
-                </cfif>
-            </small>
+    <!--- SCOPE CARD --->
+    <div class="card card-primary card-outline mb-4">
+        <div class="card-header">
+            <h3 class="card-title m-0"><i class="fas fa-globe me-2"></i>Scope</h3>
         </div>
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><strong>Scope</strong></label>
+                    <cfoutput>
+                    <select class="form-select" id="scope" name="scope" <cfif isEdit>disabled</cfif>>
+                        <option value="domain" <cfif existingRow.scope EQ "domain">selected</cfif>>Domain</option>
+                        <option value="relay"  <cfif existingRow.scope EQ "relay">selected</cfif>>Relay Recipient</option>
+                    </select>
+                    <cfif isEdit>
+                        <input type="hidden" name="scope" value="#existingRow.scope#">
+                    </cfif>
+                    </cfoutput>
+                    <p class="field-help mt-1 mb-0">
+                        <cfif isEdit>
+                            <i class="fas fa-lock me-1"></i> Scope is locked after creation. Delete and re-create to change scope.
+                        <cfelse>
+                            Domain disclaimers apply to all addresses in the domain. Relay-recipient disclaimers override the domain default for one specific upstream sender. Most-specific wins at send time.
+                        </cfif>
+                    </p>
+                </div>
 
-        <!-- Scope Key -->
-        <div id="scopeKeyWrap_domain" class="form-group mb-3">
-            <label class="form-label"><strong>Domain</strong></label>
-            <select class="form-select" id="scope_key_domain" name="scope_key_domain">
-                <option value="">&mdash; Select a domain &mdash;</option>
-                <cfoutput query="getScopeKeyDomains">
-                    <option value="#HTMLEditFormat(domain)#"<cfif existingScope EQ "domain" AND existingScopeKey EQ domain> selected</cfif>>#HTMLEditFormat(domain)#</option>
-                </cfoutput>
-            </select>
-        </div>
-
-        <div id="scopeKeyWrap_relay" class="form-group mb-3" style="display:none;">
-            <label class="form-label"><strong>Relay Recipient Address</strong></label>
-            <select class="form-select" id="scope_key_relay" name="scope_key_relay">
-                <option value="">&mdash; Select a relay recipient &mdash;</option>
-                <cfoutput query="getScopeKeyRelays">
-                    <option value="#HTMLEditFormat(recipient)#"<cfif existingScope EQ "relay" AND existingScopeKey EQ recipient> selected</cfif>>#HTMLEditFormat(recipient)#</option>
-                </cfoutput>
-            </select>
-        </div>
-
-        <!-- Enabled toggle -->
-        <div class="form-group mb-3">
-            <div class="form-check form-switch">
-                <cfoutput>
-                <input class="form-check-input" type="checkbox" name="enabled" id="enabled" value="1"<cfif existingEnabled EQ 1> checked</cfif>>
-                </cfoutput>
-                <label class="form-check-label" for="enabled"><strong>Enabled</strong></label>
-            </div>
-            <small class="form-text text-muted">If unchecked, this row is skipped at send time even if the scope key matches. An empty body is also treated as disabled.</small>
-        </div>
-
-        <!-- Position -->
-        <div class="form-group mb-3">
-            <label class="form-label"><strong>Position</strong></label>
-            <cfoutput>
-            <select class="form-select" id="position" name="position">
-                <option value="append" <cfif existingPosition EQ "append"> selected</cfif>>Append &mdash; add after the user's body</option>
-                <option value="prepend"<cfif existingPosition EQ "prepend">selected</cfif>>Prepend &mdash; add before the user's body</option>
-            </select>
-            </cfoutput>
-            <small class="form-text text-muted">Append is the standard pattern (footer-style). Prepend is unusual but supported for legal/regulatory headers.</small>
-        </div>
-
-        <!-- Body (Quill WYSIWYG editor for HTML; plain-text auto-derived) -->
-        <div class="form-group mb-3">
-            <label class="form-label"><strong>Body</strong></label>
-            <div id="quill_editor"></div>
-
-            <!-- Image width picker. Click an image in the editor to
-                 select it (a blue ring + glow appears), then pick a
-                 preset width or type a custom value. Stored as inline
-                 style="width:..." on the img tag and preserved through
-                 the cid: rewrite at save time. -->
-            <div class="mt-2 mb-2">
-                <small class="d-block mb-1 text-muted" id="imageSelectionStatus">
-                    <i class="fas fa-info-circle me-1"></i>No image selected &mdash; click an image in the editor first
-                </small>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <small class="text-muted me-1"><i class="fas fa-image me-1"></i> Width:</small>
-                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="100px">100 px</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="150px">150 px</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="200px">200 px</button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="300px">300 px</button>
-                    <div class="input-group input-group-sm" style="width:170px;">
-                        <input type="number" class="form-control" id="customImageWidth" min="10" max="2000" placeholder="Custom" aria-label="Custom width in pixels">
-                        <span class="input-group-text">px</span>
-                        <button type="button" class="btn btn-outline-secondary" id="customImageWidthBtn">Apply</button>
-                    </div>
-                    <button type="button" class="btn btn-sm btn-outline-secondary quill-image-width" data-width="auto">Reset</button>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label"><strong>Position</strong></label>
+                    <cfoutput>
+                    <select class="form-select" id="position" name="position">
+                        <option value="append" <cfif existingRow.position EQ "append">selected</cfif>>Bottom &mdash; append after the user's body (recommended)</option>
+                        <option value="prepend"<cfif existingRow.position EQ "prepend">selected</cfif>>Top &mdash; prepend before the user's body</option>
+                    </select>
+                    </cfoutput>
+                    <p class="field-help mt-1 mb-0">Append is the standard footer-style placement.</p>
                 </div>
             </div>
 
-            <!-- Hidden textarea -- Quill writes its HTML here on form submit. -->
-            <cfoutput>
-            <textarea id="body_html" name="body_html" style="display:none;">#HTMLEditFormat(existingHtml)#</textarea>
-            </cfoutput>
-            <small class="form-text text-muted mt-2">
-                Format your disclaimer using the toolbar. The HTML version is used on the <code>text/html</code> part of multipart messages; the plain-text version (auto-derived from this HTML by default) is used on the <code>text/plain</code> part.
-            </small>
-            <small class="form-text text-muted mt-1">
-                <i class="fas fa-image me-1"></i><strong>Inline images:</strong>
-                paste or upload PNG, JPEG, or GIF images directly into the editor. They are extracted to <code>cid:</code> attachments on save and embedded inline in outbound mail.
-                Limits: <strong>5 images max</strong>, <strong>200 KB per image</strong>, <strong>1 MB total</strong>.
-                SVG and WebP are not supported. The plain-text version of the disclaimer omits images.
-            </small>
-        </div>
+            <!--- Scope-key dropdowns (mutually exclusive; JS toggles). --->
+            <div id="scopeKeyWrap_domain" class="mb-3">
+                <label class="form-label"><strong>Domain</strong></label>
+                <select class="form-select" id="scope_key_domain" name="scope_key_domain" <cfif isEdit>disabled</cfif>>
+                    <option value="">&mdash; Select a domain &mdash;</option>
+                    <cfoutput query="getScopeKeyDomains">
+                        <option value="#HTMLEditFormat(domain)#"<cfif existingRow.scope EQ "domain" AND existingRow.scope_key EQ domain> selected</cfif>>#HTMLEditFormat(domain)#</option>
+                    </cfoutput>
+                </select>
+                <cfif isEdit AND existingRow.scope EQ "domain">
+                    <cfoutput><input type="hidden" name="scope_key_domain" value="#HTMLEditFormat(existingRow.scope_key)#"></cfoutput>
+                </cfif>
+            </div>
 
-        <!-- "Edit text separately" toggle. Hidden by default -- only visible
-             on edit if the stored text differs from the auto-derived version. -->
-        <div class="form-check form-switch mb-3">
-            <input class="form-check-input" type="checkbox" id="editTextSeparately">
-            <label class="form-check-label" for="editTextSeparately">
-                <strong>Edit plain-text version separately</strong>
-                <small class="text-muted ms-1">(advanced &mdash; auto-derived from HTML by default)</small>
-            </label>
-        </div>
+            <div id="scopeKeyWrap_relay" class="mb-3" style="display:none;">
+                <label class="form-label"><strong>Relay Recipient Address</strong></label>
+                <select class="form-select" id="scope_key_relay" name="scope_key_relay" <cfif isEdit>disabled</cfif>>
+                    <option value="">&mdash; Select a relay recipient &mdash;</option>
+                    <cfoutput query="getScopeKeyRelays">
+                        <option value="#HTMLEditFormat(recipient)#"<cfif existingRow.scope EQ "relay" AND existingRow.scope_key EQ recipient> selected</cfif>>#HTMLEditFormat(recipient)#</option>
+                    </cfoutput>
+                </select>
+                <cfif isEdit AND existingRow.scope EQ "relay">
+                    <cfoutput><input type="hidden" name="scope_key_relay" value="#HTMLEditFormat(existingRow.scope_key)#"></cfoutput>
+                </cfif>
+            </div>
 
-        <!-- Plain-text body, hidden by default; revealed by the toggle above. -->
-        <div class="form-group mb-3" id="textBodyWrap" style="display:none;">
-            <label class="form-label"><strong>Plain-Text Body</strong></label>
-            <cfoutput>
-            <textarea class="form-control font-monospace" id="body_text" name="body_text" rows="6" placeholder="-- &##10;CONFIDENTIAL: This message and any attachments are confidential...">#HTMLEditFormat(existingText)#</textarea>
-            </cfoutput>
-            <small class="form-text text-muted">Use this when the plain-text version needs different formatting than the auto-derived version (specific line wraps, ASCII separators, exact wording variations for compliance/regulatory text).</small>
+            <div class="form-check form-switch">
+                <cfoutput>
+                <input class="form-check-input" type="checkbox" name="enabled" id="form_enabled" value="1"<cfif existingRow.enabled EQ 1> checked</cfif>>
+                </cfoutput>
+                <label class="form-check-label" for="form_enabled"><strong>Enabled</strong></label>
+                <p class="field-help mt-1 mb-0">When unchecked the disclaimer is skipped at send time even if scope matches.</p>
+            </div>
         </div>
-
-        <!-- Buttons -->
-        <div class="d-flex gap-2 mt-4 align-items-stretch">
-            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save</button>
-            <button type="button" class="btn btn-outline-primary" id="previewBtn"><i class="fas fa-eye"></i> Preview</button>
-            <a href="view_disclaimers.cfm" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
-        </div>
-    </form>
-
     </div>
-</div>
 
-<!-- Preview panel (hidden until Preview button clicked) -->
-<div class="card card-outline card-secondary mb-4" id="previewPanel" style="display:none;">
-    <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="card-title m-0"><i class="fas fa-eye me-2"></i>Preview</h3>
-        <button type="button" class="btn-close" id="previewCloseBtn" aria-label="Close"></button>
+    <!--- TEMPLATE GALLERY CARD --->
+    <div class="card card-primary card-outline mb-4">
+        <div class="card-header">
+            <h3 class="card-title m-0"><i class="fas fa-th-large me-2"></i>Template</h3>
+        </div>
+        <div class="card-body">
+            <p class="text-muted mb-3">Pick a disclaimer style. All templates use table-based HTML with inline styles for Gmail / Outlook / Apple Mail compatibility.</p>
+            <div class="row g-3" id="templateGallery">
+                <cfloop array="#allTemplates#" index="t">
+                    <cfoutput>
+                    <div class="col-12 col-sm-6 col-lg-4">
+                        <div class="card template-card h-100" data-template-key="#HTMLEditFormat(t.key)#">
+                            <div class="thumb-wrap">
+                                <cfif t.thumbnailExists>
+                                    <img src="inc/disclaimer_templates/thumbnails/#HTMLEditFormat(t.thumbnail)#" alt="#HTMLEditFormat(t.name)# preview">
+                                <cfelse>
+                                    <span class="placeholder">[#HTMLEditFormat(t.key)#]</span>
+                                </cfif>
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title fs-6 mb-1">#HTMLEditFormat(t.name)#</h5>
+                                <p class="card-text small text-muted mb-0">#HTMLEditFormat(t.description)#</p>
+                            </div>
+                        </div>
+                    </div>
+                    </cfoutput>
+                </cfloop>
+            </div>
+        </div>
     </div>
-    <div class="card-body">
-        <p class="text-muted small mb-2"><i class="fas fa-info-circle me-1"></i> This is a client-side approximation. The actual disclaimer is rendered by altermime when the message goes out through Amavis.</p>
-        <div id="previewPanelBody" style="border:1px dashed ##aaa;padding:1em;background:##fff;"></div>
-    </div>
-</div>
 
-</div>
-</div>
+    <!--- DYNAMIC FORM CARD: rendered from the active template's fields. --->
+    <div class="card card-primary card-outline mb-4" id="dynamicFormCard" style="display:none;">
+        <div class="card-header">
+            <h3 class="card-title m-0"><i class="fas fa-list-ul me-2"></i>Disclaimer Content</h3>
+        </div>
+        <div class="card-body">
+            <div id="dynamicFormFields"></div>
+        </div>
+    </div>
+
+    <!--- PREVIEW CARD --->
+    <div class="card card-primary card-outline mb-4" id="previewCard" style="display:none;">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title m-0"><i class="fas fa-eye me-2"></i>Preview</h3>
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="btnRefreshPreview">
+                <i class="fas fa-sync-alt me-1"></i> Refresh
+            </button>
+        </div>
+        <div class="card-body">
+            <div class="alert alert-info mb-3">
+                <i class="fas fa-info-circle me-2"></i>
+                Preview shows the disclaimer as the body milter will inject it on outbound mail. Position (append or prepend) is applied at send time and not reflected here.
+            </div>
+            <iframe id="previewFrame" sandbox="allow-same-origin"></iframe>
+        </div>
+    </div>
+
+    <!--- ACTION BAR --->
+    <div class="d-flex justify-content-end gap-2 mb-4">
+        <a href="view_disclaimers.cfm" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary" id="btnSave" disabled>
+            <i class="fas fa-save me-1"></i> Save Disclaimer
+        </button>
+    </div>
+</form>
 
 </div>
 </section>
 </main>
 
 <cfinclude template="./inc/main_footer.cfm" />
+
+<script>
+// Server-side bootstrap: every available template + the existing row's
+// stored fields when editing. Lucee uppercases struct keys; normalize.
+function normalizeKeys(v) {
+    if (Array.isArray(v)) return v.map(normalizeKeys);
+    if (v && typeof v === 'object') {
+        const out = {};
+        for (const k in v) out[k.toLowerCase()] = normalizeKeys(v[k]);
+        return out;
+    }
+    return v;
+}
+const TEMPLATES = normalizeKeys(<cfoutput>#SerializeJSON(allTemplates)#</cfoutput>);
+const EXISTING_FIELDS = normalizeKeys(<cfoutput>#SerializeJSON(existingFields)#</cfoutput>);
+const IS_EDIT = <cfoutput>#(isEdit ? 'true' : 'false')#</cfoutput>;
+const INITIAL_TEMPLATE_KEY = <cfoutput>"#JSStringFormat(existingRow.template_key)#"</cfoutput>;
+
+const fieldsByTemplate = {};
+let activeTemplateKey = '';
+let previewDebounceTimer = null;
+
+function findTemplate(key) {
+    return TEMPLATES.find(function (t) { return t.key === key; });
+}
+
+function selectTemplate(key) {
+    if (!key) return;
+    if (activeTemplateKey === key) return;
+    if (activeTemplateKey) captureCurrentFields();
+    activeTemplateKey = key;
+
+    document.querySelectorAll('.template-card').forEach(function (card) {
+        card.classList.toggle('is-selected', card.dataset.templateKey === key);
+    });
+    document.getElementById('form_template_key').value = key;
+
+    const tmpl = findTemplate(key);
+    if (!tmpl) return;
+
+    renderFields(tmpl);
+    document.getElementById('dynamicFormCard').style.display = '';
+    document.getElementById('previewCard').style.display = '';
+    document.getElementById('btnSave').disabled = false;
+    schedulePreviewRefresh();
+}
+
+function renderFields(tmpl) {
+    const container = document.getElementById('dynamicFormFields');
+    container.innerHTML = '';
+
+    const stored = (tmpl.key === INITIAL_TEMPLATE_KEY) ? EXISTING_FIELDS : (fieldsByTemplate[tmpl.key] || {});
+
+    tmpl.fields.forEach(function (field) {
+        const wrap = document.createElement('div');
+        wrap.className = 'mb-3 field-row';
+        wrap.dataset.fieldName = field.name;
+        if (field.showif) wrap.dataset.showIf = field.showif;
+
+        const label = document.createElement('label');
+        label.className = 'form-label';
+        label.setAttribute('for', 'fld_' + field.name);
+        const labelStrong = document.createElement('strong');
+        labelStrong.textContent = field.label;
+        label.appendChild(labelStrong);
+
+        let input;
+        const value = (field.name in stored) ? stored[field.name] : field.default;
+
+        if (field.type === 'checkbox') {
+            wrap.classList.remove('mb-3');
+            wrap.classList.add('mb-3', 'form-check', 'form-switch');
+            input = document.createElement('input');
+            input.type = 'checkbox';
+            input.className = 'form-check-input';
+            input.id = 'fld_' + field.name;
+            input.name = 'field_' + field.name;
+            input.value = '1';
+            input.checked = !!value;
+            label.className = 'form-check-label';
+            wrap.appendChild(input);
+            wrap.appendChild(label);
+        } else if (field.type === 'textarea') {
+            input = document.createElement('textarea');
+            input.className = 'form-control';
+            input.id = 'fld_' + field.name;
+            input.name = 'field_' + field.name;
+            input.rows = 4;
+            input.value = value || '';
+            if (field.placeholder) input.placeholder = field.placeholder;
+            wrap.appendChild(label);
+            wrap.appendChild(input);
+        } else {
+            input = document.createElement('input');
+            input.type = (field.type === 'url' ? 'url' : (field.type === 'email' ? 'email' : 'text'));
+            input.className = 'form-control';
+            input.id = 'fld_' + field.name;
+            input.name = 'field_' + field.name;
+            input.value = value || '';
+            if (field.placeholder) input.placeholder = field.placeholder;
+            wrap.appendChild(label);
+            wrap.appendChild(input);
+
+            if (field.type === 'url') {
+                const fb = document.createElement('div');
+                fb.className = 'invalid-feedback';
+                fb.textContent = 'Must be a full URL starting with https:// or http://.';
+                wrap.appendChild(fb);
+            }
+        }
+
+        if (field.help) {
+            const help = document.createElement('p');
+            help.className = 'field-help mt-1 mb-0';
+            help.textContent = field.help;
+            wrap.appendChild(help);
+        }
+
+        container.appendChild(wrap);
+    });
+
+    applyShowIfGating();
+}
+
+function applyShowIfGating() {
+    document.querySelectorAll('.field-row').forEach(function (row) {
+        if (!row.dataset.showIf) {
+            row.style.display = '';
+            return;
+        }
+        const target = document.querySelector('#fld_' + row.dataset.showIf);
+        row.style.display = (target && target.checked) ? '' : 'none';
+    });
+}
+
+function captureCurrentFields() {
+    if (!activeTemplateKey) return;
+    const tmpl = findTemplate(activeTemplateKey);
+    if (!tmpl) return;
+    const captured = {};
+    tmpl.fields.forEach(function (f) {
+        const el = document.getElementById('fld_' + f.name);
+        if (!el) return;
+        if (f.type === 'checkbox') captured[f.name] = el.checked;
+        else captured[f.name] = el.value;
+    });
+    fieldsByTemplate[activeTemplateKey] = captured;
+}
+
+function schedulePreviewRefresh() {
+    if (previewDebounceTimer) clearTimeout(previewDebounceTimer);
+    document.getElementById('previewFrame').classList.add('preview-stale');
+    previewDebounceTimer = setTimeout(refreshPreview, 250);
+}
+
+function refreshPreview() {
+    if (!activeTemplateKey) return;
+    const fd = new FormData();
+    fd.append('template_key', activeTemplateKey);
+    document.querySelectorAll('#dynamicFormFields input, #dynamicFormFields textarea').forEach(function (el) {
+        if (el.type === 'checkbox') {
+            if (el.checked) fd.append(el.name, el.value);
+        } else {
+            fd.append(el.name, el.value);
+        }
+    });
+
+    fetch('inc/render_disclaimer_preview.cfm', { method: 'POST', body: fd, credentials: 'same-origin' })
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+            const iframe = document.getElementById('previewFrame');
+            const sampleBody = '<p style="margin:0 0 16px 0;color:##333;">[The user\'s email body would appear here. The disclaimer renders below.]</p>';
+            iframe.srcdoc =
+                '<!doctype html><html><head><base href="' + location.origin + '/">' +
+                '<style>body{margin:12px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;color:##333;}</style>' +
+                '</head><body>' + sampleBody + html + '</body></html>';
+            iframe.classList.remove('preview-stale');
+        })
+        .catch(function () {
+            const iframe = document.getElementById('previewFrame');
+            iframe.srcdoc = '<p style="color:##b91c1c;padding:1em;">Preview render failed.</p>';
+            iframe.classList.remove('preview-stale');
+        });
+}
+
+// Scope dropdown -> show/hide scope_key dropdowns (mutually exclusive).
+function syncScopeKeyVisibility() {
+    const scope = document.getElementById('scope').value;
+    ['domain', 'relay'].forEach(function (k) {
+        const wrap = document.getElementById('scopeKeyWrap_' + k);
+        const sel  = document.getElementById('scope_key_' + k);
+        if (k === scope) {
+            wrap.style.display = '';
+            sel.disabled = false;
+        } else {
+            wrap.style.display = 'none';
+            // Don't change disabled on edit-mode hidden mirrors; just hide visually.
+            if (!IS_EDIT) sel.disabled = true;
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    syncScopeKeyVisibility();
+    document.getElementById('scope').addEventListener('change', syncScopeKeyVisibility);
+
+    document.querySelectorAll('.template-card').forEach(function (card) {
+        card.addEventListener('click', function () {
+            selectTemplate(card.dataset.templateKey);
+        });
+    });
+
+    if (INITIAL_TEMPLATE_KEY) {
+        selectTemplate(INITIAL_TEMPLATE_KEY);
+    }
+
+    document.getElementById('dynamicFormFields').addEventListener('input', function () {
+        applyShowIfGating();
+        schedulePreviewRefresh();
+    });
+    document.getElementById('dynamicFormFields').addEventListener('change', function () {
+        applyShowIfGating();
+        schedulePreviewRefresh();
+    });
+
+    document.getElementById('btnRefreshPreview').addEventListener('click', refreshPreview);
+
+    document.getElementById('disclaimerForm').addEventListener('submit', function (ev) {
+        if (!activeTemplateKey) {
+            ev.preventDefault();
+            alert('Pick a template first.');
+            return;
+        }
+        // Scope-key required.
+        const scope = document.getElementById('scope').value;
+        const scopeKeyEl = document.getElementById('scope_key_' + scope);
+        if (scopeKeyEl && !scopeKeyEl.value) {
+            ev.preventDefault();
+            const preloader = document.querySelector('.preloader');
+            if (preloader) { preloader.style.display = 'none'; preloader.style.opacity = '0'; }
+            alert('Please select a ' + scope + '.');
+            scopeKeyEl.focus();
+            return;
+        }
+        // URL validation on dynamic fields.
+        let firstBad = null;
+        document.querySelectorAll('#dynamicFormFields input, #dynamicFormFields textarea').forEach(function (el) {
+            el.classList.remove('is-invalid');
+        });
+        document.querySelectorAll('#dynamicFormFields input').forEach(function (el) {
+            const v = (el.value || '').trim();
+            if (!v) return;
+            let bad = false;
+            if (el.type === 'url') {
+                if (!/^https?:\/\/[^\s]+$/i.test(v)) bad = true;
+            }
+            if (bad) {
+                el.classList.add('is-invalid');
+                if (!firstBad) firstBad = el;
+            }
+        });
+        if (firstBad) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            const preloader = document.querySelector('.preloader');
+            if (preloader) { preloader.style.display = 'none'; preloader.style.opacity = '0'; }
+            const row = firstBad.closest('.field-row');
+            if (row) row.style.display = '';
+            firstBad.focus();
+        }
+    });
+
+    if (IS_EDIT) {
+        document.getElementById('pageTitle').textContent = 'Edit Disclaimer';
+        document.getElementById('crumbMode').textContent = 'Edit';
+    }
+});
+</script>
 
 </div>
 </body>

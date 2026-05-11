@@ -2214,4 +2214,146 @@ CREATE TABLE IF NOT EXISTS org_signatures (
     UNIQUE KEY uk_domain_dept (domain_id, department_label)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- ============================================================================
+-- EXTERNAL SENDER BANNER (#228) - prepended warning on inbound mail from
+-- external senders to local recipients. Helps users spot phishing/spoofing.
+--
+-- Per-recipient-domain row + system-wide default. recipient_domain IS NULL
+-- = system-wide default; non-NULL rows match the local recipient's domain
+-- (the @-suffix of mailboxes.username) at message time. MariaDB treats
+-- NULLs as distinct in UNIQUE indexes, so the per-domain + one system
+-- default coexist cleanly under one constraint.
+--
+-- position default 'prepend' (banners appear at the top so users see them
+-- immediately). Disclaimers append by default; banners prepend by default.
+-- Admin can flip per-row.
+--
+-- enabled is TINYINT(3) per the Lucee/MariaDB JDBC TINYINT(1)->Boolean
+-- coercion gotcha (feedback_tinyint_boolean memory).
+--
+-- Form-based template renderer (mirrors #226 Phase 2A Organizational
+-- Signatures). Admin picks a template_key + fills form fields; CFML
+-- renders pixel-perfect HTML server-side and stores in body_html /
+-- body_text. Avoids Quill 2.x's HTML-normalization issues with inline
+-- styles, which Gmail/Outlook strip aggressively.
+--
+-- Both Community + Pro - phishing protection is a baseline security
+-- feature, not a Pro upsell.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS external_banners (
+    id                INT AUTO_INCREMENT PRIMARY KEY,
+    recipient_domain  VARCHAR(255) NULL,
+    template_key      VARCHAR(64) NOT NULL DEFAULT 'warning_yellow',
+    fields_json       LONGTEXT NULL,
+    body_text         LONGTEXT NULL,
+    body_html         LONGTEXT NOT NULL,
+    position          ENUM('prepend','append') NOT NULL DEFAULT 'prepend',
+    enabled           TINYINT(3) NOT NULL DEFAULT 1,
+    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uk_recipient_domain (recipient_domain)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ============================================================================
+-- SPAM_SETTINGS: system_managed flag (#234)
+--
+-- Marks rows as locked against admin edit/delete in view_score_overrides.cfm.
+-- Reserved for future "this score override is architectural, not tunable"
+-- entries. Originally introduced for DKIM rules under #234, but the final
+-- DKIM solution (disable the SpamAssassin DKIM plugin via init.pre) makes
+-- per-rule score overrides unnecessary. The flag mechanism is kept so it
+-- can be used by future system-level overrides without another schema
+-- migration.
+--
+-- UI: view_score_overrides.cfm renders system_managed=1 rows with a "lock"
+-- icon + System-managed badge, and the action handlers reject edit/delete
+-- on these rows. SQL itself enforces `AND system_managed = 0` on UPDATE
+-- and DELETE as a forged-POST safety net.
+-- ============================================================================
+
+ALTER TABLE spam_settings
+  ADD COLUMN IF NOT EXISTS system_managed TINYINT(3) NOT NULL DEFAULT 0 AFTER applied;
+
+-- ============================================================================
+-- Clean up inert DKIM/ADSP/SPF score overrides (#234)
+--
+-- Both SA's DKIM plugin (v312.pre override) and SPF plugin (init.pre
+-- override) are disabled. Any score overrides for rules belonging to
+-- those plugin families are now structurally inert — the rules cannot
+-- fire because their eval functions are no longer registered with
+-- SpamAssassin. Removing the rows keeps the view_score_overrides UI
+-- uncluttered and avoids admin confusion ("why isn't this DKIM rule
+-- scoring?").
+--
+-- Coverage (case-sensitive prefix/substring match against `parameter`):
+--   DKIM_*       — DKIM_INVALID, DKIM_VALID, DKIM_VALID_AU, DKIM_SIGNED,
+--                  DKIM_ADSP_ALL/DISCARD/NXDOMAIN/CUSTOM_*, etc.
+--   SPF_*        — SPF_FAIL, SPF_PASS, SPF_SOFTFAIL, SPF_NEUTRAL,
+--                  SPF_HELO_*, etc.
+--   %ADSP%       — also catches NML_ADSP_CUSTOM_* (different prefix family)
+--
+-- New rows in these families are blocked at add time by
+-- view_score_overrides.cfm (alert code 13). DKIM/SPF authority lives
+-- at OpenDKIM (:25) and postfix-policy-spf-python respectively.
+--
+-- Idempotent: re-running this migration after the rows are already gone
+-- is a no-op.
+-- ============================================================================
+
+DELETE FROM spam_settings
+WHERE spamfilter = '1'
+  AND (
+       parameter LIKE 'DKIM_%'
+    OR parameter LIKE 'SPF_%'
+    OR parameter LIKE '%ADSP%'
+  );
+
+-- ============================================================================
+-- SPF policy: tighten to reject Softfail (#234)
+--
+-- SA's SPF plugin is disabled (init.pre override), so postfix-policy-spf-python
+-- at :25 is the only SPF verifier. To preserve the spam-coverage we previously
+-- got from SA's SPF_SOFTFAIL rule, raise postfix policy rejection from Fail
+-- (hard fail only) to Softfail (hard + soft fail). DB-driven via parameters2
+-- which view_spf_settings.cfm reads/writes; spf_generate_config_file.cfm
+-- renders policyd-spf.conf from these values.
+--
+-- WHERE value2 = 'Fail' preserves any admin-tuned non-default choices (e.g.,
+-- 'SPF_Not_Pass' for stricter "Reject All" mode stays untouched). Idempotent:
+-- re-running this migration after the value is already Softfail is a no-op.
+-- ============================================================================
+
+UPDATE parameters2
+SET value2 = 'Softfail', applied = '1'
+WHERE module = 'spf'
+  AND parameter IN ('HELO_reject', 'Mail_From_reject')
+  AND value2 = 'Fail';
+
+-- ============================================================================
+-- DISCLAIMERS: Quill -> form-based template renderer refactor (#235)
+--
+-- Adds template_key + fields_json to disclaimers, mirroring the schema
+-- shape of external_banners (#228) and org_signatures (#226 Phase 2A).
+-- The body milter still reads body_text + body_html (no body_milter
+-- change needed); the new columns are for the admin UI's template
+-- picker + form-field round-tripping.
+--
+-- Force re-creation of existing disclaimer rows: the Quill-produced
+-- body_html cannot be cleanly mapped to a structured template, so
+-- existing rows are dropped. Admins must recreate via the new picker
+-- after this migration runs. Acceptable per #235 scope decision
+-- (feature was not yet production-declared; only test rows in DBs).
+--
+-- Idempotent: re-running ALTERs is a no-op via IF NOT EXISTS; re-running
+-- the DELETE on an already-empty table is also a no-op. Per-disclaimer
+-- file artifacts under /etc/hermes/body_milter/disclaimers/files/ are
+-- cleaned by disclaimer_write_and_reload.cfm on the next save (it wipes
+-- and rebuilds the dir from the DB rows).
+-- ============================================================================
+
+ALTER TABLE disclaimers
+  ADD COLUMN IF NOT EXISTS template_key VARCHAR(64) NOT NULL DEFAULT '' AFTER position;
+ALTER TABLE disclaimers
+  ADD COLUMN IF NOT EXISTS fields_json LONGTEXT NULL AFTER template_key;
+
+DELETE FROM disclaimers;
 

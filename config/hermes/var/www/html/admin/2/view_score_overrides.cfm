@@ -77,7 +77,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   "7":  {type:"success", msg:"Score override edited successfully. SpamAssassin configuration regenerated."},
   "8":  {type:"success", msg:"Score override(s) deleted successfully. SpamAssassin configuration regenerated."},
   "10": {type:"danger",  msg:"You must select at least one entry before clicking Delete"},
-  "11": {type:"danger",  msg:"An error occurred while applying settings"}
+  "11": {type:"danger",  msg:"An error occurred while applying settings"},
+  "12": {type:"danger",  msg:"This rule is system-managed and cannot be edited or deleted (defines a Hermes architectural decision)"},
+  "13": {type:"danger",  msg:"Score overrides for DKIM_*, ADSP, and SPF_* rules have no effect because the underlying SpamAssassin plugins are disabled in Hermes. See the warning callout for details and the authoritative verifier for each protocol."}
 }>
 
 <cfif structKeyExists(alerts, toString(m))>
@@ -98,6 +100,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- Validate test name --->
   <cfif NOT StructKeyExists(form, "parameter") OR trim(form.parameter) is "">
     <cfset session.m = 2>
+    <cflocation url="view_score_overrides.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Block adds for rules belonging to plugins we've disabled (#234).
+        Lookup is case-insensitive so admins can't sidestep with mixed case. --->
+  <cfset _paramUpper = UCase(trim(form.parameter))>
+  <cfif Left(_paramUpper, 5) IS "DKIM_"
+     OR FindNoCase("ADSP", _paramUpper) GT 0
+     OR Left(_paramUpper, 4) IS "SPF_">
+    <cfset session.m = 13>
     <cflocation url="view_score_overrides.cfm" addtoken="no">
   </cfif>
 
@@ -153,6 +165,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfelseif action is "edit">
 
   <cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)>
+    <!--- Block edits to system-managed rules (forged POST defense; UI hides the edit button) --->
+    <cfquery name="checkSysManagedEdit" datasource="hermes">
+      SELECT system_managed FROM spam_settings
+      WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+        AND spamfilter = '1'
+    </cfquery>
+    <cfif checkSysManagedEdit.recordcount EQ 1 AND checkSysManagedEdit.system_managed EQ 1>
+      <cfset session.m = 12>
+      <cflocation url="view_score_overrides.cfm" addtoken="no">
+    </cfif>
+
     <!--- Validate score --->
     <cfif NOT StructKeyExists(form, "edit_value") OR trim(form.edit_value) is "">
       <cfset session.m = 5>
@@ -174,6 +197,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           applied = '1'
       WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
         AND spamfilter = '1'
+        AND system_managed = 0
     </cfquery>
 
     <!--- Apply immediately --->
@@ -199,10 +223,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfloop index="i" list="#form.delete_id#" delimiters=",">
     <cfif IsValid("integer", i)>
+      <!--- AND system_managed = 0 silently skips any forged POST targeting a system-managed row.
+            UI hides the checkbox for system-managed rows so legitimate users never hit this path. --->
       <cfquery datasource="hermes">
         DELETE FROM spam_settings
         WHERE id = <cfqueryparam value="#i#" cfsqltype="cf_sql_integer">
           AND spamfilter = '1'
+          AND system_managed = 0
       </cfquery>
     </cfif>
   </cfloop>
@@ -236,12 +263,58 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Load current overrides --->
 <cfquery name="getOverrides" datasource="hermes">
-  SELECT id, parameter, value, description, applied
+  SELECT id, parameter, value, description, applied, system_managed
   FROM spam_settings
   WHERE spamfilter = '1' AND active = '1'
-  ORDER BY parameter ASC
+  ORDER BY system_managed DESC, parameter ASC
 </cfquery>
 
+
+<!-- HELP CARD (COLLAPSIBLE) -->
+<div class="card card-outline card-secondary mb-4">
+  <div class="card-header">
+    <h3 class="card-title">
+      <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggleScoringHelper" title="Expand">
+        <i class="fas fa-chevron-down"></i>
+      </button>
+      <i class="fas fa-question-circle"></i> How SpamAssassin Scoring Works
+    </h3>
+  </div>
+  <div class="collapse" id="scoringHelper">
+    <div class="card-body">
+      <p>SpamAssassin evaluates each incoming email against hundreds of built-in test rules. Each rule that matches adds its score to the message's total spam score. When the total score exceeds the spam threshold (configured in Antispam Settings), the message is flagged or quarantined as spam.</p>
+
+      <p><strong>Score overrides</strong> let you change the default score of any built-in SpamAssassin rule without modifying SpamAssassin's core files. Your overrides are written to <code>local.cf</code> and take precedence over the defaults.</p>
+
+      <h5 class="border-bottom pb-2 mb-2 mt-3">How scores work</h5>
+      <ul class="mb-3">
+        <li><strong>Positive score</strong> (e.g., <code>3.5</code>) - Adds to the spam score. Higher values make the rule more aggressive at flagging spam.</li>
+        <li><strong>Score of 0</strong> - Effectively disables the rule. The rule still runs but contributes nothing to the spam score.</li>
+        <li><strong>Negative score</strong> (e.g., <code>-2.0</code>) - Subtracts from the spam score. Acts as a whitelist/bonus, making it harder for the message to be flagged as spam.</li>
+      </ul>
+
+      <h5 class="border-bottom pb-2 mb-2 mt-3">Common use cases</h5>
+      <ul class="mb-3">
+        <li><strong>Reduce false positives</strong> - Lower the score of a rule that incorrectly flags legitimate mail (e.g., <code>HTML_MESSAGE 0</code> to stop penalizing HTML-only emails)</li>
+        <li><strong>Increase detection</strong> - Raise the score of a rule to catch more spam (e.g., <code>BAYES_99 5.0</code> to heavily penalize messages the Bayesian filter is 99% sure are spam)</li>
+        <li><strong>Disable a rule entirely</strong> - Set any rule's score to <code>0</code></li>
+      </ul>
+
+      <h5 class="border-bottom pb-2 mb-2 mt-3">Examples</h5>
+      <table class="table table-sm table-bordered mb-3" style="max-width:700px;">
+        <thead><tr><th>Test Name</th><th>Score</th><th>Effect</th></tr></thead>
+        <tbody>
+          <tr><td><code>BAYES_99</code></td><td><code>5.0</code></td><td>Increase weight when Bayes filter is 99% sure message is spam</td></tr>
+          <tr><td><code>BAYES_50</code></td><td><code>1.0</code></td><td>Reduce default weight when Bayes filter is only 50% confident</td></tr>
+          <tr><td><code>FREEMAIL_FROM</code></td><td><code>1.0</code></td><td>Penalize mail from public free-email providers (Gmail, Yahoo, etc.)</td></tr>
+          <tr><td><code>HTML_MESSAGE</code></td><td><code>0</code></td><td>Disable the HTML_MESSAGE rule (score of 0 = rule has no effect)</td></tr>
+        </tbody>
+      </table>
+
+      <p class="mb-0"><small class="text-muted"><strong>Finding rule names:</strong> Check the <code>X-Spam-Status</code> header of any email to see which SpamAssassin rules matched and their scores. Rule names are uppercase with underscores (e.g., <code>BAYES_99</code>, <code>HTML_MESSAGE</code>).</small></p>
+    </div>
+  </div>
+</div>
 
 <!-- SCORE OVERRIDES CARD -->
 <div class="card card-primary card-outline mb-4">
@@ -250,40 +323,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <div class="card-body">
 
-    <div class="alert alert-info mb-3">
-      <i class="fas fa-info-circle me-1"></i> <strong>How SpamAssassin Scoring Works</strong>
-      <p class="mt-2 mb-2">SpamAssassin evaluates each incoming email against hundreds of built-in test rules. Each rule that matches adds its score to the message's total spam score. When the total score exceeds the spam threshold (configured in Antispam Settings), the message is flagged or quarantined as spam.</p>
-
-      <p class="mb-2"><strong>Score overrides</strong> let you change the default score of any built-in SpamAssassin rule without modifying SpamAssassin's core files. Your overrides are written to <code>local.cf</code> and take precedence over the defaults.</p>
-
-      <hr>
-      <strong>How scores work:</strong>
-      <ul class="mb-2 mt-1">
-        <li><strong>Positive score</strong> (e.g., <code>3.5</code>) - Adds to the spam score. Higher values make the rule more aggressive at flagging spam.</li>
-        <li><strong>Score of 0</strong> - Effectively disables the rule. The rule still runs but contributes nothing to the spam score.</li>
-        <li><strong>Negative score</strong> (e.g., <code>-2.0</code>) - Subtracts from the spam score. Acts as a whitelist/bonus, making it harder for the message to be flagged as spam.</li>
+    <div class="alert alert-warning mb-3">
+      <i class="fas fa-exclamation-triangle me-1"></i> <strong>DKIM and SPF rules are not evaluated by SpamAssassin</strong>
+      <p class="mt-2 mb-2">Both the SpamAssassin <strong>DKIM</strong> and <strong>SPF</strong> plugins are intentionally disabled in Hermes SEG. Adding score overrides for any of the following rule families will have <strong>no effect</strong> — the rules will be parsed but cannot fire because the underlying plugin functions are not loaded:</p>
+      <ul class="mb-2">
+        <li><strong>DKIM rules</strong>: <code>DKIM_INVALID</code>, <code>DKIM_VALID</code>, <code>DKIM_ADSP_ALL</code>, <code>DKIM_ADSP_DISCARD</code>, <code>DKIM_ADSP_NXDOMAIN</code>, <code>DKIM_ADSP_CUSTOM_*</code>, <code>NML_ADSP_CUSTOM_*</code></li>
+        <li><strong>SPF rules</strong>: <code>SPF_PASS</code>, <code>SPF_FAIL</code>, <code>SPF_SOFTFAIL</code>, <code>SPF_NEUTRAL</code>, <code>SPF_HELO_FAIL</code>, <code>SPF_HELO_SOFTFAIL</code>, <code>SPF_HELO_PASS</code></li>
       </ul>
-
-      <strong>Common use cases:</strong>
-      <ul class="mb-2 mt-1">
-        <li><strong>Reduce false positives</strong> - Lower the score of a rule that incorrectly flags legitimate mail (e.g., <code>HTML_MESSAGE 0</code> to stop penalizing HTML-only emails)</li>
-        <li><strong>Increase detection</strong> - Raise the score of a rule to catch more spam (e.g., <code>BAYES_99 5.0</code> to heavily penalize messages the Bayesian filter is 99% sure are spam)</li>
-        <li><strong>Disable a rule entirely</strong> - Set any rule's score to <code>0</code></li>
-      </ul>
-
-      <strong>Examples:</strong>
-      <table class="table table-sm table-bordered mt-1 mb-1" style="max-width:600px;">
-        <thead><tr><th>Test Name</th><th>Score</th><th>Effect</th></tr></thead>
-        <tbody>
-          <tr><td><code>BAYES_99</code></td><td><code>5.0</code></td><td>Increase weight when Bayes filter is 99% sure message is spam</td></tr>
-          <tr><td><code>BAYES_50</code></td><td><code>1.0</code></td><td>Reduce default weight when Bayes filter is only 50% confident</td></tr>
-          <tr><td><code>DKIM_ADSP_ALL</code></td><td><code>3.0</code></td><td>Penalize unsigned mail from domains that declare all mail is signed</td></tr>
-          <tr><td><code>SPF_FAIL</code></td><td><code>0</code></td><td>Disable the SPF_FAIL rule (score of 0 = rule has no effect)</td></tr>
-          <tr><td><code>HTML_MESSAGE</code></td><td><code>0</code></td><td>Disable the HTML_MESSAGE rule (score of 0 = rule has no effect)</td></tr>
-        </tbody>
-      </table>
-
-      <small class="text-muted"><strong>Finding rule names:</strong> Check the <code>X-Spam-Status</code> header of any email to see which SpamAssassin rules matched and their scores. Rule names are uppercase with underscores (e.g., <code>BAYES_99</code>, <code>SPF_FAIL</code>, <code>HTML_MESSAGE</code>).</small>
+      <p class="mb-2"><strong>Why DKIM is disabled:</strong> DKIM verification is performed once at the gateway perimeter by OpenDKIM (the authoritative source). Hermes modifies inbound message bodies (External Sender Banner, Disclaimers, Signatures), which would cause SpamAssassin's redundant DKIM re-verification to produce false-positive <code>dkim=fail</code> verdicts on every legitimate message. The <code>Authentication-Results:</code> header written by OpenDKIM at <code>:25</code> is the authoritative DKIM verdict.</p>
+      <p class="mb-0"><strong>Why SPF is disabled:</strong> SPF verification is performed at SMTP envelope time by <code>postfix-policyd-spf-python</code> on hard fail AND soft fail. SpamAssassin's redundant SPF re-check could pick up the wrong intermediate hop's IP from the Received chain in multi-relay scenarios (federal mail, M365 GOV cloud, Proofpoint Government, etc.) and produce false-positive fail/softfail verdicts. The <code>Received-SPF:</code> header written by <code>postfix-policyd-spf-python</code> is the authoritative SPF verdict.</p>
     </div>
 
     <!-- BUTTONS -->
@@ -314,16 +362,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </thead>
           <tbody>
             <cfoutput query="getOverrides">
-            <tr>
-              <td><input type="checkbox" name="id" value="#id#"></td>
-              <td>#encodeForHTML(parameter)#</td>
+            <tr<cfif system_managed eq 1> class="table-light"</cfif>>
+              <td>
+                <cfif system_managed eq 1>
+                  <span class="text-muted" title="System-managed - cannot be edited or deleted"><i class="fas fa-lock"></i></span>
+                <cfelse>
+                  <input type="checkbox" name="id" value="#id#">
+                </cfif>
+              </td>
+              <td>
+                #encodeForHTML(parameter)#
+                <cfif system_managed eq 1>
+                  <span class="badge bg-secondary ms-2" title="Managed by Hermes architecture (GitHub ##234)">System-managed</span>
+                </cfif>
+              </td>
               <td>#encodeForHTML(value)#</td>
               <td>#encodeForHTML(description)#</td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary" title="Edit"
-                  onclick="openEditModal(#id#, '#encodeForJavaScript(parameter)#', '#encodeForJavaScript(value)#', '#encodeForJavaScript(description)#')">
-                  <i class="fas fa-edit"></i>
-                </button>
+                <cfif system_managed eq 1>
+                  <button type="button" class="btn btn-sm btn-secondary" disabled title="System-managed - cannot be edited">
+                    <i class="fas fa-lock"></i>
+                  </button>
+                <cfelse>
+                  <button type="button" class="btn btn-sm btn-primary" title="Edit"
+                    onclick="openEditModal(#id#, '#encodeForJavaScript(parameter)#', '#encodeForJavaScript(value)#', '#encodeForJavaScript(description)#')">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                </cfif>
               </td>
             </tr>
             </cfoutput>
@@ -490,6 +555,19 @@ function openEditModal(id, parameter, value, description) {
   document.getElementById('edit_description').value = description;
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
+
+// Scoring Helper toggle (chevron down/up) - mirrors view_message_rules.cfm pattern
+$('#toggleScoringHelper').on('click', function() {
+  $('#scoringHelper').collapse('toggle');
+});
+$('#scoringHelper').on('shown.bs.collapse', function() {
+  $('#toggleScoringHelper').find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+  $('#toggleScoringHelper').attr('title', 'Collapse');
+});
+$('#scoringHelper').on('hidden.bs.collapse', function() {
+  $('#toggleScoringHelper').find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+  $('#toggleScoringHelper').attr('title', 'Expand');
+});
 </script>
 
 </body>

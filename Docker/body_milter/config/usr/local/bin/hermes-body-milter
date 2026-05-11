@@ -85,7 +85,7 @@ import re
 import sys
 import threading
 import traceback
-from email import message_from_bytes, policy as email_policy
+from email import encoders, message_from_bytes, policy as email_policy
 from email.message import Message
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
@@ -584,6 +584,53 @@ class Modifier:
     # (e.g. a long disclaimer "Note: this message is...").
     _LABEL_ONLY_RE = re.compile(r'^\s*[A-Za-z]{1,12}\s*:\s*$')
 
+    @staticmethod
+    def _force_base64_encoding(part: Message) -> None:
+        """Force a text part to base64 Content-Transfer-Encoding.
+
+        Python's email library defaults to quoted-printable for text
+        content under the SMTP policy. QP wraps long lines with
+        `=\\r\\n` soft line breaks every 76 chars. If the receiving MUA
+        doesn't decode QP correctly (CTE header mismatch in transit,
+        broken serialization, etc.), those soft breaks render as
+        literal `=` characters in the visible body.
+
+        Base64 sidesteps the issue entirely - no soft line breaks, no
+        special characters in the encoded form, universal MUA support.
+
+        Call this AFTER set_content on a modified text/* part to
+        replace any QP encoding with base64. Idempotent.
+
+        Implementation: hand-rolled set_payload(string) + explicit CTE
+        header was tried first but is unreliable under email.policy.SMTP
+        (an EmailPolicy, not compat32) - the policy's content manager
+        re-evaluates the CTE during as_bytes() serialization and silently
+        overrides our explicit `base64` header back to `quoted-printable`
+        for single-part text/* messages. (Multipart inner parts use a
+        different code path that DOES honor the explicit header, which
+        is why this bug only manifested on single-part text/html mail.)
+
+        email.encoders.encode_base64 is the canonical policy-agnostic
+        path: it puts raw bytes in the payload, base64-encodes them in
+        place, and sets the CTE header in a way the generator honors
+        across both single- and multi-part shapes."""
+        try:
+            payload = part.get_content()
+        except Exception:
+            return
+        if not isinstance(payload, str):
+            return
+        try:
+            charset = part.get_content_charset() or 'utf-8'
+            raw = payload.encode(charset, errors='replace')
+        except Exception:
+            return
+        # Set the raw decoded bytes as the payload, then let the email
+        # encoders module handle base64 encoding AND the header update.
+        part.set_payload(raw)
+        del part['Content-Transfer-Encoding']
+        encoders.encode_base64(part)
+
     def _drop_empty_contact_lines(self, html: str) -> str:
         """Walk substituted HTML and drop leaf <div> elements that:
           - contain no text content at all (a {{user.title}} that
@@ -638,8 +685,16 @@ class DisclaimerModifier(Modifier):
         images/N.png       inline images referenced by cid: (#230)
 
     Match: outbound + sender matches map (full address before @domain).
-    Skip: signed envelope, PGP inline, pre-existing DKIM (preserve
-          upstream-signed mail going through a relay user).
+    Skip: S/MIME or PGP envelope (recipient verification would fail),
+          PGP inline body block.
+    Does NOT skip on pre-existing DKIM-Signature: the multi-instance
+    OpenDKIM architecture (#232) places a sign-only OpenDKIM instance
+    at :10026 that re-signs the modified body after CipherMail rebuilds
+    MIME. The DKIM-Signature header written by the primary OpenDKIM
+    at :587/:465 submission is invalidated by our body modification,
+    but the :10026 re-sign step produces a fresh valid signature on
+    egress. Skipping on DKIM here would render this feature useless
+    on the ~100% of outbound mail that gets signed at submission.
     No reply-chain dedup - every outbound message gets a fresh
     disclaimer, matching industry norm (Exclaimer, Crossware, M365
     transport rules) and compliance posture.
@@ -648,7 +703,7 @@ class DisclaimerModifier(Modifier):
     direction = 'outbound'
     skip_on_signed = True
     skip_on_pgp_inline = True
-    skip_on_dkim = True
+    skip_on_dkim = False        # #232 multi-instance OpenDKIM re-signs at :10026
 
     DIR = os.path.join(CONFIG_ROOT, 'disclaimers')
     FILES_DIR = os.path.join(DIR, 'files')
@@ -762,6 +817,7 @@ class DisclaimerModifier(Modifier):
                 try:
                     payload = part.get_content()
                     part.set_content(payload + '\n\n' + txt + '\n')
+                    self._force_base64_encoding(part)
                     plain_count += 1
                 except Exception:
                     log.warning('disclaimer: text/plain modify failed:\n%s',
@@ -771,6 +827,7 @@ class DisclaimerModifier(Modifier):
                     payload = part.get_content()
                     new = self._inject_html(payload, html)
                     part.set_content(new, subtype='html')
+                    self._force_base64_encoding(part)
                     html_count += 1
                 except Exception:
                     log.warning('disclaimer: text/html modify failed:\n%s',
@@ -827,13 +884,19 @@ class SignatureModifier(Modifier):
     signature.
 
     Match: outbound + sender's full address matches map.
-    Skip: signed envelope, PGP inline, pre-existing DKIM.
+    Skip: S/MIME or PGP envelope (recipient verification would fail),
+          PGP inline body block.
+    Does NOT skip on pre-existing DKIM-Signature: same rationale as
+    DisclaimerModifier - the #232 multi-instance OpenDKIM architecture
+    re-signs at :10026 after CipherMail rebuilds MIME, so we can
+    safely modify the body even though it carries a (now-invalid)
+    submission-time DKIM signature.
     """
     name = 'signature'
     direction = 'outbound'
     skip_on_signed = True
     skip_on_pgp_inline = True
-    skip_on_dkim = True
+    skip_on_dkim = False        # #232 multi-instance OpenDKIM re-signs at :10026
 
     DIR = os.path.join(CONFIG_ROOT, 'signatures')
     FILES_DIR = os.path.join(DIR, 'files')
@@ -967,6 +1030,221 @@ class SignatureModifier(Modifier):
 
 
 # ---------------------------------------------------------------------------
+# ExternalBannerModifier (#228) - prepended (or appended) warning banner on
+# inbound mail from external senders to local recipients. Helps users spot
+# phishing / spoofing.
+#
+# Lookup is by RECIPIENT DOMAIN, not sender:
+#    /etc/hermes/body_milter/banners/banner_by_recipient_domain
+#       <recipient_domain>\t<option_name>
+#       _default\t<option_name>           special key, system-wide fallback
+#    /etc/hermes/body_milter/banners/files/<option>/
+#       body.txt                  plain-text banner
+#       body.html                 html banner with cid: img refs
+#       images/<N>.<ext>          inline images (#230 pattern)
+#       position                  "prepend" or "append" - where to place
+#
+# Skip rules:
+#    skip_on_signed = True       (S/MIME and PGP envelopes - recipient would
+#                                 fail to verify)
+#    skip_on_pgp_inline = True   (same)
+#    skip_on_dkim = False        (Inbound rationale: DKIM verification at :25
+#                                 already happened upstream of us; the
+#                                 verdict is locked into Authentication-Results
+#                                 headers. Modifying body breaks the original
+#                                 signature, but the recipient's MUA almost
+#                                 never re-verifies. The forwarding edge case
+#                                 is mitigated by ARC sealing - see #229.
+#                                 Skipping on DKIM would render this feature
+#                                 useless on the ~95% of inbound mail that
+#                                 carries a DKIM signature.
+#                                 Same flag is also False on outbound modifiers
+#                                 (Disclaimer, Signature) - the #232 multi-
+#                                 instance OpenDKIM re-signs the modified body
+#                                 at :10026 post-CipherMail rebuild, so we
+#                                 can safely modify even when the submission-
+#                                 time DKIM-Signature header is present.)
+# ---------------------------------------------------------------------------
+
+class ExternalBannerModifier(Modifier):
+    """Prepend a warning banner to inbound mail from external senders.
+
+    Match: inbound (sender external + at least one recipient is local) +
+    a banner option exists for the first local recipient's domain or the
+    system-wide default.
+    """
+    name = 'external_banner'
+    direction = 'inbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False
+
+    DIR = os.path.join(CONFIG_ROOT, 'banners')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'banner_by_recipient_domain')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+    CID_REF_RE = re.compile(r'cid:(banner_[\w.-]+_img_\d+)')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+
+    def _pick_option(self, ctx: 'MessageContext') -> Optional[str]:
+        """Find the first local recipient, look up its domain in the map.
+        Fall back to the '_default' system-wide entry if the recipient's
+        domain has no specific row. Returns None if neither matches."""
+        for r in ctx.recipients:
+            if '@' not in r:
+                continue
+            rdom = r.split('@', 1)[1].lower()
+            if not local_domains.contains(rdom):
+                continue
+            opt = self.map.lookup(rdom)
+            if opt is not None:
+                return opt
+            break  # only check the first local recipient
+        # Fall back to system default
+        return self.map.lookup('_default')
+
+    def applies_to(self, ctx: 'MessageContext') -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self._pick_option(ctx) is not None
+
+    def modify(self, ctx: 'MessageContext') -> None:
+        option = self._pick_option(ctx)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('external_banner: refusing unsafe option name %r', option)
+            return
+
+        option_dir = os.path.join(self.FILES_DIR, option)
+        txt_path = os.path.join(option_dir, 'body.txt')
+        html_path = os.path.join(option_dir, 'body.html')
+        pos_path = os.path.join(option_dir, 'position')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('external_banner: missing per-option files for %r at %s',
+                        option, option_dir)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_banner = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_banner = f.read().decode('utf-8', 'replace')
+            position = 'prepend'
+            if os.path.isfile(pos_path):
+                with open(pos_path, 'rb') as f:
+                    raw_pos = f.read().decode('utf-8', 'replace').strip().lower()
+                if raw_pos in ('prepend', 'append'):
+                    position = raw_pos
+        except IOError as e:
+            log.warning('external_banner: cannot read per-option files: %s', e)
+            return
+
+        msg = ctx.email_message()
+        if position == 'append':
+            plain_n, html_n = self._append_to_parts(msg, txt_banner, html_banner)
+        else:
+            plain_n, html_n = self._prepend_to_parts(msg, txt_banner, html_banner)
+
+        if plain_n or html_n:
+            ctx.modified = True
+            log.info('external_banner applied: option=%s position=%s plain=%d html=%d direction=%s',
+                     option, position, plain_n, html_n, ctx.direction)
+            if html_n:
+                self._queue_cid_images(ctx, option_dir, html_banner)
+        else:
+            log.info('external_banner: no text/plain or text/html parts to modify')
+
+    def _append_to_parts(self, msg: Message, txt: str,
+                         html: str) -> Tuple[int, int]:
+        return DisclaimerModifier._append_to_parts(self, msg, txt, html)
+
+    def _prepend_to_parts(self, msg: Message, txt: str,
+                          html: str) -> Tuple[int, int]:
+        """Walk the MIME tree, prepend banner to text/plain and text/html
+        leaf parts. Counterpart to _append_to_parts."""
+        plain_count = 0
+        html_count = 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    part.set_content(txt + '\n\n' + payload)
+                    self._force_base64_encoding(part)
+                    plain_count += 1
+                except Exception:
+                    log.warning('external_banner: text/plain modify failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new = self._inject_html_prepend(payload, html)
+                    part.set_content(new, subtype='html')
+                    self._force_base64_encoding(part)
+                    html_count += 1
+                except Exception:
+                    log.warning('external_banner: text/html modify failed:\n%s',
+                                traceback.format_exc())
+        return (plain_count, html_count)
+
+    def _inject_html_prepend(self, body_html: str, banner_html: str) -> str:
+        """Insert banner_html as the FIRST child of <body>; if no <body>
+        tag is present, prepend at the start of the document."""
+        try:
+            soup = BeautifulSoup(body_html, 'html.parser')
+            body = soup.find('body')
+            banner_fragment = BeautifulSoup(banner_html, 'html.parser')
+            if body is not None:
+                body.insert(0, banner_fragment)
+            else:
+                # No <body> - prepend to root. Wrap in a div so the
+                # fragment doesn't get split if there's no top-level
+                # element.
+                soup.insert(0, banner_fragment)
+            return str(soup)
+        except Exception as e:
+            log.warning('external_banner: html parse failed, falling back to plain prepend: %s', e)
+            return banner_html + '\n' + body_html
+
+    def _queue_cid_images(self, ctx: 'MessageContext',
+                          option_dir: str, html_banner: str) -> None:
+        """Find cid: refs in the html banner; for each, locate the
+        matching image file and queue it for attachment at serialize time.
+        cid: refs follow pattern banner_<option>_img_<N> for namespace
+        separation from disclaimer_/signature_ cids."""
+        cid_refs = list(set(self.CID_REF_RE.findall(html_banner)))
+        if not cid_refs:
+            return
+        images_dir = os.path.join(option_dir, 'images')
+        if not os.path.isdir(images_dir):
+            log.warning('external_banner: html has %d cid refs but %s is missing',
+                        len(cid_refs), images_dir)
+            return
+        for cid in cid_refs:
+            m = re.search(r'_img_(\d+)$', cid)
+            if not m:
+                continue
+            idx = m.group(1)
+            file_path = None
+            for ext in ('png', 'jpg', 'jpeg', 'gif'):
+                candidate = os.path.join(images_dir, f'{idx}.{ext}')
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+            if file_path is None:
+                log.warning('external_banner: cid %s referenced in html but no '
+                            'matching image file in %s', cid, images_dir)
+                continue
+            ctx.attach_image(cid, file_path)
+            log.info('external_banner: queued inline image cid=%s file=%s',
+                     cid, file_path)
+
+
+# ---------------------------------------------------------------------------
 # Active modifier list. Order matters because each modifier appends its
 # content to the message; later modifiers append AFTER earlier ones.
 #
@@ -976,11 +1254,18 @@ class SignatureModifier(Modifier):
 #     [user signature]            <-- SignatureModifier appends first
 #     [domain disclaimer]         <-- DisclaimerModifier appends after
 #
-# Adding new modifiers (#228 banner, future Link Guard) is a one-line
-# append to this list - no dispatcher changes.
+# For inbound mail:
+#
+#     [external banner]           <-- ExternalBannerModifier prepends
+#     [original message body]
+#
+# Outbound modifiers skip on inbound; the inbound modifier skips on
+# outbound. Both directions can coexist in the registry without ordering
+# conflicts.
 # ---------------------------------------------------------------------------
 
 MODIFIERS: List[Modifier] = [
+    ExternalBannerModifier(),
     SignatureModifier(),
     DisclaimerModifier(),
 ]

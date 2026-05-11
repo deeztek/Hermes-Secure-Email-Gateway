@@ -35,6 +35,15 @@ $sa_tag_level_deflt = undef;
 $sa_tag2_level_deflt = 2;
 $sa_kill_level_deflt = 5;
 $sa_local_tests_only = 0;
+
+# DKIM verification disabled at amavis (#234, compensating control for #232).
+# OpenDKIM at :25 is the authoritative DKIM verifier — it sees the original,
+# unmodified body. amavis would re-verify against the post-body_milter body
+# (banner / disclaimer / signature injection) and produce false-positive
+# `dkim=fail` Authentication-Results headers. ARC sealing (#229) is the
+# long-term fix for downstream forwarders.
+$enable_dkim_verification = 0;
+
 $final_virus_destiny = final-virus-destiny;
 $final_banned_destiny = final-banned-destiny;
 $final_spam_destiny = final-spam-destiny;

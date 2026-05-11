@@ -368,6 +368,7 @@ services:
       - ./config/postfix-dkim/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
       - ./config/certbot/conf:/etc/letsencrypt
       - ./config/postfix-dkim/etc/opendkim.conf:/etc/opendkim.conf
+      - ./config/postfix-dkim/etc/opendkim-sign.conf:/etc/opendkim-sign.conf
       - ./config/hermes/opt/hermes:/opt/hermes
       - postfix_dkim_logs:/var/log
       - postfix_dkim_queue:/var/spool/postfix
@@ -441,6 +442,8 @@ services:
       - ./config/mail_filter/etc/amavis/conf.d/15-content_filter_mode:/etc/amavis/conf.d/15-content_filter_mode
       - ./config/postfix-dkim/etc/postfix/relay_domains:/etc/postfix/relay_domains
       - ./config/mail_filter/etc/spamassassin/local.cf:/etc/spamassassin/local.cf
+      - ./config/mail_filter/etc/spamassassin/init.pre:/etc/spamassassin/init.pre   # #234 - SPF plugin disabled (postfix-policyd-spf-python is the authoritative verifier)
+      - ./config/mail_filter/etc/spamassassin/v312.pre:/etc/spamassassin/v312.pre   # #234 - DKIM plugin disabled (OpenDKIM at :25 is the authoritative verifier)
       - ./config/mail_filter/sa-bayes:/sa-bayes
       - ./config/mail_filter/etc/clamav/clamd.conf:/etc/clamav/clamd.conf
       - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf

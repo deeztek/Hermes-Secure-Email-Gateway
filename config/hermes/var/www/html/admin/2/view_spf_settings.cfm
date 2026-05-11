@@ -213,6 +213,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i> Disabling <strong>SPF</strong> will also disable <strong>DMARC</strong>.</p>
       </div>
 
+      <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-1"></i> <strong>SPF is enforced once, at SMTP envelope time.</strong>
+        <p class="mt-2 mb-2">SpamAssassin's redundant SPF re-check has been disabled in Hermes SEG. Postfix's <code>postfix-policy-spf-python</code> on this page is the single authoritative SPF verifier. It sees the connecting client IP directly, avoiding the multi-hop relay-chain false-positives that SA's plugin can produce on federal/M365 GOV/Proofpoint Government mail.</p>
+        <p class="mb-0"><strong>Recommended:</strong> Set both HELO and Mail From Check Rejection Policy to <strong>Reject SoftFail</strong>. This maintains the spam-coverage that SA's <code>SPF_SOFTFAIL</code> rule previously provided.</p>
+      </div>
+
       <div class="row">
         <div class="col-md-6">
           <div class="mb-3">
@@ -254,9 +260,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <label class="form-label"><strong>HELO Check Rejection Policy</strong></label>
               <small class="form-text text-muted d-block mb-1">Controls how the system handles SPF results for the HELO/EHLO hostname check. The HELO identity is checked first in the SMTP dialogue before the Mail From check.</small>
               <select class="form-select" name="helo_reject">
-                <option value="Fail" <cfif helo_reject is "Fail">selected</cfif>>Reject HELO Fail (Default. Reject only on HELO Fail)</option>
+                <option value="Fail" <cfif helo_reject is "Fail">selected</cfif>>Reject HELO Fail (Reject only on HELO Fail)</option>
                 <option value="SPF_Not_Pass" <cfif helo_reject is "SPF_Not_Pass">selected</cfif>>Reject All (Reject on Fail, Softfail, Neutral or PermError)</option>
-                <option value="Softfail" <cfif helo_reject is "Softfail">selected</cfif>>Reject SoftFail (Reject on Softfail or Fail)</option>
+                <option value="Softfail" <cfif helo_reject is "Softfail">selected</cfif>>Reject SoftFail (Recommended. Reject on Softfail or Fail)</option>
                 <option value="Null" <cfif helo_reject is "Null">selected</cfif>>Reject Null (Reject HELO for Null Sender. NOT Recommended)</option>
                 <option value="False" <cfif helo_reject is "False">selected</cfif>>Append Only (Do NOT Reject, append SPF header only)</option>
                 <option value="No_Check" <cfif helo_reject is "No_Check">selected</cfif>>Disable Check (Do NOT Check HELO)</option>
@@ -269,9 +275,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <label class="form-label"><strong>Mail From Check Rejection Policy</strong></label>
               <small class="form-text text-muted d-block mb-1">Controls how the system handles SPF results for the envelope sender (MAIL FROM) check. If HELO rejection is already configured, messages failing HELO are rejected before reaching this check.</small>
               <select class="form-select" name="mail_from_reject">
-                <option value="Fail" <cfif mail_from_reject is "Fail">selected</cfif>>Reject Mail From Fail (Default. Reject only on Mail From Fail)</option>
+                <option value="Fail" <cfif mail_from_reject is "Fail">selected</cfif>>Reject Mail From Fail (Reject only on Mail From Fail)</option>
                 <option value="SPF_Not_Pass" <cfif mail_from_reject is "SPF_Not_Pass">selected</cfif>>Reject All (NOT Recommended)</option>
-                <option value="Softfail" <cfif mail_from_reject is "Softfail">selected</cfif>>Reject SoftFail (NOT Recommended)</option>
+                <option value="Softfail" <cfif mail_from_reject is "Softfail">selected</cfif>>Reject SoftFail (Recommended. Reject on Softfail or Fail)</option>
                 <option value="False" <cfif mail_from_reject is "False">selected</cfif>>Append Only (Do NOT Reject, append SPF header only)</option>
                 <option value="No_Check" <cfif mail_from_reject is "No_Check">selected</cfif>>Disable Check (Do NOT Check Mail From)</option>
               </select>

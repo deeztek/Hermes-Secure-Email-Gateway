@@ -31,6 +31,13 @@ service postfix start
 echo "Starting OpenDKIM"
 service opendkim start
 
+# #232 multi-instance OpenDKIM: sign-only secondary instance bound to
+# :8892 for the post-CipherMail re-injection at master.cf :10026. The
+# primary instance above (sv mode, :8891) keeps verifying inbound at
+# :25 and signing submission at :587/:465.
+echo "Starting OpenDKIM (sign-only secondary instance for :10026)"
+/usr/sbin/opendkim -x /etc/opendkim-sign.conf
+
 
 echo "Startup Complete"
 
