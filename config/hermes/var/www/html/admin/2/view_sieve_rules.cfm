@@ -527,6 +527,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     html += '<div class="col-md-7"><label class="form-label small mb-1 act-value-label">Folder name</label>';
     html += '<input type="text" class="form-control form-control-sm act-value-input" name="act_value_' + idx + '" maxlength="255" placeholder="e.g., Newsletters">';
     html += '<small class="form-text text-muted act-value-hint"></small>';
+    html += '<div class="alert alert-warning small mt-2 mb-0 act-redirect-warning" style="display:none;">';
+    html += '<i class="fas fa-shield-alt me-2"></i><strong>Chain-break warning (#229):</strong> ';
+    html += 'redirecting modified mail (banner / disclaimer injected) to an <strong>external address</strong> ';
+    html += 'invalidates the original sender\'s DKIM signature and any upstream ARC body hash. ';
+    html += 'The receiver may quarantine or reject the message based on its DMARC policy. ';
+    html += 'Internal redirects (to mailboxes Hermes hosts) are not affected. ';
+    html += 'For external destinations, ensure the receiver is configured to trust this gateway.';
+    html += '</div>';
     html += '</div>';
     html += '<div class="col-md-1 text-end">';
     html += '<button type="button" class="btn btn-sm btn-outline-danger" title="Remove" onclick="removeActionRow(' + idx + ')"><i class="fas fa-times"></i></button>';
@@ -590,6 +598,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     var $label = $row.find('.act-value-label');
     var $input = $row.find('.act-value-input');
     var $hint = $row.find('.act-value-hint');
+    var $redirectWarning = $row.find('.act-redirect-warning');
+    $redirectWarning.hide();
     if (type === 'fileinto') {
       $label.text('Folder name');
       $input.show().prop('disabled', false).attr('placeholder', 'e.g., Newsletters');
@@ -598,6 +608,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $label.text('Email address');
       $input.show().prop('disabled', false).attr('placeholder', 'e.g., user@domain.com');
       $hint.text('Forwarding may cause loops or trigger spam scoring on the destination server.');
+      $redirectWarning.show();
     } else if (type === 'reject') {
       $label.text('Rejection message');
       $input.show().prop('disabled', false).attr('placeholder', 'e.g., Mailbox does not accept mail');
