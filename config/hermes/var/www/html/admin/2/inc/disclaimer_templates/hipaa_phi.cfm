@@ -21,6 +21,7 @@ template = {
     name:        "HIPAA / PHI Notice",
     description: "Healthcare Protected Health Information disclaimer for HIPAA-covered entities and business associates. Includes misdirected-message contact.",
     thumbnail:   "hipaa_phi.png",
+    icon:        "fas fa-stethoscope",
     fields: [
         { name: "organization_name", label: "Organization Name", type: "text",     default: "",
           placeholder: "Acme Health Services",

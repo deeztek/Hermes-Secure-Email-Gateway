@@ -72,6 +72,20 @@ always shows exactly what save_external_banner_action.cfm will store.
 .template-card .thumb-wrap .placeholder {
     color: #9ca3af; font-size: 12px; font-style: italic;
 }
+/* Bulletproof title/description block layout: explicit display + spacing
+   so neither AdminLTE nor Bootstrap utility classes can collapse them
+   inline in narrow column widths. */
+.template-card .card-body {
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+.template-card .card-body .card-title,
+.template-card .card-body .card-text {
+    display: block;
+    margin: 0;
+}
 .field-help { color: #6b7280; font-size: 12px; }
 #previewFrame {
     width: 100%; height: 280px; border: 1px solid #e5e7eb; border-radius: 4px; background: #fff;

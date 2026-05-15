@@ -21,6 +21,7 @@ template = {
     name:        "Confidentiality (Standard)",
     description: "Generic confidentiality notice. Most-common corporate variant. Includes optional contact for misdirected messages.",
     thumbnail:   "confidentiality_standard.png",
+    icon:        "fas fa-lock",
     fields: [
         { name: "heading",         label: "Heading",          type: "text",     default: "CONFIDENTIALITY NOTICE",
           help: "Short emphasized prefix. Plain ASCII recommended." },

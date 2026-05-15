@@ -49,9 +49,28 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
         object-fit: contain;
     }
     .template-card .thumb-wrap .placeholder {
-        color: #6c757d;
+        color: #adb5bd;
         font-family: monospace;
         font-size: 0.85em;
+    }
+    .template-card .thumb-wrap .placeholder-icon {
+        font-size: 2.4rem;
+        color: #adb5bd;
+        line-height: 1;
+    }
+    /* Bulletproof title/description block layout: explicit display + spacing
+       so neither AdminLTE nor Bootstrap utility classes can collapse them
+       inline in narrow column widths. */
+    .template-card .card-body {
+        text-align: left;
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+    }
+    .template-card .card-body .card-title,
+    .template-card .card-body .card-text {
+        display: block;
+        margin: 0;
     }
     .field-help { font-size: 0.85em; color: #6c757d; }
 
@@ -326,13 +345,15 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                             <div class="thumb-wrap">
                                 <cfif t.thumbnailExists>
                                     <img src="inc/disclaimer_templates/thumbnails/#HTMLEditFormat(t.thumbnail)#" alt="#HTMLEditFormat(t.name)# preview">
+                                <cfelseif StructKeyExists(t, "icon") AND Len(Trim(t.icon))>
+                                    <i class="#HTMLEditFormat(t.icon)# placeholder-icon" aria-hidden="true"></i>
                                 <cfelse>
                                     <span class="placeholder">[#HTMLEditFormat(t.key)#]</span>
                                 </cfif>
                             </div>
                             <div class="card-body">
-                                <h5 class="card-title fs-6 mb-1">#HTMLEditFormat(t.name)#</h5>
-                                <p class="card-text small text-muted mb-0">#HTMLEditFormat(t.description)#</p>
+                                <h5 class="card-title fs-6">#HTMLEditFormat(t.name)#</h5>
+                                <p class="card-text small text-muted">#HTMLEditFormat(t.description)#</p>
                             </div>
                         </div>
                     </div>

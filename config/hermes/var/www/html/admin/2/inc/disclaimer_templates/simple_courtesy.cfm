@@ -21,6 +21,7 @@ template = {
     name:        "Simple Courtesy",
     description: "Brief, soft-tone footer. No legal language. Optional environmental note. Suitable when a full legal disclaimer is overkill.",
     thumbnail:   "simple_courtesy.png",
+    icon:        "fas fa-handshake",
     fields: [
         { name: "message",                label: "Message",                   type: "textarea", default: "Thank you for your message.",
           help: "Short courtesy text. One or two lines max." },

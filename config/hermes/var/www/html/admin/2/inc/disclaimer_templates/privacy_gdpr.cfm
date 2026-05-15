@@ -21,6 +21,7 @@ template = {
     name:        "Privacy / GDPR Notice",
     description: "GDPR / UK GDPR data-protection notice. Includes Data Controller contact, optional DPO email, and privacy policy link.",
     thumbnail:   "privacy_gdpr.png",
+    icon:        "fas fa-user-shield",
     fields: [
         { name: "controller_name",   label: "Data Controller Name",   type: "text",     default: "",
           placeholder: "Acme Corporation Limited",

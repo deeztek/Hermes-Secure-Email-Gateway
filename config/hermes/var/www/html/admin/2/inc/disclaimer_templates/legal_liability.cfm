@@ -20,6 +20,7 @@ template = {
     name:        "Legal / Privileged Communication",
     description: "Law firm and professional-services style. Attorney-client privilege language plus optional 'not legal advice' caveat.",
     thumbnail:   "legal_liability.png",
+    icon:        "fas fa-gavel",
     fields: [
         { name: "firm_name",         label: "Firm or Organization Name", type: "text",     default: "",
           placeholder: "Acme Law Group, LLP",
