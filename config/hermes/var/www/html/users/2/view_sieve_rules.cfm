@@ -160,6 +160,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     Selected action is not available. Please contact your administrator.
   </div>
+<cfelseif m EQ 40>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Redirect target must be a valid email address.
+  </div>
+<cfelseif m EQ 41>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Redirect target must be in your own domain. External redirects are not permitted.
+  </div>
+<cfelseif m EQ 42>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Redirect target is not a known mailbox in your domain.
+  </div>
 <cfelseif m EQ 30>
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

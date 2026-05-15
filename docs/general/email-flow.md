@@ -24,12 +24,18 @@ Companion to [`docs/handoff-#232-multi-instance-opendkim.md`](../handoff-#232-mu
 | `hermes_mail_filter` | amavisd-new (pickup / bypass) | 10030 | `BYPASSALLCHECKS` lane |
 | `hermes_body_milter` | Python pymilter (#214/#226/#228/#230) | 8893 | Disclaimer + signature + banner + CID inline |
 | `hermes_dmarc` | OpenDMARC | 54321 | DMARC verify / SPF alignment header |
+| `hermes_openarc` | OpenARC (#229, flowerysong v1.3.0 built from source) | 8893 | ARC sealing at `:10026` only — RFC 8617 chain preservation across body mods |
 | `hermes_ciphermail` | CipherMail SMTP | 25 | Encryption decisions + MIME rebuild |
 | `hermes_dovecot` | LMTP | 24 | Local mailbox delivery |
 
-Milter listening side: the OpenDKIM/OpenDMARC/body_milter daemons listen on
+Milter listening side: the OpenDKIM/OpenDMARC/body_milter/OpenARC daemons listen on
 TCP and postfix smtpd connects to them per the `smtpd_milters` line in effect
 for each port.
+
+> Note: `hermes_body_milter` and `hermes_openarc` both listen on internal port
+> `8893`, but they are separate containers with their own network namespaces.
+> Postfix reaches each by container name (`inet:hermes_body_milter:8893` vs
+> `inet:hermes_openarc:8893`), so the shared port number causes no conflict.
 
 ---
 
@@ -43,8 +49,28 @@ per-service in `master.cf` for `:10026` and `:10027`.
 |------------|-------------------------|-----|
 | `:25` (inbound) | OpenDKIM **:8891** → OpenDMARC **:54321** → body_milter **:8893** | Verify DKIM, verify DMARC, then inject External Banner / disclaimer |
 | `:587` `:465` (submission) | OpenDKIM **:8891** → OpenDMARC **:54321** → body_milter **:8893** | Sign DKIM first (before body mods), then disclaimer/signature inject — **wrong order; see #232 outbound fix history** |
-| `:10026` (re-inject) | OpenDKIM **:8892** sign-only | Re-sign body that CipherMail mutated; do NOT verify (it would `dkim=fail` on the body-modified inbound) |
+| `:10026` (re-inject) | OpenDKIM **:8892** sign-only → OpenARC **:8893** (`hermes_openarc`) | Re-sign body that CipherMail mutated, then ARC-seal the **final** form so downstream verifiers trust the cumulative auth chain even after body modification (#229) |
 | `:10027` (CipherMail GUI) | OpenDKIM **:8891** | Sign GUI-originated mail; no body mods on this path |
+
+### Why OpenARC sits ONLY at `:10026` (and NOT in `main.cf`)
+
+OpenARC's `ARC-Message-Signature` includes a hash of the message body. If
+ARC sealed at `:25`, the body would later be mutated by body_milter (`:8893`)
+and CipherMail (MIME rebuild), so the seal's body hash would be invalid by
+the time downstream verifiers received the message — `cv=fail`.
+
+`:10026` is the only point where the body is in its **final** form (all body
+modifications + CipherMail MIME rebuild complete), so it's the only correct
+hop to apply the ARC seal. Adding ARC to `main.cf`'s default `smtpd_milters`
+would cause two problems:
+
+1. **Pre-modification sealing at `:25`** → broken seal at the recipient.
+2. **Double-sealing**: mail going through `:25` → amavis → `:10026` would be
+   sealed twice by the same gateway (`i=1` at `:25`, `i=2` at `:10026`),
+   producing redundant chain bloat / verification ambiguity.
+
+ARC stays out of `main.cf` deliberately. Master.cf `:10026` override is the
+single point of truth.
 
 > The body_milter ordering is recorded in `parameters` as `order1=3.1` so it
 > sits AFTER OpenDKIM signer (`0.5`) and OpenDMARC. The retro-fix `UPDATE` in
@@ -95,18 +121,32 @@ External MTA → local mailbox.
                                                   ▼
             ┌─────────────────────────────────────────────────────────────────────────────┐
             │ hermes_postfix_dkim  ▸  :10026  (postfix smtpd, re-injection)               │
-            │   ▸ smtpd_milters = inet:localhost:8892  (OpenDKIM sign-only, s mode) #232  │
+            │   ▸ smtpd_milters = inet:localhost:8892,inet:hermes_openarc:8893            │
+            │       1. OpenDKIM sign-only (s mode)  #232                                  │
+            │       2. OpenARC seal                  #229                                 │
             │                                                                             │
             │   For INBOUND mail, the From: domain is NOT in the local KeyTable.         │
             │   → sign-only instance does nothing (no key match → no header added)       │
             │   → critically: it also does NOT verify, so no Authentication-Results      │
             │     "dkim=fail" header gets written against the body-modified message.     │
+            │                                                                             │
+            │   OpenARC then seals the FINAL body, recording the A-R header that         │
+            │   OpenDKIM-primary + OpenDMARC wrote back at :25 (which still says         │
+            │   "dkim=pass" against the unmodified original).                            │
+            │                                                                             │
+            │   ⚠ Chain-integrity caveat (#229): when the inbound message ALREADY        │
+            │     carried an upstream ARC-Seal (M365 / Workspace / Mimecast /            │
+            │     Proofpoint / Exclaimer) and Hermes modified the body at :25            │
+            │     (banner injection), OpenARC at :10026 writes cv=fail at i=2.           │
+            │     The upstream i=1 body hash no longer matches. To prevent this for      │
+            │     relay-out recipients, body_milter automatically skips banner           │
+            │     injection in that narrow case — see "Conditional banner skip" below.  │
             └─────────────────────────────────────────────────────────────────────────────┘
                                                   │  transport_maps lookup
                                                   ▼
             ┌─────────────────────────────────────────────────────────────────────────────┐
             │ hermes_dovecot       ▸  :24  (LMTP)                                         │
-            │   ▸ Sieve filtering (vacation, redirect, file-into)                         │
+            │   ▸ Sieve filtering (vacation, file-into; redirect is same-domain only)    │
             │   ▸ Local mailbox delivery → /mnt/data/vmail                                │
             └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -119,6 +159,67 @@ External MTA → local mailbox.
   (final destinies: `D_BOUNCE` virus/banned, `D_DISCARD` spam/bad_header per
   `50-user` config).
 - **Whitelisted senders** bypass via `BYPASSALLCHECKS` at `:10030`.
+
+### Architectural principle: Hermes is the auth boundary (#229)
+
+Hermes is the authoritative auth / security boundary for every domain
+it relays for. Inbound auth checks (DKIM, SPF, DMARC, ARC verify,
+spam, virus) happen at Hermes. Body modifications (External Sender
+Banner, disclaimer, signature insertion, encryption) also happen at
+Hermes. **Customer downstream mail servers (the relay-target MX) must
+be configured to trust Hermes implicitly:** allowlist Hermes by IP or
+hostname, accept forwarded mail without re-running DKIM / SPF / DMARC /
+ARC checks. This is the same deployment model Mimecast, Proofpoint,
+and Barracuda customers use — the SEG IS the trust boundary.
+
+When the inbound message arrives carrying an upstream `ARC-Seal:`
+header (M365, Workspace, Mimecast, Proofpoint, Exclaimer, etc.) and
+Hermes modifies the body (banner, disclaimer), the upstream chain's
+body hash is invalidated. OpenARC at `:10026` honestly records
+`cv=fail` on Hermes's own seal because it can no longer validate the
+upstream chain against the modified body. The original sender's
+`DKIM-Signature` body hash is also invalidated.
+
+**This is by design and is not a Hermes problem.** A correctly-configured
+customer downstream MX is allowlisting Hermes and not re-checking auth
+on forwarded mail; the `cv=fail` and broken DKIM signal never gates
+delivery. If a customer's downstream MX is doing redundant auth checks
+on mail Hermes forwards, that's a misconfiguration on the customer's
+end — the fix is to allowlist Hermes there, not to silence Hermes here.
+
+For external receivers Hermes does NOT have a trust relationship with
+(third-party MXes encountered via sieve redirect or alias forwarding,
+should those leak past the same-domain validation), the cv=fail and
+broken DKIM signals do reach a non-trusting receiver. That's why sieve
+redirects from the user portal are validated to require a same-domain
+target (see `inc/sieve_user_rule_actions.cfm`) — keeping forwarded mail
+inside Hermes's auth boundary. Aliases configured by admins are
+constrained to internal Hermes mailboxes by the existing CFML check
+in `inc/add_mailbox_alias_action.cfm`.
+
+### Why not lift the chain by stripping the upstream ARC?
+
+`cv=fail` is honest — Hermes correctly admits the chain we received
+no longer body-validates against the message we're about to send.
+The verifier walks the chain backward and recomputes the upstream
+`i=1` body hash against the **current** body, so stripping our `i=2`
+admission does not repair anything. The only mechanisms that could
+restore trust for body-modifying gateways are:
+
+1. **Receiver-side trust configuration** — Microsoft 365's "Trusted
+   ARC Sealers" feature, Gmail's internal trust list, etc. Useful
+   when forwarding to receivers OTHER than the customer's own MX.
+   See the
+   [Trusted ARC Sealers — M365 guide](../admin/04-content-checks/trusted-arc-sealers-m365.md)
+   for cross-org scenarios.
+2. **Don't modify the body** — defeats the purpose of having body
+   modification features.
+
+Multi-instance OpenARC (separate verify-only + sign-only daemons)
+does **not** help: OpenARC v1.3.0's sign-only mode re-validates the
+chain at sealing time and ignores AAR cached by the verify instance.
+This was empirically tested on DEV on 2026-05-14; see the closed #229
+discussion.
 
 ---
 
@@ -165,11 +266,19 @@ Authenticated local user → external recipient.
                                                   ▼
             ┌─────────────────────────────────────────────────────────────────────────────┐
             │ hermes_postfix_dkim  ▸  :10026  (re-injection)                              │
-            │   ▸ smtpd_milters = inet:localhost:8892  (OpenDKIM sign-only) #232          │
+            │   ▸ smtpd_milters = inet:localhost:8892,inet:hermes_openarc:8893            │
+            │       1. OpenDKIM sign-only (s mode)  #232                                  │
+            │       2. OpenARC seal                  #229                                 │
             │                                                                             │
             │   For OUTBOUND mail, the From: domain IS in the local KeyTable.            │
             │   → sign-only instance signs the post-CipherMail body.                     │
             │   → fresh DKIM header replaces (or oversigns) the stale one from :587.     │
+            │                                                                             │
+            │   OpenARC then seals the post-DKIM body, attaching ARC-Seal / ARC-Message- │
+            │   Signature / ARC-Authentication-Results headers. For outbound traffic     │
+            │   originating from a relay user whose own MTA pre-signed DKIM, the ARC     │
+            │   seal lets downstream verifiers trust the chain even though our body     │
+            │   modification (disclaimer etc.) invalidated the relay's original DKIM.    │
             │                                                                             │
             │   ⚠ Historical bug: master.cf had `no_milters` in receive_override_options │
             │     at :10026 → suppressed all milters → no re-sign → Gmail rejected.      │

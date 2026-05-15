@@ -30,9 +30,15 @@ Scoped to session.email.
     <cfreturn arr>
 </cffunction>
 
-<!--- Allowed user-portal action types. redirect/reject excluded - those are
-     admin-only because of forwarding-loop and bounce-leak risks. --->
-<cfset USER_ALLOWED_ACTIONS = "fileinto,discard,keep,flag_seen">
+<!--- Allowed user-portal action types. reject excluded (admin-only because
+     of bounce-leak risks). redirect IS allowed but the target is validated
+     against the mailboxes table for the SAME domain as the logged-in user
+     (#229 / #236) - this preserves DKIM/ARC chains for inbound mail
+     because the message stays inside the same domain and never re-crosses
+     a body-modifying boundary on its way out. Cross-domain or external
+     redirects would re-trigger banner injection / chain breakage at
+     forward time and are blocked. --->
+<cfset USER_ALLOWED_ACTIONS = "fileinto,discard,keep,flag_seen,redirect">
 
 <cffunction name="validatePayload" returntype="string" output="false">
     <cfset var condFields = formArray("cond_field_", "cond_count")>
@@ -110,6 +116,26 @@ Scoped to session.email.
             </cfif>
             <cfif Len(av) GT 255>
                 <cfreturn "16">
+            </cfif>
+        </cfif>
+        <cfif at EQ "redirect">
+            <cfif av EQ "" OR Len(av) GT 255>
+                <cfreturn "40">
+            </cfif>
+            <cfif NOT IsValid("email", av)>
+                <cfreturn "40">
+            </cfif>
+            <cfset var redirDom = LCase(ListLast(av, "@"))>
+            <cfset var sessionDom = LCase(ListLast(sieveUsername, "@"))>
+            <cfif redirDom NEQ sessionDom>
+                <cfreturn "41">
+            </cfif>
+            <cfquery name="checkRedirTarget" datasource="hermes">
+                SELECT id FROM mailboxes
+                WHERE username = <cfqueryparam value="#LCase(av)#" cfsqltype="cf_sql_varchar">
+            </cfquery>
+            <cfif checkRedirTarget.recordcount LT 1>
+                <cfreturn "42">
             </cfif>
         </cfif>
     </cfloop>

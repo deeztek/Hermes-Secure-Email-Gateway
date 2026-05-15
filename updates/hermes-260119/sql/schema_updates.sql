@@ -2357,3 +2357,74 @@ ALTER TABLE disclaimers
 
 DELETE FROM disclaimers;
 
+-- ============================================================================
+-- ARC_SIGN: OpenARC gateway signing identity (#229)
+--
+-- OpenARC is single-identity-per-gateway. Per RFC 8617 §4.2.2 + industry
+-- practice (Gmail signs ARC seals with d=google.com, M365 with
+-- d=outlook.com, Fastmail with d=fastmail.com), this table holds the
+-- ONE signing identity used for all messages this Hermes installation
+-- ARC-seals. The CFML admin UI (view_arc_settings.cfm) enforces single-
+-- row semantics: generating or importing a new key wipes any existing
+-- row + key files first.
+--
+-- The table is kept as-shaped (multi-row capable) so a future migration
+-- to a fork with KeyTable/SigningTable support won't need another schema
+-- change.
+--
+-- Columns:
+--   - selector + domain : DNS publication coords (<selector>._domainkey.<domain>)
+--   - public + private  : filenames under /opt/hermes/arc/keys/
+--                         (canonical pattern: <sel>_<dom>.arc.txt /
+--                          <sel>_<dom>.arc.private)
+--   - enabled           : 0=disabled, 1=enabled+applied, 2=created-not-yet-applied
+--   - generated         : 1=created via UI keygen, 2=imported via UI
+--   - applied           : 1 after openarc.conf regen + openarc reload
+--
+-- TINYINT(3) used per project convention to avoid Lucee TINYINT(1)->boolean
+-- mapping (the values 0/1/2 must be readable as integers).
+--
+-- Container: hermes_openarc (built from github.com/flowerysong/OpenARC v1.3.0).
+-- Milter chain placement: post-amavis re-inject at master.cf :10026, after
+-- OpenDKIM sign at :8892, before delivery.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS arc_sign (
+    id        INT AUTO_INCREMENT PRIMARY KEY,
+    domain    VARCHAR(255) NOT NULL,
+    selector  VARCHAR(64)  NOT NULL,
+    public    VARCHAR(255) NOT NULL,
+    private   VARCHAR(255) NOT NULL,
+    enabled   TINYINT(3)   NOT NULL DEFAULT 0,
+    generated TINYINT(3)   NOT NULL DEFAULT 0,
+    applied   TINYINT(3)   NOT NULL DEFAULT 0,
+    UNIQUE KEY uk_domain (domain)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- system_settings rows for ARC global toggles + openarc.conf render values.
+-- arc_signing_enabled: 0/1 master switch (UI guard - milter wiring at master.cf
+--                     is the actual on/off; this is the admin-facing state).
+-- arc_authserv_id    : value written to openarc.conf AuthservID. Defaults to
+--                     empty -> arc_generate_config_file.cfm falls back to the
+--                     server hostname from existing 'host_name' setting.
+-- arc_mode           : OpenARC Mode directive. sv (sign+verify, default),
+--                     s (sign only), v (verify only).
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'arc_signing_enabled', '0'
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'arc_signing_enabled'
+);
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'arc_authserv_id', ''
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'arc_authserv_id'
+);
+
+INSERT INTO system_settings (parameter, value)
+SELECT 'arc_mode', 'sv'
+WHERE NOT EXISTS (
+    SELECT 1 FROM system_settings WHERE parameter = 'arc_mode'
+);
+

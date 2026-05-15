@@ -930,7 +930,19 @@ select parameter, parent, child from parameters where parent='#getrelayhostid.id
 
       <div class="form-group"  id="destination">
 
-  
+        <div class="alert alert-warning small">
+          <i class="fas fa-shield-alt me-2"></i>
+          <strong>Note (#229 ARC):</strong> Hermes is the authoritative
+          auth boundary for this relay domain. The destination mail server
+          configured below must be set up to <strong>allowlist Hermes by IP
+          or hostname</strong> and accept forwarded mail without re-running
+          DKIM / SPF / DMARC / ARC checks. This is the same deployment
+          model used by Mimecast / Proofpoint / Barracuda customers. If
+          the destination MX is doing redundant auth checks on
+          Hermes-forwarded mail, the body modifications Hermes performs
+          (banner, disclaimer) will appear as DKIM / ARC failures there
+          &mdash; the remedy is to allowlist Hermes on the destination MX.
+        </div>
 
           <label><strong>Recipient Delivery</strong></label>
           <select class="form-control select2" name="recipient_delivery" data-placeholder="recipient_delivery"

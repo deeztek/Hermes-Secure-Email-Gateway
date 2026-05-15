@@ -24,6 +24,7 @@ declare -A IMAGES=(
     ["hermes-dovecot"]="dovecot"
     ["hermes-unbound"]="unbound"
     ["hermes-body-milter"]="body_milter"
+    ["hermes-openarc"]="openarc"
 )
 
 # Check Docker is available

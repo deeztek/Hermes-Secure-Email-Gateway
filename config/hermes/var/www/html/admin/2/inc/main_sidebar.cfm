@@ -351,6 +351,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_arc_settings.cfm" class="nav-link">
+                <i class="nav-icon fas fa-link"></i>
+                <p>ARC Settings</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_antivirus_settings.cfm" class="nav-link">
                 <i class="nav-icon fas fa-virus"></i>
                 <p>Antivirus Settings</p>
@@ -443,6 +449,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
                   </cfif>
                 </p>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a href="view_external_banners.cfm" class="nav-link">
+                <i class="nav-icon fas fa-shield-alt"></i>
+                <p>External Banner</p>
               </a>
             </li>
           </ul>

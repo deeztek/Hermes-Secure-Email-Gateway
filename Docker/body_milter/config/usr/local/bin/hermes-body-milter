@@ -1379,6 +1379,31 @@ class HermesBodyMilter(Milter.Base):
                                 pass
                         log.info('wrapped as multipart/related (images=%d)',
                                  len(ctx.image_attachments))
+                    else:
+                        # Single-part path: _force_base64_encoding on a
+                        # text/* leaf that IS the whole message modifies
+                        # top-level CTE in the Python Message object;
+                        # replacebody() doesn't carry that change.
+                        # Without this, the queue file ends up with
+                        # `CTE: quoted-printable` from the sender + a
+                        # base64-encoded body, and MUAs render the body
+                        # as raw base64 text (medstar.net/Mailgun 2026-05-12,
+                        # DoorDash, etc.). Sync via chgheader so the
+                        # queued message's CTE matches the newly-encoded
+                        # body bytes. Multipart messages whose top-level
+                        # CTE wasn't touched simply re-set the original
+                        # value here, which is a safe no-op.
+                        wrapped = ctx.email_message()
+                        new_cte = wrapped.get('Content-Transfer-Encoding')
+                        if new_cte:
+                            try:
+                                if 'content-transfer-encoding' in self._header_names:
+                                    self.chgheader('Content-Transfer-Encoding', 1, new_cte)
+                                else:
+                                    self.addheader('Content-Transfer-Encoding', new_cte)
+                            except Exception:
+                                log.warning('CTE header sync failed:\n%s',
+                                            traceback.format_exc())
                 except Exception:
                     log.error('replacebody failed:\n%s', traceback.format_exc())
         except Exception:
