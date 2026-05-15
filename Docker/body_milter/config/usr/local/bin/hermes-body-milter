@@ -389,7 +389,23 @@ class MessageContext:
             self._email_msg = msg
             self._was_wrapped = True
 
-        full = msg.as_bytes(policy=email_policy.SMTP)
+        # Python 3.12 has a bug in email_policy.SMTP's encoded-word folding
+        # path: when a header (e.g. Subject) contains non-ASCII characters
+        # (emoji in marketing email subjects, Unicode punctuation, etc.) the
+        # _fold_as_ew -> _ew.encode call attempts string.encode('ascii',
+        # 'surrogateescape') on already-bytes data and raises
+        # UnicodeEncodeError. When this fires from inside eom(), replacebody()
+        # is never called -- so the milter ships the original unmodified body
+        # downstream and any banner / disclaimer / signature injection is
+        # silently lost. Fall back to compat32 (the Python 2-era policy)
+        # which is forgiving on Unicode in headers and produces serializable
+        # output for the messages that trip SMTP policy.
+        try:
+            full = msg.as_bytes(policy=email_policy.SMTP)
+        except UnicodeEncodeError:
+            log.warning('serialize_body: SMTP policy raised UnicodeEncodeError '
+                        '(likely non-ASCII in header); falling back to compat32')
+            full = msg.as_bytes(policy=email_policy.compat32)
         sep = full.find(b'\r\n\r\n')
         if sep != -1:
             return full[sep + 4:]
