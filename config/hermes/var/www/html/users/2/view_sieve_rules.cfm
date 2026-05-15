@@ -312,7 +312,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfelseif getAllActs.action_type EQ "discard">
                   <span class="badge bg-dark">Delete</span>
                 <cfelseif getAllActs.action_type EQ "redirect">
-                  <span class="badge bg-warning text-dark">Forward to</span> #HTMLEditFormat(getAllActs.action_value)#
+                  <span class="badge bg-warning text-dark">Redirect to</span> #HTMLEditFormat(getAllActs.action_value)#
                 <cfelseif getAllActs.action_type EQ "flag_seen">
                   <span class="badge bg-secondary">Mark read</span>
                 </cfif>
@@ -509,7 +509,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     html += '<select class="form-control form-control-sm" name="act_type_' + idx + '" onchange="updateActRowUI(' + idx + ')">';
     html += '<option value="fileinto">Move to folder</option>';
     html += '<option value="discard">Delete silently</option>';
-    html += '<option value="redirect">Forward to address</option>';
+    html += '<option value="redirect">Redirect to address</option>';
     html += '<option value="flag_seen">Mark as read</option>';
     html += '</select></div>';
     html += '<div class="col-md-7">';
