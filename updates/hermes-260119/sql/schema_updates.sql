@@ -2428,3 +2428,143 @@ WHERE NOT EXISTS (
     SELECT 1 FROM system_settings WHERE parameter = 'arc_mode'
 );
 
+-- Drop vestigial legacy views (#179):
+--   file_types2 : unused since AdminLTE migration (zero CFML references).
+--   recipients2 : same, plus it refs the dropped `users` table so mysqldump
+--                 chokes when enumerating its dependencies. Cleaning it up
+--                 unblocks mysqldump for fresh-install schema generation and
+--                 fixes the same dump path on any future legacy migration.
+DROP VIEW IF EXISTS file_types2;
+DROP VIEW IF EXISTS recipients2;
+
+-- ============================================================================
+-- #179 Drift backfill: 5 tables present in DEV and actively used by current
+-- CFML but never previously recorded as CREATE TABLE anywhere (predates the
+-- schema_updates.sql discipline). Backfilling them as IF NOT EXISTS makes the
+-- fresh-install path complete and is a no-op on systems that already have
+-- them (e.g., DEV upgrading to the next version). DDL pulled from DEV dump
+-- 2026-05-16; AUTO_INCREMENT stripped at the table level.
+-- ============================================================================
+
+-- Mailbox infrastructure (core; ~245 CFML refs across the trio)
+CREATE TABLE IF NOT EXISTS mailbox_domains (
+    id                  INT NOT NULL AUTO_INCREMENT,
+    domain              VARCHAR(255) DEFAULT NULL,
+    mailbox_certificate INT          DEFAULT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS mailboxes (
+    id                  INT          NOT NULL AUTO_INCREMENT,
+    domain_id           INT          NOT NULL,
+    username            VARCHAR(100) NOT NULL,
+    name                VARCHAR(255) DEFAULT NULL,
+    quota               BIGINT       DEFAULT 102400,
+    mailbox_path_prefix VARCHAR(150) DEFAULT '/var/vmail',
+    created             DATETIME     DEFAULT NULL,
+    modified            DATETIME     DEFAULT NULL,
+    active              INT          DEFAULT NULL,
+    nextcloud_enabled   TINYINT(3)   NOT NULL DEFAULT 0,
+    `desc`              VARCHAR(255) DEFAULT NULL,
+    mailbox_type        ENUM('user','shared') NOT NULL DEFAULT 'user',
+    first_name          VARCHAR(64)  DEFAULT NULL,
+    last_name           VARCHAR(64)  DEFAULT NULL,
+    title               VARCHAR(128) DEFAULT NULL,
+    phone               VARCHAR(64)  DEFAULT NULL,
+    mobile              VARCHAR(64)  DEFAULT NULL,
+    department          VARCHAR(64)  DEFAULT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+CREATE TABLE IF NOT EXISTS mailbox_sans (
+    id                  INT          NOT NULL AUTO_INCREMENT,
+    certificate         INT          DEFAULT NULL,
+    mailbox_domain      INT          DEFAULT NULL,
+    subdomain           VARCHAR(255) DEFAULT NULL,
+    ip                  VARCHAR(10)  DEFAULT NULL,
+    ip_result_datetime  DATETIME     DEFAULT NULL,
+    ip_result_msg       VARCHAR(255) DEFAULT NULL,
+    dns                 VARCHAR(10)  DEFAULT NULL,
+    dns_result_datetime DATETIME     DEFAULT NULL,
+    dns_result_msg      VARCHAR(255) DEFAULT NULL,
+    acme                INT          DEFAULT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Scheduled tasks (Ofelia jobs admin page; 9 INSERT IGNORE blocks for the
+-- built-in jobs already exist further up in this file)
+CREATE TABLE IF NOT EXISTS ofelia_jobs (
+    id          INT          NOT NULL AUTO_INCREMENT,
+    job_name    VARCHAR(255) DEFAULT NULL,
+    schedule    VARCHAR(255) DEFAULT NULL,
+    command     VARCHAR(255) DEFAULT NULL,
+    container   VARCHAR(255) DEFAULT NULL,
+    image       VARCHAR(255) DEFAULT NULL,
+    `user`      VARCHAR(255) DEFAULT NULL,
+    volume      VARCHAR(255) DEFAULT NULL,
+    network     VARCHAR(255) DEFAULT NULL,
+    type        VARCHAR(255) DEFAULT NULL,
+    active      INT          DEFAULT NULL,
+    no_overlap  TINYINT(3)   NOT NULL DEFAULT 0,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Helper / reference table (Bucket B — seed rows populated via hermes_seed.sql)
+-- quotes : dashboard random-quote display (main_footer.cfm, 3 SQL refs).
+CREATE TABLE IF NOT EXISTS quotes (
+    id     INT NOT NULL AUTO_INCREMENT,
+    quote  VARCHAR(255) DEFAULT NULL,
+    source VARCHAR(255) DEFAULT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Reserved for future install-script random username/password generation.
+-- Tables exist on DEV but are unpopulated and unwired in either install script
+-- as of v260119. Keep CREATE so they survive fresh installs; populate + wire
+-- up when the random-name feature actually ships (separate follow-up issue).
+CREATE TABLE IF NOT EXISTS numbers (
+    number INT DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS random_words (
+    word VARCHAR(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ============================================================================
+-- #179 Vestigial cleanup: tables in DEV with ZERO CFML references. Safe to
+-- drop on fresh installs (no-op) and legacy->Docker (cleans them up).
+-- ============================================================================
+DROP TABLE IF EXISTS parameters_copy;   -- old working copy of `parameters`; zero refs
+DROP TABLE IF EXISTS temp_msg_archive;  -- 100K-row vestigial archive table; zero refs
+-- NOTE: numbers + random_words are NOT dropped — they're reserved infrastructure
+-- for future install-script random username/password generation (CREATEd earlier
+-- in this file at lines ~2515). Don't add DROP statements for them.
+
+-- ============================================================================
+-- #179 Legacy-dropped cleanup: tables present in legacy hermes.sql but
+-- absent in current DEV and unreferenced by current CFML. Ensures legacy
+-- ->Docker migration paths clean them up after restoring the legacy dump.
+-- ============================================================================
+DROP TABLE IF EXISTS ad_import_temp;    -- AD integration removed
+DROP TABLE IF EXISTS ad_integration;    -- AD integration removed
+DROP TABLE IF EXISTS captcha_list_all;  -- math CAPTCHA replaced word CAPTCHA
+DROP TABLE IF EXISTS mailaddr_temp;     -- bulk-import staging removed
+DROP TABLE IF EXISTS rbl_override;      -- removed; no current CFML refs
+DROP TABLE IF EXISTS users;             -- consolidated into system_users
+
+-- ============================================================================
+-- Release version stamp (must be the last block in this file).
+-- IMPORTANT: when cutting a new release, update BOTH literals below in the
+-- new copy of schema_updates.sql (and rename the directory accordingly).
+--   - version_no = code train identifier ('Docker' for the Docker era)
+--   - build_no   = release tag matching the directory + Docker image tag
+--
+-- INSERT IGNORE handles fresh installs (no rows yet from hermes_seed.sql since
+-- the seed deliberately omits version_no/build_no — see config/database/README.md);
+-- UPDATE handles upgrades (existing rows get bumped to current release).
+-- Both statements are no-ops on re-runs of the same version.
+-- ============================================================================
+INSERT IGNORE INTO system_settings (parameter, value) VALUES ('version_no', 'Docker');
+INSERT IGNORE INTO system_settings (parameter, value) VALUES ('build_no',   'v260119');
+UPDATE system_settings SET value = 'Docker'  WHERE parameter = 'version_no';
+UPDATE system_settings SET value = 'v260119' WHERE parameter = 'build_no';
