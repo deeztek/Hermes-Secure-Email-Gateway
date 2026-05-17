@@ -983,26 +983,13 @@ generate_secrets() {
         log "Syslog database password already exists, skipping"
     fi
 
-    # Substitute HERMES_USERNAME / HERMES_PASSWORD into .env so quota-warning.sh
-    # (and any other CFML/shell code reading .env) authenticates against the
-    # MariaDB hermes user with matching credentials. These are NOT separate
-    # Dovecot LMTP credentials despite the .env.template comment -- they're
-    # the MariaDB hermes user creds, used by quota-warning.sh to query the
-    # api_tokens table for the actual LMTP token. Per CLAUDE.md they should
-    # eventually move from .env to /opt/hermes/creds/ exclusively; until
-    # then, the .env copies must stay in sync with what creds/ has.
-    local env_file="${HERMES_ROOT}/.env"
-    if [[ -f "$env_file" ]] \
-       && [[ -f "${CREDS_DIR}/hermes_username" ]] \
-       && [[ -f "${CREDS_DIR}/hermes_password" ]]; then
-        local hu hp
-        hu=$(cat "${CREDS_DIR}/hermes_username")
-        hp=$(cat "${CREDS_DIR}/hermes_password")
-        log "Substituting HERMES_USERNAME / HERMES_PASSWORD into .env..."
-        # Use a non-/ delimiter so passwords with slashes don't break sed.
-        sed -i -e "s|^HERMES_USERNAME=.*|HERMES_USERNAME=${hu}|" "$env_file"
-        sed -i -e "s#^HERMES_PASSWORD=.*#HERMES_PASSWORD=${hp}#" "$env_file"
-    fi
+    # (Previously here: HERMES_USERNAME / HERMES_PASSWORD substitution into
+    # .env -- removed because the .env entries themselves were vestigial
+    # legacy-installer leftovers that nothing in the Docker stack actually
+    # consumed. quota-warning.sh reads from /opt/hermes/creds/ directly;
+    # docker-compose doesn't inject .env into containers; no CFML or shell
+    # code sources .env. See commit removing HERMES_USERNAME/PASSWORD from
+    # .env.template for the full audit.)
 
     log "Secrets generation completed"
 }
