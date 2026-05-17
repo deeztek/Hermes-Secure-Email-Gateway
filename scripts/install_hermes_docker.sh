@@ -149,6 +149,21 @@ prompt_with_default() {
     echo "${result:-$default}"
 }
 
+derive_install_version() {
+    # Returns the version string corresponding to this checkout, e.g. "v260119".
+    # Sourced from the `updates/hermes-NNNNNN/` directory name so the value
+    # auto-updates per release (no manual editing of the script at release
+    # cut). Used by:
+    #   - the banner displayed at the top of main()
+    #   - the HERMES_DOCKER_IMG_VERSION substitution in .env, so the install
+    #     pulls images that match the cloned source tree instead of :latest
+    ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
+        | grep -oE 'hermes-[0-9]+' \
+        | sort \
+        | tail -1 \
+        | sed 's/hermes-/v/'
+}
+
 validate_mount_point() {
     # Per #179: the admin is expected to pre-provision the mount point before
     # running the installer. This function VALIDATES — it does not create
@@ -638,6 +653,17 @@ generate_compose_override() {
             "$ENV_FILE"
     fi
 
+    # Substitute HERMES_DOCKER_IMG_VERSION so `docker compose pull` fetches
+    # images matching this source tree's release (e.g. v260119) instead of
+    # the .env.template default of "latest" -- which fails when no image has
+    # been promoted to :latest in the registry yet.
+    local img_version
+    img_version=$(derive_install_version)
+    if [[ -n "$img_version" ]]; then
+        log "Substituting HERMES_DOCKER_IMG_VERSION = ${img_version}..."
+        sed -i -e "s|^HERMES_DOCKER_IMG_VERSION=.*|HERMES_DOCKER_IMG_VERSION=${img_version}|" "$ENV_FILE"
+    fi
+
     # Append the three mount-point vars (strip prior entries first so a
     # re-run is idempotent). Every other var in .env stays untouched.
     local tmp_env="${ENV_FILE}.tmp.$$"
@@ -955,6 +981,27 @@ generate_secrets() {
         log "Generated Syslog database password"
     else
         log "Syslog database password already exists, skipping"
+    fi
+
+    # Substitute HERMES_USERNAME / HERMES_PASSWORD into .env so quota-warning.sh
+    # (and any other CFML/shell code reading .env) authenticates against the
+    # MariaDB hermes user with matching credentials. These are NOT separate
+    # Dovecot LMTP credentials despite the .env.template comment -- they're
+    # the MariaDB hermes user creds, used by quota-warning.sh to query the
+    # api_tokens table for the actual LMTP token. Per CLAUDE.md they should
+    # eventually move from .env to /opt/hermes/creds/ exclusively; until
+    # then, the .env copies must stay in sync with what creds/ has.
+    local env_file="${HERMES_ROOT}/.env"
+    if [[ -f "$env_file" ]] \
+       && [[ -f "${CREDS_DIR}/hermes_username" ]] \
+       && [[ -f "${CREDS_DIR}/hermes_password" ]]; then
+        local hu hp
+        hu=$(cat "${CREDS_DIR}/hermes_username")
+        hp=$(cat "${CREDS_DIR}/hermes_password")
+        log "Substituting HERMES_USERNAME / HERMES_PASSWORD into .env..."
+        # Use a non-/ delimiter so passwords with slashes don't break sed.
+        sed -i -e "s|^HERMES_USERNAME=.*|HERMES_USERNAME=${hu}|" "$env_file"
+        sed -i -e "s#^HERMES_PASSWORD=.*#HERMES_PASSWORD=${hp}#" "$env_file"
     fi
 
     log "Secrets generation completed"
@@ -1321,13 +1368,10 @@ main() {
     echo " |  _  |  __/ |  | | | | | |  __/\\__ \\___) | |__| |_| |"
     echo " |_| |_|\\___|_|  |_| |_| |_|\\___||___/____/|_____\\____|"
     echo ""
-    # Derive the install version from the `updates/hermes-NNNNNN/` directory
-    # name so the banner self-updates per release. At release cut, that
-    # directory gets renamed (e.g. updates/hermes-260119/ -> updates/hermes-260120/)
-    # and this picks up the new value automatically.
+    # Banner version self-derives from `updates/hermes-NNNNNN/` — see
+    # derive_install_version() for details.
     local install_version
-    install_version=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
-        | grep -oE 'hermes-[0-9]+' | sort | tail -1 | sed 's/hermes-/v/')
+    install_version=$(derive_install_version)
     install_version="${install_version:-unknown}"
 
     echo "         Secure Email Gateway - Docker Installation"
