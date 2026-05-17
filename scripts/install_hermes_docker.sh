@@ -81,8 +81,26 @@ header() {
 }
 
 generate_password() {
-    # Generate a secure random password (32 chars, alphanumeric + special)
-    openssl rand -base64 32 | tr -dc 'a-zA-Z0-9!@#$%^&*' | head -c 32
+    # Service-account password — 32 alphanumeric chars (~190 bits entropy).
+    # Used for DB user passwords, LDAP admin/service, etc. — credentials
+    # that are stored in config files and never typed by humans.
+    #
+    # No special characters by design: openssl rand -base64 never emits
+    # !@#$%^&* anyway (only [A-Za-z0-9+/=]), and shell/SQL/CFML quoting
+    # nightmares from specials > the marginal 7 bits of added entropy.
+    # Per NIST SP 800-63B (5.1.1.2), length matters far more than
+    # composition complexity for credentials of this length.
+    openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 32
+}
+
+generate_typeable_password() {
+    # Human-typeable password — 16 alphanumeric chars (~95 bits entropy).
+    # Used for the few credentials that an admin actually types into a
+    # browser at least once: Nextcloud admin, Hermes bootstrap admin.
+    # 95 bits is well above the NIST 64-bit floor for memorized secrets,
+    # but 16 chars is short enough to read aloud or type accurately on
+    # a phone. Replaced via UI/MFA shortly after first login anyway.
+    openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c 16
 }
 
 generate_alphanumeric() {
@@ -769,7 +787,7 @@ generate_secrets() {
 
     # Authelia JWT secret (64 bytes hex)
     if [[ ! -f "${SECRETS_DIR}/authelia_jwt_secret" ]]; then
-        JWT_SECRET=$(generate_hex 64)
+        JWT_SECRET=$(generate_hex 32)
         echo -n "$JWT_SECRET" > "${SECRETS_DIR}/authelia_jwt_secret"
         chmod 600 "${SECRETS_DIR}/authelia_jwt_secret"
         log "Generated Authelia JWT secret"
@@ -779,7 +797,7 @@ generate_secrets() {
 
     # Authelia session secret (64 bytes hex)
     if [[ ! -f "${SECRETS_DIR}/authelia_session_secret" ]]; then
-        SESSION_SECRET=$(generate_hex 64)
+        SESSION_SECRET=$(generate_hex 32)
         echo -n "$SESSION_SECRET" > "${SECRETS_DIR}/authelia_session_secret"
         chmod 600 "${SECRETS_DIR}/authelia_session_secret"
         log "Generated Authelia session secret"
@@ -789,7 +807,7 @@ generate_secrets() {
 
     # Authelia storage encryption key (64 bytes hex)
     if [[ ! -f "${SECRETS_DIR}/authelia_storage_encryption_key_file" ]]; then
-        STORAGE_KEY=$(generate_hex 64)
+        STORAGE_KEY=$(generate_hex 32)
         echo -n "$STORAGE_KEY" > "${SECRETS_DIR}/authelia_storage_encryption_key_file"
         chmod 600 "${SECRETS_DIR}/authelia_storage_encryption_key_file"
         log "Generated Authelia storage encryption key"
@@ -854,7 +872,7 @@ generate_secrets() {
     fi
 
     if [[ ! -f "${CREDS_DIR}/nextcloud_admin_password" ]]; then
-        NC_ADMIN_PASS=$(generate_password)
+        NC_ADMIN_PASS=$(generate_typeable_password)
         echo -n "$NC_ADMIN_PASS" > "${CREDS_DIR}/nextcloud_admin_password"
         chmod 600 "${CREDS_DIR}/nextcloud_admin_password"
         log "Generated Nextcloud admin password"
@@ -883,7 +901,7 @@ generate_secrets() {
 
     # Nextcloud Redis password
     if [[ ! -f "${CREDS_DIR}/nextcloud_redis_password" ]]; then
-        NC_REDIS_PASS=$(generate_password)
+        NC_REDIS_PASS=$(generate_hex 32)
         echo -n "$NC_REDIS_PASS" > "${CREDS_DIR}/nextcloud_redis_password"
         chmod 600 "${CREDS_DIR}/nextcloud_redis_password"
         log "Generated Nextcloud Redis password"
