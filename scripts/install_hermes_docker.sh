@@ -1417,12 +1417,15 @@ main() {
         state_mark_done "03-host-ip-confirmed"
     fi
 
-    if state_is_done "04-compose-rendered"; then
-        log "Skip: docker-compose.override.yml already generated"
-    else
-        generate_compose_override
-        state_mark_done "04-compose-rendered"
-    fi
+    # generate_compose_override is intentionally NOT state-guarded. It's
+    # idempotent (every sed is a no-op when the value is already correct)
+    # and re-runs in seconds. Skipping it on re-runs was an actual bug:
+    # when the script ships a new substitution (e.g. HERMES_DOCKER_IMG_VERSION
+    # was added after some testers had already run the script), the state
+    # guard prevented the new substitution from applying on a `git pull`
+    # re-run, leaving stale values in .env. Always run it.
+    generate_compose_override
+    state_mark_done "04-compose-rendered"
 
     if state_is_done "05-secrets-generated"; then
         log "Skip: credentials already generated"
