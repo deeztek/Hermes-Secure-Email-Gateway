@@ -563,15 +563,39 @@ generate_compose_override() {
     log "  VMAIL_MOUNT = ${VMAIL_MOUNT}"
     log "  FILES_MOUNT = ${FILES_MOUNT}"
 
-    # Preserve any unrelated variables already in .env (CONSOLE_HOST,
-    # NCVERSION, AUTHELIAVERSION, etc.). Only strip the three mount-point
-    # vars and re-append fresh values.
-    local tmp_env="${ENV_FILE}.tmp.$$"
-    if [[ -f "$ENV_FILE" ]]; then
-        grep -vE '^(DATA_MOUNT|VMAIL_MOUNT|FILES_MOUNT)=' "$ENV_FILE" > "$tmp_env" || true
-    else
-        : > "$tmp_env"
+    # Bootstrap .env from .env.template if it doesn't exist. The template
+    # holds defaults for everything docker-compose.yml references (IPV4SUBNET,
+    # NCVERSION, AUTHELIAVERSION, LDAP_*, TIMEZONE, etc.). Without it, every
+    # ${VAR} substitution resolves to empty -- which makes `docker compose
+    # config` fail with errors like "extra_hosts: bad host name ''" because
+    # the IP placeholder slots end up empty.
+    local ENV_TEMPLATE="${HERMES_ROOT}/.env.template"
+    if [[ ! -f "$ENV_FILE" ]]; then
+        if [[ ! -f "$ENV_TEMPLATE" ]]; then
+            error "Neither ${ENV_FILE} nor ${ENV_TEMPLATE} exist. Cannot proceed."
+        fi
+        log "Bootstrapping ${ENV_FILE} from .env.template..."
+        cp "$ENV_TEMPLATE" "$ENV_FILE"
     fi
+
+    # Substitute install-time placeholders with actual values. CONSOLE_HOST
+    # and HERMES_HOSTNAME both get the IP initially -- admin can change
+    # them to an FQDN later via the admin UI (System -> Console Settings).
+    local ip="${HERMES_HOST_IP:-$(state_get_value "03-host-ip-confirmed")}"
+    if [[ -n "$ip" ]]; then
+        log "Substituting HOST_IP / CONSOLE_HOST / HERMES_HOSTNAME = ${ip}..."
+        sed -i \
+            -e "s|^HOST_IP=.*|HOST_IP=${ip}|" \
+            -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${ip}|" \
+            -e "s|^HERMES_HOSTNAME=.*|HERMES_HOSTNAME=${ip}|" \
+            -e "s|^NEXTCLOUD_TRUSTED_DOMAINS=.*|NEXTCLOUD_TRUSTED_DOMAINS=${ip}|" \
+            "$ENV_FILE"
+    fi
+
+    # Append the three mount-point vars (strip prior entries first so a
+    # re-run is idempotent). Every other var in .env stays untouched.
+    local tmp_env="${ENV_FILE}.tmp.$$"
+    grep -vE '^(DATA_MOUNT|VMAIL_MOUNT|FILES_MOUNT)=' "$ENV_FILE" > "$tmp_env" || true
     {
         echo ""
         echo "# Storage mount points -- written by install_hermes_docker.sh on $(date)"
@@ -679,7 +703,7 @@ generate_secrets() {
 
     # Hermes database credentials
     if [[ ! -f "${CREDS_DIR}/hermes_username" ]]; then
-        HERMES_DB_USER=$(prompt_with_default "Hermes database username" "hermes")
+        HERMES_DB_USER="hermes"
         echo -n "$HERMES_DB_USER" > "${CREDS_DIR}/hermes_username"
         chmod 600 "${CREDS_DIR}/hermes_username"
         log "Created Hermes database username: $HERMES_DB_USER"
@@ -698,7 +722,7 @@ generate_secrets() {
 
     # Authelia database credentials (in keys/ for Authelia container access)
     if [[ ! -f "${SECRETS_DIR}/authelia_username" ]]; then
-        AUTHELIA_DB_USER=$(prompt_with_default "Authelia database username" "authelia")
+        AUTHELIA_DB_USER="authelia"
         echo -n "$AUTHELIA_DB_USER" > "${SECRETS_DIR}/authelia_username"
         chmod 600 "${SECRETS_DIR}/authelia_username"
         log "Created Authelia database username: $AUTHELIA_DB_USER"
@@ -774,7 +798,7 @@ generate_secrets() {
 
     # Ciphermail database credentials
     if [[ ! -f "${CREDS_DIR}/ciphermail_username" ]]; then
-        CIPHERMAIL_DB_USER=$(prompt_with_default "Ciphermail database username" "ciphermail")
+        CIPHERMAIL_DB_USER="ciphermail"
         echo -n "$CIPHERMAIL_DB_USER" > "${CREDS_DIR}/ciphermail_username"
         chmod 600 "${CREDS_DIR}/ciphermail_username"
         log "Created Ciphermail database username: $CIPHERMAIL_DB_USER"
@@ -793,7 +817,7 @@ generate_secrets() {
 
     # Nextcloud admin credentials
     if [[ ! -f "${CREDS_DIR}/nextcloud_admin_username" ]]; then
-        NC_ADMIN_USER=$(prompt_with_default "Nextcloud admin username" "ncadmin")
+        NC_ADMIN_USER="ncadmin"
         echo -n "$NC_ADMIN_USER" > "${CREDS_DIR}/nextcloud_admin_username"
         chmod 600 "${CREDS_DIR}/nextcloud_admin_username"
         log "Created Nextcloud admin username: $NC_ADMIN_USER"
@@ -812,7 +836,7 @@ generate_secrets() {
 
     # Nextcloud database credentials
     if [[ ! -f "${CREDS_DIR}/nextcloud_username" ]]; then
-        NC_DB_USER=$(prompt_with_default "Nextcloud database username" "nextcloud")
+        NC_DB_USER="nextcloud"
         echo -n "$NC_DB_USER" > "${CREDS_DIR}/nextcloud_username"
         chmod 600 "${CREDS_DIR}/nextcloud_username"
         log "Created Nextcloud database username: $NC_DB_USER"
@@ -851,7 +875,7 @@ generate_secrets() {
 
     # OpenDMARC database credentials
     if [[ ! -f "${CREDS_DIR}/opendmarc_username" ]]; then
-        DMARC_DB_USER=$(prompt_with_default "OpenDMARC database username" "opendmarc")
+        DMARC_DB_USER="opendmarc"
         echo -n "$DMARC_DB_USER" > "${CREDS_DIR}/opendmarc_username"
         chmod 600 "${CREDS_DIR}/opendmarc_username"
         log "Created OpenDMARC database username: $DMARC_DB_USER"
@@ -870,7 +894,7 @@ generate_secrets() {
 
     # Syslog database credentials
     if [[ ! -f "${CREDS_DIR}/syslog_username" ]]; then
-        SYSLOG_DB_USER=$(prompt_with_default "Syslog database username" "syslog")
+        SYSLOG_DB_USER="syslog"
         echo -n "$SYSLOG_DB_USER" > "${CREDS_DIR}/syslog_username"
         chmod 600 "${CREDS_DIR}/syslog_username"
         log "Created Syslog database username: $SYSLOG_DB_USER"
@@ -1251,8 +1275,17 @@ main() {
     echo " |  _  |  __/ |  | | | | | |  __/\\__ \\___) | |__| |_| |"
     echo " |_| |_|\\___|_|  |_| |_| |_|\\___||___/____/|_____\\____|"
     echo ""
+    # Derive the install version from the `updates/hermes-NNNNNN/` directory
+    # name so the banner self-updates per release. At release cut, that
+    # directory gets renamed (e.g. updates/hermes-260119/ -> updates/hermes-260120/)
+    # and this picks up the new value automatically.
+    local install_version
+    install_version=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
+        | grep -oE 'hermes-[0-9]+' | sort | tail -1 | sed 's/hermes-/v/')
+    install_version="${install_version:-unknown}"
+
     echo "         Secure Email Gateway - Docker Installation"
-    echo "                      Version 2.6.0"
+    echo "                      Version ${install_version}"
     echo ""
     echo "============================================================"
     echo ""
