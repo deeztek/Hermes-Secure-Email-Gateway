@@ -33,11 +33,24 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Installation paths
-HERMES_ROOT="/opt/hermes-seg"
+# HERMES_ROOT is self-locating: derived from where this script lives, so the
+# install works regardless of where the repo was cloned. Script lives at
+# <HERMES_ROOT>/scripts/install_hermes_docker.sh, so two dirname's gets us
+# the repo root. This also matches the future intent of #217 (self-locating
+# install + update scripts so the admin isn't pinned to /opt/hermes-seg).
+HERMES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECRETS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/keys"
 CREDS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/creds"
 CONFIG_FILE="${HERMES_ROOT}/.hermes_install_config"
 LOG_FILE="/var/log/hermes_install_$(date +%Y%m%d_%H%M%S).log"
+
+# State directory — per-step completion markers + persisted user inputs.
+# Lets the installer resume after a failure/cancel without re-asking for
+# inputs and without re-running idempotent-but-time-consuming steps.
+# Files inside:
+#   <step>.done   = marker that <step> completed successfully
+#   <step>.value  = persisted scalar value the step produced (e.g. the host IP)
+STATE_DIR="${HERMES_ROOT}/.install-state"
 
 # Default mount points (can be customized during installation)
 DEFAULT_DATA_MOUNT="/mnt/data"       # Databases, logs, quarantine, LDAP, configs
@@ -91,39 +104,252 @@ prompt_with_default() {
 }
 
 validate_mount_point() {
+    # Per #179: the admin is expected to pre-provision the mount point before
+    # running the installer. This function VALIDATES — it does not create
+    # directories. A missing path is a fatal error, not a recoverable warning,
+    # because silent mkdir hides storage misconfiguration (e.g., admin forgot
+    # to mount the volume; data ends up on the root filesystem).
     local path="$1"
     local name="$2"
 
-    # Check if path is absolute
     if [[ ! "$path" = /* ]]; then
-        warn "${name} path must be absolute (start with /)"
+        warn "${name} path must be absolute (start with /): ${path}"
         return 1
     fi
 
-    # Check if parent directory exists
-    local parent_dir=$(dirname "$path")
-    if [[ ! -d "$parent_dir" ]]; then
-        warn "Parent directory ${parent_dir} does not exist for ${name}"
+    if [[ ! -e "$path" ]]; then
+        warn "${name} path does not exist: ${path}"
+        warn "  Create and mount the volume first, then re-run the installer."
         return 1
     fi
 
-    # Create directory if it doesn't exist
     if [[ ! -d "$path" ]]; then
-        log "Creating ${name} directory: ${path}"
-        mkdir -p "$path"
-        if [[ $? -ne 0 ]]; then
-            warn "Failed to create ${name} directory: ${path}"
-            return 1
-        fi
+        warn "${name} path is not a directory: ${path}"
+        return 1
     fi
 
-    # Check write permissions
     if [[ ! -w "$path" ]]; then
-        warn "${name} directory is not writable: ${path}"
+        warn "${name} directory is not writable by current user: ${path}"
         return 1
+    fi
+
+    # Soft warning if the directory has unexpected content (allow override).
+    local entry_count
+    entry_count=$(find "$path" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l)
+    if [[ "$entry_count" -gt 0 ]]; then
+        warn "${name} directory is not empty: ${path} (${entry_count} entries)"
+        warn "  Existing data will not be touched, but verify this is the right mount."
     fi
 
     return 0
+}
+
+validate_ipv4() {
+    # Strict IPv4 dotted-quad validation. Returns 0 on valid, 1 otherwise.
+    # IPv6 not supported in beta — bash regex is impractical and Hermes admins
+    # essentially never install on IPv6-only hosts. Revisit if it becomes a need.
+    local ip="$1"
+
+    # Must be 4 numeric octets separated by dots.
+    if [[ ! "$ip" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+        return 1
+    fi
+
+    # Each octet must be 0-255. Reject leading-zero forms (e.g. "010") because
+    # some libc resolvers interpret those as octal.
+    local IFS='.'
+    local -a octets
+    read -ra octets <<< "$ip"
+    for octet in "${octets[@]}"; do
+        if [[ "$octet" =~ ^0[0-9]+ ]]; then
+            return 1
+        fi
+        if (( octet < 0 || octet > 255 )); then
+            return 1
+        fi
+    done
+
+    # Reject pathological reserved/unusable addresses for a server install.
+    case "$ip" in
+        0.0.0.0|127.0.0.1|255.255.255.255)
+            return 1 ;;
+    esac
+
+    return 0
+}
+
+prompt_host_ip() {
+    # Required prompt — no default. Loops until a valid IPv4 is entered AND
+    # explicitly confirmed. Stored value drives parameters2.server_ip,
+    # Authelia config, and the post-install console URL.
+    #
+    # The wrong IP here is the single most catastrophic install-time mistake
+    # (Authelia OIDC redirects fail, nginx vhost binds to the wrong addr,
+    # admin can't even log in to fix it). The double-prompt + strong warning
+    # is intentional friction.
+    echo ""
+    cat <<'EOF'
++------------------------------------------------------------------+
+|  CRITICAL  — this IP determines how Authelia, nginx, and         |
+|  authentication will be configured. If you enter the wrong one,  |
+|  the system will be UNREACHABLE and you'll need to re-run this   |
+|  installer with the WIPE option to recover.                      |
+|                                                                  |
+|  If unsure, check 'ip -4 addr show' in another terminal first.   |
++------------------------------------------------------------------+
+
+EOF
+    local ip confirm
+    while true; do
+        read -p "Host IP that will be used to access this server: " ip
+        if ! validate_ipv4 "$ip"; then
+            warn "Not a valid usable IPv4 address. Try again (e.g. 192.168.1.50)."
+            continue
+        fi
+        read -p "Confirm ${ip} is correct? [y/N]: " confirm
+        if [[ "$confirm" =~ ^[Yy]$ ]]; then
+            HERMES_HOST_IP="$ip"
+            export HERMES_HOST_IP
+            log "Host IP confirmed: ${HERMES_HOST_IP}"
+            return 0
+        fi
+        echo "Not confirmed. Try again."
+    done
+}
+
+# ============================================================================
+# STATE TRACKING — per-step completion markers + persisted user inputs
+# ============================================================================
+
+state_init() {
+    mkdir -p "$STATE_DIR" 2>/dev/null || true
+}
+
+state_mark_done() {
+    # Record that <step> completed successfully.
+    local step="$1"
+    state_init
+    touch "${STATE_DIR}/${step}.done"
+}
+
+state_is_done() {
+    # Return 0 if <step> has its .done marker, non-zero otherwise.
+    local step="$1"
+    [[ -f "${STATE_DIR}/${step}.done" ]]
+}
+
+state_set_value() {
+    # Persist a scalar value associated with <step> (e.g. an IP address).
+    local step="$1"
+    local value="$2"
+    state_init
+    printf '%s' "$value" > "${STATE_DIR}/${step}.value"
+}
+
+state_get_value() {
+    # Read back a persisted scalar; empty string if not set.
+    local step="$1"
+    [[ -f "${STATE_DIR}/${step}.value" ]] && cat "${STATE_DIR}/${step}.value"
+}
+
+state_last_completed() {
+    # Return the lexically-highest completed step name (without `.done`).
+    # Step names are deliberately numbered (01-xxx, 02-yyy, ...) so lex sort
+    # matches execution order.
+    ls -1 "${STATE_DIR}"/*.done 2>/dev/null \
+        | sed 's|.*/||;s/\.done$//' \
+        | sort \
+        | tail -1
+}
+
+wipe_install() {
+    # Destructive: tears down everything the installer touched so a fresh
+    # run starts from a clean slate. Stops + removes containers and volumes,
+    # deletes credentials, deletes state markers, deletes generated config.
+    # Leaves user-mounted storage paths (DATA_MOUNT etc.) ALONE — admin
+    # provisioned those, admin removes them if they want a deeper reset.
+    header "Wiping previous install"
+
+    if [[ -f "${HERMES_ROOT}/docker-compose.yml" ]]; then
+        log "Stopping + removing containers and volumes..."
+        ( cd "$HERMES_ROOT" && docker compose down -v 2>>"$LOG_FILE" ) || true
+    fi
+
+    log "Removing install state markers..."
+    rm -rf "$STATE_DIR" 2>/dev/null || true
+
+    log "Removing credentials..."
+    rm -rf "$CREDS_DIR" "$SECRETS_DIR" 2>/dev/null || true
+
+    log "Removing generated config files..."
+    rm -f "${HERMES_ROOT}/.env" \
+          "${HERMES_ROOT}/docker-compose.override.yml" \
+          "${CONFIG_FILE}" 2>/dev/null || true
+
+    log "Wipe complete."
+    echo ""
+}
+
+detect_previous_install() {
+    # Called at the top of main() before any prompts. If state markers exist
+    # from a prior (incomplete or completed) run, ask the admin what to do.
+    if [[ ! -d "$STATE_DIR" ]] || [[ -z "$(ls -A "$STATE_DIR" 2>/dev/null)" ]]; then
+        return 0
+    fi
+
+    local last_step
+    last_step=$(state_last_completed)
+
+    echo ""
+    echo "+------------------------------------------------------------------+"
+    echo "|  Previous install state detected at ${STATE_DIR}"
+    [[ -n "$last_step" ]] && echo "|  Last completed step: ${last_step}"
+    echo "+------------------------------------------------------------------+"
+    echo ""
+    echo "Options:"
+    echo "  [1] Continue   — resume install (idempotent steps are safe to re-run)"
+    echo "  [2] WIPE       — tear down EVERYTHING (containers, volumes, creds,"
+    echo "                   state) and start completely fresh"
+    echo "  [3] Cancel"
+    echo ""
+    local choice
+    read -p "Choice [1]: " choice
+    choice="${choice:-1}"
+
+    case "$choice" in
+        1)
+            log "Resuming previous install."
+            ;;
+        2)
+            echo ""
+            echo "WARNING: this will permanently delete:"
+            echo "  - Docker containers + named volumes (mail, db, ldap, etc.)"
+            echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
+            echo "  - Install state markers in ${STATE_DIR}"
+            echo "  - .env, docker-compose.override.yml, .hermes_install_config"
+            echo ""
+            echo "User-mounted storage directories will NOT be touched. If you"
+            echo "want to wipe those too, you must rm -rf them manually before"
+            echo "re-running."
+            echo ""
+            local confirm
+            read -p "Type the word WIPE to confirm: " confirm
+            if [[ "$confirm" == "WIPE" ]]; then
+                wipe_install
+            else
+                echo "Wipe not confirmed. Exiting."
+                exit 1
+            fi
+            ;;
+        3)
+            echo "Cancelled."
+            exit 0
+            ;;
+        *)
+            echo "Invalid choice. Exiting."
+            exit 1
+            ;;
+    esac
 }
 
 # ============================================================================
@@ -144,8 +370,8 @@ configure_mount_points() {
     echo "     - Mailbox user email (can grow very large)"
     echo "     - Separate mount allows independent quota/backup management"
     echo ""
-    echo "  3. NEXTCLOUD FILES (optional)"
-    echo "     - User file storage (if Nextcloud webmail is enabled)"
+    echo "  3. NEXTCLOUD STORAGE (required)"
+    echo "     - User file storage"
     echo "     - Can grow very large depending on usage"
     echo ""
     echo "You have two options:"
@@ -182,7 +408,8 @@ configure_mount_points() {
     # Custom mount points
     echo ""
     echo "Enter custom storage paths. Press Enter to accept defaults."
-    echo "Directories will be created if they don't exist."
+    echo "Mount points must ALREADY EXIST on the host (pre-provisioned by you)."
+    echo "Subdirectories under each mount will be created by the installer."
     echo ""
 
     # Data mount point (required)
@@ -191,7 +418,7 @@ configure_mount_points() {
         if validate_mount_point "$DATA_MOUNT" "System data"; then
             break
         fi
-        echo "Please enter a valid path or ensure the parent directory exists."
+        echo "Please enter a path that already exists, is a directory, and is writable."
     done
     log "System data path: ${DATA_MOUNT}"
 
@@ -201,28 +428,21 @@ configure_mount_points() {
         if validate_mount_point "$VMAIL_MOUNT" "Email storage"; then
             break
         fi
-        echo "Please enter a valid path or ensure the parent directory exists."
+        echo "Please enter a path that already exists, is a directory, and is writable."
     done
     log "Email storage path: ${VMAIL_MOUNT}"
 
-    # Nextcloud files mount point (optional)
+    # Nextcloud storage mount point (required — Nextcloud is part of every install)
     echo ""
-    read -p "Enable Nextcloud file storage? (Y/n): " ENABLE_NC
-    if [[ "$ENABLE_NC" =~ ^[Nn]$ ]]; then
-        ENABLE_NEXTCLOUD="false"
-        FILES_MOUNT=""
-        log "Nextcloud file storage: disabled"
-    else
-        ENABLE_NEXTCLOUD="true"
-        while true; do
-            FILES_MOUNT=$(prompt_with_default "Nextcloud files path" "$DEFAULT_FILES_MOUNT")
-            if validate_mount_point "$FILES_MOUNT" "Nextcloud files"; then
-                break
-            fi
-            echo "Please enter a valid path or ensure the parent directory exists."
-        done
-        log "Nextcloud files path: ${FILES_MOUNT}"
-    fi
+    ENABLE_NEXTCLOUD="true"
+    while true; do
+        FILES_MOUNT=$(prompt_with_default "Nextcloud storage path" "$DEFAULT_FILES_MOUNT")
+        if validate_mount_point "$FILES_MOUNT" "Nextcloud storage"; then
+            break
+        fi
+        echo "Please enter a path that already exists, is a directory, and is writable."
+    done
+    log "Nextcloud storage path: ${FILES_MOUNT}"
 
     # Create subdirectories
     log "Creating storage subdirectories..."
@@ -250,11 +470,12 @@ configure_mount_points() {
     # Vmail subdirectory (email storage)
     mkdir -p "${VMAIL_MOUNT}/dovecot"                   # dovecot_mail
 
-    # Nextcloud subdirectories (if enabled)
-    if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
-        mkdir -p "${FILES_MOUNT}/nextcloud/app"         # nextcloud
-        mkdir -p "${FILES_MOUNT}/nextcloud/redis"       # nextcloud_redis
-    fi
+    # Nextcloud subdirectories
+    # FILES_MOUNT is dedicated to Nextcloud storage, so no `nextcloud/` prefix
+    # is needed — the mount point itself IS the Nextcloud root. Layout matches
+    # the new docker-compose.yml device paths (${FILES_MOUNT}/app, /redis).
+    mkdir -p "${FILES_MOUNT}/app"                       # nextcloud volume
+    mkdir -p "${FILES_MOUNT}/redis"                     # nextcloud_redis volume
 
     # Set permissions
     chmod 755 "${DATA_MOUNT}"
@@ -306,9 +527,17 @@ load_config() {
 # ============================================================================
 
 generate_compose_override() {
-    header "Generating Docker Compose Override"
+    # As of #179, volume mount remapping is env-var driven: docker-compose.yml
+    # now uses ${DATA_MOUNT}/${VMAIL_MOUNT}/${FILES_MOUNT} in its volumes:
+    # device: lines, and docker-compose substitutes them from .env at runtime.
+    # This function writes those three variables to <repo>/.env (preserving
+    # any unrelated variables already in the file). The legacy approach of
+    # generating a docker-compose.override.yml with 22 volume redefinitions
+    # has been retired and the function name kept only so the existing
+    # --generate-override CLI flag still works.
+    header "Writing Docker Compose .env"
 
-    local OVERRIDE_FILE="${HERMES_ROOT}/docker-compose.override.yml"
+    local ENV_FILE="${HERMES_ROOT}/.env"
 
     # Load config if not already set
     if [[ -z "${USE_DOCKER_VOLUMES:-}" ]]; then
@@ -317,259 +546,63 @@ generate_compose_override() {
         fi
     fi
 
-    # If using default Docker volumes, create minimal override
+    # Default-Docker-volumes mode is no longer supported with env-var
+    # substitution (empty ${DATA_MOUNT} would resolve to '/dbase' which is
+    # a real path on the host root filesystem -- dangerous). Custom mount
+    # points are the only supported configuration.
     if [[ "${USE_DOCKER_VOLUMES}" == "true" ]]; then
-        if [[ -f "$OVERRIDE_FILE" ]]; then
-            log "Removing existing docker-compose.override.yml (using default Docker volumes)"
-            rm -f "$OVERRIDE_FILE"
-        fi
-
-        # Create a minimal override with just a comment
-        cat > "$OVERRIDE_FILE" << EOF
-# Hermes SEG Docker Compose Override
-# Generated by install_hermes_docker.sh on $(date)
-#
-# CONFIGURATION: Using default Docker volumes
-# Data is stored in /var/lib/docker/volumes
-#
-# WARNING: This is NOT recommended for production use.
-# To switch to custom mount points, run:
-#   ./scripts/install_hermes_docker.sh --configure-storage
-#
-# No volume overrides - using defaults from docker-compose.yml
-EOF
-        chmod 644 "$OVERRIDE_FILE"
-        log "Using default Docker volumes (no mount point overrides)"
-        warn "Data will be stored in /var/lib/docker/volumes"
-        return
+        error "USE_DOCKER_VOLUMES=true is no longer supported. Re-run installer with custom mount points."
     fi
 
-    # Custom mount points
-    if [[ -z "${DATA_MOUNT:-}" ]] || [[ -z "${VMAIL_MOUNT:-}" ]]; then
-        error "Mount points not configured. Run --configure-storage first."
+    if [[ -z "${DATA_MOUNT:-}" ]] || [[ -z "${VMAIL_MOUNT:-}" ]] || [[ -z "${FILES_MOUNT:-}" ]]; then
+        error "All three mount points (DATA_MOUNT, VMAIL_MOUNT, FILES_MOUNT) must be set."
     fi
 
-    log "Generating docker-compose.override.yml..."
-    log "  System data:  ${DATA_MOUNT}"
-    log "  Email storage: ${VMAIL_MOUNT}"
-    if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
-        log "  Nextcloud files: ${FILES_MOUNT}"
+    log "Writing ${ENV_FILE}..."
+    log "  DATA_MOUNT  = ${DATA_MOUNT}"
+    log "  VMAIL_MOUNT = ${VMAIL_MOUNT}"
+    log "  FILES_MOUNT = ${FILES_MOUNT}"
+
+    # Preserve any unrelated variables already in .env (CONSOLE_HOST,
+    # NCVERSION, AUTHELIAVERSION, etc.). Only strip the three mount-point
+    # vars and re-append fresh values.
+    local tmp_env="${ENV_FILE}.tmp.$$"
+    if [[ -f "$ENV_FILE" ]]; then
+        grep -vE '^(DATA_MOUNT|VMAIL_MOUNT|FILES_MOUNT)=' "$ENV_FILE" > "$tmp_env" || true
     else
-        log "  Nextcloud files: disabled"
+        : > "$tmp_env"
+    fi
+    {
+        echo ""
+        echo "# Storage mount points -- written by install_hermes_docker.sh on $(date)"
+        echo "# These drive the device: paths in docker-compose.yml volumes."
+        echo "DATA_MOUNT=${DATA_MOUNT}"
+        echo "VMAIL_MOUNT=${VMAIL_MOUNT}"
+        echo "FILES_MOUNT=${FILES_MOUNT}"
+    } >> "$tmp_env"
+    mv "$tmp_env" "$ENV_FILE"
+    chmod 644 "$ENV_FILE"
+
+    # Sweep any stale override file from the old approach. Docker Compose
+    # auto-loads docker-compose.override.yml if present; leaving an old one
+    # in place would mask the env-var-driven base compose.
+    local old_override="${HERMES_ROOT}/docker-compose.override.yml"
+    if [[ -f "$old_override" ]]; then
+        log "Removing stale ${old_override} (volume remapping is now env-driven)..."
+        rm -f "$old_override"
     fi
 
-    # Build the override file
-    cat > "$OVERRIDE_FILE" << EOF
-# Hermes SEG Docker Compose Override
-# Generated by install_hermes_docker.sh on $(date)
-#
-# This file overrides the volume mount points in docker-compose.yml.
-# Docker Compose automatically merges this with the main compose file.
-#
-# DO NOT EDIT docker-compose.yml directly - modify this override file.
-# Regenerate with: ./scripts/install_hermes_docker.sh --generate-override
-#
-# MOUNT POINT CONFIGURATION:
-#   System data:    ${DATA_MOUNT}
-#   Email storage:  ${VMAIL_MOUNT}
-#   Nextcloud files: ${ENABLE_NEXTCLOUD:-false} ${FILES_MOUNT:-"(disabled)"}
-
-# Override all named volumes to use custom bind mounts
-volumes:
-  # ============================================================================
-  # SYSTEM DATA VOLUMES (${DATA_MOUNT})
-  # ============================================================================
-
-  # Database
-  db_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/dbase
-
-  # Amavis (mail filter quarantine)
-  amavis_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/amavis
-
-  # Authelia (authentication)
-  authelia_redis:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/authelia/redis
-
-  authelia_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/authelia/logs
-
-  authelia_db:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/authelia/db
-
-  # Dovecot logs (NOT mail storage)
-  dovecot_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/dovecot/logs
-
-  # Nginx logs
-  nginx_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/nginx/logs
-
-  # CommandBox (CFML server)
-  commandbox_serverhome:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/commandbox/serverhome
-
-  # OpenLDAP
-  openldap_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/openldap
-
-  # LDAP (legacy)
-  ldap_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/ldap/data
-
-  ldap_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/ldap/logs
-
-  # Postfix DKIM
-  postfix_dkim_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/postfix_dkim/logs
-
-  postfix_dkim_queue:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/postfix_dkim/queue
-
-  # DMARC
-  dmarc_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/dmarc/logs
-
-  # Mail filter (Amavis, ClamAV, Fangfrisch)
-  mail_filter_logs:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/mail_filter/logs
-
-  mail_filter_data_amavis:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/mail_filter/data/amavis
-
-  mail_filter_data_clamav:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/mail_filter/data/clamav
-
-  mail_filter_data_fangfrisch:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${DATA_MOUNT}/mail_filter/data/fangfrisch
-
-  # ============================================================================
-  # EMAIL STORAGE VOLUME (${VMAIL_MOUNT})
-  # ============================================================================
-
-  # Dovecot mail storage (mailbox user emails)
-  dovecot_mail:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${VMAIL_MOUNT}/dovecot
-EOF
-
-    # Add Nextcloud volumes if enabled
-    if [[ "${ENABLE_NEXTCLOUD}" == "true" ]] && [[ -n "${FILES_MOUNT:-}" ]]; then
-        cat >> "$OVERRIDE_FILE" << EOF
-
-  # ============================================================================
-  # NEXTCLOUD FILES VOLUME (${FILES_MOUNT})
-  # ============================================================================
-
-  # Nextcloud application
-  nextcloud:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${FILES_MOUNT}/nextcloud/app
-
-  # Nextcloud Redis cache
-  nextcloud_redis:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: ${FILES_MOUNT}/nextcloud/redis
-EOF
-    fi
-
-    chmod 644 "$OVERRIDE_FILE"
-    log "Generated: ${OVERRIDE_FILE}"
-
-    # Validate the override file
+    # Validate the result
     log "Validating docker-compose configuration..."
     if command -v docker &> /dev/null; then
-        cd "$HERMES_ROOT"
-        if docker compose config > /dev/null 2>&1; then
-            log "Docker Compose configuration is valid"
+        if ( cd "$HERMES_ROOT" && docker compose config > /dev/null 2>&1 ); then
+            log "  Docker Compose configuration is valid"
         else
-            warn "Docker Compose configuration validation failed. Check override file."
+            warn "  Docker Compose validation failed. Run: cd ${HERMES_ROOT} && docker compose config"
         fi
     fi
 }
+
 
 # ============================================================================
 # PRE-FLIGHT CHECKS
@@ -862,16 +895,40 @@ generate_secrets() {
 # ============================================================================
 
 create_databases() {
+    # ------------------------------------------------------------------
+    # Creates the 6 databases Hermes needs + per-db users + grants, then
+    # imports schemas/seeds for the three that ship them:
+    #
+    #   hermes     -- needs schema + sanitized seed data (config/database/hermes_install.sql)
+    #   opendmarc  -- needs empty schema (config/database/opendmarc_schema.sql)
+    #   Syslog     -- needs empty schema (config/database/syslog_schema.sql)
+    #   authelia   -- Authelia auto-creates its tables on first startup
+    #   djigzo     -- Ciphermail/Hibernate auto-creates its tables on first startup
+    #   nextcloud  -- Nextcloud auto-creates its tables on first startup
+    #
+    # After schemas land, applies updates/hermes-260119/sql/schema_updates.sql
+    # which is idempotent (CREATE TABLE IF NOT EXISTS / INSERT IGNORE / etc.)
+    # so it's a near-no-op on fresh installs and a full delta on upgrades.
+    # Linked: #179
+    # ------------------------------------------------------------------
     header "Creating Databases"
 
-    # Read credentials
+    # ---- Read all credentials up front so we fail early if any are missing ----
     MYSQL_ROOT_PASS=$(cat "${CREDS_DIR}/mysql_root_password")
     HERMES_DB_USER=$(cat "${CREDS_DIR}/hermes_username")
     HERMES_DB_PASS=$(cat "${CREDS_DIR}/hermes_password")
     AUTHELIA_DB_USER=$(cat "${SECRETS_DIR}/authelia_username")
     AUTHELIA_DB_PASS=$(cat "${SECRETS_DIR}/authelia_password")
+    OPENDMARC_DB_USER=$(cat "${CREDS_DIR}/opendmarc_username")
+    OPENDMARC_DB_PASS=$(cat "${CREDS_DIR}/opendmarc_password")
+    SYSLOG_DB_USER=$(cat "${CREDS_DIR}/syslog_username")
+    SYSLOG_DB_PASS=$(cat "${CREDS_DIR}/syslog_password")
+    CIPHERMAIL_DB_USER=$(cat "${CREDS_DIR}/ciphermail_username")
+    CIPHERMAIL_DB_PASS=$(cat "${CREDS_DIR}/ciphermail_password")
+    NEXTCLOUD_DB_USER=$(cat "${CREDS_DIR}/nextcloud_username")
+    NEXTCLOUD_DB_PASS=$(cat "${CREDS_DIR}/nextcloud_password")
 
-    # Wait for MariaDB to be ready
+    # ---- Wait for MariaDB to be ready ----
     log "Waiting for MariaDB to be ready..."
     for i in {1..30}; do
         if docker exec hermes_db_server mysqladmin ping -u root -p"${MYSQL_ROOT_PASS}" --silent 2>/dev/null; then
@@ -884,35 +941,223 @@ create_databases() {
         sleep 2
     done
 
-    # Create Hermes database and user
-    log "Creating Hermes database..."
-    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
-        CREATE DATABASE IF NOT EXISTS hermes CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-        CREATE USER IF NOT EXISTS '${HERMES_DB_USER}'@'%' IDENTIFIED BY '${HERMES_DB_PASS}';
-        GRANT ALL PRIVILEGES ON hermes.* TO '${HERMES_DB_USER}'@'%';
-    " 2>> "$LOG_FILE"
-    log "Hermes database created"
+    # ---- Create one DB + user + grants ----
+    # NOTE: backtick-quoting `Syslog` is REQUIRED — case-sensitive on Linux
+    # and rsyslog's mysql template writes to exactly that mixed-case name.
+    _create_db_user() {
+        local dbname="$1"
+        local user="$2"
+        local pass="$3"
+        local collation="${4:-utf8mb4_unicode_ci}"
 
-    # Create Authelia database and user
-    log "Creating Authelia database..."
-    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
-        CREATE DATABASE IF NOT EXISTS authelia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci;
-        CREATE USER IF NOT EXISTS '${AUTHELIA_DB_USER}'@'%' IDENTIFIED BY '${AUTHELIA_DB_PASS}';
-        GRANT ALL PRIVILEGES ON authelia.* TO '${AUTHELIA_DB_USER}'@'%';
-        FLUSH PRIVILEGES;
-    " 2>> "$LOG_FILE"
-    log "Authelia database created"
+        log "Creating database '${dbname}' (user '${user}')..."
+        docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
+            CREATE DATABASE IF NOT EXISTS \`${dbname}\` CHARACTER SET utf8mb4 COLLATE ${collation};
+            CREATE USER IF NOT EXISTS '${user}'@'%' IDENTIFIED BY '${pass}';
+            GRANT ALL PRIVILEGES ON \`${dbname}\`.* TO '${user}'@'%';
+        " 2>> "$LOG_FILE"
+    }
 
-    # Import Hermes schema
-    if [[ -f "${HERMES_ROOT}/config/database/hermes_schema.sql" ]]; then
-        log "Importing Hermes database schema..."
-        docker exec -i hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" hermes < "${HERMES_ROOT}/config/database/hermes_schema.sql" 2>> "$LOG_FILE"
-        log "Hermes schema imported"
-    else
-        warn "Hermes schema file not found, skipping import"
+    _create_db_user hermes    "$HERMES_DB_USER"     "$HERMES_DB_PASS"
+    _create_db_user authelia  "$AUTHELIA_DB_USER"   "$AUTHELIA_DB_PASS"   utf8mb4_unicode_520_ci
+    _create_db_user opendmarc "$OPENDMARC_DB_USER"  "$OPENDMARC_DB_PASS"
+    _create_db_user Syslog    "$SYSLOG_DB_USER"     "$SYSLOG_DB_PASS"
+    _create_db_user djigzo    "$CIPHERMAIL_DB_USER" "$CIPHERMAIL_DB_PASS"
+    _create_db_user nextcloud "$NEXTCLOUD_DB_USER"  "$NEXTCLOUD_DB_PASS"
+
+    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;" 2>> "$LOG_FILE"
+    log "All 6 databases + users + grants created"
+
+    # ---- Import one SQL file into a target DB ----
+    _import_sql() {
+        local sql_file="$1"
+        local target_db="$2"
+        local label="$3"
+
+        if [[ ! -f "$sql_file" ]]; then
+            error "${label} file not found: ${sql_file}"
+            return 1
+        fi
+        log "Importing ${label} into '${target_db}'..."
+        if ! docker exec -i hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" "$target_db" \
+                < "$sql_file" 2>> "$LOG_FILE"; then
+            error "Failed to import ${label} (see $LOG_FILE for details)"
+            return 1
+        fi
+        log "  ✓ ${label} imported"
+    }
+
+    # ---- Schema + sanitized seed for `hermes` ----
+    _import_sql \
+        "${HERMES_ROOT}/config/database/hermes_install.sql" \
+        "hermes" \
+        "hermes_install.sql (schema + seed)"
+
+    # ---- Empty schemas for opendmarc + Syslog ----
+    # Both are app/runtime-populated (opendmarc reports + rsyslog SystemEvents);
+    # pre-creating the table structure ensures the apps don't race on first start.
+    _import_sql \
+        "${HERMES_ROOT}/config/database/opendmarc_schema.sql" \
+        "opendmarc" \
+        "opendmarc_schema.sql"
+
+    _import_sql \
+        "${HERMES_ROOT}/config/database/syslog_schema.sql" \
+        "Syslog" \
+        "syslog_schema.sql"
+
+    # ---- Apply hermes schema_updates.sql (idempotent deltas + release stamp) ----
+    # Path is parameterized off the version subdir so it picks up future
+    # versions automatically — at release-cut time, the install script will be
+    # editing a new copy under updates/hermes-260120/ etc.
+    local schema_updates="${HERMES_ROOT}/updates/hermes-260119/sql/schema_updates.sql"
+    _import_sql "$schema_updates" "hermes" "schema_updates.sql"
+
+    log "Database initialization completed"
+}
+
+# ============================================================================
+# SEED INSTALL-SPECIFIC VALUES
+# ============================================================================
+
+seed_install_specific_values() {
+    # Writes install-time-known values into the seeded DB so the admin UI
+    # shows correct defaults on first login. The IP came from the
+    # 03-host-ip-confirmed step. Mirrors what the legacy installer did
+    # for parameters2.console.host + parameters2.server_ip.
+    header "Seeding install-specific values"
+
+    local ip
+    ip=$(state_get_value "03-host-ip-confirmed")
+    if [[ -z "$ip" ]]; then
+        ip="${HERMES_HOST_IP:-}"
+    fi
+    if [[ -z "$ip" ]]; then
+        warn "Host IP not in state and HERMES_HOST_IP not set — skipping"
+        return 0
     fi
 
-    log "Database creation completed"
+    local pass
+    pass=$(cat "${CREDS_DIR}/mysql_root_password")
+
+    log "Writing parameters2.server_ip = ${ip}..."
+    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+        UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
+         WHERE parameter='server_ip' AND module='console';
+    " 2>>"$LOG_FILE"
+
+    log "Writing parameters2.console.host = ${ip} (admin can change to FQDN via UI later)..."
+    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+        UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
+         WHERE parameter='console.host' AND module='console';
+    " 2>>"$LOG_FILE"
+
+    log "Install-specific values seeded"
+}
+
+# ============================================================================
+# WRITE INSTALL SUMMARY
+# ============================================================================
+
+write_install_summary() {
+    # Writes a single-file credential + access summary to /opt/hermes/INSTALL_SUMMARY.txt
+    # (chmod 600, root-only). Also prints a condensed version to the console.
+    # This is the last user-facing output of a successful install — admins
+    # MUST save the contents before logging out of their install session.
+    local ip
+    ip=$(state_get_value "03-host-ip-confirmed")
+    [[ -z "$ip" ]] && ip="${HERMES_HOST_IP:-<not-set>}"
+
+    local summary="${HERMES_ROOT}/INSTALL_SUMMARY.txt"
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S %Z')
+
+    # Build the summary as one document. Defensive: each `cat` lookup is
+    # `2>/dev/null || echo "<not-generated>"` so a missing cred file doesn't
+    # break the summary write.
+    {
+        cat <<EOF
+================================================================================
+                      HERMES SEG INSTALL SUMMARY
+                  Generated: ${timestamp}
+================================================================================
+
+ACCESS
+------
+Console URL:        https://${ip}/   (snake-oil cert; browser will warn)
+Admin login:        $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")
+
+MARIADB
+-------
+Root password:      $(cat "${CREDS_DIR}/mysql_root_password" 2>/dev/null || echo "<not-generated>")
+hermes user/pw:     $(cat "${CREDS_DIR}/hermes_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/hermes_password" 2>/dev/null || echo "?")
+opendmarc user/pw:  $(cat "${CREDS_DIR}/opendmarc_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/opendmarc_password" 2>/dev/null || echo "?")
+syslog user/pw:     $(cat "${CREDS_DIR}/syslog_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/syslog_password" 2>/dev/null || echo "?")
+ciphermail user/pw: $(cat "${CREDS_DIR}/ciphermail_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/ciphermail_password" 2>/dev/null || echo "?")
+nextcloud user/pw:  $(cat "${CREDS_DIR}/nextcloud_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/nextcloud_password" 2>/dev/null || echo "?")
+
+AUTHELIA
+--------
+DB user/pw:         $(cat "${SECRETS_DIR}/authelia_username" 2>/dev/null || echo "?") / $(cat "${SECRETS_DIR}/authelia_password" 2>/dev/null || echo "?")
+JWT secret:         $(cat "${SECRETS_DIR}/authelia_jwt_secret" 2>/dev/null || echo "<not-generated>")
+Session secret:     $(cat "${SECRETS_DIR}/authelia_session_secret" 2>/dev/null || echo "<not-generated>")
+Storage enc key:    $(cat "${SECRETS_DIR}/authelia_storage_encryption_key_file" 2>/dev/null || echo "<not-generated>")
+
+LDAP
+----
+Admin password:     $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<not-generated>")
+Service password:   $(cat "${CREDS_DIR}/ldap_service_password" 2>/dev/null || echo "<not-generated>")
+
+NEXTCLOUD
+---------
+Admin user/pw:      $(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/nextcloud_admin_password" 2>/dev/null || echo "?")
+OIDC secret:        $(cat "${CREDS_DIR}/nextcloud_oidc_secret" 2>/dev/null || echo "<not-generated>")
+Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null || echo "<not-generated>")
+
+NEXT STEPS (in admin UI)
+------------------------
+1. Log in at https://${ip}/   (snake-oil cert — accept the browser warning)
+2. System  -> Console Settings: change console host from IP to FQDN if needed
+3. System  -> SSL Certificates: install your real cert (Let's Encrypt or imported)
+4. Email Server -> Domains: add your first domain
+5. DNS records to set up at your registrar: A/AAAA, MX, SPF, DKIM, DMARC
+
+RECOVERY
+--------
+If https://${ip}/ does NOT load, the most likely cause is that the host IP
+you entered was wrong. Re-run the installer and pick option [2] (WIPE) to
+start over with a fresh IP.
+
+    cd ${HERMES_ROOT}
+    ./scripts/install_hermes_docker.sh    # pick option [2] when prompted
+
+LOG FILES
+---------
+Install log:        ${LOG_FILE}
+State markers:      ${STATE_DIR}/
+
+================================================================================
+EOF
+    } > "$summary"
+
+    chmod 600 "$summary" 2>/dev/null || true
+
+    # Console summary — condensed
+    echo ""
+    echo "================================================================================"
+    echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
+    echo "================================================================================"
+    echo "Console URL:      https://${ip}/   (snake-oil; expect browser warning)"
+    echo "Admin login:      $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")"
+    echo "Admin password:   (in INSTALL_SUMMARY.txt below)"
+    echo ""
+    echo "Full credential summary written to:"
+    echo "  ${summary}   (chmod 600, root only)"
+    echo ""
+    echo "If https://${ip}/ does NOT load, the IP was wrong. Re-run this installer"
+    echo "and select [2] WIPE to start over."
+    echo "================================================================================"
+    echo ""
 }
 
 # ============================================================================
@@ -1012,6 +1257,10 @@ main() {
     echo "============================================================"
     echo ""
 
+    # Detect any previous install BEFORE asking the admin to confirm — they
+    # need a chance to wipe + restart rather than blindly continuing.
+    detect_previous_install
+
     # Confirm installation
     read -p "This will install Hermes SEG. Continue? (y/N): " CONFIRM
     if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
@@ -1024,11 +1273,48 @@ main() {
     log "Installation started at $(date)"
     log "Log file: $LOG_FILE"
 
-    # Run installation steps
-    preflight_checks
-    configure_mount_points
-    generate_compose_override
-    generate_secrets
+    # ---- Phase 1 steps. Each is wrapped with a state guard so a re-run
+    # skips work that already completed successfully. The underlying actions
+    # are also internally idempotent (file existence checks, IF NOT EXISTS
+    # on DB ops, etc.) — the state guards are belt-and-suspenders.
+    if state_is_done "01-preflight"; then
+        log "Skip: preflight checks already passed"
+    else
+        preflight_checks
+        state_mark_done "01-preflight"
+    fi
+
+    if state_is_done "02-mounts-configured"; then
+        log "Skip: storage mount points already configured"
+        load_config
+    else
+        configure_mount_points
+        state_mark_done "02-mounts-configured"
+    fi
+
+    if state_is_done "03-host-ip-confirmed"; then
+        HERMES_HOST_IP=$(state_get_value "03-host-ip-confirmed")
+        export HERMES_HOST_IP
+        log "Skip: host IP already confirmed (${HERMES_HOST_IP})"
+    else
+        prompt_host_ip
+        state_set_value "03-host-ip-confirmed" "$HERMES_HOST_IP"
+        state_mark_done "03-host-ip-confirmed"
+    fi
+
+    if state_is_done "04-compose-rendered"; then
+        log "Skip: docker-compose.override.yml already generated"
+    else
+        generate_compose_override
+        state_mark_done "04-compose-rendered"
+    fi
+
+    if state_is_done "05-secrets-generated"; then
+        log "Skip: credentials already generated"
+    else
+        generate_secrets
+        state_mark_done "05-secrets-generated"
+    fi
 
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
@@ -1076,10 +1362,55 @@ case "${1:-}" in
         # Initialize databases and configure services (run after containers are up)
         touch "$LOG_FILE"
         log "Database initialization started at $(date)"
-        create_databases
-        configure_authelia_mysql
-        initialize_ldap
 
+        # Resolve HERMES_HOST_IP from state (set during phase 1). The --init-db
+        # path is sometimes invoked manually by users who already ran phase 1
+        # and started containers — the IP MUST already be persisted in state.
+        if [[ -z "${HERMES_HOST_IP:-}" ]]; then
+            HERMES_HOST_IP=$(state_get_value "03-host-ip-confirmed")
+            export HERMES_HOST_IP
+        fi
+        if [[ -z "$HERMES_HOST_IP" ]]; then
+            error "Host IP not in state. Run phase 1 first: ./install_hermes_docker.sh"
+        fi
+        log "Resolved host IP from state: ${HERMES_HOST_IP}"
+
+        if state_is_done "06-databases-created"; then
+            log "Skip: databases already created"
+        else
+            create_databases
+            state_mark_done "06-databases-created"
+        fi
+
+        if state_is_done "07-install-values-seeded"; then
+            log "Skip: install-specific values already seeded"
+        else
+            seed_install_specific_values
+            state_mark_done "07-install-values-seeded"
+        fi
+
+        if state_is_done "08-authelia-configured"; then
+            log "Skip: Authelia already configured"
+        else
+            configure_authelia_mysql
+            state_mark_done "08-authelia-configured"
+        fi
+
+        if state_is_done "09-ldap-initialized"; then
+            log "Skip: LDAP already initialized"
+        else
+            initialize_ldap
+            state_mark_done "09-ldap-initialized"
+        fi
+
+        if state_is_done "10-nextcloud-configured"; then
+            log "Skip: Nextcloud already configured"
+            NC_SKIP=1
+        else
+            NC_SKIP=0
+        fi
+
+        if [[ "$NC_SKIP" -eq 0 ]]; then
         # Nextcloud post-install configuration
         log "Configuring Nextcloud..."
 
@@ -1197,17 +1528,26 @@ case "${1:-}" in
             [[ -z "$NC_HOSTNAME" ]] && log "    - HERMES_HOSTNAME not found in ${HERMES_ROOT}/.env"
         fi
 
-        # Inject database credentials into config files
-        log "Injecting database credentials into config files..."
-        if [[ -x "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" ]]; then
-            "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" --non-interactive >> "$LOG_FILE" 2>&1 \
-                && log "  Database credentials injected into all config files" \
-                || log "  WARNING: Credential injection failed — run rotate_db_credentials.sh manually"
+            state_mark_done "10-nextcloud-configured"
+        fi  # end NC_SKIP gate
+
+        if state_is_done "11-creds-injected"; then
+            log "Skip: DB credentials already injected into config files"
         else
-            log "  WARNING: rotate_db_credentials.sh not found — skipping credential injection"
+            log "Injecting database credentials into config files..."
+            if [[ -x "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" ]]; then
+                "${HERMES_ROOT}/config/hermes/opt/hermes/scripts/rotate_db_credentials.sh" --non-interactive >> "$LOG_FILE" 2>&1 \
+                    && log "  Database credentials injected into all config files" \
+                    || log "  WARNING: Credential injection failed - run rotate_db_credentials.sh manually"
+            else
+                log "  WARNING: rotate_db_credentials.sh not found - skipping credential injection"
+            fi
+            state_mark_done "11-creds-injected"
         fi
 
+        state_mark_done "99-completed"
         log "Database initialization completed"
+        write_install_summary
         ;;
     --generate-secrets)
         # Only generate secrets

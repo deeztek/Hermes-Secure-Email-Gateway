@@ -766,49 +766,49 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/amavis
+      device: ${DATA_MOUNT}/amavis
 
   db_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/dbase
+      device: ${DATA_MOUNT}/dbase
 
   nextcloud_redis:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/nextcloud/redis
+      device: ${FILES_MOUNT}/redis
 
   nextcloud:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/nextcloud/app
+      device: ${FILES_MOUNT}/app
 
   dovecot_mail:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/dovecot/vmail
+      device: ${VMAIL_MOUNT}/dovecot
 
   dovecot_sieve:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/dovecot/sieve
+      device: ${DATA_MOUNT}/dovecot/sieve
 
   authelia_redis:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/authelia/redis
+      device: ${DATA_MOUNT}/authelia/redis
 
 
   dovecot_logs:
@@ -816,28 +816,28 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/dovecot/logs
+      device: ${DATA_MOUNT}/dovecot/logs
 
   authelia_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/authelia/logs
+      device: ${DATA_MOUNT}/authelia/logs
 
   authelia_db:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/authelia/db
+      device: ${DATA_MOUNT}/authelia/db
 
   nginx_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/nginx/logs
+      device: ${DATA_MOUNT}/nginx/logs
 
 
   commandbox_serverhome:
@@ -845,7 +845,7 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/commandbox/serverhome
+      device: ${DATA_MOUNT}/commandbox/serverhome
 
 
   ldap_data:
@@ -853,14 +853,14 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/ldap/data
+      device: ${DATA_MOUNT}/ldap/data
 
   ldap_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/ldap/logs
+      device: ${DATA_MOUNT}/ldap/logs
 
 
   postfix_dkim_logs:
@@ -868,56 +868,56 @@ volumes:
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/postfix_dkim/logs
+      device: ${DATA_MOUNT}/postfix_dkim/logs
 
   postfix_dkim_queue:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/postfix_dkim/queue
+      device: ${DATA_MOUNT}/postfix_dkim/queue
 
   dmarc_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/dmarc/logs
+      device: ${DATA_MOUNT}/dmarc/logs
 
   openarc_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/openarc/logs
+      device: ${DATA_MOUNT}/openarc/logs
 
   mail_filter_logs:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/mail_filter/logs
+      device: ${DATA_MOUNT}/mail_filter/logs
 
   mail_filter_data_amavis:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/mail_filter/data/amavis
+      device: ${DATA_MOUNT}/mail_filter/data/amavis
 
   mail_filter_data_clamav:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/mail_filter/data/clamav
+      device: ${DATA_MOUNT}/mail_filter/data/clamav
  
   mail_filter_data_fangfrisch:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/data/mail_filter/data/fangfrisch
+      device: ${DATA_MOUNT}/mail_filter/data/fangfrisch
 
 
 
