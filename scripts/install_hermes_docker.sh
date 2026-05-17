@@ -508,20 +508,25 @@ configure_mount_points() {
     # Create subdirectories
     log "Creating storage subdirectories..."
 
-    # Data subdirectories (matching docker-compose.yml volume names)
+    # Data subdirectories (one per `device:` line in docker-compose.yml's
+    # `volumes:` section). Docker will NOT auto-create bind-mount source
+    # paths -- a missing directory means the dependent container fails to
+    # start with an obscure "bind source path does not exist" error. Keep
+    # this list in lock-step with docker-compose.yml.
     mkdir -p "${DATA_MOUNT}/dbase"                      # db_data
     mkdir -p "${DATA_MOUNT}/amavis"                     # amavis_data
     mkdir -p "${DATA_MOUNT}/authelia/redis"             # authelia_redis
     mkdir -p "${DATA_MOUNT}/authelia/logs"              # authelia_logs
     mkdir -p "${DATA_MOUNT}/authelia/db"                # authelia_db
     mkdir -p "${DATA_MOUNT}/dovecot/logs"               # dovecot_logs
+    mkdir -p "${DATA_MOUNT}/dovecot/sieve"              # dovecot_sieve
     mkdir -p "${DATA_MOUNT}/nginx/logs"                 # nginx_logs
     mkdir -p "${DATA_MOUNT}/commandbox/serverhome"      # commandbox_serverhome
-    mkdir -p "${DATA_MOUNT}/openldap"                   # openldap_data
     mkdir -p "${DATA_MOUNT}/ldap/data"                  # ldap_data
     mkdir -p "${DATA_MOUNT}/ldap/logs"                  # ldap_logs
     mkdir -p "${DATA_MOUNT}/postfix_dkim/logs"          # postfix_dkim_logs
     mkdir -p "${DATA_MOUNT}/postfix_dkim/queue"         # postfix_dkim_queue
+    mkdir -p "${DATA_MOUNT}/openarc/logs"               # openarc_logs
     mkdir -p "${DATA_MOUNT}/dmarc/logs"                 # dmarc_logs
     mkdir -p "${DATA_MOUNT}/mail_filter/logs"           # mail_filter_logs
     mkdir -p "${DATA_MOUNT}/mail_filter/data/amavis"    # mail_filter_data_amavis
