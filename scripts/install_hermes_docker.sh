@@ -90,6 +90,33 @@ generate_alphanumeric() {
     openssl rand -base64 32 | tr -dc 'a-zA-Z0-9' | head -c "$1"
 }
 
+generate_random_username() {
+    # Compose a memorable-but-unique username as <word><digits>, e.g.
+    #   apologise4567, paddle281, wrench9012
+    #
+    # The wordlist is pulled live from config/database/hermes_install.sql
+    # (the source for the `random_words` DB table seed). This works in
+    # phase 1 BEFORE the database has been created, since the file ships
+    # in the repo. The digit suffix uses bash $RANDOM (0-32767) -- no
+    # need to populate the `numbers` DB table at install time.
+    #
+    # If the wordlist read fails (e.g. script run from outside the repo),
+    # falls back to a small inline word array so the install never wedges.
+    local install_sql="${HERMES_ROOT}/config/database/hermes_install.sql"
+    local word=""
+    if [[ -f "$install_sql" ]] && command -v shuf >/dev/null 2>&1; then
+        word=$(grep "INSERT IGNORE INTO \`random_words\`" "$install_sql" \
+               | grep -oE "'[a-z]+'" \
+               | tr -d "'" \
+               | shuf -n 1)
+    fi
+    if [[ -z "$word" ]]; then
+        local fallback=(falcon turbine glacier orbit summit ember rapid stellar nebula vector quartz beacon meadow tide forge)
+        word="${fallback[$((RANDOM % ${#fallback[@]}))]}"
+    fi
+    echo "${word}${RANDOM}"
+}
+
 generate_hex() {
     # Generate hex string (for JWT secrets, encryption keys)
     openssl rand -hex "$1"
@@ -703,7 +730,7 @@ generate_secrets() {
 
     # Hermes database credentials
     if [[ ! -f "${CREDS_DIR}/hermes_username" ]]; then
-        HERMES_DB_USER="hermes"
+        HERMES_DB_USER=$(generate_random_username)
         echo -n "$HERMES_DB_USER" > "${CREDS_DIR}/hermes_username"
         chmod 600 "${CREDS_DIR}/hermes_username"
         log "Created Hermes database username: $HERMES_DB_USER"
@@ -722,7 +749,7 @@ generate_secrets() {
 
     # Authelia database credentials (in keys/ for Authelia container access)
     if [[ ! -f "${SECRETS_DIR}/authelia_username" ]]; then
-        AUTHELIA_DB_USER="authelia"
+        AUTHELIA_DB_USER=$(generate_random_username)
         echo -n "$AUTHELIA_DB_USER" > "${SECRETS_DIR}/authelia_username"
         chmod 600 "${SECRETS_DIR}/authelia_username"
         log "Created Authelia database username: $AUTHELIA_DB_USER"
@@ -798,7 +825,7 @@ generate_secrets() {
 
     # Ciphermail database credentials
     if [[ ! -f "${CREDS_DIR}/ciphermail_username" ]]; then
-        CIPHERMAIL_DB_USER="ciphermail"
+        CIPHERMAIL_DB_USER=$(generate_random_username)
         echo -n "$CIPHERMAIL_DB_USER" > "${CREDS_DIR}/ciphermail_username"
         chmod 600 "${CREDS_DIR}/ciphermail_username"
         log "Created Ciphermail database username: $CIPHERMAIL_DB_USER"
@@ -817,7 +844,7 @@ generate_secrets() {
 
     # Nextcloud admin credentials
     if [[ ! -f "${CREDS_DIR}/nextcloud_admin_username" ]]; then
-        NC_ADMIN_USER="ncadmin"
+        NC_ADMIN_USER=$(generate_random_username)
         echo -n "$NC_ADMIN_USER" > "${CREDS_DIR}/nextcloud_admin_username"
         chmod 600 "${CREDS_DIR}/nextcloud_admin_username"
         log "Created Nextcloud admin username: $NC_ADMIN_USER"
@@ -836,7 +863,7 @@ generate_secrets() {
 
     # Nextcloud database credentials
     if [[ ! -f "${CREDS_DIR}/nextcloud_username" ]]; then
-        NC_DB_USER="nextcloud"
+        NC_DB_USER=$(generate_random_username)
         echo -n "$NC_DB_USER" > "${CREDS_DIR}/nextcloud_username"
         chmod 600 "${CREDS_DIR}/nextcloud_username"
         log "Created Nextcloud database username: $NC_DB_USER"
@@ -875,7 +902,7 @@ generate_secrets() {
 
     # OpenDMARC database credentials
     if [[ ! -f "${CREDS_DIR}/opendmarc_username" ]]; then
-        DMARC_DB_USER="opendmarc"
+        DMARC_DB_USER=$(generate_random_username)
         echo -n "$DMARC_DB_USER" > "${CREDS_DIR}/opendmarc_username"
         chmod 600 "${CREDS_DIR}/opendmarc_username"
         log "Created OpenDMARC database username: $DMARC_DB_USER"
@@ -894,7 +921,7 @@ generate_secrets() {
 
     # Syslog database credentials
     if [[ ! -f "${CREDS_DIR}/syslog_username" ]]; then
-        SYSLOG_DB_USER="syslog"
+        SYSLOG_DB_USER=$(generate_random_username)
         echo -n "$SYSLOG_DB_USER" > "${CREDS_DIR}/syslog_username"
         chmod 600 "${CREDS_DIR}/syslog_username"
         log "Created Syslog database username: $SYSLOG_DB_USER"
