@@ -762,239 +762,174 @@ preflight_checks() {
 # ============================================================================
 
 generate_secrets() {
+    # Generate every secret/credential the install pipeline needs. Each file
+    # is gated by an existence check so re-runs are idempotent.
+    #
+    # Files are split between two directories:
+    #   ${CREDS_DIR} = config/hermes/opt/hermes/creds/  (CFML/shell readable)
+    #   ${SECRETS_DIR} = config/hermes/opt/hermes/keys/ (Docker-secret bind mounts)
+    #
+    # The exact filenames here MUST match what docker-compose.yml references
+    # in its `secrets:` block at the top of the file -- a missing file or a
+    # name mismatch causes `docker compose up` to bail out with
+    # "bind source path does not exist".
     header "Generating Secrets"
 
-    mkdir -p "$SECRETS_DIR"
-    mkdir -p "$CREDS_DIR"
+    mkdir -p "$SECRETS_DIR" "$CREDS_DIR"
     chmod 700 "$SECRETS_DIR" "$CREDS_DIR"
 
-    # MariaDB root password
-    if [[ ! -f "${CREDS_DIR}/mysql_root_password" ]]; then
-        MYSQL_ROOT_PASS=$(generate_password)
-        echo -n "$MYSQL_ROOT_PASS" > "${CREDS_DIR}/mysql_root_password"
-        chmod 600 "${CREDS_DIR}/mysql_root_password"
-        log "Generated MySQL root password"
-    else
-        log "MySQL root password already exists, skipping"
-    fi
+    # ---- Local helpers ----
+    # Write VALUE to TARGET only if TARGET doesn't exist. Always chmods 600.
+    _ensure_secret() {
+        local target="$1"
+        local value="$2"
+        if [[ ! -f "$target" ]]; then
+            printf '%s' "$value" > "$target"
+            chmod 600 "$target"
+            log "  + $(basename "$target")"
+        else
+            log "  = $(basename "$target") (kept)"
+        fi
+    }
 
-    # Hermes database credentials
-    if [[ ! -f "${CREDS_DIR}/hermes_username" ]]; then
-        HERMES_DB_USER=$(generate_random_username)
-        echo -n "$HERMES_DB_USER" > "${CREDS_DIR}/hermes_username"
-        chmod 600 "${CREDS_DIR}/hermes_username"
-        log "Created Hermes database username: $HERMES_DB_USER"
-    else
-        log "Hermes database username already exists, skipping"
-    fi
+    # Source AUTHELIAVERSION from the .env that generate_compose_override
+    # wrote moments earlier. Used to pull the Authelia image for the
+    # argon2-hashed OIDC client secret further down.
+    local AUTHELIA_VERSION
+    AUTHELIA_VERSION=$(grep -E '^AUTHELIAVERSION=' "${HERMES_ROOT}/.env" 2>/dev/null         | cut -d= -f2 | tr -d '"' | tr -d "'")
+    AUTHELIA_VERSION="${AUTHELIA_VERSION:-4.39.16}"
 
-    if [[ ! -f "${CREDS_DIR}/hermes_password" ]]; then
-        HERMES_DB_PASS=$(generate_password)
-        echo -n "$HERMES_DB_PASS" > "${CREDS_DIR}/hermes_password"
-        chmod 600 "${CREDS_DIR}/hermes_password"
-        log "Generated Hermes database password"
-    else
-        log "Hermes database password already exists, skipping"
-    fi
+    # =========================================================================
+    # CREDS_DIR  -- read by CFML, shell scripts, init flows
+    # =========================================================================
+    log "Generating creds/ files..."
+    _ensure_secret "${CREDS_DIR}/mysql_root_password"      "$(generate_password)"
+    _ensure_secret "${CREDS_DIR}/hermes_username"          "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/hermes_password"          "$(generate_password)"
+    _ensure_secret "${CREDS_DIR}/ciphermail_username"      "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/ciphermail_password"      "$(generate_password)"
+    _ensure_secret "${CREDS_DIR}/opendmarc_username"       "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/opendmarc_password"       "$(generate_password)"
+    _ensure_secret "${CREDS_DIR}/syslog_username"          "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/syslog_password"          "$(generate_password)"
 
-    # Authelia database credentials (in keys/ for Authelia container access)
-    if [[ ! -f "${SECRETS_DIR}/authelia_username" ]]; then
-        AUTHELIA_DB_USER=$(generate_random_username)
-        echo -n "$AUTHELIA_DB_USER" > "${SECRETS_DIR}/authelia_username"
-        chmod 600 "${SECRETS_DIR}/authelia_username"
-        log "Created Authelia database username: $AUTHELIA_DB_USER"
-    else
-        log "Authelia database username already exists, skipping"
-    fi
+    # Nextcloud DB connection credentials (compose names these *_mysql_*)
+    _ensure_secret "${CREDS_DIR}/nextcloud_mysql_username" "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/nextcloud_mysql_password" "$(generate_password)"
 
-    if [[ ! -f "${SECRETS_DIR}/authelia_password" ]]; then
-        AUTHELIA_DB_PASS=$(generate_password)
-        echo -n "$AUTHELIA_DB_PASS" > "${SECRETS_DIR}/authelia_password"
-        chmod 600 "${SECRETS_DIR}/authelia_password"
-        log "Generated Authelia database password"
-    else
-        log "Authelia database password already exists, skipping"
-    fi
+    # Nextcloud admin account (human-typed for first login)
+    _ensure_secret "${CREDS_DIR}/nextcloud_admin_username" "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/nextcloud_admin_password" "$(generate_typeable_password)"
 
-    # Authelia JWT secret (64 bytes hex)
-    if [[ ! -f "${SECRETS_DIR}/authelia_jwt_secret" ]]; then
-        JWT_SECRET=$(generate_hex 32)
-        echo -n "$JWT_SECRET" > "${SECRETS_DIR}/authelia_jwt_secret"
-        chmod 600 "${SECRETS_DIR}/authelia_jwt_secret"
-        log "Generated Authelia JWT secret"
-    else
-        log "Authelia JWT secret already exists, skipping"
-    fi
+    # Nextcloud Redis (crypto secret)
+    _ensure_secret "${CREDS_DIR}/nextcloud_redis_password" "$(generate_hex 32)"
 
-    # Authelia session secret (64 bytes hex)
-    if [[ ! -f "${SECRETS_DIR}/authelia_session_secret" ]]; then
-        SESSION_SECRET=$(generate_hex 32)
-        echo -n "$SESSION_SECRET" > "${SECRETS_DIR}/authelia_session_secret"
-        chmod 600 "${SECRETS_DIR}/authelia_session_secret"
-        log "Generated Authelia session secret"
-    else
-        log "Authelia session secret already exists, skipping"
-    fi
+    # CommandBox admin password (Docker secret)
+    _ensure_secret "${CREDS_DIR}/cfadmin_password"         "$(generate_password)"
 
-    # Authelia storage encryption key (64 bytes hex)
-    if [[ ! -f "${SECRETS_DIR}/authelia_storage_encryption_key_file" ]]; then
-        STORAGE_KEY=$(generate_hex 32)
-        echo -n "$STORAGE_KEY" > "${SECRETS_DIR}/authelia_storage_encryption_key_file"
-        chmod 600 "${SECRETS_DIR}/authelia_storage_encryption_key_file"
-        log "Generated Authelia storage encryption key"
-    else
-        log "Authelia storage encryption key already exists, skipping"
-    fi
+    # =========================================================================
+    # SECRETS_DIR  -- bind-mounted as Docker secrets per docker-compose.yml
+    # =========================================================================
+    log "Generating keys/ files..."
 
-    # LDAP admin password
-    if [[ ! -f "${CREDS_DIR}/ldap_admin_password" ]]; then
+    # Authelia DB credentials (compose binds the password but the username
+    # lives alongside it for symmetry with the other DBs)
+    _ensure_secret "${SECRETS_DIR}/authelia_username" "$(generate_random_username)"
+    _ensure_secret "${SECRETS_DIR}/authelia_password" "$(generate_password)"
+
+    # Authelia core crypto secrets (64 hex chars = 256 bits each)
+    _ensure_secret "${SECRETS_DIR}/authelia_session_secret_file"                                   "$(generate_hex 32)"
+    _ensure_secret "${SECRETS_DIR}/authelia_session_redis_password_file"                           "$(generate_hex 32)"
+    _ensure_secret "${SECRETS_DIR}/authelia_storage_encryption_key_file"                          "$(generate_hex 32)"
+    _ensure_secret "${SECRETS_DIR}/authelia_identity_validation_reset_password_jwt_secret_file"   "$(generate_hex 32)"
+    _ensure_secret "${SECRETS_DIR}/authelia_identity_providers_oidc_hmac_secret_file"             "$(generate_hex 32)"
+
+    # Authelia Duo MFA -- empty until admin enables Duo via the admin UI.
+    # The files MUST exist (compose bind mount), but the value can be empty.
+    _ensure_secret "${SECRETS_DIR}/authelia_duo_api_integration_key_file" ""
+    _ensure_secret "${SECRETS_DIR}/authelia_duo_api_secret_key_file"      ""
+
+    # LDAP passwords are dual-purpose:
+    #   creds/<name>           -- read by initialize_ldap, CFML, helper scripts
+    #   keys/<name>_file       -- read by Bitnami OpenLDAP container as Docker secret
+    # Both files MUST hold the same value. Generate once, write to both.
+    if [[ -f "${CREDS_DIR}/ldap_admin_password" ]]; then
+        LDAP_ADMIN_PASS=$(cat "${CREDS_DIR}/ldap_admin_password")
+    elif [[ -f "${SECRETS_DIR}/ldap_admin_password_file" ]]; then
+        LDAP_ADMIN_PASS=$(cat "${SECRETS_DIR}/ldap_admin_password_file")
+    else
         LDAP_ADMIN_PASS=$(generate_password)
-        echo -n "$LDAP_ADMIN_PASS" > "${CREDS_DIR}/ldap_admin_password"
-        chmod 600 "${CREDS_DIR}/ldap_admin_password"
-        log "Generated LDAP admin password"
+    fi
+    printf '%s' "$LDAP_ADMIN_PASS" > "${CREDS_DIR}/ldap_admin_password"
+    printf '%s' "$LDAP_ADMIN_PASS" > "${SECRETS_DIR}/ldap_admin_password_file"
+    chmod 600 "${CREDS_DIR}/ldap_admin_password" "${SECRETS_DIR}/ldap_admin_password_file"
+    log "  + ldap_admin_password (creds/ + keys/ldap_admin_password_file)"
+
+    if [[ -f "${CREDS_DIR}/ldap_service_password" ]]; then
+        LDAP_USER_PASS=$(cat "${CREDS_DIR}/ldap_service_password")
+    elif [[ -f "${SECRETS_DIR}/ldap_user_password_file" ]]; then
+        LDAP_USER_PASS=$(cat "${SECRETS_DIR}/ldap_user_password_file")
     else
-        log "LDAP admin password already exists, skipping"
+        LDAP_USER_PASS=$(generate_password)
     fi
+    printf '%s' "$LDAP_USER_PASS" > "${CREDS_DIR}/ldap_service_password"
+    printf '%s' "$LDAP_USER_PASS" > "${SECRETS_DIR}/ldap_user_password_file"
+    chmod 600 "${CREDS_DIR}/ldap_service_password" "${SECRETS_DIR}/ldap_user_password_file"
+    log "  + ldap_service_password (creds/ + keys/ldap_user_password_file)"
 
-    # LDAP service account password (hermes-ldap-user)
-    if [[ ! -f "${CREDS_DIR}/ldap_service_password" ]]; then
-        LDAP_SVC_PASS=$(generate_password)
-        echo -n "$LDAP_SVC_PASS" > "${CREDS_DIR}/ldap_service_password"
-        chmod 600 "${CREDS_DIR}/ldap_service_password"
-        log "Generated LDAP service account password"
+    # Authelia OIDC JWKS -- RSA 2048 private key in PEM format. Authelia
+    # reads this as the signing key for ID tokens and OIDC userinfo. The
+    # public half is exposed via /.well-known/jwks.json so clients can
+    # verify signatures.
+    if [[ ! -f "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file" ]]; then
+        log "  + authelia_identity_providers_oidc_jwks_file (generating RSA 2048 private key)"
+        openssl genrsa -out "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file" 2048 2>>"$LOG_FILE"
+        chmod 600 "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file"
     else
-        log "LDAP service account password already exists, skipping"
+        log "  = authelia_identity_providers_oidc_jwks_file (kept)"
     fi
 
-    # Duo API secret key (placeholder - user must configure)
-    if [[ ! -f "${SECRETS_DIR}/authelia_duo_api_secret" ]]; then
-        echo -n "CONFIGURE_ME" > "${SECRETS_DIR}/authelia_duo_api_secret"
-        chmod 600 "${SECRETS_DIR}/authelia_duo_api_secret"
-        log "Created Duo API secret placeholder (requires manual configuration)"
-    fi
+    # Authelia OIDC client secret PAIR (plain + argon2 digest)
+    # Authelia stores OIDC client secrets as an argon2id hash; the matching
+    # plain value is shared with Nextcloud's user_oidc app config so both
+    # sides agree on what to validate against. The plain and digest MUST
+    # derive from the same source secret. Hashing is delegated to the
+    # Authelia container's own CLI to guarantee the digest format matches
+    # what Authelia expects ($argon2id$v=19$m=...$p=...$<salt>$<hash>).
+    local OIDC_PLAIN_FILE="${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_plain_file"
+    local OIDC_DIGEST_FILE="${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_digest_file"
+    local NC_OIDC_FILE="${CREDS_DIR}/nextcloud_oidc_secret"
 
-    # Ciphermail database credentials
-    if [[ ! -f "${CREDS_DIR}/ciphermail_username" ]]; then
-        CIPHERMAIL_DB_USER=$(generate_random_username)
-        echo -n "$CIPHERMAIL_DB_USER" > "${CREDS_DIR}/ciphermail_username"
-        chmod 600 "${CREDS_DIR}/ciphermail_username"
-        log "Created Ciphermail database username: $CIPHERMAIL_DB_USER"
+    if [[ ! -f "$OIDC_PLAIN_FILE" ]] || [[ ! -f "$OIDC_DIGEST_FILE" ]]; then
+        log "Generating Authelia OIDC client secret pair (plain + argon2 digest)"
+        log "  Pulling authelia/authelia:${AUTHELIA_VERSION} for argon2 CLI..."
+        if ! docker pull "authelia/authelia:${AUTHELIA_VERSION}" >> "$LOG_FILE" 2>&1; then
+            error "Failed to pull authelia/authelia:${AUTHELIA_VERSION} (needed for OIDC client secret hashing)"
+        fi
+
+        local OIDC_PLAIN OIDC_DIGEST
+        OIDC_PLAIN=$(generate_password)
+        OIDC_DIGEST=$(docker run --rm "authelia/authelia:${AUTHELIA_VERSION}"             authelia crypto hash generate argon2 --password "$OIDC_PLAIN" 2>&1             | grep -oE '\$argon2id\$[^[:space:]]+'             | head -1)
+        if [[ -z "$OIDC_DIGEST" ]]; then
+            error "Failed to generate argon2 digest from authelia CLI (no \$argon2id\$... in output)"
+        fi
+
+        printf '%s' "$OIDC_PLAIN"  > "$OIDC_PLAIN_FILE"
+        printf '%s' "$OIDC_DIGEST" > "$OIDC_DIGEST_FILE"
+        printf '%s' "$OIDC_PLAIN"  > "$NC_OIDC_FILE"   # Nextcloud user_oidc uses the same plain secret
+        chmod 600 "$OIDC_PLAIN_FILE" "$OIDC_DIGEST_FILE" "$NC_OIDC_FILE"
+        log "  + authelia_identity_providers_oidc_clients_client_secret_plain_file"
+        log "  + authelia_identity_providers_oidc_clients_client_secret_digest_file"
+        log "  + nextcloud_oidc_secret (matches Authelia plain)"
     else
-        log "Ciphermail database username already exists, skipping"
+        log "  = OIDC client secret pair (kept)"
+        # Keep Nextcloud's copy in sync if it drifted
+        if [[ ! -f "$NC_OIDC_FILE" ]]; then
+            cp "$OIDC_PLAIN_FILE" "$NC_OIDC_FILE"
+            chmod 600 "$NC_OIDC_FILE"
+            log "  + nextcloud_oidc_secret (copied from Authelia plain)"
+        fi
     fi
-
-    if [[ ! -f "${CREDS_DIR}/ciphermail_password" ]]; then
-        CIPHERMAIL_DB_PASS=$(generate_password)
-        echo -n "$CIPHERMAIL_DB_PASS" > "${CREDS_DIR}/ciphermail_password"
-        chmod 600 "${CREDS_DIR}/ciphermail_password"
-        log "Generated Ciphermail database password"
-    else
-        log "Ciphermail database password already exists, skipping"
-    fi
-
-    # Nextcloud admin credentials
-    if [[ ! -f "${CREDS_DIR}/nextcloud_admin_username" ]]; then
-        NC_ADMIN_USER=$(generate_random_username)
-        echo -n "$NC_ADMIN_USER" > "${CREDS_DIR}/nextcloud_admin_username"
-        chmod 600 "${CREDS_DIR}/nextcloud_admin_username"
-        log "Created Nextcloud admin username: $NC_ADMIN_USER"
-    else
-        log "Nextcloud admin username already exists, skipping"
-    fi
-
-    if [[ ! -f "${CREDS_DIR}/nextcloud_admin_password" ]]; then
-        NC_ADMIN_PASS=$(generate_typeable_password)
-        echo -n "$NC_ADMIN_PASS" > "${CREDS_DIR}/nextcloud_admin_password"
-        chmod 600 "${CREDS_DIR}/nextcloud_admin_password"
-        log "Generated Nextcloud admin password"
-    else
-        log "Nextcloud admin password already exists, skipping"
-    fi
-
-    # Nextcloud database credentials
-    if [[ ! -f "${CREDS_DIR}/nextcloud_username" ]]; then
-        NC_DB_USER=$(generate_random_username)
-        echo -n "$NC_DB_USER" > "${CREDS_DIR}/nextcloud_username"
-        chmod 600 "${CREDS_DIR}/nextcloud_username"
-        log "Created Nextcloud database username: $NC_DB_USER"
-    else
-        log "Nextcloud database username already exists, skipping"
-    fi
-
-    if [[ ! -f "${CREDS_DIR}/nextcloud_password" ]]; then
-        NC_DB_PASS=$(generate_password)
-        echo -n "$NC_DB_PASS" > "${CREDS_DIR}/nextcloud_password"
-        chmod 600 "${CREDS_DIR}/nextcloud_password"
-        log "Generated Nextcloud database password"
-    else
-        log "Nextcloud database password already exists, skipping"
-    fi
-
-    # Nextcloud Redis password
-    if [[ ! -f "${CREDS_DIR}/nextcloud_redis_password" ]]; then
-        NC_REDIS_PASS=$(generate_hex 32)
-        echo -n "$NC_REDIS_PASS" > "${CREDS_DIR}/nextcloud_redis_password"
-        chmod 600 "${CREDS_DIR}/nextcloud_redis_password"
-        log "Generated Nextcloud Redis password"
-    else
-        log "Nextcloud Redis password already exists, skipping"
-    fi
-
-    # Nextcloud OIDC secret (for Authelia integration)
-    if [[ ! -f "${CREDS_DIR}/nextcloud_oidc_secret" ]]; then
-        NC_OIDC_SECRET=$(generate_hex 32)
-        echo -n "$NC_OIDC_SECRET" > "${CREDS_DIR}/nextcloud_oidc_secret"
-        chmod 600 "${CREDS_DIR}/nextcloud_oidc_secret"
-        log "Generated Nextcloud OIDC secret"
-    else
-        log "Nextcloud OIDC secret already exists, skipping"
-    fi
-
-    # OpenDMARC database credentials
-    if [[ ! -f "${CREDS_DIR}/opendmarc_username" ]]; then
-        DMARC_DB_USER=$(generate_random_username)
-        echo -n "$DMARC_DB_USER" > "${CREDS_DIR}/opendmarc_username"
-        chmod 600 "${CREDS_DIR}/opendmarc_username"
-        log "Created OpenDMARC database username: $DMARC_DB_USER"
-    else
-        log "OpenDMARC database username already exists, skipping"
-    fi
-
-    if [[ ! -f "${CREDS_DIR}/opendmarc_password" ]]; then
-        DMARC_DB_PASS=$(generate_password)
-        echo -n "$DMARC_DB_PASS" > "${CREDS_DIR}/opendmarc_password"
-        chmod 600 "${CREDS_DIR}/opendmarc_password"
-        log "Generated OpenDMARC database password"
-    else
-        log "OpenDMARC database password already exists, skipping"
-    fi
-
-    # Syslog database credentials
-    if [[ ! -f "${CREDS_DIR}/syslog_username" ]]; then
-        SYSLOG_DB_USER=$(generate_random_username)
-        echo -n "$SYSLOG_DB_USER" > "${CREDS_DIR}/syslog_username"
-        chmod 600 "${CREDS_DIR}/syslog_username"
-        log "Created Syslog database username: $SYSLOG_DB_USER"
-    else
-        log "Syslog database username already exists, skipping"
-    fi
-
-    if [[ ! -f "${CREDS_DIR}/syslog_password" ]]; then
-        SYSLOG_DB_PASS=$(generate_password)
-        echo -n "$SYSLOG_DB_PASS" > "${CREDS_DIR}/syslog_password"
-        chmod 600 "${CREDS_DIR}/syslog_password"
-        log "Generated Syslog database password"
-    else
-        log "Syslog database password already exists, skipping"
-    fi
-
-    # (Previously here: HERMES_USERNAME / HERMES_PASSWORD substitution into
-    # .env -- removed because the .env entries themselves were vestigial
-    # legacy-installer leftovers that nothing in the Docker stack actually
-    # consumed. quota-warning.sh reads from /opt/hermes/creds/ directly;
-    # docker-compose doesn't inject .env into containers; no CFML or shell
-    # code sources .env. See commit removing HERMES_USERNAME/PASSWORD from
-    # .env.template for the full audit.)
 
     log "Secrets generation completed"
 }
