@@ -91,14 +91,15 @@ generate_alphanumeric() {
 }
 
 generate_random_username() {
-    # Compose a memorable-but-unique username as <word><digits>, e.g.
-    #   apologise4567, paddle281, wrench9012
+    # Compose a memorable-but-unique username as <word><4-digit-number>, e.g.
+    #   apologise4567, paddle2814, wrench9012
+    # (Same shape Bitwarden uses for its word+number identity generator.)
     #
     # The wordlist is pulled live from config/database/hermes_install.sql
     # (the source for the `random_words` DB table seed). This works in
     # phase 1 BEFORE the database has been created, since the file ships
-    # in the repo. The digit suffix uses bash $RANDOM (0-32767) -- no
-    # need to populate the `numbers` DB table at install time.
+    # in the repo. The digit suffix uses bash $RANDOM scaled to 1000-9999
+    # for consistent width and ~1.8M combos with the 200-word seed list.
     #
     # If the wordlist read fails (e.g. script run from outside the repo),
     # falls back to a small inline word array so the install never wedges.
@@ -114,7 +115,7 @@ generate_random_username() {
         local fallback=(falcon turbine glacier orbit summit ember rapid stellar nebula vector quartz beacon meadow tide forge)
         word="${fallback[$((RANDOM % ${#fallback[@]}))]}"
     fi
-    echo "${word}${RANDOM}"
+    echo "${word}$(( RANDOM % 9000 + 1000 ))"
 }
 
 generate_hex() {
