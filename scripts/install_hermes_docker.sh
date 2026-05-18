@@ -393,7 +393,16 @@ wipe_install() {
            "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml" \
            "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml" \
            "${HERMES_ROOT}/config/authelia/configuration.yml" \
+           "${HERMES_ROOT}/config/postfix-dkim/etc/postfix/main.cf" \
+           "${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf" \
+           "${HERMES_ROOT}/config/mail_filter/etc/spamassassin/local.cf" \
+           "${HERMES_ROOT}/config/hermes/opt/hermes/dkim/KeyTable" \
+           "${HERMES_ROOT}/config/hermes/opt/hermes/dkim/SigningTable" \
+           "${HERMES_ROOT}/config/hermes/opt/hermes/dkim/TrustedHosts" \
+           "${HERMES_ROOT}/config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt" \
            2>/dev/null || true
+    # Postfix mysql-*.cf files: glob-deleted (count varies per release).
+    find "${HERMES_ROOT}/config/postfix-dkim/etc/postfix" -maxdepth 1 -name 'mysql-*.cf' -type f -delete 2>/dev/null || true
 
     # ---- Second-stage prompt: also wipe mount-point CONTENTS? ----
     # Leaving stale data behind breaks fresh-install testing -- the new
@@ -484,9 +493,11 @@ detect_previous_install() {
             echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
             echo "  - Install state markers in ${STATE_DIR}"
             echo "  - .env, docker-compose.override.yml, .hermes_install_config"
-            echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
-            echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml,"
-            echo "    authelia configuration.yml)"
+            echo "  - Rendered service configs (rsyslog x4, amavis 50-user,"
+            echo "    ciphermail hibernate x2, authelia configuration.yml,"
+            echo "    postfix main.cf + mysql-*.cf, nginx hermes-ssl.conf,"
+            echo "    SpamAssassin local.cf, OpenDKIM tables, CommandBox"
+            echo "    password.txt)"
             echo ""
             echo "After confirming, you will get a SECOND prompt asking whether"
             echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
@@ -1306,6 +1317,233 @@ generate_authelia_config() {
 }
 
 # ============================================================================
+# RENDER POSTFIX CONFIGS
+# ============================================================================
+
+generate_postfix_configs() {
+    # Renders the postfix configs the container expects at startup:
+    #   /etc/postfix/main.cf                   <- main.cf.HERMES (copy + dev-host sub)
+    #   /etc/postfix/mysql-*.cf  (14 files)    <- mysql-*.HERMES (creds sub)
+    #
+    # All are gitignored (the `main.cf*` and `mysql-*.cf` wildcards). The
+    # parent directory `config/postfix-dkim/etc/postfix` is bind-mounted as
+    # a directory, so missing FILES inside won't fail compose-up but postfix
+    # itself will fail to start (or start with broken DB lookups).
+    #
+    # Note: main.cf.HERMES currently has DEV-specific values baked in
+    # (`smtp-dev.deeztek.com`, `deeztek.com`, dev mynetworks) -- not just
+    # neat placeholders. We sub the most obvious ones (hostname, domain,
+    # mynetworks) to get a fresh install booting cleanly. Admin should
+    # regenerate via the System Settings UI on first login for full accuracy.
+    #
+    # Not state-guarded -- same rationale as the other render functions.
+    # Linked: #179
+    header "Rendering Postfix Configs"
+
+    local target_dir="${HERMES_ROOT}/config/postfix-dkim/etc/postfix"
+    mkdir -p "$target_dir"
+
+    # ---- Credentials + hostname / subnet from .env ----
+    local hermes_user hermes_pass hermes_hostname server_domain ipv4_subnet
+    hermes_user=$(cat "${CREDS_DIR}/hermes_username")
+    hermes_pass=$(cat "${CREDS_DIR}/hermes_password")
+    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    ipv4_subnet=$(grep -E '^IPV4SUBNET=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    ipv4_subnet="${ipv4_subnet:-172.16.32}"
+    server_domain="${hermes_hostname#*.}"
+
+    if [[ -z "$hermes_user" || -z "$hermes_pass" ]]; then
+        error "hermes DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+    if [[ -z "$hermes_hostname" ]]; then
+        error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
+    fi
+
+    # ---- main.cf: sub stale dev-host references ----
+    local main_template="${target_dir}/main.cf.HERMES"
+    local main_target="${target_dir}/main.cf"
+    if [[ -f "$main_template" ]]; then
+        [[ -e "$main_target" ]] && rm -rf "$main_target"
+        # Substitute the dev-host strings most likely to appear in main.cf.HERMES.
+        # `mynetworks` becomes "127.0.0.1, <subnet>.0/24" -- admin adds real
+        # mynetworks via the System Settings UI later (writes to parameters
+        # table -> regenerates main.cf via update_main_cf.cfm).
+        sed \
+            -e "s|smtp-dev\.deeztek\.com|${hermes_hostname}|g" \
+            -e "s|myorigin = deeztek\.com|myorigin = ${server_domain}|g" \
+            -e "s|^mynetworks = .*|mynetworks = 127.0.0.1, ${ipv4_subnet}.0/24|" \
+            "$main_template" > "$main_target"
+        chmod 644 "$main_target"
+        log "  + config/postfix-dkim/etc/postfix/main.cf"
+    else
+        warn "Postfix main.cf template missing: $main_template -- skipping"
+    fi
+
+    # ---- mysql-*.cf: 14 lookup tables with HERMES-USERNAME/HERMES-PASSWORD ----
+    # mysql-ldap-syslog.HERMES is a different beast (rsyslog config for slapd
+    # logging to MySQL) and is handled separately by generate_rsyslog_configs
+    # via the ldap rsyslog template. Skipped here.
+    local mysql_template_dir="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files"
+    local rendered=0
+    for tmpl in "$mysql_template_dir"/mysql-*.HERMES; do
+        [[ -e "$tmpl" ]] || continue
+        local base=$(basename "$tmpl" .HERMES)
+        [[ "$base" == "mysql-ldap-syslog" ]] && continue
+        local target="${target_dir}/${base}.cf"
+        [[ -e "$target" ]] && rm -rf "$target"
+        sed \
+            -e "s|HERMES-USERNAME|${hermes_user}|g" \
+            -e "s|HERMES-PASSWORD|${hermes_pass}|g" \
+            "$tmpl" > "$target"
+        chmod 640 "$target"
+        rendered=$((rendered + 1))
+    done
+    log "  + config/postfix-dkim/etc/postfix/mysql-*.cf (${rendered} files)"
+    log "Postfix configs rendered"
+}
+
+# ============================================================================
+# RENDER NGINX HERMES-SSL CONFIG
+# ============================================================================
+
+generate_nginx_config() {
+    # Renders config/nginx/etc/nginx/sites-available/hermes-ssl.conf from
+    # the committed .HERMES template. Subs the DEV-specific hostname
+    # (`smtp-dev.deeztek.com`) -> ${HERMES_HOSTNAME}. The cert paths still
+    # reference Let's Encrypt at /etc/letsencrypt/live/<hostname>/... --
+    # admin runs certbot from the UI after install to populate them.
+    #
+    # Without this rendered file nginx falls back to the default site and
+    # serves "Welcome to nginx!" instead of the Hermes admin console.
+    #
+    # Not state-guarded. Linked: #179
+    header "Rendering Nginx hermes-ssl Config"
+
+    local template="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.HERMES"
+    local target="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
+
+    if [[ ! -f "$template" ]]; then
+        error "Nginx template missing: $template"
+    fi
+
+    local hermes_hostname
+    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [[ -z "$hermes_hostname" ]]; then
+        error "HERMES_HOSTNAME missing from .env"
+    fi
+
+    [[ -e "$target" ]] && rm -rf "$target"
+    sed -e "s|smtp-dev\.deeztek\.com|${hermes_hostname}|g" "$template" > "$target"
+    chmod 644 "$target"
+    log "  + config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
+    log "Nginx hermes-ssl config rendered (domain=${hermes_hostname})"
+}
+
+# ============================================================================
+# RENDER SPAMASSASSIN local.cf
+# ============================================================================
+
+generate_spamassassin_config() {
+    # Plain copy from the .HERMES template -- no placeholders. SpamAssassin
+    # would start with built-in defaults if local.cf is absent, but the
+    # template carries Hermes-tuned scores and tweaks.
+    # Linked: #179
+    header "Rendering SpamAssassin local.cf"
+
+    local template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/local.cf.HERMES"
+    local target="${HERMES_ROOT}/config/mail_filter/etc/spamassassin/local.cf"
+
+    if [[ ! -f "$template" ]]; then
+        warn "SpamAssassin template missing: $template -- skipping"
+        return 0
+    fi
+
+    [[ -e "$target" ]] && rm -rf "$target"
+    cp "$template" "$target"
+    chmod 644 "$target"
+    log "  + config/mail_filter/etc/spamassassin/local.cf"
+    log "SpamAssassin local.cf rendered"
+}
+
+# ============================================================================
+# RENDER OPENDKIM TABLES
+# ============================================================================
+
+generate_opendkim_tables() {
+    # Writes EMPTY KeyTable + SigningTable + an initial TrustedHosts with
+    # the Docker subnet + 127.0.0.1. Admin populates KeyTable / SigningTable
+    # via the System Settings > DKIM admin UI as they configure outbound
+    # signing per domain.
+    #
+    # OpenDKIM refuses to start if these files don't exist (even empty),
+    # so on fresh install we MUST create stubs before postfix starts.
+    # Linked: #179
+    header "Rendering OpenDKIM Tables"
+
+    local dkim_dir="${HERMES_ROOT}/config/hermes/opt/hermes/dkim"
+    mkdir -p "$dkim_dir"
+
+    local ipv4_subnet
+    ipv4_subnet=$(grep -E '^IPV4SUBNET=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    ipv4_subnet="${ipv4_subnet:-172.16.32}"
+
+    # KeyTable + SigningTable: empty stubs (no domains configured yet).
+    for f in KeyTable SigningTable; do
+        local target="${dkim_dir}/${f}"
+        [[ -e "$target" ]] && rm -rf "$target"
+        : > "$target"
+        chmod 644 "$target"
+        log "  + config/hermes/opt/hermes/dkim/${f} (empty stub)"
+    done
+
+    # TrustedHosts: localhost + the Docker subnet. Admin adds additional
+    # trusted IPs via the UI later.
+    local trusted="${dkim_dir}/TrustedHosts"
+    [[ -e "$trusted" ]] && rm -rf "$trusted"
+    cat > "$trusted" <<EOF
+127.0.0.1
+${ipv4_subnet}.0/24
+EOF
+    chmod 644 "$trusted"
+    log "  + config/hermes/opt/hermes/dkim/TrustedHosts (127.0.0.1 + ${ipv4_subnet}.0/24)"
+    log "OpenDKIM tables initialized"
+}
+
+# ============================================================================
+# RENDER COMMANDBOX LUCEE PASSWORD FILE
+# ============================================================================
+
+generate_commandbox_password_file() {
+    # Writes the literal string `$CFADMIN_PASSWORD` to the Lucee password.txt
+    # file. CommandBox's startup substitutes this with the value of the
+    # $CFADMIN_PASSWORD env var, which compose populates from the
+    # ./config/hermes/opt/hermes/creds/cfadmin_password Docker secret
+    # (generated by generate_secrets()).
+    #
+    # The file is bind-mounted as a FILE in docker-compose.yml -- if it's
+    # missing on a fresh clone, Docker creates an empty dir at the source
+    # path and the commandbox container fails to start with "not a directory".
+    # Linked: #179
+    header "Rendering CommandBox Lucee Password File"
+
+    local target_dir="${HERMES_ROOT}/config/commandbox/serverhome/WEB-INF/lucee-server/context"
+    local target="${target_dir}/password.txt"
+
+    mkdir -p "$target_dir"
+    [[ -e "$target" ]] && rm -rf "$target"
+    # The single-quoted heredoc prevents the shell from expanding $CFADMIN_PASSWORD;
+    # we want the literal token to land in the file. CommandBox resolves it.
+    printf '%s\n' '$CFADMIN_PASSWORD' > "$target"
+    chmod 644 "$target"
+    log "  + config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt"
+    log "CommandBox Lucee password file rendered (env-var-templated)"
+}
+
+# ============================================================================
 # CREATE DATABASES
 # ============================================================================
 
@@ -1750,6 +1988,11 @@ main() {
     generate_amavis_50user_config
     generate_ciphermail_hibernate_configs
     generate_authelia_config
+    generate_postfix_configs
+    generate_nginx_config
+    generate_spamassassin_config
+    generate_opendkim_tables
+    generate_commandbox_password_file
 
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
@@ -1990,6 +2233,11 @@ case "${1:-}" in
         generate_amavis_50user_config
         generate_ciphermail_hibernate_configs
         generate_authelia_config
+        generate_postfix_configs
+        generate_nginx_config
+        generate_spamassassin_config
+        generate_opendkim_tables
+        generate_commandbox_password_file
         ;;
     --configure-storage)
         # Configure storage mount points
@@ -2050,9 +2298,11 @@ case "${1:-}" in
         echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
         echo "  - Install state markers in ${STATE_DIR}"
         echo "  - .env, docker-compose.override.yml, .hermes_install_config"
-        echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
-        echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml,"
-        echo "    authelia configuration.yml)"
+        echo "  - Rendered service configs (rsyslog x4, amavis 50-user,"
+        echo "    ciphermail hibernate x2, authelia configuration.yml,"
+        echo "    postfix main.cf + mysql-*.cf, nginx hermes-ssl.conf,"
+        echo "    SpamAssassin local.cf, OpenDKIM tables, CommandBox"
+        echo "    password.txt)"
         echo ""
         echo "After confirming, you will get a SECOND prompt asking whether"
         echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
