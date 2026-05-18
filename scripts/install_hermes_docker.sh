@@ -935,6 +935,80 @@ generate_secrets() {
 }
 
 # ============================================================================
+# RENDER RSYSLOG MYSQL CONFIGS
+# ============================================================================
+
+generate_rsyslog_configs() {
+    # Renders the per-container rsyslog->MySQL configs from committed
+    # `mysql.conf.template` files, substituting the generated Syslog DB
+    # user + password into each.
+    #
+    # The rendered files are gitignored (they contain DB credentials) and
+    # bind-mounted as FILE bind mounts by docker-compose.yml in 4 containers:
+    #
+    #   ./config/postfix-dkim/etc/rsyslog.d/mysql.conf   (hermes_postfix_dkim)
+    #   ./config/opendmarc/etc/rsyslog.d/mysql.conf      (hermes_opendmarc)
+    #   ./config/mail_filter/etc/rsyslog.d/mysql.conf    (hermes_mail_filter)
+    #   ./config/ldap/etc/rsyslog.d/mysql.conf           (hermes_ldap)
+    #
+    # If any of these source files are missing at `docker compose up` time,
+    # Docker silently creates an empty directory at the source path and
+    # then the bind mount fails with "not a directory" because the dest
+    # inside the container is a file. So this MUST run before containers
+    # start. Linked: #179
+    #
+    # Not state-guarded -- the function is fast, idempotent, and re-running
+    # it on a `git pull` lets template-logic changes land cleanly. Same
+    # rationale as generate_compose_override.
+    header "Rendering rsyslog Configs"
+
+    local syslog_user syslog_pass
+    syslog_user=$(cat "${CREDS_DIR}/syslog_username")
+    syslog_pass=$(cat "${CREDS_DIR}/syslog_password")
+
+    if [[ -z "$syslog_user" || -z "$syslog_pass" ]]; then
+        error "Syslog credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+
+    # Generators emit alphanumeric only ([A-Za-z0-9] for passwords, [a-z0-9]
+    # for usernames), so sed substitution is safe without escaping.
+    _render_rsyslog_conf() {
+        local template="$1"
+        local target="$2"
+        if [[ ! -f "$template" ]]; then
+            error "rsyslog template missing: $template"
+            return 1
+        fi
+        # Recover from the "Docker auto-created empty dir at file bind-mount
+        # source" failure mode: if a prior `docker compose up` ran with this
+        # file missing, Docker silently created a directory at $target, and
+        # `sed > "$target"` would then fail with "Is a directory". Strip
+        # anything sitting at the target path before writing.
+        [[ -e "$target" ]] && rm -rf "$target"
+        sed -e "s|__SYSLOG_USER__|${syslog_user}|g" \
+            -e "s|__SYSLOG_PASS__|${syslog_pass}|g" \
+            "$template" > "$target"
+        chmod 644 "$target"
+        log "  + $(echo "$target" | sed "s|^${HERMES_ROOT}/||")"
+    }
+
+    _render_rsyslog_conf \
+        "${HERMES_ROOT}/config/postfix-dkim/etc/rsyslog.d/mysql.conf.template" \
+        "${HERMES_ROOT}/config/postfix-dkim/etc/rsyslog.d/mysql.conf"
+    _render_rsyslog_conf \
+        "${HERMES_ROOT}/config/opendmarc/etc/rsyslog.d/mysql.conf.template" \
+        "${HERMES_ROOT}/config/opendmarc/etc/rsyslog.d/mysql.conf"
+    _render_rsyslog_conf \
+        "${HERMES_ROOT}/config/mail_filter/etc/rsyslog.d/mysql.conf.template" \
+        "${HERMES_ROOT}/config/mail_filter/etc/rsyslog.d/mysql.conf"
+    _render_rsyslog_conf \
+        "${HERMES_ROOT}/config/ldap/etc/rsyslog.d/mysql.conf.template" \
+        "${HERMES_ROOT}/config/ldap/etc/rsyslog.d/mysql.conf"
+
+    log "rsyslog configs rendered"
+}
+
+# ============================================================================
 # CREATE DATABASES
 # ============================================================================
 
@@ -1369,6 +1443,13 @@ main() {
         state_mark_done "05-secrets-generated"
     fi
 
+    # generate_rsyslog_configs is intentionally NOT state-guarded -- same
+    # rationale as generate_compose_override. It's fast and idempotent, and
+    # MUST run before `docker compose up` since 4 containers file-bind-mount
+    # the rendered mysql.conf files. Missing source files make Docker create
+    # empty dirs that then fail bind-mount with "not a directory".
+    generate_rsyslog_configs
+
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
 
@@ -1603,9 +1684,10 @@ case "${1:-}" in
         write_install_summary
         ;;
     --generate-secrets)
-        # Only generate secrets
+        # Only generate secrets (and re-render anything that derives from them)
         touch "$LOG_FILE"
         generate_secrets
+        generate_rsyslog_configs
         ;;
     --configure-storage)
         # Configure storage mount points
