@@ -1362,27 +1362,31 @@ generate_postfix_configs() {
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
 
-    # ---- main.cf: sub stale dev-host references ----
-    local main_template="${target_dir}/main.cf.HERMES"
+    # ---- main.cf: render from CANONICAL template ----
+    # The canonical postfix template lives at
+    # config/hermes/opt/hermes/conf_files/main.cf.HERMES (mounted into
+    # the commandbox container at /opt/hermes/conf_files/main.cf.HERMES).
+    # generate_postfix_configuration.cfm reads from there too, then runs
+    # `postconf -e` for individual parameters from the DB on Save. This
+    # bootstrap mirrors that: cp the canonical template, then sed in the
+    # install values so postfix has a parseable config at first start.
+    #
+    # NB: do NOT confuse with config/postfix-dkim/etc/postfix/main.cf.HERMES
+    # -- that path is the BACKUP location CFML writes the previous live
+    # config to before regenerating; it's gitignored and never authoritative.
+    local main_template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/main.cf.HERMES"
     local main_target="${target_dir}/main.cf"
     if [[ -f "$main_template" ]]; then
         [[ -e "$main_target" ]] && rm -rf "$main_target"
-        # Substitute the neutral demo defaults baked into main.cf.HERMES with
-        # actual install values. The CFML generate_postfix_configuration.cfm
-        # `cp`s this file over /etc/postfix/main.cf and then `postconf -e`s
-        # individual parameters from the DB, so this bootstrap just needs to
-        # produce a parseable main.cf that postfix accepts at first start.
-        # `mynetworks` becomes "127.0.0.1, <subnet>.0/24" -- admin adds real
-        # mynetworks via the System Settings UI later.
         sed \
-            -e "s|smtp\.domain\.tld|${hermes_hostname}|g" \
-            -e "s|myorigin = domain\.tld|myorigin = ${server_domain}|g" \
+            -e "s|^myhostname = .*|myhostname = ${hermes_hostname}|" \
+            -e "s|^myorigin = .*|myorigin = ${server_domain}|" \
             -e "s|^mynetworks = .*|mynetworks = 127.0.0.1, ${ipv4_subnet}.0/24|" \
             "$main_template" > "$main_target"
         chmod 644 "$main_target"
         log "  + config/postfix-dkim/etc/postfix/main.cf"
     else
-        warn "Postfix main.cf template missing: $main_template -- skipping"
+        error "Postfix canonical template missing: $main_template"
     fi
 
     # ---- mysql-*.cf: 14 lookup tables with HERMES-USERNAME/HERMES-PASSWORD ----
@@ -1413,20 +1417,29 @@ generate_postfix_configs() {
 # ============================================================================
 
 generate_nginx_config() {
-    # Renders two nginx files from their committed .HERMES templates:
-    #   config/nginx/etc/nginx/sites-available/hermes-ssl.conf  (main site)
-    #   config/nginx/etc/nginx/snippets/auth.conf               (auth snippet)
+    # Renders two nginx files from the CANONICAL templates under
+    # config/hermes/opt/hermes/templates/ (mounted into the commandbox
+    # container at /opt/hermes/templates/):
     #
-    # The templates use the same `hermes_*` placeholder names that the
-    # CFML generate_nginx_configuration.cfm / generate_auth_nginx_configuration.cfm
-    # pages substitute via ReReplace -- so the bootstrap render here uses the
-    # exact same placeholder names. CFML re-renders from DB values on admin
-    # save (e.g., when admin uploads a TLS cert).
+    #   templates/hermes-ssl.conf  ->  config/nginx/etc/nginx/sites-available/hermes-ssl.conf
+    #   templates/auth.conf        ->  config/nginx/etc/nginx/snippets/auth.conf
+    #
+    # generate_nginx_configuration.cfm and generate_auth_nginx_configuration.cfm
+    # read these exact same templates, ReReplace the `hermes_*` placeholders
+    # from DB values, and write to the live paths. Bootstrap mirrors that.
+    #
+    # NB: do NOT use config/nginx/etc/nginx/sites-available/hermes-ssl.HERMES
+    # or config/nginx/etc/nginx/snippets/auth.HERMES as source -- those are
+    # CFML write-time BACKUPS, not templates. Both deleted from the repo and
+    # gitignored to prevent re-confusion.
     #
     # Bootstrap defaults applied:
     #   hermes_server_name      -> HERMES_HOSTNAME from .env
     #   hermes_ssl_certificate  -> /etc/letsencrypt/live/<hostname>/fullchain.pem
     #   hermes_ssl_key          -> /etc/letsencrypt/live/<hostname>/privkey.pem
+    #   hermes_hsts             -> empty (admin enables via UI)
+    #   hermes_ocsp             -> empty (admin enables via UI)
+    #   hermes_verify           -> empty (no client cert verify on bootstrap)
     #   hermes_fw_hermes        -> empty (no admin IP allowlist yet)
     #   hermes_fw_ciphermail    -> empty (same)
     #   hermes_console_host     -> HERMES_HOSTNAME
@@ -1437,13 +1450,16 @@ generate_nginx_config() {
     # Not state-guarded. Linked: #179
     header "Rendering Nginx Configs"
 
-    local site_template="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.HERMES"
+    local site_template="${HERMES_ROOT}/config/hermes/opt/hermes/templates/hermes-ssl.conf"
     local site_target="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
-    local auth_template="${HERMES_ROOT}/config/nginx/etc/nginx/snippets/auth.HERMES"
+    local auth_template="${HERMES_ROOT}/config/hermes/opt/hermes/templates/auth.conf"
     local auth_target="${HERMES_ROOT}/config/nginx/etc/nginx/snippets/auth.conf"
 
     if [[ ! -f "$site_template" ]]; then
-        error "Nginx hermes-ssl template missing: $site_template"
+        error "Nginx canonical template missing: $site_template"
+    fi
+    if [[ ! -f "$auth_template" ]]; then
+        error "Auth canonical template missing: $auth_template"
     fi
 
     local hermes_hostname
@@ -1460,25 +1476,30 @@ generate_nginx_config() {
     local ssl_cert="/etc/letsencrypt/live/${hermes_hostname}/fullchain.pem"
     local ssl_key="/etc/letsencrypt/live/${hermes_hostname}/privkey.pem"
 
-    # hermes-ssl.conf
+    # hermes-ssl.conf -- 8 real placeholders. The other hermes_* tokens in
+    # the template (hermes_authelia, hermes_commandbox, hermes_ciphermail,
+    # hermes_nextcloud, hermes_webmail, hermes_access, hermes_error) are
+    # literal container/log names and intentionally not substituted.
     [[ -e "$site_target" ]] && rm -rf "$site_target"
     sed \
         -e "s|hermes_server_name|${hermes_hostname}|g" \
         -e "s|hermes_ssl_certificate|${ssl_cert}|g" \
         -e "s|hermes_ssl_key|${ssl_key}|g" \
+        -e "s|hermes_hsts||g" \
+        -e "s|hermes_ocsp||g" \
+        -e "s|hermes_verify||g" \
         -e "s|hermes_fw_hermes||g" \
         -e "s|hermes_fw_ciphermail||g" \
         "$site_template" > "$site_target"
     chmod 644 "$site_target"
     log "  + config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
 
-    # auth.conf snippet
-    if [[ -f "$auth_template" ]]; then
-        [[ -e "$auth_target" ]] && rm -rf "$auth_target"
-        sed -e "s|hermes_console_host|${hermes_hostname}|g" "$auth_template" > "$auth_target"
-        chmod 644 "$auth_target"
-        log "  + config/nginx/etc/nginx/snippets/auth.conf"
-    fi
+    # auth.conf snippet (single placeholder)
+    [[ -e "$auth_target" ]] && rm -rf "$auth_target"
+    sed -e "s|hermes_console_host|${hermes_hostname}|g" "$auth_template" > "$auth_target"
+    chmod 644 "$auth_target"
+    log "  + config/nginx/etc/nginx/snippets/auth.conf"
+
     log "Nginx configs rendered (domain=${hermes_hostname})"
 }
 

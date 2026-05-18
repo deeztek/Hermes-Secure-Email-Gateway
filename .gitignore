@@ -157,6 +157,11 @@ config/postfix-dkim/etc/postfix/networks
 config/nginx/etc/nginx/sites-available/hermes-ssl.conf
 config/nginx/etc/nginx/sites-available/hermes-ssl.*
 
+# CFML write-time backups (each generate_*.cfm copies the live file to
+# <name>.HERMES before re-rendering). Canonical templates live separately
+# at config/hermes/opt/hermes/conf_files/ and config/hermes/opt/hermes/templates/.
+config/nginx/etc/nginx/snippets/auth.HERMES
+
 # SpamAssassin config (may have custom rules/IPs)
 config/mail_filter/etc/spamassassin/local.cf
 config/hermes/opt/hermes/conf_files/local.cf.*
