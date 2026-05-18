@@ -327,9 +327,27 @@ wipe_install() {
     # Destructive: tears down everything the installer touched so a fresh
     # run starts from a clean slate. Stops + removes containers and volumes,
     # deletes credentials, deletes state markers, deletes generated config.
-    # Leaves user-mounted storage paths (DATA_MOUNT etc.) ALONE — admin
-    # provisioned those, admin removes them if they want a deeper reset.
+    # Then offers a second prompt to also wipe user-mounted storage paths
+    # (DATA_MOUNT / VMAIL_MOUNT / FILES_MOUNT) -- separately gated since
+    # those contain real data and might be a shared filesystem.
     header "Wiping previous install"
+
+    # Read mount paths BEFORE deleting .env / CONFIG_FILE so the optional
+    # mount-content wipe knows what to clear. Falls back to CONFIG_FILE
+    # vars if .env didn't have them.
+    local data_mount="" vmail_mount="" files_mount=""
+    if [[ -f "${HERMES_ROOT}/.env" ]]; then
+        data_mount=$(grep -E '^DATA_MOUNT='  "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        vmail_mount=$(grep -E '^VMAIL_MOUNT=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        files_mount=$(grep -E '^FILES_MOUNT=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+    fi
+    if [[ -f "${CONFIG_FILE}" ]]; then
+        # shellcheck disable=SC1090
+        source "${CONFIG_FILE}" 2>/dev/null || true
+        data_mount="${data_mount:-${DATA_MOUNT:-}}"
+        vmail_mount="${vmail_mount:-${VMAIL_MOUNT:-}}"
+        files_mount="${files_mount:-${FILES_MOUNT:-}}"
+    fi
 
     if [[ -f "${HERMES_ROOT}/docker-compose.yml" ]]; then
         log "Stopping + removing containers and volumes..."
@@ -346,6 +364,71 @@ wipe_install() {
     rm -f "${HERMES_ROOT}/.env" \
           "${HERMES_ROOT}/docker-compose.override.yml" \
           "${CONFIG_FILE}" 2>/dev/null || true
+
+    # Rendered service config files (output of generate_rsyslog_configs,
+    # generate_amavis_50user_config, generate_ciphermail_hibernate_configs).
+    # All are gitignored, all contain install-time credentials. Wiping them
+    # forces a fresh render with fresh creds on the next install. `rm -rf`
+    # also handles the case where Docker auto-created an empty directory at
+    # the bind-mount source path because the file was missing -- those dirs
+    # would otherwise block the next render from writing a file there.
+    log "Removing rendered service config files..."
+    rm -rf "${HERMES_ROOT}/config/postfix-dkim/etc/rsyslog.d/mysql.conf" \
+           "${HERMES_ROOT}/config/opendmarc/etc/rsyslog.d/mysql.conf" \
+           "${HERMES_ROOT}/config/mail_filter/etc/rsyslog.d/mysql.conf" \
+           "${HERMES_ROOT}/config/ldap/etc/rsyslog.d/mysql.conf" \
+           "${HERMES_ROOT}/config/mail_filter/etc/amavis/conf.d/50-user" \
+           "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml" \
+           "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml" \
+           2>/dev/null || true
+
+    # ---- Second-stage prompt: also wipe mount-point CONTENTS? ----
+    # Leaving stale data behind breaks fresh-install testing -- the new
+    # install generates new random DB creds but the persisted DB files
+    # still expect the OLD ones, so containers silently fail to auth.
+    # Gated by a separate WIPE-DATA confirmation because it's user data.
+    # The mount directories themselves are preserved (admin owns them).
+    local any_mount=0
+    [[ -n "$data_mount"  && -d "$data_mount"  ]] && any_mount=1
+    [[ -n "$vmail_mount" && -d "$vmail_mount" ]] && any_mount=1
+    [[ -n "$files_mount" && -d "$files_mount" ]] && any_mount=1
+
+    if [[ "$any_mount" -eq 1 ]]; then
+        echo ""
+        echo "============================================================"
+        echo " Mount-point contents (user data)"
+        echo "============================================================"
+        echo ""
+        echo "These directories hold real data from the previous install:"
+        [[ -n "$data_mount"  && -d "$data_mount"  ]] && echo "  ${data_mount}   ($(find "$data_mount"  -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- databases / logs / quarantine / LDAP"
+        [[ -n "$vmail_mount" && -d "$vmail_mount" ]] && echo "  ${vmail_mount}  ($(find "$vmail_mount" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- mailbox email storage"
+        [[ -n "$files_mount" && -d "$files_mount" ]] && echo "  ${files_mount}  ($(find "$files_mount" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- Nextcloud files"
+        echo ""
+        echo "Leaving them in place will cause the next install to fail auth"
+        echo "against persisted DB files (new random creds vs old stored"
+        echo "hashes). For fresh-install testing, wipe them too."
+        echo ""
+        echo "The mount directories themselves are kept; only their CONTENTS"
+        echo "are removed."
+        echo ""
+        local confirm_data
+        read -p "Type WIPE-DATA to wipe mount-point contents (or Enter to skip): " confirm_data
+        if [[ "$confirm_data" == "WIPE-DATA" ]]; then
+            for mnt in "$data_mount" "$vmail_mount" "$files_mount"; do
+                [[ -z "$mnt" ]] && continue
+                [[ ! -d "$mnt" ]] && continue
+                log "  Wiping contents of ${mnt}"
+                # `find ... -mindepth 1 -delete` removes everything inside the
+                # mount dir while leaving the mount dir itself in place. Safer
+                # than `rm -rf "${mnt}"/*` which misses dotfiles and can choke
+                # on argument-list-too-long.
+                find "$mnt" -mindepth 1 -delete 2>>"$LOG_FILE" || true
+            done
+            log "Mount-point contents wiped."
+        else
+            log "Mount-point contents kept (admin choice)."
+        fi
+    fi
 
     log "Wipe complete."
     echo ""
@@ -388,10 +471,14 @@ detect_previous_install() {
             echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
             echo "  - Install state markers in ${STATE_DIR}"
             echo "  - .env, docker-compose.override.yml, .hermes_install_config"
+            echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
+            echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml)"
             echo ""
-            echo "User-mounted storage directories will NOT be touched. If you"
-            echo "want to wipe those too, you must rm -rf them manually before"
-            echo "re-running."
+            echo "After confirming, you will get a SECOND prompt asking whether"
+            echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
+            echo "/ VMAIL_MOUNT / FILES_MOUNT — typically /mnt/data, /mnt/vmail,"
+            echo "/mnt/files). Required for fresh-install testing; skip if you"
+            echo "want to preserve mail/files."
             echo ""
             local confirm
             read -p "Type the word WIPE to confirm: " confirm
