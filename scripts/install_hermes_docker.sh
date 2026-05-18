@@ -392,6 +392,7 @@ wipe_install() {
            "${HERMES_ROOT}/config/mail_filter/etc/amavis/conf.d/50-user" \
            "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.cfg.xml" \
            "${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database/hibernate.mysql.connection.xml" \
+           "${HERMES_ROOT}/config/authelia/configuration.yml" \
            2>/dev/null || true
 
     # ---- Second-stage prompt: also wipe mount-point CONTENTS? ----
@@ -484,7 +485,8 @@ detect_previous_install() {
             echo "  - Install state markers in ${STATE_DIR}"
             echo "  - .env, docker-compose.override.yml, .hermes_install_config"
             echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
-            echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml)"
+            echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml,"
+            echo "    authelia configuration.yml)"
             echo ""
             echo "After confirming, you will get a SECOND prompt asking whether"
             echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
@@ -1215,6 +1217,95 @@ generate_ciphermail_hibernate_configs() {
 }
 
 # ============================================================================
+# RENDER AUTHELIA CONFIGURATION
+# ============================================================================
+
+generate_authelia_config() {
+    # Renders config/authelia/configuration.yml from the committed template
+    # at config/hermes/opt/hermes/templates/configuration.yml. The whole
+    # config/authelia/ directory is gitignored, so on a fresh clone there is
+    # NO live config at all -- Authelia starts up against its empty defaults
+    # and immediately fails 12+ schema validations.
+    #
+    # The template uses two layers of substitution:
+    #   1. Install-time (this function): replaces `hermes_*` literal
+    #      placeholders with admin-supplied / default scalar values.
+    #   2. Authelia runtime ({{ env ... }} / {{ secret ... }} directives,
+    #      enabled by X_AUTHELIA_CONFIG_FILTERS=template in docker-compose).
+    #      These pull LDAP base DN, OIDC keys, DB creds, etc. from
+    #      /keys/<name> Docker secret bind mounts at startup.
+    #
+    # The container reads /config/configuration.yml (mounted from
+    # ./config/authelia/), so this function MUST run before
+    # `docker compose up`. Not state-guarded -- same rationale as the other
+    # render functions. Linked: #179
+    header "Rendering Authelia Configuration"
+
+    local template="${HERMES_ROOT}/config/hermes/opt/hermes/templates/configuration.yml"
+    local target_dir="${HERMES_ROOT}/config/authelia"
+    local target="${target_dir}/configuration.yml"
+
+    if [[ ! -f "$template" ]]; then
+        error "Authelia template missing: $template"
+    fi
+
+    # Need HERMES_HOSTNAME for the access_control domain + SMTP sender.
+    local hermes_hostname
+    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [[ -z "$hermes_hostname" ]]; then
+        error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
+    fi
+    # Domain portion (after the first dot) for the SMTP From address.
+    local server_domain="${hermes_hostname#*.}"
+
+    mkdir -p "$target_dir"
+    [[ -e "$target" ]] && rm -rf "$target"
+
+    # ---- Placeholders, with comments on each default value ----
+    # Order matters: substitute longer placeholders BEFORE shorter ones that
+    # share a prefix (e.g. hermes_session_expiration before any hypothetical
+    # hermes_session match -- in this template the bare "hermes_session" is a
+    # cookie NAME on line 229, not a placeholder, so we never substitute it).
+    # The 6 non-placeholder hermes_* tokens that occur as literals are:
+    #   hermes_ldap, hermes_db_server, hermes_authelia_redis,
+    #   hermes_postfix_dkim, hermes_session (cookie name), hermes_webmail
+    #   (auth policy name). Our sed patterns use full placeholder names, so
+    #   those literals are untouched.
+    sed \
+        -e "s|hermes_log_level|info|g" \
+        -e "s|hermes_log_format|text|g" \
+        -e "s|hermes_duo_self_enrollment|false|g" \
+        -e "s|hermes_duo_hostname||g" \
+        -e "s|hermes_duo_disable|true|g" \
+        -e "s|hermes_authentication_backend_disable_reset_password|false|g" \
+        -e "s|hermes_access_control_domain|${hermes_hostname}|g" \
+        -e "s|hermes_session_expiration|0|g" \
+        -e "s|hermes_session_inactivity|3600|g" \
+        -e "s|hermes_session_remember_me|1M|g" \
+        -e "s|hermes_regulation_max_retries|5|g" \
+        -e "s|hermes_regulation_find_time|120|g" \
+        -e "s|hermes_regulation_ban_time|300|g" \
+        -e "s|hermes_notifier_smtp_sender|no-reply@${server_domain}|g" \
+        -e "s|hermes_notifier_smtp_subject|[Hermes SEG] {title}|g" \
+        "$template" > "$target"
+    chmod 644 "$target"
+
+    # Sanity check: no hermes_* placeholders should remain. The 6 literal
+    # tokens above are expected to still match; everything else (e.g.
+    # hermes_log_level) should be gone.
+    local leftovers
+    leftovers=$(grep -oE 'hermes_[a-z_]+' "$target" | sort -u | grep -vE '^hermes_(ldap|db_server|authelia_redis|postfix_dkim|session|webmail)$' || true)
+    if [[ -n "$leftovers" ]]; then
+        warn "Authelia config has unsubstituted placeholders:"
+        warn "$leftovers"
+    fi
+
+    log "  + config/authelia/configuration.yml"
+    log "Authelia configuration rendered (domain=${hermes_hostname})"
+}
+
+# ============================================================================
 # CREATE DATABASES
 # ============================================================================
 
@@ -1658,6 +1749,7 @@ main() {
     generate_rsyslog_configs
     generate_amavis_50user_config
     generate_ciphermail_hibernate_configs
+    generate_authelia_config
 
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
@@ -1897,6 +1989,7 @@ case "${1:-}" in
         generate_rsyslog_configs
         generate_amavis_50user_config
         generate_ciphermail_hibernate_configs
+        generate_authelia_config
         ;;
     --configure-storage)
         # Configure storage mount points
@@ -1958,7 +2051,8 @@ case "${1:-}" in
         echo "  - Install state markers in ${STATE_DIR}"
         echo "  - .env, docker-compose.override.yml, .hermes_install_config"
         echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
-        echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml)"
+        echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml,"
+        echo "    authelia configuration.yml)"
         echo ""
         echo "After confirming, you will get a SECOND prompt asking whether"
         echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
