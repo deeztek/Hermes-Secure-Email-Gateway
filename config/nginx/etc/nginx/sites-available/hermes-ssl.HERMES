@@ -1,7 +1,7 @@
 server {
         #LISTEN CONFIG
         listen 443 ssl;
-        server_name smtp-dev.deeztek.com;
+        server_name hermes_server_name;
         #HSTS CONFIG UNCOMMENT BELOW TO ENABLE
         add_header Strict-Transport-Security "max-age=31536000; preload";
         keepalive_timeout   70;
@@ -10,8 +10,8 @@ server {
         error_log /var/log/nginx/hermes_error.log warn;
 
         #SSL LETS ENCRYPT CERTIFICATE CONFIG
-        ssl_certificate     /etc/letsencrypt/live/smtp-dev.deeztek.com/fullchain.pem;
-        ssl_certificate_key /etc/letsencrypt/live/smtp-dev.deeztek.com/privkey.pem;
+        ssl_certificate     hermes_ssl_certificate;
+        ssl_certificate_key hermes_ssl_key;
         # Turn on OCSP stapling as recommended at
         # https://community.letsencrypt.org/t/integration-guide/13123
         # requires nginx version >= 1.3.7
@@ -132,12 +132,7 @@ location /admin/ {
         add_header Pragma public;
         add_header Cache-Control "public, must-revalidate, proxy-revalidate";
         }
-        allow 72.81.252.51;
-allow 100.16.199.56;
-allow 192.168.30.242;
-allow 192.168.50.100;
-allow 10.10.11.1;
-deny all;
+        hermes_fw_hermes
 
         proxy_pass http://hermes_commandbox:8888/admin/;
         proxy_set_header Host $host;
@@ -268,12 +263,7 @@ location /hermes-api/ {
 }
 
 location /ciphermail/ {
-        allow 72.81.252.51;
-allow 100.16.199.56;
-allow 192.168.30.242;
-allow 192.168.50.100;
-allow 10.10.11.1;
-deny all;
+        hermes_fw_ciphermail
 
         proxy_pass https://hermes_ciphermail:8443;
         proxy_set_header Host $host;

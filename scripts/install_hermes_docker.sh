@@ -395,6 +395,7 @@ wipe_install() {
            "${HERMES_ROOT}/config/authelia/configuration.yml" \
            "${HERMES_ROOT}/config/postfix-dkim/etc/postfix/main.cf" \
            "${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf" \
+           "${HERMES_ROOT}/config/nginx/etc/nginx/snippets/auth.conf" \
            "${HERMES_ROOT}/config/mail_filter/etc/spamassassin/local.cf" \
            "${HERMES_ROOT}/config/hermes/opt/hermes/dkim/KeyTable" \
            "${HERMES_ROOT}/config/hermes/opt/hermes/dkim/SigningTable" \
@@ -1366,13 +1367,16 @@ generate_postfix_configs() {
     local main_target="${target_dir}/main.cf"
     if [[ -f "$main_template" ]]; then
         [[ -e "$main_target" ]] && rm -rf "$main_target"
-        # Substitute the dev-host strings most likely to appear in main.cf.HERMES.
+        # Substitute the neutral demo defaults baked into main.cf.HERMES with
+        # actual install values. The CFML generate_postfix_configuration.cfm
+        # `cp`s this file over /etc/postfix/main.cf and then `postconf -e`s
+        # individual parameters from the DB, so this bootstrap just needs to
+        # produce a parseable main.cf that postfix accepts at first start.
         # `mynetworks` becomes "127.0.0.1, <subnet>.0/24" -- admin adds real
-        # mynetworks via the System Settings UI later (writes to parameters
-        # table -> regenerates main.cf via update_main_cf.cfm).
+        # mynetworks via the System Settings UI later.
         sed \
-            -e "s|smtp-dev\.deeztek\.com|${hermes_hostname}|g" \
-            -e "s|myorigin = deeztek\.com|myorigin = ${server_domain}|g" \
+            -e "s|smtp\.domain\.tld|${hermes_hostname}|g" \
+            -e "s|myorigin = domain\.tld|myorigin = ${server_domain}|g" \
             -e "s|^mynetworks = .*|mynetworks = 127.0.0.1, ${ipv4_subnet}.0/24|" \
             "$main_template" > "$main_target"
         chmod 644 "$main_target"
@@ -1409,23 +1413,37 @@ generate_postfix_configs() {
 # ============================================================================
 
 generate_nginx_config() {
-    # Renders config/nginx/etc/nginx/sites-available/hermes-ssl.conf from
-    # the committed .HERMES template. Subs the DEV-specific hostname
-    # (`smtp-dev.deeztek.com`) -> ${HERMES_HOSTNAME}. The cert paths still
-    # reference Let's Encrypt at /etc/letsencrypt/live/<hostname>/... --
-    # admin runs certbot from the UI after install to populate them.
+    # Renders two nginx files from their committed .HERMES templates:
+    #   config/nginx/etc/nginx/sites-available/hermes-ssl.conf  (main site)
+    #   config/nginx/etc/nginx/snippets/auth.conf               (auth snippet)
     #
-    # Without this rendered file nginx falls back to the default site and
+    # The templates use the same `hermes_*` placeholder names that the
+    # CFML generate_nginx_configuration.cfm / generate_auth_nginx_configuration.cfm
+    # pages substitute via ReReplace -- so the bootstrap render here uses the
+    # exact same placeholder names. CFML re-renders from DB values on admin
+    # save (e.g., when admin uploads a TLS cert).
+    #
+    # Bootstrap defaults applied:
+    #   hermes_server_name      -> HERMES_HOSTNAME from .env
+    #   hermes_ssl_certificate  -> /etc/letsencrypt/live/<hostname>/fullchain.pem
+    #   hermes_ssl_key          -> /etc/letsencrypt/live/<hostname>/privkey.pem
+    #   hermes_fw_hermes        -> empty (no admin IP allowlist yet)
+    #   hermes_fw_ciphermail    -> empty (same)
+    #   hermes_console_host     -> HERMES_HOSTNAME
+    #
+    # Without these rendered files nginx falls back to its default site and
     # serves "Welcome to nginx!" instead of the Hermes admin console.
     #
     # Not state-guarded. Linked: #179
-    header "Rendering Nginx hermes-ssl Config"
+    header "Rendering Nginx Configs"
 
-    local template="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.HERMES"
-    local target="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
+    local site_template="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.HERMES"
+    local site_target="${HERMES_ROOT}/config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
+    local auth_template="${HERMES_ROOT}/config/nginx/etc/nginx/snippets/auth.HERMES"
+    local auth_target="${HERMES_ROOT}/config/nginx/etc/nginx/snippets/auth.conf"
 
-    if [[ ! -f "$template" ]]; then
-        error "Nginx template missing: $template"
+    if [[ ! -f "$site_template" ]]; then
+        error "Nginx hermes-ssl template missing: $site_template"
     fi
 
     local hermes_hostname
@@ -1435,11 +1453,33 @@ generate_nginx_config() {
         error "HERMES_HOSTNAME missing from .env"
     fi
 
-    [[ -e "$target" ]] && rm -rf "$target"
-    sed -e "s|smtp-dev\.deeztek\.com|${hermes_hostname}|g" "$template" > "$target"
-    chmod 644 "$target"
+    # Cert paths default to Let's Encrypt under the hostname; admin runs
+    # certbot from the UI after install. Bootstrap value lets nginx start
+    # even though the cert files don't exist yet (nginx will log warnings
+    # but admin can fix via UI).
+    local ssl_cert="/etc/letsencrypt/live/${hermes_hostname}/fullchain.pem"
+    local ssl_key="/etc/letsencrypt/live/${hermes_hostname}/privkey.pem"
+
+    # hermes-ssl.conf
+    [[ -e "$site_target" ]] && rm -rf "$site_target"
+    sed \
+        -e "s|hermes_server_name|${hermes_hostname}|g" \
+        -e "s|hermes_ssl_certificate|${ssl_cert}|g" \
+        -e "s|hermes_ssl_key|${ssl_key}|g" \
+        -e "s|hermes_fw_hermes||g" \
+        -e "s|hermes_fw_ciphermail||g" \
+        "$site_template" > "$site_target"
+    chmod 644 "$site_target"
     log "  + config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
-    log "Nginx hermes-ssl config rendered (domain=${hermes_hostname})"
+
+    # auth.conf snippet
+    if [[ -f "$auth_template" ]]; then
+        [[ -e "$auth_target" ]] && rm -rf "$auth_target"
+        sed -e "s|hermes_console_host|${hermes_hostname}|g" "$auth_template" > "$auth_target"
+        chmod 644 "$auth_target"
+        log "  + config/nginx/etc/nginx/snippets/auth.conf"
+    fi
+    log "Nginx configs rendered (domain=${hermes_hostname})"
 }
 
 # ============================================================================
