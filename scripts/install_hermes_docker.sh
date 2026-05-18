@@ -333,8 +333,16 @@ wipe_install() {
     header "Wiping previous install"
 
     # Read mount paths BEFORE deleting .env / CONFIG_FILE so the optional
-    # mount-content wipe knows what to clear. Falls back to CONFIG_FILE
-    # vars if .env didn't have them.
+    # mount-content wipe knows what to clear. Three-tier lookup:
+    #   1. .env  (canonical at runtime)
+    #   2. .hermes_install_config  (saved during configure_mount_points)
+    #   3. DEFAULT_*_MOUNT  (fallback so the prompt still works even on a
+    #      chain of repeated --wipe runs that deleted the config files
+    #      from a prior wipe -- otherwise we'd silently skip the
+    #      mount-content prompt and leave /mnt/data populated)
+    # The mount-content prompt later filters to paths that actually exist
+    # as directories, so a wrong fallback default just means an empty
+    # offer, not a wrong wipe.
     local data_mount="" vmail_mount="" files_mount=""
     if [[ -f "${HERMES_ROOT}/.env" ]]; then
         data_mount=$(grep -E '^DATA_MOUNT='  "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
@@ -348,6 +356,10 @@ wipe_install() {
         vmail_mount="${vmail_mount:-${VMAIL_MOUNT:-}}"
         files_mount="${files_mount:-${FILES_MOUNT:-}}"
     fi
+    # Final fallback: the documented defaults.
+    data_mount="${data_mount:-${DEFAULT_DATA_MOUNT}}"
+    vmail_mount="${vmail_mount:-${DEFAULT_VMAIL_MOUNT}}"
+    files_mount="${files_mount:-${DEFAULT_FILES_MOUNT}}"
 
     if [[ -f "${HERMES_ROOT}/docker-compose.yml" ]]; then
         log "Stopping + removing containers and volumes..."
