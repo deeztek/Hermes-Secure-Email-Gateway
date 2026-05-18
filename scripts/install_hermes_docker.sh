@@ -1249,8 +1249,8 @@ create_databases() {
     SYSLOG_DB_PASS=$(cat "${CREDS_DIR}/syslog_password")
     CIPHERMAIL_DB_USER=$(cat "${CREDS_DIR}/ciphermail_username")
     CIPHERMAIL_DB_PASS=$(cat "${CREDS_DIR}/ciphermail_password")
-    NEXTCLOUD_DB_USER=$(cat "${CREDS_DIR}/nextcloud_username")
-    NEXTCLOUD_DB_PASS=$(cat "${CREDS_DIR}/nextcloud_password")
+    NEXTCLOUD_DB_USER=$(cat "${CREDS_DIR}/nextcloud_mysql_username")
+    NEXTCLOUD_DB_PASS=$(cat "${CREDS_DIR}/nextcloud_mysql_password")
 
     # ---- Wait for MariaDB to be ready ----
     log "Waiting for MariaDB to be ready..."
@@ -1418,7 +1418,7 @@ hermes user/pw:     $(cat "${CREDS_DIR}/hermes_username" 2>/dev/null || echo "?"
 opendmarc user/pw:  $(cat "${CREDS_DIR}/opendmarc_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/opendmarc_password" 2>/dev/null || echo "?")
 syslog user/pw:     $(cat "${CREDS_DIR}/syslog_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/syslog_password" 2>/dev/null || echo "?")
 ciphermail user/pw: $(cat "${CREDS_DIR}/ciphermail_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/ciphermail_password" 2>/dev/null || echo "?")
-nextcloud user/pw:  $(cat "${CREDS_DIR}/nextcloud_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/nextcloud_password" 2>/dev/null || echo "?")
+nextcloud user/pw:  $(cat "${CREDS_DIR}/nextcloud_mysql_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/nextcloud_mysql_password" 2>/dev/null || echo "?")
 
 AUTHELIA
 --------
