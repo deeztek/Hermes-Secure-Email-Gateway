@@ -522,42 +522,18 @@ configure_mount_points() {
     echo "     - User file storage"
     echo "     - Can grow very large depending on usage"
     echo ""
-    echo "You have two options:"
+    echo "You'll be asked for three storage paths. These can be:"
     echo ""
-    echo "  1) Use CUSTOM mount points (RECOMMENDED)"
-    echo "     Mount external storage (e.g., /mnt/data, /mnt/vmail, /mnt/files)"
-    echo "     Better for production, easier backups, survives Docker reinstall"
+    echo "  * Dedicated MOUNT POINTS on separate drives (recommended for"
+    echo "    production -- better backup story, survives Docker reinstall,"
+    echo "    independent quota / capacity management per category)"
     echo ""
-    echo "  2) Use DEFAULT Docker volumes (NOT RECOMMENDED)"
-    echo "     Data stored in /var/lib/docker/volumes"
-    echo "     Harder to manage, tied to Docker installation"
+    echo "  * Or just ORDINARY DIRECTORIES on the existing drive if you're"
+    echo "    testing or running a single-drive setup (e.g. mkdir -p"
+    echo "    /mnt/data /mnt/vmail /mnt/files -- no fstab entries needed)"
     echo ""
-
-    read -p "Use custom mount points? (Y/n): " USE_CUSTOM
-    if [[ "$USE_CUSTOM" =~ ^[Nn]$ ]]; then
-        warn "Using default Docker volumes. This is NOT recommended for production."
-        warn "Data will be stored in /var/lib/docker/volumes and may be lost if Docker is reinstalled."
-        echo ""
-        read -p "Are you sure you want to use default Docker volumes? (y/N): " CONFIRM_DEFAULT
-        if [[ ! "$CONFIRM_DEFAULT" =~ ^[Yy]$ ]]; then
-            log "Returning to custom mount point configuration..."
-        else
-            USE_DOCKER_VOLUMES="true"
-            DATA_MOUNT=""
-            VMAIL_MOUNT=""
-            FILES_MOUNT=""
-            ENABLE_NEXTCLOUD="false"
-            save_config
-            log "Configured to use default Docker volumes"
-            return
-        fi
-    fi
-
-    # Custom mount points
-    echo ""
-    echo "Enter custom storage paths. Press Enter to accept defaults."
-    echo "Mount points must ALREADY EXIST on the host (pre-provisioned by you)."
-    echo "Subdirectories under each mount will be created by the installer."
+    echo "All three paths must ALREADY EXIST on the host before continuing."
+    echo "Subdirectories under each path are created automatically."
     echo ""
 
     # Data mount point (required)
@@ -640,8 +616,6 @@ configure_mount_points() {
         chmod 755 "${FILES_MOUNT}"
     fi
 
-    USE_DOCKER_VOLUMES="false"
-
     # Save configuration
     save_config
 
@@ -655,7 +629,6 @@ save_config() {
 # Generated: $(date)
 # DO NOT EDIT MANUALLY - regenerate with install script
 
-USE_DOCKER_VOLUMES="${USE_DOCKER_VOLUMES:-false}"
 DATA_MOUNT="${DATA_MOUNT}"
 VMAIL_MOUNT="${VMAIL_MOUNT}"
 FILES_MOUNT="${FILES_MOUNT}"
@@ -693,20 +666,15 @@ generate_compose_override() {
     local ENV_FILE="${HERMES_ROOT}/.env"
 
     # Load config if not already set
-    if [[ -z "${USE_DOCKER_VOLUMES:-}" ]]; then
+    if [[ -z "${DATA_MOUNT:-}" ]]; then
         if ! load_config; then
             error "No configuration found. Run installation first."
         fi
     fi
 
-    # Default-Docker-volumes mode is no longer supported with env-var
-    # substitution (empty ${DATA_MOUNT} would resolve to '/dbase' which is
-    # a real path on the host root filesystem -- dangerous). Custom mount
-    # points are the only supported configuration.
-    if [[ "${USE_DOCKER_VOLUMES}" == "true" ]]; then
-        error "USE_DOCKER_VOLUMES=true is no longer supported. Re-run installer with custom mount points."
-    fi
-
+    # All three mount points are required -- empty ${DATA_MOUNT} in compose
+    # substitution would resolve to '/dbase' (a real root path), which is
+    # dangerous. configure_mount_points is the only path that sets these.
     if [[ -z "${DATA_MOUNT:-}" ]] || [[ -z "${VMAIL_MOUNT:-}" ]] || [[ -z "${FILES_MOUNT:-}" ]]; then
         error "All three mount points (DATA_MOUNT, VMAIL_MOUNT, FILES_MOUNT) must be set."
     fi
@@ -1698,17 +1666,15 @@ main() {
     echo "4. Access the admin console:"
     echo "   https://YOUR_SERVER_IP/admin/"
     echo ""
-    if [[ "${USE_DOCKER_VOLUMES}" != "true" ]]; then
-        echo "Storage Configuration:"
-        echo "   System data:    ${DATA_MOUNT}"
-        echo "   Email storage:  ${VMAIL_MOUNT}"
-        if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
-            echo "   Nextcloud files: ${FILES_MOUNT}"
-        else
-            echo "   Nextcloud files: disabled"
-        fi
-        echo ""
+    echo "Storage Configuration:"
+    echo "   System data:    ${DATA_MOUNT}"
+    echo "   Email storage:  ${VMAIL_MOUNT}"
+    if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
+        echo "   Nextcloud files: ${FILES_MOUNT}"
+    else
+        echo "   Nextcloud files: disabled"
     fi
+    echo ""
     echo "Log file: ${LOG_FILE}"
     echo "============================================================"
     echo ""
@@ -1947,18 +1913,13 @@ case "${1:-}" in
             echo "Current Hermes SEG Configuration:"
             echo "=================================="
             echo ""
-            if [[ "${USE_DOCKER_VOLUMES}" == "true" ]]; then
-                echo "Storage Mode: Default Docker volumes (NOT RECOMMENDED)"
-                echo "  Data location: /var/lib/docker/volumes"
+            echo "Storage paths:"
+            echo "  System data:    ${DATA_MOUNT:-not set}"
+            echo "  Email storage:  ${VMAIL_MOUNT:-not set}"
+            if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
+                echo "  Nextcloud files: ${FILES_MOUNT:-not set}"
             else
-                echo "Storage Mode: Custom mount points (RECOMMENDED)"
-                echo "  System data:    ${DATA_MOUNT:-not set}"
-                echo "  Email storage:  ${VMAIL_MOUNT:-not set}"
-                if [[ "${ENABLE_NEXTCLOUD}" == "true" ]]; then
-                    echo "  Nextcloud files: ${FILES_MOUNT:-not set}"
-                else
-                    echo "  Nextcloud files: disabled"
-                fi
+                echo "  Nextcloud files: disabled"
             fi
             echo ""
             echo "Installation root: ${HERMES_ROOT}"
@@ -1984,10 +1945,13 @@ case "${1:-}" in
         echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
         echo "  - Install state markers in ${STATE_DIR}"
         echo "  - .env, docker-compose.override.yml, .hermes_install_config"
+        echo "  - Rendered service configs (rsyslog mysql.conf x4, amavis"
+        echo "    50-user, ciphermail hibernate.cfg.xml + connection.xml)"
         echo ""
-        echo "User-mounted storage directories will NOT be touched. If you"
-        echo "want to wipe those too, you must rm -rf them manually before"
-        echo "re-running."
+        echo "After confirming, you will get a SECOND prompt asking whether"
+        echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
+        echo "/ VMAIL_MOUNT / FILES_MOUNT). Required for fresh-install"
+        echo "testing; skip if you want to preserve mail/files."
         echo ""
         read -p "Type the word WIPE to confirm: " confirm
         if [[ "$confirm" == "WIPE" ]]; then
