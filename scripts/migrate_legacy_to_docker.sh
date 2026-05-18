@@ -298,18 +298,18 @@ log "Authelia database created"
 # Create Nextcloud database
 log "Creating Nextcloud database..."
 NEXTCLOUD_USER="nextcloud"
-if [[ -f "${CREDS_DIR}/nextcloud_username" ]]; then
-    NEXTCLOUD_USER=$(cat "${CREDS_DIR}/nextcloud_username")
+if [[ -f "${CREDS_DIR}/nextcloud_mysql_username" ]]; then
+    NEXTCLOUD_USER=$(cat "${CREDS_DIR}/nextcloud_mysql_username")
 fi
 
 NEXTCLOUD_PASS=""
-if [[ -f "${CREDS_DIR}/nextcloud_password" ]]; then
-    NEXTCLOUD_PASS=$(cat "${CREDS_DIR}/nextcloud_password")
+if [[ -f "${CREDS_DIR}/nextcloud_mysql_password" ]]; then
+    NEXTCLOUD_PASS=$(cat "${CREDS_DIR}/nextcloud_mysql_password")
 else
     # Generate a new password
     NEXTCLOUD_PASS=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
-    echo -n "$NEXTCLOUD_PASS" > "${CREDS_DIR}/nextcloud_password"
-    chmod 600 "${CREDS_DIR}/nextcloud_password"
+    echo -n "$NEXTCLOUD_PASS" > "${CREDS_DIR}/nextcloud_mysql_password"
+    chmod 600 "${CREDS_DIR}/nextcloud_mysql_password"
     log "Generated new Nextcloud database password"
 fi
 
