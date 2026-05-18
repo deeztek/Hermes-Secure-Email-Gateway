@@ -1885,6 +1885,32 @@ case "${1:-}" in
             echo "No configuration found. Run installation first."
         fi
         ;;
+    --wipe)
+        # Non-interactive wipe entrypoint. Useful when the detect_previous_install
+        # wizard didn't fire (e.g., state dir cleared but containers/volumes
+        # still around, or non-tty stdin swallowed the prompt). Still requires
+        # confirmation -- destructive operations should never be one-keystroke.
+        touch "$LOG_FILE"
+        echo ""
+        echo "WARNING: this will permanently delete:"
+        echo "  - Docker containers + named volumes (mail, db, ldap, etc.)"
+        echo "  - All credentials in ${CREDS_DIR} and ${SECRETS_DIR}"
+        echo "  - Install state markers in ${STATE_DIR}"
+        echo "  - .env, docker-compose.override.yml, .hermes_install_config"
+        echo ""
+        echo "User-mounted storage directories will NOT be touched. If you"
+        echo "want to wipe those too, you must rm -rf them manually before"
+        echo "re-running."
+        echo ""
+        read -p "Type the word WIPE to confirm: " confirm
+        if [[ "$confirm" == "WIPE" ]]; then
+            wipe_install
+            echo "Wipe complete. Re-run the installer to start fresh."
+        else
+            echo "Wipe not confirmed. Exiting."
+            exit 1
+        fi
+        ;;
     --help|-h)
         echo "Hermes SEG Docker Installation Script"
         echo ""
@@ -1899,6 +1925,10 @@ case "${1:-}" in
         echo "  --generate-override  Regenerate docker-compose.override.yml"
         echo "  --generate-secrets   Generate secrets only"
         echo "  --show-config        Display current configuration"
+        echo ""
+        echo "Recovery:"
+        echo "  --wipe               Tear down EVERYTHING (containers, volumes,"
+        echo "                       creds, state) and start fresh"
         echo ""
         echo "Help:"
         echo "  --help, -h           Show this help message"
