@@ -1009,6 +1009,145 @@ generate_rsyslog_configs() {
 }
 
 # ============================================================================
+# RENDER AMAVIS 50-USER CONFIG
+# ============================================================================
+
+generate_amavis_50user_config() {
+    # Renders config/mail_filter/etc/amavis/conf.d/50-user from the committed
+    # 50-user.HERMES template. Same file-bind-mount-missing failure mode as
+    # the rsyslog configs (#179): docker-compose.yml bind-mounts this as a
+    # FILE, but it's gitignored (contains DB creds post-substitution), so a
+    # fresh clone has nothing at the source path and `docker compose up`
+    # silently creates an empty dir there, then bails with "not a directory".
+    #
+    # The CFML page admin/2/inc/update_amavis_config_files.cfm re-renders
+    # the file from DB values whenever an admin saves spam/network settings;
+    # this install-time render just produces a valid amavis config that
+    # boots cleanly with hermes_install.sql's seed-row defaults.
+    #
+    # Placeholders substituted (matched against committed 50-user.HERMES):
+    #   SERVER-NAME / SERVER-DOMAIN  -- split from HERMES_HOSTNAME in .env
+    #   HERMES-USERNAME / HERMES-PASSWORD  -- from generate_secrets() creds/
+    #   sa-spam-subject-tag          -- `[SUSPECTED SPAM]` (spam_settings seed)
+    #   final-virus-destiny          -- `D_BOUNCE`         (spam_settings seed)
+    #   final-banned-destiny         -- `D_BOUNCE`         (spam_settings seed)
+    #   final-spam-destiny           -- `D_DISCARD`        (spam_settings seed)
+    #   final-bad-header-destiny     -- `D_DISCARD`        (spam_settings seed)
+    #   FILE-RULES-GO-HERE           -- empty (no banned-file rules yet)
+    #
+    # Not state-guarded -- same rationale as generate_rsyslog_configs.
+    # Linked: #179
+    header "Rendering amavis 50-user Config"
+
+    local template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/50-user.HERMES"
+    local target="${HERMES_ROOT}/config/mail_filter/etc/amavis/conf.d/50-user"
+
+    if [[ ! -f "$template" ]]; then
+        error "50-user template missing: $template"
+    fi
+
+    local hermes_user hermes_pass hermes_hostname
+    hermes_user=$(cat "${CREDS_DIR}/hermes_username")
+    hermes_pass=$(cat "${CREDS_DIR}/hermes_password")
+    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+    if [[ -z "$hermes_user" || -z "$hermes_pass" ]]; then
+        error "hermes DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+    if [[ -z "$hermes_hostname" ]]; then
+        error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
+    fi
+
+    # Split hostname into name + domain: smtp.example.com -> smtp / example.com
+    local server_name server_domain
+    server_name="${hermes_hostname%%.*}"
+    server_domain="${hermes_hostname#*.}"
+
+    # Recover from Docker's empty-dir-at-missing-source failure mode.
+    [[ -e "$target" ]] && rm -rf "$target"
+
+    # Credentials and hostname are alphanumeric+dots, safe for sed without escaping.
+    # Placeholder defaults match hermes_install.sql spam_settings seed rows so
+    # admin sees consistent values whether they save via UI or never log in.
+    sed -e "s|SERVER-NAME|${server_name}|g" \
+        -e "s|SERVER-DOMAIN|${server_domain}|g" \
+        -e "s|HERMES-USERNAME|${hermes_user}|g" \
+        -e "s|HERMES-PASSWORD|${hermes_pass}|g" \
+        -e "s|sa-spam-subject-tag|[SUSPECTED SPAM]|g" \
+        -e "s|final-virus-destiny|D_BOUNCE|g" \
+        -e "s|final-banned-destiny|D_BOUNCE|g" \
+        -e "s|final-spam-destiny|D_DISCARD|g" \
+        -e "s|final-bad-header-destiny|D_DISCARD|g" \
+        -e "s|FILE-RULES-GO-HERE||g" \
+        "$template" > "$target"
+    chmod 644 "$target"
+    log "  + config/mail_filter/etc/amavis/conf.d/50-user"
+    log "amavis 50-user config rendered (host=${server_name}.${server_domain})"
+}
+
+# ============================================================================
+# RENDER CIPHERMAIL HIBERNATE CONFIGS
+# ============================================================================
+
+generate_ciphermail_hibernate_configs() {
+    # Renders the two Hibernate XML configs CipherMail's Tomcat reads at
+    # startup, from their committed .HERMES templates. Both are bind-mounted
+    # as FILES by docker-compose.yml, both are gitignored (contain DB creds),
+    # so on a fresh clone they trip the same "not a directory" failure as
+    # the rsyslog and amavis configs.
+    #
+    # Each template has exactly two placeholders: DJIGZO-USERNAME and
+    # DJIGZO-PASSWORD, mapped to the random ciphermail DB credentials
+    # generate_secrets() writes to creds/ciphermail_{username,password}.
+    # create_databases() later creates the matching djigzo DB user.
+    #
+    # Not state-guarded -- same rationale as the other render functions.
+    # Linked: #179
+    header "Rendering CipherMail Hibernate Configs"
+
+    local cfg_template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/hibernate.mysql.cfg.HERMES"
+    local conn_template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/hibernate.mysql.connection.HERMES"
+    local target_dir="${HERMES_ROOT}/config/ciphermail/usr/share/djigzo/conf/database"
+    local cfg_target="${target_dir}/hibernate.cfg.xml"
+    local conn_target="${target_dir}/hibernate.mysql.connection.xml"
+
+    if [[ ! -f "$cfg_template" ]]; then
+        error "hibernate.mysql.cfg.HERMES template missing: $cfg_template"
+    fi
+    if [[ ! -f "$conn_template" ]]; then
+        error "hibernate.mysql.connection.HERMES template missing: $conn_template"
+    fi
+
+    local ciphermail_user ciphermail_pass
+    ciphermail_user=$(cat "${CREDS_DIR}/ciphermail_username")
+    ciphermail_pass=$(cat "${CREDS_DIR}/ciphermail_password")
+
+    if [[ -z "$ciphermail_user" || -z "$ciphermail_pass" ]]; then
+        error "ciphermail DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+
+    # Target dir is not present on fresh clones (no tracked files inside).
+    mkdir -p "$target_dir"
+
+    _render_hibernate_conf() {
+        local template="$1"
+        local target="$2"
+        [[ -e "$target" ]] && rm -rf "$target"
+        sed -e "s|DJIGZO-USERNAME|${ciphermail_user}|g" \
+            -e "s|DJIGZO-PASSWORD|${ciphermail_pass}|g" \
+            "$template" > "$target"
+        chmod 644 "$target"
+        log "  + $(echo "$target" | sed "s|^${HERMES_ROOT}/||")"
+    }
+
+    _render_hibernate_conf "$cfg_template"  "$cfg_target"
+    _render_hibernate_conf "$conn_template" "$conn_target"
+
+    log "CipherMail Hibernate configs rendered"
+}
+
+# ============================================================================
 # CREATE DATABASES
 # ============================================================================
 
@@ -1443,12 +1582,15 @@ main() {
         state_mark_done "05-secrets-generated"
     fi
 
-    # generate_rsyslog_configs is intentionally NOT state-guarded -- same
-    # rationale as generate_compose_override. It's fast and idempotent, and
-    # MUST run before `docker compose up` since 4 containers file-bind-mount
-    # the rendered mysql.conf files. Missing source files make Docker create
-    # empty dirs that then fail bind-mount with "not a directory".
+    # The next 3 render steps are intentionally NOT state-guarded -- same
+    # rationale as generate_compose_override. They're fast and idempotent,
+    # and MUST run before `docker compose up` since these files are
+    # file-bind-mounted by containers. Missing source files make Docker
+    # create empty dirs at the source path that then fail bind-mount with
+    # "not a directory".
     generate_rsyslog_configs
+    generate_amavis_50user_config
+    generate_ciphermail_hibernate_configs
 
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
@@ -1688,6 +1830,8 @@ case "${1:-}" in
         touch "$LOG_FILE"
         generate_secrets
         generate_rsyslog_configs
+        generate_amavis_50user_config
+        generate_ciphermail_hibernate_configs
         ;;
     --configure-storage)
         # Configure storage mount points
