@@ -1898,7 +1898,7 @@ create_databases() {
     # ---- Wait for MariaDB to be ready ----
     log "Waiting for MariaDB to be ready..."
     for i in {1..30}; do
-        if docker exec hermes_db_server mysqladmin ping -u root -p"${MYSQL_ROOT_PASS}" --silent 2>/dev/null; then
+        if docker exec hermes_db_server mysqladmin ping -u root --silent 2>/dev/null; then
             log "MariaDB is ready"
             break
         fi
@@ -1908,30 +1908,26 @@ create_databases() {
         sleep 2
     done
 
-    # ---- Verify root password is what we expect (fail loud, not silent) ----
-    # If MariaDB was initialized without MYSQL_ROOT_PASSWORD wired through,
-    # it picks a random root password and our value here doesn't match. Every
-    # CREATE USER below would then silently fail (errors only go to log file).
-    # Catching it here means a clean error instead of mysterious downstream
-    # auth failures from Authelia / Postfix / Dovecot / etc.
-    if ! docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "SELECT 1;" >/dev/null 2>&1; then
-        error "MariaDB root password mismatch -- creds/mysql_root_password does NOT match what MariaDB has stored. Most likely cause: MariaDB initialized with a stale datadir (prior install). Wipe /mnt/data/dbase contents and re-run --init-db."
+    # ---- Verify we can talk to MariaDB as root via socket auth ----
+    # NOTE: We use unix_socket auth (no -p) because LinuxServer's mariadb
+    # image creates root@localhost / root@127.0.0.1 / root@<container-host>
+    # with the unix_socket plugin (NOT mysql_native_password). They reject
+    # password-bearing connections. The MYSQL_ROOT_PASSWORD env var set
+    # via FILE__ only configures root@'%' (the remote-access entry) with
+    # mysql_native_password. Since we always connect via `docker exec`
+    # (running as OS root inside the container -> unix socket auth), we
+    # never need to send a password from the install script.
+    #
+    # The smoke test below catches the case where MariaDB isn't ready yet
+    # or socket auth somehow doesn't map root -> root (extremely unusual).
+    if ! docker exec hermes_db_server mysql -u root -e "SELECT 1;" >/dev/null 2>&1; then
+        error "MariaDB root socket auth failed. Container may not be fully started yet, or LinuxServer's init didn't complete. Try: docker logs hermes_db_server"
     fi
-    log "MariaDB root authentication verified"
+    log "MariaDB root authentication verified (unix_socket plugin via docker exec)"
 
-    # ---- Create root@'%' so root is reachable from any internal container ----
-    # Uniform host pattern across all users (every service user is @'%').
-    # Eliminates a class of host-mismatch auth bugs. Port 3306 is NOT
-    # published to the host, so @'%' is restricted to the internal
-    # hermes_net_ext Docker network -- effectively the same threat surface
-    # as the service users we already create with @'%'.
-    log "Creating root@'%' (uniform internal-network access)..."
-    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
-        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASS}';
-        ALTER USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASS}';
-        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
-        FLUSH PRIVILEGES;
-    " 2>> "$LOG_FILE"
+    # NB: LinuxServer's mariadb init has already created root@'%' with
+    # the password from MYSQL_ROOT_PASSWORD (verified via mysql.user
+    # plugin column). No need for us to ALTER it.
 
     # ---- Create one DB + user + grants ----
     # NOTE: backtick-quoting `Syslog` is REQUIRED — case-sensitive on Linux
@@ -1950,7 +1946,7 @@ create_databases() {
         # The ALTER USER below force-syncs the password whether the user is
         # being created fresh or already existed. Idempotent + makes the
         # whole step safe to re-run on a partially-stale MariaDB volume.
-        docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
+        docker exec hermes_db_server mysql -u root -e "
             CREATE DATABASE IF NOT EXISTS \`${dbname}\` CHARACTER SET utf8mb4 COLLATE ${collation};
             CREATE USER IF NOT EXISTS '${user}'@'%' IDENTIFIED BY '${pass}';
             ALTER USER '${user}'@'%' IDENTIFIED BY '${pass}';
@@ -1965,7 +1961,7 @@ create_databases() {
     _create_db_user djigzo    "$CIPHERMAIL_DB_USER" "$CIPHERMAIL_DB_PASS"
     _create_db_user nextcloud "$NEXTCLOUD_DB_USER"  "$NEXTCLOUD_DB_PASS"
 
-    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "FLUSH PRIVILEGES;" 2>> "$LOG_FILE"
+    docker exec hermes_db_server mysql -u root -e "FLUSH PRIVILEGES;" 2>> "$LOG_FILE"
     log "All 6 databases + users + grants created"
 
     # ---- Import one SQL file into a target DB ----
@@ -1979,7 +1975,7 @@ create_databases() {
             return 1
         fi
         log "Importing ${label} into '${target_db}'..."
-        if ! docker exec -i hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" "$target_db" \
+        if ! docker exec -i hermes_db_server mysql -u root "$target_db" \
                 < "$sql_file" 2>> "$LOG_FILE"; then
             error "Failed to import ${label} (see $LOG_FILE for details)"
             return 1
@@ -2050,7 +2046,7 @@ seed_install_specific_values() {
     # server_ip (module='network') — view_server_setup.cfm reads this row.
     # Pre-correction: rule used module='console' (typo), missed the row.
     log "Writing parameters2.server_ip = ${ip} (module=network)..."
-    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+    docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
          WHERE parameter='server_ip' AND module='network';
     " 2>>"$LOG_FILE"
@@ -2059,7 +2055,7 @@ seed_install_specific_values() {
     # public hostname (CONSOLE_HOST in .env). Set to IP initially; admin
     # changes to FQDN via the Console Settings page once DNS is in place.
     log "Writing parameters2.console.host = ${ip}..."
-    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+    docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
          WHERE parameter='console.host' AND module='console';
     " 2>>"$LOG_FILE"
@@ -2068,7 +2064,7 @@ seed_install_specific_values() {
     # mail hostname. Used by Postfix main.cf myhostname/myorigin and by
     # other config generators (modify_hosts.cfm etc.).
     log "Writing parameters2.server_name = ${server_name} / server_domain = ${server_domain}..."
-    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+    docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters2 SET value2='${server_name}'   WHERE parameter='server_name'   AND module='network';
         UPDATE parameters2 SET value2='${server_domain}' WHERE parameter='server_domain' AND module='network';
     " 2>>"$LOG_FILE"
@@ -2077,7 +2073,7 @@ seed_install_specific_values() {
     # view_server_setup.cfm reads these; generate_postfix_configuration.cfm
     # postconf's main.cf from these values on Save.
     log "Writing parameters.myorigin = ${server_domain} / myhostname = ${hermes_hostname}..."
-    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+    docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters SET parameter='${server_domain}'
          WHERE parent_name='myorigin' AND child=1 AND module='postfix' AND conf_file='main.cf';
         UPDATE parameters SET parameter='${hermes_hostname}'
@@ -2116,7 +2112,7 @@ register_bootstrap_cert_in_db() {
 
     # Idempotency: skip INSERT if a row with this friendly_name already exists.
     local existing_id
-    existing_id=$(docker exec hermes_db_server mysql -u root -p"${pass}" -N -s hermes -e "
+    existing_id=$(docker exec hermes_db_server mysql -u root -N -s hermes -e "
         SELECT id FROM system_certificates WHERE friendly_name='${friendly_name}' LIMIT 1;
     " 2>>"$LOG_FILE")
 
@@ -2131,7 +2127,7 @@ register_bootstrap_cert_in_db() {
         enddate=$(openssl x509 -in "$cert_pem" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
 
         log "Inserting system_certificates row (type='Generated', file_name='${prefix}')..."
-        docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+        docker exec hermes_db_server mysql -u root hermes -e "
             INSERT INTO system_certificates
               (type, subject, issuer, serial, fingerprint, startdate, enddate, file_name, friendly_name)
             VALUES
@@ -2146,7 +2142,7 @@ register_bootstrap_cert_in_db() {
                '${friendly_name}');
         " 2>>"$LOG_FILE"
 
-        existing_id=$(docker exec hermes_db_server mysql -u root -p"${pass}" -N -s hermes -e "
+        existing_id=$(docker exec hermes_db_server mysql -u root -N -s hermes -e "
             SELECT id FROM system_certificates WHERE friendly_name='${friendly_name}' LIMIT 1;
         " 2>>"$LOG_FILE")
     else
@@ -2160,7 +2156,7 @@ register_bootstrap_cert_in_db() {
 
     # Point all three role assignments at the bootstrap cert.
     log "Pointing console.certificate / smtp.certificate / mail.certificate at id=${existing_id}..."
-    docker exec hermes_db_server mysql -u root -p"${pass}" hermes -e "
+    docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters2 SET value2='${existing_id}' WHERE parameter='console.certificate' AND module='console';
         UPDATE parameters2 SET value2='${existing_id}' WHERE parameter='smtp.certificate'    AND module='certificates';
         UPDATE parameters2 SET value2='${existing_id}' WHERE parameter='mail.certificate'    AND module='certificates';
