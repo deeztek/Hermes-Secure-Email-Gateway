@@ -1019,19 +1019,6 @@ generate_secrets() {
         fi
     fi
 
-    # Substitute MYSQLROOTPASSWORD into .env so docker-compose passes it to
-    # the MariaDB container's MYSQL_ROOT_PASSWORD env var on first init.
-    # Without this, MariaDB generates its own random root password on init,
-    # we never see it, and every subsequent root-auth attempt from the
-    # install script silently fails -- CREATE USER for the service accounts
-    # is then a no-op and downstream services can't authenticate to the DB.
-    if [[ -f "${HERMES_ROOT}/.env" && -f "${CREDS_DIR}/mysql_root_password" ]]; then
-        local _root_pw
-        _root_pw=$(cat "${CREDS_DIR}/mysql_root_password")
-        sed -i -e "s|^MYSQLROOTPASSWORD=.*|MYSQLROOTPASSWORD=${_root_pw}|" "${HERMES_ROOT}/.env"
-        log "  Substituted MYSQLROOTPASSWORD into .env (MariaDB will pick up on first init)"
-    fi
-
     log "Secrets generation completed"
 }
 
