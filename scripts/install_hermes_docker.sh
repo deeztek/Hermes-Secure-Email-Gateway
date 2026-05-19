@@ -1918,9 +1918,17 @@ create_databases() {
         local collation="${4:-utf8mb4_unicode_ci}"
 
         log "Creating database '${dbname}' (user '${user}')..."
+        # `CREATE USER IF NOT EXISTS` is a NO-OP if the user exists, which
+        # means stale users from a prior install (whose MariaDB data
+        # survived an incomplete wipe) keep their OLD password — and the
+        # current install's NEW password silently fails to authenticate.
+        # The ALTER USER below force-syncs the password whether the user is
+        # being created fresh or already existed. Idempotent + makes the
+        # whole step safe to re-run on a partially-stale MariaDB volume.
         docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
             CREATE DATABASE IF NOT EXISTS \`${dbname}\` CHARACTER SET utf8mb4 COLLATE ${collation};
             CREATE USER IF NOT EXISTS '${user}'@'%' IDENTIFIED BY '${pass}';
+            ALTER USER '${user}'@'%' IDENTIFIED BY '${pass}';
             GRANT ALL PRIVILEGES ON \`${dbname}\`.* TO '${user}'@'%';
         " 2>> "$LOG_FILE"
     }
