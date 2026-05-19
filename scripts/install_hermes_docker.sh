@@ -406,6 +406,8 @@ wipe_install() {
            "${HERMES_ROOT}/config/hermes/opt/hermes/ssl/bootstrap_hermes.chain.pem" \
            "${HERMES_ROOT}/config/hermes/opt/hermes/ssl/bootstrap_hermes.bundle.pem" \
            "${HERMES_ROOT}/config/hermes/opt/hermes/ssl/bootstrap_hermes.key" \
+           "${HERMES_ROOT}/config/dovecot-2.4/conf/dovecot.conf" \
+           "${HERMES_ROOT}/config/dovecot-2.4/conf/auth_app_passwords.lua" \
            2>/dev/null || true
     # Postfix mysql-*.cf files: glob-deleted (count varies per release).
     find "${HERMES_ROOT}/config/postfix-dkim/etc/postfix" -maxdepth 1 -name 'mysql-*.cf' -type f -delete 2>/dev/null || true
@@ -1718,6 +1720,144 @@ generate_self_signed_cert() {
 }
 
 # ============================================================================
+# RENDER DOVECOT dovecot.conf
+# ============================================================================
+
+generate_dovecot_config() {
+    # Renders config/dovecot-2.4/conf/dovecot.conf from the canonical
+    # template at config/hermes/opt/hermes/templates/dovecot.conf. The
+    # Dovecot 2.4 template has 23 distinct placeholders covering:
+    #   - DB connection (user/password)
+    #   - Protocol list, SSL paths/cipher/min-protocol
+    #   - Mail-crypt key curve + write algorithm
+    #   - Compression (yes/no, method, level)
+    #   - Quota warning thresholds (medium/high/critical) + trash quota
+    #   - Connection limits (login_client_limit, max_userip)
+    #   - Logging debug level
+    #   - 3 conditional BLOCK placeholders (ACL config, ACL dict-map,
+    #     shared namespace) — bootstrap leaves these empty; admin
+    #     enables via UI which triggers CFML re-render with actual blocks.
+    #
+    # CFML generate_dovecot_configuration.cfm re-renders this from DB
+    # values on Save. This bootstrap render uses sensible defaults so
+    # Dovecot starts cleanly on first boot:
+    #   - protocols: imap pop3 lmtp submission sieve
+    #   - SSL: bootstrap_hermes.{pem,key} (same as nginx/postfix), TLSv1.2
+    #   - Compression: off (no), method lz4 if admin turns it on
+    #   - Quota warnings: 75 / 85 / 95 (trash 10)
+    #   - Connection limits: 100 / 50
+    #   - Logging: no debug
+    #   - Mail-crypt: prime256v1 + ecdh-aes-256-gcm-sha256 (Hermes default)
+    #   - ACL / shared namespace: disabled (empty blocks)
+    #
+    # Linked: #179
+    header "Rendering Dovecot dovecot.conf"
+
+    local template="${HERMES_ROOT}/config/hermes/opt/hermes/templates/dovecot.conf"
+    local target_dir="${HERMES_ROOT}/config/dovecot-2.4/conf"
+    local target="${target_dir}/dovecot.conf"
+
+    if [[ ! -f "$template" ]]; then
+        error "Dovecot canonical template missing: $template"
+    fi
+
+    local hermes_user hermes_pass
+    hermes_user=$(cat "${CREDS_DIR}/hermes_username")
+    hermes_pass=$(cat "${CREDS_DIR}/hermes_password")
+    if [[ -z "$hermes_user" || -z "$hermes_pass" ]]; then
+        error "hermes DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+
+    mkdir -p "$target_dir"
+    [[ -e "$target" ]] && rm -rf "$target"
+
+    # Note ordering: do whole-line BLOCK replacements first (sed `^...$` to
+    # zap the entire line cleanly), then scalar substitutions. None of the
+    # placeholder names are prefixes of each other so ordering is safe.
+    sed \
+        -e "s|^hermes_log_debug_line$||" \
+        -e "s|^hermes_compress_level_line$||" \
+        -e "s|^hermes_crypt_write_algorithm_line$|crypt_write_algorithm = ecdh-aes-256-gcm-sha256|" \
+        -e "s|^[[:space:]]*hermes_acl_dict_block[[:space:]]*$||" \
+        -e "s|^hermes_acl_config_block$||" \
+        -e "s|^hermes_shared_namespace_block$||" \
+        -e "s|hermes_db_username|${hermes_user}|g" \
+        -e "s|hermes_db_password|${hermes_pass}|g" \
+        -e "s|hermes_protocols|imap pop3 lmtp submission sieve|g" \
+        -e "s|hermes_acl_enabled|no|g" \
+        -e "s|hermes_mail_compress|no|g" \
+        -e "s|hermes_compress_method|lz4|g" \
+        -e "s|hermes_crypt_curve|prime256v1|g" \
+        -e "s|hermes_quota_warn_critical|95|g" \
+        -e "s|hermes_quota_warn_high|85|g" \
+        -e "s|hermes_quota_warn_medium|75|g" \
+        -e "s|hermes_trash_quota_pct|10|g" \
+        -e "s|hermes_max_userip|50|g" \
+        -e "s|hermes_login_client_limit|100|g" \
+        -e "s|hermes_ssl_cipher_list|ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS|g" \
+        -e "s|hermes_ssl_min_protocol|TLSv1.2|g" \
+        -e "s|hermes_ssl_cert_path|/opt/hermes/ssl/bootstrap_hermes.pem|g" \
+        -e "s|hermes_ssl_key_path|/opt/hermes/ssl/bootstrap_hermes.key|g" \
+        "$template" > "$target"
+    chmod 644 "$target"
+
+    # Sanity check: only hermes_db_server / hermes_postfix_dkim (literal
+    # container names, not placeholders) should remain as hermes_* tokens.
+    local leftovers
+    leftovers=$(grep -oE 'hermes_[a-z_]+' "$target" | sort -u \
+        | grep -vE '^hermes_(db_server|postfix_dkim)$' || true)
+    if [[ -n "$leftovers" ]]; then
+        warn "Dovecot config has unsubstituted placeholders:"
+        warn "$leftovers"
+    fi
+
+    log "  + config/dovecot-2.4/conf/dovecot.conf"
+    log "Dovecot dovecot.conf rendered"
+}
+
+# ============================================================================
+# RENDER DOVECOT auth_app_passwords.lua
+# ============================================================================
+
+generate_dovecot_lua_config() {
+    # Renders config/dovecot-2.4/conf/auth_app_passwords.lua from the
+    # canonical template at config/hermes/opt/hermes/templates/auth_app_passwords.lua.
+    # Two placeholders only: hermes_db_username + hermes_db_password.
+    # `hermes_db_server` is a literal container hostname (NOT a placeholder).
+    #
+    # This is the Dovecot 2.4 passdb lua script for #197 app passwords.
+    # Without it Dovecot can't authenticate via app-password records.
+    # rotate_db_credentials.sh handles cred rotation; this is the initial
+    # bootstrap render. Linked: #179
+    header "Rendering Dovecot auth_app_passwords.lua"
+
+    local template="${HERMES_ROOT}/config/hermes/opt/hermes/templates/auth_app_passwords.lua"
+    local target_dir="${HERMES_ROOT}/config/dovecot-2.4/conf"
+    local target="${target_dir}/auth_app_passwords.lua"
+
+    if [[ ! -f "$template" ]]; then
+        error "Dovecot lua canonical template missing: $template"
+    fi
+
+    local hermes_user hermes_pass
+    hermes_user=$(cat "${CREDS_DIR}/hermes_username")
+    hermes_pass=$(cat "${CREDS_DIR}/hermes_password")
+    if [[ -z "$hermes_user" || -z "$hermes_pass" ]]; then
+        error "hermes DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
+    fi
+
+    mkdir -p "$target_dir"
+    [[ -e "$target" ]] && rm -rf "$target"
+    sed \
+        -e "s|hermes_db_username|${hermes_user}|g" \
+        -e "s|hermes_db_password|${hermes_pass}|g" \
+        "$template" > "$target"
+    chmod 644 "$target"
+    log "  + config/dovecot-2.4/conf/auth_app_passwords.lua"
+    log "Dovecot auth_app_passwords.lua rendered"
+}
+
+# ============================================================================
 # CREATE DATABASES
 # ============================================================================
 
@@ -2349,6 +2489,8 @@ main() {
     generate_opendkim_tables
     generate_commandbox_password_file
     generate_mailname_config
+    generate_dovecot_config
+    generate_dovecot_lua_config
 
     # Note: The following steps require containers to be running
     # They should be called after 'docker compose up -d'
@@ -2610,6 +2752,8 @@ case "${1:-}" in
         generate_opendkim_tables
         generate_commandbox_password_file
         generate_mailname_config
+        generate_dovecot_config
+        generate_dovecot_lua_config
         ;;
     --configure-storage)
         # Configure storage mount points

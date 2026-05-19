@@ -78,6 +78,7 @@ config/dovecot/conf/dovecot-sql-user.conf
 config/dovecot/conf/dovecot-dict-sql-quota.conf
 config/dovecot-2.4/conf/dovecot-dict-sql-quota.conf
 config/dovecot-2.4/conf/dovecot.conf
+config/dovecot-2.4/conf/auth_app_passwords.lua
 
 # Backup files with potential secrets
 config/postfix-dkim/etc/postfix/*.BACKUP
