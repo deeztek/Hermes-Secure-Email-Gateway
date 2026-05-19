@@ -1413,7 +1413,7 @@ INSERT IGNORE INTO `parameters2` VALUES (65, 'nosignature_action', 'accept', 'dk
 INSERT IGNORE INTO `parameters2` VALUES (66, 'security_action', 'accept', 'dkim', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (67, 'signature_algorithm', 'rsa-sha256', 'dkim', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (68, 'headers_canonicalization', 'relaxed', 'dkim', 1, 1);
-INSERT IGNORE INTO `parameters2` VALUES (69, 'server_ip', '192.168.50.145', 'network', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (69, 'server_ip', '', 'network', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (182, 'show_password_form', 'no', 'nextcloud', NULL, 2);
 INSERT IGNORE INTO `parameters2` VALUES (156, 'server_domain', 'domain.tld', 'network', 1, NULL);
 INSERT IGNORE INTO `parameters2` VALUES (155, 'server_name', 'smtp', 'network', 1, NULL);
@@ -2945,6 +2945,9 @@ INSERT IGNORE INTO `timezones` VALUES (448,'Pacific/Tongatapu');
 INSERT IGNORE INTO `timezones` VALUES (449,'Pacific/Wake');
 INSERT IGNORE INTO `timezones` VALUES (450,'Pacific/Wallis');
 INSERT IGNORE INTO `timezones` VALUES (451,'UTC');
+
+--- Warnings ---
+  manifest entry for `mailaddr_temp` not found in dump
 
 -- -------- tls_policies                         [truncate] --------
 CREATE TABLE IF NOT EXISTS `tls_policies` (

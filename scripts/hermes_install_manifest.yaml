@@ -99,7 +99,7 @@ tables:
       - {match: {parameter: "duo.integration_key",    module: "authelia"}, set_value2: ""}
       - {match: {parameter: "duo.secret_key",         module: "authelia"}, set_value2: ""}
       - {match: {parameter: "duo.disable",            module: "authelia"}, set_value2: "true"}
-      - {match: {parameter: "server_ip",              module: "console"},  set_value2: ""}
+      - {match: {parameter: "server_ip",              module: "network"},  set_value2: ""}
       - {match: {parameter: "console.host",           module: "console"},  set_value2: "smtp.domain.tld"}
       - {match: {parameter: "server_domain",          module: "network"},  set_value2: "domain.tld"}
       - {match: {parameter: "server_name",            module: "network"},  set_value2: "smtp"}

@@ -162,6 +162,10 @@ config/nginx/etc/nginx/sites-available/hermes-ssl.*
 # at config/hermes/opt/hermes/conf_files/ and config/hermes/opt/hermes/templates/.
 config/nginx/etc/nginx/snippets/auth.HERMES
 
+# /etc/mailname rendered output (amavis container). Canonical template:
+# config/hermes/opt/hermes/conf_files/mailname.HERMES
+config/common/etc/mailname
+
 # SpamAssassin config (may have custom rules/IPs)
 config/mail_filter/etc/spamassassin/local.cf
 config/hermes/opt/hermes/conf_files/local.cf.*
