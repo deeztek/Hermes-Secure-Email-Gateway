@@ -1019,6 +1019,19 @@ generate_secrets() {
         fi
     fi
 
+    # Substitute MYSQLROOTPASSWORD into .env so docker-compose passes it to
+    # the MariaDB container's MYSQL_ROOT_PASSWORD env var on first init.
+    # Without this, MariaDB generates its own random root password on init,
+    # we never see it, and every subsequent root-auth attempt from the
+    # install script silently fails -- CREATE USER for the service accounts
+    # is then a no-op and downstream services can't authenticate to the DB.
+    if [[ -f "${HERMES_ROOT}/.env" && -f "${CREDS_DIR}/mysql_root_password" ]]; then
+        local _root_pw
+        _root_pw=$(cat "${CREDS_DIR}/mysql_root_password")
+        sed -i -e "s|^MYSQLROOTPASSWORD=.*|MYSQLROOTPASSWORD=${_root_pw}|" "${HERMES_ROOT}/.env"
+        log "  Substituted MYSQLROOTPASSWORD into .env (MariaDB will pick up on first init)"
+    fi
+
     log "Secrets generation completed"
 }
 
@@ -1907,6 +1920,31 @@ create_databases() {
         fi
         sleep 2
     done
+
+    # ---- Verify root password is what we expect (fail loud, not silent) ----
+    # If MariaDB was initialized without MYSQL_ROOT_PASSWORD wired through,
+    # it picks a random root password and our value here doesn't match. Every
+    # CREATE USER below would then silently fail (errors only go to log file).
+    # Catching it here means a clean error instead of mysterious downstream
+    # auth failures from Authelia / Postfix / Dovecot / etc.
+    if ! docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "SELECT 1;" >/dev/null 2>&1; then
+        error "MariaDB root password mismatch -- creds/mysql_root_password does NOT match what MariaDB has stored. Most likely cause: MariaDB initialized with a stale datadir (prior install). Wipe /mnt/data/dbase contents and re-run --init-db."
+    fi
+    log "MariaDB root authentication verified"
+
+    # ---- Create root@'%' so root is reachable from any internal container ----
+    # Uniform host pattern across all users (every service user is @'%').
+    # Eliminates a class of host-mismatch auth bugs. Port 3306 is NOT
+    # published to the host, so @'%' is restricted to the internal
+    # hermes_net_ext Docker network -- effectively the same threat surface
+    # as the service users we already create with @'%'.
+    log "Creating root@'%' (uniform internal-network access)..."
+    docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e "
+        CREATE USER IF NOT EXISTS 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASS}';
+        ALTER USER 'root'@'%' IDENTIFIED BY '${MYSQL_ROOT_PASS}';
+        GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' WITH GRANT OPTION;
+        FLUSH PRIVILEGES;
+    " 2>> "$LOG_FILE"
 
     # ---- Create one DB + user + grants ----
     # NOTE: backtick-quoting `Syslog` is REQUIRED — case-sensitive on Linux

@@ -99,7 +99,12 @@ services:
     environment:
       - PUID=$PUID
       - PGID=$GUID
-      #- MYSQL_ROOT_PASSWORD=$MYSQLROOTPASSWORD
+      # MariaDB initializes root@localhost with this password on first start
+      # (empty datadir). The install script then creates root@'%' so the
+      # database accepts connections from any container on the internal
+      # hermes_net_ext network -- uniform host pattern across all users.
+      # Port 3306 is NEVER published to the host, so '%' is internal-only.
+      - MYSQL_ROOT_PASSWORD=${MYSQLROOTPASSWORD}
       - TZ=$TIMEZONE
       #- MYSQL_DATABASE=USER_DB_NAME #optional
       #- MYSQL_USER=MYSQL_USER #optional
