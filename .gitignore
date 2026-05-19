@@ -151,6 +151,9 @@ config/hermes/var/www/html/schedule/*_ad_tasks.cfm
 # Temporary config files generated during operation
 config/hermes/opt/hermes/tmp/
 
+# Install log files (written by install_hermes_docker.sh)
+install-logs/
+
 # Postfix/Nginx config files with environment-specific data
 config/postfix-dkim/etc/postfix/main.cf
 config/postfix-dkim/etc/postfix/main.cf.*

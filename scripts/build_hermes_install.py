@@ -502,9 +502,14 @@ def main() -> int:
             warnings.append(f"manifest entry for `{tbl}` not found in dump")
 
     if warnings:
-        sys.stderr.write("\n--- Warnings ---\n")
+        # Use `-- ` (single dash + space) as the comment prefix so that if
+        # this output ever ends up redirected into the SQL file (e.g. by a
+        # caller using `2>&1`), MariaDB still parses these lines as valid
+        # SQL comments instead of choking on a syntax error. `---` (triple
+        # dash, no space) is NOT a valid MariaDB comment marker.
+        sys.stderr.write("\n-- Warnings --\n")
         for w in warnings:
-            sys.stderr.write(f"  {w}\n")
+            sys.stderr.write(f"-- {w}\n")
 
     return 0
 

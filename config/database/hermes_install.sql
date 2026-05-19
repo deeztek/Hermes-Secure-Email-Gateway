@@ -2946,9 +2946,6 @@ INSERT IGNORE INTO `timezones` VALUES (449,'Pacific/Wake');
 INSERT IGNORE INTO `timezones` VALUES (450,'Pacific/Wallis');
 INSERT IGNORE INTO `timezones` VALUES (451,'UTC');
 
---- Warnings ---
-  manifest entry for `mailaddr_temp` not found in dump
-
 -- -------- tls_policies                         [truncate] --------
 CREATE TABLE IF NOT EXISTS `tls_policies` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

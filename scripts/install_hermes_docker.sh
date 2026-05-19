@@ -42,7 +42,18 @@ HERMES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECRETS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/keys"
 CREDS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/creds"
 CONFIG_FILE="${HERMES_ROOT}/.hermes_install_config"
-LOG_FILE="/var/log/hermes_install_$(date +%Y%m%d_%H%M%S).log"
+
+# Install log location — kept ALONGSIDE the install script (under HERMES_ROOT)
+# rather than /var/log/. Reasons:
+#   - Self-locating script principle (#217): admin not pinned to a specific
+#     host directory layout, so log location follows the script too.
+#   - Easier to ship to support / attach to a bug report (one tar of the
+#     repo dir captures both code state + logs).
+#   - Doesn't require root just to read past logs.
+# Gitignored so log files never get accidentally committed.
+LOG_DIR="${HERMES_ROOT}/install-logs"
+mkdir -p "$LOG_DIR" 2>/dev/null || true
+LOG_FILE="${LOG_DIR}/hermes_install_$(date +%Y%m%d_%H%M%S).log"
 
 # State directory — per-step completion markers + persisted user inputs.
 # Lets the installer resume after a failure/cancel without re-asking for
