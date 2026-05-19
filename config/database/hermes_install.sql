@@ -3084,6 +3084,128 @@ CREATE TABLE IF NOT EXISTS `wblist` (
   PRIMARY KEY (`rid`,`sid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- ============================================================================
+-- AMAVIS SQL-BACKEND TABLES
+-- Amavisd-new lazily creates these on first SQL-backend write. On a Docker
+-- fresh install --init-db runs before any mail flows, so they don't exist
+-- yet and schema_updates.sql + CFML pages (view_message.cfm, view_message_history.cfm,
+-- shared_mailbox_actions.cfm, etc.) blow up referencing them. Pre-create
+-- here so amavis just reuses them on startup.
+-- ============================================================================
+
+-- -------- mailaddr (wblist sender addresses) --------
+CREATE TABLE IF NOT EXISTS `mailaddr` (
+  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `priority` int(11) NOT NULL DEFAULT 7,
+  `email` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `email` (`email`) USING BTREE
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- -------- maddr (amavis SQL-log address table) --------
+CREATE TABLE IF NOT EXISTS `maddr` (
+  `partition_tag` int(11) DEFAULT 0,
+  `id` bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+  `email` varbinary(255) NOT NULL,
+  `domain` varchar(255) NOT NULL,
+  `archive` char(1) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `part_email` (`partition_tag`,`email`) USING BTREE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- -------- msgs (amavis message log) --------
+CREATE TABLE IF NOT EXISTS `msgs` (
+  `partition_tag` int(11) NOT NULL DEFAULT 0,
+  `mail_id` varbinary(16) NOT NULL,
+  `secret_id` varbinary(16) DEFAULT '',
+  `am_id` varchar(20) NOT NULL,
+  `time_num` int(10) unsigned NOT NULL,
+  `time_iso` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `sid` bigint(20) unsigned NOT NULL,
+  `policy` varchar(255) DEFAULT '',
+  `client_addr` varchar(255) DEFAULT '',
+  `size` int(10) unsigned NOT NULL,
+  `originating` char(1) NOT NULL DEFAULT '',
+  `content` char(1) DEFAULT NULL,
+  `quar_type` char(1) DEFAULT NULL,
+  `quar_loc` varbinary(255) DEFAULT '',
+  `dsn_sent` char(1) DEFAULT NULL,
+  `spam_level` float DEFAULT NULL,
+  `message_id` varchar(255) DEFAULT '',
+  `from_addr` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin DEFAULT '',
+  `subject` varchar(255) CHARACTER SET utf8mb3 COLLATE utf8mb3_bin DEFAULT '',
+  `host` varchar(255) NOT NULL,
+  `archive` char(1) DEFAULT 'N',
+  PRIMARY KEY (`partition_tag`,`mail_id`),
+  KEY `msgs_idx_sid` (`sid`) USING BTREE,
+  KEY `msgs_idx_mess_id` (`message_id`) USING BTREE,
+  KEY `msgs_idx_time_num` (`time_num`) USING BTREE,
+  KEY `idx_msgs_time_iso` (`time_iso`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- -------- msgrcpt (amavis recipient log) --------
+CREATE TABLE IF NOT EXISTS `msgrcpt` (
+  `partition_tag` int(11) DEFAULT 0,
+  `mail_id` varbinary(16) NOT NULL,
+  `rseqnum` int(11) NOT NULL DEFAULT 0,
+  `rid` bigint(20) unsigned NOT NULL,
+  `is_local` char(1) NOT NULL DEFAULT '',
+  `content` char(1) NOT NULL DEFAULT '',
+  `ds` char(1) NOT NULL,
+  `rs` char(1) NOT NULL,
+  `bl` char(1) DEFAULT '',
+  `wl` char(1) DEFAULT '',
+  `bspam_level` float DEFAULT NULL,
+  `smtp_resp` varchar(255) DEFAULT '',
+  `archive` char(1) DEFAULT NULL,
+  `notification_sent` tinyint(3) NOT NULL DEFAULT 0,
+  KEY `mail_id` (`mail_id`) USING BTREE,
+  KEY `rid` (`rid`) USING BTREE,
+  KEY `idx_msgrcpt_notify` (`ds`,`notification_sent`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- ============================================================================
+-- OPERATIONAL SUPPORT TABLES
+-- Pre-created so first-touch CFML pages don't error on fresh installs.
+-- ============================================================================
+
+-- -------- postfix_queue (mail queue UI cache; populated by mail_queue_check.cfm from `mailq`) --------
+CREATE TABLE IF NOT EXISTS `postfix_queue` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `QueueID` varchar(255) DEFAULT '',
+  `Sender` varchar(255) DEFAULT '',
+  `Recipient` varchar(255) DEFAULT '',
+  `ConnectionStatus` varchar(255) DEFAULT NULL,
+  `MsgStatus` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- -------- recipients_temp (legacy bulk-staging; only touched by delete_internal_recipients.cfm cleanup DELETE) --------
+CREATE TABLE IF NOT EXISTS `recipients_temp` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `policy_id` int(11) DEFAULT NULL,
+  `recipient` varchar(255) DEFAULT NULL,
+  `recipient_id` int(11) DEFAULT NULL,
+  `status` varchar(255) DEFAULT NULL,
+  `applied` int(11) DEFAULT NULL,
+  `action` varchar(255) DEFAULT NULL,
+  `delete_id` int(11) DEFAULT NULL,
+  `pdf_enabled` int(11) DEFAULT NULL,
+  `smime_enabled` int(11) DEFAULT NULL,
+  `pgp_enabled` int(11) DEFAULT NULL,
+  `digital_sign` int(11) DEFAULT NULL,
+  `validity` varchar(255) DEFAULT NULL,
+  `encryption` varchar(255) DEFAULT NULL,
+  `algorithm` varchar(255) DEFAULT NULL,
+  `smime_password` varchar(255) DEFAULT NULL,
+  `smime_certificate_key` varchar(255) DEFAULT NULL,
+  `pfx_certificate_name` varchar(255) DEFAULT NULL,
+  `smime_certificate_request` varchar(255) DEFAULT NULL,
+  `smime_certificate_name` varchar(255) DEFAULT NULL,
+  `ca_id` int(11) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 
 -- ============================================================================
 -- End of hermes_install.sql

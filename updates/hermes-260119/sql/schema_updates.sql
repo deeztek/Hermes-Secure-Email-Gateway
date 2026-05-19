@@ -152,25 +152,10 @@ INSERT IGNORE INTO remoteauth_settings (setting_name, setting_value, description
 --   - ORDER BY time_iso DESC (sorting by date)
 -- ============================================================================
 
--- Conditional CREATE INDEX: skip cleanly if msgs table doesn't exist yet.
--- `msgs` is an amavis SQL-backend table that gets created the first time
--- amavis writes to the DB (after the container starts and processes mail).
--- On a fresh install, --init-db runs before any mail flow, so the table
--- doesn't exist yet. `CREATE INDEX IF NOT EXISTS` doesn't protect against
--- a missing TABLE, so we wrap in INFORMATION_SCHEMA check + prepared
--- statement. Re-runs of schema_updates.sql (after amavis has populated
--- the table) will then successfully create the index.
-DELIMITER //
-SET @msgs_exists = (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
-                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'msgs');
-SET @sql = IF(@msgs_exists > 0,
-    'CREATE INDEX IF NOT EXISTS idx_msgs_time_iso ON msgs(time_iso)',
-    'SELECT 1');
-PREPARE stmt FROM @sql;
-EXECUTE stmt;
-DEALLOCATE PREPARE stmt;
-//
-DELIMITER ;
+-- `msgs` is now pre-created in hermes_install.sql (with idx_msgs_time_iso
+-- already defined), so this is a no-op on fresh installs and an additive
+-- index creation on upgrades where amavis populated the table at runtime.
+CREATE INDEX IF NOT EXISTS idx_msgs_time_iso ON msgs(time_iso);
 
 -- ============================================================================
 -- INTRUSION PREVENTION TABLES: Fail2ban Management GUI
