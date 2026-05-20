@@ -545,6 +545,18 @@ wipe_install() {
     # Postfix mysql-*.cf files: glob-deleted (count varies per release).
     find "${HERMES_ROOT}/config/postfix-dkim/etc/postfix" -maxdepth 1 -name 'mysql-*.cf' -type f -delete 2>/dev/null || true
 
+    # Postfix lookup tables + compiled .db files: gitignored admin data,
+    # may contain prior-install info. Clear so fresh install starts clean.
+    # generate_postfix_main_cf() touches empty placeholders + CFML populates
+    # via the UI / on save.
+    local pf_dir="${HERMES_ROOT}/config/postfix-dkim/etc/postfix"
+    rm -f "${pf_dir}"/{transport,transport.BACK,virtual,bcc_maps,tls_policy,sender_access,relay_domains,relay_recipients,networks,amavis_senderbypass,postscreen_access.cidr,regexp_header_checks,relay_passwd,sasl_passwd,master.cf} 2>/dev/null || true
+    find "$pf_dir" -maxdepth 1 -name '*.db' -type f -delete 2>/dev/null || true
+
+    # CFML scratch dir: tmp/<random>_<purpose> files written at runtime
+    find "${HERMES_ROOT}/config/hermes/opt/hermes/tmp" -mindepth 1 -maxdepth 1 \
+        -not -name '.gitkeep' -delete 2>/dev/null || true
+
     # nginx per-mailbox-domain configs: CFML's mailbox-domains feature
     # generates <random>_hermes-mailbox-ssl.conf files into sites-available
     # whenever admin adds a mailbox domain. Wipe must clear these too or
@@ -1748,6 +1760,34 @@ generate_postfix_configs() {
         rendered=$((rendered + 1))
     done
     log "  + config/postfix-dkim/etc/postfix/mysql-*.cf (${rendered} files)"
+
+    # ---- Lookup-table placeholder files ----
+    # These files are gitignored (admin data managed by CFML or directly by
+    # admin). Touch empty placeholders so postfix doesn't log warnings on
+    # every lookup at startup. CFML's generate_*.cfm pages populate them
+    # later; admin's first save through the UI triggers postmap to build
+    # the .db hashmap files.
+    local lookup_tables=(
+        transport virtual bcc_maps tls_policy sender_access
+        relay_domains relay_recipients networks amavis_senderbypass
+        postscreen_access.cidr regexp_header_checks
+        relay_passwd sasl_passwd
+    )
+    local tbl
+    for tbl in "${lookup_tables[@]}"; do
+        local tpath="${target_dir}/${tbl}"
+        [[ -d "$tpath" ]] && rm -rf "$tpath"   # recover empty-dir bind-mount trap
+        if [[ ! -f "$tpath" ]]; then
+            touch "$tpath"
+            # relay_passwd and sasl_passwd carry credentials -- chmod 600
+            if [[ "$tbl" == "relay_passwd" || "$tbl" == "sasl_passwd" ]]; then
+                chmod 600 "$tpath"
+            else
+                chmod 644 "$tpath"
+            fi
+        fi
+    done
+    log "  + ${#lookup_tables[@]} postfix lookup-table placeholders touched"
     log "Postfix configs rendered"
 }
 

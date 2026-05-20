@@ -149,15 +149,48 @@ license-check-workflow.md
 config/hermes/var/www/html/schedule/*_ad_tasks.cfm
 
 # Temporary config files generated during operation
-config/hermes/opt/hermes/tmp/
+config/hermes/opt/hermes/tmp/*
+!config/hermes/opt/hermes/tmp/.gitkeep
 
 # Install log files (written by install_hermes_docker.sh)
 install-logs/
 
-# Postfix/Nginx config files with environment-specific data
+# Postfix/Nginx config files with environment-specific data.
+#
+# Three classes of postfix files are gitignored:
+#
+#   1. Rendered configs (install script + CFML write at runtime):
+#      main.cf, master.cf (note: master.cf.* variants ARE tracked -- they
+#      are framework templates the install/CFML picks from)
+#
+#   2. Admin-managed lookup tables (CFML generates from DB, or admin
+#      edits via UI). Real prod data must NEVER be committed:
+#      transport, transport.BACK, virtual, bcc_maps, tls_policy,
+#      sender_access, relay_domains, relay_recipients, networks,
+#      amavis_senderbypass, postscreen_access.cidr,
+#      regexp_header_checks, relay_passwd, sasl_passwd
+#
+#   3. Compiled hashmap .db files (postmap regenerates from .text source
+#      every time):
+#      *.db
 config/postfix-dkim/etc/postfix/main.cf
 config/postfix-dkim/etc/postfix/main.cf.*
+config/postfix-dkim/etc/postfix/master.cf
+config/postfix-dkim/etc/postfix/transport
+config/postfix-dkim/etc/postfix/transport.BACK
+config/postfix-dkim/etc/postfix/virtual
+config/postfix-dkim/etc/postfix/bcc_maps
+config/postfix-dkim/etc/postfix/tls_policy
+config/postfix-dkim/etc/postfix/sender_access
+config/postfix-dkim/etc/postfix/relay_domains
+config/postfix-dkim/etc/postfix/relay_recipients
 config/postfix-dkim/etc/postfix/networks
+config/postfix-dkim/etc/postfix/amavis_senderbypass
+config/postfix-dkim/etc/postfix/postscreen_access.cidr
+config/postfix-dkim/etc/postfix/regexp_header_checks
+config/postfix-dkim/etc/postfix/relay_passwd
+config/postfix-dkim/etc/postfix/sasl_passwd
+config/postfix-dkim/etc/postfix/*.db
 config/nginx/etc/nginx/sites-available/hermes-ssl.conf
 config/nginx/etc/nginx/sites-available/hermes-ssl.*
 # CFML mailbox-domains feature generates <random>_hermes-mailbox-ssl.conf
