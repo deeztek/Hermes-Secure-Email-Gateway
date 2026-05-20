@@ -1820,6 +1820,20 @@ generate_nginx_config() {
     chmod 644 "$site_target"
     log "  + config/nginx/etc/nginx/sites-available/hermes-ssl.conf"
 
+    # Symlink sites-available -> sites-enabled so nginx actually loads
+    # the vhost. Without this, nginx starts with no enabled sites, accepts
+    # TCP connections on :80/:443, then immediately RSTs because no
+    # server block matches the request (no error in error.log because
+    # the conn never gets far enough to be classified). Relative path so
+    # the symlink resolves correctly when bind-mounted into the container
+    # at /etc/nginx/sites-{available,enabled}/.
+    local enabled_dir="${HERMES_ROOT}/config/nginx/etc/nginx/sites-enabled"
+    mkdir -p "$enabled_dir"
+    local enabled_link="${enabled_dir}/hermes-ssl.conf"
+    [[ -e "$enabled_link" || -L "$enabled_link" ]] && rm -f "$enabled_link"
+    ln -s "../sites-available/hermes-ssl.conf" "$enabled_link"
+    log "  + config/nginx/etc/nginx/sites-enabled/hermes-ssl.conf (-> ../sites-available/)"
+
     # auth.conf snippet (single placeholder)
     [[ -e "$auth_target" ]] && rm -rf "$auth_target"
     sed -e "s|hermes_console_host|${hermes_hostname}|g" "$auth_template" > "$auth_target"
