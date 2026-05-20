@@ -1761,6 +1761,21 @@ generate_postfix_configs() {
     done
     log "  + config/postfix-dkim/etc/postfix/mysql-*.cf (${rendered} files)"
 
+    # ---- master.cf: copy canonical from conf_files/ ----
+    # No placeholders -- literal copy. Tracked variants like master.cf.dkim,
+    # master.cf.postscreen are alternative templates the admin can swap in
+    # by hand or via CFML; postscreen-enabled topology is the canonical.
+    local master_template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/master.cf"
+    local master_target="${target_dir}/master.cf"
+    if [[ -f "$master_template" ]]; then
+        [[ -e "$master_target" ]] && rm -rf "$master_target"
+        cp "$master_template" "$master_target"
+        chmod 644 "$master_target"
+        log "  + config/postfix-dkim/etc/postfix/master.cf"
+    else
+        error "Postfix canonical master.cf template missing: $master_template"
+    fi
+
     # ---- Lookup-table placeholder files ----
     # These files are gitignored (admin data managed by CFML or directly by
     # admin). Touch empty placeholders so postfix doesn't log warnings on
