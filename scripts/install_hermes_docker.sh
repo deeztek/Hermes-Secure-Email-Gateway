@@ -2497,10 +2497,14 @@ initialize_ldap() {
     # that mapping admin privilege. No password needed.
     local LDAPI_URI="ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi"
 
-    # Wait for OpenLDAP to be ready (container is named hermes_ldap per compose)
+    # Wait for OpenLDAP to be ready (container is named hermes_ldap per compose).
+    # Probe by exit code: root DSE search succeeds (exit 0) only when slapd
+    # is accepting binds. Earlier versions grepped for `namingContexts` but
+    # that's an operational attribute -- not returned by default and the
+    # grep always failed regardless of slapd state.
     log "Waiting for OpenLDAP to be ready..."
     for i in {1..30}; do
-        if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "" -s base "(objectClass=*)" 2>/dev/null | grep -q "namingContexts"; then
+        if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "" -s base "(objectClass=*)" >/dev/null 2>&1; then
             log "OpenLDAP is ready"
             break
         fi
@@ -2511,8 +2515,9 @@ initialize_ldap() {
     done
 
     # Check if base structure already exists (SASL EXTERNAL via socket; no
-    # cn=admin bind needed because root-via-socket already has admin rights)
-    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "ou=users,dc=hermes,dc=local" -s base "(objectClass=*)" 2>/dev/null | grep -q "ou=users"; then
+    # cn=admin bind needed because root-via-socket already has admin rights).
+    # ldapsearch returns 0 if entry exists, 32 (No such object) if not.
+    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "ou=users,dc=hermes,dc=local" -s base "(objectClass=*)" >/dev/null 2>&1; then
         log "LDAP base structure already exists"
         return
     fi
