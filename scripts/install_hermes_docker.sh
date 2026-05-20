@@ -857,7 +857,139 @@ preflight_checks() {
         log "Disk space: ${AVAILABLE_DISK}GB available"
     fi
 
+    # Outbound DNS reachability — Hermes runs an internal unbound resolver
+    # (hermes_unbound) that performs FULL RECURSIVE resolution against the
+    # public DNS root servers. This requires outbound UDP/53 + TCP/53 to be
+    # OPEN at the host firewall AND any upstream perimeter (corporate
+    # firewall, cloud security group, ISP NAT). Without it:
+    #   - commandbox can't download Lucee from forgebox.io (install fatal)
+    #   - Postfix can't do MX lookups (mail flow broken)
+    #   - SpamAssassin/Amavis RBL queries fail
+    # Test now from the host before we commit to anything else. If this
+    # fails the install will fail later in --init-db with a clearer error,
+    # but we surface it here so the admin can fix it before generating
+    # secrets / rendering configs.
+    log "Checking outbound DNS reachability (UDP 53 to public resolvers)..."
+    if command -v dig &>/dev/null; then
+        if dig +time=3 +tries=1 @1.1.1.1 www.forgebox.io >/dev/null 2>&1; then
+            log "Outbound DNS: OK (UDP/53 reachable)"
+        else
+            warn "Outbound DNS test to 1.1.1.1 failed. UDP/TCP port 53 MUST"
+            warn "be open outbound at the host firewall and the network"
+            warn "perimeter, or the install will fail when commandbox tries"
+            warn "to download Lucee. If your network blocks 53, you can"
+            warn "enable upstream forwarders in"
+            warn "config/unbound/conf.d/forward.conf after this script finishes."
+        fi
+    elif command -v nslookup &>/dev/null; then
+        if nslookup -timeout=3 www.forgebox.io 1.1.1.1 >/dev/null 2>&1; then
+            log "Outbound DNS: OK (UDP/53 reachable)"
+        else
+            warn "Outbound DNS test to 1.1.1.1 failed -- see above"
+        fi
+    else
+        warn "Neither dig nor nslookup available -- can't pre-verify outbound DNS"
+    fi
+
     log "Pre-flight checks completed"
+}
+
+# ============================================================================
+# PREFLIGHT DNS CHECK (phase 2 / --init-db)
+# ============================================================================
+# All Hermes containers route DNS through hermes_unbound at ${IPV4SUBNET}.117.
+# If unbound isn't running, or can't perform recursive resolution, every
+# container that needs external DNS (commandbox downloading Lucee from
+# forgebox.io, Authelia/Nextcloud reaching update repos, postfix doing
+# MX lookups, etc.) fails. The failures are often opaque ("Temporary
+# failure in name resolution", "Unknown host") and the user wastes time
+# chasing the symptom container instead of the root cause.
+#
+# Run this BEFORE any --init-db work so the user gets a clean,
+# actionable error instead of an opaque failure deep in the install.
+preflight_dns_check() {
+    header "Preflight: DNS Resolver Health Check"
+
+    local subnet
+    subnet=$(grep -E '^IPV4SUBNET=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    subnet="${subnet:-172.16.32}"
+
+    # 1. Is hermes_unbound running?
+    local unbound_status
+    unbound_status=$(docker inspect -f '{{.State.Status}}' hermes_unbound 2>/dev/null)
+    if [[ "$unbound_status" != "running" ]]; then
+        cat <<EOF >&2
+
+[FATAL] hermes_unbound container is not running (status: ${unbound_status:-not found})
+
+All Hermes containers route DNS through hermes_unbound at ${subnet}.117.
+Without it, commandbox can't download Lucee from forgebox.io and the
+admin UI never starts.
+
+Check:
+  docker logs hermes_unbound
+  docker compose up -d hermes_unbound
+  docker compose ps
+
+EOF
+        error "Unbound DNS resolver not running"
+        return 1
+    fi
+    log "hermes_unbound container is running"
+
+    # 2. Can a typical container resolve an external hostname via unbound?
+    # Use hermes_db_server as the probe -- it's configured with unbound as
+    # its DNS resolver (per compose), so this exercises the full container
+    # -> unbound -> recursive-lookup path. We only need the container to be
+    # RUNNING (libc + getent) -- MariaDB itself doesn't have to be ready.
+    local db_status
+    db_status=$(docker inspect -f '{{.State.Status}}' hermes_db_server 2>/dev/null)
+    if [[ "$db_status" != "running" ]]; then
+        error "hermes_db_server is not running (status: ${db_status:-not found}) -- can't probe DNS path. Run 'docker compose up -d' first."
+        return 1
+    fi
+
+    local test_host="www.forgebox.io"
+    log "Resolving ${test_host} via unbound (exercises recursive path)..."
+    if docker exec hermes_db_server getent hosts "$test_host" >/dev/null 2>&1; then
+        log "External DNS resolution working"
+        return 0
+    fi
+
+    # Failed. Give an actionable error message.
+    cat <<EOF >&2
+
+[FATAL] DNS resolution failed -- container cannot resolve ${test_host}
+
+hermes_unbound is running but its recursive resolver isn't returning
+answers for external hostnames. commandbox will fail to download Lucee
+from forgebox.io, and the Hermes admin UI will never start.
+
+Most likely causes:
+
+  1. Outbound port 53 (DNS) blocked by host firewall / network policy.
+     Unbound performs full recursive resolution against the DNS root
+     servers; some networks block this.
+
+     Workaround: enable upstream forwarders. Edit
+     config/unbound/conf.d/forward.conf and uncomment the
+     forward-zone block with public resolvers (1.1.1.1, 8.8.8.8),
+     then:
+       docker compose restart hermes_unbound
+     and re-run --init-db.
+
+  2. DNSSEC validation failing on root anchor or recursive query
+     errors. Check unbound logs:
+       docker logs --tail 50 hermes_unbound
+
+  3. Host has no outbound DNS at all. Test from the host:
+       dig @1.1.1.1 ${test_host}    # should succeed
+     If this fails, fix host networking first.
+
+EOF
+    error "DNS preflight check failed"
+    return 1
 }
 
 # ============================================================================
@@ -2739,6 +2871,12 @@ case "${1:-}" in
             error "Host IP not in state. Run phase 1 first: ./install_hermes_docker.sh"
         fi
         log "Resolved host IP from state: ${HERMES_HOST_IP}"
+
+        # Fail fast if the container DNS path is broken. Without this check
+        # the user hits opaque downstream failures: commandbox can't pull
+        # Lucee, ofelia can't resolve hermes_postfix_dkim, etc. Not
+        # state-guarded -- DNS health can change between --init-db runs.
+        preflight_dns_check
 
         if state_is_done "06-databases-created"; then
             log "Skip: databases already created"
