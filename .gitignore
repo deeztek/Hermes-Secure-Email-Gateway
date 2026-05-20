@@ -160,8 +160,10 @@ install-logs/
 # Three classes of postfix files are gitignored:
 #
 #   1. Rendered configs (install script + CFML write at runtime):
-#      main.cf, master.cf (note: master.cf.* variants ARE tracked -- they
-#      are framework templates the install/CFML picks from)
+#      main.cf only. (master.cf is tracked: zero placeholders, no CFML
+#      writes -- it's a pure framework file like dynamicmaps.cf etc.
+#      The .dkim/.non-dkim/.postscreen variants ARE tracked too as
+#      alternative framework topologies admin can swap in.)
 #
 #   2. Admin-managed lookup tables (CFML generates from DB, or admin
 #      edits via UI). Real prod data must NEVER be committed:
@@ -175,7 +177,6 @@ install-logs/
 #      *.db
 config/postfix-dkim/etc/postfix/main.cf
 config/postfix-dkim/etc/postfix/main.cf.*
-config/postfix-dkim/etc/postfix/master.cf
 config/postfix-dkim/etc/postfix/transport
 config/postfix-dkim/etc/postfix/transport.BACK
 config/postfix-dkim/etc/postfix/virtual

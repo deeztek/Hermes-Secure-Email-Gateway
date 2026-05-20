@@ -550,7 +550,7 @@ wipe_install() {
     # generate_postfix_main_cf() touches empty placeholders + CFML populates
     # via the UI / on save.
     local pf_dir="${HERMES_ROOT}/config/postfix-dkim/etc/postfix"
-    rm -f "${pf_dir}"/{transport,transport.BACK,virtual,bcc_maps,tls_policy,sender_access,relay_domains,relay_recipients,networks,amavis_senderbypass,postscreen_access.cidr,regexp_header_checks,relay_passwd,sasl_passwd,master.cf} 2>/dev/null || true
+    rm -f "${pf_dir}"/{transport,transport.BACK,virtual,bcc_maps,tls_policy,sender_access,relay_domains,relay_recipients,networks,amavis_senderbypass,postscreen_access.cidr,regexp_header_checks,relay_passwd,sasl_passwd} 2>/dev/null || true
     find "$pf_dir" -maxdepth 1 -name '*.db' -type f -delete 2>/dev/null || true
 
     # CFML scratch dir: tmp/<random>_<purpose> files written at runtime
@@ -1761,20 +1761,10 @@ generate_postfix_configs() {
     done
     log "  + config/postfix-dkim/etc/postfix/mysql-*.cf (${rendered} files)"
 
-    # ---- master.cf: copy canonical from conf_files/ ----
-    # No placeholders -- literal copy. Tracked variants like master.cf.dkim,
-    # master.cf.postscreen are alternative templates the admin can swap in
-    # by hand or via CFML; postscreen-enabled topology is the canonical.
-    local master_template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/master.cf"
-    local master_target="${target_dir}/master.cf"
-    if [[ -f "$master_template" ]]; then
-        [[ -e "$master_target" ]] && rm -rf "$master_target"
-        cp "$master_template" "$master_target"
-        chmod 644 "$master_target"
-        log "  + config/postfix-dkim/etc/postfix/master.cf"
-    else
-        error "Postfix canonical master.cf template missing: $master_template"
-    fi
+    # master.cf is tracked directly at the render-target path (no
+    # placeholders, no CFML writes -- it's a pure framework file).
+    # Nothing to render here. .dkim/.non-dkim/.postscreen variants are
+    # tracked as alternatives admins can swap in by hand.
 
     # ---- Lookup-table placeholder files ----
     # These files are gitignored (admin data managed by CFML or directly by
