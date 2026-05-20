@@ -2323,15 +2323,29 @@ configure_ciphermail_portal_url() {
     portal_url="https://${hermes_hostname}/web/portal"
 
     log "Setting user.portal.baseURL = ${portal_url} (global)..."
-    if ! docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' \
-            mitm.application.djigzo.tools.CLITool \
-            --set-property user.portal.baseURL --value "$portal_url" --global \
-            >>"$LOG_FILE" 2>&1; then
-        warn "Failed to set ciphermail user.portal.baseURL -- container may still be initializing"
-        return 0
-    fi
-
-    log "Ciphermail user.portal.baseURL configured"
+    # CipherMail's Tomcat + Spring + Hibernate startup takes 30-90s on fresh
+    # installs (especially first boot when Hibernate initializes against the
+    # freshly-imported djigzo schema). Retry the CLITool call with backoff
+    # rather than failing the install -- the property must be set or the
+    # admin "CipherMail" link breaks and encryption-notification URLs are
+    # malformed.
+    local attempts=0
+    local max_attempts=20   # 20 * 5s = 100s total
+    while (( attempts < max_attempts )); do
+        if docker exec hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' \
+                mitm.application.djigzo.tools.CLITool \
+                --set-property user.portal.baseURL --value "$portal_url" --global \
+                >>"$LOG_FILE" 2>&1; then
+            log "Ciphermail user.portal.baseURL configured"
+            return 0
+        fi
+        attempts=$((attempts + 1))
+        if (( attempts < max_attempts )); then
+            sleep 5
+        fi
+    done
+    warn "Failed to set ciphermail user.portal.baseURL after ${max_attempts} attempts -- run --init-db again once hermes_ciphermail is fully started"
+    return 0
 }
 
 # ============================================================================
