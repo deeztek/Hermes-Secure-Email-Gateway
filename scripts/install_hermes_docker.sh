@@ -452,9 +452,12 @@ wipe_install() {
         echo "The mount directories themselves are kept; only their CONTENTS"
         echo "are removed."
         echo ""
+        echo "  [1] Skip — keep mount-point contents (default)"
+        echo "  [2] Wipe mount-point contents"
+        echo ""
         local confirm_data
-        read -p "Type WIPE-DATA to wipe mount-point contents (or Enter to skip): " confirm_data
-        if [[ "$confirm_data" == "WIPE-DATA" ]]; then
+        read -p "Choice [1]: " confirm_data
+        if [[ "$confirm_data" == "2" ]]; then
             for mnt in "$data_mount" "$vmail_mount" "$files_mount"; do
                 [[ -z "$mnt" ]] && continue
                 [[ ! -d "$mnt" ]] && continue
@@ -524,14 +527,15 @@ detect_previous_install() {
             echo "/mnt/files). Required for fresh-install testing; skip if you"
             echo "want to preserve mail/files."
             echo ""
-            local confirm
-            read -p "Type the word WIPE to confirm: " confirm
-            if [[ "$confirm" == "WIPE" ]]; then
-                wipe_install
-            else
-                echo "Wipe not confirmed. Exiting."
-                exit 1
-            fi
+            echo "  [1] Cancel (default)"
+            echo "  [2] Yes, wipe everything"
+            echo ""
+            local wipe_choice
+            read -p "Choice [1]: " wipe_choice
+            case "${wipe_choice:-1}" in
+                2) wipe_install ;;
+                *) echo "Wipe not confirmed. Exiting."; exit 1 ;;
+            esac
             ;;
         3)
             echo "Cancelled."
@@ -1731,6 +1735,50 @@ generate_self_signed_cert() {
 }
 
 # ============================================================================
+# DOVECOT MAIL-CRYPT KEY PLACEHOLDERS
+# ============================================================================
+# docker-compose bind-mounts /opt/hermes/keys/ec{pub,priv}key.pem as individual
+# files into hermes_dovecot. On a fresh install these files don't exist, so
+# Docker auto-creates EMPTY DIRECTORIES at those host paths and Dovecot dies
+# with "Is a directory" reading the key. Touch empty placeholder files so the
+# bind mounts resolve as files. The dovecot.conf template only emits the
+# crypt_global_public_key_file directive when a real PEM key is present (the
+# CFML inc/generate_dovecot_configuration.cfm checks for the BEGIN marker;
+# install-time bootstrap render leaves the line empty), so an empty placeholder
+# is safe. Admin generates the real keys via
+# inc/generate_mail_crypt_keys.cfm when enabling mail encryption.
+ensure_dovecot_key_placeholders() {
+    header "Ensuring Dovecot Mail-Crypt Key Placeholders"
+
+    local keys_dir="/opt/hermes/keys"
+    local privkey="${keys_dir}/ecprivkey.pem"
+    local pubkey="${keys_dir}/ecpubkey.pem"
+
+    mkdir -p "$keys_dir"
+
+    # If the path exists but is a directory (the empty-dir-trap state from a
+    # failed prior install), remove it before touching the placeholder file.
+    [[ -d "$privkey" ]] && rmdir "$privkey" 2>/dev/null
+    [[ -d "$pubkey"  ]] && rmdir "$pubkey"  2>/dev/null
+
+    if [[ ! -f "$privkey" ]]; then
+        touch "$privkey"
+        chmod 600 "$privkey"
+        log "  + ${privkey} (empty placeholder)"
+    else
+        log "  = ${privkey} already exists (kept)"
+    fi
+
+    if [[ ! -f "$pubkey" ]]; then
+        touch "$pubkey"
+        chmod 644 "$pubkey"
+        log "  + ${pubkey} (empty placeholder)"
+    else
+        log "  = ${pubkey} already exists (kept)"
+    fi
+}
+
+# ============================================================================
 # RENDER DOVECOT dovecot.conf
 # ============================================================================
 
@@ -1788,6 +1836,7 @@ generate_dovecot_config() {
     sed \
         -e "s|^hermes_log_debug_line$||" \
         -e "s|^hermes_compress_level_line$||" \
+        -e "s|^hermes_crypt_pubkey_line$||" \
         -e "s|^hermes_crypt_write_algorithm_line$|crypt_write_algorithm = ecdh-aes-256-gcm-sha256|" \
         -e "s|^[[:space:]]*hermes_acl_dict_block[[:space:]]*$||" \
         -e "s|^hermes_acl_config_block$||" \
@@ -2369,10 +2418,10 @@ configure_authelia_mysql() {
 initialize_ldap() {
     header "Initializing LDAP Directory"
 
-    # Wait for OpenLDAP to be ready
+    # Wait for OpenLDAP to be ready (container is named hermes_ldap per compose)
     log "Waiting for OpenLDAP to be ready..."
     for i in {1..30}; do
-        if docker exec hermes_openldap ldapsearch -x -H ldap://localhost -b "" -s base "(objectclass=*)" 2>/dev/null | grep -q "namingContexts"; then
+        if docker exec hermes_ldap ldapsearch -x -H ldap://localhost -b "" -s base "(objectclass=*)" 2>/dev/null | grep -q "namingContexts"; then
             log "OpenLDAP is ready"
             break
         fi
@@ -2384,7 +2433,7 @@ initialize_ldap() {
 
     # Check if base structure already exists
     LDAP_ADMIN_PASS=$(cat "${CREDS_DIR}/ldap_admin_password")
-    if docker exec hermes_openldap ldapsearch -x -H ldap://localhost -D "cn=admin,dc=hermes,dc=local" -w "$LDAP_ADMIN_PASS" -b "ou=users,dc=hermes,dc=local" "(objectClass=*)" 2>/dev/null | grep -q "ou=users"; then
+    if docker exec hermes_ldap ldapsearch -x -H ldap://localhost -D "cn=admin,dc=hermes,dc=local" -w "$LDAP_ADMIN_PASS" -b "ou=users,dc=hermes,dc=local" "(objectClass=*)" 2>/dev/null | grep -q "ou=users"; then
         log "LDAP base structure already exists"
         return
     fi
@@ -2442,14 +2491,17 @@ main() {
         echo "  https://docs.hermesseg.io/books/hermes-secure-email-gateway-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula"
         echo ""
         echo "You must agree to the terms set forth by the EULA before"
-        echo "continuing. Type the word ACCEPT to agree; anything else exits."
+        echo "continuing."
         echo ""
-        local eula_reply
-        read -p "Type ACCEPT to agree: " eula_reply
-        if [[ "$eula_reply" != "ACCEPT" ]]; then
-            echo "EULA not accepted. Installation cancelled."
-            exit 0
-        fi
+        echo "  [1] Accept the EULA and continue"
+        echo "  [2] Decline and exit (default)"
+        echo ""
+        local eula_choice
+        read -p "Choice [2]: " eula_choice
+        case "${eula_choice:-2}" in
+            1) ;;
+            *) echo "EULA not accepted. Installation cancelled."; exit 0 ;;
+        esac
         state_mark_done "00-eula-accepted"
         log "EULA accepted"
     fi
@@ -2529,6 +2581,7 @@ main() {
     generate_opendkim_tables
     generate_commandbox_password_file
     generate_mailname_config
+    ensure_dovecot_key_placeholders
     generate_dovecot_config
     generate_dovecot_lua_config
 
@@ -2865,14 +2918,20 @@ case "${1:-}" in
         echo "/ VMAIL_MOUNT / FILES_MOUNT). Required for fresh-install"
         echo "testing; skip if you want to preserve mail/files."
         echo ""
-        read -p "Type the word WIPE to confirm: " confirm
-        if [[ "$confirm" == "WIPE" ]]; then
-            wipe_install
-            echo "Wipe complete. Re-run the installer to start fresh."
-        else
-            echo "Wipe not confirmed. Exiting."
-            exit 1
-        fi
+        echo "  [1] Cancel (default)"
+        echo "  [2] Yes, wipe everything"
+        echo ""
+        read -p "Choice [1]: " confirm
+        case "${confirm:-1}" in
+            2)
+                wipe_install
+                echo "Wipe complete. Re-run the installer to start fresh."
+                ;;
+            *)
+                echo "Wipe not confirmed. Exiting."
+                exit 1
+                ;;
+        esac
         ;;
     --help|-h)
         echo "Hermes SEG Docker Installation Script"
