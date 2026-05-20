@@ -1400,13 +1400,25 @@ generate_postfix_configs() {
     local main_target="${target_dir}/main.cf"
     if [[ -f "$main_template" ]]; then
         [[ -e "$main_target" ]] && rm -rf "$main_target"
+        # Postfix rejects bare IPs for myhostname (must be FQDN-form;
+        # `postmulti[N]: fatal: parameter myhostname: bad parameter value`).
+        # When HERMES_HOSTNAME is a bare IP -- the install default before
+        # admin sets a real hostname -- substitute a placeholder FQDN for
+        # postfix only. CFML's generate_postfix_configuration.cfm rewrites
+        # this on first save from the System Settings UI.
+        local postfix_hostname="$hermes_hostname"
+        local postfix_origin="$server_domain"
+        if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            postfix_hostname="mail.local"
+            postfix_origin="local"
+        fi
         # TLS cert paths point at the self-signed bootstrap cert generated
         # by generate_self_signed_cert() -- same one nginx uses. Admin
         # uploads a real cert via the System Certificates UI; CFML's
         # generate_postfix_configuration.cfm postconf's the live paths.
         sed \
-            -e "s|^myhostname = .*|myhostname = ${hermes_hostname}|" \
-            -e "s|^myorigin = .*|myorigin = ${server_domain}|" \
+            -e "s|^myhostname = .*|myhostname = ${postfix_hostname}|" \
+            -e "s|^myorigin = .*|myorigin = ${postfix_origin}|" \
             -e "s|^mynetworks = .*|mynetworks = 127.0.0.1, ${ipv4_subnet}.0/24|" \
             -e "s|^smtpd_tls_cert_file = .*|smtpd_tls_cert_file = /opt/hermes/ssl/bootstrap_hermes.pem|" \
             -e "s|^smtpd_tls_key_file = .*|smtpd_tls_key_file = /opt/hermes/ssl/bootstrap_hermes.key|" \
@@ -1582,8 +1594,12 @@ generate_opendkim_tables() {
         | cut -d= -f2- | tr -d '"' | tr -d "'")
     ipv4_subnet="${ipv4_subnet:-172.16.32}"
 
-    # KeyTable + SigningTable: empty stubs (no domains configured yet).
-    for f in KeyTable SigningTable; do
+    # KeyTable + SigningTable + ExemptDomains: empty stubs.
+    # ExemptDomains is referenced as `refile:/opt/hermes/dkim/ExemptDomains`
+    # by both opendkim.conf and opendkim-sign.conf -- if the file is missing,
+    # opendkim logs `dkimf_db_open(): No such file or directory` (noise, not
+    # fatal, but clutters logs).
+    for f in KeyTable SigningTable ExemptDomains; do
         local target="${dkim_dir}/${f}"
         [[ -e "$target" ]] && rm -rf "$target"
         : > "$target"
