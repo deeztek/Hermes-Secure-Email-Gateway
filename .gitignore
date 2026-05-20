@@ -160,6 +160,16 @@ config/postfix-dkim/etc/postfix/main.cf.*
 config/postfix-dkim/etc/postfix/networks
 config/nginx/etc/nginx/sites-available/hermes-ssl.conf
 config/nginx/etc/nginx/sites-available/hermes-ssl.*
+# CFML mailbox-domains feature generates <random>_hermes-mailbox-ssl.conf
+# per mailbox domain (e.g. Tf2gwPQp_hermes-mailbox-ssl.conf) into
+# sites-available. Generated at runtime by view_mailbox_domains.cfm /
+# inc/generate_nginx_configuration.cfm -- must never be tracked.
+config/nginx/etc/nginx/sites-available/*_hermes-mailbox-ssl.conf
+# sites-enabled: install script symlinks hermes-ssl.conf into here at
+# bootstrap; CFML enables per-mailbox-domain configs at runtime. Track
+# the dir itself (.gitkeep) but ignore all contents.
+config/nginx/etc/nginx/sites-enabled/*
+!config/nginx/etc/nginx/sites-enabled/.gitkeep
 
 # CFML write-time backups (each generate_*.cfm copies the live file to
 # <name>.HERMES before re-rendering). Canonical templates live separately
