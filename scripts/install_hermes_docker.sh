@@ -1162,10 +1162,21 @@ generate_amavis_50user_config() {
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
 
-    # Split hostname into name + domain: smtp.example.com -> smtp / example.com
+    # Split hostname into name + domain: smtp.example.com -> smtp / example.com.
+    # Bare-IP HERMES_HOSTNAME (the install default before admin sets a real
+    # hostname) would split into nonsense like 192 / 168.30.18 -- substitute
+    # the Hermes-canonical placeholder so amavis sees a sane SERVER-NAME /
+    # SERVER-DOMAIN. CFML's amavis re-render rewrites these on first save.
+    # Same approach as postfix's myhostname handling per
+    # [[feedback-demo-data-domain]].
     local server_name server_domain
-    server_name="${hermes_hostname%%.*}"
-    server_domain="${hermes_hostname#*.}"
+    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        server_name="smtp"
+        server_domain="domain.tld"
+    else
+        server_name="${hermes_hostname%%.*}"
+        server_domain="${hermes_hostname#*.}"
+    fi
 
     # Recover from Docker's empty-dir-at-missing-source failure mode.
     [[ -e "$target" ]] && rm -rf "$target"
@@ -1291,7 +1302,16 @@ generate_authelia_config() {
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
     # Domain portion (after the first dot) for the SMTP From address.
-    local server_domain="${hermes_hostname#*.}"
+    # Bare-IP HERMES_HOSTNAME would split into nonsense like 168.30.18 and
+    # produce `no-reply@168.30.18` (technically valid but ugly). Use the
+    # Hermes-canonical placeholder per [[feedback-demo-data-domain]];
+    # admin can change once a real hostname is configured.
+    local server_domain
+    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        server_domain="domain.tld"
+    else
+        server_domain="${hermes_hostname#*.}"
+    fi
 
     mkdir -p "$target_dir"
     [[ -e "$target" ]] && rm -rf "$target"
@@ -1375,13 +1395,21 @@ generate_postfix_configs() {
     ipv4_subnet=$(grep -E '^IPV4SUBNET=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
     ipv4_subnet="${ipv4_subnet:-172.16.32}"
-    server_domain="${hermes_hostname#*.}"
 
     if [[ -z "$hermes_user" || -z "$hermes_pass" ]]; then
         error "hermes DB credentials missing in ${CREDS_DIR}/ -- run generate_secrets first"
     fi
     if [[ -z "$hermes_hostname" ]]; then
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
+    fi
+
+    # Domain portion. Bare-IP HERMES_HOSTNAME would split into nonsense
+    # (e.g. 168.30.18). Use Hermes-canonical placeholder per
+    # [[feedback-demo-data-domain]]; admin overrides via UI.
+    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        server_domain="domain.tld"
+    else
+        server_domain="${hermes_hostname#*.}"
     fi
 
     # ---- main.cf: render from CANONICAL template ----
@@ -1403,14 +1431,16 @@ generate_postfix_configs() {
         # Postfix rejects bare IPs for myhostname (must be FQDN-form;
         # `postmulti[N]: fatal: parameter myhostname: bad parameter value`).
         # When HERMES_HOSTNAME is a bare IP -- the install default before
-        # admin sets a real hostname -- substitute a placeholder FQDN for
-        # postfix only. CFML's generate_postfix_configuration.cfm rewrites
-        # this on first save from the System Settings UI.
+        # admin sets a real hostname -- substitute the Hermes-canonical
+        # placeholder (smtp.domain.tld; matches the demo-data convention
+        # per [[feedback-demo-data-domain]]) for postfix only. CFML's
+        # generate_postfix_configuration.cfm rewrites this on first save
+        # from the System Settings UI.
         local postfix_hostname="$hermes_hostname"
         local postfix_origin="$server_domain"
         if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            postfix_hostname="mail.local"
-            postfix_origin="local"
+            postfix_hostname="smtp.domain.tld"
+            postfix_origin="domain.tld"
         fi
         # TLS cert paths point at the self-signed bootstrap cert generated
         # by generate_self_signed_cert() -- same one nginx uses. Admin
@@ -2122,15 +2152,27 @@ seed_install_specific_values() {
         return 0
     fi
 
-    local pass hermes_hostname server_name server_domain
+    local pass hermes_hostname server_name server_domain postfix_hostname
     pass=$(cat "${CREDS_DIR}/mysql_root_password")
     hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
     hermes_hostname="${hermes_hostname:-${ip}}"
-    server_name="${hermes_hostname%%.*}"
-    server_domain="${hermes_hostname#*.}"
-    # If hostname is bare IP (HERMES_HOSTNAME defaults to IP at install),
-    # both halves end up the same — that's fine; admin changes via UI.
+    # Bare-IP HERMES_HOSTNAME (install default before admin sets a real FQDN)
+    # would split into nonsense like 192 / 168.30.18 and would also fail
+    # postfix's valid_hostname() check on myhostname (must be FQDN-form).
+    # Substitute the Hermes-canonical placeholder per
+    # [[feedback-demo-data-domain]]. Mirrored in generate_postfix_main_cf
+    # and generate_amavis_50user_config so all three landings agree.
+    # Admin changes via System Settings UI once a real hostname is configured.
+    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        server_name="smtp"
+        server_domain="domain.tld"
+        postfix_hostname="smtp.domain.tld"
+    else
+        server_name="${hermes_hostname%%.*}"
+        server_domain="${hermes_hostname#*.}"
+        postfix_hostname="$hermes_hostname"
+    fi
 
     # server_ip (module='network') — view_server_setup.cfm reads this row.
     # Pre-correction: rule used module='console' (typo), missed the row.
@@ -2160,12 +2202,13 @@ seed_install_specific_values() {
 
     # Postfix myorigin + myhostname child rows in parameters table.
     # view_server_setup.cfm reads these; generate_postfix_configuration.cfm
-    # postconf's main.cf from these values on Save.
-    log "Writing parameters.myorigin = ${server_domain} / myhostname = ${hermes_hostname}..."
+    # postconf's main.cf from these values on Save. Use postfix_hostname
+    # (sanitized above) -- bare-IP would fail postfix's valid_hostname().
+    log "Writing parameters.myorigin = ${server_domain} / myhostname = ${postfix_hostname}..."
     docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters SET parameter='${server_domain}'
          WHERE parent_name='myorigin' AND child=1 AND module='postfix' AND conf_file='main.cf';
-        UPDATE parameters SET parameter='${hermes_hostname}'
+        UPDATE parameters SET parameter='${postfix_hostname}'
          WHERE parent_name='myhostname' AND child=1 AND module='postfix' AND conf_file='main.cf';
     " 2>>"$LOG_FILE"
 
@@ -2447,10 +2490,17 @@ configure_authelia_mysql() {
 initialize_ldap() {
     header "Initializing LDAP Directory"
 
+    # Use ldapi:// + SASL EXTERNAL (matches Docker/openldap entrypoint and
+    # config/ldap/hermes/add_remoteauth_overlay.sh — the canonical Hermes
+    # pattern). docker exec runs as root inside the container, the socket
+    # bind maps to root via SASL EXTERNAL, and slapd's olcAccess grants
+    # that mapping admin privilege. No password needed.
+    local LDAPI_URI="ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi"
+
     # Wait for OpenLDAP to be ready (container is named hermes_ldap per compose)
     log "Waiting for OpenLDAP to be ready..."
     for i in {1..30}; do
-        if docker exec hermes_ldap ldapsearch -x -H ldap://localhost -b "" -s base "(objectclass=*)" 2>/dev/null | grep -q "namingContexts"; then
+        if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "" -s base "(objectClass=*)" 2>/dev/null | grep -q "namingContexts"; then
             log "OpenLDAP is ready"
             break
         fi
@@ -2460,9 +2510,9 @@ initialize_ldap() {
         sleep 2
     done
 
-    # Check if base structure already exists
-    LDAP_ADMIN_PASS=$(cat "${CREDS_DIR}/ldap_admin_password")
-    if docker exec hermes_ldap ldapsearch -x -H ldap://localhost -D "cn=admin,dc=hermes,dc=local" -w "$LDAP_ADMIN_PASS" -b "ou=users,dc=hermes,dc=local" "(objectClass=*)" 2>/dev/null | grep -q "ou=users"; then
+    # Check if base structure already exists (SASL EXTERNAL via socket; no
+    # cn=admin bind needed because root-via-socket already has admin rights)
+    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "ou=users,dc=hermes,dc=local" -s base "(objectClass=*)" 2>/dev/null | grep -q "ou=users"; then
         log "LDAP base structure already exists"
         return
     fi
