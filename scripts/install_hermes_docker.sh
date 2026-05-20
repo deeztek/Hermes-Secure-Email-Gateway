@@ -1924,13 +1924,16 @@ generate_dovecot_lua_config() {
 create_databases() {
     # ------------------------------------------------------------------
     # Creates the 6 databases Hermes needs + per-db users + grants, then
-    # imports schemas/seeds for the three that ship them:
+    # imports schemas/seeds for the four that ship them:
     #
     #   hermes     -- needs schema + sanitized seed data (config/database/hermes_install.sql)
     #   opendmarc  -- needs empty schema (config/database/opendmarc_schema.sql)
     #   Syslog     -- needs empty schema (config/database/syslog_schema.sql)
+    #   djigzo     -- needs canonical CipherMail schema (config/database/djigzo_schema.sql,
+    #                 extracted from /usr/share/djigzo/conf/database/sql/djigzo.mysql.sql
+    #                 in the djigzo .deb). Hibernate's hbm2ddl.auto=validate refuses
+    #                 to bootstrap, so the schema must be present before CipherMail starts.
     #   authelia   -- Authelia auto-creates its tables on first startup
-    #   djigzo     -- Ciphermail/Hibernate auto-creates its tables on first startup
     #   nextcloud  -- Nextcloud auto-creates its tables on first startup
     #
     # After schemas land, applies updates/hermes-260119/sql/schema_updates.sql
@@ -2061,6 +2064,16 @@ create_databases() {
         "${HERMES_ROOT}/config/database/syslog_schema.sql" \
         "Syslog" \
         "syslog_schema.sql"
+
+    # ---- djigzo schema for CipherMail ----
+    # hibernate.mysql.cfg.HERMES sets hbm2ddl.auto=validate (not create/update),
+    # so Hibernate refuses to bootstrap. Import the canonical schema that
+    # ships with the djigzo .deb at /usr/share/djigzo/conf/database/sql/
+    # djigzo.mysql.sql — extracted at repo-prep time to config/database/.
+    _import_sql \
+        "${HERMES_ROOT}/config/database/djigzo_schema.sql" \
+        "djigzo" \
+        "djigzo_schema.sql"
 
     # ---- Apply hermes schema_updates.sql (idempotent deltas + release stamp) ----
     # Path is parameterized off the version subdir so it picks up future
