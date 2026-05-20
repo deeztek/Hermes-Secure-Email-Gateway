@@ -2466,6 +2466,45 @@ seed_install_specific_values() {
          WHERE parent_name='myhostname' AND child=1 AND module='postfix' AND conf_file='main.cf';
     " 2>>"$LOG_FILE"
 
+    # Unbound forwarders: align the DB to match what configure_dns_forwarders()
+    # wrote to forward.conf in phase 1. Without this, the UI (System > DNS
+    # Resolver) sees the seeded recursive default (forwarding.enabled='no')
+    # and the seeded public-resolver list, and on the FIRST save will
+    # clobber the bootstrap forward.conf back to recursive mode -- breaking
+    # everything that needed DNS.
+    #
+    # The CFML page that re-renders forward.conf
+    # (inc/generate_unbound_forward_conf.cfm) reads:
+    #   - parameters2 WHERE module='unbound' AND parameter='forwarding.enabled'
+    #   - dns_forwarders WHERE enabled=1 ORDER BY sort_order
+    # so we set both to mirror the admin's phase-1 choice.
+    local dns_forwarders_csv
+    dns_forwarders_csv=$(state_get_value "03b-dns-forwarders-configured")
+    if [[ -n "$dns_forwarders_csv" ]]; then
+        log "Writing parameters2.forwarding.enabled = yes (module=unbound)..."
+        docker exec hermes_db_server mysql -u root hermes -e "
+            UPDATE parameters2 SET value2='yes', applied='1'
+             WHERE module='unbound' AND parameter='forwarding.enabled';
+        " 2>>"$LOG_FILE"
+
+        log "Replacing dns_forwarders seed with admin's choice: ${dns_forwarders_csv}"
+        # Build a multi-INSERT statement; truncate first so seeded defaults
+        # don't linger alongside admin's entries.
+        local truncate_sql="TRUNCATE TABLE dns_forwarders;"
+        local insert_sql=""
+        local sort=1 fwd
+        IFS=',' read -ra fwd_list <<< "$dns_forwarders_csv"
+        for fwd in "${fwd_list[@]}"; do
+            fwd="$(echo "$fwd" | xargs)"
+            [[ -z "$fwd" ]] && continue
+            insert_sql+="INSERT INTO dns_forwarders (server, port, tls, enabled, sort_order) VALUES ('${fwd}', 53, 0, 1, ${sort});"
+            sort=$((sort + 1))
+        done
+        docker exec hermes_db_server mysql -u root hermes -e "${truncate_sql}${insert_sql}" 2>>"$LOG_FILE"
+    else
+        warn "No DNS forwarder choice in state -- leaving DB seeded defaults"
+    fi
+
     log "Install-specific values seeded"
 }
 
