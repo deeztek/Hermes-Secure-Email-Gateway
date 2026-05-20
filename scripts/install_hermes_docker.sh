@@ -545,6 +545,20 @@ wipe_install() {
     # Postfix mysql-*.cf files: glob-deleted (count varies per release).
     find "${HERMES_ROOT}/config/postfix-dkim/etc/postfix" -maxdepth 1 -name 'mysql-*.cf' -type f -delete 2>/dev/null || true
 
+    # nginx per-mailbox-domain configs: CFML's mailbox-domains feature
+    # generates <random>_hermes-mailbox-ssl.conf files into sites-available
+    # whenever admin adds a mailbox domain. Wipe must clear these too or
+    # they survive across installs and confuse future tests.
+    find "${HERMES_ROOT}/config/nginx/etc/nginx/sites-available" -maxdepth 1 \
+        -name '*_hermes-mailbox-ssl.conf' -type f -delete 2>/dev/null || true
+
+    # nginx sites-enabled: clear everything (symlinks AND files). install
+    # script re-creates the hermes-ssl.conf symlink; any per-domain enables
+    # get re-rendered by CFML if their corresponding mailbox domain still
+    # exists in the DB (which a full wipe also clears).
+    find "${HERMES_ROOT}/config/nginx/etc/nginx/sites-enabled" -mindepth 1 -maxdepth 1 \
+        -delete 2>/dev/null || true
+
     # ---- Second-stage prompt: also wipe mount-point CONTENTS? ----
     # Leaving stale data behind breaks fresh-install testing -- the new
     # install generates new random DB creds but the persisted DB files
