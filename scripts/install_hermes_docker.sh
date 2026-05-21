@@ -2749,8 +2749,11 @@ write_install_summary() {
 
 ACCESS
 ------
-Console URL:        https://${ip}/   (snake-oil cert; browser will warn)
-Admin login:        $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")
+Console URL:        https://${ip}/admin/   (self-signed cert; browser will warn)
+Admin username:     $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")
+Admin password:     $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<not-generated>")
+                    (this is the LDAP admin password — Authelia authenticates
+                     against LDAP, so the same password unlocks the admin UI)
 
 MARIADB
 -------
@@ -2771,7 +2774,13 @@ Storage enc key:    $(cat "${SECRETS_DIR}/authelia_storage_encryption_key_file" 
 LDAP
 ----
 Admin password:     $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<not-generated>")
+                    (bind DN: cn=admin,dc=hermes,dc=local — full LDAP admin
+                     access; also used as the admin UI password — see ACCESS)
 Service password:   $(cat "${CREDS_DIR}/ldap_service_password" 2>/dev/null || echo "<not-generated>")
+                    (bind DN: cn=hermes-ldap-user,dc=hermes,dc=local —
+                     read-only service account; used by Authelia and CFML
+                     to look up users during authentication; NOT for human
+                     login)
 
 NEXTCLOUD
 ---------
@@ -2781,7 +2790,7 @@ Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null ||
 
 NEXT STEPS (in admin UI)
 ------------------------
-1. Log in at https://${ip}/   (snake-oil cert — accept the browser warning)
+1. Log in at https://${ip}/admin/   (self-signed cert — accept browser warning)
 2. System  -> Console Settings: change console host from IP to FQDN if needed
 3. System  -> SSL Certificates: install your real cert (Let's Encrypt or imported)
 4. Email Server -> Domains: add your first domain
@@ -2789,8 +2798,8 @@ NEXT STEPS (in admin UI)
 
 RECOVERY
 --------
-If https://${ip}/ does NOT load, the most likely cause is that the host IP
-you entered was wrong. Re-run the installer and pick option [2] (WIPE) to
+If https://${ip}/admin/ does NOT load, the most likely cause is that the host
+IP you entered was wrong. Re-run the installer and pick option [2] (WIPE) to
 start over with a fresh IP.
 
     cd ${HERMES_ROOT}
@@ -2810,9 +2819,9 @@ EOF
     echo "================================================================================"
     echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
     echo "================================================================================"
-    echo "Console URL:      https://${ip}/admin/2/   (self-signed; expect browser warning)"
-    echo "Admin login:      $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")"
-    echo "Admin password:   (see INSTALL_SUMMARY.txt below)"
+    echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
+    echo "Admin username:   $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")"
+    echo "Admin password:   $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
     echo ""
     echo "Full credential summary written to:"
     echo "  ${summary}"
@@ -2820,7 +2829,7 @@ EOF
     echo "To view it:"
     echo "  sudo cat ${summary}"
     echo ""
-    echo "If https://${ip}/admin/2/ does NOT load, the IP was wrong. Re-run this"
+    echo "If https://${ip}/admin/ does NOT load, the IP was wrong. Re-run this"
     echo "installer and select [2] WIPE to start over."
     echo ""
     echo "================================================================================"
