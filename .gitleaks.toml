@@ -131,7 +131,6 @@ paths = [
 description = "Global allowlist"
 paths = [
     # Template files with placeholder values (hermes_db_password, etc.)
-    '''Docker/common/opt/hermes/templates/''',
     '''config/hermes/opt/hermes/templates/''',
 
     # Plugin/vendor files

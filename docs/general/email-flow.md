@@ -369,7 +369,6 @@ signs nor adds Authentication-Results.
   `Docker/mail_filter/config/`, `Docker/opendmarc/config/` are shadowed by
   volume mounts at runtime; ~85 files to consolidate or relocate.
 - **Install-template drift** — `config/hermes/opt/hermes/conf_files/master.cf`
-  and `Docker/common/opt/hermes/conf_files/master.cf` still have the
-  pre-#232 `no_milters` token on `:10026` and `smtpd_milters=:8891` for
-  `:10026`. Fresh installs would regress until these templates are
-  brought into line with the active runtime config.
+  still has the pre-#232 `no_milters` token on `:10026` and
+  `smtpd_milters=:8891` for `:10026`. Fresh installs would regress until
+  this template is brought into line with the active runtime config.
