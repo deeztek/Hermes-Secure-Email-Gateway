@@ -3210,6 +3210,39 @@ case "${1:-}" in
             NC_HOSTNAME=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
         fi
 
+        # Wait for Nextcloud's auto-install to complete. The official
+        # nextcloud:apache image runs `occ maintenance:install` on first
+        # boot when admin creds (NEXTCLOUD_ADMIN_USER_FILE +
+        # NEXTCLOUD_ADMIN_PASSWORD_FILE) are present as Docker secrets.
+        # That takes 30-90s after the container starts. If we run our
+        # post-install occ commands too early, every one fails with
+        # "Nextcloud is not installed - only a limited number of commands
+        # are available" -- and previously the theming step would even
+        # kill the script (no || log wrapper).
+        # Poll occ status until "installed: true" or timeout (2 min).
+        log "  Waiting for Nextcloud auto-install to complete (up to 2 min)..."
+        NC_READY=0
+        for i in $(seq 1 24); do
+            if docker exec -u www-data hermes_nextcloud \
+                   php /var/www/html/occ status 2>&1 | grep -q "installed: true"; then
+                log "    Nextcloud is installed (after ${i} attempt(s))"
+                NC_READY=1
+                break
+            fi
+            sleep 5
+        done
+
+        if [[ $NC_READY -eq 0 ]]; then
+            warn "Nextcloud did not finish auto-installing within 120s -- skipping post-install configuration"
+            warn "Re-run --init-db once Nextcloud is ready; state-guard will skip completed"
+            warn "steps and retry the Nextcloud block."
+            # Intentionally do NOT mark state_mark_done "10-nextcloud-configured"
+            # so re-running --init-db picks up at the NC step.
+            NC_SKIP=1
+        fi
+        fi
+
+        if [[ "$NC_SKIP" -eq 0 ]]; then
         # Default app
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set defaultapp --value="mail,calendar,contacts,dashboard" >> "$LOG_FILE" 2>&1 \
             && log "  Set default app to Mail" \
@@ -3247,14 +3280,16 @@ case "${1:-}" in
         # (NC samples an uploaded image for header color; without one, the
         # background_color setting is used directly).
         log "  Configuring Nextcloud theming..."
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config name "Hermes SEG" >> "$LOG_FILE" 2>&1
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png >> "$LOG_FILE" 2>&1
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config slogan "Secure Email Gateway and Server" >> "$LOG_FILE" 2>&1
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config primary_color '#343A40' >> "$LOG_FILE" 2>&1
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background_color '#343A40' >> "$LOG_FILE" 2>&1
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background --reset >> "$LOG_FILE" 2>&1
+        # All theming:config commands wrapped with `|| true` so a transient
+        # failure on any single one doesn't kill the install via set -e.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config name "Hermes SEG" >> "$LOG_FILE" 2>&1 || true
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png >> "$LOG_FILE" 2>&1 || true
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config slogan "Secure Email Gateway and Server" >> "$LOG_FILE" 2>&1 || true
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config primary_color '#343A40' >> "$LOG_FILE" 2>&1 || true
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background_color '#343A40' >> "$LOG_FILE" 2>&1 || true
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background --reset >> "$LOG_FILE" 2>&1 || true
         if [[ -n "$NC_HOSTNAME" ]]; then
-            docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url "https://${NC_HOSTNAME}" >> "$LOG_FILE" 2>&1
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url "https://${NC_HOSTNAME}" >> "$LOG_FILE" 2>&1 || true
         fi
         log "  Theming configured"
 
