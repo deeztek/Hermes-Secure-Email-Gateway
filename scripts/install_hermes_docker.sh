@@ -1883,9 +1883,9 @@ generate_nginx_config() {
         -e "s|hermes_server_name|${hermes_hostname}|g" \
         -e "s|hermes_ssl_certificate|${ssl_cert}|g" \
         -e "s|hermes_ssl_key|${ssl_key}|g" \
-        -e "s|hermes_hsts||g" \
-        -e "s|hermes_ocsp||g" \
-        -e "s|hermes_verify||g" \
+        -e "s|^[[:space:]]*hermes_hsts;[[:space:]]*\$|        # add_header Strict-Transport-Security \"max-age=31536000; preload\";|" \
+        -e "s|^[[:space:]]*hermes_ocsp;[[:space:]]*\$|        # ssl_stapling on;|" \
+        -e "s|^[[:space:]]*hermes_verify;[[:space:]]*\$|        # ssl_stapling_verify on;|" \
         -e "s|hermes_fw_hermes||g" \
         -e "s|hermes_fw_ciphermail||g" \
         "$site_template" > "$site_target"
