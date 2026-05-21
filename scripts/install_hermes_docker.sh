@@ -844,7 +844,6 @@ FILES_MOUNT="${FILES_MOUNT}"
 ENABLE_NEXTCLOUD="${ENABLE_NEXTCLOUD:-false}"
 HERMES_ROOT="${HERMES_ROOT}"
 EOF
-    chmod 600 "$CONFIG_FILE"
     log "Configuration saved to ${CONFIG_FILE}"
 }
 
@@ -1172,34 +1171,20 @@ generate_secrets() {
     header "Generating Secrets"
 
     mkdir -p "$SECRETS_DIR" "$CREDS_DIR"
-    chmod 700 "$SECRETS_DIR" "$CREDS_DIR"
 
     # ---- Local helpers ----
-    # Write VALUE to TARGET only if TARGET doesn't exist. Always chmods 600.
+    # Write VALUE to TARGET only if TARGET doesn't exist. No explicit chmod
+    # -- files inherit the script's umask (typically 0022 -> mode 0644),
+    # which is required so non-root processes inside containers (Nextcloud
+    # PHP-FPM as www-data, etc.) can read the bind-mounted Docker secrets.
+    # Host security is the admin's responsibility on a dedicated server.
     _ensure_secret() {
-        # Mode 0644 (not 0600) so non-root container processes can read the
-        # bind-mounted secret. Compose's `secrets: file:` declaration is a
-        # plain bind mount; host permissions pass through to the container.
-        # When Nextcloud / commandbox / etc. run PHP as www-data (uid 33),
-        # they need read access to /run/secrets/<name>. A 0600 root-owned
-        # host file translates to a 0600 root-owned bind mount inside the
-        # container, which www-data cannot read -- breaks Redis auth,
-        # MySQL connections, etc.
-        # Host security is preserved by the 0700 mode on the parent dir
-        # ($CREDS_DIR / $SECRETS_DIR) -- non-root host users can't
-        # traverse into the directory, so the 0644 file is effectively
-        # root-only on the host. Only the Docker daemon (running as root)
-        # opens these files for bind-mounting.
         local target="$1"
         local value="$2"
         if [[ ! -f "$target" ]]; then
             printf '%s' "$value" > "$target"
-            chmod 644 "$target"
             log "  + $(basename "$target")"
         else
-            # Existing file: re-chmod in case it was created with 0600 by
-            # an earlier install. Idempotent and cheap.
-            chmod 644 "$target" 2>/dev/null || true
             log "  = $(basename "$target") (kept)"
         fi
     }
@@ -1274,7 +1259,6 @@ generate_secrets() {
     fi
     printf '%s' "$LDAP_ADMIN_PASS" > "${CREDS_DIR}/ldap_admin_password"
     printf '%s' "$LDAP_ADMIN_PASS" > "${SECRETS_DIR}/ldap_admin_password_file"
-    chmod 600 "${CREDS_DIR}/ldap_admin_password" "${SECRETS_DIR}/ldap_admin_password_file"
     log "  + ldap_admin_password (creds/ + keys/ldap_admin_password_file)"
 
     if [[ -f "${CREDS_DIR}/ldap_service_password" ]]; then
@@ -1286,7 +1270,6 @@ generate_secrets() {
     fi
     printf '%s' "$LDAP_USER_PASS" > "${CREDS_DIR}/ldap_service_password"
     printf '%s' "$LDAP_USER_PASS" > "${SECRETS_DIR}/ldap_user_password_file"
-    chmod 600 "${CREDS_DIR}/ldap_service_password" "${SECRETS_DIR}/ldap_user_password_file"
     log "  + ldap_service_password (creds/ + keys/ldap_user_password_file)"
 
     # Authelia OIDC JWKS -- RSA 2048 private key in PEM format. Authelia
@@ -1296,7 +1279,9 @@ generate_secrets() {
     if [[ ! -f "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file" ]]; then
         log "  + authelia_identity_providers_oidc_jwks_file (generating RSA 2048 private key)"
         openssl genrsa -out "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file" 2048 2>>"$LOG_FILE"
-        chmod 600 "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file"
+        # openssl creates with 0600; relax so non-root container processes
+        # (Authelia) can read the bind-mounted secret.
+        chmod 644 "${SECRETS_DIR}/authelia_identity_providers_oidc_jwks_file"
     else
         log "  = authelia_identity_providers_oidc_jwks_file (kept)"
     fi
@@ -1329,7 +1314,6 @@ generate_secrets() {
         printf '%s' "$OIDC_PLAIN"  > "$OIDC_PLAIN_FILE"
         printf '%s' "$OIDC_DIGEST" > "$OIDC_DIGEST_FILE"
         printf '%s' "$OIDC_PLAIN"  > "$NC_OIDC_FILE"   # Nextcloud user_oidc uses the same plain secret
-        chmod 600 "$OIDC_PLAIN_FILE" "$OIDC_DIGEST_FILE" "$NC_OIDC_FILE"
         log "  + authelia_identity_providers_oidc_clients_client_secret_plain_file"
         log "  + authelia_identity_providers_oidc_clients_client_secret_digest_file"
         log "  + nextcloud_oidc_secret (matches Authelia plain)"
@@ -1338,7 +1322,6 @@ generate_secrets() {
         # Keep Nextcloud's copy in sync if it drifted
         if [[ ! -f "$NC_OIDC_FILE" ]]; then
             cp "$OIDC_PLAIN_FILE" "$NC_OIDC_FILE"
-            chmod 600 "$NC_OIDC_FILE"
             log "  + nextcloud_oidc_secret (copied from Authelia plain)"
         fi
     fi
@@ -1813,12 +1796,6 @@ generate_postfix_configs() {
         [[ -d "$tpath" ]] && rm -rf "$tpath"   # recover empty-dir bind-mount trap
         if [[ ! -f "$tpath" ]]; then
             touch "$tpath"
-            # relay_passwd and sasl_passwd carry credentials -- chmod 600
-            if [[ "$tbl" == "relay_passwd" || "$tbl" == "sasl_passwd" ]]; then
-                chmod 600 "$tpath"
-            else
-                chmod 644 "$tpath"
-            fi
         fi
     done
     log "  + ${#lookup_tables[@]} postfix lookup-table placeholders touched"
@@ -2126,8 +2103,9 @@ generate_self_signed_cert() {
     cp "$pem" "$chain"
     cp "$pem" "$bundle"
 
-    chmod 600 "$key"
-    chmod 644 "$pem" "$chain" "$bundle"
+    # openssl req creates the key as 0600 by default; relax so non-root
+    # container processes (nginx, postfix) can read the bind-mounted key.
+    chmod 644 "$key" "$pem" "$chain" "$bundle"
 
     log "  + config/hermes/opt/hermes/ssl/${prefix}_hermes.pem"
     log "  + config/hermes/opt/hermes/ssl/${prefix}_hermes.chain.pem"
@@ -2165,7 +2143,6 @@ ensure_dovecot_key_placeholders() {
 
     if [[ ! -f "$privkey" ]]; then
         touch "$privkey"
-        chmod 600 "$privkey"
         log "  + ${privkey} (empty placeholder)"
     else
         log "  = ${privkey} already exists (kept)"
@@ -2173,7 +2150,6 @@ ensure_dovecot_key_placeholders() {
 
     if [[ ! -f "$pubkey" ]]; then
         touch "$pubkey"
-        chmod 644 "$pubkey"
         log "  + ${pubkey} (empty placeholder)"
     else
         log "  = ${pubkey} already exists (kept)"
@@ -2749,9 +2725,10 @@ configure_ciphermail_portal_url() {
 
 write_install_summary() {
     # Writes a single-file credential + access summary to /opt/hermes/INSTALL_SUMMARY.txt
-    # (chmod 600, root-only). Also prints a condensed version to the console.
-    # This is the last user-facing output of a successful install — admins
-    # MUST save the contents before logging out of their install session.
+    # Also prints a condensed version to the console. This is the last
+    # user-facing output of a successful install -- admins MUST save the
+    # contents before logging out, then they can delete the file or
+    # tighten its permissions as they see fit.
     local ip
     ip=$(state_get_value "03-host-ip-confirmed")
     [[ -z "$ip" ]] && ip="${HERMES_HOST_IP:-<not-set>}"
@@ -2828,8 +2805,6 @@ State markers:      ${STATE_DIR}/
 EOF
     } > "$summary"
 
-    chmod 600 "$summary" 2>/dev/null || true
-
     # Console summary — condensed
     echo ""
     echo "================================================================================"
@@ -2840,7 +2815,9 @@ EOF
     echo "Admin password:   (in INSTALL_SUMMARY.txt below)"
     echo ""
     echo "Full credential summary written to:"
-    echo "  ${summary}   (chmod 600, root only)"
+    echo "  ${summary}"
+    echo "  (Save the contents now, then delete this file or restrict its permissions"
+    echo "   as your security policy requires.)"
     echo ""
     echo "If https://${ip}/ does NOT load, the IP was wrong. Re-run this installer"
     echo "and select [2] WIPE to start over."
