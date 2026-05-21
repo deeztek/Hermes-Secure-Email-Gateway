@@ -802,6 +802,19 @@ configure_mount_points() {
     mkdir -p "${FILES_MOUNT}/app"                       # nextcloud volume
     mkdir -p "${FILES_MOUNT}/redis"                     # nextcloud_redis volume
 
+    # Pre-create empty log-file placeholders that fail2ban needs at startup.
+    # fail2ban's filter setup runs as soon as the container starts and does
+    # a glob against each jail's logpath. If the glob matches zero files,
+    # fail2ban exits with code 255 ("Have not found any log file for X
+    # jail"). On a fresh install this races against Authelia/Dovecot
+    # creating their own log files for the first time. Pre-touch empty
+    # placeholders so the glob always resolves; Authelia/Dovecot will
+    # append to these files when they start writing.
+    touch "${DATA_MOUNT}/authelia/logs/authelia.log"
+    chmod 644 "${DATA_MOUNT}/authelia/logs/authelia.log"
+    touch "${DATA_MOUNT}/dovecot/logs/dovecot-info.log"
+    chmod 644 "${DATA_MOUNT}/dovecot/logs/dovecot-info.log"
+
     # Set permissions
     chmod 755 "${DATA_MOUNT}"
     chmod 755 "${VMAIL_MOUNT}"
