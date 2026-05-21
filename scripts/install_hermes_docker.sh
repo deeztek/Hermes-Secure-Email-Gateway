@@ -1177,13 +1177,29 @@ generate_secrets() {
     # ---- Local helpers ----
     # Write VALUE to TARGET only if TARGET doesn't exist. Always chmods 600.
     _ensure_secret() {
+        # Mode 0644 (not 0600) so non-root container processes can read the
+        # bind-mounted secret. Compose's `secrets: file:` declaration is a
+        # plain bind mount; host permissions pass through to the container.
+        # When Nextcloud / commandbox / etc. run PHP as www-data (uid 33),
+        # they need read access to /run/secrets/<name>. A 0600 root-owned
+        # host file translates to a 0600 root-owned bind mount inside the
+        # container, which www-data cannot read -- breaks Redis auth,
+        # MySQL connections, etc.
+        # Host security is preserved by the 0700 mode on the parent dir
+        # ($CREDS_DIR / $SECRETS_DIR) -- non-root host users can't
+        # traverse into the directory, so the 0644 file is effectively
+        # root-only on the host. Only the Docker daemon (running as root)
+        # opens these files for bind-mounting.
         local target="$1"
         local value="$2"
         if [[ ! -f "$target" ]]; then
             printf '%s' "$value" > "$target"
-            chmod 600 "$target"
+            chmod 644 "$target"
             log "  + $(basename "$target")"
         else
+            # Existing file: re-chmod in case it was created with 0600 by
+            # an earlier install. Idempotent and cheap.
+            chmod 644 "$target" 2>/dev/null || true
             log "  = $(basename "$target") (kept)"
         fi
     }
