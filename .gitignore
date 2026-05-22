@@ -238,5 +238,29 @@ CLAUDE.md
 claude_conversation.md
 claude_next_steps.md
 
+# ===========================================
+# Internal planning docs (local only)
+# ===========================================
+# Migration trackers and upgrade plans are internal development notes,
+# not shipped artifacts. History scrubbed 2026-05-22.
+ADMINLTE4-UPGRADE-PLAN.md
+MIGRATION-PLAN.md
+
+# ===========================================
+# License server (does not belong in client repo)
+# ===========================================
+# Server-side validation code for validate.hermesseg.io / activate.hermesseg.io.
+# Belongs in its own private repo, not the client distribution. History
+# scrubbed 2026-05-22.
+license-server/
+
+# ===========================================
+# Legacy archive (untracked 2026-05-22; old code recoverable via prior tags)
+# ===========================================
+archive/
+
 # Manifest generation scripts (internal workflow, not distributed)
 manifest/
+
+# Diagnostic output from manifest generation (set -x trace; not a build artifact)
+manifest_output.txt
