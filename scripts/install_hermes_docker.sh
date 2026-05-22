@@ -958,6 +958,26 @@ generate_compose_override() {
         sed -i -e "s|^HERMES_DOCKER_IMG_VERSION=.*|HERMES_DOCKER_IMG_VERSION=${img_version}|" "$ENV_FILE"
     fi
 
+    # HERMES_ADMIN_USERNAME -- the web UI login username for the application
+    # admin. Generated once (word+4-digit code, e.g. "apologise4567") and
+    # persisted so re-runs preserve the same credential. The OpenLDAP container
+    # reads this from .env (env block in docker-compose.yml) and creates the
+    # matching user entry under ou=users with the password from
+    # /run/secrets/HERMES_ADMIN_PASSWORD. See [[project-openldap-container-architecture]].
+    local existing_admin_user
+    existing_admin_user=$(grep -E '^HERMES_ADMIN_USERNAME=' "$ENV_FILE" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [[ -z "$existing_admin_user" ]]; then
+        local new_admin_user
+        new_admin_user=$(generate_random_username)
+        log "Generating HERMES_ADMIN_USERNAME = ${new_admin_user}..."
+        # Strip any existing (empty/commented) entry then append the new value
+        sed -i -e '/^HERMES_ADMIN_USERNAME=/d' "$ENV_FILE"
+        echo "HERMES_ADMIN_USERNAME=${new_admin_user}" >> "$ENV_FILE"
+    else
+        log "Preserving HERMES_ADMIN_USERNAME = ${existing_admin_user} (from prior run)"
+    fi
+
     # Append the three mount-point vars (strip prior entries first so a
     # re-run is idempotent). Every other var in .env stays untouched.
     local tmp_env="${ENV_FILE}.tmp.$$"
@@ -1273,7 +1293,7 @@ generate_secrets() {
 
     # LDAP passwords are dual-purpose:
     #   creds/<name>           -- read by initialize_ldap, CFML, helper scripts
-    #   keys/<name>_file       -- read by Bitnami OpenLDAP container as Docker secret
+    #   keys/<name>_file       -- read by the custom OpenLDAP container as a Docker secret (mounted at /run/secrets/<NAME>)
     # Both files MUST hold the same value. Generate once, write to both.
     if [[ -f "${CREDS_DIR}/ldap_admin_password" ]]; then
         LDAP_ADMIN_PASS=$(cat "${CREDS_DIR}/ldap_admin_password")
@@ -1296,6 +1316,15 @@ generate_secrets() {
     printf '%s' "$LDAP_USER_PASS" > "${CREDS_DIR}/ldap_service_password"
     printf '%s' "$LDAP_USER_PASS" > "${SECRETS_DIR}/ldap_user_password_file"
     log "  + ldap_service_password (creds/ + keys/ldap_user_password_file)"
+
+    # Hermes application admin password -- the credential used to log into
+    # the /admin/ web UI via Authelia. The custom OpenLDAP container's
+    # entrypoint reads this from /run/secrets/HERMES_ADMIN_PASSWORD and
+    # creates cn=$HERMES_ADMIN_USERNAME,ou=users,dc=hermes,dc=local as a
+    # member of cn=admins,ou=groups,... See project memory
+    # [[project-openldap-container-architecture]]. Typeable (16-char)
+    # because the admin has to actually type this on first login.
+    _ensure_secret "${SECRETS_DIR}/hermes_admin_password_file" "$(generate_typeable_password)"
 
     # Authelia OIDC JWKS -- RSA 2048 private key in PEM format. Authelia
     # reads this as the signing key for ID tokens and OIDC userinfo. The
@@ -2760,10 +2789,12 @@ write_install_summary() {
 ACCESS
 ------
 Console URL:        https://${ip}/admin/   (self-signed cert; browser will warn)
-Admin username:     $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")
-Admin password:     $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<not-generated>")
-                    (this is the LDAP admin password — Authelia authenticates
-                     against LDAP, so the same password unlocks the admin UI)
+Admin username:     $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")
+Admin password:     $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<not-generated>")
+                    (bind DN: cn=<username>,ou=users,dc=hermes,dc=local;
+                     member of cn=admins. Created by the OpenLDAP container
+                     from HERMES_ADMIN_USERNAME (.env) + HERMES_ADMIN_PASSWORD
+                     (Docker secret). This is what Authelia binds against.)
 
 MARIADB
 -------
@@ -2784,13 +2815,15 @@ Storage enc key:    $(cat "${SECRETS_DIR}/authelia_storage_encryption_key_file" 
 LDAP
 ----
 Admin password:     $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<not-generated>")
-                    (bind DN: cn=admin,dc=hermes,dc=local — full LDAP admin
-                     access; also used as the admin UI password — see ACCESS)
+                    (bind DN: cn=hermes-ldap-admin,dc=hermes,dc=local —
+                     LDAP rootDN / manager bind. Used for ldap* CLI
+                     administration only. NOT for web UI login -- see
+                     ACCESS section for the actual admin login credential.)
 Service password:   $(cat "${CREDS_DIR}/ldap_service_password" 2>/dev/null || echo "<not-generated>")
                     (bind DN: cn=hermes-ldap-user,dc=hermes,dc=local —
-                     read-only service account; used by Authelia and CFML
-                     to look up users during authentication; NOT for human
-                     login)
+                     read-only service account used by Authelia to bind
+                     to LDAP when searching for users during login.
+                     NOT for human login.)
 
 NEXTCLOUD
 ---------
@@ -2830,8 +2863,8 @@ EOF
     echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
     echo "================================================================================"
     echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
-    echo "Admin username:   $(state_get_value "04-admin-username" 2>/dev/null || echo "admin")"
-    echo "Admin password:   $(cat "${CREDS_DIR}/ldap_admin_password" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
+    echo "Admin username:   $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")"
+    echo "Admin password:   $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
     echo ""
     echo "Full credential summary written to:"
     echo "  ${summary}"

@@ -10,6 +10,12 @@ echo "Starting rsyslog...."
 
 LDAP_ADMIN_PASS=$(cat /run/secrets/LDAP_ADMIN_PASSWORD)
 LDAP_USER_PASS=$(cat /run/secrets/LDAP_USER_PASSWORD)
+# Application-level admin (web UI / Authelia login). Both are optional from
+# the container's point of view -- if either is missing the user-creation
+# step below is skipped, so older deployments that haven't wired these
+# through .env + secrets continue to start cleanly.
+HERMES_ADMIN_PASS=$(cat /run/secrets/HERMES_ADMIN_PASSWORD 2>/dev/null || echo "")
+HERMES_ADMIN_USERNAME=${HERMES_ADMIN_USERNAME:-}
 LDAP_DOMAIN=${LDAP_DOMAIN:-hermes.local}
 LDAP_ADMIN_USERNAME=${LDAP_ADMIN_USERNAME:-hermes-ldap-admin}
 LDAP_USER_USERNAME=${LDAP_USER_USERNAME:-hermes-ldap-user}
@@ -275,7 +281,61 @@ else
 fi
 
 ###############################################################################
-# 9b. Cleanup temporary LDIF files
+# 9b. Create the Hermes application admin user under ou=users + admins group
+###############################################################################
+# Application-level admin used for the web UI / Authelia login. Distinct from:
+#   - cn=$LDAP_ADMIN_USERNAME,$LDAP_BASE_DN  (LDAP rootDN/manager bind)
+#   - cn=$LDAP_USER_USERNAME,$LDAP_BASE_DN   (read-only service account)
+# This is the user Authelia actually authenticates against when an admin
+# logs in. Username comes from $HERMES_ADMIN_USERNAME (env), password from
+# /run/secrets/HERMES_ADMIN_PASSWORD. Both populated by the install script
+# (generate_secrets + .env writer); see project memory
+# [[project-openldap-container-architecture]].
+#
+# Skipped silently if either input is missing -- the container still starts,
+# but no admin login is possible until the install script wires them up.
+
+if [ -n "$HERMES_ADMIN_USERNAME" ] && [ -n "$HERMES_ADMIN_PASS" ]; then
+  HERMES_ADMIN_DN="cn=${HERMES_ADMIN_USERNAME},ou=users,${LDAP_BASE_DN}"
+  ADMINS_GROUP_DN="cn=admins,ou=groups,${LDAP_BASE_DN}"
+  HERMES_ADMIN_PWHASH=$(/usr/local/sbin/slappasswd -o module-load=argon2.so -h "{ARGON2}" -s "$HERMES_ADMIN_PASS")
+
+  # Create the user entry under ou=users (idempotent)
+  if ! ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "$HERMES_ADMIN_DN" -s base dn 2>/dev/null | grep -q "dn:"; then
+    cat <<EOF > /tmp/hermes-admin.ldif
+dn: $HERMES_ADMIN_DN
+objectClass: inetOrgPerson
+cn: ${HERMES_ADMIN_USERNAME}
+sn: Administrator
+uid: ${HERMES_ADMIN_USERNAME}
+userPassword: ${HERMES_ADMIN_PWHASH}
+mail: ${HERMES_ADMIN_USERNAME}@${LDAP_DOMAIN}
+EOF
+    ldapadd -Y EXTERNAL -H "$LDAPI_URI" -f /tmp/hermes-admin.ldif
+    echo "Created Hermes admin user: $HERMES_ADMIN_DN"
+  else
+    echo "Hermes admin user already exists. Nothing to do..."
+  fi
+
+  # Add the user to cn=admins (idempotent: only modify if not already a member)
+  if ! ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "$ADMINS_GROUP_DN" -s base "(member=$HERMES_ADMIN_DN)" dn 2>/dev/null | grep -q "dn:"; then
+    cat <<EOF > /tmp/hermes-admin-membership.ldif
+dn: $ADMINS_GROUP_DN
+changetype: modify
+add: member
+member: $HERMES_ADMIN_DN
+EOF
+    ldapmodify -Y EXTERNAL -H "$LDAPI_URI" -f /tmp/hermes-admin-membership.ldif || true
+    echo "Added $HERMES_ADMIN_DN to admins group"
+  else
+    echo "Hermes admin already member of admins group. Nothing to do..."
+  fi
+else
+  echo "HERMES_ADMIN_USERNAME or /run/secrets/HERMES_ADMIN_PASSWORD not set -- skipping Hermes admin creation"
+fi
+
+###############################################################################
+# 9c. Cleanup temporary LDIF files
 ###############################################################################
 
 rm -f /tmp/*.ldif
