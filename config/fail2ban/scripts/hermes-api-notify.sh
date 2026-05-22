@@ -51,7 +51,7 @@ fi
 # Resolve the MySQL/MariaDB client binary. Alpine ships both names in the
 # mariadb-client package on newer versions, but older images only have
 # mysql. If neither is present the image was built without mariadb-client
-# (see dockerfiles/fail2ban/Dockerfile) — rebuild required.
+# (see Docker/fail2ban/dockerfiles/fail2ban/Dockerfile) — rebuild required.
 MYSQL_BIN=$(command -v mariadb 2>/dev/null || command -v mysql 2>/dev/null)
 if [ -z "$MYSQL_BIN" ]; then
     echo "[$DATE] ERROR: No mariadb/mysql client binary found in PATH. Rebuild the hermes-fail2ban image so mariadb-client is installed." >> /scripts/api-notify.log

@@ -73,9 +73,6 @@ services:
   hermes_unbound:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-unbound:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_unbound
-    #build:
-      #context: ./Docker/unbound/
-      #dockerfile: ./dockerfiles/unbound/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -352,9 +349,6 @@ services:
   hermes_postfix_dkim:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_postfix_dkim
-    #build:
-      #context: .
-      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -394,9 +388,6 @@ services:
   hermes_dmarc:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dmarc
-    #build:
-      #context: .
-      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -426,9 +417,6 @@ services:
   hermes_openarc:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-openarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_openarc
-    #build:
-      #context: .
-      #dockerfile: ./Docker/openarc/dockerfiles/openarc/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -460,9 +448,6 @@ services:
   hermes_mail_filter:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_mail_filter
-    #build:
-      #context: .
-      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -537,9 +522,6 @@ services:
     image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ciphermail
     privileged: true
-    #build:
-      #context: .
-      #dockerfile: ./dockerfiles/mail_filter/Dockerfile
     logging:
       options:
         max-size: 10m
@@ -580,7 +562,7 @@ services:
     container_name: hermes_fail2ban
     build:
       context: .
-      dockerfile: ./dockerfiles/fail2ban/Dockerfile
+      dockerfile: ./Docker/fail2ban/dockerfiles/fail2ban/Dockerfile
     dns:
       - ${IPV4SUBNET}.117
     cap_add:
@@ -626,11 +608,15 @@ services:
   hermes_nextcloud:
     image: nextcloud:${NCVERSION}
     container_name: hermes_nextcloud
-    build:
-      context: .
-      dockerfile: ./dockerfiles/nextcloud/Dockerfile
-      args:
-        NCVERSION: ${NCVERSION}
+    # Optional local build: adds troubleshooting utilities (dnsutils, telnet,
+    # iputils-ping) on top of the upstream nextcloud:${NCVERSION} image. Not
+    # required for normal operation. Uncomment to enable, then re-run
+    # `docker compose up -d --build hermes_nextcloud`.
+    #build:
+      #context: .
+      #dockerfile: ./Docker/nextcloud/dockerfiles/nextcloud/Dockerfile
+      #args:
+        #NCVERSION: ${NCVERSION}
     dns:
       - ${IPV4SUBNET}.117
     secrets:

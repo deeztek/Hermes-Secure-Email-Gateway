@@ -3259,7 +3259,7 @@ main() {
     echo ""
     echo "This will run the full Hermes SEG install in one session:"
     echo "  1. Host-side config rendering + secrets (a few seconds)"
-    echo "  2. docker compose up -d        (5-15 min on fresh host: image pulls)"
+    echo "  2. docker compose up -d --build (5-15 min on fresh host: image pulls + fail2ban build)"
     echo "  3. Database + LDAP + Nextcloud initialization (~2 min)"
     echo ""
     read -p "Continue? (y/N): " CONFIRM
@@ -3365,11 +3365,19 @@ main() {
     # that boundary was disorienting on a fresh install. Now it's one flow.
     # The --init-db CLI flag is still wired up as a recovery escape hatch.
     header "Starting containers"
-    echo "Running: docker compose up -d"
-    echo "(first run on a fresh host pulls ~10 images -- can take 5-15 minutes)"
+    echo "Running: docker compose up -d --build"
+    echo "(first run on a fresh host pulls ~10 images + builds fail2ban locally"
+    echo " -- can take 5-15 minutes)"
     echo ""
-    if ! ( cd "$HERMES_ROOT" && docker compose up -d 2>&1 | tee -a "$LOG_FILE" ); then
-        error "docker compose up -d failed. Inspect ${LOG_FILE}, fix the issue, then re-run ./install_hermes_docker.sh (state guards will resume where you left off)."
+    # --build is required so hermes_fail2ban gets built from its local
+    # Dockerfile (adds mariadb-client + iptables backend detection on top
+    # of the upstream lscr.io/linuxserver/fail2ban image -- both required
+    # for production operation). Every other service has only `image:` set
+    # and gets pulled from hub.deeztek.com/ as usual; --build is a no-op
+    # for them. Nextcloud's build is commented out (optional troubleshooting
+    # utilities only); admin can opt in via docker-compose.yml.
+    if ! ( cd "$HERMES_ROOT" && docker compose up -d --build 2>&1 | tee -a "$LOG_FILE" ); then
+        error "docker compose up -d --build failed. Inspect ${LOG_FILE}, fix the issue, then re-run ./install_hermes_docker.sh (state guards will resume where you left off)."
     fi
     log "Containers started"
 
