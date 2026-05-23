@@ -1235,7 +1235,7 @@ preflight_checks() {
     # secrets / rendering configs.
     log "Checking outbound DNS reachability (UDP 53 to public resolvers)..."
     if command -v dig &>/dev/null; then
-        if dig +time=3 +tries=1 @1.1.1.1 www.forgebox.io >/dev/null 2>&1; then
+        if dig +time=3 +tries=1 @1.1.1.1 example.com >/dev/null 2>&1; then
             log "Outbound DNS: OK (UDP/53 reachable)"
         else
             warn "Outbound DNS test to 1.1.1.1 failed. UDP/TCP port 53 MUST"
@@ -1246,7 +1246,7 @@ preflight_checks() {
             warn "config/unbound/conf.d/forward.conf after this script finishes."
         fi
     elif command -v nslookup &>/dev/null; then
-        if nslookup -timeout=3 www.forgebox.io 1.1.1.1 >/dev/null 2>&1; then
+        if nslookup -timeout=3 example.com 1.1.1.1 >/dev/null 2>&1; then
             log "Outbound DNS: OK (UDP/53 reachable)"
         else
             warn "Outbound DNS test to 1.1.1.1 failed -- see above"
@@ -1314,7 +1314,9 @@ EOF
         return 1
     fi
 
-    local test_host="www.forgebox.io"
+    # IANA-reserved per RFC 2606; designed for exactly this kind of test.
+    # Always exists, never goes away, no third-party operational dependency.
+    local test_host="example.com"
     log "Resolving ${test_host} via unbound (exercises recursive path)..."
     if docker exec hermes_db_server getent hosts "$test_host" >/dev/null 2>&1; then
         log "External DNS resolution working"
