@@ -3195,7 +3195,19 @@ initialize_ldap() {
 
     local base_dn="dc=hermes,dc=local"
     local hermes_admin_dn="cn=${hermes_admin_user},ou=users,${base_dn}"
-    local admins_group_dn="cn=admins,ou=groups,${base_dn}"
+
+    # Groups the bootstrap admin must be in so Authelia's access_control rules
+    # match. The /admin/ rules use AND-style subjects, e.g.
+    #   subject:
+    #     - ["group:one_factor", "group:admins"]
+    # which means "member of one_factor AND member of admins". Being only in
+    # cn=admins isn't enough; the user also needs a factor-policy group.
+    #
+    # one_factor (password only) is the gentlest bootstrap experience -- admin
+    # logs in with just their password, then enrolls 2FA via the admin UI,
+    # which moves them to cn=two_factor. We do NOT pre-enroll cn=two_factor
+    # because that would block first-ever login on a Duo/TOTP setup screen.
+    local hermes_admin_groups=(admins one_factor)
 
     # ---- 1. Create the LDAP user entry under ou=users (idempotent) ----
     if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" \
@@ -3226,21 +3238,25 @@ EOF
         log "  Created ${hermes_admin_dn}"
     fi
 
-    # ---- 2. Add the user to cn=admins (idempotent) ----
-    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" \
-           -b "$admins_group_dn" -s base "(member=${hermes_admin_dn})" dn 2>/dev/null \
-           | grep -q "^dn:"; then
-        log "${hermes_admin_user} already a member of cn=admins"
-    else
-        log "Adding ${hermes_admin_user} to cn=admins..."
+    # ---- 2. Add the user to each required group (idempotent) ----
+    local grp grp_dn
+    for grp in "${hermes_admin_groups[@]}"; do
+        grp_dn="cn=${grp},ou=groups,${base_dn}"
+        if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" \
+               -b "$grp_dn" -s base "(member=${hermes_admin_dn})" dn 2>/dev/null \
+               | grep -q "^dn:"; then
+            log "${hermes_admin_user} already a member of cn=${grp}"
+            continue
+        fi
+        log "Adding ${hermes_admin_user} to cn=${grp}..."
         docker exec -i hermes_ldap ldapmodify -Y EXTERNAL -H "$LDAPI_URI" >>"$LOG_FILE" 2>&1 <<EOF
-dn: ${admins_group_dn}
+dn: ${grp_dn}
 changetype: modify
 add: member
 member: ${hermes_admin_dn}
 EOF
-        log "  Added to cn=admins"
-    fi
+        log "  Added to cn=${grp}"
+    done
 
     # ---- 3. Mirror the user into system_users so the CFML UI lists it ----
     # CFML's view_system_users reads from this table. Without a row here the
