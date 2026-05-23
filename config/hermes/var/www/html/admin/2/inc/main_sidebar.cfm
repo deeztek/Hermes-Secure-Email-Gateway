@@ -77,7 +77,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <a href="view_intrusion_prevention.cfm" class="nav-link">
                 <i class="nav-icon fas fa-shield-alt"></i>
                 <p>
-                  Intrusion Prevention
+                  IPS
                   <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
                   <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
                   </cfif>
@@ -94,7 +94,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <a href="view_console_firewall.cfm" class="nav-link">
                 <i class="nav-icon fas fa-fire"></i>
                 <p>
-                  Admin Console Firewall
+                  Console Firewall
                   <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
                   <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
                   </cfif>
