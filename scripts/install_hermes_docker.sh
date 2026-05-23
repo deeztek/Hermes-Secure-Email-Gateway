@@ -3832,6 +3832,14 @@ case "${1:-}" in
         fi
         generate_compose_override
         ;;
+    --show-summary)
+        # Re-render the post-install summary (file + colored console block) from
+        # the state values already on disk. Non-destructive, idempotent, safe to
+        # run anytime. Useful for previewing UX tweaks to write_install_summary
+        # without doing a real --wipe + reinstall (#242 follow-up).
+        touch "$LOG_FILE"
+        write_install_summary
+        ;;
     --show-config)
         # Display current configuration
         if [[ -f "$CONFIG_FILE" ]]; then
@@ -3910,6 +3918,8 @@ case "${1:-}" in
         echo "  --generate-override  Regenerate docker-compose.override.yml"
         echo "  --generate-secrets   Generate secrets only"
         echo "  --show-config        Display current configuration"
+        echo "  --show-summary       Re-print the post-install summary (URL, admin creds,"
+        echo "                       smoke-test command) using values already on disk"
         echo ""
         echo "Recovery:"
         echo "  --init-db            Re-run phase-2 (post-container) initialization only."
