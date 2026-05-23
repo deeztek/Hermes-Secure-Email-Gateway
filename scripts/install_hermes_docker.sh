@@ -2829,12 +2829,19 @@ register_bootstrap_cert_in_db() {
         startdate=$(openssl x509 -in "$cert_pem" -noout -startdate 2>/dev/null | sed 's/^notBefore=//')
         enddate=$(openssl x509 -in "$cert_pem" -noout -enddate 2>/dev/null | sed 's/^notAfter=//')
 
-        log "Inserting system_certificates row (type='Generated', file_name='${prefix}')..."
+        # type='Imported' matches the CFML convention -- the only two values
+        # the rest of the codebase uses are 'Imported' (admin-uploaded) and
+        # 'Acme' (Let's Encrypt). Conceptually our self-signed bootstrap
+        # cert is install-time-generated and "imported" into the DB row;
+        # the UI treats it like any admin-uploaded cert (deletable when the
+        # admin replaces it). NOT 'Generated' -- that's an invented value
+        # nothing else in the codebase knows about.
+        log "Inserting system_certificates row (type='Imported', file_name='${prefix}')..."
         docker exec hermes_db_server mysql -u root hermes -e "
             INSERT INTO system_certificates
               (type, subject, issuer, serial, fingerprint, startdate, enddate, file_name, friendly_name)
             VALUES
-              ('Generated',
+              ('Imported',
                '${subject}',
                '${issuer}',
                '${serial}',
