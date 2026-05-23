@@ -48,6 +48,34 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>
 
+  <!--- Sanitize the SAN list (#243). The textarea is newline-separated.
+       Per line: trim, lowercase, allow [a-z0-9.\-\*] (same chars as
+       the CN validation above), reject anything else. Dedupe, and
+       auto-prepend the CN so the cert always covers CN-as-SAN per
+       CAB Forum baseline rules. --->
+  <cfparam name="form.sans" default="">
+  <cfset sanRaw = form.sans>
+  <cfset sanClean = ArrayNew(1)>
+  <cfset cnLower = LCase(trim(form.commonname))>
+  <cfset ArrayAppend(sanClean, cnLower)>
+
+  <cfloop list="#sanRaw#" index="oneSan" delimiters="#chr(10)#">
+    <cfset oneSan = LCase(trim(ReplaceList(oneSan, chr(13), "")))>
+    <cfif Len(oneSan) EQ 0>
+      <cfcontinue>
+    </cfif>
+    <cfif REFind("[^a-z0-9\.\-\*]", oneSan) GT 0>
+      <cfset session.m = "Invalid SAN entry '" & oneSan & "'. Only letters, numbers, dashes, periods, and asterisks allowed.">
+      <cfset session.alerttype = "error">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
+    </cfif>
+    <cfif NOT ArrayFind(sanClean, oneSan)>
+      <cfset ArrayAppend(sanClean, oneSan)>
+    </cfif>
+  </cfloop>
+
+  <cfset form.sans = ArrayToList(sanClean, chr(10))>
+
   <cfinclude template="./generate_csr.cfm">
 
 <cfelseif action is "deletecertificate">

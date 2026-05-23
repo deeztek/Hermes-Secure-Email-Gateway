@@ -89,6 +89,20 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   ORDER BY subdomain ASC
 </cfquery>
 
+<!--- Auto-populate candidate SANs for the Generate CSR modal (#243).
+     Same source the Pro ACME flow uses (inc/sync_mailbox_sans.cfm):
+     additional_sans cross-joined with mailbox-hosting domains.
+     Result is one DNS name per line, sorted. The CN is auto-prepended
+     in cert_action.cfm at validation time. --->
+<cfquery name="getCsrSans" datasource="hermes">
+  SELECT DISTINCT CONCAT(a.san, '.', d.domain) AS fqdn
+  FROM additional_sans a
+  CROSS JOIN domains d
+  INNER JOIN mailbox_domains md ON md.domain = d.domain
+  ORDER BY fqdn
+</cfquery>
+<cfset csrSanPrefill = ValueList(getCsrSans.fqdn, chr(10))>
+
 <!--- Read security settings --->
 <cfset allowCertDownload = false>
 <cfset securityConfPath = "/opt/hermes/config/security.conf">
@@ -439,6 +453,26 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
+
+          <div class="alert alert-warning mb-3" role="alert">
+            <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Buy a multi-name (SAN / UCC) certificate</h5>
+            <p class="mb-2">
+              Hermes requires a certificate that covers <strong>multiple hostnames</strong>:
+              the Common Name <em>and</em> each <code>autoconfig.&lt;domain&gt;</code> /
+              <code>autodiscover.&lt;domain&gt;</code> entry mailbox clients ping during
+              account setup. A single-name (DV) cert will <strong>not</strong> work for
+              mailbox users -- their mail clients will fail with a TLS handshake error
+              before they reach the login screen.
+            </p>
+            <p class="mb-0">
+              When ordering from your CA, look for the terms
+              <strong>"UCC certificate"</strong>, <strong>"multi-domain"</strong>, or
+              <strong>"SAN certificate"</strong>. These typically cost more than a basic
+              DV cert (often $50&ndash;$200/yr vs ~$10/yr), but a basic DV cert is not
+              an option here.
+            </p>
+          </div>
+
           <div class="mb-3">
             <label class="form-label"><strong>Country Code</strong> (2 letters, e.g. US)</label>
             <input type="text" class="form-control" name="country" placeholder="US" maxlength="2">
@@ -462,6 +496,19 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <div class="mb-3">
             <label class="form-label"><strong>Common Name</strong> (domain name)</label>
             <input type="text" class="form-control" name="commonname" placeholder="widgets.tld">
+          </div>
+          <div class="mb-3">
+            <label class="form-label"><strong>Subject Alternative Names</strong> (one DNS name per line)</label>
+            <cfoutput>
+            <textarea class="form-control font-monospace" name="sans" rows="6" placeholder="autoconfig.widgets.tld&##10;autodiscover.widgets.tld">#csrSanPrefill#</textarea>
+            </cfoutput>
+            <div class="form-text">
+              Pre-filled from your mailbox-hosting domains crossed with the prefixes in
+              <a href="view_mailbox_sans.cfm">SAN Management</a> (<code>autoconfig</code>,
+              <code>autodiscover</code>, plus any custom prefixes you've added).
+              The Common Name is added automatically -- you don't need to repeat it here.
+              Leave blank if this cert is for the admin console only with no mailbox use.
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label"><strong>Encryption Length</strong></label>
