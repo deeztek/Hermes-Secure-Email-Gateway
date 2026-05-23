@@ -1,25 +1,102 @@
-
 <!---
-Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+Hermes SEG - License Invalid / Bad-State Lockout
+Copyright Dionyssios Edwards. All Rights Reserved.
 
-This file is part of Hermes Secure Email Gateway Community Edition.
+This file is part of Hermes Secure Email Gateway Pro Edition.
 
-    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or
-    (at your option) any later version.
+Rendered by inc/license_check.cfm for non-healthy license states:
+  N/A        - No Pro license configured (Community user on a Pro page)
+  EXPIRED    - License past expiration date
+  REVOKED    - License revoked by the validation server
+  INVALID    - License format / signature does not validate
+  VIOLATION  - License registered to different hardware (UUID mismatch)
 
-    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+Visual style matches license_pro_required.cfm so all license-locked
+pages render the same shape. license_check.cfm cfabort's immediately
+after including this file, so this file must also close out the
+page layout.
 --->
 
-<div class="alert alert-danger" style="display: inline-block; text-align: center;"><i class="fa fa-exclamation-triangle fa-5x"></i>
-	<p>We apologize for the inconvenience but the system has detected that your Hermes SEG Pro license is invalid. Access to certain areas of the system is only available with a valid Hermes SEG Pro License. Please contact sales@hermesseg.io to obtain a valid Hermes SEG Pro License.</p>
+<cfset licState = (StructKeyExists(session, "license") ? session.license : "N/A")>
 
+<cfswitch expression="#licState#">
+    <cfcase value="EXPIRED">
+        <cfset lockTitle    = "Pro License Expired">
+        <cfset lockHeadline = "Your Hermes SEG Pro license has expired.">
+        <cfset lockSubtext  = "Pro features are locked until the license is renewed.">
+        <cfset lockHelpLabel = "How to Renew">
+    </cfcase>
+    <cfcase value="REVOKED">
+        <cfset lockTitle    = "Pro License Revoked">
+        <cfset lockHeadline = "Your Hermes SEG Pro license has been revoked.">
+        <cfset lockSubtext  = "Contact sales to resolve the revocation and re-enable Pro features.">
+        <cfset lockHelpLabel = "How to Resolve">
+    </cfcase>
+    <cfcase value="INVALID">
+        <cfset lockTitle    = "Pro License Invalid">
+        <cfset lockHeadline = "Your Hermes SEG Pro license could not be validated.">
+        <cfset lockSubtext  = "The license signature or format does not match what the validation server expects.">
+        <cfset lockHelpLabel = "How to Resolve">
+    </cfcase>
+    <cfcase value="VIOLATION">
+        <cfset lockTitle    = "Pro License Violation">
+        <cfset lockHeadline = "Your Hermes SEG Pro license is registered to different hardware.">
+        <cfset lockSubtext  = "The hardware signature on this host does not match the licensed installation.">
+        <cfset lockHelpLabel = "How to Resolve">
+    </cfcase>
+    <cfdefaultcase>
+        <cfset lockTitle    = "Pro License Required">
+        <cfset lockHeadline = "This feature is only available with a valid Hermes SEG Pro License.">
+        <cfset lockSubtext  = "Upgrade to Pro to unlock content checks, encryption policies, organizational signatures, and more.">
+        <cfset lockHelpLabel = "How to Upgrade">
+    </cfdefaultcase>
+</cfswitch>
 
+<div class="row justify-content-center">
+    <div class="col-lg-8 col-xl-6">
+        <div class="card card-outline card-warning">
+            <div class="card-header text-center">
+                <h3 class="card-title w-100">
+                    <i class="fas fa-crown text-warning me-2"></i>
+                    <cfoutput>#lockTitle#</cfoutput>
+                </h3>
+            </div>
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <i class="fas fa-lock fa-5x text-secondary opacity-50"></i>
+                </div>
+
+                <h4 class="mb-3"><cfoutput>#lockHeadline#</cfoutput></h4>
+
+                <p class="text-muted mb-4">
+                    <cfoutput>#lockSubtext#</cfoutput>
+                </p>
+
+                <div class="alert alert-info text-start">
+                    <h5><i class="fas fa-info-circle me-2"></i><cfoutput>#lockHelpLabel#</cfoutput></h5>
+                    <p class="mb-2">Please contact:</p>
+                    <ul class="mb-0">
+                        <li>Email: <a href="mailto:sales@hermesseg.io">sales@hermesseg.io</a></li>
+                        <li>Website: <a href="https://www.hermesseg.io" target="_blank">www.hermesseg.io</a></li>
+                    </ul>
+                </div>
+
+                <div class="mt-4">
+                    <a href="index.cfm" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-1"></i> Return to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+</div><!-- /.container-fluid -->
+</div><!-- /.content -->
+</main>
+
+<cfinclude template="./main_footer.cfm" />
+
+</div><!-- /.app-wrapper -->
+</body>
+</html>

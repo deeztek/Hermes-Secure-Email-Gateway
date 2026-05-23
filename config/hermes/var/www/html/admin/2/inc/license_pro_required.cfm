@@ -59,10 +59,10 @@ Required variable:
 
 </div><!-- /.container-fluid -->
 </div><!-- /.content -->
+</main>
 
 <cfinclude template="./main_footer.cfm" />
 
-</main>
 </div><!-- /.app-wrapper -->
 </body>
 </html>
