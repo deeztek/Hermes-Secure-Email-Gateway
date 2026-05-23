@@ -30,6 +30,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Installation paths
@@ -3023,6 +3025,19 @@ Admin user/pw:      $(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null ||
 OIDC secret:        $(cat "${CREDS_DIR}/nextcloud_oidc_secret" 2>/dev/null || echo "<not-generated>")
 Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null || echo "<not-generated>")
 
+VERIFY THE INSTALL
+------------------
+Run the post-install smoke test (non-destructive, no real mail sent):
+
+    bash ${HERMES_ROOT}/scripts/hermes_smoke_test.sh
+
+Eight tiers of checks across containers, DBs, mail chain, LDAP/Authelia,
+scheduled tasks, and fail2ban. Outputs PASS/WARN/FAIL per check + a
+summary. Exit code 0 if no failures.
+
+On a test box that can't accept inbound SMTP you'll see WARNs (not FAILs)
+on postfix queue state -- that's expected.
+
 NEXT STEPS (in admin UI)
 ------------------------
 1. Log in at https://${ip}/admin/   (self-signed cert — accept browser warning)
@@ -3061,25 +3076,42 @@ State markers:      ${STATE_DIR}/
 EOF
     } > "$summary"
 
-    # Console summary — condensed
+    # Console summary — condensed, color-highlighted, with boxes around the
+    # two things admin must act on (credentials + smoke test).
+    local admin_user admin_pass
+    admin_user=$(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")
+    admin_pass=$(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")
+
     echo ""
-    echo "================================================================================"
-    echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
-    echo "================================================================================"
-    echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
-    echo "                  Once DNS for ${console_host} is in place, change Console"
-    echo "                  Address in System > Console Settings to switch over."
-    echo "Admin username:   $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")"
-    echo "Admin password:   $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
+    echo -e "${BOLD}${YELLOW}================================================================================${NC}"
+    echo -e "${BOLD}${YELLOW}                *** INSTALL COMPLETE  -  SAVE THESE NOW ***${NC}"
+    echo -e "${BOLD}${YELLOW}================================================================================${NC}"
     echo ""
-    echo "Full credential summary written to:"
-    echo "  ${summary}"
+    echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
+    echo -e "  ${YELLOW}|${NC} ${BOLD}ADMIN LOGIN${NC} -- copy now, not shown again                            ${YELLOW}|${NC}"
+    echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
+    echo -e "    Console URL:     ${BOLD}https://${ip}/admin/${NC}   ${YELLOW}(self-signed cert; accept warning)${NC}"
+    echo -e "    Admin username:  ${BOLD}${admin_user}${NC}"
+    echo -e "    Admin password:  ${BOLD}${RED}${admin_pass}${NC}     ${YELLOW}<-- COPY ME${NC}"
     echo ""
-    echo "To view it:"
-    echo "  sudo cat ${summary}"
+    echo -e "  ${GREEN}+----------------------------------------------------------------------+${NC}"
+    echo -e "  ${GREEN}|${NC} ${BOLD}VERIFY THE INSTALL${NC} (non-destructive smoke test, no real mail)     ${GREEN}|${NC}"
+    echo -e "  ${GREEN}+----------------------------------------------------------------------+${NC}"
+    echo -e "    ${BOLD}bash ${HERMES_ROOT}/scripts/hermes_smoke_test.sh${NC}"
     echo ""
-    echo "If https://${ip}/admin/ does NOT load, the host IP you entered was"
-    echo "wrong. Re-run this installer and select [2] WIPE to start over."
+    echo -e "    Eight tiers (containers, DBs, mail chain, LDAP/Authelia, Ofelia,"
+    echo -e "    fail2ban). PASS/WARN/FAIL per check; exit 0 = clean."
+    echo ""
+    echo -e "  ${CYAN}Once DNS for ${console_host} resolves, change Console Address in${NC}"
+    echo -e "  ${CYAN}System > Console Settings to switch over from the bootstrap IP.${NC}"
+    echo ""
+    echo -e "  Full credential summary written to:"
+    echo -e "    ${BOLD}${summary}${NC}"
+    echo ""
+    echo -e "  View it later with:  ${BOLD}sudo cat ${summary}${NC}"
+    echo ""
+    echo -e "  ${YELLOW}If https://${ip}/admin/ does NOT load, the host IP you entered was${NC}"
+    echo -e "  ${YELLOW}wrong. Re-run this installer and select [2] WIPE to start over.${NC}"
     echo ""
     echo "================================================================================"
     echo "                NOTES ON FILE PERMISSIONS"
