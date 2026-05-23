@@ -1097,10 +1097,23 @@ generate_compose_override() {
     rm -f /tmp/.hermes_trusted.$$
 
     if [[ -n "$ip" ]]; then
-        log "Substituting HOST_IP = ${ip}, HERMES_HOSTNAME = ${mail_host:-${ip}}, CONSOLE_HOST = ${console_host:-${ip}}..."
+        # CONSOLE_HOST in .env is FORCED to the IP at install time, even if the
+        # admin entered an FQDN at prompt_console_host. Reason: at install time
+        # there's typically no DNS record yet for the FQDN, so nginx + Authelia
+        # + Nextcloud + Ciphermail bootstrap-rendering against the FQDN would
+        # leave the admin unable to log in (cookie scoped to a hostname their
+        # browser can't reach). Admin reaches /admin/ via IP, then when DNS is
+        # ready they save System > Console Settings and CFML re-renders the
+        # whole web stack with their preferred FQDN.
+        #
+        # Admin's FQDN preference is preserved in:
+        #   - state marker 05-console-host-confirmed.value (for re-runs)
+        #   - parameters2.console.host in the DB (so the Console Settings UI
+        #     is pre-filled with the FQDN they entered)
+        log "Substituting HOST_IP = ${ip}, HERMES_HOSTNAME = ${mail_host:-${ip}}, CONSOLE_HOST = ${ip} (bootstrap; admin's FQDN choice '${console_host:-${ip}}' kept in DB)..."
         sed -i \
             -e "s|^HOST_IP=.*|HOST_IP=${ip}|" \
-            -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${console_host:-${ip}}|" \
+            -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${ip}|" \
             -e "s|^HERMES_HOSTNAME=.*|HERMES_HOSTNAME=${mail_host:-${ip}}|" \
             -e "s|^NEXTCLOUD_TRUSTED_DOMAINS=.*|NEXTCLOUD_TRUSTED_DOMAINS=${trusted}|" \
             "$ENV_FILE"
@@ -1789,10 +1802,23 @@ generate_authelia_config() {
         error "Authelia template missing: $template"
     fi
 
-    # Need HERMES_HOSTNAME for the access_control domain + SMTP sender.
-    local hermes_hostname
+    # Need CONSOLE_HOST for the access_control_domain (cookie scope, session
+    # callback, default_redirection_url, every ACL rule). At install time
+    # generate_compose_override forces CONSOLE_HOST to the IP -- DNS for
+    # the admin's preferred FQDN typically isn't set up yet, so binding
+    # Authelia's cookie domain + redirect URL to that FQDN would lock the
+    # admin out. When admin saves Console Settings via the UI after DNS is
+    # ready, CFML re-renders this file with the FQDN.
+    #
+    # HERMES_HOSTNAME (mail FQDN) is still used for the SMTP-sender domain.
+    local console_host hermes_hostname
+    console_host=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
     hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [[ -z "$console_host" ]]; then
+        error "CONSOLE_HOST missing from .env -- run generate_compose_override first"
+    fi
     if [[ -z "$hermes_hostname" ]]; then
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
@@ -1820,7 +1846,7 @@ generate_authelia_config() {
         -e "s|hermes_duo_hostname||g" \
         -e "s|hermes_duo_disable|true|g" \
         -e "s|hermes_authentication_backend_disable_reset_password|false|g" \
-        -e "s|hermes_access_control_domain|${hermes_hostname}|g" \
+        -e "s|hermes_access_control_domain|${console_host}|g" \
         -e "s|hermes_session_expiration|0|g" \
         -e "s|hermes_session_inactivity|3600|g" \
         -e "s|hermes_session_remember_me|1M|g" \
@@ -2660,12 +2686,19 @@ seed_install_specific_values() {
         return 0
     fi
 
-    local pass hermes_hostname console_host server_name server_domain
+    local pass hermes_hostname console_host_pref server_name server_domain
     pass=$(cat "${CREDS_DIR}/mysql_root_password")
     hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
-    console_host=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" 2>/dev/null \
-        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    # console_host_pref = ADMIN'S PROMPT-TIME CHOICE (typically the FQDN they
+    # entered at prompt_console_host). Read from state, NOT from .env --
+    # CONSOLE_HOST in .env is forced to the IP at install time for
+    # bootstrap-time DNS reasons. The DB row needs the admin's actual
+    # preference so the Console Settings UI is pre-filled correctly and the
+    # admin can save it (triggering CFML to re-render the web stack against
+    # the FQDN) once their DNS is in place.
+    console_host_pref=$(state_get_value "05-console-host-confirmed" 2>/dev/null)
+    [[ -z "$console_host_pref" ]] && console_host_pref="${HERMES_CONSOLE_HOST:-${ip}}"
     if [[ -z "$hermes_hostname" ]]; then
         warn "HERMES_HOSTNAME missing from .env -- skipping hostname-derived DB seed"
         return 0
@@ -2673,9 +2706,6 @@ seed_install_specific_values() {
     # HERMES_HOSTNAME is FQDN by construction (prompt_mail_hostname validates).
     server_name="${hermes_hostname%%.*}"
     server_domain="${hermes_hostname#*.}"
-    # CONSOLE_HOST may be either IP or FQDN per prompt_console_host. Falls
-    # back to the host IP only if the .env value somehow got lost.
-    console_host="${console_host:-${ip}}"
 
     # server_ip (module='network') — view_server_setup.cfm reads this row.
     log "Writing parameters2.server_ip = ${ip} (module=network)..."
@@ -2684,12 +2714,15 @@ seed_install_specific_values() {
          WHERE parameter='server_ip' AND module='network';
     " 2>>"$LOG_FILE"
 
-    # console.host (module='console') — what admins type in the browser to
-    # reach /admin/. Now driven by the install prompt (CONSOLE_HOST in .env)
-    # rather than always defaulting to the IP.
-    log "Writing parameters2.console.host = ${console_host}..."
+    # console.host (module='console') — admin's PROMPT-TIME PREFERENCE, which
+    # is typically the FQDN they want to use eventually. NOT the bootstrap IP
+    # in .env CONSOLE_HOST. The Console Settings UI reads this row and
+    # pre-fills the input field; admin's first action after DNS is ready is to
+    # save that page, which triggers CFML to regenerate nginx + Authelia +
+    # Nextcloud + Ciphermail configs against the FQDN.
+    log "Writing parameters2.console.host = ${console_host_pref}  (admin's preferred FQDN/IP)..."
     docker exec hermes_db_server mysql -u root hermes -e "
-        UPDATE parameters2 SET value2='${console_host}', active='1', applied='2'
+        UPDATE parameters2 SET value2='${console_host_pref}', active='1', applied='2'
          WHERE parameter='console.host' AND module='console';
     " 2>>"$LOG_FILE"
 
@@ -2927,21 +2960,24 @@ write_install_summary() {
 
 ACCESS
 ------
-Console URL:        https://${console_host}/admin/   (self-signed cert; browser will warn)
-                    (also works via raw IP: https://${ip}/admin/)
+Console URL:        https://${ip}/admin/   (self-signed cert; browser will warn)
+                    First-login URL is the raw IP. DNS for the FQDN below
+                    isn't required at install time. Once DNS for
+                    ${console_host} resolves to ${ip}, open
+                    System > Console Settings (the FQDN is already pre-
+                    filled) and click Save -- that re-renders nginx +
+                    Authelia + Nextcloud + Ciphermail against the FQDN.
 Admin username:     $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")
 Admin password:     $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<not-generated>")
-                    (bind DN: cn=<username>,ou=users,dc=hermes,dc=local;
-                     member of cn=admins. Created by the OpenLDAP container
-                     from HERMES_ADMIN_USERNAME (.env) + HERMES_ADMIN_PASSWORD
-                     (Docker secret). This is what Authelia binds against.)
+                    (LDAP DN: cn=<username>,ou=users,dc=hermes,dc=local;
+                     member of cn=admins. Authelia binds against this.)
 
 SERVER IDENTITY
 ---------------
 Mail Server Hostname: ${mail_host}     (Postfix myhostname / SMTP HELO)
 Mail Server Domain  : ${mail_domain}   (Postfix myorigin)
-Console Address     : ${console_host}  (nginx server_name for /admin/, /users/, /nc/)
-Host IP             : ${ip}            (Nextcloud trusted domains + cert SAN list)
+Console Address pref: ${console_host}  (admin's choice; APPLIED via Console Settings save once DNS is ready)
+Host IP             : ${ip}            (current nginx/Authelia/NC server_name, also NC trusted domains)
 
 MARIADB
 -------
@@ -2980,7 +3016,7 @@ Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null ||
 
 NEXT STEPS (in admin UI)
 ------------------------
-1. Log in at https://${console_host}/admin/   (self-signed cert — accept browser warning)
+1. Log in at https://${ip}/admin/   (self-signed cert — accept browser warning)
 2. System  -> Server Setup: confirm Mail Server Hostname / Domain
 3. System  -> Console Settings: confirm Console Address
 4. System  -> SSL Certificates: install your real cert (Let's Encrypt or imported)
@@ -3000,9 +3036,9 @@ $( [[ "$console_host" != "$mail_host" && "$console_host" != "$ip" ]] && printf '
 
 RECOVERY
 --------
-If https://${console_host}/admin/ does NOT load, the most likely cause is that
-the host IP or hostname you entered was wrong. Re-run the installer and pick
-option [2] (WIPE) to start over.
+If https://${ip}/admin/ does NOT load, the most likely cause is that the host
+IP you entered was wrong. Re-run the installer and pick option [2] (WIPE) to
+start over with a fresh IP.
 
     cd ${HERMES_ROOT}
     ./scripts/install_hermes_docker.sh    # pick option [2] when prompted
@@ -3021,8 +3057,9 @@ EOF
     echo "================================================================================"
     echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
     echo "================================================================================"
-    echo "Console URL:      https://${console_host}/admin/   (self-signed; expect browser warning)"
-    echo "                  (or via raw IP: https://${ip}/admin/)"
+    echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
+    echo "                  Once DNS for ${console_host} is in place, save Console"
+    echo "                  Settings in the UI to switch to the FQDN."
     echo "Admin username:   $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")"
     echo "Admin password:   $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
     echo ""
@@ -3032,9 +3069,8 @@ EOF
     echo "To view it:"
     echo "  sudo cat ${summary}"
     echo ""
-    echo "If https://${console_host}/admin/ does NOT load (and https://${ip}/admin/ does"
-    echo "not either), the host IP / hostname you entered was wrong. Re-run this"
-    echo "installer and select [2] WIPE to start over."
+    echo "If https://${ip}/admin/ does NOT load, the host IP you entered was"
+    echo "wrong. Re-run this installer and select [2] WIPE to start over."
     echo ""
     echo "================================================================================"
     echo "                NOTES ON FILE PERMISSIONS"
