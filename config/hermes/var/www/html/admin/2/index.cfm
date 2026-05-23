@@ -86,7 +86,14 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 
 
-  <!--- CHECK IF HERMES.KEY IS BLANK AND IF BLANK GENERATE IT --->
+  <!--- CHECK IF HERMES.KEY EXISTS AND IS NON-BLANK; GENERATE IF NEITHER ---><!--- Self-healing: on fresh installs (or if the file ever gets deleted) the
+       file may not exist yet. Create an empty placeholder so the read below
+       succeeds; the existing if-blank guard then calls generate_hermes_key.cfm
+       which populates it with a fresh AES-256 key. This keeps the install
+       script out of the hermes-key business entirely. --->
+<cfif NOT FileExists("/opt/hermes/keys/hermes.key")>
+  <cffile action="write" file="/opt/hermes/keys/hermes.key" output="" addnewline="no">
+</cfif>
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
 
 <cfif #authkey# is "">
