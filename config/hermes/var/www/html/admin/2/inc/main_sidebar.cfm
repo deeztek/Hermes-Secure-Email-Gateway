@@ -65,13 +65,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="view_remoteauth.cfm" class="nav-link">
                 <i class="nav-icon fas fa-server"></i>
-                <p>LDAP RemoteAuth</p>
+                <p>
+                  LDAP RemoteAuth
+                  <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
+                  </cfif>
+                </p>
               </a>
             </li>
             <li class="nav-item">
               <a href="view_intrusion_prevention.cfm" class="nav-link">
                 <i class="nav-icon fas fa-shield-alt"></i>
-                <p>Intrusion Prevention</p>
+                <p>
+                  Intrusion Prevention
+                  <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
+                  </cfif>
+                </p>
               </a>
             </li>
             <li class="nav-item">
@@ -83,7 +93,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="view_console_firewall.cfm" class="nav-link">
                 <i class="nav-icon fas fa-fire"></i>
-                <p>Admin Console Firewall</p>
+                <p>
+                  Admin Console Firewall
+                  <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
+                  </cfif>
+                </p>
               </a>
             </li>
             <li class="nav-item">
@@ -438,7 +453,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <li class="nav-item">
               <a href="view_disclaimers.cfm" class="nav-link">
                 <i class="nav-icon fas fa-file-signature"></i>
-                <p>Disclaimers</p>
+                <p>
+                  Disclaimers
+                  <cfif NOT (isDefined("session.edition") AND session.edition EQ "Pro")>
+                  <span class="badge bg-warning text-dark ms-1" style="font-size:9px;">PRO</span>
+                  </cfif>
+                </p>
               </a>
             </li>
             <li class="nav-item">

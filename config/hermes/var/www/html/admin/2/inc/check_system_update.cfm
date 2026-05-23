@@ -8,6 +8,21 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
+<!--- DOCKER SHORT-CIRCUIT (#240). Docker installs are updated via image
+     tags + git pull on the host, not via the legacy tarball server at
+     updates.deeztek.com. The local seed row in system_updates is
+     ('221211') and the legacy server faithfully responds with whatever
+     is newer ('240815'), producing a false-positive "update available"
+     on the dashboard. Skip the entire remote check on Docker installs
+     until the Docker-aware updates infrastructure (#218) lands. --->
+<cfquery name="getVersionTrain" datasource="hermes">
+    SELECT value FROM system_settings WHERE parameter = 'version_no'
+</cfquery>
+<cfif getVersionTrain.recordCount AND getVersionTrain.value EQ 'Docker'>
+    <cfset hermesupdate = "MANAGED VIA DOCKER">
+    <cfexit method="exitTemplate">
+</cfif>
+
 <cfif StructKeyExists(url, "sendemail")>
 
 <cfif IsValid("integer", #url.sendemail#)>
