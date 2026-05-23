@@ -115,6 +115,17 @@ test_auth() {
     docker exec hermes_db_server mysql -u "$user" -p"$pass" -e "SELECT 1" >/dev/null 2>&1
 }
 
+# Test that we have admin access via the unix-socket-auth root inside the
+# container. LinuxServer's MariaDB image creates root@localhost with the
+# unix_socket plugin (NOT mysql_native_password), so we MUST connect with
+# `-u root` and NO -p flag from inside the container -- the socket maps
+# OS-root inside the container straight to LDAP root in the DB. The
+# password-bearing root@'%' entry only matters for remote connections.
+# See feedback-mariadb-unix-socket-via-docker-exec.
+test_root_socket_auth() {
+    docker exec hermes_db_server mysql -u root -e "SELECT 1" >/dev/null 2>&1
+}
+
 # Restore a single user to its old password, both in the DB and in the creds
 # file. Called when a post-rotation auth test fails. Config-file backups
 # (.bak.YYYYMMDD) are left in place — operator must restore those manually
@@ -122,7 +133,7 @@ test_auth() {
 rollback_user() {
     local user="$1" old_pass="$2" creds_file="$3"
     log_warn "  Rolling back ${user} to old password..."
-    if docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
+    if docker exec hermes_db_server mysql -u root -e \
         "ALTER USER '${user}'@'%' IDENTIFIED BY '${old_pass}'; FLUSH PRIVILEGES;" 2>/dev/null; then
         log_info "  ALTER USER rolled back for ${user}"
     else
@@ -334,7 +345,11 @@ fi
 
 check_prerequisites
 
-MYSQL_ROOT_PASS=$(cat "${CREDS_DIR}/mysql_root_password")
+# Note: we do NOT read mysql_root_password here. All root admin operations
+# in this script go through `docker exec hermes_db_server mysql -u root` --
+# the unix_socket plugin on root@localhost lets that bind without a password.
+# Sending -p"$pass" would actively FAIL (LinuxServer's MariaDB image rejects
+# password binds for the socket-auth root entries).
 
 # Read current usernames and generate new passwords (or use current for regen-only)
 if [[ "$ROTATE_HERMES" == true ]]; then
@@ -378,8 +393,10 @@ if [[ "$DRY_RUN" == true ]]; then
     log_warn "DRY RUN — no changes will be made"
 fi
 
-# Final confirmation
-if [[ "$DRY_RUN" == false ]]; then
+# Final confirmation. Skipped on --non-interactive (called from
+# install_hermes_docker.sh and CI/automation paths). Interactive operator
+# still has to type y/N for the human safety net.
+if [[ "$DRY_RUN" == false && "$NON_INTERACTIVE" == false ]]; then
     echo ""
     echo -e "  ${YELLOW}WARNING: This will change database passwords and restart services.${NC}"
     echo "  Mail flow will be briefly interrupted during container restarts."
@@ -404,10 +421,12 @@ echo ""
 
 log_info "Running pre-flight auth tests..."
 
-if ! test_auth root "${MYSQL_ROOT_PASS}"; then
-    log_error "Pre-flight: root authentication FAILED"
-    log_error "Cannot proceed without working root credentials"
-    log_error "Verify ${CREDS_DIR}/mysql_root_password is correct"
+if ! test_root_socket_auth; then
+    log_error "Pre-flight: root socket authentication FAILED"
+    log_error "Cannot proceed without unix-socket root access via docker exec."
+    log_error "Check that hermes_db_server is running and the container's root"
+    log_error "is configured with the unix_socket plugin (the default for the"
+    log_error "LinuxServer MariaDB image)."
     exit 1
 fi
 log_info "  ✓ root authentication OK"
@@ -598,7 +617,7 @@ if [[ "$ROTATE_HERMES" == true ]]; then
     else
         echo -n "$NEW_HERMES_PASS" > "${CREDS_DIR}/hermes_password"
         chmod 600 "${CREDS_DIR}/hermes_password"
-        docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
+        docker exec hermes_db_server mysql -u root -e \
             "ALTER USER '${NEW_HERMES_USER}'@'%' IDENTIFIED BY '${NEW_HERMES_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
         # Post-rotation auth test — verify the new password actually works.
         # Catches: silent ALTER USER no-op (host pattern mismatch), grant
@@ -621,7 +640,7 @@ if [[ "$ROTATE_CIPHERMAIL" == true ]]; then
     else
         echo -n "$NEW_CIPHERMAIL_PASS" > "${CREDS_DIR}/ciphermail_password"
         chmod 600 "${CREDS_DIR}/ciphermail_password"
-        docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
+        docker exec hermes_db_server mysql -u root -e \
             "ALTER USER '${NEW_CIPHERMAIL_USER}'@'%' IDENTIFIED BY '${NEW_CIPHERMAIL_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
         if ! test_auth "${NEW_CIPHERMAIL_USER}" "${NEW_CIPHERMAIL_PASS}"; then
             log_error "  Post-rotation auth test FAILED for ${NEW_CIPHERMAIL_USER}"
@@ -640,7 +659,7 @@ if [[ "$ROTATE_SYSLOG" == true ]]; then
     else
         echo -n "$NEW_SYSLOG_PASS" > "${CREDS_DIR}/syslog_password"
         chmod 600 "${CREDS_DIR}/syslog_password"
-        docker exec hermes_db_server mysql -u root -p"${MYSQL_ROOT_PASS}" -e \
+        docker exec hermes_db_server mysql -u root -e \
             "ALTER USER '${NEW_SYSLOG_USER}'@'%' IDENTIFIED BY '${NEW_SYSLOG_PASS}'; FLUSH PRIVILEGES;" 2>/dev/null
         if ! test_auth "${NEW_SYSLOG_USER}" "${NEW_SYSLOG_PASS}"; then
             log_error "  Post-rotation auth test FAILED for ${NEW_SYSLOG_USER}"
