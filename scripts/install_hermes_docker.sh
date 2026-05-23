@@ -2686,19 +2686,10 @@ seed_install_specific_values() {
         return 0
     fi
 
-    local pass hermes_hostname console_host_pref server_name server_domain
+    local pass hermes_hostname server_name server_domain
     pass=$(cat "${CREDS_DIR}/mysql_root_password")
     hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
-    # console_host_pref = ADMIN'S PROMPT-TIME CHOICE (typically the FQDN they
-    # entered at prompt_console_host). Read from state, NOT from .env --
-    # CONSOLE_HOST in .env is forced to the IP at install time for
-    # bootstrap-time DNS reasons. The DB row needs the admin's actual
-    # preference so the Console Settings UI is pre-filled correctly and the
-    # admin can save it (triggering CFML to re-render the web stack against
-    # the FQDN) once their DNS is in place.
-    console_host_pref=$(state_get_value "05-console-host-confirmed" 2>/dev/null)
-    [[ -z "$console_host_pref" ]] && console_host_pref="${HERMES_CONSOLE_HOST:-${ip}}"
     if [[ -z "$hermes_hostname" ]]; then
         warn "HERMES_HOSTNAME missing from .env -- skipping hostname-derived DB seed"
         return 0
@@ -2714,15 +2705,22 @@ seed_install_specific_values() {
          WHERE parameter='server_ip' AND module='network';
     " 2>>"$LOG_FILE"
 
-    # console.host (module='console') — admin's PROMPT-TIME PREFERENCE, which
-    # is typically the FQDN they want to use eventually. NOT the bootstrap IP
-    # in .env CONSOLE_HOST. The Console Settings UI reads this row and
-    # pre-fills the input field; admin's first action after DNS is ready is to
-    # save that page, which triggers CFML to regenerate nginx + Authelia +
-    # Nextcloud + Ciphermail configs against the FQDN.
-    log "Writing parameters2.console.host = ${console_host_pref}  (admin's preferred FQDN/IP)..."
+    # console.host (module='console') — the IP at bootstrap, matching what
+    # the web stack is ACTUALLY serving on. The Console Settings UI reads
+    # this row to pre-fill its input field; we want the displayed value to
+    # match reality so the admin sees "this is what's running now," not
+    # an unsubstituted FQDN that doesn't yet work. When DNS is ready the
+    # admin types their FQDN into Console Settings and clicks Save -- CFML
+    # then regenerates nginx + Authelia + Nextcloud + Ciphermail against
+    # the new value.
+    #
+    # The admin's prompt-time FQDN preference is still captured in state
+    # marker 05-console-host-confirmed (and surfaced in INSTALL_SUMMARY's
+    # DNS hint section) so they know what A record to create -- but it
+    # doesn't go into the DB.
+    log "Writing parameters2.console.host = ${ip}  (bootstrap; matches CONSOLE_HOST in .env)..."
     docker exec hermes_db_server mysql -u root hermes -e "
-        UPDATE parameters2 SET value2='${console_host_pref}', active='1', applied='2'
+        UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
          WHERE parameter='console.host' AND module='console';
     " 2>>"$LOG_FILE"
 
@@ -2961,12 +2959,16 @@ write_install_summary() {
 ACCESS
 ------
 Console URL:        https://${ip}/admin/   (self-signed cert; browser will warn)
-                    First-login URL is the raw IP. DNS for the FQDN below
-                    isn't required at install time. Once DNS for
-                    ${console_host} resolves to ${ip}, open
-                    System > Console Settings (the FQDN is already pre-
-                    filled) and click Save -- that re-renders nginx +
-                    Authelia + Nextcloud + Ciphermail against the FQDN.
+                    Bootstrap URL is the raw IP -- the Console Address +
+                    Certificate fields in System > Console Settings are
+                    pre-filled with the IP and the self-signed bootstrap
+                    cert, matching what the web stack is actually serving
+                    on. Once DNS for ${console_host} resolves to ${ip}
+                    (and ideally a real cert is uploaded via System >
+                    SSL Certificates), CHANGE the Console Address field
+                    from ${ip} to ${console_host} and click Save -- that
+                    re-renders nginx + Authelia + Nextcloud + Ciphermail
+                    against the FQDN.
 Admin username:     $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")
 Admin password:     $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<not-generated>")
                     (LDAP DN: cn=<username>,ou=users,dc=hermes,dc=local;
@@ -2976,8 +2978,8 @@ SERVER IDENTITY
 ---------------
 Mail Server Hostname: ${mail_host}     (Postfix myhostname / SMTP HELO)
 Mail Server Domain  : ${mail_domain}   (Postfix myorigin)
-Console Address pref: ${console_host}  (admin's choice; APPLIED via Console Settings save once DNS is ready)
-Host IP             : ${ip}            (current nginx/Authelia/NC server_name, also NC trusted domains)
+Console Address pref: ${console_host}  (admin's choice for future FQDN; NOT yet active -- bootstrap uses IP)
+Host IP             : ${ip}            (current Console Address, nginx server_name, NC trusted domain)
 
 MARIADB
 -------
@@ -3058,8 +3060,8 @@ EOF
     echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
     echo "================================================================================"
     echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
-    echo "                  Once DNS for ${console_host} is in place, save Console"
-    echo "                  Settings in the UI to switch to the FQDN."
+    echo "                  Once DNS for ${console_host} is in place, change Console"
+    echo "                  Address in System > Console Settings to switch over."
     echo "Admin username:   $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")"
     echo "Admin password:   $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
     echo ""
