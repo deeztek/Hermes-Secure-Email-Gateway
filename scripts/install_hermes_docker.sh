@@ -250,6 +250,149 @@ validate_ipv4() {
     return 0
 }
 
+validate_fqdn() {
+    # Lenient FQDN validation: at least one dot, valid DNS-label characters
+    # (alphanumerics + hyphens, no leading/trailing hyphen, max 63 chars per
+    # label), and overall length <= 253. Returns 0 on valid, 1 otherwise.
+    # We don't try to resolve it -- DNS isn't always set up at install time.
+    local fqdn="$1"
+
+    # Length cap
+    if (( ${#fqdn} == 0 || ${#fqdn} > 253 )); then
+        return 1
+    fi
+
+    # Must contain at least one dot. Postfix's valid_hostname() rejects
+    # single-label hostnames; same logic applies here.
+    if [[ "$fqdn" != *.* ]]; then
+        return 1
+    fi
+
+    # Disallow trailing dot for tidiness (cf. "example.com." resolver form).
+    if [[ "$fqdn" == *. ]]; then
+        return 1
+    fi
+
+    # Each label: 1-63 chars, alphanumeric + hyphen, no leading/trailing hyphen.
+    local label
+    local IFS='.'
+    local -a labels
+    read -ra labels <<< "$fqdn"
+    for label in "${labels[@]}"; do
+        if [[ ! "$label" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$ ]]; then
+            return 1
+        fi
+    done
+
+    # TLD label must not be all-numeric (would otherwise be ambiguous with an IP).
+    if [[ "${labels[-1]}" =~ ^[0-9]+$ ]]; then
+        return 1
+    fi
+
+    return 0
+}
+
+prompt_mail_hostname() {
+    # Mail Server Hostname (FQDN) -- becomes Postfix myhostname and the
+    # SMTP HELO/EHLO greeting other mail servers see. Required, no default.
+    # Derived domain (everything after the first label) is offered as a
+    # default the admin can override.
+    #
+    # Saved to state markers 04-mail-hostname-confirmed and
+    # 04-mail-domain-confirmed. Consumed by:
+    #   - generate_postfix_configs       (main.cf myhostname / myorigin)
+    #   - generate_amavis_50user_config  ($myhostname / $mydomain)
+    #   - generate_mailname_config       (/etc/mailname)
+    #   - seed_install_specific_values   (parameters / parameters2 rows)
+    echo ""
+    cat <<'EOF'
++------------------------------------------------------------------+
+|  MAIL SERVER HOSTNAME (FQDN)                                     |
+|                                                                  |
+|  - Sent in SMTP banners / HELO greetings                         |
+|  - Postfix myhostname                                            |
+|  - Should have valid forward AND reverse DNS for outbound mail   |
+|    to be accepted by other mail servers (you can fix DNS later)  |
+|  - Can be changed afterward via System > Server Setup            |
++------------------------------------------------------------------+
+
+EOF
+    local hostname domain confirm
+    while true; do
+        read -p "Mail Server Hostname (e.g. smtp.example.com): " hostname
+        if ! validate_fqdn "$hostname"; then
+            warn "Not a valid FQDN. Must contain at least one dot and use only"
+            warn "alphanumerics + hyphens in each label (e.g. smtp.example.com)."
+            continue
+        fi
+        # Derive domain by stripping the first label.
+        local derived="${hostname#*.}"
+        echo ""
+        echo "Mail Server Hostname:  ${hostname}"
+        echo "Mail Server Domain  :  ${derived}   (derived; postfix myorigin)"
+        echo ""
+        read -p "Accept both? [Y/n]: " confirm
+        if [[ -z "$confirm" || "$confirm" =~ ^[Yy]$ ]]; then
+            domain="$derived"
+        else
+            # Let admin override the domain
+            while true; do
+                read -p "Enter Mail Server Domain instead (e.g. example.com): " domain
+                if ! validate_fqdn "$domain"; then
+                    warn "Not a valid domain. Must contain at least one dot."
+                    continue
+                fi
+                break
+            done
+        fi
+        HERMES_MAIL_HOSTNAME="$hostname"
+        HERMES_MAIL_DOMAIN="$domain"
+        export HERMES_MAIL_HOSTNAME HERMES_MAIL_DOMAIN
+        log "Mail hostname confirmed: ${HERMES_MAIL_HOSTNAME}"
+        log "Mail domain confirmed:   ${HERMES_MAIL_DOMAIN}"
+        return 0
+    done
+}
+
+prompt_console_host() {
+    # Console Address -- what admins type in the browser to reach /admin/.
+    # Can be an FQDN or an IP. Default is the mail hostname captured by
+    # prompt_mail_hostname, since most installs use the same FQDN for both.
+    # Independent from mail hostname is fine (e.g. admin.example.com vs
+    # smtp.example.com).
+    #
+    # Saved to state marker 05-console-host-confirmed. Consumed by:
+    #   - generate_nginx_config         (server_name + auth.conf)
+    #   - seed_install_specific_values  (parameters2.console.host)
+    #   - configure_ciphermail_portal_url (web portal URL)
+    #   - run_phase2_db_init Nextcloud config (OIDC discovery, theming, external sites)
+    local default="${HERMES_MAIL_HOSTNAME:-$HERMES_HOST_IP}"
+    echo ""
+    cat <<EOF
++------------------------------------------------------------------+
+|  CONSOLE ADDRESS                                                 |
+|                                                                  |
+|  - The hostname or IP admins type to reach /admin/               |
+|  - Can be an FQDN (e.g. admin.example.com) or a raw IP           |
+|  - Often the same as the mail server hostname                    |
+|  - Can be changed afterward via System > Console Settings        |
++------------------------------------------------------------------+
+
+EOF
+    local host
+    while true; do
+        read -p "Console Address [${default}]: " host
+        host="${host:-${default}}"
+        if validate_fqdn "$host" || validate_ipv4 "$host"; then
+            HERMES_CONSOLE_HOST="$host"
+            export HERMES_CONSOLE_HOST
+            log "Console address confirmed: ${HERMES_CONSOLE_HOST}"
+            return 0
+        fi
+        warn "Not a valid FQDN or IPv4 address. Try again."
+    done
+}
+
 prompt_host_ip() {
     # Required prompt — no default. Loops until a valid IPv4 is entered AND
     # explicitly confirmed. Stored value drives parameters2.server_ip,
@@ -933,17 +1076,33 @@ generate_compose_override() {
         cp "$ENV_TEMPLATE" "$ENV_FILE"
     fi
 
-    # Substitute install-time placeholders with actual values. CONSOLE_HOST
-    # and HERMES_HOSTNAME both get the IP initially -- admin can change
-    # them to an FQDN later via the admin UI (System -> Console Settings).
-    local ip="${HERMES_HOST_IP:-$(state_get_value "03-host-ip-confirmed")}"
+    # Substitute install-time placeholders with the values captured by
+    # prompt_host_ip / prompt_mail_hostname / prompt_console_host. Admin
+    # can change any of these later via System > Server Setup or System >
+    # Console Settings in the admin UI.
+    local ip mail_host console_host trusted
+    ip="${HERMES_HOST_IP:-$(state_get_value "03-host-ip-confirmed")}"
+    mail_host="${HERMES_MAIL_HOSTNAME:-$(state_get_value "04-mail-hostname-confirmed")}"
+    console_host="${HERMES_CONSOLE_HOST:-$(state_get_value "05-console-host-confirmed")}"
+
+    # NEXTCLOUD_TRUSTED_DOMAINS is a comma-separated list. Include every
+    # address from which Nextcloud may legitimately be reached. Deduped to
+    # avoid "192.168.1.1,192.168.1.1" when mail_host == console_host == IP.
+    {
+        echo "$ip"
+        [[ -n "$mail_host"    && "$mail_host"    != "$ip" ]] && echo "$mail_host"
+        [[ -n "$console_host" && "$console_host" != "$ip" && "$console_host" != "$mail_host" ]] && echo "$console_host"
+    } >/tmp/.hermes_trusted.$$ 2>/dev/null || true
+    trusted=$(paste -sd ',' /tmp/.hermes_trusted.$$ 2>/dev/null)
+    rm -f /tmp/.hermes_trusted.$$
+
     if [[ -n "$ip" ]]; then
-        log "Substituting HOST_IP / CONSOLE_HOST / HERMES_HOSTNAME = ${ip}..."
+        log "Substituting HOST_IP = ${ip}, HERMES_HOSTNAME = ${mail_host:-${ip}}, CONSOLE_HOST = ${console_host:-${ip}}..."
         sed -i \
             -e "s|^HOST_IP=.*|HOST_IP=${ip}|" \
-            -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${ip}|" \
-            -e "s|^HERMES_HOSTNAME=.*|HERMES_HOSTNAME=${ip}|" \
-            -e "s|^NEXTCLOUD_TRUSTED_DOMAINS=.*|NEXTCLOUD_TRUSTED_DOMAINS=${ip}|" \
+            -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${console_host:-${ip}}|" \
+            -e "s|^HERMES_HOSTNAME=.*|HERMES_HOSTNAME=${mail_host:-${ip}}|" \
+            -e "s|^NEXTCLOUD_TRUSTED_DOMAINS=.*|NEXTCLOUD_TRUSTED_DOMAINS=${trusted}|" \
             "$ENV_FILE"
     fi
 
@@ -1508,20 +1667,11 @@ generate_amavis_50user_config() {
     fi
 
     # Split hostname into name + domain: smtp.example.com -> smtp / example.com.
-    # Bare-IP HERMES_HOSTNAME (the install default before admin sets a real
-    # hostname) would split into nonsense like 192 / 168.30.18 -- substitute
-    # the Hermes-canonical placeholder so amavis sees a sane SERVER-NAME /
-    # SERVER-DOMAIN. CFML's amavis re-render rewrites these on first save.
-    # Same approach as postfix's myhostname handling per
-    # [[feedback-demo-data-domain]].
-    local server_name server_domain
-    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        server_name="smtp"
-        server_domain="domain.tld"
-    else
-        server_name="${hermes_hostname%%.*}"
-        server_domain="${hermes_hostname#*.}"
-    fi
+    # HERMES_HOSTNAME is now an FQDN by construction (prompt_mail_hostname
+    # validates) so the split is always safe. CFML's amavis re-render rewrites
+    # these on first save from System > Server Setup.
+    local server_name="${hermes_hostname%%.*}"
+    local server_domain="${hermes_hostname#*.}"
 
     # Recover from Docker's empty-dir-at-missing-source failure mode.
     [[ -e "$target" ]] && rm -rf "$target"
@@ -1645,16 +1795,8 @@ generate_authelia_config() {
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
     # Domain portion (after the first dot) for the SMTP From address.
-    # Bare-IP HERMES_HOSTNAME would split into nonsense like 168.30.18 and
-    # produce `no-reply@168.30.18` (technically valid but ugly). Use the
-    # Hermes-canonical placeholder per [[feedback-demo-data-domain]];
-    # admin can change once a real hostname is configured.
-    local server_domain
-    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        server_domain="domain.tld"
-    else
-        server_domain="${hermes_hostname#*.}"
-    fi
+    # HERMES_HOSTNAME is FQDN by construction (prompt_mail_hostname validates).
+    local server_domain="${hermes_hostname#*.}"
 
     mkdir -p "$target_dir"
     [[ -e "$target" ]] && rm -rf "$target"
@@ -1745,14 +1887,9 @@ generate_postfix_configs() {
         error "HERMES_HOSTNAME missing from .env -- run generate_compose_override first"
     fi
 
-    # Domain portion. Bare-IP HERMES_HOSTNAME would split into nonsense
-    # (e.g. 168.30.18). Use Hermes-canonical placeholder per
-    # [[feedback-demo-data-domain]]; admin overrides via UI.
-    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        server_domain="domain.tld"
-    else
-        server_domain="${hermes_hostname#*.}"
-    fi
+    # Domain portion. HERMES_HOSTNAME is FQDN by construction
+    # (prompt_mail_hostname validates).
+    server_domain="${hermes_hostname#*.}"
 
     # ---- main.cf: render from CANONICAL template ----
     # The canonical postfix template lives at
@@ -1770,20 +1907,12 @@ generate_postfix_configs() {
     local main_target="${target_dir}/main.cf"
     if [[ -f "$main_template" ]]; then
         [[ -e "$main_target" ]] && rm -rf "$main_target"
-        # Postfix rejects bare IPs for myhostname (must be FQDN-form;
-        # `postmulti[N]: fatal: parameter myhostname: bad parameter value`).
-        # When HERMES_HOSTNAME is a bare IP -- the install default before
-        # admin sets a real hostname -- substitute the Hermes-canonical
-        # placeholder (smtp.domain.tld; matches the demo-data convention
-        # per [[feedback-demo-data-domain]]) for postfix only. CFML's
-        # generate_postfix_configuration.cfm rewrites this on first save
-        # from the System Settings UI.
+        # HERMES_HOSTNAME is FQDN by construction (prompt_mail_hostname
+        # validates), so it's directly usable as Postfix myhostname (which
+        # requires FQDN form). CFML's generate_postfix_configuration.cfm
+        # rewrites main.cf on any subsequent save from System > Server Setup.
         local postfix_hostname="$hermes_hostname"
         local postfix_origin="$server_domain"
-        if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            postfix_hostname="smtp.domain.tld"
-            postfix_origin="domain.tld"
-        fi
         # TLS cert paths point at the self-signed bootstrap cert generated
         # by generate_self_signed_cert() -- same one nginx uses. Admin
         # uploads a real cert via the System Certificates UI; CFML's
@@ -1872,7 +2001,8 @@ generate_nginx_config() {
     # gitignored to prevent re-confusion.
     #
     # Bootstrap defaults applied:
-    #   hermes_server_name      -> HERMES_HOSTNAME from .env
+    #   hermes_server_name      -> CONSOLE_HOST from .env (the address admins
+    #                              type in the browser to reach /admin/)
     #   hermes_ssl_certificate  -> /etc/letsencrypt/live/<hostname>/fullchain.pem
     #   hermes_ssl_key          -> /etc/letsencrypt/live/<hostname>/privkey.pem
     #   hermes_hsts             -> empty (admin enables via UI)
@@ -1880,7 +2010,12 @@ generate_nginx_config() {
     #   hermes_verify           -> empty (no client cert verify on bootstrap)
     #   hermes_fw_hermes        -> empty (no admin IP allowlist yet)
     #   hermes_fw_ciphermail    -> empty (same)
-    #   hermes_console_host     -> HERMES_HOSTNAME
+    #   hermes_console_host     -> CONSOLE_HOST (auth.conf, auth_request target)
+    #
+    # Both server_name and hermes_console_host use CONSOLE_HOST, NOT
+    # HERMES_HOSTNAME, because the nginx vhost is the WEB-FACING entry
+    # point. When console and mail hostnames differ, the mail hostname
+    # belongs to postfix's SMTP banner -- not nginx.
     #
     # Without these rendered files nginx falls back to its default site and
     # serves "Welcome to nginx!" instead of the Hermes admin console.
@@ -1900,11 +2035,11 @@ generate_nginx_config() {
         error "Auth canonical template missing: $auth_template"
     fi
 
-    local hermes_hostname
-    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+    local console_host
+    console_host=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
-    if [[ -z "$hermes_hostname" ]]; then
-        error "HERMES_HOSTNAME missing from .env"
+    if [[ -z "$console_host" ]]; then
+        error "CONSOLE_HOST missing from .env"
     fi
 
     # Point nginx at the self-signed bootstrap cert generated by
@@ -1921,7 +2056,7 @@ generate_nginx_config() {
     # literal container/log names and intentionally not substituted.
     [[ -e "$site_target" ]] && rm -rf "$site_target"
     sed \
-        -e "s|hermes_server_name|${hermes_hostname}|g" \
+        -e "s|hermes_server_name|${console_host}|g" \
         -e "s|hermes_ssl_certificate|${ssl_cert}|g" \
         -e "s|hermes_ssl_key|${ssl_key}|g" \
         -e "s|^[[:space:]]*hermes_hsts;[[:space:]]*\$|        # add_header Strict-Transport-Security \"max-age=31536000; preload\";|" \
@@ -1948,10 +2083,10 @@ generate_nginx_config() {
 
     # auth.conf snippet (single placeholder)
     [[ -e "$auth_target" ]] && rm -rf "$auth_target"
-    sed -e "s|hermes_console_host|${hermes_hostname}|g" "$auth_template" > "$auth_target"
+    sed -e "s|hermes_console_host|${console_host}|g" "$auth_template" > "$auth_target"
     log "  + config/nginx/etc/nginx/snippets/auth.conf"
 
-    log "Nginx configs rendered (domain=${hermes_hostname})"
+    log "Nginx configs rendered (server_name=${console_host})"
 }
 
 # ============================================================================
@@ -2523,42 +2658,36 @@ seed_install_specific_values() {
         return 0
     fi
 
-    local pass hermes_hostname server_name server_domain postfix_hostname
+    local pass hermes_hostname console_host server_name server_domain
     pass=$(cat "${CREDS_DIR}/mysql_root_password")
     hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
-    hermes_hostname="${hermes_hostname:-${ip}}"
-    # Bare-IP HERMES_HOSTNAME (install default before admin sets a real FQDN)
-    # would split into nonsense like 192 / 168.30.18 and would also fail
-    # postfix's valid_hostname() check on myhostname (must be FQDN-form).
-    # Substitute the Hermes-canonical placeholder per
-    # [[feedback-demo-data-domain]]. Mirrored in generate_postfix_main_cf
-    # and generate_amavis_50user_config so all three landings agree.
-    # Admin changes via System Settings UI once a real hostname is configured.
-    if [[ "$hermes_hostname" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-        server_name="smtp"
-        server_domain="domain.tld"
-        postfix_hostname="smtp.domain.tld"
-    else
-        server_name="${hermes_hostname%%.*}"
-        server_domain="${hermes_hostname#*.}"
-        postfix_hostname="$hermes_hostname"
+    console_host=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    if [[ -z "$hermes_hostname" ]]; then
+        warn "HERMES_HOSTNAME missing from .env -- skipping hostname-derived DB seed"
+        return 0
     fi
+    # HERMES_HOSTNAME is FQDN by construction (prompt_mail_hostname validates).
+    server_name="${hermes_hostname%%.*}"
+    server_domain="${hermes_hostname#*.}"
+    # CONSOLE_HOST may be either IP or FQDN per prompt_console_host. Falls
+    # back to the host IP only if the .env value somehow got lost.
+    console_host="${console_host:-${ip}}"
 
     # server_ip (module='network') — view_server_setup.cfm reads this row.
-    # Pre-correction: rule used module='console' (typo), missed the row.
     log "Writing parameters2.server_ip = ${ip} (module=network)..."
     docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
          WHERE parameter='server_ip' AND module='network';
     " 2>>"$LOG_FILE"
 
-    # console.host (module='console') — what the admin UI uses as its
-    # public hostname (CONSOLE_HOST in .env). Set to IP initially; admin
-    # changes to FQDN via the Console Settings page once DNS is in place.
-    log "Writing parameters2.console.host = ${ip}..."
+    # console.host (module='console') — what admins type in the browser to
+    # reach /admin/. Now driven by the install prompt (CONSOLE_HOST in .env)
+    # rather than always defaulting to the IP.
+    log "Writing parameters2.console.host = ${console_host}..."
     docker exec hermes_db_server mysql -u root hermes -e "
-        UPDATE parameters2 SET value2='${ip}', active='1', applied='2'
+        UPDATE parameters2 SET value2='${console_host}', active='1', applied='2'
          WHERE parameter='console.host' AND module='console';
     " 2>>"$LOG_FILE"
 
@@ -2573,13 +2702,12 @@ seed_install_specific_values() {
 
     # Postfix myorigin + myhostname child rows in parameters table.
     # view_server_setup.cfm reads these; generate_postfix_configuration.cfm
-    # postconf's main.cf from these values on Save. Use postfix_hostname
-    # (sanitized above) -- bare-IP would fail postfix's valid_hostname().
-    log "Writing parameters.myorigin = ${server_domain} / myhostname = ${postfix_hostname}..."
+    # postconf's main.cf from these values on Save.
+    log "Writing parameters.myorigin = ${server_domain} / myhostname = ${hermes_hostname}..."
     docker exec hermes_db_server mysql -u root hermes -e "
         UPDATE parameters SET parameter='${server_domain}'
          WHERE parent_name='myorigin' AND child=1 AND module='postfix' AND conf_file='main.cf';
-        UPDATE parameters SET parameter='${postfix_hostname}'
+        UPDATE parameters SET parameter='${hermes_hostname}'
          WHERE parent_name='myhostname' AND child=1 AND module='postfix' AND conf_file='main.cf';
     " 2>>"$LOG_FILE"
 
@@ -2723,14 +2851,17 @@ configure_ciphermail_portal_url() {
     # overwrites the property to the same value.
     header "Configuring Ciphermail User Portal URL"
 
-    local hermes_hostname portal_url
-    hermes_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+    local console_host portal_url
+    console_host=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" 2>/dev/null \
         | cut -d= -f2- | tr -d '"' | tr -d "'")
-    if [[ -z "$hermes_hostname" ]]; then
-        warn "HERMES_HOSTNAME missing from .env -- skipping ciphermail portal URL"
+    if [[ -z "$console_host" ]]; then
+        warn "CONSOLE_HOST missing from .env -- skipping ciphermail portal URL"
         return 0
     fi
-    portal_url="https://${hermes_hostname}/web/portal"
+    # Portal URL is end-recipient-facing (encrypted-email notifications link
+    # here). Uses CONSOLE_HOST -- the web-facing hostname -- so the URL works
+    # whether or not it matches the mail server hostname.
+    portal_url="https://${console_host}/web/portal"
 
     log "Setting user.portal.baseURL = ${portal_url} (global)..."
     # CipherMail's Tomcat + Spring + Hibernate startup takes 30-90s on fresh
@@ -2768,9 +2899,15 @@ write_install_summary() {
     # user-facing output of a successful install -- admins MUST save the
     # contents before logging out, then they can delete the file or
     # tighten its permissions as they see fit.
-    local ip
+    local ip mail_host mail_domain console_host
     ip=$(state_get_value "03-host-ip-confirmed")
     [[ -z "$ip" ]] && ip="${HERMES_HOST_IP:-<not-set>}"
+    mail_host=$(state_get_value "04-mail-hostname-confirmed" 2>/dev/null)
+    mail_domain=$(state_get_value "04-mail-domain-confirmed" 2>/dev/null)
+    console_host=$(state_get_value "05-console-host-confirmed" 2>/dev/null)
+    [[ -z "$mail_host"    ]] && mail_host="<not-set>"
+    [[ -z "$mail_domain"  ]] && mail_domain="<not-set>"
+    [[ -z "$console_host" ]] && console_host="$ip"
 
     local summary="${HERMES_ROOT}/INSTALL_SUMMARY.txt"
     local timestamp
@@ -2788,13 +2925,21 @@ write_install_summary() {
 
 ACCESS
 ------
-Console URL:        https://${ip}/admin/   (self-signed cert; browser will warn)
+Console URL:        https://${console_host}/admin/   (self-signed cert; browser will warn)
+                    (also works via raw IP: https://${ip}/admin/)
 Admin username:     $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")
 Admin password:     $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<not-generated>")
                     (bind DN: cn=<username>,ou=users,dc=hermes,dc=local;
                      member of cn=admins. Created by the OpenLDAP container
                      from HERMES_ADMIN_USERNAME (.env) + HERMES_ADMIN_PASSWORD
                      (Docker secret). This is what Authelia binds against.)
+
+SERVER IDENTITY
+---------------
+Mail Server Hostname: ${mail_host}     (Postfix myhostname / SMTP HELO)
+Mail Server Domain  : ${mail_domain}   (Postfix myorigin)
+Console Address     : ${console_host}  (nginx server_name for /admin/, /users/, /nc/)
+Host IP             : ${ip}            (Nextcloud trusted domains + cert SAN list)
 
 MARIADB
 -------
@@ -2833,17 +2978,29 @@ Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null ||
 
 NEXT STEPS (in admin UI)
 ------------------------
-1. Log in at https://${ip}/admin/   (self-signed cert — accept browser warning)
-2. System  -> Console Settings: change console host from IP to FQDN if needed
-3. System  -> SSL Certificates: install your real cert (Let's Encrypt or imported)
-4. Email Server -> Domains: add your first domain
-5. DNS records to set up at your registrar: A/AAAA, MX, SPF, DKIM, DMARC
+1. Log in at https://${console_host}/admin/   (self-signed cert — accept browser warning)
+2. System  -> Server Setup: confirm Mail Server Hostname / Domain
+3. System  -> Console Settings: confirm Console Address
+4. System  -> SSL Certificates: install your real cert (Let's Encrypt or imported)
+5. Email Server -> Domains: add your first domain
+
+DNS RECORDS TO CONFIGURE AT YOUR REGISTRAR
+------------------------------------------
+  ${mail_host}             A      ${ip}
+  ${mail_host}             PTR    ${ip}    (reverse DNS — request from hosting provider)
+  ${mail_domain}                  MX 10  ${mail_host}
+  ${mail_domain}                  TXT    "v=spf1 mx ~all"
+  _dmarc.${mail_domain}           TXT    "v=DMARC1; p=none; rua=mailto:postmaster@${mail_domain}"
+$( [[ "$console_host" != "$mail_host" && "$console_host" != "$ip" ]] && printf '  %s             A      %s\n' "$console_host" "$ip" )
+
+(DKIM TXT record gets generated later when you set up signing per-domain via
+ the admin UI -- Email Policies > DKIM.)
 
 RECOVERY
 --------
-If https://${ip}/admin/ does NOT load, the most likely cause is that the host
-IP you entered was wrong. Re-run the installer and pick option [2] (WIPE) to
-start over with a fresh IP.
+If https://${console_host}/admin/ does NOT load, the most likely cause is that
+the host IP or hostname you entered was wrong. Re-run the installer and pick
+option [2] (WIPE) to start over.
 
     cd ${HERMES_ROOT}
     ./scripts/install_hermes_docker.sh    # pick option [2] when prompted
@@ -2862,7 +3019,8 @@ EOF
     echo "================================================================================"
     echo "                INSTALL COMPLETE   -   SAVE THESE NOW"
     echo "================================================================================"
-    echo "Console URL:      https://${ip}/admin/   (self-signed; expect browser warning)"
+    echo "Console URL:      https://${console_host}/admin/   (self-signed; expect browser warning)"
+    echo "                  (or via raw IP: https://${ip}/admin/)"
     echo "Admin username:   $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'" || echo "<not-set>")"
     echo "Admin password:   $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<see INSTALL_SUMMARY.txt>")"
     echo ""
@@ -2872,7 +3030,8 @@ EOF
     echo "To view it:"
     echo "  sudo cat ${summary}"
     echo ""
-    echo "If https://${ip}/admin/ does NOT load, the IP was wrong. Re-run this"
+    echo "If https://${console_host}/admin/ does NOT load (and https://${ip}/admin/ does"
+    echo "not either), the host IP / hostname you entered was wrong. Re-run this"
     echo "installer and select [2] WIPE to start over."
     echo ""
     echo "================================================================================"
@@ -3074,10 +3233,16 @@ run_phase2_db_init() {
         # Nextcloud post-install configuration
         log "Configuring Nextcloud..."
 
-        # Read hostname from .env (needed for theming URL and OIDC discovery)
+        # Read CONSOLE_HOST from .env. Nextcloud's theming URL, OIDC discovery
+        # endpoint, user_oidc redirect URL, and External Sites link all need
+        # the WEB-FACING hostname (where admins type in the browser), NOT the
+        # mail server hostname. CONSOLE_HOST is the right value for all of
+        # these; when console and mail hostnames differ, using HERMES_HOSTNAME
+        # would point at the mail server's nginx vhost which doesn't serve
+        # /admin/.
         NC_HOSTNAME=""
         if [[ -f "${HERMES_ROOT}/.env" ]]; then
-            NC_HOSTNAME=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
+            NC_HOSTNAME=$(grep -E '^CONSOLE_HOST=' "${HERMES_ROOT}/.env" | cut -d'=' -f2- | tr -d '"' | tr -d "'")
         fi
 
         # Wait for Nextcloud's auto-install to complete. The official
@@ -3200,7 +3365,7 @@ run_phase2_db_init() {
         else
             log "  WARNING: Skipping OIDC provider registration (missing client secret or hostname)"
             [[ -z "$OIDC_CLIENT_SECRET" ]] && log "    - OIDC client secret not found at ${SECRETS_DIR}/authelia_identity_providers_oidc_clients_client_secret_plain_file"
-            [[ -z "$NC_HOSTNAME" ]] && log "    - HERMES_HOSTNAME not found in ${HERMES_ROOT}/.env"
+            [[ -z "$NC_HOSTNAME" ]] && log "    - CONSOLE_HOST not found in ${HERMES_ROOT}/.env"
         fi
 
         state_mark_done "10-nextcloud-configured"
@@ -3339,6 +3504,29 @@ main() {
         prompt_host_ip
         state_set_value "03-host-ip-confirmed" "$HERMES_HOST_IP"
         state_mark_done "03-host-ip-confirmed"
+    fi
+
+    if state_is_done "04-mail-hostname-confirmed"; then
+        HERMES_MAIL_HOSTNAME=$(state_get_value "04-mail-hostname-confirmed")
+        HERMES_MAIL_DOMAIN=$(state_get_value "04-mail-domain-confirmed")
+        export HERMES_MAIL_HOSTNAME HERMES_MAIL_DOMAIN
+        log "Skip: mail hostname already confirmed (${HERMES_MAIL_HOSTNAME} / ${HERMES_MAIL_DOMAIN})"
+    else
+        prompt_mail_hostname
+        state_set_value "04-mail-hostname-confirmed" "$HERMES_MAIL_HOSTNAME"
+        state_set_value "04-mail-domain-confirmed"   "$HERMES_MAIL_DOMAIN"
+        state_mark_done "04-mail-hostname-confirmed"
+        state_mark_done "04-mail-domain-confirmed"
+    fi
+
+    if state_is_done "05-console-host-confirmed"; then
+        HERMES_CONSOLE_HOST=$(state_get_value "05-console-host-confirmed")
+        export HERMES_CONSOLE_HOST
+        log "Skip: console address already confirmed (${HERMES_CONSOLE_HOST})"
+    else
+        prompt_console_host
+        state_set_value "05-console-host-confirmed" "$HERMES_CONSOLE_HOST"
+        state_mark_done "05-console-host-confirmed"
     fi
 
     if state_is_done "03b-dns-forwarders-configured"; then
