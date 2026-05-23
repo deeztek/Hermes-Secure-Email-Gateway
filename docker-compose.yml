@@ -6,9 +6,6 @@ secrets:
   LDAP_USER_PASSWORD:
     file: ./config/hermes/opt/hermes/keys/ldap_user_password_file
 
-  HERMES_ADMIN_PASSWORD:
-    file: ./config/hermes/opt/hermes/keys/hermes_admin_password_file
-
   AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET:
     file: ./config/hermes/opt/hermes/keys/authelia_identity_validation_reset_password_jwt_secret_file
 
@@ -734,12 +731,10 @@ services:
     secrets:
       - LDAP_ADMIN_PASSWORD
       - LDAP_USER_PASSWORD
-      - HERMES_ADMIN_PASSWORD
     environment:
       LDAP_DOMAIN: ${LDAP_DOMAIN}
       LDAP_ADMIN_USERNAME: ${LDAP_ADMIN_USERNAME}
       LDAP_USER_USERNAME: ${LDAP_USER_USERNAME}
-      HERMES_ADMIN_USERNAME: ${HERMES_ADMIN_USERNAME}
       LDAP_GROUPS: ${LDAP_GROUPS}
       LDAP_LOG_LEVEL: ${LDAP_LOG_LEVEL}
     healthcheck:

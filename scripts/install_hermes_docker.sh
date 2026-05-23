@@ -3111,20 +3111,19 @@ configure_authelia_mysql() {
 # ============================================================================
 
 initialize_ldap() {
-    header "Initializing LDAP Directory"
+    header "Initializing LDAP application admin"
 
-    # Use ldapi:// + SASL EXTERNAL (matches Docker/openldap entrypoint and
-    # config/ldap/hermes/add_remoteauth_overlay.sh — the canonical Hermes
-    # pattern). docker exec runs as root inside the container, the socket
-    # bind maps to root via SASL EXTERNAL, and slapd's olcAccess grants
-    # that mapping admin privilege. No password needed.
+    # All operations use ldapi:// + SASL EXTERNAL. docker exec runs as root
+    # inside the container, the socket maps that to the peercred root identity,
+    # and slapd's olcAccess grants it admin privilege -- no bind password
+    # needed. Matches the canonical Hermes pattern in the container's
+    # entrypoint and config/ldap/hermes/add_remoteauth_overlay.sh.
     local LDAPI_URI="ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi"
 
-    # Wait for OpenLDAP to be ready (container is named hermes_ldap per compose).
-    # Probe by exit code: root DSE search succeeds (exit 0) only when slapd
-    # is accepting binds. Earlier versions grepped for `namingContexts` but
-    # that's an operational attribute -- not returned by default and the
-    # grep always failed regardless of slapd state.
+    # Wait for OpenLDAP to be ready. The container's entrypoint creates the
+    # base layout (rootDN, service account, ou=users, ou=groups, group
+    # entries) before slapd serves requests, so once the root DSE search
+    # succeeds we know the layout is in place.
     log "Waiting for OpenLDAP to be ready..."
     for i in {1..30}; do
         if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "" -s base "(objectClass=*)" >/dev/null 2>&1; then
@@ -3137,19 +3136,100 @@ initialize_ldap() {
         sleep 2
     done
 
-    # Check if base structure already exists (SASL EXTERNAL via socket; no
-    # cn=admin bind needed because root-via-socket already has admin rights).
-    # ldapsearch returns 0 if entry exists, 32 (No such object) if not.
-    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" -b "ou=users,dc=hermes,dc=local" -s base "(objectClass=*)" >/dev/null 2>&1; then
-        log "LDAP base structure already exists"
-        return
+    # ---- Resolve credentials for the application admin we're about to create ----
+    local hermes_admin_user hermes_admin_pass mail_domain
+    hermes_admin_user=$(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+    mail_domain=$(state_get_value "04-mail-domain-confirmed" 2>/dev/null)
+    [[ -z "$mail_domain" ]] && mail_domain="hermes.local"
+    if [[ -z "$hermes_admin_user" ]]; then
+        error "HERMES_ADMIN_USERNAME missing from .env -- run generate_compose_override first"
+    fi
+    if [[ ! -f "${SECRETS_DIR}/hermes_admin_password_file" ]]; then
+        error "hermes_admin_password_file missing from ${SECRETS_DIR}/ -- run generate_secrets first"
+    fi
+    hermes_admin_pass=$(cat "${SECRETS_DIR}/hermes_admin_password_file")
+    if [[ -z "$hermes_admin_pass" ]]; then
+        error "hermes_admin_password_file is empty"
     fi
 
-    log "Creating LDAP base structure..."
-    # The base structure should be created by the LDAP container's seed data
-    # This is a placeholder for any additional initialization
+    local base_dn="dc=hermes,dc=local"
+    local hermes_admin_dn="cn=${hermes_admin_user},ou=users,${base_dn}"
+    local admins_group_dn="cn=admins,ou=groups,${base_dn}"
 
-    log "LDAP initialization completed"
+    # ---- 1. Create the LDAP user entry under ou=users (idempotent) ----
+    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" \
+           -b "$hermes_admin_dn" -s base dn 2>/dev/null | grep -q "^dn:"; then
+        log "LDAP entry ${hermes_admin_dn} already exists"
+    else
+        log "Creating ${hermes_admin_dn}..."
+        # Hash the password inside the container so we don't need slappasswd
+        # on the host. {ARGON2} matches the password-hash slapd setting from
+        # the entrypoint.
+        local pwhash
+        pwhash=$(docker exec hermes_ldap /usr/local/sbin/slappasswd \
+                    -o module-load=argon2.so -h '{ARGON2}' \
+                    -s "$hermes_admin_pass" 2>>"$LOG_FILE")
+        if [[ -z "$pwhash" ]]; then
+            error "slappasswd failed to hash the hermes admin password"
+        fi
+        # ldapadd via stdin to avoid leaving a password-bearing LDIF on disk.
+        docker exec -i hermes_ldap ldapadd -Y EXTERNAL -H "$LDAPI_URI" >>"$LOG_FILE" 2>&1 <<EOF
+dn: ${hermes_admin_dn}
+objectClass: inetOrgPerson
+cn: ${hermes_admin_user}
+sn: Administrator
+uid: ${hermes_admin_user}
+userPassword: ${pwhash}
+mail: ${hermes_admin_user}@${mail_domain}
+EOF
+        log "  Created ${hermes_admin_dn}"
+    fi
+
+    # ---- 2. Add the user to cn=admins (idempotent) ----
+    if docker exec hermes_ldap ldapsearch -Y EXTERNAL -H "$LDAPI_URI" \
+           -b "$admins_group_dn" -s base "(member=${hermes_admin_dn})" dn 2>/dev/null \
+           | grep -q "^dn:"; then
+        log "${hermes_admin_user} already a member of cn=admins"
+    else
+        log "Adding ${hermes_admin_user} to cn=admins..."
+        docker exec -i hermes_ldap ldapmodify -Y EXTERNAL -H "$LDAPI_URI" >>"$LOG_FILE" 2>&1 <<EOF
+dn: ${admins_group_dn}
+changetype: modify
+add: member
+member: ${hermes_admin_dn}
+EOF
+        log "  Added to cn=admins"
+    fi
+
+    # ---- 3. Mirror the user into system_users so the CFML UI lists it ----
+    # CFML's view_system_users reads from this table. Without a row here the
+    # bootstrap admin would authenticate via Authelia but not appear in the
+    # admin UI's user list and not be manageable through it.
+    # system=1 marks this as a built-in/install-created row (UI may gate
+    # delete/edit on system=2). access_control='admins' mirrors the LDAP
+    # group; auth_type='local' matches the CFML "Add Local User" flow.
+    log "Mirroring admin into system_users (system=1, access_control='admins')..."
+    docker exec hermes_db_server mysql -u root hermes -e "
+        INSERT INTO system_users
+          (username, email, first_name, last_name,
+           system, applied, access_control,
+           auth_type, remoteauth_domain, password,
+           ldap_synced)
+        SELECT
+          '${hermes_admin_user}',
+          '${hermes_admin_user}@${mail_domain}',
+          'Hermes',
+          'Administrator',
+          1, 1, 'admins',
+          'local', '', '',
+          1
+        WHERE NOT EXISTS (
+          SELECT 1 FROM system_users WHERE username = '${hermes_admin_user}'
+        );
+    " 2>>"$LOG_FILE"
+
+    log "LDAP application admin initialization completed (${hermes_admin_user})"
 }
 
 # ============================================================================
