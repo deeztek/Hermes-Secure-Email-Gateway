@@ -500,15 +500,31 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <div class="mb-3">
             <label class="form-label"><strong>Subject Alternative Names</strong> (one DNS name per line)</label>
             <cfoutput>
-            <textarea class="form-control font-monospace" name="sans" rows="6" placeholder="autoconfig.widgets.tld&##10;autodiscover.widgets.tld">#csrSanPrefill#</textarea>
+            <cfif getCsrSans.recordCount GT 0>
+              <textarea class="form-control font-monospace" name="sans" rows="6">#csrSanPrefill#</textarea>
+              <div class="form-text">
+                Pre-filled from your mailbox-hosting domains crossed with the prefixes in
+                <a href="view_mailbox_sans.cfm">SAN Management</a> (<code>autoconfig</code>,
+                <code>autodiscover</code>, plus any custom prefixes you've added).
+                Edit freely &mdash; the Common Name is added automatically, so you don't
+                need to repeat it here. Clear the field entirely if this cert is for the
+                admin console only with no mailbox use.
+              </div>
+            <cfelse>
+              <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="No mailbox-hosting domains configured yet -- this field will auto-populate once you add some."></textarea>
+              <div class="form-text">
+                This field auto-populates from your mailbox-hosting domains crossed with
+                the prefixes in <a href="view_mailbox_sans.cfm">SAN Management</a>
+                (<code>autoconfig</code>, <code>autodiscover</code>, plus any custom
+                prefixes). You currently have <strong>no mailbox-hosting domains</strong>
+                &mdash; add them in
+                <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a> first,
+                then re-open this dialog to see the SANs pre-filled. The Common Name is
+                always included automatically, so a cert generated now would cover the CN
+                only.
+              </div>
+            </cfif>
             </cfoutput>
-            <div class="form-text">
-              Pre-filled from your mailbox-hosting domains crossed with the prefixes in
-              <a href="view_mailbox_sans.cfm">SAN Management</a> (<code>autoconfig</code>,
-              <code>autodiscover</code>, plus any custom prefixes you've added).
-              The Common Name is added automatically -- you don't need to repeat it here.
-              Leave blank if this cert is for the admin console only with no mailbox use.
-            </div>
           </div>
           <div class="mb-3">
             <label class="form-label"><strong>Encryption Length</strong></label>
