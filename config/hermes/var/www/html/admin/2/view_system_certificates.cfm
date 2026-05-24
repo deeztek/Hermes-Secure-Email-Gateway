@@ -89,29 +89,26 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   ORDER BY subdomain ASC
 </cfquery>
 
-<!--- Auto-populate candidate SANs for the Generate CSR modal (#243).
-     Same source the Pro ACME flow uses (inc/sync_mailbox_sans.cfm):
-     additional_sans cross-joined with mailbox-hosting domains.
-     Result is one DNS name per line, sorted. The CN is auto-prepended
-     in cert_action.cfm at validation time. --->
-<cfquery name="getCsrSans" datasource="hermes">
-  SELECT DISTINCT CONCAT(a.san, '.', d.domain) AS fqdn
-  FROM additional_sans a
-  CROSS JOIN domains d
-  INNER JOIN mailbox_domains md ON md.domain = d.domain
-  ORDER BY fqdn
-</cfquery>
-<cfset csrSanPrefill = ValueList(getCsrSans.fqdn, chr(10))>
-
-<!--- SAN prefix list for the "planned mailbox domains" assist (#245).
-     When no mailbox-hosting domains exist yet, the modal exposes a
-     planned-domains input so the admin can pre-generate SANs for the
-     CSR they're about to hand to the CA. JS cross-joins these prefixes
-     with the admin's typed domain list. --->
+<!--- SAN prefix list for the Generate CSR mailbox-cert path (#246).
+     Hermes' canonical model is one mailbox cert = one mailbox domain
+     (matching the Pro ACME path in inc/mailbox_domain_add_action.cfm).
+     Per-domain mandatory SANs are autoconfig + autodiscover (seeded
+     system=1) plus any custom prefixes the admin has added in SAN
+     Management. JS uses this list to render the live mandatory-SAN
+     preview as admin types a mailbox domain in the modal; backend
+     cert_action.cfm uses the same source to auto-inject the SANs at
+     submission. --->
 <cfquery name="getCsrSanPrefixes" datasource="hermes">
   SELECT san FROM additional_sans ORDER BY san
 </cfquery>
 <cfset csrSanPrefixesList = ValueList(getCsrSanPrefixes.san)>
+
+<!--- Used only for the radio-toggle smart default in the CSR modal.
+     If any mailbox-hosting domains exist, default to "Mailbox"; else
+     default to "Server". --->
+<cfquery name="getMailboxDomainCount" datasource="hermes">
+  SELECT COUNT(*) AS c FROM mailbox_domains
+</cfquery>
 
 <!--- Read security settings --->
 <cfset allowCertDownload = false>
@@ -211,12 +208,16 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           </div>
           <div class="card-body">
             <p class="text-muted small mb-2"><strong>Cost:</strong> typically $50&ndash;$200/year</p>
-            <p class="mb-2"><strong>Required if this Hermes hosts mailboxes.</strong> The cert must cover:</p>
+            <p class="mb-2">
+              <strong>One cert per mailbox domain.</strong> If you host mailboxes
+              for multiple email domains, generate a separate cert for each.
+              Each cert must cover:
+            </p>
             <ul class="mb-2">
-              <li>The Common Name (your primary mail hostname)</li>
-              <li><code>autoconfig.&lt;domain&gt;</code> for each mailbox domain</li>
-              <li><code>autodiscover.&lt;domain&gt;</code> for each mailbox domain</li>
-              <li>Any custom subdomain prefixes from <a href="view_mailbox_sans.cfm">SAN Management</a></li>
+              <li>The Common Name (e.g. <code>mail.widgets.tld</code>)</li>
+              <li><code>autoconfig.&lt;domain&gt;</code> &mdash; <em>mandatory</em>, auto-included</li>
+              <li><code>autodiscover.&lt;domain&gt;</code> &mdash; <em>mandatory</em>, auto-included</li>
+              <li>Any custom subdomain prefixes from <a href="view_mailbox_sans.cfm">SAN Management</a> &mdash; auto-included</li>
             </ul>
             <p class="mb-2">
               When ordering, ask your CA for a <strong>UCC certificate</strong>,
@@ -552,21 +553,22 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
           <!--- Cert-purpose radio toggle (#244). Smart default: Mailbox if
                mailbox_domains has rows, Server otherwise. The radio is
-               informational + drives the show/hide for the cost warning
-               and SAN textarea help text; sanitization in cert_action.cfm
-               is the same either way (CN auto-prepended, CAB compliance). --->
+               informational + drives the show/hide for the cost warning,
+               mailbox-domain input, and mandatory-SAN preview. Sanitization
+               in cert_action.cfm enforces autoconfig/autodiscover + custom
+               prefixes for mailbox certs regardless. --->
           <cfoutput>
           <div class="mb-3 p-3 border rounded bg-body-secondary">
             <label class="form-label mb-2"><strong>Certificate purpose</strong> &mdash; pick the use case for this cert</label>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeServer" value="server" <cfif getCsrSans.recordCount EQ 0>checked</cfif>>
+              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeServer" value="server" <cfif getMailboxDomainCount.c EQ 0>checked</cfif>>
               <label class="form-check-label" for="purposeServer">
                 <strong>Server certificate</strong> &mdash; admin console / SMTP / relay-only
                 <span class="text-muted">(single-name DV, ~$10/yr)</span>
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeMailbox" value="mailbox" <cfif getCsrSans.recordCount GT 0>checked</cfif>>
+              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeMailbox" value="mailbox" <cfif getMailboxDomainCount.c GT 0>checked</cfif>>
               <label class="form-check-label" for="purposeMailbox">
                 <strong>Mailbox certificate</strong> &mdash; covers mailbox autoconfig / autodiscover
                 <span class="text-muted">(SAN / UCC, $50&ndash;$200/yr)</span>
@@ -574,32 +576,6 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             </div>
           </div>
           </cfoutput>
-
-          <!--- Planned-domains assist (#245). Only shown for the
-               narrow Community-fresh-install case: cert_purpose=mailbox
-               AND no mailbox-hosting domains exist yet. JS cross-joins
-               the typed domains with system SAN prefixes and rewrites
-               the SAN textarea below. The block is rendered always but
-               hidden via JS when the conditions aren't met. --->
-          <cfif getCsrSans.recordCount EQ 0>
-            <div id="csrPlannedDomains" class="mb-3">
-              <label class="form-label" for="plannedDomainsInput">
-                <strong>Planned mailbox domains</strong>
-                <span class="text-muted small">(space- or comma-separated)</span>
-              </label>
-              <input type="text" class="form-control font-monospace"
-                     id="plannedDomainsInput"
-                     placeholder="acme.tld widgets.tld">
-              <div class="form-text">
-                You don't have mailbox-hosting domains configured yet, so we
-                can't auto-populate from your DB. Type the domain names this
-                cert will need to cover (the ones you're about to add in
-                <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a>)
-                and we'll generate the SAN list below. The Common Name is
-                added automatically at submission.
-              </div>
-            </div>
-          </cfif>
 
           <!--- Cost warning shown only when purpose=mailbox. JS toggles
                visibility based on the radio above. --->
@@ -641,30 +617,61 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <input type="text" class="form-control" name="department" placeholder="IT Department">
           </div>
           <div class="mb-3">
-            <label class="form-label"><strong>Common Name</strong> (domain name)</label>
-            <input type="text" class="form-control" name="commonname" placeholder="widgets.tld">
+            <label class="form-label"><strong>Common Name</strong> (primary mail hostname, e.g. <code>mail.widgets.tld</code>)</label>
+            <input type="text" class="form-control" name="commonname" placeholder="mail.widgets.tld">
           </div>
-          <div class="mb-3">
-            <label class="form-label"><strong>Subject Alternative Names</strong> (one DNS name per line)</label>
-            <cfoutput>
-            <textarea class="form-control font-monospace" name="sans" rows="6">#csrSanPrefill#</textarea>
-            </cfoutput>
 
-            <!--- Help text variants. JS toggles which one is visible based
-                 on the radio above. Both reference the same SAN field. --->
+          <!--- Singular mailbox-domain input (#246). Shown only when
+               cert_purpose=mailbox. Hermes-canonical model is one cert
+               per mailbox domain (matches Pro ACME pattern in
+               inc/mailbox_domain_add_action.cfm). JS updates the
+               mandatory-SAN preview below as admin types. --->
+          <div id="csrMailboxDomainBlock" class="mb-3">
+            <label class="form-label" for="mailboxDomainInput">
+              <strong>Mailbox domain</strong>
+              <span class="text-muted small">(the email domain you're hosting mailboxes for)</span>
+            </label>
+            <input type="text" class="form-control font-monospace"
+                   id="mailboxDomainInput" name="mailbox_domain"
+                   placeholder="widgets.tld">
+            <div class="form-text">
+              One mailbox cert covers one mailbox domain. If you host mailboxes
+              for multiple email domains, generate a separate cert for each.
+              (Pro Edition's Auto mode handles this automatically when you add
+              a domain in <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a>.)
+            </div>
+          </div>
+
+          <!--- Read-only mandatory-SAN preview (#246). JS rebuilds this
+               list whenever the mailbox-domain input changes. The SANs
+               here are non-negotiable for mailbox certs and are injected
+               by cert_action.cfm regardless of what the admin types in
+               the Additional SANs textarea below. --->
+          <div id="csrMandatorySansBlock" class="mb-3">
+            <label class="form-label"><strong>SANs that will be included</strong> <span class="text-muted small">(read-only)</span></label>
+            <div id="csrMandatorySansPreview" class="border rounded p-2 bg-body-tertiary font-monospace small" style="min-height:5rem;">
+              <span class="text-muted">Type a mailbox domain above to see the SANs that will be on the cert.</span>
+            </div>
+            <div class="form-text">
+              <code>autoconfig.&lt;domain&gt;</code> and <code>autodiscover.&lt;domain&gt;</code>
+              are <strong>mandatory</strong> for any mailbox cert and are always included
+              &mdash; you don't need to (and can't) opt out. Any custom prefixes you've
+              added in <a href="view_mailbox_sans.cfm">SAN Management</a> are also expanded
+              automatically against the mailbox domain.
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one DNS name per line)</span></label>
+            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="extra-name.widgets.tld"></textarea>
+
+            <!--- Help text variants. JS toggles which one is visible
+                 based on the cert_purpose radio. --->
             <div id="csrSanHelpMailbox" class="form-text">
-              <cfif getCsrSans.recordCount GT 0>
-                Pre-filled from your mailbox-hosting domains crossed with the prefixes in
-                <a href="view_mailbox_sans.cfm">SAN Management</a> (<code>autoconfig</code>,
-                <code>autodiscover</code>, plus any custom prefixes you've added).
-                Edit freely &mdash; the Common Name is added automatically, so you don't
-                need to repeat it here.
-              <cfelse>
-                <strong>No mailbox-hosting domains configured yet</strong> &mdash; add them in
-                <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a> first,
-                then re-open this dialog to see the SANs pre-filled. A cert generated now
-                would cover only the Common Name.
-              </cfif>
+              Leave blank in most cases &mdash; the mandatory SANs above already cover
+              what mailbox clients need. Only add entries here if you want the cert to
+              cover additional non-standard names (e.g. a vanity hostname that points at
+              this Hermes). Duplicates of the mandatory SANs are dropped silently.
             </div>
 
             <div id="csrSanHelpServer" class="form-text" style="display:none;">
@@ -724,70 +731,67 @@ $(document).ready(function() {
     }
   });
 
-  // CSR modal -- cert purpose radio toggle (#244).
-  // Server: hide cost warning + mailbox help, show server help, clear SAN
-  //         textarea if it still holds the default prefill (preserves admin edits).
-  // Mailbox: show cost warning + mailbox help, hide server help, restore prefill
-  //         if textarea is currently empty (preserves admin edits).
-  var csrSanDefault = $('#csrModal textarea[name="sans"]').val();
+  // CSR modal (#244 + #246) -- cert purpose radio toggle + mandatory-SAN
+  // preview for mailbox certs.
+  //
+  // Server: hide cost warning + mailbox-domain input + mandatory-SAN preview
+  //         + mailbox help. Show server help. Additional-SANs textarea stays
+  //         visible for optional custom SANs.
+  // Mailbox: show cost warning + mailbox-domain input + mandatory-SAN preview
+  //          + mailbox help. Hide server help. As admin types the mailbox
+  //          domain, the preview updates live from the system SAN prefixes
+  //          (autoconfig, autodiscover, plus custom from additional_sans).
+  //          The same expansion is enforced server-side by cert_action.cfm.
   <cfoutput>
   var csrSanPrefixes = "#csrSanPrefixesList#".split(',').filter(function(p) { return p.length > 0; });
   </cfoutput>
 
   function applyCsrPurpose() {
     var purpose = $('#csrModal input[name="cert_purpose"]:checked').val();
-    var $textarea = $('#csrModal textarea[name="sans"]');
-    var current = $textarea.val();
     if (purpose === 'mailbox') {
       $('#csrMailboxWarning').show();
+      $('#csrMailboxDomainBlock').show();
+      $('#csrMandatorySansBlock').show();
       $('#csrSanHelpMailbox').show();
       $('#csrSanHelpServer').hide();
-      $('#csrPlannedDomains').show();
-      if (current.trim() === '') {
-        $textarea.val(csrSanDefault);
-      }
+      updateMandatorySansPreview();
     } else {
       $('#csrMailboxWarning').hide();
+      $('#csrMailboxDomainBlock').hide();
+      $('#csrMandatorySansBlock').hide();
       $('#csrSanHelpMailbox').hide();
       $('#csrSanHelpServer').show();
-      $('#csrPlannedDomains').hide();
-      if (current === csrSanDefault) {
-        $textarea.val('');
-      }
     }
   }
-  $('#csrModal input[name="cert_purpose"]').on('change', applyCsrPurpose);
-  applyCsrPurpose();
 
-  // CSR modal -- planned-domains assist (#245).
-  // When the cross-join prefill came back empty (no mailbox_domains in DB),
-  // the modal exposes a planned-domains input. As the admin types domains,
-  // we cross-join with the system SAN prefixes (autoconfig, autodiscover,
-  // plus any custom) and rewrite the SAN textarea. Idempotent: editing the
-  // input updates the textarea each time. If the admin then manually edits
-  // the textarea, the next planned-domains change overwrites their edits --
-  // documented trade-off.
-  function regenSansFromPlannedDomains() {
-    var raw = $('#plannedDomainsInput').val() || '';
-    var domains = raw.split(/[\s,]+/).map(function(d) {
-      return d.trim().toLowerCase();
-    }).filter(function(d) {
-      // RFC 1123-ish: lower-alpha + digit + dot + hyphen; reject empty + invalid
-      return d.length > 0 && /^[a-z0-9.\-]+$/.test(d);
-    });
-    if (domains.length === 0 || csrSanPrefixes.length === 0) {
-      $('#csrModal textarea[name="sans"]').val('');
+  function updateMandatorySansPreview() {
+    var domain = ($('#mailboxDomainInput').val() || '').trim().toLowerCase();
+    var $preview = $('#csrMandatorySansPreview');
+    if (domain.length === 0) {
+      $preview.html('<span class="text-muted">Type a mailbox domain above to see the SANs that will be on the cert.</span>');
       return;
     }
-    var sans = [];
-    domains.forEach(function(d) {
-      csrSanPrefixes.forEach(function(p) {
-        sans.push(p + '.' + d);
-      });
+    if (!/^[a-z0-9.\-]+$/.test(domain)) {
+      $preview.html('<span class="text-danger">Invalid domain &mdash; only letters, numbers, dots, and hyphens are allowed.</span>');
+      return;
+    }
+    if (csrSanPrefixes.length === 0) {
+      $preview.html('<span class="text-warning">No SAN prefixes configured in SAN Management.</span>');
+      return;
+    }
+    var lines = csrSanPrefixes.map(function(p) {
+      return p + '.' + domain;
     });
-    $('#csrModal textarea[name="sans"]').val(sans.join('\n'));
+    var html = '';
+    lines.forEach(function(line) {
+      html += '<div>' + line + '</div>';
+    });
+    $preview.html(html);
   }
-  $('#plannedDomainsInput').on('input', regenSansFromPlannedDomains);
+
+  $('#csrModal input[name="cert_purpose"]').on('change', applyCsrPurpose);
+  $('#mailboxDomainInput').on('input', updateMandatorySansPreview);
+  applyCsrPurpose();
 });
 
 function openDeleteModal(id, name) {

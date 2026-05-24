@@ -48,26 +48,59 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>
 
-  <!--- Cert purpose (#244). Informational only -- SAN sanitization is the
-       same either way (CN auto-prepended for CAB Forum compliance). Kept
-       for future use (telemetry / audit log of generated CSRs). --->
+  <!--- Cert purpose (#244 / #246). Server vs Mailbox drives the
+       mandatory-SAN expansion below. --->
   <cfparam name="form.cert_purpose" default="mailbox">
   <cfif NOT ListFindNoCase("server,mailbox", form.cert_purpose)>
     <cfset form.cert_purpose = "mailbox">
   </cfif>
 
-  <!--- Sanitize the SAN list (#243). The textarea is newline-separated.
-       Per line: trim, lowercase, allow [a-z0-9.\-\*] (same chars as
-       the CN validation above), reject anything else. Dedupe, and
-       auto-prepend the CN so the cert always covers CN-as-SAN per
-       CAB Forum baseline rules. --->
+  <!--- Mailbox domain (#246). Required when cert_purpose=mailbox; ignored
+       for server certs. Sanitize same as CN. The mandatory autoconfig +
+       autodiscover + custom-prefix SANs are derived from this domain. --->
+  <cfparam name="form.mailbox_domain" default="">
+  <cfset mailboxDomainClean = LCase(trim(form.mailbox_domain))>
+  <cfif form.cert_purpose IS "mailbox">
+    <cfif Len(mailboxDomainClean) EQ 0>
+      <cfset session.m = "Generate CSR: Mailbox domain is required when generating a mailbox certificate.">
+      <cfset session.alerttype = "error">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
+    </cfif>
+    <cfif REFind("[^a-z0-9\.\-]", mailboxDomainClean) GT 0>
+      <cfset session.m = "Generate CSR: Invalid mailbox domain. Only letters, numbers, dashes, and periods are allowed.">
+      <cfset session.alerttype = "error">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
+    </cfif>
+  </cfif>
+
+  <!--- Build the final SAN list (#243 / #246). Order:
+         1. CN (always, CAB Forum requires CN-as-SAN since 2017)
+         2. Mandatory SANs for mailbox certs: each <prefix>.<mailbox_domain>
+            for every row in additional_sans (autoconfig + autodiscover +
+            any custom prefixes). Non-negotiable for mailbox certs.
+         3. Admin-supplied "Additional SANs" textarea entries, sanitized
+            per line and deduped against the above.
+       Per line: trim, lowercase, allow [a-z0-9.\-\*] (same chars as the
+       CN validation above). Dedupe is silent: if admin types one of the
+       mandatory SANs, it's dropped without error. --->
   <cfparam name="form.sans" default="">
-  <cfset sanRaw = form.sans>
   <cfset sanClean = ArrayNew(1)>
   <cfset cnLower = LCase(trim(form.commonname))>
   <cfset ArrayAppend(sanClean, cnLower)>
 
-  <cfloop list="#sanRaw#" index="oneSan" delimiters="#chr(10)#">
+  <cfif form.cert_purpose IS "mailbox">
+    <cfquery name="getMandatoryPrefixes" datasource="hermes">
+      SELECT san FROM additional_sans ORDER BY san
+    </cfquery>
+    <cfloop query="getMandatoryPrefixes">
+      <cfset mandatoryFqdn = LCase(getMandatoryPrefixes.san) & "." & mailboxDomainClean>
+      <cfif NOT ArrayFind(sanClean, mandatoryFqdn)>
+        <cfset ArrayAppend(sanClean, mandatoryFqdn)>
+      </cfif>
+    </cfloop>
+  </cfif>
+
+  <cfloop list="#form.sans#" index="oneSan" delimiters="#chr(10)#">
     <cfset oneSan = LCase(trim(ReplaceList(oneSan, chr(13), "")))>
     <cfif Len(oneSan) EQ 0>
       <cfcontinue>
