@@ -117,12 +117,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   ORDER BY d.domain ASC
 </cfquery>
 
-<!--- Get all certificates usable for mailbox SAN binding --->
+<!--- Get all certificates usable for mailbox SAN binding (#248).
+     Includes real SAN certs (san='1') AND the bootstrap System
+     self-signed cert (file_name='bootstrap') so admin can pick the
+     bootstrap as a placeholder when no real SAN cert exists yet --
+     decouples mailbox-domain add from cert procurement. ORDER BY
+     puts real SAN certs first so the placeholder isn't the default.
+     The bootstrap row is visually marked in the dropdown render. --->
 <cfquery name="getCerts" datasource="hermes">
-  SELECT id, friendly_name, domain_name, type, file_name
+  SELECT id, friendly_name, domain_name, type, file_name, san
   FROM system_certificates
-  WHERE san = '1'
-  ORDER BY friendly_name ASC
+  WHERE san = '1' OR file_name = 'bootstrap'
+  ORDER BY (file_name = 'bootstrap') ASC, friendly_name ASC
 </cfquery>
 
 <!--- Get SAN prefixes for DNS guidance --->
@@ -381,13 +387,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <select class="form-select" name="cert_id" id="add_cert_id">
                 <option value="">-- Select certificate --</option>
                 <cfoutput query="getCerts">
-                <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
+                <cfif file_name EQ "bootstrap">
+                  <option value="#id#">#encodeForHTMLAttribute(friendly_name)# &mdash; TEMPORARY PLACEHOLDER (replace before production)</option>
+                <cfelse>
+                  <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
+                </cfif>
                 </cfoutput>
               </select>
               <small class="text-muted">
-                Only SAN-enabled certificates are shown. For imported certs, verify it includes
-                <code>autodiscover.</code> and <code>autoconfig.</code> subdomains (plus any
-                custom SAN prefixes configured in your system).
+                For production, <strong>only SAN-enabled certificates should be used</strong>
+                &mdash; the cert must cover <code>autoconfig.&lt;domain&gt;</code> and
+                <code>autodiscover.&lt;domain&gt;</code> (plus any custom prefixes in
+                <a href="view_mailbox_sans.cfm">SAN Management</a>) or mailbox clients will
+                fail TLS during account setup.
+                <br>
+                The <strong>System Bootstrap Certificate</strong> can be selected as a
+                <strong>placeholder</strong> while you generate or obtain a real SAN cert
+                via <a href="view_system_certificates.cfm">System Certificates</a>. It
+                unblocks the mailbox-domain setup but mail clients <strong>will not be
+                able to connect</strong> (CN=localhost, no SANs) until you swap in a
+                real cert.
               </small>
             </div>
           </div>
@@ -606,9 +625,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <select class="form-select" name="cert_id" id="edit_cert_id">
                       <option value="">-- Select certificate --</option>
                       <cfoutput query="getCerts">
-                      <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
+                      <cfif file_name EQ "bootstrap">
+                        <option value="#id#">#encodeForHTMLAttribute(friendly_name)# &mdash; TEMPORARY PLACEHOLDER (replace before production)</option>
+                      <cfelse>
+                        <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
+                      </cfif>
                       </cfoutput>
                     </select>
+                    <small class="text-muted">
+                      For production, use a SAN cert covering <code>autoconfig.&lt;domain&gt;</code>
+                      and <code>autodiscover.&lt;domain&gt;</code>. The System Bootstrap Certificate
+                      is a placeholder only &mdash; mail clients can't connect until it's replaced.
+                    </small>
                   </div>
                 </div>
               </div>

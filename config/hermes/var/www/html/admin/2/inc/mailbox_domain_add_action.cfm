@@ -75,10 +75,16 @@ Expects:
     <cfset session.m = 13>
     <cflocation url="view_mailbox_domains.cfm" addtoken="no">
   </cfif>
+  <!--- Accept either a real SAN cert (san='1') OR the System Bootstrap
+       self-signed cert as a placeholder (#248). The bootstrap path lets
+       admin set up the mailbox-domain infrastructure before they have
+       a real SAN cert -- mail clients won't actually connect until the
+       admin swaps in a real cert, but the DB row + downstream config
+       can land. --->
   <cfquery name="validateCert" datasource="hermes">
     SELECT id FROM system_certificates
     WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.cert_id#">
-    AND san = '1'
+    AND (san = '1' OR file_name = 'bootstrap')
   </cfquery>
   <cfif validateCert.recordcount EQ 0>
     <cfset session.m = 13>
