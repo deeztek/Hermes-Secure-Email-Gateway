@@ -2554,6 +2554,33 @@ DROP TABLE IF EXISTS rbl_override;      -- removed; no current CFML refs
 DROP TABLE IF EXISTS users;             -- consolidated into system_users
 
 -- ============================================================================
+-- #252 system_certificates.system column
+-- ============================================================================
+-- Flags install-generated certs that should be treated as system-managed
+-- (read-only in UI, used as placeholder for mailbox-domain binding when no
+-- real SAN cert exists yet). Mirrors the additional_sans.system convention.
+--
+--   system = 0  admin-managed (default for any Import or future ACME)
+--   system = 1  install-generated:
+--                 - Docker installs: file_name='bootstrap' from
+--                   install_hermes_docker.sh:register_bootstrap_cert_in_db
+--                 - Legacy installs: file_name='ssl-cert-snakeoil' from
+--                   the ssl-cert package's default cert
+--   2+          reserved for future auto-generated certs (per-mailbox-domain
+--               self-signed, etc.)
+--
+-- The backfill matches by (type, file_name) so DEV legacy installs and
+-- Docker fresh installs both get the right row flagged without depending
+-- on AUTO_INCREMENT id values being predictable.
+ALTER TABLE system_certificates
+  ADD COLUMN IF NOT EXISTS system INT NOT NULL DEFAULT 0;
+
+UPDATE system_certificates SET system = 1
+  WHERE type = 'Imported'
+    AND file_name IN ('bootstrap', 'ssl-cert-snakeoil')
+    AND system = 0;
+
+-- ============================================================================
 -- Release version stamp (must be the last block in this file).
 -- IMPORTANT: when cutting a new release, update BOTH literals below in the
 -- new copy of schema_updates.sql (and rename the directory accordingly).

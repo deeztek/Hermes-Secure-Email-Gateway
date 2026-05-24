@@ -39,21 +39,44 @@ just produces a profile that's worse than unsigned).
     WHERE module = 'console' AND parameter = 'console.certificate'
 </cfquery>
 
-<!--- Defaults point at the bootstrap self-signed cert files (#251).
-     These ARE created by install_hermes_docker.sh:generate_self_signed_cert
-     and stay on disk for the life of the install. The old Ubuntu
-     ssl-cert-snakeoil.pem paths were leftover from the pre-#179 era
-     before the bootstrap cert was registered in system_certificates;
-     those files were never created in our minimal nginx container, so
-     any code path that hit the fallback crashed nginx with a
-     BIO_new_file error. Bootstrap paths are a safe always-loadable
-     fallback for callers that don't care about signing. --->
+<!--- Defaults point at the system-flagged cert's files (#251 + #252).
+     The system cert (Docker bootstrap with file_name='bootstrap',
+     legacy snakeoil with file_name='ssl-cert-snakeoil') is always
+     installed -- its files exist on disk for the life of the install.
+     Path pattern matches the Imported branch below so callers get the
+     same shape (.bundle.pem for nginx, .key for the key) regardless
+     of which install variant they're on. The old Ubuntu
+     /etc/ssl/certs/ssl-cert-snakeoil.pem hardcode was leftover from
+     pre-#179 and crashed nginx with BIO_new_file in our minimal
+     container that doesn't have the ssl-cert package. --->
+<cfinclude template="get_system_cert_ids.cfm">
 <cfset hermesCertType = "Snakeoil">
 <cfset hermesCertIsSnakeoil = true>
 <cfset hermesCertNginxPath = "/opt/hermes/ssl/bootstrap_hermes.bundle.pem">
 <cfset hermesCertKeyPath = "/opt/hermes/ssl/bootstrap_hermes.key">
 <cfset hermesCertSignerPath = "">
 <cfset hermesCertChainPath = "">
+
+<cfif systemCertIds NEQ "">
+    <cfquery name="_systemCertRow" datasource="hermes">
+        SELECT file_name FROM system_certificates
+        WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#ListFirst(systemCertIds)#">
+    </cfquery>
+    <cfif _systemCertRow.recordcount EQ 1 AND Len(_systemCertRow.file_name) GT 0>
+        <cfif _systemCertRow.file_name EQ "ssl-cert-snakeoil">
+            <!--- Legacy non-Docker installs: Ubuntu ssl-cert package paths.
+                 The cert files live under /etc/ssl/, not /opt/hermes/ssl/. --->
+            <cfset hermesCertNginxPath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
+            <cfset hermesCertKeyPath = "/etc/ssl/private/ssl-cert-snakeoil.key">
+        <cfelse>
+            <!--- Docker bootstrap (file_name='bootstrap') or any future
+                 install-generated cert: standard Hermes /opt/hermes/ssl/
+                 path pattern, same as the Imported branch below. --->
+            <cfset hermesCertNginxPath = "/opt/hermes/ssl/" & _systemCertRow.file_name & "_hermes.bundle.pem">
+            <cfset hermesCertKeyPath = "/opt/hermes/ssl/" & _systemCertRow.file_name & "_hermes.key">
+        </cfif>
+    </cfif>
+</cfif>
 
 <!--- Drop the legacy `value2 NEQ "1"` guard (#251). It assumed id=1 was
      a sentinel for "no cert configured", but post-#179 id=1 is a real
@@ -71,12 +94,25 @@ just produces a profile that's worse than unsigned).
 
     <cfif _certRow.recordcount EQ 1>
         <cfif _certRow.type EQ "Imported">
-            <cfset hermesCertType = "Imported">
-            <cfset hermesCertIsSnakeoil = false>
-            <cfset hermesCertNginxPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.bundle.pem">
-            <cfset hermesCertKeyPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.key">
-            <cfset hermesCertSignerPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.pem">
-            <cfset hermesCertChainPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.chain.pem">
+            <cfif _certRow.file_name EQ "ssl-cert-snakeoil">
+                <!--- Legacy non-Docker install bound to the Ubuntu
+                     ssl-cert package snakeoil. Cert files live under
+                     /etc/ssl/, not /opt/hermes/ssl/. Still flag as
+                     Snakeoil so signing callers skip. --->
+                <cfset hermesCertType = "Snakeoil">
+                <cfset hermesCertIsSnakeoil = true>
+                <cfset hermesCertNginxPath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
+                <cfset hermesCertKeyPath = "/etc/ssl/private/ssl-cert-snakeoil.key">
+                <cfset hermesCertSignerPath = "">
+                <cfset hermesCertChainPath = "">
+            <cfelse>
+                <cfset hermesCertType = "Imported">
+                <cfset hermesCertIsSnakeoil = false>
+                <cfset hermesCertNginxPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.bundle.pem">
+                <cfset hermesCertKeyPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.key">
+                <cfset hermesCertSignerPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.pem">
+                <cfset hermesCertChainPath = "/opt/hermes/ssl/" & _certRow.file_name & "_hermes.chain.pem">
+            </cfif>
         <cfelseif _certRow.type EQ "Acme">
             <cfset hermesCertType = "Acme">
             <cfset hermesCertIsSnakeoil = false>

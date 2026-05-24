@@ -77,13 +77,19 @@ re-validation).
     <cfset session.m = 13>
     <cflocation url="view_mailbox_domains.cfm" addtoken="no">
   </cfif>
-  <!--- Accept either a real SAN cert (san='1') OR the System Bootstrap
-       self-signed cert as a placeholder (#248). Mirrors the add-action
+  <!--- Accept either a real SAN cert (san='1') OR any system-flagged
+       cert as a placeholder (#248 + #252). Mirrors the add-action
        validation so admin can swap to/from the placeholder via edit. --->
+  <cfinclude template="./get_system_cert_ids.cfm">
   <cfquery name="validateCert" datasource="hermes">
     SELECT id FROM system_certificates
     WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.cert_id#">
-    AND (san = '1' OR file_name = 'bootstrap')
+    AND (
+      san = '1'
+      <cfif systemCertIds NEQ "">
+        OR id IN (<cfqueryparam cfsqltype="cf_sql_integer" list="yes" value="#systemCertIds#">)
+      </cfif>
+    )
   </cfquery>
   <cfif validateCert.recordcount EQ 0>
     <cfset session.m = 13>

@@ -2377,6 +2377,7 @@ CREATE TABLE IF NOT EXISTS `system_certificates` (
   `domain_name` varchar(255) DEFAULT NULL,
   `acme_hash` varchar(255) DEFAULT '',
   `san` varchar(255) DEFAULT '',
+  `system` int(11) NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 

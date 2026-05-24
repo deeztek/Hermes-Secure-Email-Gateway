@@ -2838,10 +2838,15 @@ register_bootstrap_cert_in_db() {
         # the UI treats it like any admin-uploaded cert (deletable when the
         # admin replaces it). NOT 'Generated' -- that's an invented value
         # nothing else in the codebase knows about.
-        log "Inserting system_certificates row (type='Imported', file_name='${prefix}')..."
+        log "Inserting system_certificates row (type='Imported', file_name='${prefix}', system=1)..."
+        # system=1 flags this as install-generated (read-only in UI, valid
+        # mailbox-domain cert binding via the bootstrap-as-placeholder
+        # path). See #252. Defensive CFML in inc/get_system_cert_ids.cfm
+        # also identifies this row by (type,file_name) so the flag works
+        # before the schema migration is applied on an upgraded install.
         docker exec hermes_db_server mysql -u root hermes -e "
             INSERT INTO system_certificates
-              (type, subject, issuer, serial, fingerprint, startdate, enddate, file_name, friendly_name)
+              (type, subject, issuer, serial, fingerprint, startdate, enddate, file_name, friendly_name, system)
             VALUES
               ('Imported',
                '${subject}',
@@ -2851,7 +2856,8 @@ register_bootstrap_cert_in_db() {
                '${startdate}',
                '${enddate}',
                '${prefix}',
-               '${friendly_name}');
+               '${friendly_name}',
+               1);
         " 2>>"$LOG_FILE"
 
         existing_id=$(docker exec hermes_db_server mysql -u root -N -s hermes -e "

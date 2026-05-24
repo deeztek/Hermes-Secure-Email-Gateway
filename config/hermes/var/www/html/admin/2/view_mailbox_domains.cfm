@@ -117,18 +117,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   ORDER BY d.domain ASC
 </cfquery>
 
-<!--- Get all certificates usable for mailbox SAN binding (#248).
-     Includes real SAN certs (san='1') AND the bootstrap System
-     self-signed cert (file_name='bootstrap') so admin can pick the
-     bootstrap as a placeholder when no real SAN cert exists yet --
-     decouples mailbox-domain add from cert procurement. ORDER BY
+<!--- Get all certificates usable for mailbox SAN binding (#248 + #252).
+     Includes real SAN certs (san='1') AND any system-flagged certs
+     (system=1, or matched defensively by file_name when the column
+     doesn't exist yet -- see inc/get_system_cert_ids.cfm). ORDER BY
      puts real SAN certs first so the placeholder isn't the default.
-     The bootstrap row is visually marked in the dropdown render. --->
+     The placeholder row is visually marked in the dropdown render
+     using systemCertIds membership. --->
+<cfinclude template="./inc/get_system_cert_ids.cfm">
 <cfquery name="getCerts" datasource="hermes">
   SELECT id, friendly_name, domain_name, type, file_name, san
   FROM system_certificates
-  WHERE san = '1' OR file_name = 'bootstrap'
-  ORDER BY (file_name = 'bootstrap') ASC, friendly_name ASC
+  WHERE san = '1'
+  <cfif systemCertIds NEQ "">
+    OR id IN (<cfqueryparam cfsqltype="cf_sql_integer" list="yes" value="#systemCertIds#">)
+  </cfif>
+  ORDER BY san DESC, friendly_name ASC
 </cfquery>
 
 <!--- Get SAN prefixes for DNS guidance --->
@@ -387,7 +391,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <select class="form-select" name="cert_id" id="add_cert_id">
                 <option value="">-- Select certificate --</option>
                 <cfoutput query="getCerts">
-                <cfif file_name EQ "bootstrap">
+                <cfif ListFind(systemCertIds, id) GT 0>
                   <option value="#id#">#encodeForHTMLAttribute(friendly_name)# &mdash; TEMPORARY PLACEHOLDER (replace before production)</option>
                 <cfelse>
                   <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
@@ -625,7 +629,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <select class="form-select" name="cert_id" id="edit_cert_id">
                       <option value="">-- Select certificate --</option>
                       <cfoutput query="getCerts">
-                      <cfif file_name EQ "bootstrap">
+                      <cfif ListFind(systemCertIds, id) GT 0>
                         <option value="#id#">#encodeForHTMLAttribute(friendly_name)# &mdash; TEMPORARY PLACEHOLDER (replace before production)</option>
                       <cfelse>
                         <option value="#id#">#encodeForHTMLAttribute(friendly_name)# (#type#<cfif Len(domain_name)> - #encodeForHTMLAttribute(domain_name)#</cfif>)</option>
