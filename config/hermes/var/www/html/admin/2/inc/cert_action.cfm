@@ -5,31 +5,21 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
 
 <cfif action is "generatecsr">
 
-  <!--- Validate required fields --->
-  <cfloop list="country,state,locality,organization,department,commonname,encryption,algorithm" index="f">
+  <!--- Validate required fields. commonname is conditional (mailbox certs
+       auto-derive it from the mailbox_domain + first additional_sans prefix
+       per #247) so it's checked separately below. --->
+  <cfloop list="country,state,locality,organization,department,encryption,algorithm" index="f">
     <cfif NOT StructKeyExists(form, f)>
       <cfset session.m = "Generate CSR: form.#f# does not exist">
       <cfset session.alerttype = "error">
       <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfif>
   </cfloop>
+  <cfparam name="form.commonname" default="">
 
   <!--- Validate country code (2 chars) --->
   <cfif Len(form.country) NEQ 2>
     <cfset session.m = "The Country Code must be exactly 2 characters">
-    <cfset session.alerttype = "error">
-    <cflocation url="view_system_certificates.cfm" addtoken="no">
-  </cfif>
-
-  <!--- Validate common name --->
-  <cfif trim(form.commonname) is "">
-    <cfset session.m = "The Common Name cannot be blank">
-    <cfset session.alerttype = "error">
-    <cflocation url="view_system_certificates.cfm" addtoken="no">
-  </cfif>
-
-  <cfif REFind("[^A-Za-z0-9\.\-\*@]", form.commonname) GT 0>
-    <cfset session.m = "Invalid Common Name. Only letters, numbers, dashes, periods, and asterisks allowed">
     <cfset session.alerttype = "error">
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>
@@ -49,7 +39,7 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
   </cfif>
 
   <!--- Cert purpose (#244 / #246). Server vs Mailbox drives the
-       mandatory-SAN expansion below. --->
+       mandatory-SAN expansion below + the CN derivation strategy. --->
   <cfparam name="form.cert_purpose" default="mailbox">
   <cfif NOT ListFindNoCase("server,mailbox", form.cert_purpose)>
     <cfset form.cert_purpose = "mailbox">
@@ -73,25 +63,56 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     </cfif>
   </cfif>
 
-  <!--- Build the final SAN list (#243 / #246). Order:
-         1. CN (always, CAB Forum requires CN-as-SAN since 2017)
-         2. Mandatory SANs for mailbox certs: each <prefix>.<mailbox_domain>
-            for every row in additional_sans (autoconfig + autodiscover +
-            any custom prefixes). Non-negotiable for mailbox certs.
+  <!--- Fetch SAN prefixes once -- used for both CN derivation (mailbox)
+       and the mandatory-SAN expansion (mailbox). Sorted alphabetically;
+       index 0 is the prefix that also becomes the CN. --->
+  <cfquery name="getMandatoryPrefixes" datasource="hermes">
+    SELECT san FROM additional_sans ORDER BY san
+  </cfquery>
+
+  <!--- CN derivation (#247). For mailbox certs, the CN is auto-derived
+       as <first-prefix>.<mailbox_domain> -- matches Pro ACME's
+       first-`-d`-flag behavior (inc/acme_request_san_certificate.cfm)
+       so the resulting cert is byte-for-byte identical to Pro Auto mode.
+       For server certs, the admin-supplied form.commonname stands. --->
+  <cfif form.cert_purpose IS "mailbox">
+    <cfif getMandatoryPrefixes.recordcount EQ 0>
+      <cfset session.m = "Generate CSR: No SAN prefixes configured in SAN Management. Cannot generate a mailbox certificate without at least autoconfig + autodiscover.">
+      <cfset session.alerttype = "error">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
+    </cfif>
+    <cfset form.commonname = LCase(getMandatoryPrefixes.san[1]) & "." & mailboxDomainClean>
+  </cfif>
+
+  <!--- Validate the (now-resolved) CN -- blank check + char check apply
+       to both auto-derived (mailbox) and admin-supplied (server) CNs. --->
+  <cfif trim(form.commonname) is "">
+    <cfset session.m = "The Common Name cannot be blank">
+    <cfset session.alerttype = "error">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
+  </cfif>
+  <cfif REFind("[^A-Za-z0-9\.\-\*@]", form.commonname) GT 0>
+    <cfset session.m = "Invalid Common Name. Only letters, numbers, dashes, periods, and asterisks allowed">
+    <cfset session.alerttype = "error">
+    <cflocation url="view_system_certificates.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Build the final SAN list. Order:
+         1. CN (always, CAB Forum requires CN-as-SAN since 2017). For
+            mailbox certs this IS the first mandatory prefix.<domain>.
+         2. Mandatory SANs for mailbox certs: remaining <prefix>.<domain>
+            entries from additional_sans. Non-negotiable.
          3. Admin-supplied "Additional SANs" textarea entries, sanitized
             per line and deduped against the above.
-       Per line: trim, lowercase, allow [a-z0-9.\-\*] (same chars as the
-       CN validation above). Dedupe is silent: if admin types one of the
-       mandatory SANs, it's dropped without error. --->
+       Per line: trim, lowercase, allow [a-z0-9.\-\*]. Dedupe is silent:
+       if admin types one of the mandatory SANs, it's dropped without
+       error. --->
   <cfparam name="form.sans" default="">
   <cfset sanClean = ArrayNew(1)>
   <cfset cnLower = LCase(trim(form.commonname))>
   <cfset ArrayAppend(sanClean, cnLower)>
 
   <cfif form.cert_purpose IS "mailbox">
-    <cfquery name="getMandatoryPrefixes" datasource="hermes">
-      SELECT san FROM additional_sans ORDER BY san
-    </cfquery>
     <cfloop query="getMandatoryPrefixes">
       <cfset mandatoryFqdn = LCase(getMandatoryPrefixes.san) & "." & mailboxDomainClean>
       <cfif NOT ArrayFind(sanClean, mandatoryFqdn)>

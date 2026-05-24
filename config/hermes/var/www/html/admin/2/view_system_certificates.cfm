@@ -211,14 +211,18 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <p class="mb-2">
               <strong>One cert per mailbox domain.</strong> If you host mailboxes
               for multiple email domains, generate a separate cert for each.
-              Each cert must cover:
+              Each cert covers:
             </p>
             <ul class="mb-2">
-              <li>The Common Name (e.g. <code>mail.widgets.tld</code>)</li>
-              <li><code>autoconfig.&lt;domain&gt;</code> &mdash; <em>mandatory</em>, auto-included</li>
-              <li><code>autodiscover.&lt;domain&gt;</code> &mdash; <em>mandatory</em>, auto-included</li>
+              <li><code>autoconfig.&lt;domain&gt;</code> &mdash; <em>mandatory</em>; this is the cert's <strong>Common Name</strong></li>
+              <li><code>autodiscover.&lt;domain&gt;</code> &mdash; <em>mandatory</em></li>
               <li>Any custom subdomain prefixes from <a href="view_mailbox_sans.cfm">SAN Management</a> &mdash; auto-included</li>
             </ul>
+            <p class="mb-2 small text-muted">
+              No separate Common Name field is needed when generating a mailbox CSR &mdash; the
+              first SAN alphabetically (<code>autoconfig.&lt;domain&gt;</code> by default) also serves as the CN.
+              This produces a cert byte-for-byte identical to what Pro Edition's Auto mode would issue.
+            </p>
             <p class="mb-2">
               When ordering, ask your CA for a <strong>UCC certificate</strong>,
               <strong>multi-domain certificate</strong>, or <strong>SAN
@@ -616,8 +620,14 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <label class="form-label"><strong>Department</strong></label>
             <input type="text" class="form-control" name="department" placeholder="IT Department">
           </div>
-          <div class="mb-3">
-            <label class="form-label"><strong>Common Name</strong> (primary mail hostname, e.g. <code>mail.widgets.tld</code>)</label>
+          <!--- Common Name input (#247). Shown only for server certs.
+               For mailbox certs, the CN is auto-derived server-side as
+               the first alphabetical SAN (matching Pro ACME's
+               first-`-d`-flag behavior in inc/acme_request_san_certificate.cfm)
+               so the resulting cert is byte-for-byte identical to what
+               Pro Auto mode would produce. --->
+          <div id="csrCommonNameBlock" class="mb-3">
+            <label class="form-label"><strong>Common Name</strong> (hostname this cert identifies, e.g. <code>mail.widgets.tld</code>)</label>
             <input type="text" class="form-control" name="commonname" placeholder="mail.widgets.tld">
           </div>
 
@@ -658,6 +668,11 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               &mdash; you don't need to (and can't) opt out. Any custom prefixes you've
               added in <a href="view_mailbox_sans.cfm">SAN Management</a> are also expanded
               automatically against the mailbox domain.
+              <br><br>
+              The <strong>first SAN alphabetically</strong> also serves as the certificate's
+              <strong>Common Name</strong> (no separate CN field is required) &mdash; this
+              produces a cert that's byte-for-byte identical to what Pro Edition's Auto
+              mode would issue for the same domain.
             </div>
           </div>
 
@@ -750,6 +765,7 @@ $(document).ready(function() {
     var purpose = $('#csrModal input[name="cert_purpose"]:checked').val();
     if (purpose === 'mailbox') {
       $('#csrMailboxWarning').show();
+      $('#csrCommonNameBlock').hide();
       $('#csrMailboxDomainBlock').show();
       $('#csrMandatorySansBlock').show();
       $('#csrSanHelpMailbox').show();
@@ -757,6 +773,7 @@ $(document).ready(function() {
       updateMandatorySansPreview();
     } else {
       $('#csrMailboxWarning').hide();
+      $('#csrCommonNameBlock').show();
       $('#csrMailboxDomainBlock').hide();
       $('#csrMandatorySansBlock').hide();
       $('#csrSanHelpMailbox').hide();
@@ -779,12 +796,18 @@ $(document).ready(function() {
       $preview.html('<span class="text-warning">No SAN prefixes configured in SAN Management.</span>');
       return;
     }
+    // csrSanPrefixes is already ORDER BY san from the DB query, so index 0
+    // is the alphabetically first prefix -- that row also serves as the
+    // certificate's Common Name (matches Pro ACME's first-`-d`-flag behavior).
     var lines = csrSanPrefixes.map(function(p) {
       return p + '.' + domain;
     });
     var html = '';
-    lines.forEach(function(line) {
-      html += '<div>' + line + '</div>';
+    lines.forEach(function(line, idx) {
+      var marker = (idx === 0)
+        ? ' <span class="badge bg-secondary ms-2" style="font-size:9px;">CN</span>'
+        : '';
+      html += '<div>' + line + marker + '</div>';
     });
     $preview.html(html);
   }
