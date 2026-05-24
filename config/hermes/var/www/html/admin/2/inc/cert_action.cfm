@@ -48,6 +48,14 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>
 
+  <!--- Cert purpose (#244). Informational only -- SAN sanitization is the
+       same either way (CN auto-prepended for CAB Forum compliance). Kept
+       for future use (telemetry / audit log of generated CSRs). --->
+  <cfparam name="form.cert_purpose" default="mailbox">
+  <cfif NOT ListFindNoCase("server,mailbox", form.cert_purpose)>
+    <cfset form.cert_purpose = "mailbox">
+  </cfif>
+
   <!--- Sanitize the SAN list (#243). The textarea is newline-separated.
        Per line: trim, lowercase, allow [a-z0-9.\-\*] (same chars as
        the CN validation above), reject anything else. Dedupe, and

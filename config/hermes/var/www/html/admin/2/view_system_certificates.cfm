@@ -152,6 +152,76 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset session.alerttype = "">
 <cfset session.m = "">
 
+<!-- CHOOSING THE RIGHT CERTIFICATE TYPE (#244) -->
+<div class="card card-info card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-info-circle"></i> Choosing the Right Certificate Type</h3>
+  </div>
+  <div class="card-body">
+    <p class="mb-3 text-muted">
+      Hermes can use two distinct kinds of TLS certificate depending on what
+      this gateway is doing. <strong>Pick the right one before ordering or
+      generating a CSR &mdash; the cheap kind will not work if you're hosting
+      mailboxes.</strong>
+    </p>
+    <div class="row">
+
+      <div class="col-md-6">
+        <div class="card border-primary h-100">
+          <div class="card-header bg-primary bg-opacity-10">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-server text-primary"></i> Server Certificate
+              <span class="badge bg-primary ms-1" style="font-size:10px;">Single-name DV</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-2"><strong>Cost:</strong> ~$10/year from any CA</p>
+            <p class="mb-2"><strong>Use when this Hermes is for:</strong></p>
+            <ul class="mb-2">
+              <li>Admin console access only</li>
+              <li>SMTP host / mail transport only</li>
+              <li>Relay-only setups (no mailbox users hosted locally)</li>
+            </ul>
+            <p class="mb-0">
+              Any standard Domain Validation (DV) cert from any CA works.
+              Covers the Common Name only. Pick this in the Generate CSR
+              dialog if it matches your use case.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card border-warning h-100">
+          <div class="card-header bg-warning bg-opacity-10">
+            <h5 class="card-title mb-0">
+              <i class="fas fa-inbox text-warning"></i> Mailbox Certificate
+              <span class="badge bg-warning text-dark ms-1" style="font-size:10px;">SAN / UCC</span>
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="text-muted small mb-2"><strong>Cost:</strong> typically $50&ndash;$200/year</p>
+            <p class="mb-2"><strong>Required if this Hermes hosts mailboxes.</strong> The cert must cover:</p>
+            <ul class="mb-2">
+              <li>The Common Name (your primary mail hostname)</li>
+              <li><code>autoconfig.&lt;domain&gt;</code> for each mailbox domain</li>
+              <li><code>autodiscover.&lt;domain&gt;</code> for each mailbox domain</li>
+              <li>Any custom subdomain prefixes from <a href="view_mailbox_sans.cfm">SAN Management</a></li>
+            </ul>
+            <p class="mb-0">
+              When ordering, ask your CA for a <strong>UCC certificate</strong>,
+              <strong>multi-domain certificate</strong>, or <strong>SAN
+              certificate</strong>. A basic DV cert will <strong>not work</strong>
+              &mdash; mail clients will fail TLS during autoconfig.
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
 <!-- CERTIFICATES CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
@@ -454,22 +524,47 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
         </div>
         <div class="modal-body">
 
-          <div class="alert alert-warning mb-3" role="alert">
+          <!--- Cert-purpose radio toggle (#244). Smart default: Mailbox if
+               mailbox_domains has rows, Server otherwise. The radio is
+               informational + drives the show/hide for the cost warning
+               and SAN textarea help text; sanitization in cert_action.cfm
+               is the same either way (CN auto-prepended, CAB compliance). --->
+          <cfoutput>
+          <div class="mb-3 p-3 border rounded bg-body-secondary">
+            <label class="form-label mb-2"><strong>Certificate purpose</strong> &mdash; pick the use case for this cert</label>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeServer" value="server" <cfif getCsrSans.recordCount EQ 0>checked</cfif>>
+              <label class="form-check-label" for="purposeServer">
+                <strong>Server certificate</strong> &mdash; admin console / SMTP / relay-only
+                <span class="text-muted">(single-name DV, ~$10/yr)</span>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="cert_purpose" id="purposeMailbox" value="mailbox" <cfif getCsrSans.recordCount GT 0>checked</cfif>>
+              <label class="form-check-label" for="purposeMailbox">
+                <strong>Mailbox certificate</strong> &mdash; covers mailbox autoconfig / autodiscover
+                <span class="text-muted">(SAN / UCC, $50&ndash;$200/yr)</span>
+              </label>
+            </div>
+          </div>
+          </cfoutput>
+
+          <!--- Cost warning shown only when purpose=mailbox. JS toggles
+               visibility based on the radio above. --->
+          <div id="csrMailboxWarning" class="alert alert-warning mb-3" role="alert">
             <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Buy a multi-name (SAN / UCC) certificate</h5>
             <p class="mb-2">
-              Hermes requires a certificate that covers <strong>multiple hostnames</strong>:
-              the Common Name <em>and</em> each <code>autoconfig.&lt;domain&gt;</code> /
-              <code>autodiscover.&lt;domain&gt;</code> entry mailbox clients ping during
-              account setup. A single-name (DV) cert will <strong>not</strong> work for
-              mailbox users -- their mail clients will fail with a TLS handshake error
-              before they reach the login screen.
+              For mailbox use, Hermes requires a certificate that covers <strong>multiple
+              hostnames</strong>: the Common Name <em>and</em> each
+              <code>autoconfig.&lt;domain&gt;</code> / <code>autodiscover.&lt;domain&gt;</code>
+              entry mailbox clients ping during account setup. A single-name (DV) cert will
+              <strong>not</strong> work &mdash; mail clients will fail TLS during autoconfig.
             </p>
             <p class="mb-0">
-              When ordering from your CA, look for the terms
-              <strong>"UCC certificate"</strong>, <strong>"multi-domain"</strong>, or
-              <strong>"SAN certificate"</strong>. These typically cost more than a basic
-              DV cert (often $50&ndash;$200/yr vs ~$10/yr), but a basic DV cert is not
-              an option here.
+              When ordering from your CA, look for <strong>"UCC certificate"</strong>,
+              <strong>"multi-domain"</strong>, or <strong>"SAN certificate"</strong>.
+              These typically cost more than a basic DV cert ($50&ndash;$200/yr vs ~$10/yr),
+              but a basic DV cert is not an option for mailbox users.
             </p>
           </div>
 
@@ -500,31 +595,32 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           <div class="mb-3">
             <label class="form-label"><strong>Subject Alternative Names</strong> (one DNS name per line)</label>
             <cfoutput>
-            <cfif getCsrSans.recordCount GT 0>
-              <textarea class="form-control font-monospace" name="sans" rows="6">#csrSanPrefill#</textarea>
-              <div class="form-text">
+            <textarea class="form-control font-monospace" name="sans" rows="6">#csrSanPrefill#</textarea>
+            </cfoutput>
+
+            <!--- Help text variants. JS toggles which one is visible based
+                 on the radio above. Both reference the same SAN field. --->
+            <div id="csrSanHelpMailbox" class="form-text">
+              <cfif getCsrSans.recordCount GT 0>
                 Pre-filled from your mailbox-hosting domains crossed with the prefixes in
                 <a href="view_mailbox_sans.cfm">SAN Management</a> (<code>autoconfig</code>,
                 <code>autodiscover</code>, plus any custom prefixes you've added).
                 Edit freely &mdash; the Common Name is added automatically, so you don't
-                need to repeat it here. Clear the field entirely if this cert is for the
-                admin console only with no mailbox use.
-              </div>
-            <cfelse>
-              <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="No mailbox-hosting domains configured yet -- this field will auto-populate once you add some."></textarea>
-              <div class="form-text">
-                This field auto-populates from your mailbox-hosting domains crossed with
-                the prefixes in <a href="view_mailbox_sans.cfm">SAN Management</a>
-                (<code>autoconfig</code>, <code>autodiscover</code>, plus any custom
-                prefixes). You currently have <strong>no mailbox-hosting domains</strong>
-                &mdash; add them in
+                need to repeat it here.
+              <cfelse>
+                <strong>No mailbox-hosting domains configured yet</strong> &mdash; add them in
                 <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a> first,
-                then re-open this dialog to see the SANs pre-filled. The Common Name is
-                always included automatically, so a cert generated now would cover the CN
-                only.
-              </div>
-            </cfif>
-            </cfoutput>
+                then re-open this dialog to see the SANs pre-filled. A cert generated now
+                would cover only the Common Name.
+              </cfif>
+            </div>
+
+            <div id="csrSanHelpServer" class="form-text" style="display:none;">
+              Optional &mdash; a standard single-name DV cert is sufficient for server-only
+              use. Only add SANs here if you need the cert to cover additional subdomains
+              (e.g. a separate hostname for the admin console). The Common Name is added
+              automatically.
+            </div>
           </div>
           <div class="mb-3">
             <label class="form-label"><strong>Encryption Length</strong></label>
@@ -575,6 +671,36 @@ $(document).ready(function() {
       icon.removeClass('fa-chevron-down').addClass('fa-chevron-up');
     }
   });
+
+  // CSR modal -- cert purpose radio toggle (#244).
+  // Server: hide cost warning + mailbox help, show server help, clear SAN
+  //         textarea if it still holds the default prefill (preserves admin edits).
+  // Mailbox: show cost warning + mailbox help, hide server help, restore prefill
+  //         if textarea is currently empty (preserves admin edits).
+  var csrSanDefault = $('#csrModal textarea[name="sans"]').val();
+
+  function applyCsrPurpose() {
+    var purpose = $('#csrModal input[name="cert_purpose"]:checked').val();
+    var $textarea = $('#csrModal textarea[name="sans"]');
+    var current = $textarea.val();
+    if (purpose === 'mailbox') {
+      $('#csrMailboxWarning').show();
+      $('#csrSanHelpMailbox').show();
+      $('#csrSanHelpServer').hide();
+      if (current.trim() === '') {
+        $textarea.val(csrSanDefault);
+      }
+    } else {
+      $('#csrMailboxWarning').hide();
+      $('#csrSanHelpMailbox').hide();
+      $('#csrSanHelpServer').show();
+      if (current === csrSanDefault) {
+        $textarea.val('');
+      }
+    }
+  }
+  $('#csrModal input[name="cert_purpose"]').on('change', applyCsrPurpose);
+  applyCsrPurpose();
 });
 
 function openDeleteModal(id, name) {
