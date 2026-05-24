@@ -127,7 +127,17 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
       <cfcontinue>
     </cfif>
     <cfif REFind("[^a-z0-9\.\-\*]", oneSan) GT 0>
-      <cfset session.m = "Invalid SAN entry '" & oneSan & "'. Only letters, numbers, dashes, periods, and asterisks allowed.">
+      <cfset session.m = "Invalid Additional SAN entry '" & oneSan & "'. Only letters, numbers, dashes, periods, and asterisks allowed.">
+      <cfset session.alerttype = "error">
+      <cflocation url="view_system_certificates.cfm" addtoken="no">
+    </cfif>
+    <!--- Reject bare prefixes (#247 cont.). The Additional SANs field
+         is for full DNS names only; a bare prefix like "mail" would be
+         unusable on the cert (mail clients ping FQDNs, not labels).
+         Admins who want prefix-style entries that expand across mailbox
+         domains use SAN Management instead. --->
+    <cfif REFind("\.", oneSan) EQ 0>
+      <cfset session.m = "Invalid Additional SAN entry '" & oneSan & "'. Enter a fully-qualified domain name (e.g. vanity.widgets.tld), not a bare prefix. To add prefix-style entries that apply to every mailbox domain, use SAN Management.">
       <cfset session.alerttype = "error">
       <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfif>

@@ -678,23 +678,31 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           </div>
 
           <div class="mb-3">
-            <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one DNS name per line)</span></label>
-            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="extra-name.widgets.tld"></textarea>
+            <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one <strong>fully-qualified domain name</strong> per line)</span></label>
+            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="vanity-mail.widgets.tld&##10;legacy-imap.widgets.tld"></textarea>
 
             <!--- Help text variants. JS toggles which one is visible
                  based on the cert_purpose radio. --->
             <div id="csrSanHelpMailbox" class="form-text">
-              Leave blank in most cases &mdash; the mandatory SANs above already cover
-              what mailbox clients need. Only add entries here if you want the cert to
-              cover additional non-standard names (e.g. a vanity hostname that points at
-              this Hermes). Duplicates of the mandatory SANs are dropped silently.
+              Enter <strong>full DNS names</strong> (e.g. <code>vanity-mail.widgets.tld</code>),
+              not bare prefixes. Leave blank in most cases &mdash; the mandatory SANs above
+              already cover what mailbox clients need. Add entries here only for one-off
+              vanity hostnames that point at this Hermes.
+              <br>
+              To add a prefix that applies to <strong>every</strong> mailbox domain
+              (e.g. <code>mail</code> &rarr; <code>mail.widgets.tld</code> +
+              <code>mail.acme.tld</code> + ...), use
+              <a href="view_mailbox_sans.cfm">SAN Management</a> instead &mdash; the
+              expansion above will pick it up automatically. Duplicates of the mandatory
+              SANs are dropped silently.
             </div>
 
             <div id="csrSanHelpServer" class="form-text" style="display:none;">
-              Optional &mdash; a standard single-name DV cert is sufficient for server-only
-              use. Only add SANs here if you need the cert to cover additional subdomains
-              (e.g. a separate hostname for the admin console). The Common Name is added
-              automatically.
+              Enter <strong>full DNS names</strong> (e.g. <code>admin.widgets.tld</code>),
+              not bare prefixes. Optional &mdash; a standard single-name DV cert is
+              sufficient for server-only use. Only add SANs here if you need the cert to
+              cover additional subdomains (e.g. a separate hostname for the admin console).
+              The Common Name is added automatically.
             </div>
           </div>
           <div class="mb-3">
