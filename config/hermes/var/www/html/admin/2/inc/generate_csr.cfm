@@ -14,6 +14,17 @@ in cert_action.cfm + CN auto-prepended).
 
 <cfinclude template="generate_customtrans.cfm">
 
+<!--- Orphan cleanup (#249). If a prior CSR bundle is still pending
+     (admin generated one but never clicked Discard), delete its .rar
+     before creating the new one. Without this, /opt/hermes/tmp slowly
+     leaks 1-2 KB files. --->
+<cfif StructKeyExists(session, "customtrans") AND Len(session.customtrans) GT 0>
+  <cfset orphanRar = "/opt/hermes/tmp/" & session.customtrans & "_csr_key.rar">
+  <cfif fileExists(orphanRar)>
+    <cffile action="delete" file="#orphanRar#">
+  </cfif>
+</cfif>
+
 <cfset cnfPath = "/opt/hermes/tmp/" & customtrans3 & ".csr.cnf">
 
 <!--- Build [alt_names] block from the validated SAN list. cert_action.cfm

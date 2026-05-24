@@ -35,7 +35,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
     
 <cfoutput>
 <cfheader name="Content-disposition" value="attachment;filename=#customtrans#_csr_key.rar">
-<CFCONTENT FILE="/opt/hermes/tmp/#customtrans#_csr_key.rar" type="application/unknown" DELETEFILE="Yes">
+<CFCONTENT FILE="/opt/hermes/tmp/#customtrans#_csr_key.rar" type="application/unknown" DELETEFILE="No">
 </cfoutput>
 
 <cfelse>

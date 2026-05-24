@@ -156,6 +156,20 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
 
   <cfinclude template="./generate_csr.cfm">
 
+<cfelseif action is "discardcsr">
+
+  <!--- Discard the pending CSR bundle (#249). Clears session.customtrans
+       AND deletes the .rar from /opt/hermes/tmp so the persistent
+       "Pending CSR" callout disappears on next render. Idempotent. --->
+  <cfif StructKeyExists(session, "customtrans") AND Len(session.customtrans) GT 0>
+    <cfset discardRar = "/opt/hermes/tmp/" & session.customtrans & "_csr_key.rar">
+    <cfif fileExists(discardRar)>
+      <cffile action="delete" file="#discardRar#">
+    </cfif>
+    <cfset session.customtrans = "">
+  </cfif>
+  <cflocation url="view_system_certificates.cfm" addtoken="no">
+
 <cfelseif action is "deletecertificate">
 
   <cfif NOT StructKeyExists(form, "certificate_id") OR NOT isValid("integer", form.certificate_id)>

@@ -134,19 +134,9 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success</h4>
-    <cfoutput>#m#</cfoutput><br><br>
-    <cfoutput>
-    <iframe id="csrDownloadFrame" style="display:none;"></iframe>
-    <button type="button" class="btn btn-secondary" onclick="downloadCsr('#encodeForJavaScript(session.customtrans)#');">
-      <i class="fas fa-download"></i> Download CSR
-    </button>
-    <script>
-    function downloadCsr(ct) {
-      document.getElementById('csrDownloadFrame').src = '/admin/2/inc/download_csr.cfm?customtrans=' + ct;
-      setTimeout(function() { window.location.href = 'view_system_certificates.cfm'; }, 2000);
-    }
-    </script>
-    </cfoutput>
+    <cfoutput>#m#</cfoutput><br>
+    <small class="text-muted">The Download CSR button is in the persistent callout below &mdash;
+    it stays visible across page reloads until you click Discard.</small>
   </div>
 <cfelseif alerttype is "success" AND m is not "">
   <div class="alert alert-success alert-dismissible">
@@ -158,6 +148,43 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <cfset session.alerttype = "">
 <cfset session.m = "">
+
+<!-- PERSISTENT "PENDING CSR" CALLOUT (#249).
+     Replaces the one-shot Download button that used to live inside the
+     success alert. Shown whenever session.customtrans is set AND the
+     corresponding .rar bundle still exists on disk. Survives page
+     reloads / navigates / alert dismisses until admin clicks Discard. -->
+<cfif StructKeyExists(session, "customtrans") AND Len(session.customtrans) GT 0>
+  <cfset pendingCsrRar = "/opt/hermes/tmp/" & session.customtrans & "_csr_key.rar">
+  <cfif fileExists(pendingCsrRar)>
+    <cfoutput>
+    <div class="alert alert-info d-flex align-items-center mb-4" role="alert">
+      <i class="fas fa-download fa-2x me-3"></i>
+      <div class="flex-grow-1">
+        <strong>CSR ready to download</strong><br>
+        <small class="text-muted">Bundle <code>#encodeForHTML(session.customtrans)#_csr_key.rar</code>
+        contains your CSR + private key. Submit the CSR to your CA, keep the private key safe
+        (you'll need it when importing the resulting cert). Click Discard once you've saved
+        the bundle.</small>
+      </div>
+      <div class="ms-3 text-nowrap">
+        <iframe id="csrDownloadFrame" style="display:none;"></iframe>
+        <button type="button" class="btn btn-primary me-1"
+                onclick="document.getElementById('csrDownloadFrame').src = '/admin/2/inc/download_csr.cfm?customtrans=#encodeForJavaScript(session.customtrans)#';">
+          <i class="fas fa-download"></i> Download CSR
+        </button>
+        <form method="post" action="view_system_certificates.cfm" class="d-inline">
+          <input type="hidden" name="action" value="discardcsr">
+          <button type="submit" class="btn btn-outline-secondary"
+                  onclick="return confirm('Discard this CSR + private key? You will not be able to recover them after this -- if you have not saved the bundle yet, click Download first.');">
+            <i class="fas fa-trash"></i> Discard
+          </button>
+        </form>
+      </div>
+    </div>
+    </cfoutput>
+  </cfif>
+</cfif>
 
 <!-- CHOOSING THE RIGHT CERTIFICATE TYPE (#244) -->
 <div class="card card-info card-outline mb-4">
