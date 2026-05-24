@@ -39,17 +39,30 @@ just produces a profile that's worse than unsigned).
     WHERE module = 'console' AND parameter = 'console.certificate'
 </cfquery>
 
+<!--- Defaults point at the bootstrap self-signed cert files (#251).
+     These ARE created by install_hermes_docker.sh:generate_self_signed_cert
+     and stay on disk for the life of the install. The old Ubuntu
+     ssl-cert-snakeoil.pem paths were leftover from the pre-#179 era
+     before the bootstrap cert was registered in system_certificates;
+     those files were never created in our minimal nginx container, so
+     any code path that hit the fallback crashed nginx with a
+     BIO_new_file error. Bootstrap paths are a safe always-loadable
+     fallback for callers that don't care about signing. --->
 <cfset hermesCertType = "Snakeoil">
 <cfset hermesCertIsSnakeoil = true>
-<cfset hermesCertNginxPath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
-<cfset hermesCertKeyPath = "/etc/ssl/private/ssl-cert-snakeoil.key">
+<cfset hermesCertNginxPath = "/opt/hermes/ssl/bootstrap_hermes.bundle.pem">
+<cfset hermesCertKeyPath = "/opt/hermes/ssl/bootstrap_hermes.key">
 <cfset hermesCertSignerPath = "">
 <cfset hermesCertChainPath = "">
 
+<!--- Drop the legacy `value2 NEQ "1"` guard (#251). It assumed id=1 was
+     a sentinel for "no cert configured", but post-#179 id=1 is a real
+     row -- the bootstrap System Bootstrap Certificate. Letting id=1
+     through the lookup resolves to file_name='bootstrap' which builds
+     the correct Imported paths below. --->
 <cfif _certIdLookup.recordcount EQ 1
       AND Len(Trim(_certIdLookup.value2)) GT 0
-      AND IsNumeric(_certIdLookup.value2)
-      AND _certIdLookup.value2 NEQ "1">
+      AND IsNumeric(_certIdLookup.value2)>
 
     <cfquery name="_certRow" datasource="hermes">
         SELECT id, type, file_name FROM system_certificates
