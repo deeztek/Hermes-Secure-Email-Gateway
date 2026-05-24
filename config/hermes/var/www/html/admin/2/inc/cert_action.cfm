@@ -121,6 +121,12 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     </cfloop>
   </cfif>
 
+  <!--- Process Additional SANs textarea (#247 cont.). For mailbox certs,
+       smart-expand bare prefixes (no dot) against the mailbox domain so
+       the admin doesn't have to retype it for each entry. Full FQDNs
+       (has dot) pass through as-is, supporting cross-domain vanity SANs.
+       For server certs, only FQDNs are accepted (no mailbox domain to
+       attach a bare prefix to). --->
   <cfloop list="#form.sans#" index="oneSan" delimiters="#chr(10)#">
     <cfset oneSan = LCase(trim(ReplaceList(oneSan, chr(13), "")))>
     <cfif Len(oneSan) EQ 0>
@@ -131,13 +137,13 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
       <cfset session.alerttype = "error">
       <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfif>
-    <!--- Reject bare prefixes (#247 cont.). The Additional SANs field
-         is for full DNS names only; a bare prefix like "mail" would be
-         unusable on the cert (mail clients ping FQDNs, not labels).
-         Admins who want prefix-style entries that expand across mailbox
-         domains use SAN Management instead. --->
-    <cfif REFind("\.", oneSan) EQ 0>
-      <cfset session.m = "Invalid Additional SAN entry '" & oneSan & "'. Enter a fully-qualified domain name (e.g. vanity.widgets.tld), not a bare prefix. To add prefix-style entries that apply to every mailbox domain, use SAN Management.">
+    <cfif form.cert_purpose IS "mailbox" AND REFind("\.", oneSan) EQ 0>
+      <!--- Bare prefix on mailbox cert: smart-expand against mailbox_domain. --->
+      <cfset oneSan = oneSan & "." & mailboxDomainClean>
+    <cfelseif REFind("\.", oneSan) EQ 0>
+      <!--- Bare prefix on server cert: no mailbox domain to attach to,
+           reject and route the admin to the right field. --->
+      <cfset session.m = "Invalid Additional SAN entry '" & oneSan & "'. Server certs require fully-qualified domain names (e.g. admin.widgets.tld), not bare prefixes.">
       <cfset session.alerttype = "error">
       <cflocation url="view_system_certificates.cfm" addtoken="no">
     </cfif>

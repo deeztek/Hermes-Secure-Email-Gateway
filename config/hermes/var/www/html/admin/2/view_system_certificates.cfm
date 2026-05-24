@@ -678,23 +678,28 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           </div>
 
           <div class="mb-3">
-            <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one <strong>fully-qualified domain name</strong> per line)</span></label>
-            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="vanity-mail.widgets.tld&##10;legacy-imap.widgets.tld"></textarea>
+            <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one entry per line)</span></label>
+            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="imap&##10;smtp&##10;vanity.othercompany.com"></textarea>
 
             <!--- Help text variants. JS toggles which one is visible
                  based on the cert_purpose radio. --->
             <div id="csrSanHelpMailbox" class="form-text">
-              Enter <strong>full DNS names</strong> (e.g. <code>vanity-mail.widgets.tld</code>),
-              not bare prefixes. Leave blank in most cases &mdash; the mandatory SANs above
-              already cover what mailbox clients need. Add entries here only for one-off
-              vanity hostnames that point at this Hermes.
+              Two kinds of entry are accepted, mixed freely:
+              <ul class="mb-1 ps-3">
+                <li><strong>Bare prefix</strong> (e.g. <code>imap</code>, <code>smtp</code>,
+                    <code>pop</code>) &mdash; automatically expanded against the mailbox
+                    domain above (becomes <code>imap.&lt;mailbox-domain&gt;</code>, etc.)</li>
+                <li><strong>Full DNS name</strong> (e.g. <code>vanity.othercompany.com</code>)
+                    &mdash; used as-is, for cross-domain vanity hostnames</li>
+              </ul>
+              The preview above updates live so you can see exactly what will end up on
+              the cert. Leave blank in most cases &mdash; the mandatory SANs already cover
+              what mailbox clients need.
               <br>
               To add a prefix that applies to <strong>every</strong> mailbox domain
-              (e.g. <code>mail</code> &rarr; <code>mail.widgets.tld</code> +
-              <code>mail.acme.tld</code> + ...), use
-              <a href="view_mailbox_sans.cfm">SAN Management</a> instead &mdash; the
-              expansion above will pick it up automatically. Duplicates of the mandatory
-              SANs are dropped silently.
+              (not just this one), add it to <a href="view_mailbox_sans.cfm">SAN Management</a>
+              instead &mdash; it'll be auto-included in every mailbox CSR going forward.
+              Duplicates of the mandatory SANs are dropped silently.
             </div>
 
             <div id="csrSanHelpServer" class="form-text" style="display:none;">
@@ -805,24 +810,55 @@ $(document).ready(function() {
       $preview.html('<span class="text-warning">No SAN prefixes configured in SAN Management.</span>');
       return;
     }
-    // csrSanPrefixes is already ORDER BY san from the DB query, so index 0
-    // is the alphabetically first prefix -- that row also serves as the
-    // certificate's Common Name (matches Pro ACME's first-`-d`-flag behavior).
-    var lines = csrSanPrefixes.map(function(p) {
-      return p + '.' + domain;
+
+    // Mandatory entries first. csrSanPrefixes is ORDER BY san from the
+    // DB query, so index 0 is the alphabetically first prefix -- that
+    // row also serves as the certificate's Common Name (matches Pro
+    // ACME's first-`-d`-flag behavior).
+    var entries = csrSanPrefixes.map(function(p) {
+      return { fqdn: p + '.' + domain, kind: 'mandatory', source: null };
     });
+
+    // Additional entries from the textarea, with smart expansion:
+    // - bare prefix (no dot) -> append .<mailbox-domain>
+    // - full FQDN (has dot)  -> used as-is
+    // Skip empties, invalid chars, and dedupe against existing entries.
+    var rawAdd = $('#csrModal textarea[name="sans"]').val() || '';
+    rawAdd.split('\n').forEach(function(line) {
+      var clean = line.replace(/\r/g, '').trim().toLowerCase();
+      if (clean.length === 0) return;
+      if (!/^[a-z0-9.\-\*]+$/.test(clean)) return;
+      var fqdn = (clean.indexOf('.') === -1) ? clean + '.' + domain : clean;
+      // dedupe (case-insensitive)
+      var dup = entries.some(function(e) { return e.fqdn === fqdn; });
+      if (dup) return;
+      entries.push({
+        fqdn: fqdn,
+        kind: 'additional',
+        source: (clean !== fqdn) ? clean : null
+      });
+    });
+
     var html = '';
-    lines.forEach(function(line, idx) {
-      var marker = (idx === 0)
-        ? ' <span class="badge bg-secondary ms-2" style="font-size:9px;">CN</span>'
-        : '';
-      html += '<div>' + line + marker + '</div>';
+    entries.forEach(function(e, idx) {
+      var chips = '';
+      if (idx === 0) {
+        chips += ' <span class="badge bg-secondary ms-2" style="font-size:9px;">CN</span>';
+      }
+      if (e.kind === 'additional') {
+        chips += ' <span class="badge bg-info text-dark ms-1" style="font-size:9px;">added</span>';
+        if (e.source) {
+          chips += ' <span class="text-muted small">(from &ldquo;' + e.source + '&rdquo;)</span>';
+        }
+      }
+      html += '<div>' + e.fqdn + chips + '</div>';
     });
     $preview.html(html);
   }
 
   $('#csrModal input[name="cert_purpose"]').on('change', applyCsrPurpose);
   $('#mailboxDomainInput').on('input', updateMandatorySansPreview);
+  $('#csrModal textarea[name="sans"]').on('input', updateMandatorySansPreview);
   applyCsrPurpose();
 });
 
