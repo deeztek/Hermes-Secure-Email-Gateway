@@ -82,28 +82,24 @@ Called from: email_server_settings_action.cfm (after saving form values)
 <cfset sslKeyPath = "">
 
 <cfif getCertParam.recordcount GTE 1 AND getCertParam.value2 NEQ "">
-    <cfif getCertParam.value2 EQ "1">
-        <!--- Built-in self-signed (snakeoil) certificate — ID 1 is always the
-             system default. Same paths as generate_nginx_configuration.cfm. --->
-        <cfset sslCertPath = "/etc/ssl/certs/ssl-cert-snakeoil.pem">
-        <cfset sslKeyPath = "/etc/ssl/private/ssl-cert-snakeoil.key">
-    <cfelse>
-        <!--- Look up the certificate type and file_name to build the correct path.
-             Path patterns match generate_nginx_configuration.cfm:
-               Acme:     /etc/letsencrypt/live/<file_name>/fullchain.pem + privkey.pem
-               Imported: /opt/hermes/ssl/<file_name>_hermes.pem + _hermes.key --->
-        <cfquery name="getCertInfo" datasource="hermes">
-            SELECT type, file_name FROM system_certificates
-            WHERE id = <cfqueryparam value="#getCertParam.value2#" cfsqltype="cf_sql_integer">
-        </cfquery>
-        <cfif getCertInfo.recordcount GTE 1>
-            <cfif getCertInfo.type EQ "Acme">
-                <cfset sslCertPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/fullchain.pem">
-                <cfset sslKeyPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/privkey.pem">
-            <cfelseif getCertInfo.type EQ "Imported">
-                <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.pem">
-                <cfset sslKeyPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.key">
-            </cfif>
+    <!--- Look up the certificate type and file_name to build the correct path.
+         Path patterns match generate_nginx_configuration.cfm:
+           Acme:     /etc/letsencrypt/live/<file_name>/fullchain.pem + privkey.pem
+           Imported: /opt/hermes/ssl/<file_name>_hermes.pem + _hermes.key
+         Bootstrap cert (id=1, file_name='bootstrap') goes through the Imported
+         branch -- the legacy `EQ "1"` special case that pointed at the
+         non-existent /etc/ssl/certs/ssl-cert-snakeoil.pem was removed in #251 --->
+    <cfquery name="getCertInfo" datasource="hermes">
+        SELECT type, file_name FROM system_certificates
+        WHERE id = <cfqueryparam value="#getCertParam.value2#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfif getCertInfo.recordcount GTE 1>
+        <cfif getCertInfo.type EQ "Acme">
+            <cfset sslCertPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/fullchain.pem">
+            <cfset sslKeyPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/privkey.pem">
+        <cfelseif getCertInfo.type EQ "Imported">
+            <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.pem">
+            <cfset sslKeyPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.key">
         </cfif>
     </cfif>
 </cfif>
@@ -127,10 +123,14 @@ Called from: email_server_settings_action.cfm (after saving form values)
     </cftry>
 </cfif>
 
-<!--- Final fallback if still empty (brand new install, no cert at all) --->
+<!--- Final fallback if still empty (#251). Bootstrap self-signed cert
+     files are always created by install_hermes_docker.sh:generate_self_signed_cert
+     so they're a safe last-resort path. The old fallback to
+     /etc/letsencrypt/live/localhost/fullchain.pem was bogus -- that
+     LE folder never existed on a fresh install. --->
 <cfif sslCertPath EQ "">
-    <cfset sslCertPath = "/etc/letsencrypt/live/localhost/fullchain.pem">
-    <cfset sslKeyPath = "/etc/letsencrypt/live/localhost/privkey.pem">
+    <cfset sslCertPath = "/opt/hermes/ssl/bootstrap_hermes.pem">
+    <cfset sslKeyPath = "/opt/hermes/ssl/bootstrap_hermes.key">
 </cfif>
 
 <!--- READ DATABASE CREDENTIALS from mounted creds files --->
