@@ -103,6 +103,16 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 </cfquery>
 <cfset csrSanPrefill = ValueList(getCsrSans.fqdn, chr(10))>
 
+<!--- SAN prefix list for the "planned mailbox domains" assist (#245).
+     When no mailbox-hosting domains exist yet, the modal exposes a
+     planned-domains input so the admin can pre-generate SANs for the
+     CSR they're about to hand to the CA. JS cross-joins these prefixes
+     with the admin's typed domain list. --->
+<cfquery name="getCsrSanPrefixes" datasource="hermes">
+  SELECT san FROM additional_sans ORDER BY san
+</cfquery>
+<cfset csrSanPrefixesList = ValueList(getCsrSanPrefixes.san)>
+
 <!--- Read security settings --->
 <cfset allowCertDownload = false>
 <cfset securityConfPath = "/opt/hermes/config/security.conf">
@@ -208,12 +218,28 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               <li><code>autodiscover.&lt;domain&gt;</code> for each mailbox domain</li>
               <li>Any custom subdomain prefixes from <a href="view_mailbox_sans.cfm">SAN Management</a></li>
             </ul>
-            <p class="mb-0">
+            <p class="mb-2">
               When ordering, ask your CA for a <strong>UCC certificate</strong>,
               <strong>multi-domain certificate</strong>, or <strong>SAN
               certificate</strong>. A basic DV cert will <strong>not work</strong>
               &mdash; mail clients will fail TLS during autoconfig.
             </p>
+
+            <!--- Community-edition workflow callout (#245). Pro skips
+                 this because Auto mode generates per-domain ACME certs
+                 on the fly when adding the mailbox domain. --->
+            <div class="alert alert-info small mb-0 mt-3">
+              <strong>Community Edition workflow</strong> (Pro automates this):
+              <ol class="mb-0 mt-1 ps-3">
+                <li>Open <strong>Generate CSR</strong>, pick <em>Mailbox</em>,
+                    list your planned mailbox domains</li>
+                <li>Submit the CSR to your CA, receive the cert + chain</li>
+                <li><strong>Import Certificate</strong> &mdash; upload the cert</li>
+                <li><strong>Email Server &rsaquo; Domains &rsaquo; Add</strong>
+                    &mdash; select the imported cert</li>
+              </ol>
+            </div>
+
           </div>
         </div>
       </div>
@@ -549,6 +575,32 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           </div>
           </cfoutput>
 
+          <!--- Planned-domains assist (#245). Only shown for the
+               narrow Community-fresh-install case: cert_purpose=mailbox
+               AND no mailbox-hosting domains exist yet. JS cross-joins
+               the typed domains with system SAN prefixes and rewrites
+               the SAN textarea below. The block is rendered always but
+               hidden via JS when the conditions aren't met. --->
+          <cfif getCsrSans.recordCount EQ 0>
+            <div id="csrPlannedDomains" class="mb-3">
+              <label class="form-label" for="plannedDomainsInput">
+                <strong>Planned mailbox domains</strong>
+                <span class="text-muted small">(space- or comma-separated)</span>
+              </label>
+              <input type="text" class="form-control font-monospace"
+                     id="plannedDomainsInput"
+                     placeholder="acme.tld widgets.tld">
+              <div class="form-text">
+                You don't have mailbox-hosting domains configured yet, so we
+                can't auto-populate from your DB. Type the domain names this
+                cert will need to cover (the ones you're about to add in
+                <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a>)
+                and we'll generate the SAN list below. The Common Name is
+                added automatically at submission.
+              </div>
+            </div>
+          </cfif>
+
           <!--- Cost warning shown only when purpose=mailbox. JS toggles
                visibility based on the radio above. --->
           <div id="csrMailboxWarning" class="alert alert-warning mb-3" role="alert">
@@ -678,6 +730,9 @@ $(document).ready(function() {
   // Mailbox: show cost warning + mailbox help, hide server help, restore prefill
   //         if textarea is currently empty (preserves admin edits).
   var csrSanDefault = $('#csrModal textarea[name="sans"]').val();
+  <cfoutput>
+  var csrSanPrefixes = "#csrSanPrefixesList#".split(',').filter(function(p) { return p.length > 0; });
+  </cfoutput>
 
   function applyCsrPurpose() {
     var purpose = $('#csrModal input[name="cert_purpose"]:checked').val();
@@ -687,6 +742,7 @@ $(document).ready(function() {
       $('#csrMailboxWarning').show();
       $('#csrSanHelpMailbox').show();
       $('#csrSanHelpServer').hide();
+      $('#csrPlannedDomains').show();
       if (current.trim() === '') {
         $textarea.val(csrSanDefault);
       }
@@ -694,6 +750,7 @@ $(document).ready(function() {
       $('#csrMailboxWarning').hide();
       $('#csrSanHelpMailbox').hide();
       $('#csrSanHelpServer').show();
+      $('#csrPlannedDomains').hide();
       if (current === csrSanDefault) {
         $textarea.val('');
       }
@@ -701,6 +758,36 @@ $(document).ready(function() {
   }
   $('#csrModal input[name="cert_purpose"]').on('change', applyCsrPurpose);
   applyCsrPurpose();
+
+  // CSR modal -- planned-domains assist (#245).
+  // When the cross-join prefill came back empty (no mailbox_domains in DB),
+  // the modal exposes a planned-domains input. As the admin types domains,
+  // we cross-join with the system SAN prefixes (autoconfig, autodiscover,
+  // plus any custom) and rewrite the SAN textarea. Idempotent: editing the
+  // input updates the textarea each time. If the admin then manually edits
+  // the textarea, the next planned-domains change overwrites their edits --
+  // documented trade-off.
+  function regenSansFromPlannedDomains() {
+    var raw = $('#plannedDomainsInput').val() || '';
+    var domains = raw.split(/[\s,]+/).map(function(d) {
+      return d.trim().toLowerCase();
+    }).filter(function(d) {
+      // RFC 1123-ish: lower-alpha + digit + dot + hyphen; reject empty + invalid
+      return d.length > 0 && /^[a-z0-9.\-]+$/.test(d);
+    });
+    if (domains.length === 0 || csrSanPrefixes.length === 0) {
+      $('#csrModal textarea[name="sans"]').val('');
+      return;
+    }
+    var sans = [];
+    domains.forEach(function(d) {
+      csrSanPrefixes.forEach(function(p) {
+        sans.push(p + '.' + d);
+      });
+    });
+    $('#csrModal textarea[name="sans"]').val(sans.join('\n'));
+  }
+  $('#plannedDomainsInput').on('input', regenSansFromPlannedDomains);
 });
 
 function openDeleteModal(id, name) {
