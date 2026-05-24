@@ -587,10 +587,11 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <h5 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Buy a multi-name (SAN / UCC) certificate</h5>
             <p class="mb-2">
               For mailbox use, Hermes requires a certificate that covers <strong>multiple
-              hostnames</strong>: the Common Name <em>and</em> each
-              <code>autoconfig.&lt;domain&gt;</code> / <code>autodiscover.&lt;domain&gt;</code>
-              entry mailbox clients ping during account setup. A single-name (DV) cert will
-              <strong>not</strong> work &mdash; mail clients will fail TLS during autoconfig.
+              hostnames</strong>: <code>autoconfig.&lt;domain&gt;</code> and
+              <code>autodiscover.&lt;domain&gt;</code> at minimum (mailbox clients ping these
+              during account setup), plus any custom prefixes you've added in SAN Management.
+              A single-name (DV) cert will <strong>not</strong> work &mdash; mail clients will
+              fail TLS during autoconfig.
             </p>
             <p class="mb-0">
               When ordering from your CA, look for <strong>"UCC certificate"</strong>,
