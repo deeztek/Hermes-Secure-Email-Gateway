@@ -679,7 +679,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
           <div class="mb-3">
             <label class="form-label"><strong>Additional SANs</strong> <span class="text-muted small">(optional, one entry per line)</span></label>
-            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="imap&##10;smtp&##10;vanity.othercompany.com"></textarea>
+            <textarea class="form-control font-monospace" name="sans" rows="4" placeholder="imap&#10;smtp&#10;vanity.othercompany.com"></textarea>
 
             <!--- Help text variants. JS toggles which one is visible
                  based on the cert_purpose radio. --->
