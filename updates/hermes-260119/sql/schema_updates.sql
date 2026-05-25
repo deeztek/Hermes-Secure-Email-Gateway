@@ -2603,15 +2603,30 @@ UPDATE system_certificates SET system = 1
 --     UI, so the migration targets the exact same row the UI writes to.
 --     Avoids the brittle AUTO_INCREMENT id match (id values aren't
 --     deterministic across installs).
---   - EXISTS gate: only runs on Docker (version_no='Docker'), leaves DEV
---     legacy installs alone (their snakeoil paths are real files).
+--   - EXISTS gate: ONLY fires when system_certificates has a row with
+--     system=1 AND file_name='bootstrap'. That's a precise "this install
+--     has the bootstrap_hermes.* files on disk" signal -- true on
+--     Docker fresh installs (where register_bootstrap_cert_in_db
+--     created the row + the files), false on DEV legacy installs
+--     where the system cert is file_name='ssl-cert-snakeoil' (and the
+--     existing snakeoil paths in parameters point at the real Ubuntu
+--     ssl-cert package files inside the postfix container, so they
+--     MUST be preserved -- changing them to bootstrap_hermes.* would
+--     break STARTTLS because those files don't exist on DEV).
+--     This is more precise than gating on version_no='Docker' alone
+--     (which would match DEV too -- DEV IS a Docker install, just
+--     predating the bootstrap_hermes cert system).
 --   - WHERE on parameters value: only updates rows still holding the
 --     seed default, so admin customizations via edit_smtp_tls_settings.cfm
 --     are preserved.
 --   - Fresh Docker installs also get these UPDATEs from
---     install_hermes_docker.sh:register_bootstrap_cert_in_db so the
---     timing doesn't depend on which schema_updates.sql block runs
---     first relative to the version_no INSERT below.
+--     install_hermes_docker.sh:register_bootstrap_cert_in_db -- the
+--     install-script-side fire is what makes fresh installs land
+--     correctly without depending on this migration block running
+--     after the system_certificates retro-tag UPDATE above. On
+--     re-runs of schema_updates.sql for existing Docker upgrades,
+--     this block is what catches the snakeoil-seed-still-in-parameters
+--     state and rewrites to bootstrap paths.
 --
 -- EXISTS form (not UPDATE...JOIN) so IDE linters using T-SQL grammar
 -- don't flag false-positive errors; MariaDB runs both forms.
@@ -2622,8 +2637,8 @@ UPDATE parameters
     AND child = 1
     AND enabled = 1
     AND parameter = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
-    AND EXISTS (SELECT 1 FROM system_settings s
-                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+    AND EXISTS (SELECT 1 FROM system_certificates sc
+                WHERE sc.system = 1 AND sc.file_name = 'bootstrap');
 
 UPDATE parameters
   SET parameter = '/opt/hermes/ssl/bootstrap_hermes.key'
@@ -2631,8 +2646,8 @@ UPDATE parameters
     AND child = 1
     AND enabled = 1
     AND parameter = '/etc/ssl/private/ssl-cert-snakeoil.key'
-    AND EXISTS (SELECT 1 FROM system_settings s
-                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+    AND EXISTS (SELECT 1 FROM system_certificates sc
+                WHERE sc.system = 1 AND sc.file_name = 'bootstrap');
 
 UPDATE parameters
   SET parameter = '/opt/hermes/ssl/bootstrap_hermes.chain.pem'
@@ -2640,8 +2655,8 @@ UPDATE parameters
     AND child = 1
     AND enabled = 1
     AND (parameter IS NULL OR parameter = '')
-    AND EXISTS (SELECT 1 FROM system_settings s
-                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+    AND EXISTS (SELECT 1 FROM system_certificates sc
+                WHERE sc.system = 1 AND sc.file_name = 'bootstrap');
 
 -- ============================================================================
 -- Release version stamp (must be the last block in this file).
