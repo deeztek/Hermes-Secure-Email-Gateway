@@ -71,7 +71,7 @@ networks:
 
 services:
   hermes_unbound:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-unbound:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-unbound:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_unbound
     logging:
       options:
@@ -159,7 +159,7 @@ services:
       - hermes_commandbox
 
   hermes_nginx:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_nginx
     dns:
       - ${IPV4SUBNET}.117
@@ -279,7 +279,7 @@ services:
 
 
   hermes_commandbox:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-commandbox:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_commandbox
     cap_add:
       - SYS_ADMIN
@@ -347,7 +347,7 @@ services:
       - 8888
 
   hermes_postfix_dkim:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-postfix-dkim:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_postfix_dkim
     logging:
       options:
@@ -386,7 +386,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_dmarc:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-dmarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dmarc
     logging:
       options:
@@ -415,7 +415,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_openarc:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-openarc:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-openarc:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_openarc
     logging:
       options:
@@ -446,7 +446,7 @@ services:
 
 
   hermes_mail_filter:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_mail_filter
     logging:
       options:
@@ -494,7 +494,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_body_milter:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-body-milter:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-body-milter:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_body_milter
     logging:
       options:
@@ -519,7 +519,7 @@ services:
       - TZ=${TIMEZONE}
 
   hermes_ciphermail:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-ciphermail:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ciphermail
     privileged: true
     logging:
@@ -676,7 +676,7 @@ services:
 
 
   hermes_dovecot:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-dovecot:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-dovecot:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_dovecot
     dns:
       - ${IPV4SUBNET}.117
@@ -723,7 +723,7 @@ services:
 
 
   hermes_ldap:
-    image: hub.deeztek.com/dedwards/hermes-seg-docker-gl/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
+    image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ldap
     dns:
       - ${IPV4SUBNET}.117
