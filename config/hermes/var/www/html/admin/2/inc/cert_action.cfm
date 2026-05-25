@@ -178,9 +178,13 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>
 
-  <!--- Cannot delete system-self-signed --->
-  <cfif form.certificate_id is "1">
-    <cfset session.m = "You cannot delete the system-self-signed certificate">
+  <!--- Cannot delete system-managed certs (#253). Uses the same
+       helper as view_system_certificates.cfm so this stays consistent
+       with the UI gate and works on installs where the bootstrap row
+       is not id=1 (DEV's ssl-cert-snakeoil case). --->
+  <cfinclude template="./get_system_cert_ids.cfm">
+  <cfif ListFind(systemCertIds, form.certificate_id) GT 0>
+    <cfset session.m = "You cannot delete a system-managed certificate.">
     <cfset session.alerttype = "error">
     <cflocation url="view_system_certificates.cfm" addtoken="no">
   </cfif>

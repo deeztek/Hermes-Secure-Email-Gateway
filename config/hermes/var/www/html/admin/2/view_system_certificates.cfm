@@ -110,6 +110,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
   SELECT COUNT(*) AS c FROM mailbox_domains
 </cfquery>
 
+<!--- System cert IDs (#252 + #253) -- install-generated rows that the
+     row render uses to (a) stamp a SYSTEM badge next to the friendly
+     name and (b) replace the brittle hardcoded `id=1` check that
+     used to hide the Delete button. The helper detects the `system`
+     column at runtime so this works pre- and post-schema-migration. --->
+<cfinclude template="./inc/get_system_cert_ids.cfm">
+
 <!--- Read security settings --->
 <cfset allowCertDownload = false>
 <cfset securityConfPath = "/opt/hermes/config/security.conf">
@@ -425,14 +432,20 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
                 </button>
               </td>
               <td>
-                <cfif id is not "1">
+                <cfif ListFind(systemCertIds, id) GT 0>
+                  <span data-bs-toggle="tooltip" title="System-managed certificate -- cannot be deleted. Used as a placeholder when binding mailbox domains before a real cert is imported.">
+                    <button type="button" class="btn btn-sm btn-danger" disabled>
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
+                  </span>
+                <cfelse>
                   <button type="button" class="btn btn-sm btn-danger" title="Delete"
                     onclick="openDeleteModal('#id#', '#encodeForJavaScript(friendly_name)#');">
                     <i class="fas fa-trash-alt"></i>
                   </button>
                 </cfif>
               </td>
-              <td>#encodeForHTML(friendly_name)#</td>
+              <td>#encodeForHTML(friendly_name)#<cfif ListFind(systemCertIds, id) GT 0> <span class="badge bg-secondary ms-1" data-bs-toggle="tooltip" title="System-managed certificate (install-generated)">SYSTEM</span></cfif></td>
               <td><span class="badge <cfif type is 'Acme'>bg-success<cfelse>bg-info</cfif>">#encodeForHTML(type)#</span></td>
               <td>#encodeForHTML(domain_name)#</td>
               <td><cfif getWebCert.value2 is id><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
