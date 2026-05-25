@@ -8,18 +8,47 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
-<!--- DOCKER SHORT-CIRCUIT (#240). Docker installs are updated via image
-     tags + git pull on the host, not via the legacy tarball server at
-     updates.deeztek.com. The local seed row in system_updates is
-     ('221211') and the legacy server faithfully responds with whatever
-     is newer ('240815'), producing a false-positive "update available"
-     on the dashboard. Skip the entire remote check on Docker installs
-     until the Docker-aware updates infrastructure (#218) lands. --->
+<!--- DOCKER PATH (#218). Docker installs use GitHub Releases as the
+     source of truth. The daily Ofelia job invokes
+     /schedule/check_for_update.cfm which polls the GitHub Releases API,
+     writes the result to /opt/hermes/updates/check_system_update.txt,
+     and emails the admin when a new build is available. This file
+     is now just a thin cache-reader for the dashboard widget -- no
+     network call, no auth dance, no per-page-load API hit. --->
 <cfquery name="getVersionTrain" datasource="hermes">
     SELECT value FROM system_settings WHERE parameter = 'version_no'
 </cfquery>
 <cfif getVersionTrain.recordCount AND getVersionTrain.value EQ 'Docker'>
-    <cfset hermesupdate = "MANAGED VIA DOCKER">
+    <cfset cacheFile = "/opt/hermes/updates/check_system_update.txt">
+    <cfif fileExists(cacheFile)>
+        <cffile action="read" file="#cacheFile#" variable="cachedContent">
+        <cfset cachedContent = trim(cachedContent)>
+        <cfif Len(cachedContent) GT 0>
+            <cfset status = ListGetAt(cachedContent, 1, chr(64))>
+            <cfif status EQ "SUCCESS">
+                <cfif ListLen(cachedContent, chr(64)) GE 2>
+                    <cfset build = ListGetAt(cachedContent, 2, chr(64))>
+                </cfif>
+                <cfif ListLen(cachedContent, chr(64)) GE 3>
+                    <cfset released = ListGetAt(cachedContent, 3, chr(64))>
+                </cfif>
+                <cfif ListLen(cachedContent, chr(64)) GE 5>
+                    <cfset releasenote = ListGetAt(cachedContent, 5, chr(64))>
+                </cfif>
+                <cfset hermesupdate = "UPDATEFOUND">
+            <cfelseif status EQ "NOUPDATE">
+                <cfset hermesupdate = "LATEST VERSION">
+            <cfelse>
+                <!--- "UPDATE CHECK UNAVAILABLE" passes through verbatim --->
+                <cfset hermesupdate = status>
+            </cfif>
+        <cfelse>
+            <cfset hermesupdate = "UPDATE CHECK UNAVAILABLE">
+        </cfif>
+    <cfelse>
+        <!--- Cache file not yet written; first Ofelia run hasn't happened. --->
+        <cfset hermesupdate = "UPDATE CHECK PENDING">
+    </cfif>
     <cfexit method="exitTemplate">
 </cfif>
 

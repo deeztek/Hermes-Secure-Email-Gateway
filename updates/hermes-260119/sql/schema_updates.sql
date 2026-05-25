@@ -2659,6 +2659,36 @@ UPDATE parameters
                 WHERE sc.system = 1 AND sc.file_name = 'bootstrap');
 
 -- ============================================================================
+-- #218: Ofelia update-check job points at the new /schedule/ CFML endpoint
+-- ============================================================================
+-- The legacy update-check pipeline ran a bash script (update_check.sh) that
+-- queried api_tokens for an X-Token, then curled /hermes-api/ with an
+-- X-Original-URL header to invoke /admin/2/inc/check_system_update.cfm. Two
+-- problems on Docker:
+--   1. The script used `mysql -h localhost` which doesn't reach the separate
+--      hermes_db_server container.
+--   2. The api_token detour exists only because check_system_update.cfm
+--      lived under /admin/2/ (auth-gated). Other Ofelia jobs (message
+--      cleanup, quarantine notify, etc.) use the cleaner /schedule/ pattern
+--      with a direct curl -- no auth dance.
+--
+-- Post-#218: schedule/check_for_update.cfm holds the GitHub API poll +
+-- cache write + email logic. Ofelia just curls it directly. inc/check_system
+-- _update.cfm becomes a thin cache-reader for the dashboard widget.
+--
+-- This UPDATE flips the ofelia_jobs row for existing installs. Fresh
+-- installs pick up the new command from hermes_install.sql:1230 which has
+-- been updated in lockstep.
+--
+-- Idempotent: re-running on an already-migrated row is a no-op (WHERE clause
+-- only matches the legacy script path).
+
+UPDATE ofelia_jobs
+SET command = '/usr/bin/curl --silent http://localhost:8888/schedule/check_for_update.cfm'
+WHERE job_name LIKE '%hermes-update-check%'
+  AND command = '/opt/hermes/schedule/update_check.sh';
+
+-- ============================================================================
 -- Release version stamp (must be the last block in this file).
 -- IMPORTANT: when cutting a new release, update BOTH literals below in the
 -- new copy of schema_updates.sql (and rename the directory accordingly).

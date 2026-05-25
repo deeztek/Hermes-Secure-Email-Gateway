@@ -1227,7 +1227,7 @@ CREATE TABLE IF NOT EXISTS `ofelia_jobs` (
 -- 10 row(s) for `ofelia_jobs`
 INSERT IGNORE INTO `ofelia_jobs` VALUES (1,'[job-exec \"renew-acme-certificate\"]',' 0 05 12 * * *','/opt/hermes/schedule/renew_acme_certificate.sh','hermes_commandbox',NULL,NULL,NULL,NULL,'certbot',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (2,'[job-exec \"hermes-message-cleanup\"]',' 0 30 01 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/message_cleanup.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
-INSERT IGNORE INTO `ofelia_jobs` VALUES (3,'[job-exec \"hermes-update-check\"]',' 0 30 04 * * *','/opt/hermes/schedule/update_check.sh','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
+INSERT IGNORE INTO `ofelia_jobs` VALUES (3,'[job-exec \"hermes-update-check\"]',' 0 30 04 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/check_for_update.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (8,'[job-exec \"acme-validate-ip\"]','@every 30m','/usr/bin/curl --silent http://localhost:8888/schedule/acme_validate_ip.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'certbot',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (9,'[job-exec \"hermes-health-check-mailqueue\"]','@every 15m','/usr/bin/curl --silent http://localhost:8888/schedule/health_check_mailqueue.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'pushover',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (10,'[job-exec \"hermes-dmarc-report\"]','0 30 02 * * *','/opt/hermes/schedule/dmarc_report_script.sh','hermes_dmarc',NULL,NULL,NULL,NULL,'dmarc',1,0);

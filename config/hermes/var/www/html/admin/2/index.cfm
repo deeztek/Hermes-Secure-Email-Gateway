@@ -505,8 +505,11 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.release-notes-link').forEach(function(link) {
     link.addEventListener('click', function(e) {
       var buildNumber = this.getAttribute('data-build');
-      var githubReleaseUrl = 'https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases/tag/build-' + buildNumber;
-      var githubApiUrl = 'https://api.github.com/repos/deeztek/Hermes-Secure-Email-Gateway/releases/tags/build-' + buildNumber;
+      // Tag format is vYYMMDD (e.g. v260119) -- the GitHub release tag is
+      // the build number itself, no `build-` prefix. Pre-#218 code added
+      // a `build-` prefix that doesn't match the canonical tag scheme.
+      var githubReleaseUrl = 'https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases/tag/' + buildNumber;
+      var githubApiUrl = 'https://api.github.com/repos/deeztek/Hermes-Secure-Email-Gateway/releases/tags/' + buildNumber;
 
       // Update modal title and GitHub link
       document.getElementById('releaseNotesModalLabel').textContent = 'Release Notes - Build ' + buildNumber;
