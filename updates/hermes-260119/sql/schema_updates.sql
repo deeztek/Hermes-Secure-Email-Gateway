@@ -2583,8 +2583,9 @@ UPDATE system_certificates SET system = 1
 -- ============================================================================
 -- #254: postfix smtpd_tls_*_file parameters -- Docker bootstrap path fix
 -- ============================================================================
--- hermes_install.sql seeds parameters rows 213/215/217 with Ubuntu snakeoil
--- paths. Correct for legacy DEV (the ssl-cert package's files exist).
+-- hermes_install.sql seeds the child rows of smtpd_tls_cert_file /
+-- smtpd_tls_key_file / smtpd_tls_CAfile with Ubuntu snakeoil paths.
+-- Correct for legacy DEV (the ssl-cert package's files exist).
 -- Broken for Docker:
 --   - install_hermes_docker.sh:1954-1956 SED-replaces /etc/postfix/main.cf
 --     to point at /opt/hermes/ssl/bootstrap_hermes.* paths.
@@ -2597,6 +2598,11 @@ UPDATE system_certificates SET system = 1
 --     handshakes fail when admin enables TLS-required.
 --
 -- Fix: align parameters table with what the install-script SED writes.
+--   - Matches by (parent_name + child=1 + enabled=1) -- the same pattern
+--     edit_smtp_tls_settings.cfm uses to write these rows from the admin
+--     UI, so the migration targets the exact same row the UI writes to.
+--     Avoids the brittle AUTO_INCREMENT id match (id values aren't
+--     deterministic across installs).
 --   - EXISTS gate: only runs on Docker (version_no='Docker'), leaves DEV
 --     legacy installs alone (their snakeoil paths are real files).
 --   - WHERE on parameters value: only updates rows still holding the
@@ -2612,21 +2618,27 @@ UPDATE system_certificates SET system = 1
 
 UPDATE parameters
   SET parameter = '/opt/hermes/ssl/bootstrap_hermes.pem'
-  WHERE id = 213
+  WHERE parent_name = 'smtpd_tls_cert_file'
+    AND child = 1
+    AND enabled = 1
     AND parameter = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
     AND EXISTS (SELECT 1 FROM system_settings s
                 WHERE s.parameter = 'version_no' AND s.value = 'Docker');
 
 UPDATE parameters
   SET parameter = '/opt/hermes/ssl/bootstrap_hermes.key'
-  WHERE id = 215
+  WHERE parent_name = 'smtpd_tls_key_file'
+    AND child = 1
+    AND enabled = 1
     AND parameter = '/etc/ssl/private/ssl-cert-snakeoil.key'
     AND EXISTS (SELECT 1 FROM system_settings s
                 WHERE s.parameter = 'version_no' AND s.value = 'Docker');
 
 UPDATE parameters
   SET parameter = '/opt/hermes/ssl/bootstrap_hermes.chain.pem'
-  WHERE id = 217
+  WHERE parent_name = 'smtpd_tls_CAfile'
+    AND child = 1
+    AND enabled = 1
     AND (parameter IS NULL OR parameter = '')
     AND EXISTS (SELECT 1 FROM system_settings s
                 WHERE s.parameter = 'version_no' AND s.value = 'Docker');
