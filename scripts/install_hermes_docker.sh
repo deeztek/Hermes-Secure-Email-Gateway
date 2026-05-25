@@ -2880,6 +2880,26 @@ register_bootstrap_cert_in_db() {
         UPDATE parameters2 SET value2='${existing_id}' WHERE parameter='mail.certificate'    AND module='certificates';
     " 2>>"$LOG_FILE"
 
+    # Point postfix TLS path parameters at bootstrap cert (#254).
+    # The hermes_install.sql seed has rows 213/215/217 set to Ubuntu
+    # snakeoil paths (correct for legacy DEV, broken for Docker).
+    # SED at install time fixes /etc/postfix/main.cf, but the next CFML
+    # generate_postfix_configuration.cfm regen reads from `parameters`
+    # and reverts those paths back to snakeoil -- STARTTLS handshakes
+    # then fail when admin enables TLS-required. Mirror the main.cf SED
+    # with a parameters-table UPDATE here so both stay in sync.
+    # WHERE clause is defensive: only updates rows still holding the
+    # seed defaults so admin customizations are left alone.
+    log "Pointing postfix TLS path parameters (213/215/217) at bootstrap cert files..."
+    docker exec hermes_db_server mysql -u root hermes -e "
+        UPDATE parameters SET parameter='/opt/hermes/ssl/bootstrap_hermes.pem'
+          WHERE id=213 AND parameter='/etc/ssl/certs/ssl-cert-snakeoil.pem';
+        UPDATE parameters SET parameter='/opt/hermes/ssl/bootstrap_hermes.key'
+          WHERE id=215 AND parameter='/etc/ssl/private/ssl-cert-snakeoil.key';
+        UPDATE parameters SET parameter='/opt/hermes/ssl/bootstrap_hermes.chain.pem'
+          WHERE id=217 AND (parameter IS NULL OR parameter='');
+    " 2>>"$LOG_FILE"
+
     log "Bootstrap cert registered (id=${existing_id})"
 }
 

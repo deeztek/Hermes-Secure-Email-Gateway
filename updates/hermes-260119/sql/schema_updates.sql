@@ -2581,6 +2581,57 @@ UPDATE system_certificates SET system = 1
     AND system = 0;
 
 -- ============================================================================
+-- #254: postfix smtpd_tls_*_file parameters -- Docker bootstrap path fix
+-- ============================================================================
+-- hermes_install.sql seeds parameters rows 213/215/217 with Ubuntu snakeoil
+-- paths. Correct for legacy DEV (the ssl-cert package's files exist).
+-- Broken for Docker:
+--   - install_hermes_docker.sh:1954-1956 SED-replaces /etc/postfix/main.cf
+--     to point at /opt/hermes/ssl/bootstrap_hermes.* paths.
+--   - But the parameters table seed retains snakeoil values.
+--   - First CFML generate_postfix_configuration.cfm regen (~10 admin actions
+--     trigger it: relay-host save, domain add, RBL apply, SMTP TLS save,
+--     etc.) reads parameters and runs `postconf -e "smtpd_tls_cert_file =
+--     /etc/ssl/certs/ssl-cert-snakeoil.pem"`, reverting the install SED.
+--   - Postfix doesn't crash (TLS files are lazy-loaded) but STARTTLS
+--     handshakes fail when admin enables TLS-required.
+--
+-- Fix: align parameters table with what the install-script SED writes.
+--   - EXISTS gate: only runs on Docker (version_no='Docker'), leaves DEV
+--     legacy installs alone (their snakeoil paths are real files).
+--   - WHERE on parameters value: only updates rows still holding the
+--     seed default, so admin customizations via edit_smtp_tls_settings.cfm
+--     are preserved.
+--   - Fresh Docker installs also get these UPDATEs from
+--     install_hermes_docker.sh:register_bootstrap_cert_in_db so the
+--     timing doesn't depend on which schema_updates.sql block runs
+--     first relative to the version_no INSERT below.
+--
+-- EXISTS form (not UPDATE...JOIN) so IDE linters using T-SQL grammar
+-- don't flag false-positive errors; MariaDB runs both forms.
+
+UPDATE parameters
+  SET parameter = '/opt/hermes/ssl/bootstrap_hermes.pem'
+  WHERE id = 213
+    AND parameter = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
+    AND EXISTS (SELECT 1 FROM system_settings s
+                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+
+UPDATE parameters
+  SET parameter = '/opt/hermes/ssl/bootstrap_hermes.key'
+  WHERE id = 215
+    AND parameter = '/etc/ssl/private/ssl-cert-snakeoil.key'
+    AND EXISTS (SELECT 1 FROM system_settings s
+                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+
+UPDATE parameters
+  SET parameter = '/opt/hermes/ssl/bootstrap_hermes.chain.pem'
+  WHERE id = 217
+    AND (parameter IS NULL OR parameter = '')
+    AND EXISTS (SELECT 1 FROM system_settings s
+                WHERE s.parameter = 'version_no' AND s.value = 'Docker');
+
+-- ============================================================================
 -- Release version stamp (must be the last block in this file).
 -- IMPORTANT: when cutting a new release, update BOTH literals below in the
 -- new copy of schema_updates.sql (and rename the directory accordingly).
