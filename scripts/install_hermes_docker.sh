@@ -35,12 +35,24 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Installation paths
-# HERMES_ROOT is self-locating: derived from where this script lives, so the
-# install works regardless of where the repo was cloned. Script lives at
-# <HERMES_ROOT>/scripts/install_hermes_docker.sh, so two dirname's gets us
-# the repo root. This also matches the future intent of #217 (self-locating
-# install + update scripts so the admin isn't pinned to /opt/hermes-seg).
-HERMES_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Self-locate Hermes root by walking up from script location until we
+# find docker-compose.yml. Robust to install path AND to wherever this
+# script lives in the repo tree (currently scripts/, 1 level deep, but
+# the walk-up pattern works at any depth). Allow HERMES_ROOT env var
+# to override for unusual setups. Matches the canonical pattern used by
+# rotate_db_credentials.sh and other Hermes scripts (#217).
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [[ -z "${HERMES_ROOT:-}" ]]; then
+    HERMES_ROOT="$SCRIPT_DIR"
+    while [[ "$HERMES_ROOT" != "/" ]] && [[ ! -f "$HERMES_ROOT/docker-compose.yml" ]]; do
+        HERMES_ROOT="$(dirname "$HERMES_ROOT")"
+    done
+    if [[ "$HERMES_ROOT" == "/" ]]; then
+        echo "ERROR: Could not locate docker-compose.yml in any parent of $SCRIPT_DIR" >&2
+        echo "Set HERMES_ROOT environment variable manually and retry." >&2
+        exit 1
+    fi
+fi
 SECRETS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/keys"
 CREDS_DIR="${HERMES_ROOT}/config/hermes/opt/hermes/creds"
 CONFIG_FILE="${HERMES_ROOT}/.hermes_install_config"
