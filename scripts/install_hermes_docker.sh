@@ -2668,6 +2668,56 @@ create_databases() {
 }
 
 # ============================================================================
+# APPLY SCHEMA UPDATES (standalone -- callable from --apply-schema)
+# ============================================================================
+
+apply_schema_updates() {
+    # Applies the current release's schema_updates.sql to the hermes DB.
+    # Designed for the post-`git pull` upgrade flow on Test/Prod:
+    #
+    #   cd /opt/hermes-seg-docker-gl
+    #   git fetch && git reset --hard origin/main
+    #   ./scripts/install_hermes_docker.sh --apply-schema
+    #
+    # Replaces the manual `docker exec -i hermes_db_server mariadb hermes <
+    # updates/.../schema_updates.sql` invocation (where forgetting `-i`
+    # silently no-ops -- caught in session 20260524).
+    #
+    # Idempotent: every statement in schema_updates.sql is guarded
+    # (IF NOT EXISTS / INSERT IGNORE / value-gated WHERE) so re-running
+    # against an already-up-to-date DB does nothing.
+    header "Applying Schema Updates"
+
+    local schema_updates="${HERMES_ROOT}/updates/hermes-260119/sql/schema_updates.sql"
+
+    if [[ ! -f "$schema_updates" ]]; then
+        error "schema_updates.sql not found at: ${schema_updates}"
+        return 1
+    fi
+
+    if ! docker ps --format '{{.Names}}' | grep -q '^hermes_db_server$'; then
+        error "hermes_db_server container is not running. Start it first: docker compose up -d hermes_db_server"
+        return 1
+    fi
+
+    log "Importing schema_updates.sql into 'hermes'..."
+    if ! docker exec -i hermes_db_server mysql -u root hermes \
+            < "$schema_updates" 2>> "$LOG_FILE"; then
+        error "Failed to apply schema updates (see $LOG_FILE for details)"
+        return 1
+    fi
+    log "  ✓ schema_updates.sql applied"
+
+    # Confirm the release stamp landed (the file's final block).
+    local stamped_build
+    stamped_build=$(docker exec hermes_db_server mysql -u root -N -s hermes \
+        -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE")
+    if [[ -n "$stamped_build" ]]; then
+        log "  ✓ Release stamp: build_no=${stamped_build}"
+    fi
+}
+
+# ============================================================================
 # SEED INSTALL-SPECIFIC VALUES
 # ============================================================================
 
@@ -3874,6 +3924,15 @@ case "${1:-}" in
         touch "$LOG_FILE"
         write_install_summary
         ;;
+    --apply-schema)
+        # Apply updates/<version>/sql/schema_updates.sql to the hermes DB.
+        # Designed for the post `git pull` upgrade flow: pull new code, then
+        # run this to apply any new schema deltas / param-table fixups.
+        # Idempotent + safe to re-run; replaces the error-prone manual
+        # `docker exec -i ... < schema_updates.sql` invocation.
+        touch "$LOG_FILE"
+        apply_schema_updates
+        ;;
     --show-config)
         # Display current configuration
         if [[ -f "$CONFIG_FILE" ]]; then
@@ -3954,6 +4013,11 @@ case "${1:-}" in
         echo "  --show-config        Display current configuration"
         echo "  --show-summary       Re-print the post-install summary (URL, admin creds,"
         echo "                       smoke-test command) using values already on disk"
+        echo ""
+        echo "Upgrades:"
+        echo "  --apply-schema       Apply the current release's schema_updates.sql to"
+        echo "                       the hermes DB. Run after 'git pull' to land any new"
+        echo "                       schema deltas. Idempotent + safe to re-run."
         echo ""
         echo "Recovery:"
         echo "  --init-db            Re-run phase-2 (post-container) initialization only."
