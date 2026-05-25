@@ -13,8 +13,10 @@ sync-smtp-dev-docker.ffs_gui
 # images to hub.deeztek.com; end-user deployments pull pre-built images
 # so these scripts are not part of the deployed artifact.
 Docker/build-all.sh
+Docker/build-all-ghcr.sh
 Docker/build-single.sh
 Docker/push-all.sh
+Docker/push-all-ghcr.sh
 
 # AdminLTE download (use dist/ for deployed files)
 AdminLTE-4.0.0-rc4/
