@@ -2,7 +2,15 @@
 
 This page is the **minimum config needed to get mail flowing** on a fresh Hermes SEG Docker install. The install script (`scripts/install_hermes_docker.sh`) does most of the heavy lifting — this page covers the handful of admin-UI steps that still need a human.
 
-If you skip these, Postfix will silently bounce or reject incoming mail and the admin UI will surface red callout banners until the missing pieces are filled in (see [Dashboard nudges](#dashboard-nudges) at the bottom).
+Skip these and Postfix will silently bounce or reject mail. The admin dashboard also surfaces two universal nudges (placeholder hostname, self-signed cert) until those are addressed (see [Dashboard nudges](#dashboard-nudges) at the bottom).
+
+Hermes supports three deployment topologies and you don't need all of them:
+
+| Topology | Required steps | Skip |
+| --- | --- | --- |
+| **Relay-only** (Hermes forwards inbound mail to a downstream MX) | First Domain → Relay Networks → First Recipient | Mailboxes |
+| **Mail-server-only** (Hermes hosts mailboxes) | Mailbox Domain (under Email Server) → Mailboxes | Relay Domains, Relay Networks, Relay Recipients |
+| **Hybrid** | All of the above | (nothing) |
 
 > **Legacy reference**: this page replaces the [pre-Docker 16-step page](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started). The Docker install script absorbs ~6 of those steps, so the list below is shorter.
 
@@ -39,7 +47,7 @@ The install script sets `myhostname` from what you typed at the FQDN prompt, but
 - **Admin email** — where alerts (license, system events) get delivered
 - **Time zone** — affects log timestamps and report scheduling
 
-> **Dashboard nudge**: an orange callout `Placeholder hostname` fires if `myhostname` still equals the seed default `hermes.domain.tld` or `console.host` equals `smtp.domain.tld`. Both should never appear on a Docker install (the install script overrides them), but if they do, this is the page to fix.
+> **Dashboard nudge**: an orange callout `Placeholder hostname` fires (any topology) if `myhostname` still equals the seed default `hermes.domain.tld` or `console.host` equals `smtp.domain.tld`. Both should never appear on a Docker install (the install script overrides them), but if they do, this is the page to fix.
 
 ### 2. First Relay Domain {#first-domain}
 
@@ -56,8 +64,6 @@ For each domain you'll choose:
 | Destination address / port | The downstream MX (relay mode) or which mailbox-hosting-domain (local mode) |
 | Policy | Encryption policy applied to outbound mail for this domain (Pro only) |
 
-> **Dashboard nudge**: red callout `No relay domains configured` fires when `SELECT COUNT(*) FROM domains = 0`.
-
 ### 3. Relay Networks {#relay-networks}
 
 **Page**: Email Relay → Relay Networks
@@ -65,8 +71,6 @@ For each domain you'll choose:
 Add the IP addresses or CIDR blocks of any **upstream MTA** (your customer's mail server, an application server that sends notification mail, etc.) that should be allowed to relay outbound mail through Hermes.
 
 By default Hermes only trusts `127.0.0.1` and the Docker bridge subnet (`172.16.32.0/24`). Anything else needs to be added here.
-
-> **Dashboard nudge**: red callout `No relay networks configured` fires when there are zero entries beyond the two install defaults.
 
 ### 4. First Recipient OR Mailbox {#first-recipient}
 
@@ -83,8 +87,6 @@ Add the individual recipients (or wildcards) that Hermes should accept mail for.
 **Page**: Email Server → Mailboxes
 
 Skip Relay Recipients entirely and create mailboxes on Hermes itself. Each mailbox row creates an LDAP user, a Dovecot maildir, and (optionally) a Nextcloud account.
-
-> **Dashboard nudge**: red callout `No recipients or mailboxes` fires only when **both** the `recipients` table AND the `mailboxes` table are empty. Either one being populated satisfies the gate.
 
 ---
 
@@ -137,23 +139,22 @@ Beyond the gateway itself, DNS is what makes mail actually arrive. The install s
 
 ## Dashboard nudges
 
-After each install, the admin dashboard surfaces red / orange / blue callout banners under the navbar whenever any of the above gates aren't satisfied:
+The admin dashboard surfaces two universal callout banners under the navbar — these apply regardless of topology:
 
 | Color | Priority | Trigger |
 | --- | --- | --- |
-| Red `Setup needed` | 1 | No relay domains, OR no relay networks, OR no recipients + no mailboxes |
-| Orange `Placeholder hostname` | 2 | `myhostname` or `console.host` still at seed placeholder |
-| Blue `Self-signed cert` | 3 | Only the bootstrap cert exists in System Certificates |
+| Orange `Placeholder hostname` | 2 | `myhostname` or `console.host` still at the seed placeholder (`hermes.domain.tld` / `smtp.domain.tld`) |
+| Blue `Self-signed cert` | 3 | Only the bootstrap cert exists in System Certificates — no real cert imported yet |
 
-Each banner links directly to the page where you'd fix the underlying condition. There's no "hide forever" — the callout disappears automatically as soon as the underlying check passes (add a domain → "no relay domains" disappears, etc.).
+Each banner links directly to the page where you'd fix the underlying condition and disappears automatically as soon as the check passes. The topology-specific gates (relay domains, networks, recipients, mailboxes) intentionally don't have dashboard nudges — they depend on which topology you're using and the guidance above covers them.
 
 ---
 
 ## After you finish these steps
 
-1. Send a **test message** from an external account to a recipient on one of your relay domains. Check Reports → Mail Log to confirm it arrived at Hermes and was handed off downstream.
-2. Send a **test outbound message** from your customer MTA (the one whose IP you added to Relay Networks) to an external recipient. Confirm DKIM/SPF pass on the receiver side.
-3. Visit **System → Dashboard** and confirm all priority-1/2/3 setup nudges are gone.
+1. Send a **test message** from an external account to a recipient on one of your relay domains (or to a mailbox if mail-server topology). Check Reports → Mail Log to confirm it arrived at Hermes and was handed off / delivered correctly.
+2. (Relay topology) Send a **test outbound message** from your customer MTA (the one whose IP you added to Relay Networks) to an external recipient. Confirm DKIM/SPF pass on the receiver side.
+3. Visit **System → Dashboard** and confirm both setup nudges are gone (placeholder hostname + self-signed cert).
 4. If you set up Pro features, verify `session.edition` reads "Pro" in the top-right corner of any admin page.
 
 You're done. Welcome to Hermes SEG.

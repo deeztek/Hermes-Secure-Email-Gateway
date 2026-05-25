@@ -166,78 +166,17 @@ Usage: <cfinclude template="system_alerts.cfm">
 <!--- ============================================================================
      FRESH-INSTALL ONBOARDING NUDGES (#241)
      ============================================================================
-     After install_hermes_docker.sh finishes the admin sees a working
-     console but mail won't actually flow until at least:
-       - one relay domain is configured
-       - one relay network entry is added (so an upstream MTA can hand
-         off mail to this gateway)
-       - one recipient OR mailbox exists
-       - the real FQDN is set (not the placeholder)
-     With no UI signal, the admin can spend a long time wondering why
-     Postfix bounces every test message. Each alert below fires only
-     when its underlying condition is true (no schema needed -- the
-     check IS the gate) and the title links to the admin page where
-     the fix lives. As soon as admin adds the missing config the
-     alert disappears.
+     Topology-agnostic post-install reminders. Earlier scoping included
+     three more nudges (no relay domains / no relay networks / no
+     recipients-or-mailboxes) but those depend on whether the admin
+     is building relay-only, mail-server-only, or hybrid -- making
+     them topology-aware would have rebuilt the wizard we explicitly
+     rejected during scoping. Topology-specific guidance lives in
+     docs/install/get-started-docker.md instead. Only the two checks
+     below remain here -- both apply to every install regardless of
+     topology (every install needs a real FQDN; every install should
+     replace the bootstrap self-signed cert before going live).
      ============================================================================ --->
-
-<!--- No relay domains configured --->
-<cfquery name="_alertDomainCount" datasource="hermes">
-    SELECT COUNT(*) AS c FROM domains
-</cfquery>
-<cfif _alertDomainCount.c EQ 0>
-    <cfset ArrayAppend(systemAlerts, {
-        type: "danger",
-        icon: "fas fa-globe",
-        label: "Setup needed",
-        title: "No relay domains configured. <a href='view_domains.cfm' class='alert-link'>Add a domain</a> so the gateway knows what mail to accept.",
-        priority: 1
-    })>
-</cfif>
-
-<!--- No relay networks configured (excluding the two install-default
-     entries that get_relay_networks.cfm also filters out) --->
-<cfquery name="_alertMynetworksParent" datasource="hermes">
-    SELECT id FROM parameters WHERE parameter = 'mynetworks' AND child = '2'
-</cfquery>
-<cfif _alertMynetworksParent.recordcount EQ 1>
-    <cfquery name="_alertRelayNetworkCount" datasource="hermes">
-        SELECT COUNT(*) AS c FROM parameters
-        WHERE parent = <cfqueryparam value="#_alertMynetworksParent.id#" cfsqltype="cf_sql_varchar">
-          AND child = '1'
-          AND enabled = '1'
-          AND applied = '1'
-          AND parameter NOT IN ('127.0.0.1', '172.16.32.0/24')
-    </cfquery>
-    <cfif _alertRelayNetworkCount.c EQ 0>
-        <cfset ArrayAppend(systemAlerts, {
-            type: "danger",
-            icon: "fas fa-network-wired",
-            label: "Setup needed",
-            title: "No relay networks configured. <a href='view_relay_networks.cfm' class='alert-link'>Add a network</a> for the customer MTA / app server that should be allowed to relay outbound mail.",
-            priority: 1
-        })>
-    </cfif>
-</cfif>
-
-<!--- No recipients OR mailboxes -- either path is valid (relay topology
-     uses `recipients`, Hermes-hosted mailboxes use `mailboxes`); only
-     fire if BOTH are empty --->
-<cfquery name="_alertRecipientCount" datasource="hermes">
-    SELECT COUNT(*) AS c FROM recipients
-</cfquery>
-<cfquery name="_alertMailboxCount" datasource="hermes">
-    SELECT COUNT(*) AS c FROM mailboxes
-</cfquery>
-<cfif _alertRecipientCount.c EQ 0 AND _alertMailboxCount.c EQ 0>
-    <cfset ArrayAppend(systemAlerts, {
-        type: "danger",
-        icon: "fas fa-user-plus",
-        label: "Setup needed",
-        title: "No recipients or mailboxes. Add a <a href='view_internal_recipients.cfm' class='alert-link'>relay recipient</a> (for upstream-relay topology) or a <a href='view_mailboxes.cfm' class='alert-link'>mailbox</a> (for Hermes-hosted mailboxes).",
-        priority: 1
-    })>
-</cfif>
 
 <!--- Placeholder hostname still in use (parameters.myhostname seed
      default is 'hermes.domain.tld'; install script normally overrides
