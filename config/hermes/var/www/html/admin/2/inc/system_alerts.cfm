@@ -164,6 +164,135 @@ Usage: <cfinclude template="system_alerts.cfm">
 </cfif>
 
 <!--- ============================================================================
+     FRESH-INSTALL ONBOARDING NUDGES (#241)
+     ============================================================================
+     After install_hermes_docker.sh finishes the admin sees a working
+     console but mail won't actually flow until at least:
+       - one relay domain is configured
+       - one relay network entry is added (so an upstream MTA can hand
+         off mail to this gateway)
+       - one recipient OR mailbox exists
+       - the real FQDN is set (not the placeholder)
+     With no UI signal, the admin can spend a long time wondering why
+     Postfix bounces every test message. Each alert below fires only
+     when its underlying condition is true (no schema needed -- the
+     check IS the gate) and the title links to the admin page where
+     the fix lives. As soon as admin adds the missing config the
+     alert disappears.
+     ============================================================================ --->
+
+<!--- No relay domains configured --->
+<cfquery name="_alertDomainCount" datasource="hermes">
+    SELECT COUNT(*) AS c FROM domains
+</cfquery>
+<cfif _alertDomainCount.c EQ 0>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "danger",
+        icon: "fas fa-globe",
+        label: "Setup needed",
+        title: "No relay domains configured. <a href='view_domains.cfm' class='alert-link'>Add a domain</a> so the gateway knows what mail to accept.",
+        priority: 1
+    })>
+</cfif>
+
+<!--- No relay networks configured (excluding the two install-default
+     entries that get_relay_networks.cfm also filters out) --->
+<cfquery name="_alertMynetworksParent" datasource="hermes">
+    SELECT id FROM parameters WHERE parameter = 'mynetworks' AND child = '2'
+</cfquery>
+<cfif _alertMynetworksParent.recordcount EQ 1>
+    <cfquery name="_alertRelayNetworkCount" datasource="hermes">
+        SELECT COUNT(*) AS c FROM parameters
+        WHERE parent = <cfqueryparam value="#_alertMynetworksParent.id#" cfsqltype="cf_sql_varchar">
+          AND child = '1'
+          AND enabled = '1'
+          AND applied = '1'
+          AND parameter NOT IN ('127.0.0.1', '172.16.32.0/24')
+    </cfquery>
+    <cfif _alertRelayNetworkCount.c EQ 0>
+        <cfset ArrayAppend(systemAlerts, {
+            type: "danger",
+            icon: "fas fa-network-wired",
+            label: "Setup needed",
+            title: "No relay networks configured. <a href='view_relay_networks.cfm' class='alert-link'>Add a network</a> for the customer MTA / app server that should be allowed to relay outbound mail.",
+            priority: 1
+        })>
+    </cfif>
+</cfif>
+
+<!--- No recipients OR mailboxes -- either path is valid (relay topology
+     uses `recipients`, Hermes-hosted mailboxes use `mailboxes`); only
+     fire if BOTH are empty --->
+<cfquery name="_alertRecipientCount" datasource="hermes">
+    SELECT COUNT(*) AS c FROM recipients
+</cfquery>
+<cfquery name="_alertMailboxCount" datasource="hermes">
+    SELECT COUNT(*) AS c FROM mailboxes
+</cfquery>
+<cfif _alertRecipientCount.c EQ 0 AND _alertMailboxCount.c EQ 0>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "danger",
+        icon: "fas fa-user-plus",
+        label: "Setup needed",
+        title: "No recipients or mailboxes. Add a <a href='view_internal_recipients.cfm' class='alert-link'>relay recipient</a> (for upstream-relay topology) or a <a href='view_mailboxes.cfm' class='alert-link'>mailbox</a> (for Hermes-hosted mailboxes).",
+        priority: 1
+    })>
+</cfif>
+
+<!--- Placeholder hostname still in use (parameters.myhostname seed
+     default is 'hermes.domain.tld'; install script normally overrides
+     it but if seed survived for any reason, flag it). Also check the
+     parameters2.console.host seed default 'smtp.domain.tld'. --->
+<cfquery name="_alertMyhostname" datasource="hermes">
+    SELECT parameter FROM parameters
+    WHERE parent_name = 'myhostname' AND child = 1
+      AND module = 'postfix' AND conf_file = 'main.cf'
+    LIMIT 1
+</cfquery>
+<cfquery name="_alertConsoleHost" datasource="hermes">
+    SELECT value2 FROM parameters2
+    WHERE parameter = 'console.host' AND module = 'console'
+    LIMIT 1
+</cfquery>
+<cfset _hostnamePlaceholder = false>
+<cfif _alertMyhostname.recordcount EQ 1 AND _alertMyhostname.parameter EQ 'hermes.domain.tld'>
+    <cfset _hostnamePlaceholder = true>
+</cfif>
+<cfif _alertConsoleHost.recordcount EQ 1 AND _alertConsoleHost.value2 EQ 'smtp.domain.tld'>
+    <cfset _hostnamePlaceholder = true>
+</cfif>
+<cfif _hostnamePlaceholder>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "warning",
+        icon: "fas fa-server",
+        label: "Placeholder hostname",
+        title: "System hostname still uses the seed placeholder. <a href='view_server_setup.cfm' class='alert-link'>Set the real FQDN</a> so the SMTP banner / HELO is correct.",
+        priority: 2
+    })>
+</cfif>
+
+<!--- Bootstrap-only certs -- no real cert has been imported yet.
+     Uses inc/get_system_cert_ids.cfm helper (#252) to identify the
+     install-generated row(s). If every row in system_certificates
+     is a system row, no real cert exists. --->
+<cfinclude template="get_system_cert_ids.cfm">
+<cfif systemCertIds NEQ "">
+    <cfquery name="_alertNonSystemCerts" datasource="hermes">
+        SELECT COUNT(*) AS c FROM system_certificates
+        WHERE id NOT IN (<cfqueryparam list="yes" value="#systemCertIds#" cfsqltype="cf_sql_integer">)
+    </cfquery>
+    <cfif _alertNonSystemCerts.c EQ 0>
+        <cfset ArrayAppend(systemAlerts, {
+            type: "info",
+            icon: "fas fa-certificate",
+            label: "Self-signed cert",
+            title: "Using the bootstrap self-signed certificate. <a href='view_system_certificates.cfm' class='alert-link'>Import a real cert</a> or generate a CSR before going live.",
+            priority: 3
+        })>
+    </cfif>
+</cfif>
+
+<!--- ============================================================================
      RENDER ALERTS
      Display all alerts sorted by priority (lower = higher priority)
      ============================================================================ --->
