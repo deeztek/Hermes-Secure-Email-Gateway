@@ -349,9 +349,21 @@ The orchestrator applies BOTH release directories in order:
 | Per-release directory (`updates/v260119/`) | Empty by design — v260119 IS the baseline; first real per-release directory is the NEXT release |
 | `install_hermes_docker.sh --init-db` | Imports baseline only; no schema_updates.sql call |
 | `install_hermes_docker.sh --apply-schema` | Globs `updates/v*/sql/schema_updates.sql`, applies in version order; no-op on v260119-only |
-| `system_update_docker.sh` (#221) | NOT YET BUILT — admin updates are manual per the procedure above |
-| `schedule/post_upgrade.cfm` framework | NOT YET BUILT — no CFML migrations need it yet; ships when first one does |
+| `scripts/system_update_docker.sh` (#221) | **MVP shipped 2026-05-26** — phases 1-5 functional; some v2 polish deferred (see "Known MVP limitations" below) |
+| `schedule/post_upgrade.cfm` framework | Stub shipped 2026-05-26 — framework + helpers + `migrations` table in place, zero blocks registered (first one lands when first migration is needed) |
+| `migrations` table | Added to baseline 2026-05-26 |
 | GitHub Actions release workflow | NOT YET BUILT — image pushes are manual via `Docker/push-all-ghcr.sh` |
 | Image registry (ghcr.io) | Empty as of 2026-05-25; bootstrap is a pre-Session B task |
 
-The orchestrator (`#221`) and the GH Actions workflow (`#218 Session C`) are the two remaining pieces blocking a fully automated release flow. Until they land, the methodology above describes the architecture; the manual procedure above describes the operational reality.
+## Known MVP limitations of `system_update_docker.sh`
+
+The MVP that shipped 2026-05-26 is deliberately scoped. These limitations are tracked for v2:
+
+| Limitation | What happens today | v2 plan |
+|---|---|---|
+| Service-restart detection | Always restarts `hermes_commandbox` in Phase 4; logs a reminder that admin may need to re-save certain config pages | Diff config files between previous and new tag; only restart containers whose volume-mounted config changed |
+| `*.HERMES` template re-render | Phase 4 logs a reminder; admin must re-save the corresponding admin page manually | Detect modified template files and invoke each one's regen endpoint via curl into commandbox |
+| `occ upgrade` | Phase 4 logs the declared `NCVERSION` and reminds operator to run `occ upgrade` if it bumped | Detect NCVERSION change vs the running container; auto-invoke `docker exec ... occ upgrade` |
+| `updates/v<DATE>/cfml/*.cfm` artifacts | Phase 3 logs a WARN and skips them | First release that ships a CFML migration must add a host→container mount for `updates/` plus a Lucee mapping; the orchestrator already curls the right URL pattern, just needs the mount to exist |
+| Mid-upgrade resume | `set -e` fail-fast; operator re-runs from scratch and idempotency handles re-application | Track per-phase + per-release-artifact completion; resume from last successful step |
+| GitHub Releases API auth | Anonymous polling; subject to GitHub's unauthenticated rate limit (60 req/hr per IP) | Honor a `GITHUB_TOKEN` env var if present |

@@ -1165,6 +1165,19 @@ INSERT IGNORE INTO `message_rules` VALUES (59,'peak_performance_capital_funding'
 INSERT IGNORE INTO `message_rules` VALUES (62,'shredit_domain','header','','Return-Path','~ /shredit\\.com/i',20,1);
 INSERT IGNORE INTO `message_rules` VALUES (63,'fundingpronto_com_from','header','','From','~ /fundingpronto\\.com/i',20,1);
 
+-- -------- migrations                            [truncate] --------
+-- Ledger for one-shot post-upgrade migrations gated by `schedule/post_upgrade.cfm`.
+-- Each named block in post_upgrade.cfm checks this table before running and
+-- inserts a row on completion. See docs/install/release-and-update-methodology.md
+-- (Category 3: persistent post-upgrade hook).
+CREATE TABLE IF NOT EXISTS `migrations` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL,
+  `completed_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- mobile_setup_tokens                  [truncate] --------
 CREATE TABLE IF NOT EXISTS `mobile_setup_tokens` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
