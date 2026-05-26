@@ -33,6 +33,12 @@ config/fail2ban/config/fail2ban/fail2ban.sqlite3
 config/fail2ban/config/log/fail2ban/fail2ban.log
 config/fail2ban/config/log/fail2ban/fail2ban.log.*
 config/fail2ban/config/log/logrotate.status
+
+# Date-stamped pre-modification backups created by rotate_db_credentials.sh
+# (and any other future bash script following the same `.bak.YYYYMMDD` pattern).
+# These are transient operator safety nets; the canonical version history is
+# in git. Filed for proper backup-suffix unification: #256-followup.
+*.bak.[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]
 config/opendmarc/etc/opendmarc/opendmarc.dat
 
 # IDE and editor files
