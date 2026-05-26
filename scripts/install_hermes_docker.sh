@@ -2727,6 +2727,40 @@ apply_schema_updates() {
     if [[ -n "$stamped_build" ]]; then
         log "  ✓ Release stamp: build_no=${stamped_build}"
     fi
+
+    # Regenerate /etc/ofelia/config.ini from the ofelia_jobs DB table (#218).
+    # Schema migrations may have UPDATEd ofelia_jobs rows (e.g., new command
+    # for hermes-update-check post-#218); the static config.ini on disk is a
+    # bootstrap snapshot and falls out of sync until something rewrites it.
+    # The /schedule/ regen entry point is self-contained (no auth required),
+    # so a direct curl from inside commandbox is the cleanest invocation.
+    if docker ps --format '{{.Names}}' | grep -q '^hermes_commandbox$'; then
+        log "Regenerating /etc/ofelia/config.ini from ofelia_jobs DB table..."
+        local regen_output
+        regen_output=$(docker exec hermes_commandbox /usr/bin/curl --silent \
+            http://localhost:8888/schedule/regenerate_ofelia_config.cfm 2>>"$LOG_FILE")
+        if [[ "$regen_output" == OK:* ]]; then
+            log "  ✓ ${regen_output}"
+            # Restart Ofelia so it re-reads the new config.ini.
+            if docker ps --format '{{.Names}}' | grep -q '^hermes_ofelia$'; then
+                log "Restarting hermes_ofelia to pick up new config..."
+                if docker restart hermes_ofelia >>"$LOG_FILE" 2>&1; then
+                    log "  ✓ hermes_ofelia restarted"
+                else
+                    warn "hermes_ofelia restart failed (manually: docker restart hermes_ofelia)"
+                fi
+            else
+                warn "hermes_ofelia not running -- start with: docker compose up -d hermes_ofelia"
+            fi
+        else
+            warn "Ofelia config regen returned: ${regen_output:-<empty>}"
+            warn "  Manually: open Scheduled Tasks UI and save anything, then `docker restart hermes_ofelia`"
+        fi
+    else
+        warn "hermes_commandbox not running -- skipping Ofelia config regen"
+        warn "  After commandbox starts, regen by visiting: /schedule/regenerate_ofelia_config.cfm"
+        warn "  Or via Scheduled Tasks UI (any save triggers regen)"
+    fi
 }
 
 # ============================================================================
