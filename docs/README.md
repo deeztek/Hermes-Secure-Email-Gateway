@@ -31,3 +31,7 @@ Three implementation memos predate this structure and live at the docs root:
 - `URL-SAFE-LINKS-IMPLEMENTATION.md`
 
 These are developer notes, not BookStack-destined. They will eventually move under `docs/internal/` or be archived.
+
+## Cross-cutting reference
+
+- [`install/release-and-update-methodology.md`](install/release-and-update-methodology.md) — canonical reference for how Hermes is released, distributed, and upgraded. Covers both developer side (cutting a release) and admin side (applying an update). Read before adding any schema change, migration, or release-engineering work.

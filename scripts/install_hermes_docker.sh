@@ -2669,12 +2669,12 @@ create_databases() {
         "djigzo" \
         "djigzo_schema.sql"
 
-    # ---- Apply hermes schema_updates.sql (idempotent deltas + release stamp) ----
-    # Path is parameterized off the version subdir so it picks up future
-    # versions automatically — at release-cut time, the install script will be
-    # editing a new copy under updates/hermes-260120/ etc.
-    local schema_updates="${HERMES_ROOT}/updates/v260119/sql/schema_updates.sql"
-    _import_sql "$schema_updates" "hermes" "schema_updates.sql"
+    # NOTE: v260119 is the baseline release -- hermes_install.sql is
+    # self-contained (audit on 2026-05-26 moved every fresh-install seed/value
+    # out of updates/v260119/sql/schema_updates.sql into the baseline, then
+    # deleted the delta file). Future releases (v<DATE>/) will have their own
+    # schema_updates.sql that runs via --apply-schema during upgrades, not
+    # during fresh install. See updates/v260119/README.md.
 
     log "Database initialization completed"
 }
@@ -2684,8 +2684,9 @@ create_databases() {
 # ============================================================================
 
 apply_schema_updates() {
-    # Applies the current release's schema_updates.sql to the hermes DB.
-    # Designed for the post-`git pull` upgrade flow on Test/Prod:
+    # Applies all per-release schema_updates.sql files newer than the current
+    # build_no, in chronological (filename-sort) order. Designed for the
+    # post-`git pull` upgrade flow on Test/Prod:
     #
     #   cd /opt/hermes-seg-docker-gl
     #   git fetch && git reset --hard origin/main
@@ -2695,32 +2696,69 @@ apply_schema_updates() {
     # updates/.../schema_updates.sql` invocation (where forgetting `-i`
     # silently no-ops -- caught in session 20260524).
     #
-    # Idempotent: every statement in schema_updates.sql is guarded
-    # (IF NOT EXISTS / INSERT IGNORE / value-gated WHERE) so re-running
-    # against an already-up-to-date DB does nothing.
+    # Idempotent: every statement in every release's schema_updates.sql is
+    # guarded (IF NOT EXISTS / INSERT IGNORE / value-gated WHERE) so
+    # re-running against an already-up-to-date DB does nothing.
+    #
+    # Discovery: globs `updates/v*/sql/schema_updates.sql`; sorts by directory
+    # name (calendar versioning vYYMMDD sorts chronologically as a string).
+    # v260119 is the baseline release and has no `sql/` subdirectory by
+    # design -- this loop simply finds nothing to apply on a brand-new
+    # baseline install, which is the correct behavior.
+    #
+    # Future improvement (Session D / #221): the dedicated
+    # system_update_docker.sh orchestrator will read build_no first and skip
+    # release directories at or below the current version. For now we rely on
+    # each statement's idempotency to handle re-application gracefully.
     header "Applying Schema Updates"
-
-    local schema_updates="${HERMES_ROOT}/updates/v260119/sql/schema_updates.sql"
-
-    if [[ ! -f "$schema_updates" ]]; then
-        error "schema_updates.sql not found at: ${schema_updates}"
-        return 1
-    fi
 
     if ! docker ps --format '{{.Names}}' | grep -q '^hermes_db_server$'; then
         error "hermes_db_server container is not running. Start it first: docker compose up -d hermes_db_server"
         return 1
     fi
 
-    log "Importing schema_updates.sql into 'hermes'..."
-    if ! docker exec -i hermes_db_server mysql -u root hermes \
-            < "$schema_updates" 2>> "$LOG_FILE"; then
-        error "Failed to apply schema updates (see $LOG_FILE for details)"
-        return 1
-    fi
-    log "  ✓ schema_updates.sql applied"
+    # Glob `updates/v*/sql/schema_updates.sql` -- enable nullglob so an empty
+    # match is an empty array rather than a literal pattern string.
+    shopt -s nullglob
+    local schema_files=( "${HERMES_ROOT}"/updates/v*/sql/schema_updates.sql )
+    shopt -u nullglob
 
-    # Confirm the release stamp landed (the file's final block).
+    if [[ ${#schema_files[@]} -eq 0 ]]; then
+        log "No per-release schema_updates.sql files found under updates/v*/sql/"
+        log "  This is normal on a fresh v260119 baseline install."
+        # Confirm baseline release stamp is in place.
+        local stamped_build
+        stamped_build=$(docker exec hermes_db_server mysql -u root -N -s hermes \
+            -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE")
+        if [[ -n "$stamped_build" ]]; then
+            log "  ✓ Current build_no=${stamped_build}"
+        fi
+        return 0
+    fi
+
+    # Sort chronologically (vYYMMDD sorts correctly as a string).
+    local sorted_files
+    IFS=$'\n' sorted_files=( $(printf '%s\n' "${schema_files[@]}" | sort) )
+    unset IFS
+
+    log "Found ${#sorted_files[@]} schema_updates.sql file(s):"
+    local f
+    for f in "${sorted_files[@]}"; do
+        log "  - ${f#${HERMES_ROOT}/}"
+    done
+
+    for f in "${sorted_files[@]}"; do
+        local rel="${f#${HERMES_ROOT}/}"
+        log "Importing ${rel} into 'hermes'..."
+        if ! docker exec -i hermes_db_server mysql -u root hermes \
+                < "$f" 2>> "$LOG_FILE"; then
+            error "Failed to apply ${rel} (see $LOG_FILE for details)"
+            return 1
+        fi
+        log "  ✓ ${rel} applied"
+    done
+
+    # Confirm the release stamp landed (the last release applied wins).
     local stamped_build
     stamped_build=$(docker exec hermes_db_server mysql -u root -N -s hermes \
         -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE")

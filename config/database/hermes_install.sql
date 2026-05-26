@@ -28,13 +28,17 @@
 /*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
 /*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
 
--- -------- additional_sans                      [truncate] --------
+-- -------- additional_sans                      [seed] --------
 CREATE TABLE IF NOT EXISTS `additional_sans` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `san` varchar(255) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 2 row(s) for `additional_sans` (system prefixes for autoconfig endpoints)
+INSERT IGNORE INTO `additional_sans` (`san`, `system`) VALUES ('autoconfig', 1);
+INSERT IGNORE INTO `additional_sans` (`san`, `system`) VALUES ('autodiscover', 1);
 
 -- -------- aliases                              [seed] --------
 CREATE TABLE IF NOT EXISTS `aliases` (
@@ -1419,8 +1423,8 @@ INSERT IGNORE INTO `parameters2` VALUES (156, 'server_domain', 'domain.tld', 'ne
 INSERT IGNORE INTO `parameters2` VALUES (155, 'server_name', 'smtp', 'network', 1, NULL);
 INSERT IGNORE INTO `parameters2` VALUES (75, 'debugLevel', '1', 'spf', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (76, 'TestOnly', '2', 'spf', 1, 1);
-INSERT IGNORE INTO `parameters2` VALUES (77, 'HELO_reject', 'Fail', 'spf', 1, 1);
-INSERT IGNORE INTO `parameters2` VALUES (78, 'Mail_From_reject', 'Fail', 'spf', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (77, 'HELO_reject', 'Softfail', 'spf', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (78, 'Mail_From_reject', 'Softfail', 'spf', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (79, 'PermError_reject', 'False', 'spf', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (80, 'TempError_Defer', 'False', 'spf', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (81, 'FailureReports', 'true', 'dmarc', 1, 1);
@@ -1731,7 +1735,7 @@ INSERT IGNORE INTO `postscreen_access` VALUES (217,'170.130.100.0/24','permit','
 INSERT IGNORE INTO `postscreen_access` VALUES (218,'158.69.4.26','permit','NONE',1,'harmony_mailtrain');
 INSERT IGNORE INTO `postscreen_access` VALUES (219,'149.72.195.209','permit','NONE',1,'Assurant');
 
--- -------- pushover_notifications               [truncate] --------
+-- -------- pushover_notifications               [seed] --------
 CREATE TABLE IF NOT EXISTS `pushover_notifications` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
@@ -1743,6 +1747,10 @@ CREATE TABLE IF NOT EXISTS `pushover_notifications` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 1 row(s) for `pushover_notifications`
+INSERT IGNORE INTO `pushover_notifications` (`name`,`display_name`,`description`,`ofelia_job_name`,`enabled`,`category`)
+VALUES ('mailqueue_check','Mail Queue Health Check','Monitors the Postfix mail queue and sends a Pushover alert when the queue size exceeds the configured threshold. Runs every 15 minutes.','[job-exec \"hermes-health-check-mailqueue\"]',2,'health');
 
 -- -------- quota2                               [truncate] --------
 CREATE TABLE IF NOT EXISTS `quota2` (
@@ -2234,7 +2242,7 @@ CREATE TABLE IF NOT EXISTS `sieve_rule_conditions` (
   CONSTRAINT `fk_sieve_cond_rule` FOREIGN KEY (`rule_id`) REFERENCES `sieve_rules` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- -------- sieve_rules                          [truncate] --------
+-- -------- sieve_rules                          [seed] --------
 CREATE TABLE IF NOT EXISTS `sieve_rules` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `scope` varchar(10) NOT NULL DEFAULT 'global',
@@ -2253,6 +2261,10 @@ CREATE TABLE IF NOT EXISTS `sieve_rules` (
   `modified_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 1 row(s) for `sieve_rules` (system rule: move spam to Spam folder; identified by is_system=1)
+INSERT IGNORE INTO `sieve_rules` (`scope`,`username`,`rule_name`,`rule_order`,`enabled`,`is_system`,`match_type`,`condition_field`,`condition_type`,`condition_value`,`action_type`,`action_value`)
+VALUES ('global',NULL,'Move spam to Spam folder',1,1,1,'all','header','matches','X-Spam-Status: Yes,*','fileinto','Spam');
 
 -- -------- spam_policies                        [seed] --------
 CREATE TABLE IF NOT EXISTS `spam_policies` (
@@ -2425,6 +2437,27 @@ INSERT IGNORE INTO `system_settings` (`id`, `parameter`, `value`) VALUES ('74', 
 INSERT IGNORE INTO `system_settings` (`id`, `parameter`, `value`) VALUES ('75', 'daily_update_check', '2');
 INSERT IGNORE INTO `system_settings` (`id`, `parameter`, `value`) VALUES ('76', 'timezone', 'America/New_York');
 INSERT IGNORE INTO `system_settings` (`id`, `parameter`, `value`) VALUES ('77', 'telemetry', '1');
+-- v260119 baseline additions (formerly applied via updates/v260119/sql/schema_updates.sql).
+-- ID omitted so MariaDB auto-assigns; UNIQUE KEY on `parameter` dedupes on re-import.
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('cleanup_threshold', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('pushover_enabled', '0');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('pushover_api_token', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('pushover_user_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('captcha_provider', 'builtin');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('recaptcha_site_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('recaptcha_secret_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('hcaptcha_site_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('hcaptcha_secret_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('turnstile_site_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('turnstile_secret_key', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('relay_host_username', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('relay_host_password', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_signing_enabled', '0');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_authserv_id', '');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 'sv');
+-- Release stamp (the version_no/build_no rows that schema_updates.sql used to set in two steps)
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260119');
 
 -- -------- system_updates                       [seed] --------
 CREATE TABLE IF NOT EXISTS `system_updates` (
