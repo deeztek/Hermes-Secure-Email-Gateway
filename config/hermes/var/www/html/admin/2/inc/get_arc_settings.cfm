@@ -18,7 +18,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 --->
 
 <!--- Read ARC global settings from system_settings. Schema rows created in
-      updates/hermes-260119/sql/schema_updates.sql (#229). --->
+      updates/v260119/sql/schema_updates.sql (#229). --->
 
 <cfquery name="get_arc_signing_enabled" datasource="hermes">
     SELECT value FROM system_settings WHERE parameter = 'arc_signing_enabled'

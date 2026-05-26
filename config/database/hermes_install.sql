@@ -9,7 +9,7 @@
 --   1) this file (hermes_install.sql)
 --   2) config/database/opendmarc_schema.sql
 --   3) config/database/syslog_schema.sql
---   4) updates/hermes-260119/sql/schema_updates.sql
+--   4) updates/v260119/sql/schema_updates.sql
 --
 -- Regenerate:
 --   scripts/build_hermes_install.py archive/dev_hermes_full.sql \
