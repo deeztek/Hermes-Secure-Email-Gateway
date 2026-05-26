@@ -192,10 +192,11 @@ find_pending_releases() {
     fi
 }
 
-# Prompt yes/no unless --yes was passed. Default: no.
+# Prompt yes/no unless --yes was passed OR we're in --dry-run mode.
+# Dry-run skips the prompt because nothing is at risk (no changes are made).
 confirm() {
     local prompt="${1:-Continue?}"
-    if (( ASSUME_YES )); then
+    if (( ASSUME_YES )) || (( DRY_RUN )); then
         return 0
     fi
     local reply
@@ -293,8 +294,8 @@ phase2_update_containers() {
 
     cd "$HERMES_ROOT"
 
-    log "docker compose pull..."
-    run docker compose pull
+    log "docker compose pull (--quiet, suppresses per-layer progress)..."
+    run docker compose pull --quiet
 
     log "docker compose up -d (restarts only services whose config or image changed)..."
     run docker compose up -d

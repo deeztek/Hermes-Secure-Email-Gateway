@@ -1,3 +1,0 @@
-logrotate state -- version 2
-"/var/log/acpid.log" 2025-12-7-2:0:0
-"/config/log/fail2ban/fail2ban.log" 2026-1-4-2:0:0

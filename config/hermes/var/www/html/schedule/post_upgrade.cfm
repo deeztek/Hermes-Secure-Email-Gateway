@@ -47,6 +47,7 @@ CFML migration is needed.
 <cfset migrationsSkipped = []>
 <cfset migrationErrors = []>
 <cfset startTime = now()>
+<cfset startTickCount = getTickCount()>
 
 <!---
 Helper: hasRun(name) — returns true if a migration with this name has
@@ -106,8 +107,7 @@ No blocks registered yet — framework only.
 <!--- (intentionally empty — first real block lands when first migration needed) --->
 
 <!--- Build response --->
-<cfset elapsedMs = getTickCount() - getTickCount(startTime)>
-<cfset elapsedMs = dateDiff("s", startTime, now()) * 1000>
+<cfset elapsedMs = getTickCount() - startTickCount>
 
 <cfif url.format EQ "json">
     <cfset response = {

@@ -29,6 +29,10 @@ config/ciphermail/usr/share/UUID3
 config/ciphermail/usr/share/lt
 config/ciphermail/usr/share/djigzo/ADDITIONAL-NOTES.TXT
 config/fail2ban/config/fail2ban/fail2ban.sqlite3
+# fail2ban runtime logs (rotated by logrotate inside the container at runtime)
+config/fail2ban/config/log/fail2ban/fail2ban.log
+config/fail2ban/config/log/fail2ban/fail2ban.log.*
+config/fail2ban/config/log/logrotate.status
 config/opendmarc/etc/opendmarc/opendmarc.dat
 
 # IDE and editor files
