@@ -238,19 +238,6 @@ config/mail_filter/etc/spamassassin/local.cf
 config/hermes/opt/hermes/conf_files/local.cf.*
 
 # ===========================================
-# Claude Code artifacts (local only, never remote)
-# ===========================================
-# Conversation logs, project instructions, workflow rules, plans, hooks,
-# tmp queues, skills, slash-command defs, and machine-local settings are
-# all personal session state. History was scrubbed on 2026-05-22 to remove
-# previously-tracked CLAUDE.md / claude_conversation.md / claude_next_steps.md
-# and any .claude/* blobs from the remote repo.
-.claude/
-CLAUDE.md
-claude_conversation.md
-claude_next_steps.md
-
-# ===========================================
 # Internal planning docs (local only)
 # ===========================================
 # Migration trackers and upgrade plans are internal development notes,
