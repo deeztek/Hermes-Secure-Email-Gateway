@@ -16,7 +16,6 @@
 #     2. Tag matches v\d{6}?
 #     3. Working tree clean?
 #     4. Tag exists locally?
-#     5. RELEASE-NOTES.md has a section for the tag?  (warn only)
 #
 # Exit codes:
 #     0 = success
@@ -155,18 +154,6 @@ if [[ "$MODE" == "release" ]]; then
         exit 1
     fi
     info "Tag exists locally: $RELEASE_TAG -> $(git rev-parse --short "$RELEASE_TAG")"
-
-    # Verify RELEASE-NOTES.md has a section for this tag (warn only)
-    if [[ -f "RELEASE-NOTES.md" ]]; then
-        if grep -qE "^(##|###)[[:space:]]+\#?[[:digit:]]+:?.*${RELEASE_TAG}|^(##|###)[[:space:]]+${RELEASE_TAG}\b" RELEASE-NOTES.md 2>/dev/null; then
-            info "RELEASE-NOTES.md references $RELEASE_TAG"
-        else
-            warn "RELEASE-NOTES.md does not appear to reference $RELEASE_TAG"
-            echo "       Hotfix releases without notes are OK; just verify this is intentional." >&2
-        fi
-    else
-        warn "RELEASE-NOTES.md not found"
-    fi
 fi
 
 # ---- Push ----

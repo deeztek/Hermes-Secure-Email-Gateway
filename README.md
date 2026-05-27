@@ -294,11 +294,14 @@ Run any of the above with `--help` for full usage. The installer is **idempotent
 
 - [`docs/install/release-and-update-methodology.md`](docs/install/release-and-update-methodology.md) &mdash; canonical reference for how Hermes is released, distributed, and upgraded
 - [`docs/install/storage-topology.md`](docs/install/storage-topology.md) &mdash; the four-tier storage model
-- [RELEASE-NOTES.md](RELEASE-NOTES.md) &mdash; per-release change log
+
+### Per-release change log
+
+Each release's change log lives on its [GitHub Release page](https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases) &mdash; one body per tag, scoped to that release only.
 
 ### Online documentation
 
-Online documentation for the Docker Edition is in progress and will be available as soon as possible.
+Operator documentation is published to BookStack at the URL announced in each release. The source markdown lives under [`docs/admin/`](docs/admin/) in this repo and is synced to BookStack at every release-cut (see [#259](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/259)).
 
 ## Support
 

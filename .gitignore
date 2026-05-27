@@ -246,6 +246,15 @@ ADMINLTE4-UPGRADE-PLAN.md
 MIGRATION-PLAN.md
 
 # ===========================================
+# Release notes (per-tag, not cumulative)
+# ===========================================
+# Each release's change log lives on its GitHub Release page -- one body
+# per tag, scoped to that release only. A cumulative RELEASE-NOTES.md is
+# the wrong shape (release notes belong to a specific tag, not an
+# ever-growing file). Untracked 2026-05-27; local copy retained.
+RELEASE-NOTES.md
+
+# ===========================================
 # License server (does not belong in client repo)
 # ===========================================
 # Server-side validation code for validate.hermesseg.io / activate.hermesseg.io.

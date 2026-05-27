@@ -282,7 +282,7 @@ For maintainers preparing a release:
    ```
 4. **Add CFML / bash migrations** as needed under `updates/v<DATE>/cfml/` and `updates/v<DATE>/scripts/`.
 5. **Update `.env`**: bump `HERMES_DOCKER_IMG_VERSION=v<DATE>` and (if NC bumped) `NCVERSION=...`.
-6. **Update `RELEASE-NOTES.md`**: add a section for `v<DATE>` listing every change.
+6. **Draft the GitHub Release body for `v<DATE>`**: list every change in the release. Per-release notes live on the GitHub Release page (created when the tag is pushed) — the cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
 7. **Build + push images**: `./Docker/build-all-ghcr.sh && ./Docker/push-all-ghcr.sh` (or wait for GitHub Actions per #218 Session C).
 8. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub).
 9. **Verify**: GitHub Release page exists, ghcr.io packages updated, run `./scripts/system_update_docker.sh v<DATE>` on Test box and confirm clean upgrade.
