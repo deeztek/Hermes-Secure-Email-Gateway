@@ -50,7 +50,7 @@ Hermes and the page renders at all, the page is doing its job.
 +--------------------------------------------------------------+
 | System Resources card                                        |
 |   CPU | Memory | Root FS | Data FS | Vmail FS | Nextcloud FS |
-|   (six progress rings, auto-refresh every 10s)               |
+|   (seven progress rings, auto-refresh every 10s)             |
 +--------------------------------------------------------------+
 ```
 
@@ -206,7 +206,7 @@ the breakdown.
 
 ## System Resources card
 
-Six progress rings, auto-refreshing every 10s via
+Seven progress rings, auto-refreshing every 10s via
 `api/get_system_resources.cfm`:
 
 | Ring | Source |
@@ -215,16 +215,17 @@ Six progress rings, auto-refreshing every 10s via
 | Memory Utilization % | `/opt/hermes/scripts/get_memory_usage.sh` |
 | Root FileSystem % | `df` on `/` (host root) |
 | Data FileSystem % | `df` on the Data tier mount (see [Storage Topology](../../install/storage-topology.md)) |
+| Archive FileSystem % | `df` on the Archive tier mount (#260; Amavis quarantine) |
 | Vmail FileSystem % | `df` on the Vmail tier mount |
 | Nextcloud FileSystem % | `df` on the Nextcloud tier mount |
 
 Each ring color-codes by threshold (`get_system_*_usage.cfm` returns
 a hex color alongside the value). The rings degrade independently —
-a missing Vmail mount or Nextcloud mount renders that ring at 0
-rather than failing the whole card.
+a missing tier mount renders that ring at 0 rather than failing the
+whole card.
 
-Tiers that share a host path (a smaller install where Vmail and
-Nextcloud are pinned to the same disk as Data) will show the same
+Tiers that share a host path (a smaller install where Archive, Vmail,
+and Nextcloud are pinned to the same disk as Data) will show the same
 percentage on multiple rings. That is the correct behavior; the
 underlying `df` reading is the same.
 
@@ -286,6 +287,6 @@ does not surface:
 - [System Logs](system-logs.md) — drill-down for the message-volume
   numbers shown in the Messages Processed card
 - [Storage Topology](../../install/storage-topology.md) — explains
-  the four tiers the resource-usage rings reflect
+  the five tiers the resource-usage rings reflect
 - [Release and Update Methodology](../../install/release-and-update-methodology.md)
   — methodology behind the version stamp this page surfaces

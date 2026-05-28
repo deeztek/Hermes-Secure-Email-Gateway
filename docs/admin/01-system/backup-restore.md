@@ -6,12 +6,12 @@ rewrite) and `scripts/system_restore.sh` (#220, pending Docker rewrite).
 Both are tracked but **not yet shipped** in the current build.
 
 This page is where the operator will eventually run scoped backups
-across Hermes's [four storage tiers](../../install/storage-topology.md),
+across Hermes's [five storage tiers](../../install/storage-topology.md),
 inspect past backup archives, and restore from them. Backup and
 restore are the operational surface that ties the storage topology
 together — what you can back up cleanly depends entirely on which
-paths the operator chose at install time for Data, Vmail, and
-Nextcloud, and the script reads those choices back from
+paths the operator chose at install time for Data, Archive, Vmail,
+and Nextcloud, and the script reads those choices back from
 `.hermes_install_config` at runtime.
 
 > **The page is currently a notice, not a workflow.** In today's
@@ -34,9 +34,9 @@ one-to-one onto the storage topology:
 
 | Scope | What's included | Typical use |
 |---|---|---|
-| `system` | Config tier + Data tier (DBs, configs, logs) **minus** the heavy data tiers | Disaster-recovery snapshot; fits on modest backup storage |
-| `archive` | Just the Amavis quarantine archive (`<DATA_MOUNT>/amavis/`) | Compliance / retention; separate cadence from system backups |
-| `vmail` | Just the Vmail tier (Dovecot mailboxes under `<VMAIL_MOUNT>/dovecot_mail/`) | Per-user mail recovery; mailbox migration |
+| `system` | Config tier + Data tier (DBs, configs, logs) | Disaster-recovery snapshot; fits on modest backup storage |
+| `archive` | Just the Archive tier — Amavis quarantine archive at `<ARCHIVE_MOUNT>/amavis/` | Compliance / retention; separate cadence from system backups |
+| `vmail` | Just the Vmail tier (Dovecot mailboxes under `<VMAIL_MOUNT>/dovecot/`) | Per-user mail recovery; mailbox migration |
 | `nextcloud` | Just the Nextcloud tier (`<FILES_MOUNT>/app/` + the NC database) | File-store recovery; large, slow |
 | `all` | Every tier in a single archive | Cold-storage full backup |
 
@@ -46,24 +46,22 @@ a cadence matching their actual change rate.
 
 ## Tier coverage at a glance
 
-Each scope draws from the [4-tier storage topology](../../install/storage-topology.md)
+Each scope draws from the [5-tier storage topology](../../install/storage-topology.md)
 in a different combination:
 
 ```
-                  Config       Data         Vmail        Nextcloud
-                  (install     (/mnt/data)  (/mnt/vmail) (/mnt/files)
+                  Config       Data          Archive        Vmail         Nextcloud
+                  (install     (/mnt/data)   (/mnt/archive) (/mnt/vmail)  (/mnt/files)
                    root)
-                  ---------    ---------    ---------    ----------
-system            [INCLUDED]   [INCLUDED]*  [skipped]    [skipped]
-archive           [skipped]    [archive/    [skipped]    [skipped]
-                                only]
-vmail             [skipped]    [skipped]    [INCLUDED]   [skipped]
-nextcloud        [skipped]    [nc DB only] [skipped]    [INCLUDED]
-all               [INCLUDED]   [INCLUDED]   [INCLUDED]   [INCLUDED]
-
-(*) system excludes amavis/ from the Data tier — that lives in the
-    archive scope.
+                  ---------    ---------     ----------     ---------     ----------
+system            [INCLUDED]   [INCLUDED]    [skipped]      [skipped]     [skipped]
+archive           [skipped]    [skipped]     [INCLUDED]     [skipped]     [skipped]
+vmail             [skipped]    [skipped]     [skipped]      [INCLUDED]    [skipped]
+nextcloud         [skipped]    [nc DB only]  [skipped]      [skipped]     [INCLUDED]
+all               [INCLUDED]   [INCLUDED]    [INCLUDED]     [INCLUDED]    [INCLUDED]
 ```
+
+Since #260 promoted Archive to its own tier, the `system` scope no longer needs to exclude `amavis/` from the Data tier — the two are now physically separate paths. Operators who kept Archive collocated with Data (`ARCHIVE_MOUNT == DATA_MOUNT`) still get the same backup shape because the script reads the actual path from `.hermes_install_config` per-scope.
 
 Config tier is implicit — it's wherever the operator ran `git clone`.
 The script self-locates the install root via the walk-up locator
@@ -99,6 +97,7 @@ from the install root:
 
 ```bash
 DATA_MOUNT=/mnt/data
+ARCHIVE_MOUNT=/mnt/archive
 VMAIL_MOUNT=/mnt/vmail
 FILES_MOUNT=/mnt/files
 ENABLE_NEXTCLOUD=true
@@ -127,7 +126,7 @@ the original install where to put it.
 
 The legacy scripts under `config/hermes/opt/hermes/scripts/`
 (`system_backup.sh`, `system_restore.sh`) carried over from the
-pre-Docker era. They predate the 4-tier topology and assume a single
+pre-Docker era. They predate the 5-tier topology and assume a single
 flat layout under `/mnt/data` and `/mnt/vmail`. They work on
 Docker installs only because those mount points are the defaults.
 

@@ -421,6 +421,21 @@ select property, value from encryption_settings where property='user.systemMailS
               </div>
               <!-- ./col -->
 
+              <!--- Archive tier ring -- #260 (Amavis quarantine on its own tier) --->
+              <div class="col-6 col-md text-center">
+                <cfoutput>
+                <div class="progress-ring-container" id="ring-archive" data-value="#archiveusage#" data-color="###archiveusagecolor#">
+                  <svg class="progress-ring" width="90" height="90">
+                    <circle class="progress-ring-bg" cx="45" cy="45" r="38" />
+                    <circle class="progress-ring-circle" cx="45" cy="45" r="38" />
+                  </svg>
+                  <div class="progress-ring-text">#archiveusage#</div>
+                </div>
+                </cfoutput>
+                <div class="knob-label">Archive FileSystem Utilization %</div>
+              </div>
+              <!-- ./col -->
+
               <div class="col-6 col-md text-center">
                 <cfoutput>
                 <div class="progress-ring-container" id="ring-vmail" data-value="#vmailusage#" data-color="###vmailusagecolor#">
@@ -639,6 +654,7 @@ document.addEventListener('DOMContentLoaded', function() {
           updateProgressRing('ring-mem', data.mem, '#' + data.memColor);
           updateProgressRing('ring-root', data.rootUsage, '#' + data.rootUsageColor);
           updateProgressRing('ring-data', data.dataUsage, '#' + data.dataUsageColor);
+          updateProgressRing('ring-archive', data.archiveUsage, '#' + data.archiveUsageColor);
           updateProgressRing('ring-vmail', data.vmailUsage, '#' + data.vmailUsageColor);
           updateProgressRing('ring-nextcloud', data.nextcloudUsage, '#' + data.nextcloudUsageColor);
         }

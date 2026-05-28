@@ -22,6 +22,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfinclude template="get_system_memory_usage.cfm" />
 <cfinclude template="get_system_root_filesystem_usage.cfm" />
 <cfinclude template="get_system_data_filesystem_usage.cfm" />
+<cfinclude template="get_system_archive_filesystem_usage.cfm" /><!--- #260 --->
 <cfinclude template="get_system_vmail_filesystem_usage.cfm" />
 <cfinclude template="get_system_nextcloud_filesystem_usage.cfm" />
 

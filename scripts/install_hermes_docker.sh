@@ -78,7 +78,8 @@ LOG_FILE="${LOG_DIR}/hermes_install_$(date +%Y%m%d_%H%M%S).log"
 STATE_DIR="${HERMES_ROOT}/.install-state"
 
 # Default mount points (can be customized during installation)
-DEFAULT_DATA_MOUNT="/mnt/data"       # Databases, logs, quarantine, LDAP, configs
+DEFAULT_DATA_MOUNT="/mnt/data"       # Databases, logs, LDAP, configs
+DEFAULT_ARCHIVE_MOUNT="/mnt/archive" # Amavis quarantine archive (grows w/ retention; #260)
 DEFAULT_VMAIL_MOUNT="/mnt/vmail"     # Dovecot email storage (mailbox users)
 DEFAULT_FILES_MOUNT="/mnt/files"     # Nextcloud files (optional)
 
@@ -642,8 +643,8 @@ wipe_install() {
     # run starts from a clean slate. Stops + removes containers and volumes,
     # deletes credentials, deletes state markers, deletes generated config.
     # Then offers a second prompt to also wipe user-mounted storage paths
-    # (DATA_MOUNT / VMAIL_MOUNT / FILES_MOUNT) -- separately gated since
-    # those contain real data and might be a shared filesystem.
+    # (DATA_MOUNT / ARCHIVE_MOUNT / VMAIL_MOUNT / FILES_MOUNT) -- separately
+    # gated since those contain real data and might be a shared filesystem.
     header "Wiping previous install"
 
     # Read mount paths BEFORE deleting .env / CONFIG_FILE so the optional
@@ -657,21 +658,24 @@ wipe_install() {
     # The mount-content prompt later filters to paths that actually exist
     # as directories, so a wrong fallback default just means an empty
     # offer, not a wrong wipe.
-    local data_mount="" vmail_mount="" files_mount=""
+    local data_mount="" archive_mount="" vmail_mount="" files_mount=""
     if [[ -f "${HERMES_ROOT}/.env" ]]; then
-        data_mount=$(grep -E '^DATA_MOUNT='  "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
-        vmail_mount=$(grep -E '^VMAIL_MOUNT=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
-        files_mount=$(grep -E '^FILES_MOUNT=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        data_mount=$(grep -E '^DATA_MOUNT='    "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        archive_mount=$(grep -E '^ARCHIVE_MOUNT=' "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        vmail_mount=$(grep -E '^VMAIL_MOUNT='  "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
+        files_mount=$(grep -E '^FILES_MOUNT='  "${HERMES_ROOT}/.env" 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
     fi
     if [[ -f "${CONFIG_FILE}" ]]; then
         # shellcheck disable=SC1090
         source "${CONFIG_FILE}" 2>/dev/null || true
         data_mount="${data_mount:-${DATA_MOUNT:-}}"
+        archive_mount="${archive_mount:-${ARCHIVE_MOUNT:-}}"
         vmail_mount="${vmail_mount:-${VMAIL_MOUNT:-}}"
         files_mount="${files_mount:-${FILES_MOUNT:-}}"
     fi
     # Final fallback: the documented defaults.
     data_mount="${data_mount:-${DEFAULT_DATA_MOUNT}}"
+    archive_mount="${archive_mount:-${DEFAULT_ARCHIVE_MOUNT}}"
     vmail_mount="${vmail_mount:-${DEFAULT_VMAIL_MOUNT}}"
     files_mount="${files_mount:-${DEFAULT_FILES_MOUNT}}"
 
@@ -760,9 +764,10 @@ wipe_install() {
     # Gated by a separate WIPE-DATA confirmation because it's user data.
     # The mount directories themselves are preserved (admin owns them).
     local any_mount=0
-    [[ -n "$data_mount"  && -d "$data_mount"  ]] && any_mount=1
-    [[ -n "$vmail_mount" && -d "$vmail_mount" ]] && any_mount=1
-    [[ -n "$files_mount" && -d "$files_mount" ]] && any_mount=1
+    [[ -n "$data_mount"    && -d "$data_mount"    ]] && any_mount=1
+    [[ -n "$archive_mount" && -d "$archive_mount" ]] && any_mount=1
+    [[ -n "$vmail_mount"   && -d "$vmail_mount"   ]] && any_mount=1
+    [[ -n "$files_mount"   && -d "$files_mount"   ]] && any_mount=1
 
     if [[ "$any_mount" -eq 1 ]]; then
         echo ""
@@ -771,9 +776,10 @@ wipe_install() {
         echo "============================================================"
         echo ""
         echo "These directories hold real data from the previous install:"
-        [[ -n "$data_mount"  && -d "$data_mount"  ]] && echo "  ${data_mount}   ($(find "$data_mount"  -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- databases / logs / quarantine / LDAP"
-        [[ -n "$vmail_mount" && -d "$vmail_mount" ]] && echo "  ${vmail_mount}  ($(find "$vmail_mount" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- mailbox email storage"
-        [[ -n "$files_mount" && -d "$files_mount" ]] && echo "  ${files_mount}  ($(find "$files_mount" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- Nextcloud files"
+        [[ -n "$data_mount"    && -d "$data_mount"    ]] && echo "  ${data_mount}     ($(find "$data_mount"    -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- databases / logs / LDAP"
+        [[ -n "$archive_mount" && -d "$archive_mount" ]] && echo "  ${archive_mount}  ($(find "$archive_mount" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- Amavis quarantine archive"
+        [[ -n "$vmail_mount"   && -d "$vmail_mount"   ]] && echo "  ${vmail_mount}    ($(find "$vmail_mount"   -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- mailbox email storage"
+        [[ -n "$files_mount"   && -d "$files_mount"   ]] && echo "  ${files_mount}    ($(find "$files_mount"   -mindepth 1 -maxdepth 1 2>/dev/null | wc -l) entries) -- Nextcloud files"
         echo ""
         echo "Leaving them in place will cause the next install to fail auth"
         echo "against persisted DB files (new random creds vs old stored"
@@ -788,7 +794,7 @@ wipe_install() {
         local confirm_data
         read -p "Choice [1]: " confirm_data
         if [[ "$confirm_data" == "2" ]]; then
-            for mnt in "$data_mount" "$vmail_mount" "$files_mount"; do
+            for mnt in "$data_mount" "$archive_mount" "$vmail_mount" "$files_mount"; do
                 [[ -z "$mnt" ]] && continue
                 [[ ! -d "$mnt" ]] && continue
                 log "  Wiping contents of ${mnt}"
@@ -853,9 +859,10 @@ detect_previous_install() {
             echo ""
             echo "After confirming, you will get a SECOND prompt asking whether"
             echo "to also wipe the contents of user-mounted storage (DATA_MOUNT"
-            echo "/ VMAIL_MOUNT / FILES_MOUNT — typically /mnt/data, /mnt/vmail,"
-            echo "/mnt/files). Required for fresh-install testing; skip if you"
-            echo "want to preserve mail/files."
+            echo "/ ARCHIVE_MOUNT / VMAIL_MOUNT / FILES_MOUNT — typically"
+            echo "/mnt/data, /mnt/archive, /mnt/vmail, /mnt/files). Required"
+            echo "for fresh-install testing; skip if you want to preserve mail"
+            echo "/ archive / files."
             echo ""
             echo "  [1] Cancel (default)"
             echo "  [2] Yes, wipe everything"
@@ -889,22 +896,27 @@ prompt_mount_points() {
     # runs unconditionally; see [[feedback-state-guards-only-for-slow-steps]].
     header "Storage Configuration"
 
-    echo "Hermes SEG stores significant amounts of data across three categories:"
+    echo "Hermes SEG stores significant amounts of data across four categories:"
     echo ""
     echo "  1. SYSTEM DATA (required)"
-    echo "     - Databases (MariaDB, LDAP)"
-    echo "     - Email quarantine and virus signatures"
-    echo "     - Logs, session data, and configuration"
+    echo "     - Databases (MariaDB, LDAP, Authelia, Ciphermail)"
+    echo "     - Logs, session data, configuration, runtime state"
+    echo "     - Virus signatures (ClamAV, Fangfrisch)"
     echo ""
-    echo "  2. EMAIL STORAGE (required)"
+    echo "  2. ARCHIVE STORAGE (required, #260)"
+    echo "     - Amavis quarantine archive (grows unboundedly with retention)"
+    echo "     - Separate mount lets archive live on cheap bulk storage"
+    echo "       while DBs stay on fast SSD"
+    echo ""
+    echo "  3. EMAIL STORAGE (required)"
     echo "     - Mailbox user email (can grow very large)"
     echo "     - Separate mount allows independent quota/backup management"
     echo ""
-    echo "  3. NEXTCLOUD STORAGE (required)"
+    echo "  4. NEXTCLOUD STORAGE (required)"
     echo "     - User file storage"
     echo "     - Can grow very large depending on usage"
     echo ""
-    echo "You'll be asked for three storage paths. These can be:"
+    echo "You'll be asked for four storage paths. These can be:"
     echo ""
     echo "  * Dedicated MOUNT POINTS on separate drives (recommended for"
     echo "    production -- better backup story, survives Docker reinstall,"
@@ -912,21 +924,32 @@ prompt_mount_points() {
     echo ""
     echo "  * Or just ORDINARY DIRECTORIES on the existing drive if you're"
     echo "    testing or running a single-drive setup (e.g. mkdir -p"
-    echo "    /mnt/data /mnt/vmail /mnt/files -- no fstab entries needed)"
+    echo "    /mnt/data /mnt/archive /mnt/vmail /mnt/files -- no fstab"
+    echo "    entries needed)"
     echo ""
-    echo "All three paths must ALREADY EXIST on the host before continuing."
+    echo "All four paths must ALREADY EXIST on the host before continuing."
     echo "Subdirectories under each path are created automatically."
     echo ""
 
     # Data mount point (required)
     while true; do
-        DATA_MOUNT=$(prompt_with_default "System data path (databases, logs, quarantine)" "$DEFAULT_DATA_MOUNT")
+        DATA_MOUNT=$(prompt_with_default "System data path (databases, logs)" "$DEFAULT_DATA_MOUNT")
         if validate_mount_point "$DATA_MOUNT" "System data"; then
             break
         fi
         echo "Please enter a path that already exists, is a directory, and is writable."
     done
     log "System data path: ${DATA_MOUNT}"
+
+    # Archive mount point (required) -- Amavis quarantine, #260
+    while true; do
+        ARCHIVE_MOUNT=$(prompt_with_default "Archive storage path (Amavis quarantine)" "$DEFAULT_ARCHIVE_MOUNT")
+        if validate_mount_point "$ARCHIVE_MOUNT" "Archive storage"; then
+            break
+        fi
+        echo "Please enter a path that already exists, is a directory, and is writable."
+    done
+    log "Archive storage path: ${ARCHIVE_MOUNT}"
 
     # Vmail mount point (required)
     while true; do
@@ -963,14 +986,14 @@ provision_mount_dirs() {
     # would skip this and `docker compose up` would die on "bind source path
     # does not exist". See [[feedback-state-guards-only-for-slow-steps]].
     #
-    # Requires DATA_MOUNT / VMAIL_MOUNT / FILES_MOUNT to be set -- either
-    # by prompt_mount_points() running just before, or by load_config()
-    # reading them from .hermes_install_config on a re-run.
-    if [[ -z "${DATA_MOUNT:-}" || -z "${VMAIL_MOUNT:-}" || -z "${FILES_MOUNT:-}" ]]; then
+    # Requires DATA_MOUNT / ARCHIVE_MOUNT / VMAIL_MOUNT / FILES_MOUNT to be
+    # set -- either by prompt_mount_points() running just before, or by
+    # load_config() reading them from .hermes_install_config on a re-run.
+    if [[ -z "${DATA_MOUNT:-}" || -z "${ARCHIVE_MOUNT:-}" || -z "${VMAIL_MOUNT:-}" || -z "${FILES_MOUNT:-}" ]]; then
         error "Mount paths missing -- run without --init-db or check ${CONFIG_FILE}"
     fi
 
-    log "Provisioning storage subdirectories under ${DATA_MOUNT} / ${VMAIL_MOUNT} / ${FILES_MOUNT}..."
+    log "Provisioning storage subdirectories under ${DATA_MOUNT} / ${ARCHIVE_MOUNT} / ${VMAIL_MOUNT} / ${FILES_MOUNT}..."
 
     # Data subdirectories (one per `device:` line in docker-compose.yml's
     # `volumes:` section). Docker will NOT auto-create bind-mount source
@@ -978,7 +1001,6 @@ provision_mount_dirs() {
     # start with an obscure "bind source path does not exist" error. Keep
     # this list in lock-step with docker-compose.yml.
     mkdir -p "${DATA_MOUNT}/dbase"                      # db_data
-    mkdir -p "${DATA_MOUNT}/amavis"                     # amavis_data
     mkdir -p "${DATA_MOUNT}/authelia/redis"             # authelia_redis
     mkdir -p "${DATA_MOUNT}/authelia/logs"              # authelia_logs
     mkdir -p "${DATA_MOUNT}/authelia/db"                # authelia_db
@@ -996,6 +1018,11 @@ provision_mount_dirs() {
     mkdir -p "${DATA_MOUNT}/mail_filter/data/amavis"    # mail_filter_data_amavis
     mkdir -p "${DATA_MOUNT}/mail_filter/data/clamav"    # mail_filter_data_clamav
     mkdir -p "${DATA_MOUNT}/mail_filter/data/fangfrisch" # mail_filter_data_fangfrisch
+
+    # Archive subdirectory (Amavis quarantine, #260). Promoted from a
+    # Data-tier subdir to its own tier so it can live on cheap bulk
+    # storage independent of the latency-sensitive DBs/logs.
+    mkdir -p "${ARCHIVE_MOUNT}/amavis"                  # amavis_data
 
     # Vmail subdirectory (email storage)
     mkdir -p "${VMAIL_MOUNT}/dovecot"                   # dovecot_mail
@@ -1022,6 +1049,7 @@ save_config() {
 # DO NOT EDIT MANUALLY - regenerate with install script
 
 DATA_MOUNT="${DATA_MOUNT}"
+ARCHIVE_MOUNT="${ARCHIVE_MOUNT}"
 VMAIL_MOUNT="${VMAIL_MOUNT}"
 FILES_MOUNT="${FILES_MOUNT}"
 ENABLE_NEXTCLOUD="${ENABLE_NEXTCLOUD:-false}"
@@ -1045,13 +1073,14 @@ load_config() {
 
 generate_compose_override() {
     # As of #179, volume mount remapping is env-var driven: docker-compose.yml
-    # now uses ${DATA_MOUNT}/${VMAIL_MOUNT}/${FILES_MOUNT} in its volumes:
-    # device: lines, and docker-compose substitutes them from .env at runtime.
-    # This function writes those three variables to <repo>/.env (preserving
-    # any unrelated variables already in the file). The legacy approach of
-    # generating a docker-compose.override.yml with 22 volume redefinitions
-    # has been retired and the function name kept only so the existing
-    # --generate-override CLI flag still works.
+    # uses ${DATA_MOUNT}/${ARCHIVE_MOUNT}/${VMAIL_MOUNT}/${FILES_MOUNT} in its
+    # volumes: device: lines, and docker-compose substitutes them from .env at
+    # runtime. This function writes those four variables to <repo>/.env
+    # (preserving any unrelated variables already in the file). The legacy
+    # approach of generating a docker-compose.override.yml with 22 volume
+    # redefinitions has been retired and the function name kept only so the
+    # existing --generate-override CLI flag still works.
+    # (#260 added ARCHIVE_MOUNT for the Amavis quarantine tier.)
     header "Writing Docker Compose .env"
 
     local ENV_FILE="${HERMES_ROOT}/.env"
@@ -1063,17 +1092,19 @@ generate_compose_override() {
         fi
     fi
 
-    # All three mount points are required -- empty ${DATA_MOUNT} in compose
+    # All four mount points are required -- empty ${DATA_MOUNT} in compose
     # substitution would resolve to '/dbase' (a real root path), which is
-    # dangerous. prompt_mount_points / load_config are the only paths that set these.
-    if [[ -z "${DATA_MOUNT:-}" ]] || [[ -z "${VMAIL_MOUNT:-}" ]] || [[ -z "${FILES_MOUNT:-}" ]]; then
-        error "All three mount points (DATA_MOUNT, VMAIL_MOUNT, FILES_MOUNT) must be set."
+    # dangerous. Same risk for ${ARCHIVE_MOUNT} resolving to '/amavis', etc.
+    # prompt_mount_points / load_config are the only paths that set these.
+    if [[ -z "${DATA_MOUNT:-}" ]] || [[ -z "${ARCHIVE_MOUNT:-}" ]] || [[ -z "${VMAIL_MOUNT:-}" ]] || [[ -z "${FILES_MOUNT:-}" ]]; then
+        error "All four mount points (DATA_MOUNT, ARCHIVE_MOUNT, VMAIL_MOUNT, FILES_MOUNT) must be set."
     fi
 
     log "Writing ${ENV_FILE}..."
-    log "  DATA_MOUNT  = ${DATA_MOUNT}"
-    log "  VMAIL_MOUNT = ${VMAIL_MOUNT}"
-    log "  FILES_MOUNT = ${FILES_MOUNT}"
+    log "  DATA_MOUNT    = ${DATA_MOUNT}"
+    log "  ARCHIVE_MOUNT = ${ARCHIVE_MOUNT}"
+    log "  VMAIL_MOUNT   = ${VMAIL_MOUNT}"
+    log "  FILES_MOUNT   = ${FILES_MOUNT}"
 
     # Bootstrap .env from .env.template if it doesn't exist. The template
     # holds defaults for everything docker-compose.yml references (IPV4SUBNET,
@@ -1164,15 +1195,16 @@ generate_compose_override() {
         log "Preserving HERMES_ADMIN_USERNAME = ${existing_admin_user} (from prior run)"
     fi
 
-    # Append the three mount-point vars (strip prior entries first so a
+    # Append the four mount-point vars (strip prior entries first so a
     # re-run is idempotent). Every other var in .env stays untouched.
     local tmp_env="${ENV_FILE}.tmp.$$"
-    grep -vE '^(DATA_MOUNT|VMAIL_MOUNT|FILES_MOUNT)=' "$ENV_FILE" > "$tmp_env" || true
+    grep -vE '^(DATA_MOUNT|ARCHIVE_MOUNT|VMAIL_MOUNT|FILES_MOUNT)=' "$ENV_FILE" > "$tmp_env" || true
     {
         echo ""
         echo "# Storage mount points -- written by install_hermes_docker.sh on $(date)"
         echo "# These drive the device: paths in docker-compose.yml volumes."
         echo "DATA_MOUNT=${DATA_MOUNT}"
+        echo "ARCHIVE_MOUNT=${ARCHIVE_MOUNT}"
         echo "VMAIL_MOUNT=${VMAIL_MOUNT}"
         echo "FILES_MOUNT=${FILES_MOUNT}"
     } >> "$tmp_env"

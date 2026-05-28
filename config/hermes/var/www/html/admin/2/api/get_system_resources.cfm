@@ -35,6 +35,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     "rootUsageColor": "20c997",
     "dataUsage": 0,
     "dataUsageColor": "20c997",
+    "archiveUsage": 0,
+    "archiveUsageColor": "20c997",
     "vmailUsage": 0,
     "vmailUsageColor": "20c997",
     "nextcloudUsage": 0,
@@ -144,6 +146,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset response.dataUsageColor = "e74c3c">
 <cfelse>
     <cfset response.dataUsageColor = "e74c3c">
+</cfif>
+
+<!--- GET ARCHIVE FILESYSTEM USAGE -- #260 (Amavis quarantine tier) --->
+<cftry>
+    <cfexecute name="/opt/hermes/scripts/disk_space_usage_archive.sh" variable="archiveResult" timeout="10" />
+    <cfset archiveUsage = reReplace(archiveResult, "Use%", "", "all")>
+    <cfset archiveUsage = reReplace(archiveUsage, "%", "", "all")>
+    <cfset archiveUsage = trim(archiveUsage)>
+    <cfif isNumeric(archiveUsage)>
+        <cfset response.archiveUsage = int(archiveUsage)>
+    </cfif>
+    <cfcatch type="any">
+        <cfset response.archiveUsage = 0>
+    </cfcatch>
+</cftry>
+
+<!--- Set archive filesystem color based on value --->
+<cfif response.archiveUsage GTE 0 AND response.archiveUsage LTE 59>
+    <cfset response.archiveUsageColor = "20c997">
+<cfelseif response.archiveUsage GTE 60 AND response.archiveUsage LTE 79>
+    <cfset response.archiveUsageColor = "ffc107">
+<cfelseif response.archiveUsage GTE 80 AND response.archiveUsage LTE 89>
+    <cfset response.archiveUsageColor = "fd7e14">
+<cfelseif response.archiveUsage GTE 90 AND response.archiveUsage LTE 100>
+    <cfset response.archiveUsageColor = "e74c3c">
+<cfelse>
+    <cfset response.archiveUsageColor = "e74c3c">
 </cfif>
 
 <!--- GET VMAIL FILESYSTEM USAGE --->

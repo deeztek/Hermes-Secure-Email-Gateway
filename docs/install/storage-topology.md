@@ -1,13 +1,14 @@
-# Storage Topology (4 tiers)
+# Storage Topology (5 tiers)
 
-Hermes SEG splits storage into four independent tiers so each can live on the right kind of disk for its workload. Three are operator-chosen at install time; the fourth (Config) is implicit — chosen by where the operator `git clone`d the repo.
+Hermes SEG splits storage into five independent tiers so each can live on the right kind of disk for its workload. Four are operator-chosen at install time; the fifth (Config) is implicit — chosen by where the operator `git clone`d the repo.
 
 | Tier | Default path | Contents | Storage profile |
 | --- | --- | --- | --- |
-| **1. Config** | install root (implicit) | Repo working tree, `config/` subtrees, install script, secrets in `config/hermes/opt/hermes/keys/`, `.env`, `docker-compose.override.yml`, `.hermes_install_config` | Fast SSD, modest size — chosen by where the repo lives |
-| **2. Data** | `/mnt/data` | DBs (MariaDB, Authelia, OpenLDAP), Amavis archive + runtime, ClamAV signatures, Fangfrisch state, Lucee server home, sieve scripts, all service logs, OpenDMARC, Postfix queue | Fast SSD; sized for DB growth + log retention |
-| **3. Vmail** | `/mnt/vmail` | Dovecot mailboxes | Cheap bulk; sized for users × quota |
-| **4. Nextcloud** | `/mnt/files` (`FILES_MOUNT` var) | Nextcloud app + user files + Nextcloud's Redis cache | Cheap bulk; sized for user file storage |
+| **1. Config** | install root (implicit) | Repo working tree, `config/` subtrees, install script, secrets in `config/hermes/opt/hermes/keys/`, `.env`, `.hermes_install_config` | Fast SSD, modest size — chosen by where the repo lives |
+| **2. Data** | `/mnt/data` (`DATA_MOUNT`) | DBs (MariaDB, Authelia, OpenLDAP), Amavis runtime state, ClamAV signatures, Fangfrisch state, Lucee server home, sieve scripts, all service logs, OpenDMARC, Postfix queue | Fast SSD; sized for DB growth + log retention |
+| **3. Archive** | `/mnt/archive` (`ARCHIVE_MOUNT`) — added in #260 | Amavis quarantine archive | Cheap bulk; sized for retention policy × quarantine inflow |
+| **4. Vmail** | `/mnt/vmail` (`VMAIL_MOUNT`) | Dovecot mailboxes | Cheap bulk; sized for users × quota |
+| **5. Nextcloud** | `/mnt/files` (`FILES_MOUNT`) | Nextcloud app + user files + Nextcloud's Redis cache | Cheap bulk; sized for user file storage |
 
 Each tier is **one host path**; the install script lays out the canonical sub-directory structure underneath it.
 
@@ -17,10 +18,11 @@ Each tier is **one host path**; the install script lays out the canonical sub-di
 | --- | --- |
 | **Config** | Frequent reads (every container start); small footprint; lives with the install script + version control |
 | **Data** | High write rate (logs + DBs); benefits from fast SSD; backup hot spot |
+| **Archive** | Grows unboundedly with retention policy; cold reads (admin browses quarantine occasionally); cheaper bulk storage; backup cadence independent of Data |
 | **Vmail** | Grows linearly with user count × quota; cheaper bulk storage; separate backup cadence (often less frequent than Data) |
 | **Nextcloud** | Same growth characteristics as Vmail but different access pattern; often shared across multiple Hermes installs in larger deployments |
 
-Smaller deployments can collapse tiers — set Vmail and Nextcloud to the same path as Data, or leave any tier empty to fall back to Docker default named volumes (state lives under `/var/lib/docker/volumes/`).
+Smaller deployments can collapse tiers — point Archive, Vmail, and Nextcloud at the same path as Data for a single-disk install. Each tier is its own prompt so the operator picks per workload.
 
 ## Canonical sub-directory layout
 
@@ -29,7 +31,6 @@ Smaller deployments can collapse tiers — set Vmail and Nextcloud to the same p
 | Sub-path | Named volume | Service |
 | --- | --- | --- |
 | `dbase/` | `db_data` | MariaDB |
-| `amavis/` | `amavis_data` | Amavis quarantine archive |
 | `authelia/db/` | `authelia_db` | Authelia state DB |
 | `authelia/logs/` | `authelia_logs` | Authelia logs |
 | `authelia/redis/` | `authelia_redis` | Authelia Redis |
@@ -39,21 +40,30 @@ Smaller deployments can collapse tiers — set Vmail and Nextcloud to the same p
 | `dovecot/sieve/` | `dovecot_sieve` | Sieve scripts (shared by commandbox + dovecot) |
 | `ldap/data/` | `ldap_data` | OpenLDAP data |
 | `ldap/logs/` | `ldap_logs` | OpenLDAP logs |
-| `mail_filter/data/amavis/` | `mail_filter_data_amavis` | Amavis runtime state |
+| `mail_filter/data/amavis/` | `mail_filter_data_amavis` | Amavis runtime state (PID files, scan tmp dirs — small, latency-sensitive) |
 | `mail_filter/data/clamav/` | `mail_filter_data_clamav` | ClamAV signatures |
 | `mail_filter/data/fangfrisch/` | `mail_filter_data_fangfrisch` | Fangfrisch state |
 | `mail_filter/logs/` | `mail_filter_logs` | Mail filter logs |
 | `nginx/logs/` | `nginx_logs` | Nginx logs |
+| `openarc/logs/` | `openarc_logs` | OpenARC logs |
 | `postfix_dkim/logs/` | `postfix_dkim_logs` | Postfix logs |
 | `postfix_dkim/queue/` | `postfix_dkim_queue` | Postfix mail queue |
 
-### Tier 3 — Vmail (default `/mnt/vmail/`)
+### Tier 3 — Archive (default `/mnt/archive/`) — added in #260
 
 | Sub-path | Named volume | Service |
 | --- | --- | --- |
-| `dovecot_mail/` | `dovecot_mail` | Dovecot mailboxes |
+| `amavis/` | `amavis_data` | Amavis quarantine archive (admin-browsable, grows with retention) |
 
-### Tier 4 — Nextcloud (default `/mnt/files/`)
+Note: the Amavis runtime state (`mail_filter/data/amavis/` named volume `mail_filter_data_amavis`) stays on the Data tier — it's small, doesn't grow with retention, and benefits from fast SSD latency. Only the quarantine archive moved.
+
+### Tier 4 — Vmail (default `/mnt/vmail/`)
+
+| Sub-path | Named volume | Service |
+| --- | --- | --- |
+| `dovecot/` | `dovecot_mail` | Dovecot mailboxes |
+
+### Tier 5 — Nextcloud (default `/mnt/files/`)
 
 | Sub-path | Named volume | Service |
 | --- | --- | --- |
@@ -62,13 +72,13 @@ Smaller deployments can collapse tiers — set Vmail and Nextcloud to the same p
 
 ## How it works at install time
 
-1. `prompt_mount_points()` asks the operator for three paths (Data / Vmail / Nextcloud) — Config is already chosen by where the repo lives. Defaults `/mnt/data`, `/mnt/vmail`, `/mnt/files`. Choices saved to `.hermes_install_config` at the install root.
+1. `prompt_mount_points()` asks the operator for four paths (Data / Archive / Vmail / Nextcloud) — Config is already chosen by where the repo lives. Defaults `/mnt/data`, `/mnt/archive`, `/mnt/vmail`, `/mnt/files`. Choices saved to `.hermes_install_config` at the install root.
 
-2. `provision_mount_dirs()` creates the entire sub-directory layout under each chosen path with the correct UID/GID for the containers that will write to them. Critical: bind-mounted volumes (`type: none, o: bind` in `docker-compose.override.yml`) require the source directory to **pre-exist** — Docker refuses to start the container otherwise.
+2. `provision_mount_dirs()` creates the entire sub-directory layout under each chosen path with the correct UID/GID for the containers that will write to them. Critical: bind-mounted volumes (`type: none, o: bind` in `docker-compose.yml`) require the source directory to **pre-exist** — Docker refuses to start the container otherwise.
 
-3. `generate_compose_override()` reads `.hermes_install_config` and emits per-volume bind directives in `docker-compose.override.yml` (which Docker Compose auto-merges with the base file). Each named volume in `docker-compose.yml` maps to exactly one tier.
+3. `generate_compose_override()` writes the four mount-point variables (`DATA_MOUNT` / `ARCHIVE_MOUNT` / `VMAIL_MOUNT` / `FILES_MOUNT`) to `.env` at the install root. `docker-compose.yml` references these variables directly in its `device:` lines (e.g. `device: ${ARCHIVE_MOUNT}/amavis`) — Docker Compose substitutes at runtime. The legacy `docker-compose.override.yml` approach was retired in #179; the function name was kept for backwards-compatibility with the `--generate-override` CLI flag.
 
-4. If the operator answered empty for a tier, the override omits those volumes — Docker's default named-volume kicks in for them (`/var/lib/docker/volumes/`).
+4. All four mount points are **required**. Empty values would resolve to dangerous relative paths during `device:` substitution (e.g. empty `${ARCHIVE_MOUNT}/amavis` → `/amavis` at the host root). For single-disk installs, point all four prompts at the same path.
 
 ## Self-locating scripts
 
@@ -97,6 +107,7 @@ This is depth-independent (works at 1 level or 5 levels deep in the tree) and su
 
 ```bash
 DATA_MOUNT=/mnt/data
+ARCHIVE_MOUNT=/mnt/archive
 VMAIL_MOUNT=/mnt/vmail
 FILES_MOUNT=/mnt/files
 ENABLE_NEXTCLOUD=true

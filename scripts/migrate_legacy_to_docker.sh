@@ -36,6 +36,7 @@ NC='\033[0m' # No Color
 # Defaults
 HERMES_ROOT="/opt/hermes-seg"
 DATA_MOUNT="/mnt/data"
+ARCHIVE_MOUNT="/mnt/archive"  # #260: Amavis quarantine tier
 VMAIL_MOUNT="/mnt/vmail"
 TEMP_DIR="/tmp/hermes_migration_$$"
 LOG_FILE="/var/log/hermes_migration_$(date +%Y%m%d_%H%M%S).log"
@@ -78,13 +79,14 @@ trap cleanup EXIT
 # PARSE ARGUMENTS
 # ============================================================================
 
-while getopts B:R:D:M:V: flag
+while getopts B:R:D:M:A:V: flag
 do
     case "${flag}" in
         B) BACKUP_FILE=${OPTARG};;
         R) MYSQL_ROOT_PASS=${OPTARG};;
         D) HERMES_ROOT=${OPTARG};;
         M) DATA_MOUNT=${OPTARG};;
+        A) ARCHIVE_MOUNT=${OPTARG};;
         V) VMAIL_MOUNT=${OPTARG};;
     esac
 done
@@ -131,11 +133,12 @@ if [[ ! -f "${HERMES_ROOT}/docker-compose.yml" ]]; then
     error "docker-compose.yml not found in ${HERMES_ROOT}"
 fi
 
-log "Backup file: ${BACKUP_FILE}"
-log "Hermes root: ${HERMES_ROOT}"
-log "Data mount:  ${DATA_MOUNT}"
-log "Vmail mount: ${VMAIL_MOUNT}"
-log "Log file:    ${LOG_FILE}"
+log "Backup file:   ${BACKUP_FILE}"
+log "Hermes root:   ${HERMES_ROOT}"
+log "Data mount:    ${DATA_MOUNT}"
+log "Archive mount: ${ARCHIVE_MOUNT}"
+log "Vmail mount:   ${VMAIL_MOUNT}"
+log "Log file:      ${LOG_FILE}"
 
 # ============================================================================
 # CONFIRM MIGRATION
@@ -555,19 +558,23 @@ if [[ "$RESTORE_ARCHIVE" =~ ^[Yy]$ ]]; then
     if [[ -f "$ARCHIVE_FILE" ]]; then
         header "Restoring Archive Backup"
 
-        log "Extracting archive to ${DATA_MOUNT}/amavis..."
-        mkdir -p "${DATA_MOUNT}/amavis"
+        # Post-#260 the Amavis quarantine archive lives on its own tier
+        # (ARCHIVE_MOUNT, default /mnt/archive), not under DATA_MOUNT.
+        # Legacy backups still contain the literal path /mnt/data/amavis,
+        # so extract to / and then move into the new ARCHIVE_MOUNT location.
+        log "Extracting archive to ${ARCHIVE_MOUNT}/amavis..."
+        mkdir -p "${ARCHIVE_MOUNT}/amavis"
 
         # Extract the archive - it contains /mnt/data/amavis
         tar -xzf "$ARCHIVE_FILE" -C "/" >> "$LOG_FILE" 2>&1
 
-        # If the archive had a different structure, move files
-        if [[ -d "/mnt/data/amavis" ]] && [[ "${DATA_MOUNT}" != "/mnt/data" ]]; then
-            mv /mnt/data/amavis/* "${DATA_MOUNT}/amavis/" 2>/dev/null || true
+        # Move legacy-pathed extracted content into the new ARCHIVE_MOUNT.
+        if [[ -d "/mnt/data/amavis" ]] && [[ "${ARCHIVE_MOUNT}/amavis" != "/mnt/data/amavis" ]]; then
+            mv /mnt/data/amavis/* "${ARCHIVE_MOUNT}/amavis/" 2>/dev/null || true
             rm -rf /mnt/data/amavis
         fi
 
-        log "Archive restored to ${DATA_MOUNT}/amavis"
+        log "Archive restored to ${ARCHIVE_MOUNT}/amavis"
     else
         warn "Archive file not found: ${ARCHIVE_FILE}"
     fi

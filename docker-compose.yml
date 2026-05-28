@@ -763,11 +763,15 @@ services:
 volumes:
 
   amavis_data:
+    # Amavis quarantine archive. Lives on its own tier (ARCHIVE_MOUNT, #260)
+    # so it can use cheap bulk storage independent of the latency-sensitive
+    # DBs on DATA_MOUNT. Default /mnt/archive; install_hermes_docker.sh
+    # prompts for the path and writes it into .env.
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: ${DATA_MOUNT}/amavis
+      device: ${ARCHIVE_MOUNT}/amavis
 
   db_data:
     driver: local
