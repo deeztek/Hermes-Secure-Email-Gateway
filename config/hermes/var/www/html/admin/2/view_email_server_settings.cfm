@@ -283,10 +283,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <button type="button" class="btn btn-warning" onclick="ncOidcToggle('disable');">
             <i class="fas fa-power-off"></i> Enter Maintenance Mode (disable OIDC)
           </button>
+          <p class="mt-3 mb-0 small text-muted">
+            <strong>Step 1:</strong> click <strong>Enter Maintenance Mode</strong> above (disables OIDC).<br>
+            <strong>Step 2:</strong> open Nextcloud in a new tab and log in as the local admin:
+            <a href="https://#consoleHostNc#/nc/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary ms-1">
+              <i class="fas fa-external-link-alt"></i> Open Nextcloud
+            </a>
+          </p>
         <cfelse>
           <button type="button" class="btn btn-success" onclick="ncOidcToggle('enable');">
             <i class="fas fa-power-off"></i> Exit Maintenance Mode (enable OIDC)
           </button>
+          <p class="mt-3 mb-0 small text-muted">
+            OIDC is currently disabled. Open Nextcloud in a new tab and log in as the local admin:
+            <a href="https://#consoleHostNc#/nc/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary ms-1">
+              <i class="fas fa-external-link-alt"></i> Open Nextcloud
+            </a><br>
+            When done, click <strong>Exit Maintenance Mode</strong> above to restore SSO for mailbox users.
+          </p>
         </cfif>
         </cfoutput>
         <script>
