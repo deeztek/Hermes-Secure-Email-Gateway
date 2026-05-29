@@ -301,9 +301,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 body: 'action=' + encodeURIComponent(action),
                 credentials: 'same-origin'
             }).then(function() {
-                // Reload so the page re-reads OIDC state + surfaces the
-                // session.m=62/63/64 alert flash.
-                window.location.href = 'view_email_server_settings.cfm#nc-maintenance';
+                // Force a full page reload so CFML re-reads the live OIDC
+                // state from `occ` and surfaces the session.m=62/63/64
+                // alert flash. window.location.href to the same URL+hash
+                // would just scroll -- reload() actually hits the server.
+                window.location.reload();
             }).catch(function(err) {
                 alert('Toggle failed: ' + err);
             });
