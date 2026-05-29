@@ -125,7 +125,7 @@ read path in `view_email_server_settings.cfm` normalizes legacy
 
 ## Nextcloud Maintenance Mode card
 
-Below the Webmail Settings card sits a second card that controls the local-admin escape hatch. As of [#262](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262) there is **no permanent bypass URL** &mdash; the operator toggles OIDC on/off from this card when they need to administer Nextcloud as the local admin (separate identity from the Authelia/LDAP users that normally SSO in). The sidebar entry "Nextcloud Admin" anchors to this card.
+Below the Webmail Settings card sits a second card that controls the local-admin escape hatch. As of [#262](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262) there is **no permanent bypass URL** &mdash; the operator toggles OIDC on/off from this card when they need to administer Nextcloud as the local admin (separate identity from the Authelia/LDAP users that normally SSO in).
 
 | State | What it means |
 | --- | --- |

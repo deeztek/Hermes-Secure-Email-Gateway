@@ -3204,12 +3204,12 @@ Maintenance Mode for admin work (e.g. installing apps, configuring
 Nextcloud settings not exposed via the Hermes UI).
 
 To enter maintenance mode: log into Hermes Admin Console, navigate to
-Email Server > Settings > Nextcloud Maintenance Mode (also linked as
-"Nextcloud Admin" in the sidebar), click "Enter Maintenance Mode". This
-disables Nextcloud OIDC temporarily so the local admin can log into
-https://${ip}/nc/ with the credentials above. NC will prompt for TOTP
-enrollment on first login. When done, click "Exit Maintenance Mode" on
-the same page to restore SSO. See #262 for the architectural background.
+Email Server > Settings, scroll to the Nextcloud Maintenance Mode card
+and click "Enter Maintenance Mode". This disables Nextcloud OIDC
+temporarily so the local admin can log into https://${ip}/nc/ with the
+credentials above. NC will prompt for TOTP enrollment on first login.
+When done, click "Exit Maintenance Mode" on the same page to restore
+SSO. See #262 for the architectural background.
 
 OIDC secret:        $(cat "${CREDS_DIR}/nextcloud_oidc_secret" 2>/dev/null || echo "<not-generated>")
 Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null || echo "<not-generated>")
@@ -3285,9 +3285,9 @@ EOF
     echo ""
     # Nextcloud admin (#262). Surface the credentials but DO NOT instruct
     # the operator to use them right away -- the local NC admin login is
-    # a maintenance-mode escape hatch managed via the "Nextcloud Admin"
-    # sidebar entry (Email Server > Settings > Nextcloud Maintenance Mode
-    # card). Normal mailbox-user SSO doesn't require these credentials.
+    # a maintenance-mode escape hatch managed via Email Server > Settings
+    # > Nextcloud Maintenance Mode card. Normal mailbox-user SSO doesn't
+    # require these credentials.
     local nc_admin_user nc_admin_pass
     nc_admin_user=$(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null | tr -d '[:space:]')
     nc_admin_pass=$(cat "${CREDS_DIR}/nextcloud_admin_password" 2>/dev/null | tr -d '[:space:]')
@@ -3299,8 +3299,7 @@ EOF
         echo -e "    Admin password:  ${BOLD}${RED}${nc_admin_pass}${NC}     ${YELLOW}<-- COPY ME${NC}"
         echo ""
         echo -e "    Use only when entering Nextcloud Maintenance Mode via"
-        echo -e "    ${BOLD}Email Server > Settings > Nextcloud Maintenance Mode${NC}"
-        echo -e "    (also linked as ${BOLD}Nextcloud Admin${NC} in the sidebar)."
+        echo -e "    ${BOLD}Email Server > Settings > Nextcloud Maintenance Mode${NC} card."
         echo ""
     fi
     echo -e "  ${GREEN}+----------------------------------------------------------------------+${NC}"

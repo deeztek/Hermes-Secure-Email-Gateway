@@ -291,13 +291,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <p>SAN Management</p>
               </a>
             </li>
-            <li class="nav-item">
-              <a href="view_email_server_settings.cfm" class="nav-link"
-                 title="Nextcloud local admin recovery -- scroll to the Maintenance Mode card on the Email Server Settings page (##262).">
-                <i class="nav-icon fas fa-cloud"></i>
-                <p>Nextcloud Admin</p>
-              </a>
-            </li>
           </ul>
         </li>
         <!--- EMAIL SERVER ENDS HERE --->
