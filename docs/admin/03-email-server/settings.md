@@ -124,14 +124,35 @@ read path in `view_email_server_settings.cfm` normalizes legacy
 `true`/`false` strings to `auto_redirect` / `full_form`.
 
 > **Operational consequence — `/nc-admin-login` is your escape hatch.**
-> All three modes ship with the `/nc-admin-login` URL active. That
-> URL is gated by Authelia and requires admin-group membership AND a
-> registered 2FA method (TOTP, WebAuthn, or Duo). The link also
-> appears in the main admin sidebar as "Nextcloud Admin". On a fresh
-> install your admin only has 1FA — if Authelia prompts for a TOTP
-> code you can't satisfy, enroll a method first via
-> [Authentication Settings](../01-system/authentication-settings.md)
-> then return to the link.
+> All three modes ship with the `/nc-admin-login` URL active. As of
+> [#262](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262)
+> it is **anonymous at the nginx layer** — Authelia is not in the
+> path. The endpoint proxies straight to Nextcloud's local login form
+> (`/login?direct=1`), where the local NC admin account authenticates
+> with a password plus a Nextcloud-native TOTP that the install script
+> enforced via `occ twofactor:enable`. On first login the operator
+> scans a QR code in Nextcloud's UI and TOTP is then mandatory for
+> that account from that point on. The link also appears in the main
+> admin sidebar as "Nextcloud Admin".
+>
+> Why anonymous instead of Authelia-gated: the prior Authelia-gated
+> design was architecturally infeasible. The Authelia session created
+> by the gate enabled `user_oidc` to silently re-authenticate the
+> operator as their Authelia identity on the post-form redirect,
+> overriding whatever local-admin session the form submission had
+> just established. Removing Authelia from the path removes that
+> session, so the silent OIDC re-auth has no fuel. Security is
+> preserved by Nextcloud's built-in login throttling plus the TOTP
+> requirement on the local admin account.
+>
+> If the local NC admin needs TOTP disabled for recovery (lost
+> authenticator etc.):
+>
+> ```bash
+> docker exec hermes_nextcloud php occ twofactor:disable <username> totp
+> # do recovery work
+> docker exec hermes_nextcloud php occ twofactor:enable <username> totp
+> ```
 
 ### Mailbox Sharing
 

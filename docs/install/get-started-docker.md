@@ -1,5 +1,22 @@
 # Get Started (Docker)
 
+> ## Before you install &mdash; TOTP authenticator required
+>
+> Hermes provisions a **Nextcloud local admin account** during install and enforces TOTP (two-factor) on it before letting you log in (#262). On your first login at `/nc-admin-login` you will be prompted to scan a QR code with an authenticator app.
+>
+> Install one of these on your phone or computer **before** you run the install script. Any RFC 6238 TOTP app works &mdash; common choices:
+>
+> | App | Platforms | Notes |
+> | --- | --- | --- |
+> | **Google Authenticator** | iOS, Android | Cloud sync (Google account) |
+> | **Microsoft Authenticator** | iOS, Android | Cloud sync (Microsoft account) |
+> | **Authy** | iOS, Android, desktop | Multi-device sync |
+> | **Duo Mobile** | iOS, Android | Same app used for the Hermes admin Authelia 2FA |
+> | **1Password / Bitwarden** | iOS, Android, desktop, browser | TOTP built into the password manager |
+> | **Aegis** (Android) / **Raivo OTP** (iOS) | Mobile-only | Open source, local-only (no cloud) |
+>
+> The install script asks you to confirm you have an authenticator ready before completing. If you say No, the installer exits cleanly &mdash; install one, re-run the script with the same `--init-db` flag, and you'll land back at the same prompt with state preserved.
+
 This page is the **minimum config needed to get mail flowing** on a fresh Hermes SEG Docker install. The install script (`scripts/install_hermes_docker.sh`) does most of the heavy lifting — this page covers the handful of admin-UI steps that still need a human.
 
 Skip these and Postfix will silently bounce or reject mail. The admin dashboard also surfaces two universal nudges (placeholder hostname, self-signed cert) until those are addressed (see [Dashboard nudges](#dashboard-nudges) at the bottom).
