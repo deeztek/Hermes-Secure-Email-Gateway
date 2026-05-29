@@ -293,7 +293,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </li>
             <li class="nav-item">
               <a href="view_email_server_settings.cfm##nc-maintenance" class="nav-link"
-                 title="Nextcloud local admin recovery via the Maintenance Mode toggle on the Email Server Settings page -- #262.">
+                 title="Nextcloud local admin recovery via the Maintenance Mode toggle on the Email Server Settings page -- ##262.">
                 <i class="nav-icon fas fa-cloud"></i>
                 <p>Nextcloud Admin</p>
               </a>
