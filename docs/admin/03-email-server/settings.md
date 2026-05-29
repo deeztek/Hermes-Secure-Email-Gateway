@@ -134,12 +134,16 @@ Below the Webmail Settings card sits a second card that controls the local-admin
 
 **Maintenance procedure:**
 
-1. Click **Enter Maintenance Mode**. The card status flips to yellow, mailbox-user SSO goes offline.
-2. Open `https://<console-host>/nc/` in an incognito tab.
-3. Log in as the NC local admin (username + password shown on the card; password is also in `/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt` on the host).
+1. Click **Enter Maintenance Mode**. The card status flips to yellow, mailbox-user SSO goes offline, and a success banner appears at the top of the page.
+2. Click the **Open Nextcloud** button that appears below the toggle &mdash; it opens `https://<console-host>/nc/` in a new tab (`target="_blank"`) so the Hermes admin tab stays put for step 6.
+3. In the Nextcloud tab, log in as the NC local admin. Username is shown on the card; password is also in `/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt` on the host.
 4. On first login Nextcloud prompts for TOTP enrollment via its own UI &mdash; scan the QR code with any TOTP authenticator app.
 5. Do your admin work in Nextcloud.
-6. Return to this card and click **Exit Maintenance Mode**. SSO is restored.
+6. Switch back to the Hermes admin tab and click **Exit Maintenance Mode**. SSO is restored for mailbox users.
+
+The button uses `fetch()` to call `inc/edit_nc_oidc_action.cfm` (`occ app:disable user_oidc` or `enable`), bypassing the outer settings form so the toggle doesn't collide with a normal Save submission. `redirect: 'manual'` on the fetch prevents the action handler's `cflocation` from being auto-followed and consuming the `session.m` flash before the page can render it.
+
+Operators who need to use this often can ignore step 2's helper link and just type `/nc/` &mdash; the helper link exists to make first-time use obvious.
 
 **Why the toggle pattern and not a permanent bypass URL:**
 
