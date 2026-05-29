@@ -3667,8 +3667,12 @@ run_phase2_db_init() {
         done
 
         # Enable core apps that ship with NC.
+        # - twofactor_totp: ships with NC but NOT enabled by default. Required
+        #   for the local NC admin TOTP enforcement (#262). Without it,
+        #   `occ twofactorauth:enable <user> totp` fails with
+        #   "The provider 'totp' does not exist".
         log "  Enabling core Nextcloud apps..."
-        for app in files_sharing; do
+        for app in files_sharing twofactor_totp; do
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:enable "$app" >> "$LOG_FILE" 2>&1 \
                 && log "    Enabled: $app" \
                 || log "    WARNING: Failed to enable $app (may already be enabled)"
@@ -3843,6 +3847,10 @@ enable_nc_admin_totp() {
     # the operator to scan a QR code on FIRST login at /nc-admin-login and
     # complete enrollment via NC's own UI. Idempotent -- re-runs after a
     # successful enable skip via the state marker.
+    #
+    # Two-step: the twofactor_totp app SHIPS with NC but isn't enabled by
+    # default. Without it enabled, `occ twofactorauth:enable <user> totp`
+    # fails with "The provider 'totp' does not exist".
     if state_is_done "16-nc-totp-enabled"; then
         log "Nextcloud admin TOTP already enabled (re-run skip)"
         return 0
@@ -3854,18 +3862,28 @@ enable_nc_admin_totp() {
     if [[ -z "$nc_admin_user" ]]; then
         warn "Nextcloud admin username not found at ${CREDS_DIR}/nextcloud_admin_username"
         warn "Skipping TOTP enable -- you can run it manually later:"
-        warn "  docker exec hermes_nextcloud php occ twofactor:enable <username> totp"
+        warn "  docker exec hermes_nextcloud php occ app:enable twofactor_totp"
+        warn "  docker exec hermes_nextcloud php occ twofactorauth:enable <username> totp"
+        return 0
+    fi
+
+    log "Enabling twofactor_totp app in Nextcloud..."
+    if ! docker exec hermes_nextcloud php occ app:enable twofactor_totp >> "$LOG_FILE" 2>&1; then
+        warn "  Failed to enable twofactor_totp app -- TOTP enforcement WILL fail"
+        warn "  Run manually after install completes:"
+        warn "    docker exec hermes_nextcloud php occ app:enable twofactor_totp"
+        warn "    docker exec hermes_nextcloud php occ twofactorauth:enable ${nc_admin_user} totp"
         return 0
     fi
 
     log "Enabling TOTP requirement for Nextcloud admin '${nc_admin_user}'..."
-    if docker exec hermes_nextcloud php occ twofactor:enable "${nc_admin_user}" totp >> "$LOG_FILE" 2>&1; then
+    if docker exec hermes_nextcloud php occ twofactorauth:enable "${nc_admin_user}" totp >> "$LOG_FILE" 2>&1; then
         log "  TOTP requirement enabled -- enroll on first login at /nc-admin-login"
         state_mark_done "16-nc-totp-enabled"
     else
         warn "  Failed to enable TOTP via occ. The install will continue, but you must"
         warn "  enable it manually before going live:"
-        warn "    docker exec hermes_nextcloud php occ twofactor:enable ${nc_admin_user} totp"
+        warn "    docker exec hermes_nextcloud php occ twofactorauth:enable ${nc_admin_user} totp"
     fi
 }
 
