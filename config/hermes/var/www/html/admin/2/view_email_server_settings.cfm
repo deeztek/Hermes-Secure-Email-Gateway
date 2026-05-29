@@ -299,12 +299,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
                 body: 'action=' + encodeURIComponent(action),
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                // 'manual' prevents fetch from following the action handler's
+                // cflocation 302. If we let it follow, the redirect target
+                // (view_email_server_settings.cfm) loads in the background,
+                // reads session.m, and clears it -- so by the time our
+                // reload() fires, the flash is gone and no alert shows.
+                redirect: 'manual'
             }).then(function() {
                 // Force a full page reload so CFML re-reads the live OIDC
                 // state from `occ` and surfaces the session.m=62/63/64
-                // alert flash. window.location.href to the same URL+hash
-                // would just scroll -- reload() actually hits the server.
+                // alert flash.
                 window.location.reload();
             }).catch(function(err) {
                 alert('Toggle failed: ' + err);
