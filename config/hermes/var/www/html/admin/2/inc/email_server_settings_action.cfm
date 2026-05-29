@@ -55,28 +55,32 @@ dovecot.conf from template and reloads Dovecot.
 <!--- ================================================================== --->
 <!--- NEXTCLOUD LOGIN FORM MODE                                            --->
 <!---                                                                      --->
-<!--- Three states map onto two underlying Nextcloud knobs:                --->
+<!--- Two states map onto two underlying Nextcloud knobs:                  --->
 <!---   auto_redirect: allow_multiple_user_backends=0, hide_login_form=no  --->
 <!---   sso_only:      allow_multiple_user_backends=1, hide_login_form=yes --->
-<!---   full_form:     allow_multiple_user_backends=1, hide_login_form=no  --->
+<!---                                                                      --->
+<!--- The third historical mode "full_form" was dropped in #262 -- it      --->
+<!--- visually showed the form but didn't actually enable local logins,    --->
+<!--- because user_oidc still hijacks the form submission. Local-admin     --->
+<!--- access is now via the Maintenance Mode toggle (separate card),       --->
+<!--- which disables user_oidc entirely.                                   --->
 <!---                                                                      --->
 <!--- The legacy key `oidc.auto_redirect` is reused as the storage slot    --->
-<!--- so existing upgraders don't need a schema migration — the read path  --->
-<!--- in view_email_server_settings.cfm normalizes legacy boolean values.  --->
+<!--- so existing upgraders don't need a schema migration -- the read path --->
+<!--- in view_email_server_settings.cfm normalizes legacy "full_form" /    --->
+<!--- "false" values to "auto_redirect" on display.                        --->
 <!--- ================================================================== --->
-<cfif form.nc_login_mode NEQ "auto_redirect" AND form.nc_login_mode NEQ "sso_only" AND form.nc_login_mode NEQ "full_form">
+<cfif form.nc_login_mode NEQ "auto_redirect" AND form.nc_login_mode NEQ "sso_only">
     <cfset form.nc_login_mode = "auto_redirect">
 </cfif>
 <cfset ncLoginModeVal = form.nc_login_mode>
 
-<cfif ncLoginModeVal EQ "auto_redirect">
-    <cfset occBackendVal = "0">
-    <cfset hideLoginFormVal = "false">
-<cfelseif ncLoginModeVal EQ "sso_only">
+<cfif ncLoginModeVal EQ "sso_only">
     <cfset occBackendVal = "1">
     <cfset hideLoginFormVal = "true">
 <cfelse>
-    <cfset occBackendVal = "1">
+    <!--- auto_redirect (default) --->
+    <cfset occBackendVal = "0">
     <cfset hideLoginFormVal = "false">
 </cfif>
 
