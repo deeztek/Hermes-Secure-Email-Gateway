@@ -109,12 +109,10 @@ access_control:
     # removed from the nginx location block), so there is nothing to bypass.
     # Nextcloud handles its own DAV authentication via app passwords.
 
-    # /nc-admin-login is now anonymous (no Authelia gate) per #262.
-    # See nginx vhost comment for the architectural rationale -- short
-    # version: the Authelia gate enabled silent user_oidc re-auth via
-    # the resulting Authelia session, defeating the local-form login.
-    # NC's own brute-force protection + a TOTP-enrolled local admin
-    # account (enforced at install time) is the new security model.
+    # The /nc-admin-login bypass URL was retired (#262). Local Nextcloud
+    # admin access is now via the Maintenance Mode toggle on Email Server
+    # > Settings, which runs `occ app:disable user_oidc` from the admin
+    # UI -- no separate URL needs an Authelia rule.
 
     #Deny Access to /admin for  mailboxes
     - domain: hermes_access_control_domain

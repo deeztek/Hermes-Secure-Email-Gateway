@@ -292,10 +292,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
-              <a href="/nc-admin-login" class="nav-link" target="_blank"
-                 title="Local Nextcloud admin login (bypasses OIDC). Requires 2FA. If 2FA isn't enrolled yet, set one up via Authelia first -- see Email Server Settings for details.">
+              <a href="view_email_server_settings.cfm##nc-maintenance" class="nav-link"
+                 title="Nextcloud local admin recovery via the Maintenance Mode toggle on the Email Server Settings page -- #262.">
                 <i class="nav-icon fas fa-cloud"></i>
-                <p>Nextcloud Admin <i class="fas fa-external-link-alt fa-xs"></i></p>
+                <p>Nextcloud Admin</p>
               </a>
             </li>
           </ul>

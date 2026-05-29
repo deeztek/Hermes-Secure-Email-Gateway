@@ -92,6 +92,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset session.saveErrors = ArrayNew(1)>
     </cfif>
   </div>
+<cfelseif m EQ 62>
+  <cfoutput>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h5><i class="bi bi-check-circle-fill"></i> Maintenance mode enabled</h5>
+    Nextcloud OIDC has been disabled. Open <a href="https://#consoleHostNc#/nc/" target="_blank">https://#consoleHostNc#/nc/</a> in an incognito tab and log in as the local admin. Mailbox-user SSO is offline until you exit maintenance mode below.
+  </div>
+  </cfoutput>
+<cfelseif m EQ 63>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h5><i class="bi bi-check-circle-fill"></i> Normal operation restored</h5>
+    Nextcloud OIDC has been re-enabled. Mailbox users can SSO into Nextcloud again.
+  </div>
+<cfelseif m EQ 64>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h5><i class="bi bi-exclamation-triangle-fill"></i> Nextcloud OIDC toggle failed</h5>
+    The <code>occ</code> command did not complete successfully. Check the Nextcloud container status and try again.
+  </div>
+</cfif>
+
+<!--- Nextcloud OIDC enabled-state (for the maintenance mode card). #262.
+     Sets ncOidcEnabled (boolean) and ncAdminUsername. --->
+<cfinclude template="inc/get_nc_oidc_status.cfm">
+
+<!--- Console host for the local-admin URL in the maintenance card --->
+<cfquery name="getConsoleHostNcMaint" datasource="hermes">
+    SELECT value2 FROM parameters2 WHERE module = 'console' AND parameter = 'host'
+</cfquery>
+<cfset consoleHostNc = "">
+<cfif getConsoleHostNcMaint.recordcount GTE 1>
+    <cfset consoleHostNc = getConsoleHostNcMaint.value2>
+</cfif>
+<cfif consoleHostNc EQ "" OR consoleHostNc EQ "smtp.domain.tld">
+    <cfset consoleHostNc = cgi.HTTP_HOST>
 </cfif>
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
@@ -197,9 +233,71 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <small class="form-text text-muted">
             <strong>Auto-redirect to SSO:</strong> Users clicking "Login to Webmail" are silently redirected through Authelia OIDC and land in Nextcloud already logged in. Recommended for normal operation.<br>
             <strong>SSO button only:</strong> Users see the Nextcloud login page with just the SSO button &mdash; username/password fields are hidden. Good for deployments where you want users to know SSO is required but don't want to auto-redirect.<br>
-            <strong>Show full form:</strong> Users see the username/password form and the SSO button. Use temporarily for local Nextcloud admin maintenance.<br>
-            <em>In all modes, use <a href="/nc-admin-login" target="_blank"><code>/nc-admin-login</code></a> (also linked as "Nextcloud Admin" in the sidebar) for local Nextcloud admin login. This endpoint goes straight to Nextcloud's local login form &mdash; Authelia is not in the path. The Nextcloud local admin account is protected by Nextcloud's built-in login throttling plus a <strong>TOTP requirement enrolled in Nextcloud itself</strong>, set up by the install script and completed on first login (QR code scan in the Nextcloud UI). If the admin needs to disable TOTP for recovery: <code>docker exec hermes_nextcloud php occ twofactor:disable &lt;username&gt; totp</code> (and re-enable when done).</em>
+            <strong>Show full form:</strong> Users see the username/password form and the SSO button. Useful for deployments where local Nextcloud accounts coexist with SSO users.<br>
+            <em>None of the three modes enable local-admin login. To log into Nextcloud as the LOCAL admin (for maintenance), see the <a href="##nc-maintenance"><strong>Nextcloud Maintenance Mode</strong></a> card below &mdash; it temporarily disables OIDC so the local NC admin can log in via Nextcloud's own form at <code>/nc/</code>.</em>
           </small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================== -->
+<!-- NEXTCLOUD MAINTENANCE MODE CARD (#262)                              -->
+<!-- Toggle OIDC off/on so the operator can log into Nextcloud as the    -->
+<!-- LOCAL admin (separate identity from the Authelia/LDAP users that     -->
+<!-- normally SSO in). Replaces the old /nc-admin-login bypass URL.      -->
+<!-- ================================================================== -->
+<a id="nc-maintenance"></a>
+<div class="card card-warning card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-tools"></i> Nextcloud Maintenance Mode</h3>
+  </div>
+  <div class="card-body">
+    <div class="row">
+      <div class="col-md-8">
+        <h6>Current state</h6>
+        <cfoutput>
+        <cfif ncOidcEnabled>
+          <p class="mb-2"><span class="badge bg-success" style="font-size:0.9rem;">OIDC ENABLED</span> &mdash; normal operation. Mailbox users SSO into Nextcloud via Authelia. Local NC admin login is NOT available.</p>
+        <cfelse>
+          <p class="mb-2"><span class="badge bg-warning text-dark" style="font-size:0.9rem;">MAINTENANCE MODE</span> &mdash; OIDC is DISABLED. Mailbox-user SSO is offline. Local NC admin login is available at <a href="https://#consoleHostNc#/nc/" target="_blank">https://#consoleHostNc#/nc/</a>.</p>
+          <p class="mb-2"><strong>Local admin credentials:</strong></p>
+          <ul class="mb-3">
+            <li>Username: <code>#ncAdminUsername#</code></li>
+            <li>Password: see <code>/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt</code> on the host (or whichever <code>HERMES_ROOT</code> your install uses)</li>
+          </ul>
+        </cfif>
+        </cfoutput>
+
+        <h6 class="mt-3">Action</h6>
+        <cfoutput>
+        <cfif ncOidcEnabled>
+          <form method="post" action="inc/edit_nc_oidc_action.cfm" style="display:inline-block;" onsubmit="return confirm('Disable Nextcloud OIDC?\n\nMailbox users will NOT be able to SSO into Nextcloud until you re-enable OIDC. They will see the local NC login form, which their Authelia credentials will NOT match.\n\nProceed?');">
+            <input type="hidden" name="action" value="disable">
+            <button type="submit" class="btn btn-warning">
+              <i class="fas fa-power-off"></i> Enter Maintenance Mode (disable OIDC)
+            </button>
+          </form>
+        <cfelse>
+          <form method="post" action="inc/edit_nc_oidc_action.cfm" style="display:inline-block;" onsubmit="return confirm('Re-enable Nextcloud OIDC?\n\nMailbox users will be able to SSO into Nextcloud again. The local admin login form will be replaced by the OIDC redirect.\n\nProceed?');">
+            <input type="hidden" name="action" value="enable">
+            <button type="submit" class="btn btn-success">
+              <i class="fas fa-power-off"></i> Exit Maintenance Mode (enable OIDC)
+            </button>
+          </form>
+        </cfif>
+        </cfoutput>
+      </div>
+      <div class="col-md-4">
+        <div class="callout callout-info">
+          <h6 class="mb-2"><i class="fas fa-info-circle"></i> What is this?</h6>
+          <p class="mb-2 small">Hermes uses Authelia OIDC to SSO mailbox users into Nextcloud. The Nextcloud <strong>local admin</strong> account can't share that path &mdash; OIDC silent re-auth always wins over local credentials.</p>
+          <p class="mb-0 small">To do admin work via Nextcloud's UI: enter maintenance mode (disables OIDC) &rarr; open <code>/nc/</code> in incognito &rarr; log in as the NC local admin &rarr; (first login triggers NC's TOTP enrollment prompt) &rarr; do admin work &rarr; exit maintenance mode here.</p>
+        </div>
+        <div class="callout callout-warning">
+          <h6 class="mb-2"><i class="fas fa-exclamation-triangle"></i> Heads-up</h6>
+          <p class="mb-0 small">While OIDC is disabled, mailbox users CANNOT log into Nextcloud via SSO. Plan maintenance windows accordingly. The toggle is the industry-standard pattern for OIDC-fronted Nextcloud (see <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262" target="_blank">##262</a> for the architectural background).</p>
         </div>
       </div>
     </div>

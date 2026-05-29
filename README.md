@@ -187,8 +187,6 @@ If you don't want to use a secondary drive for any tier, simply create the direc
 
 ## Installation
 
-> **Before you start: TOTP authenticator required.** The installer enforces TOTP (two-factor) on the Nextcloud local admin account before completion. Install an authenticator app &mdash; Google Authenticator, Microsoft Authenticator, Authy, Duo Mobile, 1Password, Bitwarden, Aegis, or Raivo OTP all work &mdash; on your phone or computer **before** running the installer. The installer pauses to confirm you have one ready and lets you exit cleanly to install one if you don't. See the [Get Started page](docs/install/get-started-docker.md#before-you-install) for the full list and details.
-
 ### 1. Clone the repository
 
 Clone the repository wherever you'd like Hermes installed:

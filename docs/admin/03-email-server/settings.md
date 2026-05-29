@@ -123,36 +123,35 @@ this three-way value so existing installs don't need a migration. The
 read path in `view_email_server_settings.cfm` normalizes legacy
 `true`/`false` strings to `auto_redirect` / `full_form`.
 
-> **Operational consequence — `/nc-admin-login` is your escape hatch.**
-> All three modes ship with the `/nc-admin-login` URL active. As of
-> [#262](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262)
-> it is **anonymous at the nginx layer** — Authelia is not in the
-> path. The endpoint proxies straight to Nextcloud's local login form
-> (`/login?direct=1`), where the local NC admin account authenticates
-> with a password plus a Nextcloud-native TOTP that the install script
-> enforced via `occ twofactor:enable`. On first login the operator
-> scans a QR code in Nextcloud's UI and TOTP is then mandatory for
-> that account from that point on. The link also appears in the main
-> admin sidebar as "Nextcloud Admin".
->
-> Why anonymous instead of Authelia-gated: the prior Authelia-gated
-> design was architecturally infeasible. The Authelia session created
-> by the gate enabled `user_oidc` to silently re-authenticate the
-> operator as their Authelia identity on the post-form redirect,
-> overriding whatever local-admin session the form submission had
-> just established. Removing Authelia from the path removes that
-> session, so the silent OIDC re-auth has no fuel. Security is
-> preserved by Nextcloud's built-in login throttling plus the TOTP
-> requirement on the local admin account.
->
-> If the local NC admin needs TOTP disabled for recovery (lost
-> authenticator etc.):
->
-> ```bash
-> docker exec hermes_nextcloud php occ twofactor:disable <username> totp
-> # do recovery work
-> docker exec hermes_nextcloud php occ twofactor:enable <username> totp
-> ```
+## Nextcloud Maintenance Mode card
+
+Below the Webmail Settings card sits a second card that controls the local-admin escape hatch. As of [#262](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/262) there is **no permanent bypass URL** &mdash; the operator toggles OIDC on/off from this card when they need to administer Nextcloud as the local admin (separate identity from the Authelia/LDAP users that normally SSO in). The sidebar entry "Nextcloud Admin" anchors to this card.
+
+| State | What it means |
+| --- | --- |
+| `OIDC ENABLED` (green) | Normal operation. Mailbox users SSO into Nextcloud via Authelia. The local NC admin **cannot** log in. |
+| `MAINTENANCE MODE` (yellow) | Click "Enter Maintenance Mode" ran `occ app:disable user_oidc`. Mailbox-user SSO is offline. The local NC admin can now log in via Nextcloud's own form at `/nc/`. |
+
+**Maintenance procedure:**
+
+1. Click **Enter Maintenance Mode**. The card status flips to yellow, mailbox-user SSO goes offline.
+2. Open `https://<console-host>/nc/` in an incognito tab.
+3. Log in as the NC local admin (username + password shown on the card; password is also in `/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt` on the host).
+4. On first login Nextcloud prompts for TOTP enrollment via its own UI &mdash; scan the QR code with any TOTP authenticator app.
+5. Do your admin work in Nextcloud.
+6. Return to this card and click **Exit Maintenance Mode**. SSO is restored.
+
+**Why the toggle pattern and not a permanent bypass URL:**
+
+Earlier attempts at a permanent local-admin URL (the `/nc-admin-login` path) were architecturally infeasible. The Authelia session created by gating that URL fueled `user_oidc` silent OIDC re-auth on every post-form `/nc/` request, overriding whatever local-admin session the form submission had just established. Removing the Authelia gate didn't help either because `user_oidc` itself force-redirects `/login?direct=1` to OIDC under several conditions. The toggle is the only path that reliably wins against `user_oidc`, and it's what most NC operators in OIDC-fronted deployments use anyway. See #262 for the full diagnostic trace.
+
+**Recovery if the operator gets locked out of NC TOTP** (lost authenticator etc.) &mdash; from a shell on the Hermes host:
+
+```bash
+docker exec hermes_nextcloud php occ twofactorauth:enforce --off
+# log in, re-enroll TOTP via NC UI, then:
+docker exec hermes_nextcloud php occ twofactorauth:enforce --on
+```
 
 ### Mailbox Sharing
 

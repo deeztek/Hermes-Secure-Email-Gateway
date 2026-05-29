@@ -3196,19 +3196,20 @@ NEXTCLOUD
 ---------
 Local admin user:   $(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null || echo "?")
 Local admin pw:     $(cat "${CREDS_DIR}/nextcloud_admin_password" 2>/dev/null || echo "?")
-Local login URL:    https://${ip}/nc-admin-login
 
-FIRST LOGIN — TOTP enrollment is REQUIRED.
-You will be prompted to scan a QR code with your authenticator app on
-first login. Until you complete enrollment, this account is protected
-by password only. Do this BEFORE doing anything else with Nextcloud.
+Normal operation: mailbox users SSO into Nextcloud via Authelia OIDC
+at https://${ip}/nc/ — the local admin credentials above are NOT used
+for everyday operation. They are only required when entering Nextcloud
+Maintenance Mode for admin work (e.g. installing apps, configuring
+Nextcloud settings not exposed via the Hermes UI).
 
-If for some reason you need to disable TOTP enforcement (e.g. lost
-authenticator + need to recover), the supported pattern is:
-
-  docker exec hermes_nextcloud php occ twofactor:disable <username> totp
-  # do your recovery work
-  docker exec hermes_nextcloud php occ twofactor:enable <username> totp
+To enter maintenance mode: log into Hermes Admin Console, navigate to
+Email Server > Settings > Nextcloud Maintenance Mode (also linked as
+"Nextcloud Admin" in the sidebar), click "Enter Maintenance Mode". This
+disables Nextcloud OIDC temporarily so the local admin can log into
+https://${ip}/nc/ with the credentials above. NC will prompt for TOTP
+enrollment on first login. When done, click "Exit Maintenance Mode" on
+the same page to restore SSO. See #262 for the architectural background.
 
 OIDC secret:        $(cat "${CREDS_DIR}/nextcloud_oidc_secret" 2>/dev/null || echo "<not-generated>")
 Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null || echo "<not-generated>")
@@ -3282,23 +3283,24 @@ EOF
     echo -e "    Admin username:  ${BOLD}${admin_user}${NC}"
     echo -e "    Admin password:  ${BOLD}${RED}${admin_pass}${NC}     ${YELLOW}<-- COPY ME${NC}"
     echo ""
-    # Nextcloud admin (#262). Surface prominently so the operator does the
-    # first-login TOTP enrollment immediately. Account is protected by
-    # password ONLY until TOTP enrollment completes.
+    # Nextcloud admin (#262). Surface the credentials but DO NOT instruct
+    # the operator to use them right away -- the local NC admin login is
+    # a maintenance-mode escape hatch managed via the "Nextcloud Admin"
+    # sidebar entry (Email Server > Settings > Nextcloud Maintenance Mode
+    # card). Normal mailbox-user SSO doesn't require these credentials.
     local nc_admin_user nc_admin_pass
     nc_admin_user=$(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null | tr -d '[:space:]')
     nc_admin_pass=$(cat "${CREDS_DIR}/nextcloud_admin_password" 2>/dev/null | tr -d '[:space:]')
     if [[ -n "$nc_admin_user" && -n "$nc_admin_pass" ]]; then
         echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
-        echo -e "  ${YELLOW}|${NC} ${BOLD}NEXTCLOUD ADMIN LOGIN${NC} -- enroll TOTP IMMEDIATELY                  ${YELLOW}|${NC}"
+        echo -e "  ${YELLOW}|${NC} ${BOLD}NEXTCLOUD LOCAL ADMIN${NC} -- only used for maintenance              ${YELLOW}|${NC}"
         echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
-        echo -e "    Login URL:       ${BOLD}https://${ip}/nc-admin-login${NC}"
         echo -e "    Admin username:  ${BOLD}${nc_admin_user}${NC}"
         echo -e "    Admin password:  ${BOLD}${RED}${nc_admin_pass}${NC}     ${YELLOW}<-- COPY ME${NC}"
         echo ""
-        echo -e "    ${BOLD}${RED}FIRST LOGIN:${NC} you will be prompted to scan a QR code with your"
-        echo -e "    authenticator app. Until TOTP is enrolled this account is protected"
-        echo -e "    by password ONLY -- do it now, before doing anything else."
+        echo -e "    Use only when entering Nextcloud Maintenance Mode via"
+        echo -e "    ${BOLD}Email Server > Settings > Nextcloud Maintenance Mode${NC}"
+        echo -e "    (also linked as ${BOLD}Nextcloud Admin${NC} in the sidebar)."
         echo ""
     fi
     echo -e "  ${GREEN}+----------------------------------------------------------------------+${NC}"
@@ -3771,121 +3773,11 @@ run_phase2_db_init() {
         state_mark_done "11-creds-injected"
     fi
 
-    # Nextcloud admin TOTP enforcement (#262). Authelia is OUT of the
-    # /nc-admin-login path; NC's own TOTP is what protects the local
-    # admin account. Shown BEFORE write_install_summary so the operator
-    # can bail and resume if they need to install an authenticator first.
-    prompt_nc_admin_totp_acknowledgment
-    enable_nc_admin_totp
-
     state_mark_done "99-completed"
     log "Phase 2 (post-container) initialization completed"
     write_install_summary
 }
 
-# ============================================================================
-# NEXTCLOUD ADMIN TOTP (#262)
-# ============================================================================
-
-prompt_nc_admin_totp_acknowledgment() {
-    # Shown late in --init-db, after Nextcloud is reachable but before the
-    # install summary. The operator gets the chance to bail (e.g. to go
-    # install an authenticator on their phone) and re-run later -- state
-    # is preserved, so the re-run lands back here without re-prompting
-    # for earlier steps.
-    #
-    # The banner is NOT state-guarded -- it's the gate, not the action.
-    # The actual `occ twofactor:enable` call IS state-guarded
-    # ("16-nc-totp-enabled") so it only runs once after a Y answer.
-    if state_is_done "16-nc-totp-enabled"; then
-        log "Nextcloud admin TOTP already enabled (skipping prompt)"
-        return 0
-    fi
-
-    echo ""
-    echo -e "${BOLD}${YELLOW}================================================================================${NC}"
-    echo -e "${BOLD}${YELLOW}            NEXT STEP - Nextcloud Admin TOTP Enrollment${NC}"
-    echo -e "${BOLD}${YELLOW}================================================================================${NC}"
-    echo ""
-    echo "The installer is about to require TOTP (two-factor) on the Nextcloud"
-    echo "admin account. On your FIRST login at /nc-admin-login you will be"
-    echo "prompted to scan a QR code with an authenticator app."
-    echo ""
-    echo "You need a TOTP authenticator installed on your phone or computer"
-    echo "BEFORE you continue. Any RFC 6238 TOTP app works -- common choices:"
-    echo ""
-    echo "  - Google Authenticator     (iOS / Android; cloud sync)"
-    echo "  - Microsoft Authenticator  (iOS / Android; cloud sync)"
-    echo "  - Authy                    (iOS / Android / desktop; multi-device)"
-    echo "  - Duo Mobile               (iOS / Android; same app used for /admin/ 2FA)"
-    echo "  - 1Password / Bitwarden    (if you already use one as your password manager)"
-    echo "  - Aegis (Android) / Raivo OTP (iOS)  -- open source, local-only"
-    echo ""
-    echo -e "  ${BOLD}[Y]${NC} I have an authenticator ready -- continue installation"
-    echo -e "  ${BOLD}[N]${NC} Not ready -- exit. I'll install one and re-run the installer"
-    echo "      (install state is preserved; re-running lands back at this prompt)"
-    echo ""
-    local choice
-    read -p "Continue? [Y/n]: " choice
-    choice="${choice:-Y}"
-
-    if [[ "$choice" =~ ^[Nn] ]]; then
-        echo ""
-        echo -e "${YELLOW}OK -- exiting without enabling TOTP.${NC}"
-        echo ""
-        echo "To resume:"
-        echo "  1. Install a TOTP authenticator on your phone or desktop"
-        echo "  2. Re-run:  ${BOLD}sudo ${HERMES_ROOT}/scripts/install_hermes_docker.sh --init-db${NC}"
-        echo "  3. The installer will skip already-completed steps and land back here."
-        echo ""
-        exit 0
-    fi
-}
-
-enable_nc_admin_totp() {
-    # Marks TOTP as required for the Nextcloud admin user. NC will prompt
-    # the operator to scan a QR code on FIRST login at /nc-admin-login and
-    # complete enrollment via NC's own UI. Idempotent -- re-runs after a
-    # successful enable skip via the state marker.
-    #
-    # Two-step: the twofactor_totp app SHIPS with NC but isn't enabled by
-    # default. Without it enabled, `occ twofactorauth:enable <user> totp`
-    # fails with "The provider 'totp' does not exist".
-    if state_is_done "16-nc-totp-enabled"; then
-        log "Nextcloud admin TOTP already enabled (re-run skip)"
-        return 0
-    fi
-
-    local nc_admin_user
-    nc_admin_user=$(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null | tr -d '[:space:]')
-
-    if [[ -z "$nc_admin_user" ]]; then
-        warn "Nextcloud admin username not found at ${CREDS_DIR}/nextcloud_admin_username"
-        warn "Skipping TOTP enable -- you can run it manually later:"
-        warn "  docker exec hermes_nextcloud php occ app:enable twofactor_totp"
-        warn "  docker exec hermes_nextcloud php occ twofactorauth:enable <username> totp"
-        return 0
-    fi
-
-    log "Enabling twofactor_totp app in Nextcloud..."
-    if ! docker exec hermes_nextcloud php occ app:enable twofactor_totp >> "$LOG_FILE" 2>&1; then
-        warn "  Failed to enable twofactor_totp app -- TOTP enforcement WILL fail"
-        warn "  Run manually after install completes:"
-        warn "    docker exec hermes_nextcloud php occ app:enable twofactor_totp"
-        warn "    docker exec hermes_nextcloud php occ twofactorauth:enable ${nc_admin_user} totp"
-        return 0
-    fi
-
-    log "Enabling TOTP requirement for Nextcloud admin '${nc_admin_user}'..."
-    if docker exec hermes_nextcloud php occ twofactorauth:enable "${nc_admin_user}" totp >> "$LOG_FILE" 2>&1; then
-        log "  TOTP requirement enabled -- enroll on first login at /nc-admin-login"
-        state_mark_done "16-nc-totp-enabled"
-    else
-        warn "  Failed to enable TOTP via occ. The install will continue, but you must"
-        warn "  enable it manually before going live:"
-        warn "    docker exec hermes_nextcloud php occ twofactorauth:enable ${nc_admin_user} totp"
-    fi
-}
 
 # ============================================================================
 # MAIN INSTALLATION
