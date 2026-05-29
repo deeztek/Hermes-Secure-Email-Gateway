@@ -273,23 +273,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfoutput>
 
         <h6 class="mt-3">Action</h6>
+        <!-- Buttons use type="button" + fetch() because this card lives INSIDE
+             the outer email-server-settings form. Nested <form> tags are
+             silently stripped by browsers, so a real <form> here would have
+             its action= overridden by the parent and submit save_settings
+             instead of toggling OIDC. fetch() bypasses the parent form. -->
         <cfoutput>
         <cfif ncOidcEnabled>
-          <form method="post" action="inc/edit_nc_oidc_action.cfm" style="display:inline-block;" onsubmit="return confirm('Disable Nextcloud OIDC?\n\nMailbox users will NOT be able to SSO into Nextcloud until you re-enable OIDC. They will see the local NC login form, which their Authelia credentials will NOT match.\n\nProceed?');">
-            <input type="hidden" name="action" value="disable">
-            <button type="submit" class="btn btn-warning">
-              <i class="fas fa-power-off"></i> Enter Maintenance Mode (disable OIDC)
-            </button>
-          </form>
+          <button type="button" class="btn btn-warning" onclick="ncOidcToggle('disable');">
+            <i class="fas fa-power-off"></i> Enter Maintenance Mode (disable OIDC)
+          </button>
         <cfelse>
-          <form method="post" action="inc/edit_nc_oidc_action.cfm" style="display:inline-block;" onsubmit="return confirm('Re-enable Nextcloud OIDC?\n\nMailbox users will be able to SSO into Nextcloud again. The local admin login form will be replaced by the OIDC redirect.\n\nProceed?');">
-            <input type="hidden" name="action" value="enable">
-            <button type="submit" class="btn btn-success">
-              <i class="fas fa-power-off"></i> Exit Maintenance Mode (enable OIDC)
-            </button>
-          </form>
+          <button type="button" class="btn btn-success" onclick="ncOidcToggle('enable');">
+            <i class="fas fa-power-off"></i> Exit Maintenance Mode (enable OIDC)
+          </button>
         </cfif>
         </cfoutput>
+        <script>
+        function ncOidcToggle(action) {
+            var msg = action === 'disable'
+                ? 'Disable Nextcloud OIDC?\n\nMailbox users will NOT be able to SSO into Nextcloud until you re-enable OIDC. They will see the local NC login form, which their Authelia credentials will NOT match.\n\nProceed?'
+                : 'Re-enable Nextcloud OIDC?\n\nMailbox users will be able to SSO into Nextcloud again. The local admin login form will be replaced by the OIDC redirect.\n\nProceed?';
+            if (!confirm(msg)) return;
+            fetch('inc/edit_nc_oidc_action.cfm', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'action=' + encodeURIComponent(action),
+                credentials: 'same-origin'
+            }).then(function() {
+                // Reload so the page re-reads OIDC state + surfaces the
+                // session.m=62/63/64 alert flash.
+                window.location.href = 'view_email_server_settings.cfm#nc-maintenance';
+            }).catch(function(err) {
+                alert('Toggle failed: ' + err);
+            });
+        }
+        </script>
       </div>
       <div class="col-md-4">
         <div class="callout callout-info">
