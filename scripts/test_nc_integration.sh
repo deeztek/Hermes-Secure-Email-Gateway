@@ -119,13 +119,37 @@ APPS_JSON=$(occ app:list --output=json 2>/dev/null)
 if [[ -z "$APPS_JSON" ]]; then
     fail "occ app:list returned no output"
 else
+    # First pass: auto re-enable any Hermes-required app that's installed
+    # but disabled. This handles two real workflow cases:
+    #   (a) Dev disabled user_oidc via the Maintenance Mode toggle to log
+    #       into NC as admin and check the next NC version before bumping.
+    #   (b) NC's major-upgrade compatibility check auto-disabled an app it
+    #       thinks is incompatible with the new core version.
+    # If the re-enable itself fails, the regular check below will FAIL on
+    # that app -- so real breakage is not hidden, only friction is removed.
+    REHYDRATED=0
+    for app in "${REQUIRED_APPS[@]}"; do
+        IS_DISABLED=$(echo "$APPS_JSON" | jq -r --arg a "$app" '.disabled[$a] // empty' 2>/dev/null)
+        if [[ -n "$IS_DISABLED" ]]; then
+            if occ app:enable "$app" >/dev/null 2>&1; then
+                printf "  [${YELLOW}NOTE${NC}] Re-enabled '%s' (was disabled -- maintenance toggle or NC compat auto-disable)\n" "$app"
+                REHYDRATED=1
+            fi
+        fi
+    done
+    # Refresh app list after any rehydrate so the check below sees the
+    # post-enable state.
+    if (( REHYDRATED )); then
+        APPS_JSON=$(occ app:list --output=json 2>/dev/null)
+    fi
+
     for app in "${REQUIRED_APPS[@]}"; do
         IS_ENABLED=$(echo "$APPS_JSON" | jq -r --arg a "$app" '.enabled[$a] // empty' 2>/dev/null)
         IS_DISABLED=$(echo "$APPS_JSON" | jq -r --arg a "$app" '.disabled[$a] // empty' 2>/dev/null)
         if [[ -n "$IS_ENABLED" ]]; then
             pass "App '$app' enabled (version $IS_ENABLED)"
         elif [[ -n "$IS_DISABLED" ]]; then
-            fail "App '$app' is DISABLED (should be enabled for this NC version)"
+            fail "App '$app' is DISABLED and could not be auto-enabled (occ app:enable failed)"
         else
             fail "App '$app' is NOT INSTALLED"
         fi
