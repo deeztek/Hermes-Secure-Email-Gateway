@@ -255,6 +255,27 @@ MIGRATION-PLAN.md
 RELEASE-NOTES.md
 
 # ===========================================
+# Developer-only scripts (untracked 2026-05-30)
+# ===========================================
+# Personal DEV deployment helper -- hardcodes the maintainer's private
+# DEV IP, SSH username, and install path. Local-only by design.
+scripts/upload-to-dev.sh
+
+# Maintainer build tools for #179: build_hermes_install.py reads a DEV
+# DB dump + sanitization manifest and emits config/database/hermes_install.sql
+# (the canonical fresh-install schema). Operators don't run these --
+# they consume the resulting committed .sql. Kept locally for the
+# maintainer; untracked so they don't ship with the operator-facing tree.
+scripts/build_hermes_install.py
+scripts/hermes_install_manifest.yaml
+
+# One-off social-icon download helper for #226 Phase 1 (Personal
+# Signatures template gallery). Ran once on the maintainer workstation;
+# the generated PNGs are committed under dist/img/. Script itself
+# doesn't need to ship.
+scripts/generate_social_icons.sh
+
+# ===========================================
 # License server (does not belong in client repo)
 # ===========================================
 # Server-side validation code for validate.hermesseg.io / activate.hermesseg.io.
