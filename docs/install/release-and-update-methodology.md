@@ -273,6 +273,12 @@ cd /opt/hermes-seg-docker-gl
 
 The orchestrator runs all 5 phases. Idempotent + re-runnable. Logs every step. Refuses to run if working tree is dirty.
 
+### Post-upgrade: hard-refresh the browser (any release that bumps NCVERSION or admin/2 assets)
+
+After the orchestrator finishes, **operators must hard-refresh their browser** (Ctrl-Shift-R on Linux/Windows, Cmd-Shift-R on macOS) on any open Hermes admin tab or Nextcloud tab. The browser cache often serves the pre-upgrade CSS/JS bundle even though the server is now serving the new one, which presents as broken layouts — most visibly NC's top navbar collapsing to a vertical stack of icons when the NC 30 → 31 bundle swaps under it.
+
+Release notes that bump `NCVERSION` or land changes under `config/hermes/var/www/html/admin/2/` should call this out explicitly. One sentence in the release notes prevents the "Nextcloud top bar broke" support ticket.
+
 ## The release-cut procedure (developer side)
 
 For maintainers preparing a release:
