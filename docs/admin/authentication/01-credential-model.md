@@ -349,4 +349,4 @@ The flow runs through `admin/2/inc/add_mailbox_action.cfm`. Most steps are ident
 
 - [App passwords (admin)](02-app-passwords.md) — managing app passwords from the admin side
 - [Rotate NC internal password](03-rotate-nc-password.md) — the per-mailbox rotation action
-- [App passwords (user)](../../users/app-passwords/01-what-are-they.md) — what end users see and do
+- [My App Passwords (user)](../../users/my-app-passwords.md) — what end users see and do
