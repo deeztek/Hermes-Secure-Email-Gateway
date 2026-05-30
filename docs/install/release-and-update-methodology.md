@@ -292,7 +292,7 @@ For maintainers preparing a release:
    ./scripts/test_nc_integration.sh
    ```
 
-   The script (read-only `occ` queries + log scan) verifies the Hermes-NC integration surface: container responsive, `occ status` reports the expected version, no `needsDbUpgrade`, required apps enabled and not flagged incompatible (`user_oidc` / `user_ldap` / `mail` / `twofactor_totp` / `external`), `trusted_domains` populated, theming URL set, `user_oidc` provider `Hermes_SEG` registered, `user_ldap` has a configuration, and no ERROR/FATAL entries in the last 200 `nextcloud.log` lines. Exit code 0 if no FAIL.
+   The script (read-only `occ` queries + log scan) verifies the Hermes-NC integration surface: container responsive, `occ status` reports the expected version, no `needsDbUpgrade`, required apps enabled and not flagged incompatible (`user_oidc` / `mail` / `twofactor_totp` / `twofactor_backupcodes` / `external`), `trusted_domains` populated, theming URL set, `user_oidc` provider `Hermes_SEG` registered, and no ERROR/FATAL entries in the last 200 `nextcloud.log` lines. Exit code 0 if no FAIL.
 
    If anything fails, fix the integration (or revert the `NCVERSION` bump and pin to the prior NC) before continuing. Do not publish a release that ships a failing NC integration.
 

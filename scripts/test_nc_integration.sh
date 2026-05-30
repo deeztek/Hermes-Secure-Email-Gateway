@@ -110,7 +110,10 @@ section "Integration apps enabled + compatible"
 
 # Apps Hermes integration depends on. If any of these are missing,
 # disabled, or marked incompatible, the upgrade is not safe to release.
-REQUIRED_APPS=(user_oidc user_ldap mail twofactor_totp external)
+# NB: user_ldap is intentionally NOT required -- Hermes migrated NC auth
+# from user_ldap to user_oidc early in the Docker era; LDAP lookups now
+# happen upstream in Authelia, and NC receives OIDC tokens only.
+REQUIRED_APPS=(user_oidc mail twofactor_totp twofactor_backupcodes external)
 APPS_JSON=$(occ app:list --output=json 2>/dev/null)
 
 if [[ -z "$APPS_JSON" ]]; then
@@ -163,26 +166,19 @@ else
 fi
 
 # ============================================================================
-section "OIDC + LDAP wiring (mailbox-user SSO path)"
+section "OIDC wiring (mailbox-user SSO path)"
 # ============================================================================
 
 # Authelia is the OIDC provider, registered as "Hermes_SEG" by the install
 # script. If user_oidc lost the provider config on upgrade, SSO is broken.
+# NB: there's no user_ldap check here. Hermes NC auth is OIDC-only since
+# the early-Docker migration -- LDAP lookups happen upstream in Authelia,
+# and NC receives OIDC tokens. user_ldap is expected to be absent / disabled.
 PROVIDER_LIST=$(occ user_oidc:provider 2>/dev/null || true)
 if echo "$PROVIDER_LIST" | grep -qE 'Hermes_SEG|hermes_seg'; then
     pass "user_oidc provider 'Hermes_SEG' is registered"
 else
     fail "user_oidc provider 'Hermes_SEG' is MISSING -- mailbox-user SSO will fail"
-fi
-
-# LDAP backend config (from install + nextcloud_provision_user.cfm).
-# `occ ldap:show-config` returns one or more configIDs; we just verify
-# at least one config exists.
-LDAP_CONFIG=$(occ ldap:show-config 2>/dev/null || true)
-if echo "$LDAP_CONFIG" | grep -qE 'Configuration|ldapHost'; then
-    pass "user_ldap backend has at least one configuration"
-else
-    fail "user_ldap has NO configurations -- mailbox-user provisioning is broken"
 fi
 
 # ============================================================================
