@@ -281,11 +281,25 @@ For maintainers preparing a release:
    UPDATE system_settings SET value='Docker'  WHERE parameter='version_no';
    ```
 4. **Add CFML / bash migrations** as needed under `updates/v<DATE>/cfml/` and `updates/v<DATE>/scripts/`.
-5. **Update `.env`**: bump `HERMES_DOCKER_IMG_VERSION=v<DATE>` and (if NC bumped) `NCVERSION=...`.
-6. **Draft the GitHub Release body for `v<DATE>`**: list every change in the release. Per-release notes live on the GitHub Release page (created when the tag is pushed) — the cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
-7. **Build + push images**: `./Docker/build-all-ghcr.sh && ./Docker/push-all-ghcr.sh` (or wait for GitHub Actions per #218 Session C).
-8. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub).
-9. **Verify**: GitHub Release page exists, ghcr.io packages updated, run `./scripts/system_update_docker.sh v<DATE>` on Test box and confirm clean upgrade.
+5. **Update `.env.template`**: bump `HERMES_DOCKER_IMG_VERSION=v<DATE>` and (if NC bumped) `NCVERSION=...`. `NCVERSION` is release-managed per [#261](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/261) — operators never edit it; bumps land here only after the integration check in step 6 passes.
+6. **(If `NCVERSION` was bumped in step 5) Run the NC integration check on a Test box**:
+
+   ```bash
+   # On Test, after a fresh clone or pull that includes the new .env.template
+   docker compose pull hermes_nextcloud
+   docker compose up -d hermes_nextcloud
+   sleep 30                                    # let NC finish first-start init
+   ./scripts/test_nc_integration.sh
+   ```
+
+   The script (read-only `occ` queries + log scan) verifies the Hermes-NC integration surface: container responsive, `occ status` reports the expected version, no `needsDbUpgrade`, required apps enabled and not flagged incompatible (`user_oidc` / `user_ldap` / `mail` / `twofactor_totp` / `external`), `trusted_domains` populated, theming URL set, `user_oidc` provider `Hermes_SEG` registered, `user_ldap` has a configuration, and no ERROR/FATAL entries in the last 200 `nextcloud.log` lines. Exit code 0 if no FAIL.
+
+   If anything fails, fix the integration (or revert the `NCVERSION` bump and pin to the prior NC) before continuing. Do not publish a release that ships a failing NC integration.
+
+7. **Draft the GitHub Release body for `v<DATE>`**: list every change in the release. Per-release notes live on the GitHub Release page (created when the tag is pushed) — the cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
+8. **Build + push images**: `./Docker/build-all-ghcr.sh && ./Docker/push-all-ghcr.sh` (or wait for GitHub Actions per #218 Session C).
+9. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub).
+10. **Verify**: GitHub Release page exists, ghcr.io packages updated, run `./scripts/system_update_docker.sh v<DATE>` on Test box and confirm clean upgrade.
 
 ## Common scenarios
 
