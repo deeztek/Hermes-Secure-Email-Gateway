@@ -135,11 +135,12 @@ Below the Webmail Settings card sits a second card that controls the local-admin
 **Maintenance procedure:**
 
 1. Click **Enter Maintenance Mode**. The card status flips to yellow, mailbox-user SSO goes offline, and a success banner appears at the top of the page.
-2. Click the **Open Nextcloud** button that appears below the toggle &mdash; it opens `https://<console-host>/nc/` in a new tab (`target="_blank"`) so the Hermes admin tab stays put for step 6.
+2. Click the **Open Nextcloud** button that appears below the toggle &mdash; it opens `https://<console-host>/nc/` in a new tab (`target="_blank"`) so the Hermes admin tab stays put for step 7.
 3. In the Nextcloud tab, log in as the NC local admin. Username is shown on the card; password is also in `/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt` on the host.
 4. On first login Nextcloud prompts for TOTP enrollment via its own UI &mdash; scan the QR code with any TOTP authenticator app.
-5. Do your admin work in Nextcloud.
-6. Switch back to the Hermes admin tab and click **Exit Maintenance Mode**. SSO is restored for mailbox users.
+5. **First login only &mdash; generate backup codes immediately**. Click your avatar (top-right) &rarr; **Personal settings** &rarr; **Security**, scroll to **Two-Factor backup codes**, click **Generate backup codes**. Save the 10 single-use codes somewhere safe (password manager, printed copy in a safe, etc.). These codes are the ONLY recovery path if you lose your TOTP authenticator &mdash; without them, recovery requires shell access. Done once per admin; codes persist across sessions until used.
+6. Do your admin work in Nextcloud.
+7. Switch back to the Hermes admin tab and click **Exit Maintenance Mode**. SSO is restored for mailbox users.
 
 The button uses `fetch()` to call `inc/edit_nc_oidc_action.cfm` (`occ app:disable user_oidc` or `enable`), bypassing the outer settings form so the toggle doesn't collide with a normal Save submission. `redirect: 'manual'` on the fetch prevents the action handler's `cflocation` from being auto-followed and consuming the `session.m` flash before the page can render it.
 
@@ -149,13 +150,19 @@ Operators who need to use this often can ignore step 2's helper link and just ty
 
 Earlier attempts at a permanent local-admin URL (the `/nc-admin-login` path) were architecturally infeasible. The Authelia session created by gating that URL fueled `user_oidc` silent OIDC re-auth on every post-form `/nc/` request, overriding whatever local-admin session the form submission had just established. Removing the Authelia gate didn't help either because `user_oidc` itself force-redirects `/login?direct=1` to OIDC under several conditions. The toggle is the only path that reliably wins against `user_oidc`, and it's what most NC operators in OIDC-fronted deployments use anyway. See #262 for the full diagnostic trace.
 
-**Recovery if the operator gets locked out of NC TOTP** (lost authenticator etc.) &mdash; from a shell on the Hermes host:
+**Recovery if the NC local admin loses their TOTP authenticator:**
 
-```bash
-docker exec hermes_nextcloud php occ twofactorauth:enforce --off
-# log in, re-enroll TOTP via NC UI, then:
-docker exec hermes_nextcloud php occ twofactorauth:enforce --on
-```
+1. **Preferred &mdash; backup codes** (generated at TOTP enrollment time per step 5 of the maintenance procedure above). At the TOTP prompt during login, click **"Use backup code"** (or **"Try another method"**, wording varies by NC version), paste one of the saved codes. Each code is single-use, so re-generate a new set after recovery via Personal &rarr; Security &rarr; Two-Factor backup codes.
+
+2. **Fallback &mdash; disable enforcement via shell** (only if backup codes are also lost or were never generated):
+
+   ```bash
+   docker exec hermes_nextcloud php occ twofactorauth:enforce --off
+   # log in, re-enroll TOTP via NC UI, generate fresh backup codes, then:
+   docker exec hermes_nextcloud php occ twofactorauth:enforce --on
+   ```
+
+   This requires shell access to the Hermes host. If you don't have shell access, the only recovery is restoring `/mnt/data/dbase/` from a backup taken when the admin still had TOTP access, which is a significantly more disruptive operation. Generating backup codes at enrollment time is much cheaper.
 
 ### Mailbox Sharing
 

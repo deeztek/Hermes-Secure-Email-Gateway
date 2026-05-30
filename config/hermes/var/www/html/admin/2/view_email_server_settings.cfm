@@ -294,7 +294,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <strong>Step 2:</strong> open Nextcloud in a new tab and log in as the local admin:
             <a href="https://#consoleHostNc#/nc/" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary ms-1">
               <i class="fas fa-external-link-alt"></i> Open Nextcloud
-            </a>
+            </a><br>
+            <strong>Step 3 (first login only):</strong> after enrolling TOTP, click your avatar &rarr; <strong>Personal settings &rarr; Security</strong>, scroll to <strong>Two-Factor backup codes</strong>, and click <strong>Generate backup codes</strong>. Save them somewhere safe &mdash; they're your only recovery path if you lose your authenticator.
           </p>
         <cfelse>
           <button type="button" class="btn btn-success" onclick="ncOidcToggle('enable');">
@@ -341,7 +342,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <div class="callout callout-info">
           <h6 class="mb-2"><i class="fas fa-info-circle"></i> What is this?</h6>
           <p class="mb-2 small">Hermes uses Authelia OIDC to SSO mailbox users into Nextcloud. The Nextcloud <strong>local admin</strong> account can't share that path &mdash; OIDC silent re-auth always wins over local credentials.</p>
-          <p class="mb-0 small">To do admin work via Nextcloud's UI: enter maintenance mode (disables OIDC) &rarr; open <code>/nc/</code> in incognito &rarr; log in as the NC local admin &rarr; (first login triggers NC's TOTP enrollment prompt) &rarr; do admin work &rarr; exit maintenance mode here.</p>
+          <p class="mb-0 small">To do admin work via Nextcloud's UI: enter maintenance mode (disables OIDC) &rarr; open <code>/nc/</code> in incognito &rarr; log in as the NC local admin &rarr; (first login triggers NC's TOTP enrollment prompt &mdash; <strong>also generate backup codes</strong> under Personal &rarr; Security after enrollment) &rarr; do admin work &rarr; exit maintenance mode here.</p>
         </div>
         <div class="callout callout-warning">
           <h6 class="mb-2"><i class="fas fa-exclamation-triangle"></i> Heads-up</h6>

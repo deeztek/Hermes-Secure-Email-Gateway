@@ -3208,8 +3208,17 @@ Email Server > Settings, scroll to the Nextcloud Maintenance Mode card
 and click "Enter Maintenance Mode". This disables Nextcloud OIDC
 temporarily so the local admin can log into https://${ip}/nc/ with the
 credentials above. NC will prompt for TOTP enrollment on first login.
-When done, click "Exit Maintenance Mode" on the same page to restore
-SSO. See #262 for the architectural background.
+
+IMPORTANT — also generate TOTP backup codes on first login:
+  In Nextcloud, click your avatar (top-right) -> Personal settings ->
+  Security, scroll to "Two-Factor backup codes", click "Generate backup
+  codes". Save the 10 single-use codes somewhere safe (password manager
+  / printed in a safe / etc.). They are your ONLY recovery path if you
+  lose your TOTP authenticator -- without them, recovery requires shell
+  access to disable TOTP enforcement.
+
+When done with admin work, click "Exit Maintenance Mode" on the same
+page to restore SSO. See #262 for the architectural background.
 
 OIDC secret:        $(cat "${CREDS_DIR}/nextcloud_oidc_secret" 2>/dev/null || echo "<not-generated>")
 Redis password:     $(cat "${CREDS_DIR}/nextcloud_redis_password" 2>/dev/null || echo "<not-generated>")
@@ -3672,8 +3681,15 @@ run_phase2_db_init() {
         #   for the local NC admin TOTP enforcement (#262). Without it,
         #   `occ twofactorauth:enable <user> totp` fails with
         #   "The provider 'totp' does not exist".
+        # - twofactor_backupcodes: backup-code provider (10 single-use codes
+        #   the admin generates after TOTP enrollment). Critical recovery
+        #   path if the TOTP authenticator is lost -- otherwise the only
+        #   recovery is `occ twofactorauth:enforce --off` from the host
+        #   shell. Appears enabled by default on NC 30 but adding to this
+        #   loop defensively in case a future NC version regresses (and
+        #   app:enable is idempotent -- "already enabled" is fine).
         log "  Enabling core Nextcloud apps..."
-        for app in files_sharing twofactor_totp; do
+        for app in files_sharing twofactor_totp twofactor_backupcodes; do
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:enable "$app" >> "$LOG_FILE" 2>&1 \
                 && log "    Enabled: $app" \
                 || log "    WARNING: Failed to enable $app (may already be enabled)"
