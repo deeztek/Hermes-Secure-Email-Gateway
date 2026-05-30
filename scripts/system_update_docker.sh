@@ -192,6 +192,107 @@ find_pending_releases() {
     fi
 }
 
+# Detect NC version drift between .env's NCVERSION and what
+# hermes_nextcloud is actually running; if they differ, run
+# `occ upgrade` and rehydrate Hermes-required NC apps. Called
+# from phase4_finalize. See #264.
+nc_upgrade_if_needed() {
+    local declared_nc=""
+    if grep -qE '^NCVERSION=' "${HERMES_ROOT}/.env" 2>/dev/null; then
+        declared_nc="$(grep -E '^NCVERSION=' "${HERMES_ROOT}/.env" \
+            | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'" | tr -d '[:space:]')"
+    fi
+
+    if [[ -z "$declared_nc" ]]; then
+        log "No NCVERSION in .env -- skipping NC upgrade detection."
+        return 0
+    fi
+
+    if ! docker ps --format '{{.Names}}' | grep -q '^hermes_nextcloud$'; then
+        warn "hermes_nextcloud container not running -- skipping NC upgrade detection."
+        return 0
+    fi
+
+    log "Declared NCVERSION in .env: ${declared_nc}"
+
+    if (( DRY_RUN )); then
+        echo -e "${CYAN}[dry-run]${NC} docker exec hermes_nextcloud php occ status --output=json"
+        echo -e "${CYAN}[dry-run]${NC} (if live versionstring != ${declared_nc}: run occ upgrade + rehydrate apps)"
+        return 0
+    fi
+
+    # Wait briefly for occ to be responsive (NC may still be initializing
+    # after Phase 2's `docker compose up -d`).
+    local status_json="" attempt
+    for attempt in {1..15}; do
+        status_json="$(docker exec hermes_nextcloud php occ status --output=json 2>/dev/null || true)"
+        [[ -n "$status_json" ]] && break
+        sleep 2
+    done
+
+    if [[ -z "$status_json" ]]; then
+        warn "occ status returned no output after 30s -- skipping NC upgrade detection."
+        warn "If a release included an NC bump, run manually: docker exec -u www-data hermes_nextcloud php /var/www/html/occ upgrade"
+        return 0
+    fi
+
+    # Extract versionstring without depending on host jq.
+    local live_nc
+    live_nc="$(echo "$status_json" | grep -oE '"versionstring":"[^"]+"' \
+        | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+
+    if [[ -z "$live_nc" ]]; then
+        warn "Could not parse versionstring from occ status output -- skipping NC upgrade detection."
+        return 0
+    fi
+
+    # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1
+    # vs declared=30.0.15). Prefix-match is the same rule test_nc_integration.sh uses.
+    if [[ "$live_nc" == "$declared_nc"* ]]; then
+        log "  Live NC version '${live_nc}' matches declared '${declared_nc}' ✓"
+        return 0
+    fi
+
+    log "  NC version drift detected: live='${live_nc}' declared='${declared_nc}'"
+    log "  Running occ upgrade (can take several minutes; output streamed to log)..."
+    if ! docker exec -u www-data hermes_nextcloud php /var/www/html/occ upgrade 2>&1 | tee -a "$LOG_FILE"; then
+        fatal "occ upgrade failed. See $LOG_FILE. NC is half-upgraded -- investigate before retrying."
+    fi
+    log "  occ upgrade complete ✓"
+
+    # Rehydrate Hermes-required NC apps. NC's compatibility check
+    # auto-disables apps it thinks are incompatible with the new core
+    # version; re-enable them after upgrade. Mirrors the rehydrate loop
+    # in scripts/test_nc_integration.sh.
+    log "  Rehydrating Hermes-required NC apps..."
+    local app
+    for app in user_oidc mail twofactor_totp twofactor_backupcodes external; do
+        if docker exec -u www-data hermes_nextcloud php /var/www/html/occ app:enable "$app" >> "$LOG_FILE" 2>&1; then
+            log "    enabled: ${app} ✓"
+        else
+            warn "    could not enable ${app} (see $LOG_FILE); test_nc_integration.sh will fail until resolved"
+        fi
+    done
+
+    # Verify post-upgrade state.
+    local post_status post_needsdb post_maint new_live_nc
+    post_status="$(docker exec hermes_nextcloud php occ status --output=json 2>/dev/null || true)"
+    post_needsdb="$(echo "$post_status" | grep -oE '"needsDbUpgrade":(true|false)' | head -1 | cut -d: -f2)"
+    post_maint="$(echo "$post_status" | grep -oE '"maintenance":(true|false)' | head -1 | cut -d: -f2)"
+    new_live_nc="$(echo "$post_status" | grep -oE '"versionstring":"[^"]+"' \
+        | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+
+    if [[ "$post_needsdb" == "true" ]]; then
+        fatal "Post-upgrade: NC still reports needsDbUpgrade=true. Investigate before continuing."
+    fi
+    if [[ "$post_maint" == "true" ]]; then
+        warn "Post-upgrade: NC is still in maintenance mode. Disable with:"
+        warn "  docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --off"
+    fi
+
+    log "  Nextcloud upgraded: ${live_nc} → ${new_live_nc} ✓"
+}
+
 # Prompt yes/no unless --yes was passed OR we're in --dry-run mode.
 # Dry-run skips the prompt because nothing is at risk (no changes are made).
 confirm() {
@@ -468,15 +569,14 @@ phase4_finalize() {
         done
     fi
 
-    # NCVERSION change detection: compare .env's NCVERSION against the
-    # one Nextcloud is currently running. If different, `occ upgrade`.
-    # MVP: log a reminder rather than fully detecting + executing.
-    if grep -qE '^NCVERSION=' "${HERMES_ROOT}/.env" 2>/dev/null; then
-        local declared_nc
-        declared_nc="$(grep -E '^NCVERSION=' "${HERMES_ROOT}/.env" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")"
-        log "Declared NCVERSION in .env: ${declared_nc}"
-        log "  If this release bumped Nextcloud's version, run: docker exec -u 33 hermes_nextcloud php /var/www/html/occ upgrade"
-    fi
+    # NCVERSION change detection + automated upgrade (#264).
+    # If .env's NCVERSION differs from what NC is currently running,
+    # run `occ upgrade` and rehydrate Hermes-required NC apps. This
+    # makes customer-side NCVERSION bumps a fully-automated path -- no
+    # manual occ step required after pulling a release that includes an
+    # NC bump.
+    nc_upgrade_if_needed
+
 
     # *.HERMES template re-render reminder.
     log "Reminder: if this release modified any config/<service>/etc/.../*.HERMES template,"

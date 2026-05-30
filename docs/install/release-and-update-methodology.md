@@ -204,12 +204,16 @@ If any artifact fails, the orchestrator aborts. Because `build_no` advances at t
 ### Phase 4 — Standard finalize steps
 
 ```
-- Service-specific restarts for config files that don't auto-reload
-- docker exec hermes_commandbox occ upgrade  (only when NCVERSION in .env bumped)
-- Re-render *.HERMES config templates (when template content changed)
+- Restart hermes_commandbox so it picks up admin/2/, schedule/, schema changes
+- NC version-drift detection (#264): if .env's NCVERSION differs from
+  the live `occ status` versionstring → run `occ upgrade` + rehydrate
+  Hermes-required NC apps (user_oidc, mail, twofactor_totp,
+  twofactor_backupcodes, external) + verify needsDbUpgrade=false
+- Re-render *.HERMES config templates (reminder only in MVP; v2 will
+  detect modified template files and trigger each regen endpoint)
 ```
 
-Service restart triggers are detected by diffing the working tree against the previous tag for known config-file paths. The orchestrator maintains a static map of `config-path → containers-needing-restart`.
+NC upgrade is fully automated — no manual `occ upgrade` step needed after a release that bumps `NCVERSION`. The rehydrate loop covers NC's tendency to auto-disable apps it thinks are incompatible with a new core version. Service restart triggers (other than commandbox) will be detected in v2 by diffing the working tree against the previous tag.
 
 ### Phase 5 — Persistent post-upgrade hook
 
@@ -377,7 +381,7 @@ The MVP that shipped 2026-05-26 is deliberately scoped. These limitations are tr
 |---|---|---|
 | Service-restart detection | Always restarts `hermes_commandbox` in Phase 4; logs a reminder that admin may need to re-save certain config pages | Diff config files between previous and new tag; only restart containers whose volume-mounted config changed |
 | `*.HERMES` template re-render | Phase 4 logs a reminder; admin must re-save the corresponding admin page manually | Detect modified template files and invoke each one's regen endpoint via curl into commandbox |
-| `occ upgrade` | Phase 4 logs the declared `NCVERSION` and reminds operator to run `occ upgrade` if it bumped | Detect NCVERSION change vs the running container; auto-invoke `docker exec ... occ upgrade` |
+| `occ upgrade` | **Phase 4 auto-detects NCVERSION drift, runs `occ upgrade`, rehydrates Hermes-required NC apps, verifies post-upgrade state** (#264) | — already MVP-complete — |
 | `updates/v<DATE>/cfml/*.cfm` artifacts | Phase 3 logs a WARN and skips them | First release that ships a CFML migration must add a host→container mount for `updates/` plus a Lucee mapping; the orchestrator already curls the right URL pattern, just needs the mount to exist |
 | Mid-upgrade resume | `set -e` fail-fast; operator re-runs from scratch and idempotency handles re-application | Track per-phase + per-release-artifact completion; resume from last successful step |
 | GitHub Releases API auth | Anonymous polling; subject to GitHub's unauthenticated rate limit (60 req/hr per IP) | Honor a `GITHUB_TOKEN` env var if present |
