@@ -145,9 +145,15 @@ id="btn-back-to-top"
     
 
 <div class="alert alert-warning" role="alert">
-  System Backups and Restores are configured in the CLI. More information can be found on our <a href="#" onClick="window.open('https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/system-backup-and-restore', '_blank')"><b>System Backup and Restore</b></a> documentation.
-
-  
+  <h5 class="alert-heading"><i class="fas fa-tools"></i> Backup &amp; Restore &mdash; Coming Soon</h5>
+  <p>First-class Docker-aware backup/restore tooling is in development. It is <strong>not yet shipped</strong> in this release. Progress is tracked at
+    <a href="#" onClick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/219', '_blank'); return false;"><b>#219 (system_backup.sh)</b></a>
+    and
+    <a href="#" onClick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/220', '_blank'); return false;"><b>#220 (system_restore.sh)</b></a>.
+  </p>
+  <hr>
+  <p class="mb-2"><strong>Recommended interim strategy &mdash; hypervisor / VM snapshots.</strong> Take a snapshot of the entire Hermes host VM (Proxmox, VMware, KVM, AWS EBS, Azure Disk, etc.) with the VM either powered off or quiesced through your hypervisor's guest-tools integration. This is the only backup method we currently recommend for Docker installs &mdash; it captures every storage tier, the databases, and container state in a single consistent point-in-time image.</p>
+  <p class="mb-0"><strong>Do NOT use the legacy <code>/opt/hermes/scripts/system_backup.sh</code> and <code>system_restore.sh</code> scripts</strong> referenced in older bare-metal documentation. The restore script extracts the backup tarball relative to the host filesystem root and will overwrite host directories &mdash; safe on a legacy bare-metal install where the backup originated from that same layout, dangerous on a Docker host where it does not. Do not tar a running <code>/mnt/data</code>, <code>/mnt/vmail</code>, <code>/mnt/files</code>, or <code>/mnt/archive</code> while containers are writing to them.</p>
 </div>
     
 

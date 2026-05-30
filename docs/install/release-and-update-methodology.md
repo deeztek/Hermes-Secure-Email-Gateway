@@ -273,6 +273,10 @@ cd /opt/hermes-seg-docker-gl
 
 The orchestrator runs all 5 phases. Idempotent + re-runnable. Logs every step. Refuses to run if working tree is dirty.
 
+### Pre-upgrade: take a hypervisor snapshot
+
+Before running `system_update_docker.sh`, take a hypervisor / VM snapshot of the entire Hermes host (Proxmox, VMware, KVM, AWS EBS, Azure Disk, GCE, Hyper-V). If the upgrade fails partway through, reverting the snapshot is the only currently-supported rollback path — Docker-aware backup/restore tooling is in development at [#219](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/219) and [#220](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/220) and is not yet shipped. See [`docs/admin/01-system/backup-restore.md`](../admin/01-system/backup-restore.md) for the full interim-backup guidance.
+
 ### Post-upgrade: hard-refresh the browser (any release that bumps NCVERSION or admin/2 assets)
 
 After the orchestrator finishes, **operators must hard-refresh their browser** (Ctrl-Shift-R on Linux/Windows, Cmd-Shift-R on macOS) on any open Hermes admin tab or Nextcloud tab. The browser cache often serves the pre-upgrade CSS/JS bundle even though the server is now serving the new one, which presents as broken layouts — most visibly NC's top navbar collapsing to a vertical stack of icons when the NC 30 → 31 bundle swaps under it.
