@@ -2,19 +2,24 @@
 # ============================================================================
 # Hermes SEG Nextcloud integration check (#261)
 # ============================================================================
-# Pre-release sanity test for a Nextcloud version bump. Run this AFTER you
-# have manually updated NCVERSION in .env.template AND restarted the
-# hermes_nextcloud container (`docker compose pull hermes_nextcloud &&
-# docker compose up -d hermes_nextcloud`). The script does NOT mutate state
-# -- read-only occ queries + log scan only -- so it is safe to re-run.
+# Pre-release sanity test for a Nextcloud version bump. Run AFTER you have
+# bumped NCVERSION and restarted hermes_nextcloud. Read-only against the
+# running container (occ queries + log scan), with one safe write: it will
+# re-enable any Hermes-required NC app that's installed-but-disabled (see
+# Integration apps section). Safe to re-run.
 #
 # Workflow:
-#   1. Bump NCVERSION in .env.template
+#   1. Bump NCVERSION in BOTH .env (live config docker compose reads) AND
+#      .env.template (shipped default for fresh installs). The script
+#      reads .env preferentially and warns if .env.template lags behind.
 #   2. docker compose pull hermes_nextcloud
 #   3. docker compose up -d hermes_nextcloud
-#   4. Wait ~30s for NC to finish initialization on first start
-#   5. ./scripts/test_nc_integration.sh
-#   6. All PASS -> safe to cut a release that ships this NC bump.
+#   4. docker exec -u www-data hermes_nextcloud php /var/www/html/occ upgrade
+#      (NC sometimes auto-runs this, sometimes refuses requests until
+#      you run it explicitly -- explicit is safer.)
+#   5. Wait ~30s for NC to finish post-upgrade initialization
+#   6. ./scripts/test_nc_integration.sh
+#   7. All PASS -> safe to cut a release that ships this NC bump.
 #      Any FAIL -> investigate, fix the integration, re-run.
 #
 # Exit code: 0 if no FAIL, 1 if any FAIL. WARNs do not flip the exit code.
@@ -57,16 +62,39 @@ section() { printf "\n${BOLD}== %s ==${NC}\n" "$1"; }
 # ---- Helpers ----
 occ() { docker exec hermes_nextcloud php occ "$@" 2>&1; }
 
-# ---- Read expected version from .env.template ----
-EXPECTED_VERSION=$(grep -E '^NCVERSION=' "$HERMES_ROOT/.env.template" 2>/dev/null \
-    | cut -d= -f2 | tr -d '"' | tr -d "'" | tr -d '[:space:]')
+# ---- Read expected version ----
+# Prefer .env (live config docker compose reads at startup) over
+# .env.template (shipped default for fresh installs). docker compose
+# pull/up reads .env, so .env is the source of truth for what NC is
+# actually running. .env.template is checked separately further down
+# and a WARN fires if it lags behind -- that means fresh installs would
+# get the OLD version after this release ships.
+read_ncversion() {
+    grep -E '^NCVERSION=' "$1" 2>/dev/null \
+        | head -1 | cut -d= -f2 | tr -d '"' | tr -d "'" | tr -d '[:space:]'
+}
+
+ENV_FILE="$HERMES_ROOT/.env"
+TPL_FILE="$HERMES_ROOT/.env.template"
+
+if [[ -f "$ENV_FILE" ]]; then
+    EXPECTED_VERSION="$(read_ncversion "$ENV_FILE")"
+    EXPECTED_SOURCE=".env"
+elif [[ -f "$TPL_FILE" ]]; then
+    EXPECTED_VERSION="$(read_ncversion "$TPL_FILE")"
+    EXPECTED_SOURCE=".env.template (no .env present)"
+else
+    echo "ERROR: Neither .env nor .env.template found under $HERMES_ROOT" >&2
+    exit 1
+fi
+
 if [[ -z "$EXPECTED_VERSION" ]]; then
-    echo "ERROR: NCVERSION not found in $HERMES_ROOT/.env.template" >&2
+    echo "ERROR: NCVERSION not found in $EXPECTED_SOURCE" >&2
     exit 1
 fi
 
 printf "${BOLD}Hermes SEG Nextcloud integration check (#261)${NC}\n"
-printf "  Expected NCVERSION (from .env.template):  ${BOLD}%s${NC}\n" "$EXPECTED_VERSION"
+printf "  Expected NCVERSION (from %s):  ${BOLD}%s${NC}\n" "$EXPECTED_SOURCE" "$EXPECTED_VERSION"
 printf "  Reading live state from hermes_nextcloud container...\n"
 
 # ============================================================================
@@ -95,12 +123,25 @@ else
     [[ "$MAINTENANCE" == "false" ]] && pass "NC is NOT in maintenance mode" || fail "NC is in maintenance mode (maintenance=$MAINTENANCE)"
     [[ "$NEEDS_DB_UPGRADE" == "false" ]] && pass "NC does not need a DB upgrade" || fail "NC reports needsDbUpgrade=$NEEDS_DB_UPGRADE -- run occ upgrade first"
 
-    # Live version should start with the .env.template pin (NC reports
+    # Live version should start with the configured pin (NC reports
     # "30.0.15.1" sometimes -- the .4th component is internal).
     if [[ "$LIVE_VERSION" == "$EXPECTED_VERSION"* ]]; then
         pass "Live versionstring '$LIVE_VERSION' matches expected pin '$EXPECTED_VERSION'"
     else
         fail "Live versionstring '$LIVE_VERSION' does NOT match expected pin '$EXPECTED_VERSION'"
+    fi
+
+    # Cross-check .env vs .env.template: if .env has been bumped but
+    # .env.template lags behind, fresh installs would get the OLD NC
+    # version after this release ships. WARN so dev notices before
+    # cutting the release tag.
+    if [[ "$EXPECTED_SOURCE" == ".env" ]] && [[ -f "$TPL_FILE" ]]; then
+        TPL_VERSION="$(read_ncversion "$TPL_FILE")"
+        if [[ -n "$TPL_VERSION" ]] && [[ "$TPL_VERSION" != "$EXPECTED_VERSION" ]]; then
+            warn ".env.template NCVERSION='$TPL_VERSION' lags behind .env NCVERSION='$EXPECTED_VERSION'"
+            warn "  Fresh installs from this release would get NC '$TPL_VERSION', not '$EXPECTED_VERSION'."
+            warn "  Bump NCVERSION in .env.template before cutting the release tag."
+        fi
     fi
 fi
 
