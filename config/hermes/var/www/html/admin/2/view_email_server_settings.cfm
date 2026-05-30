@@ -71,6 +71,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/email_server_settings_action.cfm">
 </cfif>
 
+<!--- Console host for the local-admin URL in the maintenance card.
+     MUST be resolved BEFORE the m-code alert block below -- the m=62
+     alert references #consoleHostNc# (Maintenance mode enabled flash),
+     and was throwing "variable [CONSOLEHOSTNC] doesn't exist" because
+     the original init lived further down the file. --->
+<cfquery name="getConsoleHostNcMaint" datasource="hermes">
+    SELECT value2 FROM parameters2 WHERE module = 'console' AND parameter = 'host'
+</cfquery>
+<cfset consoleHostNc = "">
+<cfif getConsoleHostNcMaint.recordcount GTE 1>
+    <cfset consoleHostNc = getConsoleHostNcMaint.value2>
+</cfif>
+<cfif consoleHostNc EQ "" OR consoleHostNc EQ "smtp.domain.tld">
+    <cfset consoleHostNc = cgi.HTTP_HOST>
+</cfif>
+
 <!--- SUCCESS / ERROR MESSAGES --->
 <cfif m EQ 1>
   <div class="alert alert-success alert-dismissible">
@@ -115,20 +131,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- Nextcloud OIDC enabled-state (for the maintenance mode card). #262.
-     Sets ncOidcEnabled (boolean) and ncAdminUsername. --->
+     Sets ncOidcEnabled (boolean) and ncAdminUsername. consoleHostNc is
+     resolved earlier in the file (above the m-code alerts) so the m=62
+     flash can reference it. --->
 <cfinclude template="inc/get_nc_oidc_status.cfm">
-
-<!--- Console host for the local-admin URL in the maintenance card --->
-<cfquery name="getConsoleHostNcMaint" datasource="hermes">
-    SELECT value2 FROM parameters2 WHERE module = 'console' AND parameter = 'host'
-</cfquery>
-<cfset consoleHostNc = "">
-<cfif getConsoleHostNcMaint.recordcount GTE 1>
-    <cfset consoleHostNc = getConsoleHostNcMaint.value2>
-</cfif>
-<cfif consoleHostNc EQ "" OR consoleHostNc EQ "smtp.domain.tld">
-    <cfset consoleHostNc = cgi.HTTP_HOST>
-</cfif>
 
 <!--- LOAD CURRENT SETTINGS FROM DATABASE --->
 
