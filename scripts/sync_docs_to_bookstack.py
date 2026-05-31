@@ -188,7 +188,9 @@ def find_page(book_id=None, chapter_id=None, name=None):
                 return item["id"]
     return None
 
-def upsert_page(book_id, chapter_id, name, markdown, priority):
+def upsert_page(book_id, chapter_id, name, markdown, priority, src_path=None):
+    """Create or update a page. Records the (src_path -> page_id) mapping in
+    PAGE_REGISTRY for the link-rewriting pass."""
     if book_id == -1 or chapter_id == -1:
         if DRY_RUN:
             print(f"      [DRY] would upsert page: {name!r}")
@@ -203,19 +205,26 @@ def upsert_page(book_id, chapter_id, name, markdown, priority):
     if pid:
         if DRY_RUN:
             print(f"      [DRY] would update page: {name!r} (id={pid})")
-            return pid
-        api("PUT", f"/api/pages/{pid}", payload)
-        print(f"      updated:  {name!r} (id={pid})")
-        return pid
+        else:
+            api("PUT", f"/api/pages/{pid}", payload)
+            print(f"      updated:  {name!r} (id={pid})")
+    else:
+        if DRY_RUN:
+            print(f"      [DRY] would create page: {name!r}")
+            return -1
+        res = api("POST", "/api/pages", payload)
+        pid = res["id"]
+        print(f"      created:  {name!r} (id={pid})")
 
-    if DRY_RUN:
-        print(f"      [DRY] would create page: {name!r}")
-        return -1
-    res = api("POST", "/api/pages", payload)
-    print(f"      created:  {name!r} (id={res['id']})")
-    return res["id"]
+    if src_path is not None:
+        PAGE_REGISTRY[src_path.resolve()] = pid
+    return pid
 
 # --- Sync orchestrator ------------------------------------------------------
+
+# Populated during sync_book: source-file Path -> BookStack page id.
+# Used by the link-rewriting pass to map relative .md links to live URLs.
+PAGE_REGISTRY = {}
 
 def sync_book(spec):
     # Spec accepts either {source_root + chapters} OR {files} (explicit ordered list).
@@ -230,7 +239,7 @@ def sync_book(spec):
             if not md.is_file():
                 print(f"      SKIP: {md.relative_to(REPO_ROOT)} (file not found)")
                 continue
-            upsert_page(book_id, None, page_title(md), md.read_text(), priority=p_idx)
+            upsert_page(book_id, None, page_title(md), md.read_text(), priority=p_idx, src_path=md)
     elif spec.get("chapters"):
         for idx, (subdir, chapter_name) in enumerate(spec["chapters"]):
             chap_path = spec["source_root"] / subdir
@@ -240,11 +249,173 @@ def sync_book(spec):
             cid = find_or_create_chapter(book_id, chapter_name, priority=idx)
             md_files = sorted(chap_path.glob("*.md"))
             for p_idx, md in enumerate(md_files):
-                upsert_page(book_id, cid, page_title(md), md.read_text(), priority=p_idx)
+                upsert_page(book_id, cid, page_title(md), md.read_text(), priority=p_idx, src_path=md)
     else:
         md_files = sorted(spec["source_root"].glob("*.md"))
         for p_idx, md in enumerate(md_files):
-            upsert_page(book_id, None, page_title(md), md.read_text(), priority=p_idx)
+            upsert_page(book_id, None, page_title(md), md.read_text(), priority=p_idx, src_path=md)
+
+# --- Link rewriting (Pass 2) ------------------------------------------------
+
+GITHUB_REPO_URL = "https://github.com/deeztek/Hermes-Secure-Email-Gateway"
+GITHUB_BLOB_BASE = f"{GITHUB_REPO_URL}/blob/main"
+MD_LINK_RE = re.compile(r"(?<!\!)\[([^\]]+)\]\(([^)]+)\)")
+# (?<!\!) = negative lookbehind to skip image links (![alt](src))
+
+# Files tracked in git (computed once). Used to decide whether to rewrite an
+# in-repo target to a GitHub blob URL — only if the file is actually on
+# GitHub. Skips gitignored local-only files (e.g. v260119-release-notes-draft.md).
+import subprocess
+try:
+    _tracked = subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=REPO_ROOT, text=False
+    ).split(b"\0")
+    GIT_TRACKED = {(REPO_ROOT / p.decode()).resolve() for p in _tracked if p}
+except subprocess.CalledProcessError:
+    GIT_TRACKED = set()
+
+def resolve_relative_path(target, src_path):
+    """Resolve a markdown link's target against src_path's directory.
+
+    Returns the resolved absolute Path (which may or may not exist on disk),
+    or None if the target is absolute / anchor-only / cannot be resolved.
+    """
+    if not target or target.startswith(("#", "http://", "https://", "mailto:", "ftp://")):
+        return None
+    # Strip the fragment so relative resolution works on the path part.
+    path_part = target.split("#", 1)[0]
+    if not path_part:
+        return None
+    try:
+        return (src_path.parent / path_part).resolve()
+    except (OSError, RuntimeError):
+        return None
+
+def build_url_cache():
+    """Fetch BookStack page URLs by walking every book on shelf 202 once
+    (3 API calls regardless of page count). Returns {src_path: bookstack_url}
+    keyed off the page_id captured in PAGE_REGISTRY during sync.
+    BookStack page URLs are /books/<book>/page/<page> with NO chapter slug.
+    """
+    page_id_to_url = {}
+    shelf = api("GET", f"/api/shelves/{SHELF_ID}")
+    for book in shelf.get("books", []):
+        book_data = api("GET", f"/api/books/{book['id']}")
+        book_slug = book_data["slug"]
+        for item in book_data.get("contents", []):
+            if item["type"] == "page":
+                page_id_to_url[item["id"]] = f"{BASE_URL}/books/{book_slug}/page/{item['slug']}"
+            elif item["type"] == "chapter":
+                for p in item.get("pages", []):
+                    page_id_to_url[p["id"]] = f"{BASE_URL}/books/{book_slug}/page/{p['slug']}"
+
+    cache = {}
+    for src_path, pid in PAGE_REGISTRY.items():
+        if pid == -1:
+            continue
+        if pid in page_id_to_url:
+            cache[src_path] = page_id_to_url[pid]
+    return cache
+
+def rewrite_links_in_content(content, src_path, url_cache):
+    """Rewrite all relative markdown links in `content`.
+
+    - `.md` link in url_cache         → BookStack page URL (preserves #anchor)
+    - `.md` link to git-tracked repo  → GitHub blob URL (e.g. CLAUDE.md)
+    - other git-tracked repo file     → GitHub blob URL
+    - absolute / anchor / mailto      → leave alone
+    - missing or gitignored target    → leave alone (stays broken; flagged in stats)
+    """
+    stats = {"rewritten_md": 0, "rewritten_repo": 0, "rewritten_to_github_md": 0,
+             "broken": 0}
+
+    def repl(m):
+        text, target = m.group(1), m.group(2)
+        resolved = resolve_relative_path(target, src_path)
+        if resolved is None:
+            return m.group(0)
+
+        # Split off fragment for re-attachment after path rewrite.
+        fragment = ""
+        if "#" in target:
+            fragment = "#" + target.split("#", 1)[1]
+
+        if resolved.suffix == ".md":
+            if resolved in url_cache:
+                stats["rewritten_md"] += 1
+                return f"[{text}]({url_cache[resolved]}{fragment})"
+            # .md target NOT in synced set. If it's git-tracked, send to
+            # GitHub (where it'll render). Otherwise leave the broken link.
+            if resolved in GIT_TRACKED:
+                try:
+                    rel = resolved.relative_to(REPO_ROOT)
+                    stats["rewritten_to_github_md"] += 1
+                    return f"[{text}]({GITHUB_BLOB_BASE}/{rel}{fragment})"
+                except ValueError:
+                    pass
+            stats["broken"] += 1
+            return m.group(0)
+
+        # Non-.md repo file: rewrite to GitHub if git-tracked.
+        if resolved in GIT_TRACKED:
+            try:
+                rel = resolved.relative_to(REPO_ROOT)
+            except ValueError:
+                return m.group(0)
+            stats["rewritten_repo"] += 1
+            return f"[{text}]({GITHUB_BLOB_BASE}/{rel}{fragment})"
+
+        # Target exists but is gitignored, or doesn't exist at all.
+        stats["broken"] += 1
+        return m.group(0)
+
+    new_content = MD_LINK_RE.sub(repl, content)
+    return new_content, stats
+
+def rewrite_pass():
+    print("\n=== Pass 2: Rewriting cross-doc + repo-file links ===")
+    if not PAGE_REGISTRY:
+        print("  Nothing in PAGE_REGISTRY (likely DRY-RUN). Skipping.")
+        return
+
+    print(f"  Building URL cache for {len(PAGE_REGISTRY)} pages...")
+    url_cache = build_url_cache()
+    print(f"  URL cache: {len(url_cache)} pages resolved")
+
+    totals = {"rewritten_md": 0, "rewritten_repo": 0, "rewritten_to_github_md": 0,
+              "broken": 0, "pages_updated": 0, "pages_unchanged": 0}
+
+    for src_path, pid in PAGE_REGISTRY.items():
+        if pid == -1:
+            continue
+        original = src_path.read_text()
+        rewritten, stats = rewrite_links_in_content(original, src_path, url_cache)
+        rel = src_path.relative_to(REPO_ROOT)
+
+        if rewritten == original:
+            totals["pages_unchanged"] += 1
+            continue
+
+        msg = f"md→bs={stats['rewritten_md']} md→gh={stats['rewritten_to_github_md']} repo={stats['rewritten_repo']} broken={stats['broken']}"
+        if DRY_RUN:
+            print(f"  [DRY] {rel}: {msg}")
+        else:
+            api("PUT", f"/api/pages/{pid}", {
+                "name": page_title(src_path),
+                "markdown": rewritten,
+            })
+            print(f"  rewrote {rel}: {msg}")
+        totals["pages_updated"] += 1
+        for k in ("rewritten_md", "rewritten_repo", "rewritten_to_github_md", "broken"):
+            totals[k] += stats[k]
+
+    print(f"\n  Summary:")
+    print(f"    Pages updated:                  {totals['pages_updated']}")
+    print(f"    Pages unchanged:                {totals['pages_unchanged']}")
+    print(f"    .md links → BookStack:          {totals['rewritten_md']}")
+    print(f"    .md links → GitHub blob:        {totals['rewritten_to_github_md']}")
+    print(f"    Repo file links → GitHub blob:  {totals['rewritten_repo']}")
+    print(f"    Links left broken:              {totals['broken']}  (target missing or gitignored)")
 
 def main():
     print(f"BookStack: {BASE_URL}")
@@ -252,6 +423,7 @@ def main():
     print(f"Mode:      {'DRY-RUN (no writes)' if DRY_RUN else 'LIVE'}")
     for spec in BOOKS:
         sync_book(spec)
+    rewrite_pass()
     print("\nDone.")
 
 if __name__ == "__main__":
