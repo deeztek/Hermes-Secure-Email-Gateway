@@ -273,7 +273,7 @@ would be the wrong default.
 | Concern | Lives on |
 |---|---|
 | Mailbox creation | [Email Server > Mailboxes](../03-email-server/mailboxes.md) — separate table, separate LDAP group |
-| Relay-recipient creation | [Email Relay > Recipients](../02-email-relay/recipients.md) — separate table, separate LDAP group |
+| Relay-recipient creation | [Email Relay > Relay Recipients](../02-email-relay/relay-recipients.md) — separate table, separate LDAP group |
 | Per-user MFA enforcement (admin-policy flag) | The mailbox / relay-recipient detail pages set `enforce_mfa` for those user classes. System Users use `access_control` instead; if you set it to `two_factor`, Authelia challenges every login. There is no separate "encourage but don't require" middle state for admins — see [Authentication Settings § MFA enforcement is decoupled from the cn=two_factor LDAP group](authentication-settings.md#mfa-enforcement-is-decoupled-from-the-cntwo_factor-ldap-group-225). |
 | Password reset queue (admin processes user-initiated requests) | [Password Resets](password-resets.md) |
 | Authelia session length, brute-force throttle, Duo / OIDC | [Authentication Settings](authentication-settings.md) |

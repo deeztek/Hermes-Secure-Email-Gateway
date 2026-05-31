@@ -104,8 +104,6 @@ If outbound mail should route through Gmail / M365 / SendGrid / etc. instead of 
 
 Enter your serial number to unlock Pro features (organizational signatures, encrypted mail, ACME / Let's Encrypt automation, ARC sealing, etc.). Validation hits `validate.hermesseg.io` over HTTPS; the result is cached locally so Pro stays available during brief network outages.
 
-> See [License Validation flow in CLAUDE.md](../../CLAUDE.md#pro-edition-license-validation) for the detailed state machine.
-
 ### 7. Real TLS Certificate {#optional-tls-cert}
 
 **Page**: System → System Certificates

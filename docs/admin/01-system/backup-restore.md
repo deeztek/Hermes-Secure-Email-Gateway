@@ -72,7 +72,7 @@ Whatever interim strategy you adopt, **practice the restore at least once on a n
 
 A separate migration tool exists at [`scripts/migrate_legacy_to_docker.sh`](../../../scripts/migrate_legacy_to_docker.sh) for operators on a legacy bare-metal install who want to move to the Docker install. That tool consumes a backup produced by the legacy `system_backup.sh` (which is correct in the bare-metal context where it was made) and restores it into the Docker layout via a translation step — not the same as running the legacy restore script directly.
 
-That migration tool is itself early-stage; see the [Migrating from legacy](../../../v260119-release-notes-draft.md) section of the v260119 release notes for current scope and limitations.
+That migration tool is itself early-stage; see the [Migrating from legacy](https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases/tag/v260119) section of the v260119 release notes for current scope and limitations.
 
 ## What will land in #219 / #220
 

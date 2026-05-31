@@ -233,7 +233,7 @@ next request.
 | **Password reset flow UI** | [Password Resets](password-resets.md) — the reset page itself, CAPTCHA, rate limiting |
 | **System users / admins list** | [System Users](system-users.md) — managing accounts in `cn=admins`,`ou=users` |
 | **Fail2ban brute-force protection** | [Intrusion Prevention](intrusion-prevention.md) — the host-firewall layer in front of Authelia |
-| **Nextcloud OIDC auto-redirect toggle** | [Email Server Settings](../03-email-server/email-server-settings.md) — moved off this page; controls whether `/nc` silently SSOs the already-authenticated user |
+| **Nextcloud OIDC auto-redirect toggle** | [Email Server Settings](../03-email-server/settings.md) — moved off this page; controls whether `/nc` silently SSOs the already-authenticated user |
 
 ## MFA enforcement is decoupled from the `cn=two_factor` LDAP group (#225)
 
@@ -332,4 +332,4 @@ admin should not navigate away until the success banner appears.
 - [Console Settings](console-settings.md) — the console hostname change that triggers an Authelia template re-render
 - [Intrusion Prevention](intrusion-prevention.md) — the Fail2ban `authelia` jail that protects this surface at the firewall
 - [System Users](system-users.md) — admin accounts that live in `cn=admins`
-- [Email Server Settings](../03-email-server/email-server-settings.md) — the Nextcloud OIDC auto-redirect toggle that complements the OIDC client configured here
+- [Email Server Settings](../03-email-server/settings.md) — the Nextcloud OIDC auto-redirect toggle that complements the OIDC client configured here

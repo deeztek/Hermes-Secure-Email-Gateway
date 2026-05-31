@@ -52,8 +52,9 @@ itself.
 
 Amavis calls ClamAV over the local socket; the verdict
 determines whether Amavis quarantines, blocks, or passes the
-message. Amavis's own action policy lives in
-[Quarantine Settings](quarantine-settings.md) and the per-domain
+message. Amavis's own action policy (the `final_*_destiny`
+settings — quarantine vs DSN vs discard) lives in
+[Antispam Settings](antispam-settings.md) and the per-domain
 policy table, not on this page. This page is **engine knobs only**.
 
 ## Container and socket placement

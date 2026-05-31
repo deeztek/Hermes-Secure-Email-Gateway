@@ -86,7 +86,7 @@ Hermes already records the upstream DKIM verdict in `Authentication-Results:` be
 
 The narrower edge case &mdash; a recipient who forwards Hermes-banner'd mail to a downstream MX that **does** re-verify upstream DKIM &mdash; is addressed by [ARC sealing](../04-content-checks/arc-settings.md) (#229). Hermes' ARC seal at `:10026` records `cv=fail` for the upstream chain (because we modified the body), but the seal itself is mathematically valid and the downstream MX can trust Hermes' ARC verdict if Hermes is on its allowlist. See [ARC Settings](../04-content-checks/arc-settings.md) for the full discussion of the `cv=fail`-by-design pattern.
 
-> **Operational consequence.** Banner injection breaks the original sender's DKIM body hash and any upstream ARC body hash. **This is by design.** Hermes is the authoritative auth boundary for the domains it relays; customer downstream MX servers must allowlist Hermes and accept its delivered mail without re-running DKIM/SPF/DMARC/ARC. A downstream MX that re-verifies upstream auth on mail Hermes forwards is misconfigured &mdash; cross-ref [ARC Settings](../04-content-checks/arc-settings.md), [DKIM Settings](dkim-settings.md), and [DMARC Settings](dmarc-settings.md).
+> **Operational consequence.** Banner injection breaks the original sender's DKIM body hash and any upstream ARC body hash. **This is by design.** Hermes is the authoritative auth boundary for the domains it relays; customer downstream MX servers must allowlist Hermes and accept its delivered mail without re-running DKIM/SPF/DMARC/ARC. A downstream MX that re-verifies upstream auth on mail Hermes forwards is misconfigured &mdash; cross-ref [ARC Settings](../04-content-checks/arc-settings.md), [DKIM Settings](../04-content-checks/dkim-settings.md), and [DMARC Settings](../04-content-checks/dmarc-settings.md).
 
 ## Position: prepend vs append
 
@@ -225,6 +225,6 @@ The banner appears in the message body, so the easiest verification is to send a
 - [Disclaimers](disclaimers.md) &mdash; the outbound counterpart; same `hermes_body_milter` container, parallel design (sender-keyed instead of recipient-keyed)
 - [Organizational Signatures](organizational-signatures.md) &mdash; second outbound modifier in the same container, with per-recipient resolution
 - [ARC Settings](../04-content-checks/arc-settings.md) &mdash; full explanation of `cv=fail` after body modification and the Hermes-as-auth-boundary model
-- [DKIM Settings](dkim-settings.md), [DMARC Settings](dmarc-settings.md) &mdash; upstream-verdict context preserved in `Authentication-Results`
+- [DKIM Settings](../04-content-checks/dkim-settings.md), [DMARC Settings](../04-content-checks/dmarc-settings.md) &mdash; upstream-verdict context preserved in `Authentication-Results`
 - [Domains](../03-email-server/domains.md) &mdash; local mailbox-hosting domains drive the per-domain dropdown on `edit_external_banner.cfm`
 - [System Logs](../01-system/system-logs.md) &mdash; surface the body-milter log stream for troubleshooting

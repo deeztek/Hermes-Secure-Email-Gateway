@@ -347,6 +347,5 @@ The flow runs through `admin/2/inc/add_mailbox_action.cfm`. Most steps are ident
 
 ## Related documentation
 
-- [App passwords (admin)](02-app-passwords.md) — managing app passwords from the admin side
-- [Rotate NC internal password](03-rotate-nc-password.md) — the per-mailbox rotation action
 - [My App Passwords (user)](../../users/my-app-passwords.md) — what end users see and do
+- [Email Server > Mailboxes](../03-email-server/mailboxes.md) — the per-mailbox detail page is where an admin revokes a user's app passwords or rotates the per-mailbox Nextcloud internal password

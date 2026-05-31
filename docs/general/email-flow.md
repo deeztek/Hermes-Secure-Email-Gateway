@@ -5,8 +5,6 @@ paths inside the Docker stack. Includes every listening port, every container,
 the milter chain at each smtpd service, and where body modifications occur
 relative to DKIM signing.
 
-Companion to [`docs/handoff-#232-multi-instance-opendkim.md`](../handoff-#232-multi-instance-opendkim.md).
-
 ---
 
 ## Container + port map (at a glance)
