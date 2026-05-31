@@ -47,7 +47,7 @@ Hermes ships in two editions:
 | Edition | License | What you get |
 |---|---|---|
 | **Community** | [AGPL v3](https://www.gnu.org/licenses/agpl.html) &mdash; free, open source | The entire mail gateway and email server stack. All core security, encryption, mailbox hosting, and administration features. |
-| **Pro** | Commercial &mdash; see [EULA](https://docs.hermesseg.io/books/hermes-secure-email-gateway-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). |
+| **Pro** | Commercial &mdash; see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). |
 
 A Pro license is purchased separately. Community Edition needs no license file and works fully without one.
 
@@ -301,7 +301,13 @@ Each release's change log lives on its [GitHub Release page](https://github.com/
 
 ### Online documentation
 
-Operator documentation is published to BookStack at the URL announced in each release. The source markdown lives under [`docs/admin/`](docs/admin/) in this repo and is synced to BookStack at every release-cut (see [#259](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/259)).
+Operator and end-user documentation is published at **[docs.deeztek.com/shelves/hermes-seg-docker](https://docs.deeztek.com/shelves/hermes-seg-docker)**, organized into:
+
+- [Installation & Reference](https://docs.deeztek.com/books/installation-reference) &mdash; Get Started, Release & Update Methodology, Storage Topology, Email Flow
+- [Administrator Guide](https://docs.deeztek.com/books/administrator-guide) &mdash; full reference for system administrators (60 pages across 7 chapters)
+- [User Guide](https://docs.deeztek.com/books/user-guide) &mdash; end-user portal documentation (11 pages)
+
+The source markdown lives under [`docs/`](docs/) in this repo and is synced to BookStack at every release-cut via [`scripts/sync_docs_to_bookstack.py`](scripts/sync_docs_to_bookstack.py) (tracking: [#259](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/259)).
 
 ## Support
 
@@ -320,6 +326,6 @@ Bugs and feature requests go on GitHub Issues:
 
 Hermes Secure Email Gateway Community Edition is free software licensed under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl.html).
 
-Hermes Secure Email Gateway Pro Edition is **not** free software. It is covered by the [Hermes Secure Email Gateway Pro End-User License Agreement](https://docs.hermesseg.io/books/hermes-secure-email-gateway-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula).
+Hermes Secure Email Gateway Pro Edition is **not** free software. It is covered by the [Hermes Secure Email Gateway Pro End-User License Agreement](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula).
 
 Copyright Dionyssios Edwards 2011&ndash;2026. All Rights Reserved.

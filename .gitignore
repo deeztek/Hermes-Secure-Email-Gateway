@@ -293,3 +293,8 @@ manifest/
 
 # Diagnostic output from manifest generation (set -x trace; not a build artifact)
 manifest_output.txt
+
+# ===========================================
+# Bookstack API
+# ===========================================
+docs/.env-bookstack
