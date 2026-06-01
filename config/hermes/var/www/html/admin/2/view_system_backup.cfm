@@ -144,16 +144,98 @@ id="btn-back-to-top"
     
     
 
+<!--- ===========================================================================
+     CLI-ONLY by design. Backup/restore is a long-running, infrequent,
+     SSH-native operation. Wrapping it in a web UI buys nothing (web UI
+     adds brittleness: page-reload kills progress, websocket timeouts,
+     race conditions) and costs significant dev time on something
+     sysadmins are already doing from a shell. This page is a read-only
+     INFO surface -- discover the tool, see what's on disk, click out
+     to the docs. No buttons, no actions.
+=========================================================================== --->
+
+<!--- Discover backups on disk. Default discovery path is /mnt/backups
+     because that's the convention the scripts document. If the operator
+     uses a different -P path, those backups won't appear here -- the
+     page's job is discoverability for newcomers, not authoritative
+     inventory. --->
+<cfset backupDiscoveryPath = "/mnt/backups">
+<cfset backupFiles = []>
+<cfif directoryExists(backupDiscoveryPath)>
+    <cftry>
+        <cfdirectory action="list" directory="#backupDiscoveryPath#" name="qBackups" filter="hermes-backup-*.tar" sort="dateLastModified DESC">
+        <cfloop query="qBackups">
+            <cfset arrayAppend(backupFiles, {
+                "name": qBackups.name,
+                "size": qBackups.size,
+                "modified": qBackups.dateLastModified
+            })>
+        </cfloop>
+        <cfcatch type="any"></cfcatch>
+    </cftry>
+</cfif>
+
+<div class="alert alert-info" role="alert">
+  <h5 class="alert-heading"><i class="fas fa-terminal"></i> Backup &amp; Restore is CLI-only</h5>
+  <p class="mb-0">Run backups and restores by SSH'ing into the Docker host and invoking the scripts below. This page is read-only &mdash; there is no launch button by design. See the <a href="#" onClick="window.open('https://docs.deeztek.com/books/administrator-guide/page/backup-restore', '_blank'); return false;"><b>full Backup &amp; Restore documentation</b></a> for the disaster-recovery flow, hot-backup alternatives, and what NOT to do.</p>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><strong>Backup &mdash; cold mode, full-stack snapshot</strong></div>
+  <div class="card-body">
+    <p>Stops the stack, dumps all six databases, tars all five storage tiers (Config / Data / Archive / Vmail / Nextcloud), emits a manifest with SHA256 per archive, and restarts the stack. Plan around your mail-flow tolerances &mdash; the stack is offline for 5&ndash;15 minutes (longer for large vmail/nextcloud installs).</p>
+    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups</code></pre>
+    <p class="mb-0 text-muted small">Add <code>--yes</code> to skip the interactive confirmation prompt (useful for cron / Ofelia). Add <code>--dry-run</code> to preview without stopping anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header"><strong>Restore &mdash; cold mode, replaces all current data</strong></div>
+  <div class="card-body">
+    <p>Verifies the backup manifest (SHA256 per archive) BEFORE any destructive action, refuses to restore on storage-topology mismatch unless <code>FORCE_REMAP=1</code> is set, stops the stack, restores all six databases, rsyncs each tier from staging to its mount path with <code>--delete</code>, and restarts the stack. The current install's data is <strong>completely replaced</strong>.</p>
+    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre>
+    <p class="mb-0 text-muted small">If restoring onto a host with a different storage topology (different DATA_MOUNT etc.), prefix with <code>FORCE_REMAP=1</code>. Run <code>system_restore.sh --help</code> for full usage.</p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-header">
+    <strong>Backups discovered at <code><cfoutput>#backupDiscoveryPath#</cfoutput></code></strong>
+    <span class="text-muted small">&mdash; read-only inventory; the canonical location is wherever you point <code>-P</code></span>
+  </div>
+  <div class="card-body p-0">
+    <cfif NOT directoryExists(backupDiscoveryPath)>
+      <p class="m-3 text-muted">Directory <code><cfoutput>#backupDiscoveryPath#</cfoutput></code> does not exist on the Docker host. Create it (e.g., <code>sudo mkdir /mnt/backups</code>) and run a backup, or point your backup script's <code>-P</code> flag at a different path &mdash; that path won't be auto-discovered here, but the backups will be created and restorable.</p>
+    <cfelseif arrayLen(backupFiles) EQ 0>
+      <p class="m-3 text-muted">No <code>hermes-backup-*.tar</code> files found at <code><cfoutput>#backupDiscoveryPath#</cfoutput></code>. Run the backup command above to create one.</p>
+    <cfelse>
+      <table class="table table-striped table-hover mb-0">
+        <thead>
+          <tr>
+            <th>Filename</th>
+            <th class="text-end">Size</th>
+            <th>Last modified</th>
+          </tr>
+        </thead>
+        <tbody>
+          <cfoutput>
+            <cfloop array="#backupFiles#" index="b">
+              <tr>
+                <td><code>#b.name#</code></td>
+                <td class="text-end">#numberFormat(b.size / 1048576, "0.0")# MB</td>
+                <td>#dateFormat(b.modified, "yyyy-mm-dd")# #timeFormat(b.modified, "HH:mm:ss")#</td>
+              </tr>
+            </cfloop>
+          </cfoutput>
+        </tbody>
+      </table>
+    </cfif>
+  </div>
+</div>
+
 <div class="alert alert-warning" role="alert">
-  <h5 class="alert-heading"><i class="fas fa-tools"></i> Backup &amp; Restore &mdash; Coming Soon</h5>
-  <p>First-class Docker-aware backup/restore tooling is in development. It is <strong>not yet shipped</strong> in this release. Progress is tracked at
-    <a href="#" onClick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/219', '_blank'); return false;"><b>#219 (system_backup.sh)</b></a>
-    and
-    <a href="#" onClick="window.open('https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/220', '_blank'); return false;"><b>#220 (system_restore.sh)</b></a>.
-  </p>
-  <hr>
-  <p class="mb-2"><strong>Recommended interim strategy &mdash; hypervisor / VM snapshots.</strong> Take a snapshot of the entire Hermes host VM (Proxmox, VMware, KVM, AWS EBS, Azure Disk, etc.) with the VM either powered off or quiesced through your hypervisor's guest-tools integration. This is the only backup method we currently recommend for Docker installs &mdash; it captures every storage tier, the databases, and container state in a single consistent point-in-time image.</p>
-  <p class="mb-0"><strong>Do NOT use the legacy <code>/opt/hermes/scripts/system_backup.sh</code> and <code>system_restore.sh</code> scripts</strong> referenced in older bare-metal documentation. The restore script extracts the backup tarball relative to the host filesystem root and will overwrite host directories &mdash; safe on a legacy bare-metal install where the backup originated from that same layout, dangerous on a Docker host where it does not. Do not tar a running <code>/mnt/data</code>, <code>/mnt/vmail</code>, <code>/mnt/files</code>, or <code>/mnt/archive</code> while containers are writing to them.</p>
+  <h6 class="alert-heading"><i class="fas fa-exclamation-triangle"></i> Do NOT use the legacy bare-metal CLI scripts</h6>
+  <p class="mb-0">The pre-Docker <code>config/hermes/opt/hermes/scripts/system_backup.sh</code> and <code>system_restore.sh</code> scripts must NOT be run on a Docker host. The legacy restore extracts the backup tarball relative to the host filesystem root and will overwrite system directories &mdash; safe on the bare-metal install it was written for, destructive on Docker. Use only the Docker-aware scripts under <code>scripts/</code> as shown above.</p>
 </div>
     
 
