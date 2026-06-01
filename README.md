@@ -20,7 +20,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/deeztek/Hermes-Secure-Email-Gateway?label=release&color=ee6c2b"></a>
+  <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases"><img alt="Latest pre-release" src="https://img.shields.io/github/v/release/deeztek/Hermes-Secure-Email-Gateway?include_prereleases&label=pre-release&color=ee6c2b"></a>
   <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/deeztek/Hermes-Secure-Email-Gateway?style=social"></a>
   <a href="https://www.gnu.org/licenses/agpl-3.0.html"><img alt="License: AGPL v3" src="https://img.shields.io/badge/license-AGPLv3-blue.svg"></a>
   <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/deeztek/Hermes-Secure-Email-Gateway?color=586069"></a>
