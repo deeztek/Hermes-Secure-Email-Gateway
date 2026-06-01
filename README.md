@@ -4,7 +4,7 @@
   </a>
 </p>
 
-<h1 align="center">Hermes Secure Email Gateway</h1>
+<h1 align="center">Hermes Secure Email Gateway and Email Server</h1>
 
 <p align="center">
   <strong>Self-hosted email security, mail server, and Nextcloud — one stack.</strong><br>
