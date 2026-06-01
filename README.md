@@ -1,44 +1,90 @@
-<h1 align="center"> Hermes Secure Email Gateway and Email Server</h1> <br>
 <p align="center">
   <a href="https://www.hermesseg.io">
-    <img alt="Hermes Secure Email Gateway" title="Hermes Secure Email Gateway" src="https://imgur.com/Qfzv1iZ.png" width="auto">
+    <img alt="Hermes SEG logo" title="Hermes Secure Email Gateway" src="docs/images/hermes-logo-mark.png" width="120">
   </a>
 </p>
 
+<h1 align="center">Hermes Secure Email Gateway</h1>
+
 <p align="center">
-  Open Source Secure Email Gateway and Email Server &mdash; Docker Edition
+  <strong>Self-hosted email security, mail server, and Nextcloud — one stack.</strong><br>
+  Open-source SEG + Dovecot 2.4 mail server + Nextcloud + Authelia SSO, deployed as one Docker Compose file.
 </p>
 
-## Table of Contents
+<p align="center">
+  <a href="https://www.hermesseg.io/features/">Features</a> &middot;
+  <a href="https://www.hermesseg.io/pro/">Pro</a> &middot;
+  <a href="https://www.hermesseg.io/pricing/">Pricing</a> &middot;
+  <a href="https://docs.deeztek.com/shelves/hermes-seg-docker">Docs</a> &middot;
+  <a href="https://www.hermesseg.io/support/">Support</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases"><img alt="Latest release" src="https://img.shields.io/github/v/release/deeztek/Hermes-Secure-Email-Gateway?label=release&color=ee6c2b"></a>
+  <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/deeztek/Hermes-Secure-Email-Gateway?style=social"></a>
+  <a href="https://www.gnu.org/licenses/agpl-3.0.html"><img alt="License: AGPL v3" src="https://img.shields.io/badge/license-AGPLv3-blue.svg"></a>
+  <a href="https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/deeztek/Hermes-Secure-Email-Gateway?color=586069"></a>
+  <a href="https://matrix.to/#/#hermesseg:matrix.org"><img alt="Matrix" src="https://img.shields.io/badge/matrix-%23hermesseg%3Amatrix.org-0DBD8B?logo=matrix&logoColor=white"></a>
+  <a href="https://t.me/HermesSEG"><img alt="Telegram" src="https://img.shields.io/badge/telegram-HermesSEG-26A5E4?logo=telegram&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <em>
+    Deployable as a gateway in front of Microsoft 365 / Google Workspace / Exchange,
+    as a full mail server with built-in mailboxes, or in hybrid mode.
+  </em>
+</p>
+
+<!--
+  Screenshots row. Add these PNGs under docs/images/screenshots/ in the repo,
+  or replace the src URLs with absolute hermesseg.io / imgur URLs if you prefer
+  to keep binaries out of git history.
+-->
+<p align="center">
+  <img alt="Admin Dashboard" src="docs/images/screenshots/dashboard.png" width="32%">
+  &nbsp;
+  <img alt="Message History" src="docs/images/screenshots/message-history.png" width="32%">
+  &nbsp;
+  <img alt="Organizational Signatures" src="docs/images/screenshots/organizational-signatures.png" width="32%">
+</p>
+
+---
+
+## Table of contents
 
 - [About](#about)
 - [Editions](#editions)
 - [Features](#features)
 - [Architecture](#architecture)
-- [Storage Topology](#storage-topology)
+- [Storage topology](#storage-topology)
 - [Requirements](#requirements)
 - [Installation](#installation)
 - [Updating](#updating)
 - [Configuration](#configuration)
-- [Recovery and Maintenance Tools](#recovery-and-maintenance-tools)
+- [Recovery and maintenance tools](#recovery-and-maintenance-tools)
 - [Documentation](#documentation)
 - [Support](#support)
-- [Bugs](#bugs)
 - [License](#license)
+
+---
 
 ## About
 
-Hermes Secure Email Gateway is a Free Open Source Secure Email Gateway **and** Email Server. It provides Spam, Virus, and Malware protection through Apache SpamAssassin, ClamAV, and Amavisd-new; full in-transit and at-rest email encryption via SMTP TLS, S/MIME, PGP, encrypted PDF, and Dovecot mail-crypt (powered by CipherMail); email archiving; integrated mailbox hosting on Dovecot with per-user quotas, aliases, shared folders, Sieve rules, vacation auto-reply, and mobile device autoconfiguration; file sync, webmail, calendars (CalDAV), and contacts (CardDAV) through Nextcloud; a local user directory and single sign-on via OpenLDAP and Authelia &mdash; with multifactor authentication via TOTP, WebAuthn, and Duo Push; and modern email authentication standards including SPF, DKIM signing and verification, DMARC, and ARC through OpenDKIM, OpenDMARC, and OpenARC.
+Hermes Secure Email Gateway is a Free Open Source Secure Email Gateway **and** Email Server.
 
-Hermes combines these Open Source technologies under one unified web-based administration console for easy management of your organization's inbound and outbound email, mailbox users, encryption keys, and authentication policies. End users get a self-service portal for managing their own signatures, sieve rules, vacation messages, app passwords, and mobile device profiles.
+It provides spam, virus, and malware protection through Apache SpamAssassin, ClamAV, and Amavisd-new; full in-transit and at-rest email encryption via SMTP TLS, S/MIME, PGP, encrypted PDF, and Dovecot mail-crypt (powered by CipherMail); email archiving; integrated mailbox hosting on Dovecot with per-user quotas, aliases, shared folders, Sieve rules, vacation auto-reply, and mobile-device autoconfiguration; file sync, webmail, calendars (CalDAV), and contacts (CardDAV) through Nextcloud; a local user directory and single sign-on via OpenLDAP and Authelia &mdash; with multi-factor authentication via TOTP, WebAuthn, and Duo Push; and modern email authentication standards including SPF, DKIM signing and verification, DMARC, and ARC through OpenDKIM, OpenDMARC, and OpenARC.
+
+Hermes combines these Open Source technologies under one unified web-based administration console for easy management of your organization's inbound and outbound email, mailbox users, encryption keys, and authentication policies. End users get a self-service portal for managing their own signatures, sieve rules, vacation messages, app passwords, and mobile-device profiles.
 
 Hermes can be deployed three ways:
 
-- **As a gateway** in front of an existing mail solution (in-house Exchange/Postfix, Google Workspace, Microsoft 365). Hermes scans, filters, encrypts, and relays mail to your backend.
+- **As a gateway** in front of an existing mail solution (in-house Exchange / Postfix, Google Workspace, Microsoft 365). Hermes scans, filters, encrypts, and relays mail to your backend.
 - **As a full mail server** with built-in mailbox hosting, webmail, file sync, calendars, and contacts. No external mail backend required.
 - **As a hybrid** &mdash; gateway for some domains AND mail server for others on the same install. Relay (gateway) domains and mailbox (mail server) domains coexist in a single Hermes deployment.
 
 This Docker Edition packages the entire stack as a set of containers managed by Docker Compose, replacing the legacy bare-metal Ubuntu installer with a portable, reproducible deployment.
+
+> **Looking for a managed version?** Hermes is self-hosted by design. If you want to support development and get vendor support, see [Pro pricing](https://www.hermesseg.io/pricing/) &mdash; per-server licensing, no per-mailbox fees.
 
 ## Editions
 
@@ -47,41 +93,43 @@ Hermes ships in two editions:
 | Edition | License | What you get |
 |---|---|---|
 | **Community** | [AGPL v3](https://www.gnu.org/licenses/agpl.html) &mdash; free, open source | The entire mail gateway and email server stack. All core security, encryption, mailbox hosting, and administration features. |
-| **Pro** | Commercial &mdash; see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). |
+| **Pro** | Commercial &mdash; see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). [Pricing &rarr;](https://www.hermesseg.io/pricing/) |
 
 A Pro license is purchased separately. Community Edition needs no license file and works fully without one.
 
 ## Features
 
-### Mail Security (Community)
+A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/) for the full feature page with screenshots.
+
+### Mail security (Community)
 
 - Spam protection (Apache SpamAssassin, postscreen, RBL configuration, sender/recipient/network block-allow lists, global sender filters)
 - Anti-virus protection (ClamAV via Amavisd-new, with built-in feeds: ClamAV official + URLhaus)
-- Malware Feeds management (managed via Fangfrisch) &mdash; configure additional 3rd-party signature feeds including SaneSecurity, MalwarePatrol, SecuriteInfo, TwinWave, ClamPunch, RFXN, InterServer, Ditekshen, and more
-- Per-recipient Spam/Virus/File policies
+- Malware feeds management (managed via Fangfrisch) &mdash; configure additional 3rd-party signature feeds including SaneSecurity, MalwarePatrol, SecuriteInfo, TwinWave, ClamPunch, RFXN, InterServer, Ditekshen, and more
+- Per-recipient spam/virus/file policies
 - Custom message rules, score overrides, custom file expressions/extensions/rules
-- Quarantine, message history search, queue management, train as spam/ham, release to recipient, download messages
+- Quarantine, message-history search, queue management, train as spam/ham, release to recipient, download messages
 - ARC (Authenticated Received Chain) integration via OpenARC
 - Multi-instance OpenDKIM for differential outbound-sign vs inbound-verify behavior
 
-### Encryption and Authentication (Community)
+### Encryption and authentication (Community)
 
 - In-transit email encryption: SMTP TLS, S/MIME, PGP (via CipherMail)
 - At-rest encryption: Dovecot mail crypt
 - Encrypted PDF email for recipients without S/MIME or PGP
-- Multifactor authentication (Authelia): TOTP, WebAuthn, Duo Push
+- Multi-factor authentication (Authelia): TOTP, WebAuthn, Duo Push
 - Local LDAP user store (built-in OpenLDAP) for admins, mailbox users, and relay users
-- App passwords for SMTP/IMAP/DAV clients (separate from main account password)
+- App passwords for SMTP / IMAP / DAV clients (separate from main account password)
 - 3rd-party SSL certificate support
 - haveibeenpwned password check integration
 
-### Email Standards (Community)
+### Email standards (Community)
 
 - SPF check, DKIM check + sign, DMARC verification (OpenDMARC)
 - DKIM key generation and management (UI)
 - DMARC report aggregation and reporting
 
-### Email Server / Mailbox Hosting (Community)
+### Email server / mailbox hosting (Community)
 
 - Local mailbox hosting (Dovecot 2.4) with IMAPS / POP3S / Submission (587/465) / LMTP
 - Per-domain and per-mailbox quotas
@@ -91,9 +139,9 @@ A Pro license is purchased separately. Community Edition needs no license file a
 - Vacation auto-reply with date scoping and per-address filtering
 - Mobile device autoconfiguration via signed `.mobileconfig` profiles (iOS) and CalDAV/CardDAV autodiscovery
 - Personal email signatures (rich HTML, with template gallery)
-- External Sender Banner (inbound mail from outside-the-org gets a visual banner)
+- External Sender Banner (inbound mail from outside the org gets a visual banner)
 
-### Nextcloud Integration (Community)
+### Nextcloud integration (Community)
 
 - File sync (Nextcloud Files)
 - Webmail (Nextcloud Mail)
@@ -101,31 +149,36 @@ A Pro license is purchased separately. Community Edition needs no license file a
 - Single sign-on via Authelia OIDC
 - Pre-provisioning of Nextcloud user accounts on first login
 
-### Admin and User Experience (Community)
+### Admin and user experience (Community)
 
 - Modern AdminLTE 4 / Bootstrap 5 administrator console
 - User self-service portal (per-mailbox)
-- Real-time dashboard with system resource monitoring
+- Real-time dashboard with system-resource monitoring
 - Message statistics with visual charts
 - Scheduled tasks UI (DB-backed Ofelia job management)
 - Searchable system event logs
 - Internal CA management (S/MIME)
 - DNS resolver (Unbound, local-recursive)
 - Console host and domain management
-- Console firewall settings UI
 
-### Pro Features
+### Pro features
 
-Pro Edition adds the following capabilities on top of everything in Community:
+Pro Edition adds the following capabilities on top of everything in Community. [Full Pro feature page &rarr;](https://www.hermesseg.io/pro/)
 
 | Pro Feature | What it does |
 |---|---|
-| **Let's Encrypt (ACME) Automation** | Automated issuance and renewal of free Let's Encrypt SSL certificates for the console and per-domain. Community Edition can still request and use Let's Encrypt certificates, but the issuance and renewal automation is Pro-only. |
-| **Email Disclaimers** | Per-domain outbound disclaimer templates, applied at the milter level. Form-based template renderer with reusable templates. |
-| **Organizational Signatures** | Centrally-managed per-domain employee signature templates with placeholder substitution (employee name, title, phone, email, department, organization info). Renders on every outbound message. Community Edition has Personal Signatures (per-user, free-form) only. |
+| **Let's Encrypt (ACME) automation** | Automated issuance and renewal of free Let's Encrypt SSL certificates for the console and per-domain. Community Edition can still request and use Let's Encrypt certificates, but the issuance and renewal automation is Pro-only. |
+| **Email disclaimers** | Per-domain outbound disclaimer templates, applied at the milter level. Form-based template renderer with reusable templates. |
+| **Organizational signatures** | Centrally-managed per-domain employee signature templates with placeholder substitution (employee name, title, phone, email, department, organization info). Renders on every outbound message. Community Edition has Personal Signatures (per-user, free-form) only. |
 | **Intrusion Prevention (IPS)** | Web UI for managing Fail2ban jails, ban thresholds, ban duration, whitelists. Real-time view of active bans. |
-| **Console Firewall** | Web UI for managing the host firewall protecting the admin console (port allowlisting, source IP restriction). |
+| **Console firewall** | Web UI for managing the host firewall protecting the admin console (port allowlisting, source-IP restriction). |
 | **LDAP RemoteAuth** | Per-domain pass-through authentication to one or more external LDAP servers (including Microsoft Active Directory). End users authenticate against your existing directory; Hermes provisions mailboxes on first successful login. Supports STARTTLS and LDAPS. |
+
+<p align="center">
+  <a href="https://www.hermesseg.io/pricing/">
+    <img alt="Get Pro" src="https://img.shields.io/badge/Get%20Hermes%20Pro-%24750%2Fyr-ee6c2b?style=for-the-badge">
+  </a>
+</p>
 
 ## Architecture
 
@@ -140,11 +193,11 @@ Hermes SEG Docker Edition runs as **18 containers** orchestrated by Docker Compo
 | `hermes_authelia` | SSO portal with MFA (TOTP / WebAuthn / Duo Push) |
 | `hermes_authelia_redis` | Session store for Authelia |
 | `hermes_commandbox` | CFML application server (Lucee) &mdash; hosts admin console + user portal |
-| `hermes_postfix_dkim` | Postfix MTA + OpenDKIM signer/verifier |
+| `hermes_postfix_dkim` | Postfix MTA + OpenDKIM signer / verifier |
 | `hermes_dmarc` | OpenDMARC verifier + report aggregator |
-| `hermes_openarc` | OpenARC chain signer/verifier |
+| `hermes_openarc` | OpenARC chain signer / verifier |
 | `hermes_mail_filter` | Amavisd-new + SpamAssassin + ClamAV content filter |
-| `hermes_body_milter` | Outbound body modification milter (signatures, disclaimers, banners) |
+| `hermes_body_milter` | Outbound body-modification milter (signatures, disclaimers, banners) |
 | `hermes_ciphermail` | S/MIME, PGP, encrypted-PDF encryption gateway |
 | `hermes_fail2ban` | Brute-force prevention (Dovecot, Authelia jails) |
 | `hermes_dovecot` | IMAP / POP3 / Submission / LMTP / Sieve server |
@@ -152,38 +205,39 @@ Hermes SEG Docker Edition runs as **18 containers** orchestrated by Docker Compo
 | `hermes_nextcloud` | File sync, webmail, CalDAV, CardDAV |
 | `hermes_nextcloud_redis` | Cache + locking backend for Nextcloud |
 
-## Storage Topology
+## Storage topology
 
-Hermes splits storage across **four independent tiers** so each can live on the right type of disk for its workload:
+Hermes splits storage across **five independent tiers** so each can live on the right type of disk for its workload:
 
 | Tier | Default path | Contents | Storage profile |
 |---|---|---|---|
-| **Config** | install root (implicit) | Repo working tree, generated config, secrets, `.env` | Fast SSD; chosen by where the repo lives |
-| **Data** | `/mnt/data` | Databases, all service logs, quarantine, OpenDMARC reports, mail queue | Fast SSD; sized for DB growth and log retention |
+| **Config** | install root (implicit) | Repo working tree, generated config, secrets, `.env` | Fast SSD; sized by repo location |
+| **Data** | `/mnt/data` | Databases, service logs, mail-filter state, Postfix queue | Fast SSD; sized for DB growth and log retention. **High write rate, backup-critical.** |
+| **Archive** | `/mnt/archive` | Amavis quarantine archive | Cheap bulk; sized for retention policy &times; quarantine inflow. Grows unboundedly, cold access. |
 | **Vmail** | `/mnt/vmail` | Dovecot mailboxes | Cheap bulk; sized for users &times; quota |
 | **Nextcloud** | `/mnt/files` | Nextcloud app + user files + Redis cache | Cheap bulk; sized for user file storage |
 
-Smaller deployments can collapse tiers &mdash; set Vmail and Nextcloud to the same path as Data, or leave any tier on the default Docker named volume. The installer prompts for each path during phase 1.
+Smaller deployments can collapse tiers &mdash; point Archive, Vmail, and Nextcloud at the same path as Data for a single-disk install. The installer prompts for each path; all four operator-selected mount points are mandatory (empty values risk relative path resolution during compose substitution).
 
-See [`docs/install/storage-topology.md`](docs/install/storage-topology.md) for the canonical reference covering all four tiers, sub-directory layout, and the install flow.
+See the canonical reference at [docs.deeztek.com &middot; Storage Topology (5 tiers)](https://docs.deeztek.com/books/installation-reference/page/storage-topology-5-tiers) or [`docs/install/storage-topology.md`](docs/install/storage-topology.md) in the repo.
 
 ## Requirements
 
 | Item | Recommendation |
 |---|---|
-| OS | **Ubuntu 24.04 Server** (tested). Other modern Linux distributions with Docker support should work but are not officially tested. |
+| Host OS | Any Linux distribution capable of running Docker Engine 24.0+ and Compose v2. **Tested reference: Ubuntu 24.04 Server.** |
 | Docker | Engine 24.0+ |
 | Docker Compose | v2 |
-| CPU | 4 cores minimum, more for higher mail volume |
-| RAM | 4 GB minimum, 8 GB+ recommended for production |
-| Disk | 50 GB minimum for the install root and Data tier on the primary disk |
-| Network | Static IP or DHCP reservation; outbound 80/443 reachable for image pulls; inbound 25/80/443/465/587/993/995 as needed |
+| CPU | 4 vCPUs minimum, more for higher mail volume |
+| RAM | 8 GB minimum, 16 GB+ recommended for production |
+| Disk | **275 GB** minimum (thin provisioning enabled), more depending on mail volume and archive retention |
+| Network | Static IP or DHCP reservation. See [docs](https://www.hermesseg.io/download/) for the full inbound + outbound port list (anti-spam services need TCP/2703, UDP/6277, TCP/24441, etc.) |
 
 ### Optional but recommended
 
-A separate physical or virtual disk for the **Data** tier (databases, logs, quarantine) is **not strictly required** but is **highly recommended** for performance reasons. Database write patterns and log churn benefit from being isolated from the OS disk. The same applies to the Vmail and Nextcloud tiers if you expect significant mailbox or file storage growth &mdash; commodity bulk storage works well for these.
+A separate physical or virtual disk for the **Data** tier (databases, logs, mail-filter state, Postfix queue) is **not strictly required** but **highly recommended** for performance. Database write patterns and log churn benefit from being isolated from the OS disk. The same applies to the Archive, Vmail, and Nextcloud tiers if you expect significant quarantine, mailbox, or file-storage growth &mdash; commodity bulk storage works well for these.
 
-If you don't want to use a secondary drive for any tier, simply create the directory on your primary disk (e.g., `mkdir /mnt/data`) and point the installer at it.
+If you don't want to use a secondary drive for any tier, simply create the directory on your primary disk (e.g., `mkdir /mnt/data /mnt/archive /mnt/vmail /mnt/files`) and point the installer at it.
 
 ## Installation
 
@@ -206,13 +260,13 @@ The installer runs the full install in a single session and takes 10&ndash;30 mi
 
 The installer will:
 
-1. Display the Pro EULA and ask for acceptance (Community Edition users can accept; the EULA only takes effect if a Pro license is later activated)
-2. Prompt for mail server hostname (FQDN), console address, host IP, upstream DNS forwarders, and the three storage mount paths
-3. Generate all secrets and per-service config files (LDAP secrets, DB passwords, Authelia session keys, OIDC keypair, self-signed bootstrap cert, etc.)
-4. Render `docker-compose.override.yml` to bind the tier paths into the right containers
-5. Run `docker compose up -d --build` to pull images and start the stack
-6. Initialize all databases (Hermes, Authelia, Nextcloud, OpenDMARC, CipherMail, Syslog), populate the LDAP base structure, create the initial admin user, and pre-provision the Nextcloud admin
-7. Print an installation summary with the admin console URL and one-time admin credentials
+1. Display the Pro EULA and ask for acceptance (Community Edition users can accept; the EULA only takes effect if a Pro license is later activated).
+2. Prompt for mail-server hostname (FQDN), console address, host IP, upstream DNS forwarders, and the four storage mount paths (Data, Archive, Vmail, Nextcloud).
+3. Generate all secrets and per-service config files (LDAP secrets, DB passwords, Authelia session keys, OIDC keypair, self-signed bootstrap cert, etc.).
+4. Render `docker-compose.override.yml` to bind the tier paths into the right containers.
+5. Run `docker compose up -d --build` to pull images and start the stack.
+6. Initialize all databases (Hermes, Authelia, Nextcloud, OpenDMARC, CipherMail, Syslog), populate the LDAP base structure, create the initial admin user, and pre-provision the Nextcloud admin.
+7. Print an installation summary with the admin console URL and one-time admin credentials.
 
 ### 3. Access the consoles
 
@@ -258,7 +312,7 @@ sudo ./scripts/system_update_docker.sh --dry-run
 | `--yes` | Skip the interactive confirmation prompt |
 | `--help` | Show full usage |
 
-For the full release and update methodology &mdash; including how artifacts are organized, idempotency rules, and the orchestrator's five-phase pipeline &mdash; see [`docs/install/release-and-update-methodology.md`](docs/install/release-and-update-methodology.md).
+For the full release-and-update methodology &mdash; including how artifacts are organized, idempotency rules, and the orchestrator's five-phase pipeline &mdash; see [`docs/install/release-and-update-methodology.md`](docs/install/release-and-update-methodology.md).
 
 ## Configuration
 
@@ -272,7 +326,7 @@ After the installer completes, the admin will be guided through first-run config
 
 Detailed configuration walkthroughs &mdash; including SPF/DKIM/DMARC setup, mailbox provisioning, relay vs. mail-server modes, and the encryption gateway &mdash; live in the [Documentation](#documentation) section.
 
-## Recovery and Maintenance Tools
+## Recovery and maintenance tools
 
 The install script also provides a set of recovery and maintenance flags:
 
@@ -293,7 +347,7 @@ Run any of the above with `--help` for full usage. The installer is **idempotent
 ### In-repo documentation
 
 - [`docs/install/release-and-update-methodology.md`](docs/install/release-and-update-methodology.md) &mdash; canonical reference for how Hermes is released, distributed, and upgraded
-- [`docs/install/storage-topology.md`](docs/install/storage-topology.md) &mdash; the four-tier storage model
+- [`docs/install/storage-topology.md`](docs/install/storage-topology.md) &mdash; the five-tier storage model (Config / Data / Archive / Vmail / Nextcloud)
 
 ### Per-release change log
 
@@ -307,25 +361,23 @@ Operator and end-user documentation is published at **[docs.deeztek.com/shelves/
 - [Administrator Guide](https://docs.deeztek.com/books/administrator-guide) &mdash; full reference for system administrators (60 pages across 7 chapters)
 - [User Guide](https://docs.deeztek.com/books/user-guide) &mdash; end-user portal documentation (11 pages)
 
-The source markdown lives under [`docs/`](docs/) in this repo and is synced to BookStack at every release-cut via [`scripts/sync_docs_to_bookstack.py`](scripts/sync_docs_to_bookstack.py) (tracking: [#259](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/259)).
-
 ## Support
 
-Post your questions at:
-[github.com/deeztek/Hermes-Secure-Email-Gateway/discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions)
+| Channel | Use it for |
+|---|---|
+| [GitHub Discussions](https://github.com/deeztek/Hermes-Secure-Email-Gateway/discussions) | Long-form Q&A, "how do I…", configuration help. Searchable. |
+| [Matrix `#hermesseg:matrix.org`](https://matrix.to/#/#hermesseg:matrix.org) | Real-time community chat. |
+| [Telegram `HermesSEG`](https://t.me/HermesSEG) | Same audience as Matrix, different client. |
+| [GitHub Issues](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues) | Bugs and feature requests. |
+| [helpdesk.deeztek.com](https://helpdesk.deeztek.com) | Paid support tickets (Pro license holders). |
+| [hermesseg.io/support](https://www.hermesseg.io/support/) | All support options in one place + [Support Terms & Conditions](https://www.hermesseg.io/support-terms-conditions/). |
 
-Chat with us on Matrix:
-[matrix.to/#/#hermesseg:matrix.org](https://matrix.to/#/#hermesseg:matrix.org)
-
-## Bugs
-
-Bugs and feature requests go on GitHub Issues:
-[github.com/deeztek/Hermes-Secure-Email-Gateway/issues](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues)
+**Stay updated**: subscribe to release notes and security advisories at [hermesseg.io](https://www.hermesseg.io/) (newsletter signup in the footer).
 
 ## License
 
-Hermes Secure Email Gateway Community Edition is free software licensed under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl.html).
+Hermes Secure Email Gateway **Community Edition** is free software licensed under the [GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl.html).
 
-Hermes Secure Email Gateway Pro Edition is **not** free software. It is covered by the [Hermes Secure Email Gateway Pro End-User License Agreement](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula).
+Hermes Secure Email Gateway **Pro Edition** is **not** free software. It is covered by the [Hermes Secure Email Gateway Pro End-User License Agreement](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula).
 
 Copyright Dionyssios Edwards 2011&ndash;2026. All Rights Reserved.
