@@ -598,8 +598,15 @@ preflight() {
         command -v docker >/dev/null 2>&1 || fatal "docker not in PATH"
         docker compose version >/dev/null 2>&1 || fatal "docker compose v2 not available"
     fi
-    [[ -d "$BACKUP_PATH" ]] || fatal "Backup path does not exist: ${BACKUP_PATH}"
-    [[ -w "$BACKUP_PATH" ]] || fatal "Backup path is not writable: ${BACKUP_PATH}"
+    if [[ ! -d "$BACKUP_PATH" ]]; then
+        error "Backup path does not exist: ${BACKUP_PATH}"
+        error "The script does NOT auto-create the backup directory -- this is"
+        error "deliberate, to catch typos in -P before writing GBs to the wrong place."
+        error "Create it first, then re-run:"
+        error "  sudo mkdir -p ${BACKUP_PATH}"
+        fatal "Aborting."
+    fi
+    [[ -w "$BACKUP_PATH" ]] || fatal "Backup path exists but is not writable by root: ${BACKUP_PATH}"
     load_mounts
     read_build_no
 
@@ -714,11 +721,23 @@ test_notify_and_exit() {
     log "Target: ${NOTIFY_EMAIL}"
     log "Sending [TEST] [SUCCESS] sample..."
     send_notification TEST_SUCCESS
+    # 5s gap between the two test sends. Two messages with same From/To and
+    # similar bodies submitted within microseconds of each other can trip
+    # short-window content-hash dedup at a smarthost or receiving MX. The
+    # gap defeats burst-style dedup; longer-window dedup may still collapse
+    # them. If only one of the pair arrives, look at the smarthost's mail
+    # log for "discarded as duplicate" or similar.
+    log "Pausing 5s before second test (avoids burst-dedup at smarthost / MX)..."
+    sleep 5
     log "Sending [TEST] [FAILURE] sample..."
     send_notification TEST_FAILURE
     log ""
     log "Two test messages dispatched to ${NOTIFY_EMAIL}."
     log "Check your inbox (and ops alerting if any) to confirm both arrived."
+    log "If only one arrived: your smarthost or receiving MX is likely deduplicating"
+    log "near-identical messages. Check that mailserver's log for discard / dedup"
+    log "events. Real backup notifications (which send only one message) are not"
+    log "affected by this."
     log "If neither arrived: verify hermes_postfix_dkim is running and check"
     log "${LOG_FILE} for sendmail errors."
     exit 0
