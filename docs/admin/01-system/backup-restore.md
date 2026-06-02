@@ -103,9 +103,59 @@ A typical cadence:
 | Weekly | `vmail` (or `archive` or `nextcloud`, rotated) | Larger but slower-changing. |
 | Monthly | `all` | Full disaster-recovery snapshot. |
 
-The script's exit code reflects success (0) or failure (non-zero) — pipe into your existing alerting (Nagios, Zabbix, healthchecks.io, etc.) however you already wire host cron failures.
+The script's exit code reflects success (0) or failure (non-zero). For built-in email alerting, use the `--notify-email=ADDR` flag (see below). For "Hermes is so dead it can't even tell you" cases, see [External monitoring](#external-monitoring-strongly-recommended).
 
-> **Why host cron and not Ofelia?** Ofelia runs as a container (`hermes_ofelia`). Its job model (`job-exec` into a named container, `job-local` on the Ofelia container itself) doesn't fit `system_backup.sh` cleanly — the script needs host-level `docker compose` access, root, and write access to `/mnt/backups`. Ofelia's image lacks `docker compose` plugin and root host access. Native Ofelia integration is deferred to Phase B; the existing **System > Scheduled Tasks** admin page lists Ofelia jobs but does NOT support adding new ones from the UI today.
+> **Why host cron and not Ofelia?** Ofelia runs as a container (`hermes_ofelia`). Its job model (`job-exec` into a named container, `job-local` on the Ofelia container itself) doesn't fit `system_backup.sh` cleanly — the script needs host-level `docker compose` access, root, and write access to `/mnt/backups`. Ofelia's image lacks `docker compose` plugin and root host access. Native Ofelia integration is deliberately NOT on the roadmap; the existing **System > Scheduled Tasks** admin page lists Ofelia jobs but does NOT support adding new ones from the UI today.
+
+### Failure / success email alerting
+
+Use `--notify-email=ADDR` to receive an email on backup completion. By default emails on **failure only** (the "noisy on failure, silent on success" pattern most operators want). Add `--notify-on-success` to also email on success — useful for "daily I-am-alive confirmation" use cases.
+
+```bash
+# Email on failure only (typical)
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes \
+  --notify-email=admin@example.com
+
+# Email on both failure AND success
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all --yes \
+  --notify-email=admin@example.com --notify-on-success
+```
+
+Subject lines are bracketed for easy scanning in a mail client:
+
+- Success: `[SUCCESS] Hermes backup on <hostname> (scope=<scope>)`
+- Failure: `[FAILURE] Hermes backup on <hostname> (scope=<scope>)`
+
+Failure bodies include the timestamp, scope, mode, reason, log file path, and the last 50 lines of the log. Success bodies include the timestamp, scope, mode, output filename, file size, and run duration.
+
+**How it works**: the script shells out to `docker exec -i hermes_postfix_dkim sendmail -t` and pipes the message into the Postfix container's `sendmail` binary. Postfix queues and delivers it like any other outbound mail from Hermes. No host MTA configuration is needed — Hermes's own Postfix does the work.
+
+**Caveat — needs Hermes to be at least partially healthy**: if the failure cause is "the Postfix container is down" or "the Docker daemon is down", `docker exec` has nothing to talk to and the email won't go out. The script logs the failure-to-notify as a warning and exits with the original non-zero status, but you won't get the email. This is the gap external monitoring fills — see below.
+
+### External monitoring (strongly recommended)
+
+Built-in email alerting covers the "backup ran but something went wrong" case (the 99% case). It does NOT cover "Hermes itself is so broken it can't send any email at all" — Docker daemon crashed, host out of disk, container restart loop, network partition, etc. For that, you need an external monitoring tool that lives off the Hermes host and tells YOU when Hermes goes dark.
+
+**Strongly recommended for every production install.** Common choices:
+
+| Tool | Pattern | Best for |
+|---|---|---|
+| **[Zabbix](https://www.zabbix.com/)** | Agent on the Hermes host reports up/down, disk, container health, custom metrics | Self-hosted, comprehensive; common in business / mid-size deployments |
+| **[Nagios / Icinga](https://www.nagios.org/)** | NRPE plugin or similar | Self-hosted, classic; many existing operator setups already have it |
+| **[healthchecks.io](https://healthchecks.io/)** | Cron pings a URL on success; if the ping doesn't arrive on schedule, healthchecks alerts you | Dead simple; free tier; cron-native pattern |
+| **[Uptime Kuma](https://github.com/louislam/uptime-kuma)** | Self-hosted ping monitor with web UI | Free, self-hosted alternative to healthchecks.io |
+| **PRTG / Datadog / New Relic / etc.** | Commercial monitoring | If you already have one, integrate Hermes alongside your other infrastructure |
+
+The healthchecks.io pattern works nicely alongside cron-based backups:
+
+```cron
+# Pings healthchecks.io on success only (curl wraps the backup; ping is the URL of your check)
+0 3 * * *  root  /opt/.../system_backup.sh -P /mnt/backups -B system --yes \
+                 --notify-email=admin@example.com \
+                 && curl -fsS --retry 3 https://hc-ping.com/<your-uuid> >/dev/null
+```
+
+If the backup fails, the `--notify-email` sends the failure email (assuming Postfix is up). If the backup succeeds, healthchecks.io gets the ping. If the WHOLE HOST is down (no ping, no email), healthchecks.io alerts you after the scheduled interval. Three-layer coverage with minimal moving parts.
 
 ### Off-site copy
 

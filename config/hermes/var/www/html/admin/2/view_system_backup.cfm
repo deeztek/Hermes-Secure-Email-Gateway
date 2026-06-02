@@ -178,8 +178,9 @@ id="btn-back-to-top"
     </ul>
     <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
 sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B vmail
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all  --yes</code></pre>
-    <p class="mb-0 text-muted small">Add <code>--cold</code> for legal-hold / forensic snapshots that need absolute byte-level consistency at the cost of full-stack downtime. Add <code>--dry-run</code> to preview without changing anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all  --yes \
+  --notify-email=admin@example.com   # email subject prefixed [SUCCESS] / [FAILURE]</code></pre>
+    <p class="mb-0 text-muted small">Add <code>--notify-email=ADDR</code> for failure email (subject prefixed <code>[SUCCESS]</code> or <code>[FAILURE]</code>; delivered via Hermes's own Postfix container). Add <code>--notify-on-success</code> to also email on success. Add <code>--cold</code> for legal-hold / forensic snapshots that need absolute byte-level consistency at the cost of full-stack downtime. Add <code>--dry-run</code> to preview without changing anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
   </div>
 </div>
 

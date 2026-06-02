@@ -77,14 +77,93 @@ NC=$'\033[0m'
 log()   { printf '%s[%s]%s %s\n' "$GREEN" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
 warn()  { printf '%s[%s] WARN:%s %s\n' "$YELLOW" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
 error() { printf '%s[%s] ERROR:%s %s\n' "$RED" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE" >&2; }
-fatal() { error "$@"; cleanup_on_fatal; exit 1; }
+fatal() { error "$@"; cleanup_on_fatal; send_notification FAILURE "$*"; exit 1; }
 header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
+
+# ---- Notifications --------------------------------------------------------
+# Sends a status email via the hermes_postfix_dkim container's sendmail.
+# Subject is prefixed with [SUCCESS] or [FAILURE] -- the bracketed prefix is
+# greppable in a mail client and visually unmissable. Body includes the run
+# context + the tail of the log file.
+#
+# Caveats:
+# - Requires hermes_postfix_dkim to be running. If the failure cause is "the
+#   postfix container is down", the email won't go out -- catch that case
+#   with external monitoring (Zabbix, healthchecks.io, etc.) instead.
+# - sendmail-injected mail bypasses most of Postfix's smtpd_*_restrictions
+#   (no network-receive checks), so the From: address can be anything
+#   Postfix accepts as local; we use postmaster@<hostname>.
+send_notification() {
+    local status="$1"   # SUCCESS or FAILURE
+    local detail="${2:-}"
+
+    [[ -z "$NOTIFY_EMAIL" ]] && return 0
+    [[ "$status" == "SUCCESS" ]] && (( ! NOTIFY_ON_SUCCESS )) && return 0
+    (( DRY_RUN )) && { log "[dry-run] would send ${status} notification to ${NOTIFY_EMAIL}"; return 0; }
+
+    local host subject from log_tail body
+    host="$(hostname -f 2>/dev/null || hostname)"
+    subject="[${status}] Hermes backup on ${host} (scope=${SCOPE:-?})"
+    from="postmaster@${host}"
+    log_tail="$(tail -50 "$LOG_FILE" 2>/dev/null || echo '(log unavailable)')"
+
+    if [[ "$status" == "FAILURE" ]]; then
+        body="The Hermes backup at $(date) FAILED.
+
+Host:        ${host}
+Scope:       ${SCOPE:-?}
+Mode:        $((( COLD_MODE )) && echo cold || echo hot)
+Reason:      ${detail}
+Log file:    ${LOG_FILE}
+
+Last 50 lines of log:
+${log_tail}
+
+---
+This message was sent by scripts/system_backup.sh on the Hermes Docker host.
+Investigate the log file above for the full failure context."
+    else
+        local sz="(unknown)"
+        [[ -n "${FINAL_TAR:-}" && -f "${FINAL_TAR}" ]] && \
+            sz="$(stat -c%s "$FINAL_TAR" | numfmt --to=iec --suffix=B 2>/dev/null || stat -c%s "$FINAL_TAR")"
+        body="The Hermes backup at $(date) succeeded.
+
+Host:        ${host}
+Scope:       ${SCOPE:-?}
+Mode:        $((( COLD_MODE )) && echo cold || echo hot)
+Output:      ${FINAL_TAR:-?}
+Size:        ${sz}
+Duration:    ${SECONDS}s
+Log file:    ${LOG_FILE}
+
+---
+This message was sent by scripts/system_backup.sh on the Hermes Docker host.
+You're receiving this because --notify-on-success was set."
+    fi
+
+    # Compose the SMTP message and pipe to sendmail inside the postfix
+    # container. If hermes_postfix_dkim is down, this fails silently --
+    # external monitoring is the safety net for that case.
+    {
+        printf 'From: %s\n' "$from"
+        printf 'To: %s\n' "$NOTIFY_EMAIL"
+        printf 'Subject: %s\n' "$subject"
+        printf 'Auto-Submitted: auto-generated\n'
+        printf 'Content-Type: text/plain; charset=utf-8\n'
+        printf '\n'
+        printf '%s\n' "$body"
+    } | docker exec -i hermes_postfix_dkim sendmail -t 2>>"$LOG_FILE" \
+        && log "Notification sent to ${NOTIFY_EMAIL} ([${status}])" \
+        || warn "Failed to send ${status} notification to ${NOTIFY_EMAIL} (is hermes_postfix_dkim up?). Check ${LOG_FILE}."
+}
 
 # ---- Args ----
 BACKUP_PATH=""
 SCOPE=""
 COLD_MODE=0
 NO_NC_MAINTENANCE=0
+NOTIFY_EMAIL=""
+NOTIFY_ON_SUCCESS=0
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
@@ -120,6 +199,29 @@ Mode:
                  during the file tar. Without it, file uploads happening
                  mid-tar may be missed by the backup.
 
+Notifications:
+  --notify-email=ADDR
+                 Send an email when the backup completes. By default
+                 emails on FAILURE only ("noisy on failure, silent on
+                 success"). Subject is prefixed with [SUCCESS] or
+                 [FAILURE] so it's easy to spot in a mail client.
+                 Delivered via 'docker exec -i hermes_postfix_dkim
+                 sendmail -t' (uses the Postfix MTA Hermes already
+                 runs; no host MTA configuration needed).
+
+                 IMPORTANT: this only works if Hermes itself is healthy
+                 enough to send mail. For the "Hermes is so dead it
+                 can't tell you" case, ALSO use an external monitoring
+                 tool (Zabbix, Nagios, healthchecks.io, etc.) -- see
+                 the Notifications section of the Backup & Restore
+                 documentation for details.
+
+  --notify-on-success
+                 Also email on successful completion (not just on
+                 failure). Most operators want failure-only; this is
+                 opt-in for the "daily I-am-alive confirmation" use
+                 case.
+
 Options:
   --yes          Skip the interactive confirmation prompt.
   --dry-run      Show what would be done without changing anything.
@@ -130,6 +232,10 @@ Examples:
   sudo $(basename "$0") -P /mnt/backups -B vmail
   sudo $(basename "$0") -P /mnt/backups -B all --yes
   sudo $(basename "$0") -P /mnt/backups -B all --cold     # forensic snapshot
+  sudo $(basename "$0") -P /mnt/backups -B system --yes \\
+       --notify-email=admin@example.com                   # email on failure
+  sudo $(basename "$0") -P /mnt/backups -B all --yes \\
+       --notify-email=admin@example.com --notify-on-success   # both
 
 Output filename:
   <path>/hermes-backup-<scope>-<build_no>-<UTC-timestamp>.tar
@@ -152,6 +258,9 @@ while [[ $# -gt 0 ]]; do
         -B)                   SCOPE="$2"; shift 2 ;;
         --cold)               COLD_MODE=1; shift ;;
         --no-nc-maintenance)  NO_NC_MAINTENANCE=1; shift ;;
+        --notify-email=*)     NOTIFY_EMAIL="${1#--notify-email=}"; shift ;;
+        --notify-email)       NOTIFY_EMAIL="$2"; shift 2 ;;
+        --notify-on-success)  NOTIFY_ON_SUCCESS=1; shift ;;
         --yes|-y)             ASSUME_YES=1; shift ;;
         --dry-run|-n)         DRY_RUN=1; shift ;;
         --help|-h)            SHOW_HELP=1; shift ;;
@@ -550,6 +659,7 @@ main() {
     assemble_outer
     restart_stack_if_cold
     report
+    send_notification SUCCESS
 }
 
 main "$@"
