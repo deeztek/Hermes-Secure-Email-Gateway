@@ -1,29 +1,45 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Hermes SEG Docker -- cold-mode system backup (#219 Phase A)
+# Hermes SEG Docker -- system backup (#219 Phase A)
 # ============================================================================
-# Stops the stack, dumps all six databases, tars all five storage tiers
-# (Config / Data / Archive / Vmail / Nextcloud), writes a manifest with
-# SHA256 per archive, atomically renames the .partial output to its final
-# name, then restarts the stack.
+# Backs up Hermes's databases, LDAP directory, configs, and storage tiers
+# WITHOUT downtime by default. Uses application-native hot-backup primitives
+# (mariadb-dump --single-transaction, slapcat, atomic-rename mail formats).
 #
-# COLD mode only -- the stack is down for the duration of the backup
-# (5-15 minutes for small sites; longer for large vmail/nextcloud installs).
-# Hot mode + scoped backups + retention pruning + Ofelia scheduling land in
-# the Phase B refactor.
+# Scopes (-B):
+#   system    -- Config + Data + 6 DB dumps + LDAP slapcat (nightly default)
+#   archive   -- Archive tier only (Amavis quarantine)
+#   vmail     -- Vmail tier only (Dovecot mailboxes)
+#   nextcloud -- Nextcloud tier only (NC files; uses occ maintenance:mode)
+#   all       -- Everything
 #
-# Output layout:
-#   <-P>/hermes-backup-<build_no>-<timestamp>.tar
+# Modes:
+#   HOT (default)  -- Zero application downtime. Used for daily backups.
+#   COLD (--cold)  -- Full stack stop. Used for forensic / legal-hold
+#                     backups where absolute byte-level consistency is
+#                     required and the operator can afford downtime.
+#
+# Hot-backup safety per component:
+#   MariaDB     -- mariadb-dump --single-transaction (InnoDB MVCC)
+#   OpenLDAP    -- slapcat (live LDIF export; safe with no locks)
+#   Dovecot     -- maildir/sdbox atomic-rename writes; safe for live tar
+#   Amavis      -- quarantine atomic-rename writes; safe for live tar
+#   Postfix     -- queue atomic-rename writes; safe for live tar
+#   Nextcloud   -- occ maintenance:mode --on briefly (NC web UI only; mail
+#                  flow unaffected); skip via --no-nc-maintenance
+#   Logs        -- append-only; last few lines may be torn (cosmetic)
+#   MariaDB / LDAP / ClamAV raw files -- excluded from data tier tar
+#                  (dumps + slapcat are the authoritative restore source;
+#                  ClamAV signatures are regenerable)
+#
+# Output:
+#   <-P>/hermes-backup-<scope>-<build_no>-<UTC-ts>.tar
 #       backup_manifest.json
-#       databases.tar.gz          (6 .sql files: hermes, authelia, ...)
-#       config.tar.gz             (the install root, MINUS the data tiers)
-#       data.tar.gz, archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz
-#
-# The outer .tar is uncompressed (each tier is already .tar.gz inside).
-# Operators can `tar -xf` it once to inspect the manifest before restore.
-#
-# Required: run as root, all containers in a known state (running or
-# fully stopped -- not partially up). Run via cron/Ofelia or by hand.
+#       databases.tar.gz   (6 .sql; system/all only)
+#       ldap.ldif.gz       (slapcat output; system/all only)
+#       config.tar.gz      (install root MINUS data tiers; system/all)
+#       data.tar.gz        (Data tier MINUS mysql/ ldap/ clamav/; system/all)
+#       archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz  (relevant tiers)
 #
 # Tracking: #219
 # ============================================================================
@@ -58,7 +74,6 @@ RED=$'\033[0;31m'
 CYAN=$'\033[0;36m'
 NC=$'\033[0m'
 
-# ---- Logging helpers ----
 log()   { printf '%s[%s]%s %s\n' "$GREEN" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
 warn()  { printf '%s[%s] WARN:%s %s\n' "$YELLOW" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
 error() { printf '%s[%s] ERROR:%s %s\n' "$RED" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE" >&2; }
@@ -67,74 +82,123 @@ header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
 
 # ---- Args ----
 BACKUP_PATH=""
+SCOPE=""
+COLD_MODE=0
+NO_NC_MAINTENANCE=0
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") -P <path> [--yes] [--dry-run] [--help]
+Usage: $(basename "$0") -P <path> -B <scope> [--cold] [--no-nc-maintenance]
+                       [--yes] [--dry-run] [--help]
 
-Hermes SEG Docker cold-mode system backup (#219 Phase A).
+Hermes SEG Docker system backup (#219 Phase A).
 
 Required:
-  -P <path>      Output directory for the backup tarball. Must already
-                 exist and be writable. The tarball will be created as
-                 <path>/hermes-backup-<build_no>-<timestamp>.tar.
+  -P <path>      Output directory for the backup tarball. Must exist and
+                 be writable.
+  -B <scope>     What to back up. One of:
+                   system    -- Config + Data + 6 DB dumps + LDAP slapcat.
+                                Nightly default. Small + fast.
+                   archive   -- Archive tier only (Amavis quarantine).
+                   vmail     -- Vmail tier only (Dovecot mailboxes).
+                   nextcloud -- Nextcloud tier only (NC files).
+                   all       -- Everything (every tier + dumps + slapcat).
+
+Mode:
+  --cold         Stop the stack for the duration of the backup. Use for
+                 legal hold / forensic snapshots where absolute byte-
+                 level consistency matters more than uptime. Default is
+                 HOT mode (zero application downtime; uses application-
+                 native hot-backup primitives -- safe for daily use).
+
+  --no-nc-maintenance
+                 Skip the brief 'occ maintenance:mode --on' that hot-mode
+                 nextcloud / all backups use to pause NC user writes
+                 during the file tar. Without it, file uploads happening
+                 mid-tar may be missed by the backup.
 
 Options:
   --yes          Skip the interactive confirmation prompt.
-  --dry-run      Show what would be done without stopping anything or
-                 writing any files.
+  --dry-run      Show what would be done without changing anything.
   --help         Show this help.
 
 Examples:
-  sudo $(basename "$0") -P /mnt/backups
-  sudo $(basename "$0") -P /mnt/backups --yes
+  sudo $(basename "$0") -P /mnt/backups -B system --yes
+  sudo $(basename "$0") -P /mnt/backups -B vmail
+  sudo $(basename "$0") -P /mnt/backups -B all --yes
+  sudo $(basename "$0") -P /mnt/backups -B all --cold     # forensic snapshot
 
-The stack is stopped for the duration of the backup. Plan around your
-mail-flow tolerances. For hot-mode backups, use hypervisor snapshots
-until #219 Phase B ships.
+Output filename:
+  <path>/hermes-backup-<scope>-<build_no>-<UTC-timestamp>.tar
 
-Output layout (inside the outer .tar):
-  backup_manifest.json                   (versions, topology, SHA256 sums)
-  databases.tar.gz                       (hermes, authelia, nextcloud,
-                                          djigzo, opendmarc, Syslog)
-  config.tar.gz                          (install root MINUS data tiers)
-  data.tar.gz, archive.tar.gz,
-  vmail.tar.gz, nextcloud.tar.gz         (five storage tiers)
+Inner archives (only the ones relevant to the chosen scope):
+  backup_manifest.json   (scope, mode, topology, SHA256 sums)
+  databases.tar.gz       (6 .sql files; system/all only)
+  ldap.ldif.gz           (slapcat output; system/all only)
+  config.tar.gz          (install root MINUS data tiers; system/all only)
+  data.tar.gz            (Data tier MINUS mysql/ ldap/ clamav/; system/all)
+  archive.tar.gz         (Archive tier; archive/all only)
+  vmail.tar.gz           (Vmail tier; vmail/all only)
+  nextcloud.tar.gz       (Nextcloud tier; nextcloud/all only)
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -P)             BACKUP_PATH="$2"; shift 2 ;;
-        --yes|-y)       ASSUME_YES=1; shift ;;
-        --dry-run|-n)   DRY_RUN=1; shift ;;
-        --help|-h)      SHOW_HELP=1; shift ;;
-        *)              error "Unknown argument: $1"; usage; exit 1 ;;
+        -P)                   BACKUP_PATH="$2"; shift 2 ;;
+        -B)                   SCOPE="$2"; shift 2 ;;
+        --cold)               COLD_MODE=1; shift ;;
+        --no-nc-maintenance)  NO_NC_MAINTENANCE=1; shift ;;
+        --yes|-y)             ASSUME_YES=1; shift ;;
+        --dry-run|-n)         DRY_RUN=1; shift ;;
+        --help|-h)            SHOW_HELP=1; shift ;;
+        *)                    error "Unknown argument: $1"; usage; exit 1 ;;
     esac
 done
 
 if (( SHOW_HELP )); then usage; exit 0; fi
 if [[ -z "$BACKUP_PATH" ]]; then error "Required flag -P missing."; usage; exit 1; fi
+if [[ -z "$SCOPE" ]]; then error "Required flag -B missing."; usage; exit 1; fi
+case "$SCOPE" in
+    system|archive|vmail|nextcloud|all) ;;
+    *) error "Invalid -B scope '${SCOPE}'. Must be one of: system, archive, vmail, nextcloud, all."; exit 1 ;;
+esac
 if [[ $EUID -ne 0 ]] && (( ! DRY_RUN )); then fatal "Must run as root (live mode)."; fi
+
+# ---- Scope helpers --------------------------------------------------------
+scope_needs_dbs() { [[ "$SCOPE" == "system" || "$SCOPE" == "all" ]]; }
+scope_includes_tier() {
+    local t="$1"
+    case "$SCOPE" in
+        all)       return 0 ;;
+        system)    [[ "$t" == "config" || "$t" == "data" ]] ;;
+        archive)   [[ "$t" == "archive" ]] ;;
+        vmail)     [[ "$t" == "vmail" ]] ;;
+        nextcloud) [[ "$t" == "nextcloud" ]] ;;
+    esac
+}
+scope_touches_nextcloud() { [[ "$SCOPE" == "nextcloud" || "$SCOPE" == "all" ]]; }
 
 # ---- Constants ----
 DATABASES=( hermes authelia opendmarc Syslog djigzo nextcloud )
 TIERS=( config data archive vmail nextcloud )
+LDAP_SUFFIX="dc=hermes,dc=local"
 
-# Tier paths read from .env at runtime (resolved below).
+# Filled in at runtime
 declare -A TIER_PATH
 declare -A ARCHIVE_SHA
 declare -A ARCHIVE_SIZE
-
 TIMESTAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
 BUILD_NO=""
-STAGE_DIR=""    # populated in main()
-FINAL_TAR=""    # populated in main()
-PARTIAL_TAR=""  # populated in main()
-RESTART_NEEDED=0
+STAGE_DIR=""
+FINAL_TAR=""
+PARTIAL_TAR=""
+STACK_STOPPED=0
+NC_MAINT_TOGGLED=0
+ARCHIVES_CREATED=()
 
 # ---- Helpers ----
 run() {
@@ -146,13 +210,14 @@ run() {
 }
 
 cleanup_on_fatal() {
-    # If we already stopped the stack, try to bring it back up so the
-    # operator isn't left with a dead system on a script error.
-    if (( RESTART_NEEDED )) && (( ! DRY_RUN )); then
+    if (( NC_MAINT_TOGGLED )) && (( ! DRY_RUN )); then
+        warn "Attempting to clear NC maintenance mode..."
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --off >>"$LOG_FILE" 2>&1 || true
+    fi
+    if (( STACK_STOPPED )) && (( ! DRY_RUN )); then
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
     fi
-    # Leave .partial files in place so the operator can inspect them.
     if [[ -d "${STAGE_DIR:-}" ]]; then
         warn "Staging directory left at ${STAGE_DIR} for inspection. Remove it manually after diagnosing."
     fi
@@ -166,7 +231,7 @@ confirm() {
 
 load_mounts() {
     local env_file="${HERMES_ROOT}/.env"
-    [[ -f "$env_file" ]] || fatal "Cannot read ${env_file} -- need DATA_MOUNT/ARCHIVE_MOUNT/VMAIL_MOUNT/FILES_MOUNT."
+    [[ -f "$env_file" ]] || fatal "Cannot read ${env_file} -- need DATA/ARCHIVE/VMAIL/FILES_MOUNT."
     local k v
     while IFS='=' read -r k v; do
         v="${v%\"}"; v="${v#\"}"; v="${v%\'}"; v="${v#\'}"
@@ -178,61 +243,103 @@ load_mounts() {
         esac
     done < <(grep -E '^(DATA|ARCHIVE|VMAIL|FILES)_MOUNT=' "$env_file" | sed 's/\r$//')
     TIER_PATH[config]="$HERMES_ROOT"
-
     for t in "${TIERS[@]}"; do
         [[ -n "${TIER_PATH[$t]:-}" ]] || fatal "Tier '$t' has no mount path in .env."
-        [[ -d "${TIER_PATH[$t]}" ]]   || fatal "Tier '$t' path does not exist: ${TIER_PATH[$t]}"
+        if scope_includes_tier "$t"; then
+            [[ -d "${TIER_PATH[$t]}" ]] || fatal "Tier '$t' path does not exist: ${TIER_PATH[$t]}"
+        fi
     done
 }
 
-read_build_no() {
-    # Same source the orchestrator uses.
-    if ! docker ps --format '{{.Names}}' | grep -q '^hermes_db_server$'; then
-        warn "hermes_db_server not running -- starting it briefly to read build_no..."
-        ( cd "$HERMES_ROOT" && docker compose up -d hermes_db_server ) >>"$LOG_FILE" 2>&1
-        sleep 8
+ensure_container_running() {
+    local name="$1"
+    if docker ps --format '{{.Names}}' | grep -q "^${name}$"; then return 0; fi
+    if (( COLD_MODE )); then
+        warn "Cold mode: starting ${name} briefly for dump..."
+        ( cd "$HERMES_ROOT" && docker compose start "$name" ) >>"$LOG_FILE" 2>&1 || \
+            fatal "Failed to start ${name} for dump."
+        sleep 4
+    else
+        fatal "${name} is not running. Hot mode requires it to be up. Start it with: docker compose up -d ${name}"
     fi
+}
+
+read_build_no() {
+    ensure_container_running hermes_db_server
+    local i
+    for i in {1..15}; do
+        if docker exec hermes_db_server mariadb -u root -e 'SELECT 1' >/dev/null 2>&1; then break; fi
+        sleep 2
+    done
     BUILD_NO="$(docker exec hermes_db_server mariadb -u root -N -s hermes \
         -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE" | tr -d '[:space:]')"
     [[ -n "$BUILD_NO" ]] || fatal "Could not read build_no from system_settings."
 }
 
-wait_for_db() {
-    local i
-    for i in {1..30}; do
-        if docker exec hermes_db_server mariadb -u root -e 'SELECT 1' >/dev/null 2>&1; then
-            return 0
-        fi
-        sleep 2
-    done
-    fatal "hermes_db_server did not become reachable within 60s."
-}
-
 dump_databases() {
-    header "Dumping databases"
+    header "Dumping databases (mariadb-dump --single-transaction)"
+    ensure_container_running hermes_db_server
     local db_stage="${STAGE_DIR}/databases"
     mkdir -p "$db_stage"
     local db
     for db in "${DATABASES[@]}"; do
         log "  dumping ${db}..."
         if (( DRY_RUN )); then
-            printf '%s[dry-run]%s docker exec hermes_db_server mariadb-dump --single-transaction --routines --triggers --events %s\n' "$CYAN" "$NC" "$db" | tee -a "$LOG_FILE"
-        else
-            # --single-transaction: consistent dump without table locks (InnoDB)
-            # --routines/triggers/events: capture stored procedures + scheduled events
-            # No -p flag: socket auth from inside the container (root has it)
-            if ! docker exec hermes_db_server \
-                mariadb-dump --single-transaction --routines --triggers --events --databases "$db" \
-                > "${db_stage}/${db}.sql" 2>>"$LOG_FILE"; then
-                fatal "mariadb-dump failed for database '${db}'. See $LOG_FILE."
-            fi
+            printf '%s[dry-run]%s mariadb-dump --single-transaction %s\n' "$CYAN" "$NC" "$db" | tee -a "$LOG_FILE"
+            continue
+        fi
+        if ! docker exec hermes_db_server \
+            mariadb-dump --single-transaction --routines --triggers --events --databases "$db" \
+            > "${db_stage}/${db}.sql" 2>>"$LOG_FILE"; then
+            fatal "mariadb-dump failed for '${db}'. See $LOG_FILE."
         fi
     done
     if (( ! DRY_RUN )); then
         log "  packaging databases.tar.gz..."
         tar -czf "${STAGE_DIR}/databases.tar.gz" -C "$db_stage" . 2>>"$LOG_FILE"
         rm -rf "$db_stage"
+        ARCHIVES_CREATED+=( "databases.tar.gz" )
     fi
+}
+
+dump_ldap() {
+    header "Dumping OpenLDAP directory (slapcat)"
+    ensure_container_running hermes_ldap
+    if (( DRY_RUN )); then
+        printf '%s[dry-run]%s docker exec hermes_ldap slapcat -b %s\n' "$CYAN" "$NC" "$LDAP_SUFFIX" | tee -a "$LOG_FILE"
+        return 0
+    fi
+    if ! docker exec hermes_ldap slapcat -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
+        | gzip -c > "${STAGE_DIR}/ldap.ldif.gz"; then
+        fatal "slapcat failed for ${LDAP_SUFFIX}. See $LOG_FILE."
+    fi
+    ARCHIVES_CREATED+=( "ldap.ldif.gz" )
+}
+
+nc_maintenance_on() {
+    if (( NO_NC_MAINTENANCE )) || ! scope_touches_nextcloud; then return 0; fi
+    log "Setting Nextcloud maintenance mode ON (paused NC web UI; mail flow unaffected)..."
+    if (( DRY_RUN )); then
+        printf '%s[dry-run]%s occ maintenance:mode --on\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
+        return 0
+    fi
+    if docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --on >>"$LOG_FILE" 2>&1; then
+        NC_MAINT_TOGGLED=1
+    else
+        warn "occ maintenance:mode --on failed; nextcloud tier tar will proceed without it."
+    fi
+}
+
+nc_maintenance_off() {
+    if ! (( NC_MAINT_TOGGLED )); then return 0; fi
+    log "Clearing Nextcloud maintenance mode..."
+    if (( DRY_RUN )); then
+        printf '%s[dry-run]%s occ maintenance:mode --off\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
+        return 0
+    fi
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --off >>"$LOG_FILE" 2>&1 \
+        || warn "occ maintenance:mode --off failed -- operator should run it manually."
+    NC_MAINT_TOGGLED=0
 }
 
 tar_tier() {
@@ -241,30 +348,36 @@ tar_tier() {
     local out="${STAGE_DIR}/${tier}.tar.gz"
     log "  ${tier}: tarring ${src} -> $(basename "$out")"
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s tar -czf %s ... \n' "$CYAN" "$NC" "$out" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s tar -czf %s ...\n' "$CYAN" "$NC" "$out" | tee -a "$LOG_FILE"
         return 0
     fi
-    # For the config tier, exclude the install-logs dir (large, churning,
-    # not needed for restore) and the data tier paths in case the operator
-    # mounted them inside the install root.
     local exclude_args=()
-    if [[ "$tier" == "config" ]]; then
-        exclude_args+=( --exclude="./install-logs" --exclude="./.git" )
-        for t in data archive vmail nextcloud; do
-            local p="${TIER_PATH[$t]}"
-            if [[ "$p" == "$src"/* ]]; then
-                exclude_args+=( --exclude="./${p#$src/}" )
-            fi
-        done
-    fi
+    case "$tier" in
+        config)
+            exclude_args+=( --exclude='./install-logs' --exclude='./.git' )
+            # Exclude any data tier paths nested inside the install root.
+            for t in data archive vmail nextcloud; do
+                local p="${TIER_PATH[$t]}"
+                if [[ "$p" == "$src"/* ]]; then
+                    exclude_args+=( --exclude="./${p#$src/}" )
+                fi
+            done
+            ;;
+        data)
+            # Excluded from the data tier tar:
+            #   mysql/  -- captured authoritatively by mariadb-dump
+            #   ldap/   -- captured authoritatively by slapcat
+            #   clamav/ -- signatures are regenerable, not worth backup space
+            exclude_args+=( --exclude='./mysql' --exclude='./ldap' --exclude='./clamav' )
+            ;;
+    esac
     tar -czf "$out" "${exclude_args[@]}" -C "$src" . 2>>"$LOG_FILE" \
         || fatal "tar failed for tier '${tier}'"
+    ARCHIVES_CREATED+=( "${tier}.tar.gz" )
 }
 
 compute_sha256() {
-    local f="$1"
-    if (( DRY_RUN )); then echo "DRYRUN_SHA256"; return; fi
-    sha256sum "$f" | awk '{print $1}'
+    sha256sum "$1" | awk '{print $1}'
 }
 
 emit_manifest() {
@@ -274,11 +387,14 @@ emit_manifest() {
         printf '%s[dry-run]%s would write %s\n' "$CYAN" "$NC" "$m" | tee -a "$LOG_FILE"
         return 0
     fi
+    local mode_str
+    mode_str="$((( COLD_MODE )) && echo cold || echo hot)"
     {
         printf '{\n'
         printf '  "manifest_version": "1.0",\n'
         printf '  "build_no": "%s",\n' "$BUILD_NO"
-        printf '  "scope": "all",\n'
+        printf '  "scope": "%s",\n' "$SCOPE"
+        printf '  "mode": "%s",\n' "$mode_str"
         printf '  "timestamp": "%s",\n' "$TIMESTAMP"
         printf '  "hostname": "%s",\n' "$(hostname -f 2>/dev/null || hostname)"
         printf '  "topology": {\n'
@@ -295,10 +411,11 @@ emit_manifest() {
             printf '"%s"' "$db"
         done
         printf '],\n'
+        printf '  "ldap_suffix": "%s",\n' "$LDAP_SUFFIX"
         printf '  "archives": {\n'
-        local archives=( databases.tar.gz config.tar.gz data.tar.gz archive.tar.gz vmail.tar.gz nextcloud.tar.gz )
         first=1
-        for a in "${archives[@]}"; do
+        local a
+        for a in "${ARCHIVES_CREATED[@]}"; do
             (( first )) && first=0 || printf ',\n'
             printf '    "%s": {"sha256": "%s", "size_bytes": %s}' \
                 "$a" "${ARCHIVE_SHA[$a]}" "${ARCHIVE_SIZE[$a]}"
@@ -317,92 +434,87 @@ preflight() {
     fi
     [[ -d "$BACKUP_PATH" ]] || fatal "Backup path does not exist: ${BACKUP_PATH}"
     [[ -w "$BACKUP_PATH" ]] || fatal "Backup path is not writable: ${BACKUP_PATH}"
-
     load_mounts
     read_build_no
 
-    FINAL_TAR="${BACKUP_PATH}/hermes-backup-${BUILD_NO}-${TIMESTAMP}.tar"
+    FINAL_TAR="${BACKUP_PATH}/hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}.tar"
     PARTIAL_TAR="${FINAL_TAR}.partial"
-    STAGE_DIR="${BACKUP_PATH}/.staging-${TIMESTAMP}"
+    STAGE_DIR="${BACKUP_PATH}/.staging-${SCOPE}-${TIMESTAMP}"
     [[ -e "$FINAL_TAR" || -e "$PARTIAL_TAR" || -e "$STAGE_DIR" ]] && \
         fatal "Target files already exist (timestamp collision): ${FINAL_TAR}*"
 
     log "HERMES_ROOT:   ${HERMES_ROOT}"
     log "build_no:      ${BUILD_NO}"
-    log "Timestamp:     ${TIMESTAMP}"
+    log "Scope:         ${SCOPE}"
+    log "Mode:          $((( COLD_MODE )) && echo COLD || echo HOT)"
     log "Output:        ${FINAL_TAR}"
     log "Staging:       ${STAGE_DIR}"
-    for t in "${TIERS[@]}"; do log "Tier ${t}: ${TIER_PATH[$t]}"; done
+    for t in "${TIERS[@]}"; do
+        scope_includes_tier "$t" && log "Tier ${t}: ${TIER_PATH[$t]}"
+    done
 
     log ""
-    log "This will STOP the Hermes stack for the duration of the backup."
-    log "Plan around your mail-flow tolerances. The stack is restarted at the end."
-    log ""
-    if ! confirm "Proceed?"; then
-        log "Aborted by operator."
-        exit 0
+    if (( COLD_MODE )); then
+        log "COLD mode: the stack will be STOPPED for the duration of the backup."
+    else
+        log "HOT mode: zero application downtime. Mail flow continues throughout."
+        if scope_touches_nextcloud && ! (( NO_NC_MAINTENANCE )); then
+            log "Nextcloud web UI will be in 'maintenance mode' for the duration of the NC file tar."
+            log "Mail is unaffected. To skip, re-run with --no-nc-maintenance."
+        fi
     fi
+    log ""
+    confirm "Proceed?" || { log "Aborted by operator."; exit 0; }
     if (( ! DRY_RUN )); then mkdir -p "$STAGE_DIR"; fi
 }
 
-stop_stack_dump_dbs() {
-    header "Stopping stack + dumping databases"
-    log "docker compose stop (full stack down)..."
-    run bash -c "cd '$HERMES_ROOT' && docker compose stop"
-    RESTART_NEEDED=1
+run_backup() {
+    if (( COLD_MODE )); then
+        header "Stopping stack (cold mode)"
+        run bash -c "cd '$HERMES_ROOT' && docker compose stop"
+        STACK_STOPPED=1
+    fi
 
-    log "Starting hermes_db_server briefly to dump databases..."
-    run bash -c "cd '$HERMES_ROOT' && docker compose start hermes_db_server"
-    if (( ! DRY_RUN )); then wait_for_db; fi
+    if scope_needs_dbs; then
+        dump_databases
+        dump_ldap
+    fi
 
-    dump_databases
+    nc_maintenance_on   # no-op if scope doesn't touch nextcloud
 
-    log "Stopping hermes_db_server..."
-    run bash -c "cd '$HERMES_ROOT' && docker compose stop hermes_db_server"
-}
+    header "Archiving in-scope storage tiers"
+    for t in "${TIERS[@]}"; do
+        scope_includes_tier "$t" && tar_tier "$t"
+    done
 
-tar_tiers() {
-    header "Archiving five storage tiers"
-    for t in "${TIERS[@]}"; do tar_tier "$t"; done
+    nc_maintenance_off
 }
 
 assemble_outer() {
     header "Assembling outer tarball"
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s would compute SHA256 and emit manifest\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
-        printf '%s[dry-run]%s tar -cf %s -C %s .\n' "$CYAN" "$NC" "$PARTIAL_TAR" "$STAGE_DIR" | tee -a "$LOG_FILE"
-        printf '%s[dry-run]%s mv %s %s\n' "$CYAN" "$NC" "$PARTIAL_TAR" "$FINAL_TAR" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s would compute SHA256 + emit manifest + outer tar + atomic rename\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
         return 0
     fi
-
-    local archives=( databases.tar.gz config.tar.gz data.tar.gz archive.tar.gz vmail.tar.gz nextcloud.tar.gz )
-    for a in "${archives[@]}"; do
+    local a
+    for a in "${ARCHIVES_CREATED[@]}"; do
         ARCHIVE_SHA[$a]="$(compute_sha256 "${STAGE_DIR}/${a}")"
         ARCHIVE_SIZE[$a]="$(stat -c%s "${STAGE_DIR}/${a}")"
     done
-
     emit_manifest
-
-    # Outer tar is UNCOMPRESSED -- the inners are already .gz.
     tar -cf "$PARTIAL_TAR" -C "$STAGE_DIR" . 2>>"$LOG_FILE" \
         || fatal "Outer tar assembly failed."
-
-    # Atomic rename signals 'done'. If we crash before this, the operator
-    # sees only .partial and knows the backup is incomplete.
     mv "$PARTIAL_TAR" "$FINAL_TAR" \
         || fatal "Atomic rename failed: ${PARTIAL_TAR} -> ${FINAL_TAR}"
-
-    # Drop the staging dir on success.
     rm -rf "$STAGE_DIR"
 }
 
-restart_stack() {
-    header "Restarting stack"
-    run bash -c "cd '$HERMES_ROOT' && docker compose start"
-    RESTART_NEEDED=0
+restart_stack_if_cold() {
+    if ! (( STACK_STOPPED )); then return 0; fi
+    header "Restarting stack (cold mode)"
+    run bash -c "cd '$HERMES_ROOT' && docker compose up -d"
+    STACK_STOPPED=0
     if (( DRY_RUN )); then return 0; fi
-
-    # Brief readiness check: wait for commandbox to respond, then move on.
     local i
     for i in {1..30}; do
         if docker exec hermes_commandbox curl -sf --max-time 2 http://localhost:8888/ >/dev/null 2>&1; then
@@ -411,7 +523,7 @@ restart_stack() {
         fi
         sleep 2
     done
-    warn "hermes_commandbox did not respond on :8888 within 60s. Stack may still be coming up; check with 'docker compose ps'."
+    warn "hermes_commandbox did not respond on :8888 within 60s. Check 'docker compose ps'."
 }
 
 report() {
@@ -423,21 +535,20 @@ report() {
     local sz
     sz="$(stat -c%s "$FINAL_TAR" | numfmt --to=iec --suffix=B 2>/dev/null || stat -c%s "$FINAL_TAR")"
     log "Backup written: ${FINAL_TAR}"
+    log "Scope:          ${SCOPE} (${ARCHIVES_CREATED[*]})"
     log "Size:           ${sz}"
     log "Log:            ${LOG_FILE}"
     log ""
-    log "To restore on this or another host:"
+    log "To restore:"
     log "  sudo ./scripts/system_restore.sh -F '${FINAL_TAR}'"
 }
 
 main() {
-    log "Hermes SEG cold-mode system backup (#219 Phase A)"
-    log "Mode: $((( DRY_RUN )) && echo DRY-RUN || echo LIVE)"
+    log "Hermes SEG system backup (#219 Phase A)"
     preflight
-    stop_stack_dump_dbs
-    tar_tiers
+    run_backup
     assemble_outer
-    restart_stack
+    restart_stack_if_cold
     report
 }
 

@@ -181,19 +181,29 @@ id="btn-back-to-top"
 </div>
 
 <div class="card mb-3">
-  <div class="card-header"><strong>Backup &mdash; cold mode, full-stack snapshot</strong></div>
+  <div class="card-header"><strong>Backup &mdash; hot mode by default, zero application downtime</strong></div>
   <div class="card-body">
-    <p>Stops the stack, dumps all six databases, tars all five storage tiers (Config / Data / Archive / Vmail / Nextcloud), emits a manifest with SHA256 per archive, and restarts the stack. Plan around your mail-flow tolerances &mdash; the stack is offline for 5&ndash;15 minutes (longer for large vmail/nextcloud installs).</p>
-    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups</code></pre>
-    <p class="mb-0 text-muted small">Add <code>--yes</code> to skip the interactive confirmation prompt (useful for cron / Ofelia). Add <code>--dry-run</code> to preview without stopping anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
+    <p>Uses application-native hot-backup primitives: <code>mariadb-dump --single-transaction</code> for the six databases, <code>slapcat</code> for OpenLDAP, and live tar of mail tiers (Dovecot maildir/sdbox and Amavis quarantine use atomic-rename writes, so live tar is safe). For Nextcloud, the script briefly toggles <code>occ maintenance:mode --on</code> to pause NC user writes during the file tar (mail flow unaffected).</p>
+    <p>The <code>-B</code> flag chooses what to back up:</p>
+    <ul class="mb-3">
+      <li><code>system</code> &mdash; Config + Data + 6 DB dumps + LDAP slapcat. Small + fast. Nightly default.</li>
+      <li><code>archive</code> &mdash; Archive tier only (Amavis quarantine).</li>
+      <li><code>vmail</code> &mdash; Vmail tier only (Dovecot mailboxes).</li>
+      <li><code>nextcloud</code> &mdash; Nextcloud tier only (NC files).</li>
+      <li><code>all</code> &mdash; Everything.</li>
+    </ul>
+    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B vmail
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all  --yes</code></pre>
+    <p class="mb-0 text-muted small">Add <code>--cold</code> for legal-hold / forensic snapshots that need absolute byte-level consistency at the cost of full-stack downtime. Add <code>--dry-run</code> to preview without changing anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
   </div>
 </div>
 
 <div class="card mb-3">
-  <div class="card-header"><strong>Restore &mdash; cold mode, replaces all current data</strong></div>
+  <div class="card-header"><strong>Restore &mdash; replaces only the scopes present in the backup</strong></div>
   <div class="card-body">
-    <p>Verifies the backup manifest (SHA256 per archive) BEFORE any destructive action, refuses to restore on storage-topology mismatch unless <code>FORCE_REMAP=1</code> is set, stops the stack, restores all six databases, rsyncs each tier from staging to its mount path with <code>--delete</code>, and restarts the stack. The current install's data is <strong>completely replaced</strong>.</p>
-    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre>
+    <p>Verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless <code>FORCE_REMAP=1</code> is set, stops the stack for the duration of the restore (always; even hot-mode backups restore cold), restores DBs via socket-auth <code>mariadb</code>, restores OpenLDAP via <code>slapadd</code>, rsyncs each in-scope tier from staging to its mount path with <code>--delete</code>, and restarts the stack. Reads the scope from the backup's manifest: restoring a <code>vmail</code> backup only touches <code>/mnt/vmail</code>; restoring an <code>archive</code> backup only touches <code>/mnt/archive</code>; etc.</p>
+    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre>
     <p class="mb-0 text-muted small">If restoring onto a host with a different storage topology (different DATA_MOUNT etc.), prefix with <code>FORCE_REMAP=1</code>. Run <code>system_restore.sh --help</code> for full usage.</p>
   </div>
 </div>

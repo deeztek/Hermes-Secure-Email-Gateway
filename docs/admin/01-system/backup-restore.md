@@ -10,34 +10,66 @@ Two scripts under [`scripts/`](../../../scripts/):
 
 | Script | Purpose |
 |---|---|
-| [`system_backup.sh`](../../../scripts/system_backup.sh) | Cold-mode full-stack backup: stops the stack, dumps all six databases, tars all five storage tiers, emits a manifest with SHA256 per archive, atomically renames `.partial` to final, restarts the stack. |
-| [`system_restore.sh`](../../../scripts/system_restore.sh) | Cold-mode restore: verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless `FORCE_REMAP=1` is set, stops the stack, restores all six databases via socket auth, rsyncs each tier from staging to its mount path with `--delete`, restarts the stack, verifies Nextcloud is not stuck in maintenance mode post-restore. |
+| [`system_backup.sh`](../../../scripts/system_backup.sh) | **Hot mode by default — zero application downtime.** Uses application-native hot-backup primitives: `mariadb-dump --single-transaction`, `slapcat`, and live tar of mail tiers (Dovecot, Amavis, Postfix all use atomic-rename writes safe for live tar). Toggles `occ maintenance:mode --on` briefly during Nextcloud file tar to pause NC user writes (mail flow unaffected). `--cold` flag stops the full stack for legal-hold / forensic snapshots that need absolute byte-level consistency. |
+| [`system_restore.sh`](../../../scripts/system_restore.sh) | **Always cold on the restore side** (we're overwriting tier contents — concurrent reads/writes would corrupt). Verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless `FORCE_REMAP=1` is set, restores DBs via socket auth, restores OpenLDAP via `slapadd`, rsyncs in-scope tiers from staging to mount paths with `--delete`, restarts the stack. |
 
-**Cold mode means the stack is stopped for the duration of the backup or restore** — 5–15 minutes for small sites, longer for large mailbox / Nextcloud installs. Plan around your mail-flow tolerances. For zero-downtime backups, use hypervisor snapshots (see [Hot-backup alternatives](#hot-backup-alternatives)) until hot-mode lands.
+## Backup scopes
+
+The `-B` flag chooses what to back up. Pick the scope that matches your need — there's no reason to back up 500 GB of vmail every night if only the DBs and configs are churning.
+
+| Scope | Includes | Typical cadence | Hot-mode duration |
+|---|---|---|---|
+| `system` | Config tier + Data tier + 6 DB dumps + LDAP slapcat | Nightly | seconds to a few minutes (dominated by `/mnt/data` tar size; DB+LDAP dumps are fast) |
+| `archive` | Archive tier (Amavis quarantine) | Weekly or per retention policy | proportional to archive size; mail intake continues uninterrupted |
+| `vmail` | Vmail tier (Dovecot mailboxes) | Weekly | proportional to mailbox size; mail flow continues uninterrupted |
+| `nextcloud` | Nextcloud tier (NC files) | Weekly | proportional to NC file size; NC web UI shows "under maintenance" during the tar; mail unaffected |
+| `all` | Everything above | Periodic full-DR snapshot | sum of all of the above |
+
+## Hot-mode safety per component
+
+Why we don't need downtime:
+
+| Component | Hot-backup technique | Why it's safe |
+|---|---|---|
+| **MariaDB** | `mariadb-dump --single-transaction --routines --triggers --events --databases <db>` | InnoDB MVCC gives a consistent point-in-time snapshot. No table locks. Stored procedures, triggers, and scheduled events captured. |
+| **OpenLDAP** | `slapcat -b dc=hermes,dc=local` inside `hermes_ldap` | Standard hot LDIF export. |
+| **Dovecot (vmail)** | tar `/mnt/vmail` live | maildir/sdbox writes are atomic-rename (write to temp filename, atomic `mv` to final name). No torn files. Worst case: messages arriving during the tar window may land after the tar's snapshot — they're durable upstream (postfix queue, sender's MX retries) and captured by the next backup. |
+| **Amavis (archive)** | tar `/mnt/archive` live | Amavis quarantine writes are atomic-rename. Same as Dovecot. |
+| **Nextcloud (files)** | tar `/mnt/files` live, with `occ maintenance:mode --on` toggled around the tar | NC writes are atomic, but the filesystem ↔ `oc_filecache` DB table can drift if a user uploads mid-tar. Maintenance mode pauses NC user writes — the NC web UI shows "under maintenance" briefly, but mail flow is unaffected. Use `--no-nc-maintenance` to skip the toggle if needed. |
+| **Postfix (data tier)** | tar `/mnt/data/postfix` live | Postfix queue files are atomic-rename. |
+| **Service logs (data tier)** | tar live | Append-only. A torn last line is cosmetic, not data loss. |
+| **MariaDB / LDAP / ClamAV raw files** | **Excluded** from the data tier tar | DB dumps + LDAP slapcat are the authoritative restore sources, so the on-disk InnoDB tablespace files and slapd data files are redundant. ClamAV signatures are regenerable, not worth the backup space. |
+
+Hot mode is the daily backup. **Cold mode (`--cold`) is the escape hatch for use cases where absolute byte-level consistency matters more than uptime** — legal hold, forensic snapshots, regulatory archive. Cold mode does `docker compose stop` for the full duration.
 
 ## Backup
 
 ### Backup quick start
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
 ```
 
-The script creates `/mnt/backups/hermes-backup-<build_no>-<UTC-timestamp>.tar`. The outer tar is uncompressed (each tier inside is already `.tar.gz`); operators can `tar -xf` it once to inspect the manifest before deciding to restore.
+The script creates `/mnt/backups/hermes-backup-system-<build_no>-<UTC-timestamp>.tar`. The outer tar is uncompressed (each tier inside is already `.tar.gz`); operators can `tar -xf` it once to inspect the manifest before deciding to restore.
 
 ### Output layout
 
-Inside the outer `.tar`:
+Inside the outer `.tar` (only the archives relevant to the chosen scope are present):
 
 ```text
-backup_manifest.json           ← topology, build, timestamps, SHA256 per archive
-databases.tar.gz               ← all six .sql files
+backup_manifest.json           ← scope, mode (hot/cold), topology, SHA256 per archive
+databases.tar.gz               ← 6 .sql files; system / all scopes only
+ldap.ldif.gz                   ← slapcat output; system / all scopes only
 config.tar.gz                  ← install root MINUS data tiers
-                                  (excludes install-logs/ and .git/)
-data.tar.gz                    ← the Data tier (/mnt/data)
-archive.tar.gz                 ← the Archive tier (/mnt/archive)
-vmail.tar.gz                   ← the Vmail tier (/mnt/vmail)
-nextcloud.tar.gz               ← the Nextcloud tier (/mnt/files)
+                                  (excludes install-logs/ and .git/);
+                                  system / all scopes only
+data.tar.gz                    ← Data tier; system / all scopes only
+                                  (excludes mysql/ ldap/ clamav/ — captured
+                                  authoritatively by dumps / slapcat / are
+                                  regenerable)
+archive.tar.gz                 ← Archive tier; archive / all scopes only
+vmail.tar.gz                   ← Vmail tier; vmail / all scopes only
+nextcloud.tar.gz               ← Nextcloud tier; nextcloud / all scopes only
 ```
 
 ### Backup flags
@@ -45,17 +77,28 @@ nextcloud.tar.gz               ← the Nextcloud tier (/mnt/files)
 | Flag | Purpose |
 |---|---|
 | `-P <path>` | **Required.** Output directory. Must exist and be writable. |
+| `-B <scope>` | **Required.** One of: `system`, `archive`, `vmail`, `nextcloud`, `all`. |
+| `--cold` | Stop the full stack for the duration of the backup. Use for legal-hold / forensic snapshots. Default is HOT mode (zero application downtime). |
+| `--no-nc-maintenance` | Skip the brief `occ maintenance:mode --on` that hot-mode nextcloud / all backups use to pause NC user writes during the file tar. Without it, file uploads happening mid-tar may be missed by the backup. |
 | `--yes` (or `-y`) | Skip the interactive confirmation prompt. Use for cron / Ofelia. |
-| `--dry-run` (or `-n`) | Print what would happen without stopping anything or writing any files. |
+| `--dry-run` (or `-n`) | Print what would happen without changing anything. |
 | `--help` (or `-h`) | Show usage. |
 
 ### Scheduling
 
-For nightly automated backups, register the command as an Ofelia job using the existing **System > Scheduled Tasks** admin page. The Ofelia job is just a shell command on the Docker host; no separate backup-scheduling UI exists by design. Example Ofelia job spec:
+For nightly automated backups, register the command as an Ofelia job using the existing **System > Scheduled Tasks** admin page. The Ofelia job is just a shell command on the Docker host; no separate backup-scheduling UI exists by design. Example Ofelia job:
 
 ```text
 schedule: 0 0 3 * * *
-command:  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups --yes
+command:  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
+```
+
+A typical cadence:
+
+```text
+0 3 * * *        system    (nightly; small, fast, captures DBs + configs)
+0 4 * * 0        all       (weekly Sunday; full DR snapshot)
+0 5 1 * *        nextcloud (monthly; NC files for offsite copy)
 ```
 
 The script's exit code reflects success (0) or failure (non-zero), so Ofelia's built-in alerting picks up failures.
@@ -65,7 +108,7 @@ The script's exit code reflects success (0) or failure (non-zero), so Ofelia's b
 `system_backup.sh` writes to the local `-P` path only. Off-site copy is left to your existing tooling — `rclone`, `rsync` to remote storage, `aws s3 cp`, `restic`, whatever you already use. Typical pattern:
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups --yes \
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes \
   && rclone sync /mnt/backups remote:hermes-backups/
 ```
 
@@ -74,10 +117,10 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups --yes \
 ### Restore quick start
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-v260119-20260601T103000Z.tar
+sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-v260119-20260601T103000Z.tar
 ```
 
-**This replaces all current data on this host** with the backup's contents — all six databases, the install root (repo working tree, secrets, `.env`), and all four storage tiers. The stack is stopped for the duration. There is no rollback once it starts.
+**The restore replaces the data in the backup's scope and leaves other scopes alone.** Restoring a `system` backup overwrites the install root + Data tier + DBs + LDAP; the Vmail / Archive / Nextcloud tiers are untouched. Restoring a `vmail` backup overwrites only `/mnt/vmail`. The stack is stopped for the duration of the restore (always — even hot-mode backups are restored cold).
 
 ### Safety: SHA256 verification + topology refusal
 
@@ -86,7 +129,7 @@ Two gates fire BEFORE any destructive action:
 1. **Manifest SHA256 verification.** Every inner archive's SHA256 is checked against the manifest. If any byte of the backup is corrupt or tampered with, the restore aborts BEFORE stopping the stack or touching any data.
 2. **Storage-topology refusal.** If the backup's recorded mount paths (`/mnt/data`, `/mnt/vmail`, etc.) don't match this host's current mount paths from `.env`, the restore aborts with a clear error and instructions for forcing a remap.
 
-To restore a backup onto a host with a different storage topology (e.g., backup took on a 5-tier-split host, restoring onto a single-mount host where everything lives under `/mnt/data`), set `FORCE_REMAP=1`:
+To restore a backup onto a host with a different storage topology (e.g., a 5-tier-split host restoring onto a single-mount host where everything lives under `/mnt/data`), set `FORCE_REMAP=1`:
 
 ```bash
 sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/to/backup.tar
@@ -96,7 +139,7 @@ sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/
 
 ### Disaster-recovery flow (different host)
 
-1. Install Hermes fresh on the new host using [`install_hermes_docker.sh`](../../../scripts/install_hermes_docker.sh). The install root needs to exist and `.env` needs to be populated with the right mount paths before restore can succeed.
+1. Install Hermes fresh on the new host using [`install_hermes_docker.sh`](../../../scripts/install_hermes_docker.sh). The install root + `.env` need to exist before restore can succeed.
 2. `scp` the backup tarball from off-site storage to the new host.
 3. Run `system_restore.sh -F /path/to/backup.tar`. If the new host's mount paths differ from the original (typical when restoring onto different hardware), prefix with `FORCE_REMAP=1`.
 4. Verify the admin console loads and a test message flows end-to-end.
@@ -111,65 +154,54 @@ sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/
 | `--help` (or `-h`) | Show usage. |
 | `FORCE_REMAP=1` (env) | Required to proceed past the topology-mismatch refusal. |
 
-## Hot-backup alternatives
+## When to use hypervisor snapshots instead
 
-Cold mode means downtime. When zero-downtime is needed (busy mail flow, can't take an outage window), use **hypervisor / VM snapshots** instead. Snapshot the entire Hermes host VM via your virtualization platform's native mechanism:
+The cold-mode escape hatch (`--cold`) covers byte-level-consistency use cases that the cold-mode scripts can satisfy. For two other cases, **hypervisor snapshots** are the right tool, not the Hermes scripts:
 
-| Platform | Snapshot mechanism |
+1. **Pre-upgrade safety net.** Always take a hypervisor snapshot before running `system_update_docker.sh` — that gives you a working rollback if the upgrade fails mid-flight. The methodology doc codifies this.
+2. **Zero-downtime full-host snapshot.** If you want a single consistent point-in-time image of the entire Hermes host (every storage tier, the Docker daemon state, the host OS), a hypervisor snapshot is the only tool that captures all of that atomically.
+
+Per-hypervisor snapshot mechanisms:
+
+| Platform | Mechanism |
 |---|---|
 | Proxmox VE | Datacenter > Backup, or Snapshot from the VM's right-click menu |
 | VMware vSphere / ESXi | VM > Snapshots > Take Snapshot |
-| KVM / libvirt | `virsh snapshot-create-as <domain> <name> --disk-only --atomic` (or `virt-manager`) |
-| AWS EC2 | EBS volume snapshot (or AMI for a full image) |
+| KVM / libvirt | `virsh snapshot-create-as <domain> <name> --disk-only --atomic` |
+| AWS EC2 | EBS volume snapshot (or AMI for full image) |
 | Azure VMs | Disk snapshot, or Recovery Services Vault |
 | Google Compute Engine | Disk snapshot |
 | Hyper-V | Checkpoint |
-
-Take the snapshot with the VM either:
-
-1. **Powered off** — safest.
-2. **Quiesced via guest tools** — VMware Tools, qemu-guest-agent, Hyper-V Integration Services. Verify quiesce behavior on your specific guest OS first.
-
-A whole-VM snapshot captures every storage tier, every database, every container's state, and the Docker daemon's metadata in one consistent point-in-time image. Restoration is your hypervisor's "revert to snapshot" — no Hermes-specific tooling needed.
-
-**Always take a hypervisor snapshot before running `system_update_docker.sh`** for any upgrade — that gives you a working rollback if the upgrade fails mid-flight.
 
 ## What you should NOT do
 
 ### Do NOT run the legacy bare-metal scripts on a Docker host
 
-The pre-Docker `config/hermes/opt/hermes/scripts/system_backup.sh` and `system_restore.sh` are kept in the repo for reference and for the legacy-to-Docker migration path. **Do not run them on a Docker install.** Specifically:
+The pre-Docker `config/hermes/opt/hermes/scripts/system_backup.sh` and `system_restore.sh` are kept in the repo for reference and for the legacy-to-Docker migration path. **Do not run them on a Docker install.** The legacy `system_restore.sh` does `cd / && tar -xvzf <backup-file>` — extracts the backup tarball relative to the host filesystem root and will overwrite host directories with files from a layout that does not match the Docker host's reality. Hermes services fail to start, host OS may become unbootable.
 
-- The legacy `system_restore.sh` does `cd / && tar -xvzf <backup-file>` — extracts the backup tarball relative to the host filesystem root. On a Docker host it will overwrite host directories with files from a layout that does not match the Docker host's reality. Hermes services fail to start, host OS may become unbootable.
-- The legacy `system_backup.sh` does not know about the Authelia or Nextcloud databases (which didn't exist in the bare-metal era), does not coordinate with running containers, and produces backups that won't restore on a Docker install via the new Docker-aware restore.
+### Do NOT tar a running storage tier with `tar` directly
 
-The Docker-aware scripts under [`scripts/`](../../../scripts/) are the only safe option.
+If for some reason you reach for `tar` directly instead of `system_backup.sh`, do NOT tar `/mnt/data`, `/mnt/vmail`, `/mnt/files`, or `/mnt/archive` while the stack is running **without using the hot-backup primitives the script uses**. Specifically:
 
-### Do NOT tar a running storage tier
+- `/mnt/data` contains MariaDB's tablespace files — tar'ing them while `hermes_db_server` is running produces a backup MariaDB will reject as inconsistent on restore. Use `system_backup.sh` (which excludes `mysql/` from the data tar and captures DBs via `mariadb-dump`) instead.
+- Without `slapcat`, raw tar of `/mnt/data/ldap` mid-write captures inconsistent slapd database files.
 
-If for some reason you reach for `tar` directly instead of `system_backup.sh`, do NOT tar `/mnt/data`, `/mnt/vmail`, `/mnt/files`, or `/mnt/archive` while the stack is running:
-
-- `/mnt/data` contains MariaDB's tablespace files — tar'ing while `hermes_db_server` is running produces a backup MariaDB will reject as inconsistent on restore.
-- `/mnt/vmail` contains Dovecot mailboxes — tar'ing while `hermes_dovecot` has them open captures torn writes mid-delivery.
-- `/mnt/files` contains Nextcloud user files plus the NC Redis cache state — file-level copies break NC's `oc_filecache` table's consistency with the underlying filesystem.
-
-If you want a file-level backup outside of `system_backup.sh`, stop the stack first (`docker compose down`), tar, then restart (`docker compose up -d`).
+The Hermes scripts handle all of this correctly. Use them.
 
 ### Do NOT trust an untested restore procedure
 
-Whatever backup strategy you adopt (cold-mode scripts, hypervisor snapshots, file-level), **practice the restore at least once on a non-production system before you rely on it.** Take a backup of your live Hermes host, spin up a second VM, run the restore, and verify you can log into the admin console and send a test message. A backup procedure that has never been restored from is not a backup procedure — it is wishful thinking.
+Whatever backup strategy you adopt, **practice the restore at least once on a non-production system before you rely on it.** Take a backup of your live Hermes host, spin up a second VM, run the restore, verify you can log into the admin console and send a test message. A backup procedure that has never been restored from is not a backup procedure — it is wishful thinking.
 
 ## What's coming in Phase B
 
-The Phase A scripts are deliberately minimal. The Phase B refactor (post-Link-Guard) will add:
+The Phase A scripts cover the common cases (hot daily system backup, scoped tier backups, cold-mode forensic snapshot, scope-aware restore). The Phase B refactor (post-Link-Guard) will add:
 
-- **Scoped categories** (`--scope=config|data|archive|vmail|nextcloud|all`) so operators can back up or restore just one tier
-- **Hot mode** (`mariadb-backup` for DBs + NC `occ maintenance:mode --on` for files) for zero-downtime backups without needing hypervisor snapshots
 - **Retention pruning** (`--retain-last=N` deletes older backups beyond N)
-- **Ofelia-scheduled** backups configured natively (today the operator wires it up by hand via the Scheduled Tasks page)
+- **Ofelia-scheduled backups** wired natively (today the operator wires it up by hand via the Scheduled Tasks page)
 - **Net::SMTP** notification on success/failure (today's pattern is "pipe exit code into your existing alerting")
-- **Per-tier `--remap-tiers`** flag replacing the all-or-nothing `FORCE_REMAP=1` env var
-- **Selective container restart** instead of full `compose down` (faster restart, smaller blast radius)
+- **Per-tier `--remap-tiers <old>:<new>`** replacing the all-or-nothing `FORCE_REMAP=1` env var
+- **Selective container restart** instead of full `compose down` on the restore side (faster restart, smaller blast radius)
+- **Filesystem-snapshot integration** (LVM / ZFS / btrfs detection): if a tier lives on a snapshot-capable filesystem, take a filesystem snapshot and tar the snapshot rather than the live mount, for use cases where "best-effort hot tar" isn't good enough but `--cold` is too disruptive
 
 Tracking: [#219](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/219) for the backup-side enhancements, [#220](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/220) for the restore-side.
 
