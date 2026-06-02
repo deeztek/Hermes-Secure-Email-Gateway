@@ -201,11 +201,16 @@ Whatever backup strategy you adopt, **practice the restore at least once on a no
 The Phase A scripts cover the common cases (hot daily system backup, scoped tier backups, cold-mode forensic snapshot, scope-aware restore). The Phase B refactor (post-Link-Guard) will add:
 
 - **Retention pruning** (`--retain-last=N` deletes older backups beyond N)
-- **Ofelia-scheduled backups** wired natively (today the operator wires it up by hand via the Scheduled Tasks page)
-- **Net::SMTP** notification on success/failure (today's pattern is "pipe exit code into your existing alerting")
 - **Per-tier `--remap-tiers <old>:<new>`** replacing the all-or-nothing `FORCE_REMAP=1` env var
 - **Selective container restart** instead of full `compose down` on the restore side (faster restart, smaller blast radius)
 - **Filesystem-snapshot integration** (LVM / ZFS / btrfs detection): if a tier lives on a snapshot-capable filesystem, take a filesystem snapshot and tar the snapshot rather than the live mount, for use cases where "best-effort hot tar" isn't good enough but `--cold` is too disruptive
+
+**Not on the Phase B roadmap** (deliberately dropped):
+
+- **Native Ofelia integration**. Cron is the right tool. Ofelia's job model (`job-exec` into a named container, `job-local` on the Ofelia container) doesn't fit a host-level script cleanly. Forcing it would mean a custom Ofelia image with `docker compose` plugin + Docker socket + root access, plus admin-page UI work to add jobs — all to honor a pattern that doesn't fit. Host cron is the answer.
+- **Admin-UI launch button**. Long-running operations + web UIs is a footgun; the admin who runs a backup is already in SSH. The Backup/Restore admin page stays read-only / informational, by design.
+
+Failure / success notification is a separate discussion — see the Scheduling section above. Today the answer is cron's `MAILTO=` / pipe exit code into existing alerting; if operators ask for native built-in notification, it's a small Phase B addition.
 
 Tracking: [#219](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/219) for the backup-side enhancements, [#220](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/220) for the restore-side.
 
