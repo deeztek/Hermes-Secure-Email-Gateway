@@ -46,18 +46,25 @@
 
 set -uo pipefail
 
-# ---- Self-locate HERMES_ROOT (walk up to find docker-compose.yml + .git) ----
+# ---- Self-locate HERMES_ROOT (walk up to find docker-compose.yml) ----
+# Only docker-compose.yml is required as the sentinel; .git is intentionally
+# NOT required here (unlike system_update_docker.sh which needs git for
+# `git fetch` + `git checkout`). Upload-deployed installs that bypass git
+# clone -- the common pattern on DEV / Test boxes that get files pushed via
+# scp / rsync -- have no .git/ at all. The backup/restore scripts only
+# need to find .env and call docker compose, so docker-compose.yml alone
+# is enough to identify the install root.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -z "${HERMES_ROOT:-}" ]]; then
     HERMES_ROOT="$SCRIPT_DIR"
     while [[ "$HERMES_ROOT" != "/" ]]; do
-        if [[ -f "$HERMES_ROOT/docker-compose.yml" && -d "$HERMES_ROOT/.git" ]]; then
+        if [[ -f "$HERMES_ROOT/docker-compose.yml" ]]; then
             break
         fi
         HERMES_ROOT="$(dirname "$HERMES_ROOT")"
     done
     if [[ "$HERMES_ROOT" == "/" ]]; then
-        echo "ERROR: Could not locate docker-compose.yml + .git pair walking up from $SCRIPT_DIR" >&2
+        echo "ERROR: Could not locate docker-compose.yml walking up from $SCRIPT_DIR" >&2
         echo "Set HERMES_ROOT environment variable manually and retry." >&2
         exit 1
     fi
