@@ -185,12 +185,13 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-
 
 **The restore replaces the data in the backup's scope and leaves other scopes alone.** Restoring a `system` backup overwrites the install root + Data tier + DBs + LDAP; the Vmail / Archive / Nextcloud tiers are untouched. Restoring a `vmail` backup overwrites only `/mnt/vmail`. The stack is stopped for the duration of the restore (always — even hot-mode backups are restored cold).
 
-### Safety: SHA256 verification + topology refusal
+### Safety: SHA256, version, and topology gates
 
-Two gates fire BEFORE any destructive action:
+Three gates fire BEFORE any destructive action:
 
 1. **Manifest SHA256 verification.** Every inner archive's SHA256 is checked against the manifest. If any byte of the backup is corrupt or tampered with, the restore aborts BEFORE stopping the stack or touching any data.
-2. **Storage-topology refusal.** If the backup's recorded mount paths (`/mnt/data`, `/mnt/vmail`, etc.) don't match this host's current mount paths from `.env`, the restore aborts with a clear error and instructions for forcing a remap.
+2. **Hermes build-version match.** The backup's `build_no` (captured at backup time from `system_settings.build_no`) is compared against the current host's `build_no`. If they differ, restore refuses unless `FORCE_VERSION_MISMATCH=1` is set. Schema migrations between Hermes builds make cross-version restore unsafe — restoring a v260119 DB dump onto a v260201 host leaves the schema in a state the running code does not expect, which breaks silently when something hits a missing or renamed column. **The correct procedure is to install Hermes at the matching build first (`git checkout <build>`), restore, then upgrade forward via `scripts/system_update_docker.sh`** — same model the legacy bare-metal install documented.
+3. **Storage-topology refusal.** If the backup's recorded mount paths (`/mnt/data`, `/mnt/vmail`, etc.) don't match this host's current mount paths from `.env`, the restore aborts with a clear error and instructions for forcing a remap.
 
 To restore a backup onto a host with a different storage topology (e.g., a 5-tier-split host restoring onto a single-mount host where everything lives under `/mnt/data`), set `FORCE_REMAP=1`:
 

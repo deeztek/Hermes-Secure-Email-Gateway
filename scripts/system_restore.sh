@@ -82,6 +82,15 @@ Environment:
                  this host's (different DATA_MOUNT etc.). Without it,
                  restore refuses on topology mismatch.
 
+  FORCE_VERSION_MISMATCH=1
+                 Required if the backup's Hermes build_no does NOT match
+                 this host's current build_no. Schema migrations between
+                 builds make restore unsafe by default. Override only if
+                 you understand the schema risk -- the documented
+                 procedure is to install Hermes at the matching build
+                 first, restore, then upgrade forward with
+                 system_update_docker.sh.
+
 The stack is STOPPED for the duration of the restore. All data in the
 backup's scope is REPLACED on this host. Other scopes are left alone:
 restoring a "vmail" backup only touches /mnt/vmail; restoring an
@@ -266,6 +275,59 @@ extract_and_verify() {
     log "Verifying SHA256 of inner archives..."
     local a
     for a in "${BK_ARCHIVES[@]}"; do verify_archive_sha "$a"; done
+}
+
+check_version_match() {
+    header "Version match check"
+    # Reads build_no from the current host's system_settings table. If the
+    # backup was taken on a different build, refuse unless FORCE_VERSION_MISMATCH=1.
+    # Same pattern as FORCE_REMAP=1 for topology mismatch.
+    #
+    # Why: schema migrations between Hermes releases can change tables, so a DB
+    # dump from build X restored onto a host running build Y leaves the schema
+    # in a state the running code doesn't expect -- breaks silently, hours later,
+    # when something hits a missing column. Hard-refusing upfront is the right
+    # default; the operator can override for legitimate cross-version cases
+    # (e.g., extracting old vmail files from an older backup without touching
+    # the DB).
+    if ! docker ps --format '{{.Names}}' | grep -q '^hermes_db_server$'; then
+        warn "hermes_db_server not running -- starting briefly to read current build_no..."
+        ( cd "$HERMES_ROOT" && docker compose start hermes_db_server ) >>"$LOG_FILE" 2>&1
+        sleep 4
+    fi
+    local current_build
+    current_build="$(docker exec hermes_db_server mariadb -u root -N -s hermes \
+        -e "SELECT value FROM system_settings WHERE parameter='build_no';" \
+        2>>"$LOG_FILE" | tr -d '[:space:]')"
+    if [[ -z "$current_build" ]]; then
+        warn "Could not read current build_no from system_settings -- proceeding without version check."
+        warn "If this is a fresh install or a partially-initialized host, that's expected."
+        return 0
+    fi
+    if [[ "$BK_BUILD_NO" == "$current_build" ]]; then
+        log "  Version match: ${current_build} ✓"
+        return 0
+    fi
+    if [[ "${FORCE_VERSION_MISMATCH:-0}" == "1" ]]; then
+        warn "Version mismatch: backup=${BK_BUILD_NO}, current host=${current_build}"
+        warn "FORCE_VERSION_MISMATCH=1 -- proceeding. Restored DBs may be incompatible with running code."
+        warn "Schema-sensitive paths (admin UI queries, mail-flow handlers, etc.) may fail unpredictably"
+        warn "until you complete a 'system_update_docker.sh' run to migrate the schema forward."
+        return 0
+    fi
+    error "Version mismatch: backup build=${BK_BUILD_NO}, current host build=${current_build}."
+    error "Schema migrations between these versions make restore unsafe."
+    error ""
+    error "Correct procedure (matches the legacy methodology):"
+    error "  1. Install Hermes at the SAME build as the backup (${BK_BUILD_NO})"
+    error "     git checkout ${BK_BUILD_NO} && docker compose up -d"
+    error "  2. Re-run this restore -- version match, restore proceeds."
+    error "  3. After restore verified, upgrade forward with"
+    error "     scripts/system_update_docker.sh"
+    error ""
+    error "To restore anyway and accept the schema-mismatch risk:"
+    error "  FORCE_VERSION_MISMATCH=1 $0 -F ${BACKUP_FILE}"
+    fatal "Refusing to restore on version mismatch without explicit FORCE_VERSION_MISMATCH=1."
 }
 
 check_topology() {
@@ -508,6 +570,7 @@ main() {
     log "Mode: $((( DRY_RUN )) && echo DRY-RUN || echo LIVE)"
     preflight
     extract_and_verify
+    check_version_match
     check_topology
     confirm_destructive
     stop_stack
