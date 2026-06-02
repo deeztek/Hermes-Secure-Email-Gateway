@@ -94,20 +94,48 @@ header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
 #   (no network-receive checks), so the From: address can be anything
 #   Postfix accepts as local; we use postmaster@<hostname>.
 send_notification() {
-    local status="$1"   # SUCCESS or FAILURE
+    local status="$1"   # SUCCESS, FAILURE, TEST_SUCCESS, or TEST_FAILURE
     local detail="${2:-}"
 
     [[ -z "$NOTIFY_EMAIL" ]] && return 0
     [[ "$status" == "SUCCESS" ]] && (( ! NOTIFY_ON_SUCCESS )) && return 0
     (( DRY_RUN )) && { log "[dry-run] would send ${status} notification to ${NOTIFY_EMAIL}"; return 0; }
 
-    local host subject from log_tail body
+    local host subject from log_tail body status_label is_test=0
     host="$(hostname -f 2>/dev/null || hostname)"
-    subject="[${status}] Hermes backup on ${host} (scope=${SCOPE:-?})"
+    case "$status" in
+        TEST_SUCCESS) status_label="[TEST] [SUCCESS]"; is_test=1 ;;
+        TEST_FAILURE) status_label="[TEST] [FAILURE]"; is_test=1 ;;
+        SUCCESS)      status_label="[SUCCESS]" ;;
+        FAILURE)      status_label="[FAILURE]" ;;
+        *)            status_label="[${status}]" ;;
+    esac
+    subject="${status_label} Hermes backup on ${host} (scope=${SCOPE:-test})"
     from="postmaster@${host}"
     log_tail="$(tail -50 "$LOG_FILE" 2>/dev/null || echo '(log unavailable)')"
 
-    if [[ "$status" == "FAILURE" ]]; then
+    if (( is_test )); then
+        # Test payload -- self-explanatory body, no real run context to report.
+        body="This is a TEST notification from scripts/system_backup.sh.
+
+Host:        ${host}
+Subject:     ${subject}
+Sent at:     $(date)
+Sent by:     $(basename "$0") --test-notify
+
+If you are reading this in your inbox, the Hermes backup notification path
+is working end to end:
+  1. docker exec into hermes_postfix_dkim succeeded
+  2. The Postfix container accepted the message
+  3. Postfix delivered to ${NOTIFY_EMAIL}
+
+No actual backup was run. Real backups will send messages prefixed
+[SUCCESS] or [FAILURE] (without the leading [TEST] tag), so any ops-
+alert filters watching for [FAILURE] will NOT be tripped by this test.
+
+---
+This message was sent by scripts/system_backup.sh --test-notify."
+    elif [[ "$status" == "FAILURE" ]]; then
         body="The Hermes backup at $(date) FAILED.
 
 Host:        ${host}
@@ -164,6 +192,7 @@ COLD_MODE=0
 NO_NC_MAINTENANCE=0
 NOTIFY_EMAIL=""
 NOTIFY_ON_SUCCESS=0
+TEST_NOTIFY=0
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
@@ -222,6 +251,16 @@ Notifications:
                  opt-in for the "daily I-am-alive confirmation" use
                  case.
 
+  --test-notify  Send a test [TEST] [SUCCESS] email AND a test
+                 [TEST] [FAILURE] email immediately, then exit. Lets
+                 you verify the notification path (Hermes Postfix
+                 container -> external delivery -> your inbox /
+                 alerting tool) without running an actual backup or
+                 forcing a real failure. Requires --notify-email=ADDR;
+                 -P and -B are not required. Subjects are prefixed
+                 [TEST] so any ops-alert filters watching for
+                 [FAILURE] are not tripped.
+
 Options:
   --yes          Skip the interactive confirmation prompt.
   --dry-run      Show what would be done without changing anything.
@@ -236,6 +275,7 @@ Examples:
        --notify-email=admin@example.com                   # email on failure
   sudo $(basename "$0") -P /mnt/backups -B all --yes \\
        --notify-email=admin@example.com --notify-on-success   # both
+  sudo $(basename "$0") --test-notify --notify-email=admin@example.com  # test only
 
 Output filename:
   <path>/hermes-backup-<scope>-<build_no>-<UTC-timestamp>.tar
@@ -261,6 +301,7 @@ while [[ $# -gt 0 ]]; do
         --notify-email=*)     NOTIFY_EMAIL="${1#--notify-email=}"; shift ;;
         --notify-email)       NOTIFY_EMAIL="$2"; shift 2 ;;
         --notify-on-success)  NOTIFY_ON_SUCCESS=1; shift ;;
+        --test-notify)        TEST_NOTIFY=1; shift ;;
         --yes|-y)             ASSUME_YES=1; shift ;;
         --dry-run|-n)         DRY_RUN=1; shift ;;
         --help|-h)            SHOW_HELP=1; shift ;;
@@ -269,12 +310,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 if (( SHOW_HELP )); then usage; exit 0; fi
-if [[ -z "$BACKUP_PATH" ]]; then error "Required flag -P missing."; usage; exit 1; fi
-if [[ -z "$SCOPE" ]]; then error "Required flag -B missing."; usage; exit 1; fi
-case "$SCOPE" in
-    system|archive|vmail|nextcloud|all) ;;
-    *) error "Invalid -B scope '${SCOPE}'. Must be one of: system, archive, vmail, nextcloud, all."; exit 1 ;;
-esac
+# --test-notify is self-contained: needs --notify-email but NOT -P or -B.
+# Handled below after the helper functions are defined; just relax the
+# required-arg checks for it here.
+if (( ! TEST_NOTIFY )); then
+    if [[ -z "$BACKUP_PATH" ]]; then error "Required flag -P missing."; usage; exit 1; fi
+    if [[ -z "$SCOPE" ]]; then error "Required flag -B missing."; usage; exit 1; fi
+    case "$SCOPE" in
+        system|archive|vmail|nextcloud|all) ;;
+        *) error "Invalid -B scope '${SCOPE}'. Must be one of: system, archive, vmail, nextcloud, all."; exit 1 ;;
+    esac
+fi
+if (( TEST_NOTIFY )) && [[ -z "$NOTIFY_EMAIL" ]]; then
+    error "--test-notify requires --notify-email=ADDR (otherwise there's nowhere to send the test)."
+    exit 1
+fi
 if [[ $EUID -ne 0 ]] && (( ! DRY_RUN )); then fatal "Must run as root (live mode)."; fi
 
 # ---- Scope helpers --------------------------------------------------------
@@ -652,7 +702,23 @@ report() {
     log "  sudo ./scripts/system_restore.sh -F '${FINAL_TAR}'"
 }
 
+test_notify_and_exit() {
+    log "Hermes SEG system backup -- test notification mode"
+    log "Target: ${NOTIFY_EMAIL}"
+    log "Sending [TEST] [SUCCESS] sample..."
+    send_notification TEST_SUCCESS
+    log "Sending [TEST] [FAILURE] sample..."
+    send_notification TEST_FAILURE
+    log ""
+    log "Two test messages dispatched to ${NOTIFY_EMAIL}."
+    log "Check your inbox (and ops alerting if any) to confirm both arrived."
+    log "If neither arrived: verify hermes_postfix_dkim is running and check"
+    log "${LOG_FILE} for sendmail errors."
+    exit 0
+}
+
 main() {
+    if (( TEST_NOTIFY )); then test_notify_and_exit; fi
     log "Hermes SEG system backup (#219 Phase A)"
     preflight
     run_backup

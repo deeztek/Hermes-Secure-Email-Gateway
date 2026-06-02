@@ -130,6 +130,15 @@ Failure bodies include the timestamp, scope, mode, reason, log file path, and th
 
 **How it works**: the script shells out to `docker exec -i hermes_postfix_dkim sendmail -t` and pipes the message into the Postfix container's `sendmail` binary. Postfix queues and delivers it like any other outbound mail from Hermes. No host MTA configuration is needed — Hermes's own Postfix does the work.
 
+**Verify the path before wiring into cron** — `--test-notify` sends one `[TEST] [SUCCESS]` sample and one `[TEST] [FAILURE]` sample to the address you give, then exits without running a backup:
+
+```bash
+sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh --test-notify \
+  --notify-email=admin@example.com
+```
+
+Both test messages have a `[TEST]` prefix in the subject so any ops-alert filters watching for `[FAILURE]` are not tripped. If both arrive, your notification path is good. If neither arrives, check `hermes_postfix_dkim` is running and look at the log file the script prints for sendmail errors.
+
 **Caveat — needs Hermes to be at least partially healthy**: if the failure cause is "the Postfix container is down" or "the Docker daemon is down", `docker exec` has nothing to talk to and the email won't go out. The script logs the failure-to-notify as a warning and exits with the original non-zero status, but you won't get the email. This is the gap external monitoring fills — see below.
 
 ### External monitoring (strongly recommended)
