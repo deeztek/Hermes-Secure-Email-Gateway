@@ -149,35 +149,19 @@ id="btn-back-to-top"
      SSH-native operation. Wrapping it in a web UI buys nothing (web UI
      adds brittleness: page-reload kills progress, websocket timeouts,
      race conditions) and costs significant dev time on something
-     sysadmins are already doing from a shell. This page is a read-only
-     INFO surface -- discover the tool, see what's on disk, click out
-     to the docs. No buttons, no actions.
-=========================================================================== --->
+     sysadmins are already doing from a shell.
 
-<!--- Discover backups on disk. Default discovery path is /mnt/backups
-     because that's the convention the scripts document. If the operator
-     uses a different -P path, those backups won't appear here -- the
-     page's job is discoverability for newcomers, not authoritative
-     inventory. --->
-<cfset backupDiscoveryPath = "/mnt/backups">
-<cfset backupFiles = []>
-<cfif directoryExists(backupDiscoveryPath)>
-    <cftry>
-        <cfdirectory action="list" directory="#backupDiscoveryPath#" name="qBackups" filter="hermes-backup-*.tar" sort="dateLastModified DESC">
-        <cfloop query="qBackups">
-            <cfset arrayAppend(backupFiles, {
-                "name": qBackups.name,
-                "size": qBackups.size,
-                "modified": qBackups.dateLastModified
-            })>
-        </cfloop>
-        <cfcatch type="any"></cfcatch>
-    </cftry>
-</cfif>
+     This page is a pointer to the CLI, not a launcher. It exists so
+     the sidebar entry isn't a dead link and so an admin who clicks
+     "Backup/Restore" sees the canonical commands + a link to the full
+     docs. No discovery list, no buttons, no actions -- the admin who
+     ran the backup already knows where it landed (the CLI prints the
+     path on success).
+=========================================================================== --->
 
 <div class="alert alert-info" role="alert">
   <h5 class="alert-heading"><i class="fas fa-terminal"></i> Backup &amp; Restore is CLI-only</h5>
-  <p class="mb-0">Run backups and restores by SSH'ing into the Docker host and invoking the scripts below. This page is read-only &mdash; there is no launch button by design. See the <a href="#" onClick="window.open('https://docs.deeztek.com/books/administrator-guide/page/backup-restore', '_blank'); return false;"><b>full Backup &amp; Restore documentation</b></a> for the disaster-recovery flow, hot-backup alternatives, and what NOT to do.</p>
+  <p class="mb-0">Run backups and restores by SSH'ing into the Docker host and invoking the scripts below. This page is informational &mdash; there is no launch button by design. See the <a href="#" onClick="window.open('https://docs.deeztek.com/books/administrator-guide/page/backup-restore', '_blank'); return false;"><b>full Backup &amp; Restore documentation</b></a> for scope tradeoffs, the disaster-recovery flow, hypervisor-snapshot alternatives, and what NOT to do.</p>
 </div>
 
 <div class="card mb-3">
@@ -205,41 +189,6 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all  
     <p>Verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless <code>FORCE_REMAP=1</code> is set, stops the stack for the duration of the restore (always; even hot-mode backups restore cold), restores DBs via socket-auth <code>mariadb</code>, restores OpenLDAP via <code>slapadd</code>, rsyncs each in-scope tier from staging to its mount path with <code>--delete</code>, and restarts the stack. Reads the scope from the backup's manifest: restoring a <code>vmail</code> backup only touches <code>/mnt/vmail</code>; restoring an <code>archive</code> backup only touches <code>/mnt/archive</code>; etc.</p>
     <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre>
     <p class="mb-0 text-muted small">If restoring onto a host with a different storage topology (different DATA_MOUNT etc.), prefix with <code>FORCE_REMAP=1</code>. Run <code>system_restore.sh --help</code> for full usage.</p>
-  </div>
-</div>
-
-<div class="card mb-3">
-  <div class="card-header">
-    <strong>Backups discovered at <code><cfoutput>#backupDiscoveryPath#</cfoutput></code></strong>
-    <span class="text-muted small">&mdash; read-only inventory; the canonical location is wherever you point <code>-P</code></span>
-  </div>
-  <div class="card-body p-0">
-    <cfif NOT directoryExists(backupDiscoveryPath)>
-      <p class="m-3 text-muted">Directory <code><cfoutput>#backupDiscoveryPath#</cfoutput></code> does not exist on the Docker host. Create it (e.g., <code>sudo mkdir /mnt/backups</code>) and run a backup, or point your backup script's <code>-P</code> flag at a different path &mdash; that path won't be auto-discovered here, but the backups will be created and restorable.</p>
-    <cfelseif arrayLen(backupFiles) EQ 0>
-      <p class="m-3 text-muted">No <code>hermes-backup-*.tar</code> files found at <code><cfoutput>#backupDiscoveryPath#</cfoutput></code>. Run the backup command above to create one.</p>
-    <cfelse>
-      <table class="table table-striped table-hover mb-0">
-        <thead>
-          <tr>
-            <th>Filename</th>
-            <th class="text-end">Size</th>
-            <th>Last modified</th>
-          </tr>
-        </thead>
-        <tbody>
-          <cfoutput>
-            <cfloop array="#backupFiles#" index="b">
-              <tr>
-                <td><code>#b.name#</code></td>
-                <td class="text-end">#numberFormat(b.size / 1048576, "0.0")# MB</td>
-                <td>#dateFormat(b.modified, "yyyy-mm-dd")# #timeFormat(b.modified, "HH:mm:ss")#</td>
-              </tr>
-            </cfloop>
-          </cfoutput>
-        </tbody>
-      </table>
-    </cfif>
   </div>
 </div>
 
