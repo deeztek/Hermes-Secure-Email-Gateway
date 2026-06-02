@@ -86,22 +86,26 @@ nextcloud.tar.gz               ← Nextcloud tier; nextcloud / all scopes only
 
 ### Scheduling
 
-For nightly automated backups, register the command as an Ofelia job using the existing **System > Scheduled Tasks** admin page. The Ofelia job is just a shell command on the Docker host; no separate backup-scheduling UI exists by design. Example Ofelia job:
+For nightly automated backups, use **host cron** on the Docker host. `system_backup.sh` is a host-level script (it runs `docker compose stop`, reads `.env` from the host, writes to `/mnt/backups` on the host) — host cron is the natural fit. Example `/etc/cron.d/hermes-backup`:
 
-```text
-schedule: 0 0 3 * * *
-command:  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
+```cron
+# m h dom mon dow user  command
+0 3 * * *      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system    --yes >> /var/log/hermes-backup.log 2>&1
+0 4 * * 0      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B vmail     --yes >> /var/log/hermes-backup.log 2>&1
+0 5 1 * *      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all       --yes >> /var/log/hermes-backup.log 2>&1
 ```
 
 A typical cadence:
 
-```text
-0 3 * * *        system    (nightly; small, fast, captures DBs + configs)
-0 4 * * 0        all       (weekly Sunday; full DR snapshot)
-0 5 1 * *        nextcloud (monthly; NC files for offsite copy)
-```
+| Cadence | Scope | Why |
+|---|---|---|
+| Nightly | `system` | Small + fast. Captures DBs, LDAP, configs, install-root state. Run with hot mode = zero downtime. |
+| Weekly | `vmail` (or `archive` or `nextcloud`, rotated) | Larger but slower-changing. |
+| Monthly | `all` | Full disaster-recovery snapshot. |
 
-The script's exit code reflects success (0) or failure (non-zero), so Ofelia's built-in alerting picks up failures.
+The script's exit code reflects success (0) or failure (non-zero) — pipe into your existing alerting (Nagios, Zabbix, healthchecks.io, etc.) however you already wire host cron failures.
+
+> **Why host cron and not Ofelia?** Ofelia runs as a container (`hermes_ofelia`). Its job model (`job-exec` into a named container, `job-local` on the Ofelia container itself) doesn't fit `system_backup.sh` cleanly — the script needs host-level `docker compose` access, root, and write access to `/mnt/backups`. Ofelia's image lacks `docker compose` plugin and root host access. Native Ofelia integration is deferred to Phase B; the existing **System > Scheduled Tasks** admin page lists Ofelia jobs but does NOT support adding new ones from the UI today.
 
 ### Off-site copy
 

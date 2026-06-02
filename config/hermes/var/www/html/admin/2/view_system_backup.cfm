@@ -161,7 +161,7 @@ id="btn-back-to-top"
 
 <div class="alert alert-info" role="alert">
   <h5 class="alert-heading"><i class="fas fa-terminal"></i> Backup &amp; Restore is CLI-only</h5>
-  <p class="mb-0">Run backups and restores by SSH'ing into the Docker host and invoking the scripts below. This page is informational &mdash; there is no launch button by design. See the <a href="#" onClick="window.open('https://docs.deeztek.com/books/administrator-guide/page/backup-restore', '_blank'); return false;"><b>full Backup &amp; Restore documentation</b></a> for scope tradeoffs, the disaster-recovery flow, hypervisor-snapshot alternatives, and what NOT to do.</p>
+  <p class="mb-0">Run backups and restores by SSH'ing into the Docker host and invoking the scripts below. This page is informational &mdash; there is no launch button by design. See the <a href="#" onClick="window.open('https://docs.deeztek.com/books/administrator-guide/page/backuprestore', '_blank'); return false;"><b>full Backup &amp; Restore documentation</b></a> for scope tradeoffs, the disaster-recovery flow, hypervisor-snapshot alternatives, and what NOT to do.</p>
 </div>
 
 <div class="card mb-3">
