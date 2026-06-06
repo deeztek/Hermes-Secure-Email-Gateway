@@ -589,6 +589,27 @@ restore_tiers() {
     for t in "${TIERS[@]}"; do restore_tier "$t"; done
 }
 
+ensure_scripts_executable() {
+    # Defensive chmod +x on every .sh in the repo. tar/rsync restore can
+    # strip the executable bit depending on the source filesystem and the
+    # tar/rsync flags used. cfexecute on a non-executable script throws an
+    # exception that surfaces in the admin UI as
+    # "There was an error executing /opt/hermes/scripts/...".
+    # Run after restore_config completes (it rsyncs over the repo's
+    # config/hermes/opt/hermes/scripts/ tree) and before stack restart.
+    header "Ensuring .sh files are executable"
+    local count
+    count=$(find "$HERMES_ROOT" -name '*.sh' -type f ! -perm -u+x \
+            -not -path '*/.git/*' 2>/dev/null | wc -l)
+    if (( count > 0 )); then
+        find "$HERMES_ROOT" -name '*.sh' -type f ! -perm -u+x \
+            -not -path '*/.git/*' -exec chmod +x {} + 2>>"$LOG_FILE"
+        log "  +x applied to ${count} .sh file(s)"
+    else
+        log "  all .sh files already executable"
+    fi
+}
+
 restart_stack() {
     header "Restarting stack"
     run bash -c "cd '$HERMES_ROOT' && docker compose up -d"
@@ -653,6 +674,7 @@ main() {
     restore_databases
     restore_ldap
     restore_tiers
+    ensure_scripts_executable
     restart_stack
     post_restore_nc_maintenance_off
     cleanup_stage

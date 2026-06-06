@@ -940,6 +940,31 @@ prompt_mount_points() {
     log "Storage paths captured"
 }
 
+ensure_scripts_executable() {
+    # Defensive chmod +x on every .sh in the repo. Always runs (not state-
+    # guarded). Reasons it has to be defensive even when git tracks the
+    # executable bit:
+    #   - tar/rsync restores may strip permissions depending on source FS
+    #   - FAT/exFAT/CIFS mounts don't carry the bit
+    #   - Operators editing scripts in IDEs that drop the bit
+    #   - Cloning into a directory whose umask removes group/other bits
+    # cfexecute on a non-executable script throws an exception that surfaces
+    # in the admin UI as "There was an error executing /opt/hermes/scripts/...".
+    # Legacy install_hermes.sh did this; the Docker rewrite dropped it.
+    # See [[feedback-state-guards-only-for-slow-steps]].
+    log "Ensuring .sh files are executable..."
+    local count
+    count=$(find "$HERMES_ROOT" -name '*.sh' -type f ! -perm -u+x \
+            -not -path '*/.git/*' 2>/dev/null | wc -l)
+    if (( count > 0 )); then
+        find "$HERMES_ROOT" -name '*.sh' -type f ! -perm -u+x \
+            -not -path '*/.git/*' -exec chmod +x {} + 2>>"$LOG_FILE"
+        log "  +x applied to ${count} .sh file(s)"
+    else
+        log "  all .sh files already executable"
+    fi
+}
+
 provision_mount_dirs() {
     # Always runs (not state-guarded). mkdir/touch are fast + idempotent;
     # state-guarding them was a real footgun -- if a prior install completed
@@ -3856,6 +3881,12 @@ main() {
     # [[feedback-install-script-patterns]] rule #3.
     provision_mount_dirs
 
+    # Always ensure .sh files are executable. Same not-state-guarded
+    # rationale as provision_mount_dirs: fast, idempotent, recovers from
+    # FS modes that don't carry the +x bit (FAT/CIFS), tar restores
+    # without --preserve-permissions, IDE save quirks, etc.
+    ensure_scripts_executable
+
     if state_is_done "03-host-ip-confirmed"; then
         HERMES_HOST_IP=$(state_get_value "03-host-ip-confirmed")
         export HERMES_HOST_IP
@@ -4024,6 +4055,7 @@ case "${1:-}" in
         log "Storage configuration started at $(date)"
         prompt_mount_points
         provision_mount_dirs
+        ensure_scripts_executable
         generate_compose_override
         log "Storage configuration completed"
         echo ""
