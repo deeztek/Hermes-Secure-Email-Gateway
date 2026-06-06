@@ -154,10 +154,28 @@ cleanup_on_fatal() {
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
     fi
+    # Auto-delete staging on failure. Restore staging contains only gzip'd
+    # inner archives (recoverable from the source backup) -- no diagnostic
+    # value, unlike backup staging which holds partial dumps. With staging
+    # now living next to the backup file (often on a backup share with
+    # finite space), leaving 20GB+ stranded on every aborted run is a real
+    # problem.
     if [[ -d "${STAGE_DIR:-}" ]]; then
-        warn "Staging directory left at ${STAGE_DIR} for inspection."
+        warn "Removing staging directory: ${STAGE_DIR}"
+        rm -rf "$STAGE_DIR" 2>>"$LOG_FILE" \
+            || warn "Could not remove ${STAGE_DIR} -- delete manually."
     fi
 }
+
+cleanup_on_signal() {
+    # Triggered by SIGINT (Ctrl+C) / SIGTERM. Without this, an operator-
+    # interrupted restore leaves the staging dir stranded on the backup
+    # share. Re-uses cleanup_on_fatal for the same auto-delete behavior.
+    warn "Interrupted by signal -- cleaning up..."
+    cleanup_on_fatal
+    exit 130
+}
+trap cleanup_on_signal INT TERM
 
 confirm() {
     if (( ASSUME_YES )) || (( DRY_RUN )); then return 0; fi
