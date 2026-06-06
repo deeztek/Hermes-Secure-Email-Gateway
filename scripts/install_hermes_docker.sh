@@ -369,45 +369,6 @@ EOF
     done
 }
 
-prompt_console_host() {
-    # Console Address -- what admins type in the browser to reach /admin/.
-    # Can be an FQDN or an IP. Default is the mail hostname captured by
-    # prompt_mail_hostname, since most installs use the same FQDN for both.
-    # Independent from mail hostname is fine (e.g. admin.example.com vs
-    # smtp.example.com).
-    #
-    # Saved to state marker 05-console-host-confirmed. Consumed by:
-    #   - generate_nginx_config         (server_name + auth.conf)
-    #   - seed_install_specific_values  (parameters2.console.host)
-    #   - configure_ciphermail_portal_url (web portal URL)
-    #   - run_phase2_db_init Nextcloud config (OIDC discovery, theming, external sites)
-    local default="${HERMES_MAIL_HOSTNAME:-$HERMES_HOST_IP}"
-    echo ""
-    cat <<EOF
-+------------------------------------------------------------------+
-|  CONSOLE ADDRESS                                                 |
-|                                                                  |
-|  - The hostname or IP admins type to reach /admin/               |
-|  - Can be an FQDN (e.g. admin.example.com) or a raw IP           |
-|  - Often the same as the mail server hostname                    |
-|  - Can be changed afterward via System > Console Settings        |
-+------------------------------------------------------------------+
-
-EOF
-    local host
-    while true; do
-        read -p "Console Address [${default}]: " host
-        host="${host:-${default}}"
-        if validate_fqdn "$host" || validate_ipv4 "$host"; then
-            HERMES_CONSOLE_HOST="$host"
-            export HERMES_CONSOLE_HOST
-            log "Console address confirmed: ${HERMES_CONSOLE_HOST}"
-            return 0
-        fi
-        warn "Not a valid FQDN or IPv4 address. Try again."
-    done
-}
-
 prompt_host_ip() {
     # Required prompt — no default. Loops until a valid IPv4 is entered AND
     # explicitly confirmed. Stored value drives parameters2.server_ip,
@@ -1142,20 +1103,15 @@ generate_compose_override() {
     rm -f /tmp/.hermes_trusted.$$
 
     if [[ -n "$ip" ]]; then
-        # CONSOLE_HOST in .env is FORCED to the IP at install time, even if the
-        # admin entered an FQDN at prompt_console_host. Reason: at install time
-        # there's typically no DNS record yet for the FQDN, so nginx + Authelia
-        # + Nextcloud + Ciphermail bootstrap-rendering against the FQDN would
+        # CONSOLE_HOST in .env is the Host IP at install time. Reason: at
+        # install time there's typically no DNS record yet for the FQDN the
+        # admin will eventually use, so nginx + Authelia + Nextcloud +
+        # Ciphermail bootstrap-rendering against an unresolvable FQDN would
         # leave the admin unable to log in (cookie scoped to a hostname their
-        # browser can't reach). Admin reaches /admin/ via IP, then when DNS is
-        # ready they save System > Console Settings and CFML re-renders the
-        # whole web stack with their preferred FQDN.
-        #
-        # Admin's FQDN preference is preserved in:
-        #   - state marker 05-console-host-confirmed.value (for re-runs)
-        #   - parameters2.console.host in the DB (so the Console Settings UI
-        #     is pre-filled with the FQDN they entered)
-        log "Substituting HOST_IP = ${ip}, HERMES_HOSTNAME = ${mail_host:-${ip}}, CONSOLE_HOST = ${ip} (bootstrap; admin's FQDN choice '${console_host:-${ip}}' kept in DB)..."
+        # browser can't reach). Admin reaches /admin/ via IP at first, then
+        # when DNS is ready they save System > Console Settings and CFML
+        # re-renders the whole web stack with their preferred FQDN.
+        log "Substituting HOST_IP = ${ip}, HERMES_HOSTNAME = ${mail_host:-${ip}}, CONSOLE_HOST = ${ip} (bootstrap; admin can change console address via System > Console Settings post-install)..."
         sed -i \
             -e "s|^HOST_IP=.*|HOST_IP=${ip}|" \
             -e "s|^CONSOLE_HOST=.*|CONSOLE_HOST=${ip}|" \
@@ -3926,9 +3882,17 @@ main() {
     if state_is_done "05-console-host-confirmed"; then
         HERMES_CONSOLE_HOST=$(state_get_value "05-console-host-confirmed")
         export HERMES_CONSOLE_HOST
-        log "Skip: console address already confirmed (${HERMES_CONSOLE_HOST})"
+        log "Skip: console address already set (${HERMES_CONSOLE_HOST})"
     else
-        prompt_console_host
+        # No prompt -- install always uses the Host IP as the console address.
+        # The .env CONSOLE_HOST and parameters2.console.host both get the IP at
+        # install time (bootstrap-safe, always reachable, no DNS dependency).
+        # When DNS is ready, the admin changes this via System > Console
+        # Settings -- the UI saves to DB and re-renders nginx + Authelia +
+        # Nextcloud OIDC + Ciphermail portal URLs against the new FQDN.
+        HERMES_CONSOLE_HOST="$HERMES_HOST_IP"
+        export HERMES_CONSOLE_HOST
+        log "Console address: ${HERMES_CONSOLE_HOST} (Host IP; change later via System > Console Settings)"
         state_set_value "05-console-host-confirmed" "$HERMES_CONSOLE_HOST"
         state_mark_done "05-console-host-confirmed"
     fi
@@ -4001,7 +3965,11 @@ main() {
     # and gets pulled from hub.deeztek.com/ as usual; --build is a no-op
     # for them. Nextcloud's build is commented out (optional troubleshooting
     # utilities only); admin can opt in via docker-compose.yml.
-    if ! ( cd "$HERMES_ROOT" && docker compose up -d --build 2>&1 | tee -a "$LOG_FILE" ); then
+    # --progress=plain avoids the dozens-of-lines-per-image-layer flood that
+    # the default TTY-aware progress emits when stdout is piped through tee
+    # (no carriage-return redraw -> every update gets its own line). plain
+    # emits one line per real event (Pulling, Pulled, Built, Started).
+    if ! ( cd "$HERMES_ROOT" && docker compose up -d --build --progress=plain 2>&1 | tee -a "$LOG_FILE" ); then
         error "docker compose up -d --build failed. Inspect ${LOG_FILE}, fix the issue, then re-run ./install_hermes_docker.sh (state guards will resume where you left off)."
     fi
     log "Containers started"
