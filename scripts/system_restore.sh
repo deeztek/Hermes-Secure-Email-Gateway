@@ -104,8 +104,17 @@ restoring a "vmail" backup only touches /mnt/vmail; restoring an
 
 Disaster-recovery flow (different host):
   1. Install Hermes fresh on the new host (install root + .env exist).
-  2. scp the backup tarball from offsite storage.
-  3. sudo $(basename "$0") -F /path/to/backup.tar
+  2. Mount your backup storage on the new host (CIFS / NFS / S3FS / etc.)
+     so the backup tarball is reachable directly. This is preferable to
+     scp -- the restore extracts the outer tar to a staging directory in
+     the same parent dir as the backup file (default), so a mounted
+     share with plenty of space "just works" without filling local
+     storage. Example:
+         sudo mount -t cifs //backup-host/share /mnt/backups \
+             -o credentials=/root/.smbcreds
+  3. sudo $(basename "$0") -F /mnt/backups/hermes-backup-system-vXXXXXX.tar
+  4. After restore completes, if the new host's IP/hostname differs from
+     the backup's, run scripts/system_rehost.sh to rewire identity.
 EOF
 }
 
