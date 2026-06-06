@@ -349,20 +349,23 @@ extract_and_verify() {
         || fatal "Failed to create staging dir under ${staging_parent}"
     log "Staging dir: ${STAGE_DIR}"
 
-    # Disk-space warning + sanity check. The staging directory will hold:
-    #   1. The extracted outer tar (= backup file size, since the outer
-    #      tar is uncompressed -cf, not -czf -- its contents are already
-    #      gzip'd inner archives)
-    #   2. Per-tier extracts (each inner tier.tar.gz expanded into
-    #      extracted_<tier>/ -- raw uncompressed data, can be 2-3x the
-    #      gzip'd size on top of the outer-tar extract from step 1)
-    # Rough estimate: peak usage = backup_size + sum(uncompressed_tier_sizes)
-    # which can easily be 3-4x the .tar size for data-heavy backups.
+    # Disk-space warning + sanity check. The staging directory only holds
+    # the extracted OUTER tar (= backup file size, since outer is -cf not
+    # -czf -- its contents are already gzip'd inner archives). Per-tier
+    # extracts stream directly to the destination filesystem (TIER_PATH),
+    # NOT through staging. So scratch requirement = ~1x backup size.
+    #
+    # The destination filesystem also needs space for the restored data,
+    # but that's typically the LIVE filesystem the data is being restored
+    # to (you wouldn't be restoring data you don't have room for). The
+    # operator is responsible for ensuring TIER_PATH dests have room.
+    #
+    # 1.1x conservative buffer for filesystem overhead + simultaneous
+    # writes during the extract.
     local backup_size_bytes backup_size_h required_bytes required_h avail_bytes avail_h fs_label
     backup_size_bytes=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)
     backup_size_h=$(numfmt --to=iec "$backup_size_bytes" 2>/dev/null || echo "?")
-    # Conservative multiplier: 3x backup size as the safe required estimate
-    required_bytes=$(( backup_size_bytes * 3 ))
+    required_bytes=$(( backup_size_bytes * 11 / 10 ))
     required_h=$(numfmt --to=iec "$required_bytes" 2>/dev/null || echo "?")
     avail_bytes=$(df --output=avail -B1 "$staging_parent" 2>/dev/null | tail -1 | tr -d ' ')
     avail_h=$(numfmt --to=iec "${avail_bytes:-0}" 2>/dev/null || echo "?")
@@ -370,20 +373,24 @@ extract_and_verify() {
 
     echo "" | tee -a "$LOG_FILE"
     warn "================================================================"
-    warn "  DISK SPACE WARNING"
+    warn "  DISK SPACE CHECK -- staging directory"
     warn "================================================================"
-    warn "  Restore extracts the backup to a staging directory BEFORE"
-    warn "  rsync'ing data to the final tier paths. Peak disk use during"
-    warn "  restore is roughly 3x the backup size (outer tar extract +"
-    warn "  per-tier uncompressed extracts running in sequence)."
+    warn "  Restore extracts the OUTER tar to staging, then streams each"
+    warn "  inner tier tar DIRECTLY to its destination filesystem (no"
+    warn "  intermediate copy). Staging needs ~1x the backup size."
     warn ""
     warn "  Backup file size:     ${backup_size_h}"
-    warn "  Estimated required:   ${required_h}  (3x backup, conservative)"
+    warn "  Staging required:     ${required_h}  (~1.1x backup, buffer for overhead)"
     warn "  Staging filesystem:   ${fs_label:-${staging_parent}}"
     warn "  Available space:      ${avail_h}"
     warn ""
+    warn "  NOTE: each tier's destination filesystem (DATA_MOUNT, VMAIL_MOUNT,"
+    warn "  etc.) also needs enough free space for the restored tier data."
+    warn "  This check covers ONLY the staging extract. Verify your tier"
+    warn "  destinations independently if you're not sure they fit."
+    warn ""
     if (( avail_bytes < required_bytes )); then
-        warn "  *** INSUFFICIENT SPACE -- restore will likely fail mid-extract. ***"
+        warn "  *** INSUFFICIENT STAGING SPACE -- aborting before extraction. ***"
         warn ""
         warn "  Options:"
         warn "    - Free space on ${fs_label:-${staging_parent}} and retry"
@@ -612,54 +619,35 @@ restore_tier() {
 
     local src_archive="${STAGE_DIR}/${archive}"
     local dest="${TIER_PATH[$tier]}"
-    local tier_stage="${STAGE_DIR}/extracted_${tier}"
 
-    log "  ${tier}: extract + rsync --delete to ${dest}"
+    log "  ${tier}: extract directly to ${dest}"
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s tar -xzf %s -C %s\n' "$CYAN" "$NC" "$src_archive" "$tier_stage" | tee -a "$LOG_FILE"
-        printf '%s[dry-run]%s rsync -a --delete %s/ %s/\n' "$CYAN" "$NC" "$tier_stage" "$dest" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s tar -xzf %s -C %s\n' "$CYAN" "$NC" "$src_archive" "$dest" | tee -a "$LOG_FILE"
         return 0
     fi
 
-    mkdir -p "$tier_stage"
+    mkdir -p "$dest"
+
+    # Stream-extract the inner tier tar DIRECTLY to its final destination.
+    # No per-tier staging copy + no rsync intermediate = peak scratch space
+    # stays at ~1x the backup size (just the outer-tar extract in STAGE_DIR).
+    # The legacy non-Docker system_restore.sh worked this way (tar -xf to
+    # root); we kept the same shape, just per-tier instead of monolithic.
+    #
+    # Trade-off: no --delete semantics. Files that exist at DEST but weren't
+    # in the backup (e.g. mail received after the backup was taken, or
+    # leftovers from a prior install) will SURVIVE the restore. For DR onto
+    # a fresh install: no impact (DEST is empty). For "restore-over-existing"
+    # scenarios: orphan files persist; clean manually if it matters.
+    #
+    # Preserved on DEST without explicit handling:
+    #   - dbase/, ldap/data/, mail_filter/data/clamav/ in the data tier
+    #     (backup excludes them; tar -x can't delete what it doesn't see)
+    #   - install-logs/, .git/ in the config tier (same rationale)
     start_heartbeat "${tier}: extract" "" 60
-    tar -xzf "$src_archive" -C "$tier_stage" 2>>"$LOG_FILE" \
-        || { stop_heartbeat; fatal "Failed to extract ${archive}."; }
+    tar -xzf "$src_archive" -C "$dest" 2>>"$LOG_FILE" \
+        || { stop_heartbeat; fatal "Failed to extract ${archive} to ${dest}."; }
     stop_heartbeat
-
-    local exclude_args=()
-    case "$tier" in
-        config)
-            # Preserve install-logs/ and .git/ on the target -- they were
-            # excluded from the backup so without these excludes rsync's
-            # --delete would wipe them.
-            exclude_args=( --exclude='install-logs/' --exclude='.git/' )
-            ;;
-        data)
-            # Preserve dbase/, ldap/data/, and mail_filter/data/clamav/ on
-            # the target -- the backup excluded them because DB dumps,
-            # slapcat, and ClamAV signature regeneration are the
-            # authoritative sources. Without these excludes, --delete would
-            # wipe MariaDB's tablespace files (restore would still work via
-            # mariadb-dump repopulating) and slapd's data files (LDAP restore
-            # would have no on-disk LMDB to slapadd into).
-            #
-            # Paths must match the backup-side excludes in system_backup.sh
-            # tar_tier(). If you change one, change the other.
-            exclude_args=( \
-                --exclude='dbase/' \
-                --exclude='ldap/data/' \
-                --exclude='mail_filter/data/clamav/' \
-            )
-            ;;
-    esac
-
-    start_heartbeat "${tier}: rsync" "" 60
-    rsync -a --delete "${exclude_args[@]}" "${tier_stage}/" "${dest}/" 2>>"$LOG_FILE" \
-        || { stop_heartbeat; fatal "rsync failed for tier '${tier}'."; }
-    stop_heartbeat
-
-    rm -rf "$tier_stage"
 }
 
 restore_tiers() {
