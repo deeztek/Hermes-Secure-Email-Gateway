@@ -141,6 +141,9 @@ run() {
 }
 
 cleanup_on_fatal() {
+    # Heartbeat may still be running if fatal fired mid-op; reap it first so
+    # it doesn't keep emitting "still running" lines after the FAILURE line.
+    stop_heartbeat
     if (( STACK_STOPPED )) && (( ! DRY_RUN )); then
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
@@ -238,6 +241,38 @@ wait_for_container() {
     fatal "${name} did not become ready within 60s."
 }
 
+# Background heartbeat: emits a log line every N seconds with elapsed time
+# and (if given a watch file) the file's current size. Wraps a long op so
+# operators / cron logs can see progress instead of a frozen-looking terminal.
+# stop_heartbeat is idempotent + safe to call when no heartbeat is running.
+HEARTBEAT_PID=""
+start_heartbeat() {
+    local label="$1"
+    local watch_file="${2:-}"
+    local interval="${3:-60}"
+    stop_heartbeat
+    (
+        local start=$SECONDS
+        while true; do
+            sleep "$interval"
+            local elapsed=$((SECONDS - start))
+            if [[ -n "$watch_file" && -f "$watch_file" ]]; then
+                local size_h
+                size_h=$(stat -c%s "$watch_file" 2>/dev/null | numfmt --to=iec 2>/dev/null)
+                log "  ... ${label}: ${size_h:-?} after ${elapsed}s"
+            else
+                log "  ... ${label}: still running (${elapsed}s)"
+            fi
+        done
+    ) &
+    HEARTBEAT_PID=$!
+    disown 2>/dev/null || true
+}
+stop_heartbeat() {
+    [[ -n "$HEARTBEAT_PID" ]] && kill "$HEARTBEAT_PID" 2>/dev/null
+    HEARTBEAT_PID=""
+}
+
 # Run a mariadb client command inside hermes_db_server using root auth.
 # Password is read from the mounted Docker secret at /run/secrets/MYSQL_ROOT_PASSWORD.
 # (docker exec does NOT inherit env vars set by the entrypoint at runtime, so
@@ -290,8 +325,10 @@ extract_and_verify() {
         printf '%s[dry-run]%s tar -xf %s -C %s\n' "$CYAN" "$NC" "$BACKUP_FILE" "$STAGE_DIR" | tee -a "$LOG_FILE"
         return 0
     fi
+    start_heartbeat "extract outer tar" "" 60
     tar -xf "$BACKUP_FILE" -C "$STAGE_DIR" 2>>"$LOG_FILE" \
-        || fatal "Failed to extract outer tarball."
+        || { stop_heartbeat; fatal "Failed to extract outer tarball."; }
+    stop_heartbeat
 
     parse_manifest
 
@@ -506,8 +543,10 @@ restore_tier() {
     fi
 
     mkdir -p "$tier_stage"
+    start_heartbeat "${tier}: extract" "" 60
     tar -xzf "$src_archive" -C "$tier_stage" 2>>"$LOG_FILE" \
-        || fatal "Failed to extract ${archive}."
+        || { stop_heartbeat; fatal "Failed to extract ${archive}."; }
+    stop_heartbeat
 
     local exclude_args=()
     case "$tier" in
@@ -518,19 +557,28 @@ restore_tier() {
             exclude_args=( --exclude='install-logs/' --exclude='.git/' )
             ;;
         data)
-            # Preserve mysql/, ldap/, and clamav/ on the target -- the
-            # backup excluded them because DB dumps and slapcat are the
-            # authoritative restore sources. Without these excludes,
-            # --delete would wipe MariaDB's tablespace files and slapd's
-            # data files (DB restore would still work via mariadb-dump
-            # repopulating, but LDAP restore would have no on-disk state
-            # to slapadd into).
-            exclude_args=( --exclude='mysql/' --exclude='ldap/' --exclude='clamav/' )
+            # Preserve dbase/, ldap/data/, and mail_filter/data/clamav/ on
+            # the target -- the backup excluded them because DB dumps,
+            # slapcat, and ClamAV signature regeneration are the
+            # authoritative sources. Without these excludes, --delete would
+            # wipe MariaDB's tablespace files (restore would still work via
+            # mariadb-dump repopulating) and slapd's data files (LDAP restore
+            # would have no on-disk LMDB to slapadd into).
+            #
+            # Paths must match the backup-side excludes in system_backup.sh
+            # tar_tier(). If you change one, change the other.
+            exclude_args=( \
+                --exclude='dbase/' \
+                --exclude='ldap/data/' \
+                --exclude='mail_filter/data/clamav/' \
+            )
             ;;
     esac
 
+    start_heartbeat "${tier}: rsync" "" 60
     rsync -a --delete "${exclude_args[@]}" "${tier_stage}/" "${dest}/" 2>>"$LOG_FILE" \
-        || fatal "rsync failed for tier '${tier}'."
+        || { stop_heartbeat; fatal "rsync failed for tier '${tier}'."; }
+    stop_heartbeat
 
     rm -rf "$tier_stage"
 }

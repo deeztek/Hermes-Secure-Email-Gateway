@@ -377,6 +377,9 @@ run() {
 }
 
 cleanup_on_fatal() {
+    # Heartbeat may still be running if fatal fired mid-op; reap it first so
+    # it doesn't keep emitting "still running" lines after the FAILURE line.
+    stop_heartbeat
     if (( NC_MAINT_TOGGLED )) && (( ! DRY_RUN )); then
         warn "Attempting to clear NC maintenance mode..."
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --off >>"$LOG_FILE" 2>&1 || true
@@ -454,6 +457,38 @@ load_mounts() {
             [[ -d "${TIER_PATH[$t]}" ]] || fatal "Tier '$t' path does not exist: ${TIER_PATH[$t]}"
         fi
     done
+}
+
+# Background heartbeat: emits a log line every N seconds with elapsed time
+# and (if given a watch file) the file's current size. Wraps a long op so
+# operators / cron logs can see progress instead of a frozen-looking terminal.
+# stop_heartbeat is idempotent + safe to call when no heartbeat is running.
+HEARTBEAT_PID=""
+start_heartbeat() {
+    local label="$1"
+    local watch_file="${2:-}"
+    local interval="${3:-60}"
+    stop_heartbeat
+    (
+        local start=$SECONDS
+        while true; do
+            sleep "$interval"
+            local elapsed=$((SECONDS - start))
+            if [[ -n "$watch_file" && -f "$watch_file" ]]; then
+                local size_h
+                size_h=$(stat -c%s "$watch_file" 2>/dev/null | numfmt --to=iec 2>/dev/null)
+                log "  ... ${label}: ${size_h:-?} after ${elapsed}s"
+            else
+                log "  ... ${label}: still running (${elapsed}s)"
+            fi
+        done
+    ) &
+    HEARTBEAT_PID=$!
+    disown 2>/dev/null || true
+}
+stop_heartbeat() {
+    [[ -n "$HEARTBEAT_PID" ]] && kill "$HEARTBEAT_PID" 2>/dev/null
+    HEARTBEAT_PID=""
 }
 
 ensure_container_running() {
@@ -623,7 +658,9 @@ tar_tier() {
     # The script previously fatal'd on ANY non-zero; that misclassified
     # successful hot backups as failures.
     local tar_exit=0
+    start_heartbeat "${tier}: tar" "$out" 60
     tar -czf "$out" "${exclude_args[@]}" -C "$src" . 2>>"$LOG_FILE" || tar_exit=$?
+    stop_heartbeat
     case "$tar_exit" in
         0) ;;
         1) warn "  ${tier}: tar exited 1 (warnings only -- sockets ignored, live-file changes); archive is valid." ;;
@@ -782,7 +819,9 @@ assemble_outer() {
     # read it" on the staging dir itself even though all the inner files
     # are static and complete). Only exit >= 2 is a real failure.
     local outer_exit=0
+    start_heartbeat "outer tar" "$PARTIAL_TAR" 60
     tar -cf "$PARTIAL_TAR" -C "$STAGE_DIR" . 2>>"$LOG_FILE" || outer_exit=$?
+    stop_heartbeat
     case "$outer_exit" in
         0) ;;
         1) warn "  outer tar exited 1 (warnings only -- CIFS metadata quirk); archive is valid." ;;
