@@ -3156,8 +3156,8 @@ nextcloud user/pw:  $(cat "${CREDS_DIR}/nextcloud_mysql_username" 2>/dev/null ||
 AUTHELIA
 --------
 DB user/pw:         $(cat "${SECRETS_DIR}/authelia_username" 2>/dev/null || echo "?") / $(cat "${SECRETS_DIR}/authelia_password" 2>/dev/null || echo "?")
-JWT secret:         $(cat "${SECRETS_DIR}/authelia_jwt_secret" 2>/dev/null || echo "<not-generated>")
-Session secret:     $(cat "${SECRETS_DIR}/authelia_session_secret" 2>/dev/null || echo "<not-generated>")
+JWT secret:         $(cat "${SECRETS_DIR}/authelia_identity_validation_reset_password_jwt_secret_file" 2>/dev/null || echo "<not-generated>")
+Session secret:     $(cat "${SECRETS_DIR}/authelia_session_secret_file" 2>/dev/null || echo "<not-generated>")
 Storage enc key:    $(cat "${SECRETS_DIR}/authelia_storage_encryption_key_file" 2>/dev/null || echo "<not-generated>")
 
 LDAP
