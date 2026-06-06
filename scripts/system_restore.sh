@@ -60,13 +60,14 @@ header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
 
 # ---- Args ----
 BACKUP_FILE=""
+STAGING_DIR_OVERRIDE=""
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") -F <backup.tar> [--yes] [--dry-run] [--help]
+Usage: $(basename "$0") -F <backup.tar> [--staging-dir=PATH] [--yes] [--dry-run] [--help]
 
 Hermes SEG Docker system restore.
 
@@ -74,6 +75,14 @@ Required:
   -F <path>      Path to the backup tarball produced by system_backup.sh.
 
 Options:
+  --staging-dir=PATH   Where to extract the outer + tier tars during restore.
+                       Defaults to the backup file's parent directory (where
+                       there is by definition enough space, since the backup
+                       itself lives there). Override when:
+                         - the backup file is on a read-only mount
+                         - you have fast local scratch and want better perf
+                           than extracting over CIFS/NFS
+                       Must have at least ~2x the backup size free.
   --yes          Skip the interactive confirmation prompt.
   --dry-run      Show what would be done without changing anything.
   --help         Show this help.
@@ -102,11 +111,12 @@ EOF
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        -F)             BACKUP_FILE="$2"; shift 2 ;;
-        --yes|-y)       ASSUME_YES=1; shift ;;
-        --dry-run|-n)   DRY_RUN=1; shift ;;
-        --help|-h)      SHOW_HELP=1; shift ;;
-        *)              error "Unknown argument: $1"; usage; exit 1 ;;
+        -F)                 BACKUP_FILE="$2"; shift 2 ;;
+        --staging-dir=*)    STAGING_DIR_OVERRIDE="${1#*=}"; shift ;;
+        --yes|-y)           ASSUME_YES=1; shift ;;
+        --dry-run|-n)       DRY_RUN=1; shift ;;
+        --help|-h)          SHOW_HELP=1; shift ;;
+        *)                  error "Unknown argument: $1"; usage; exit 1 ;;
     esac
 done
 
@@ -315,7 +325,28 @@ preflight() {
 
 extract_and_verify() {
     header "Extracting backup + verifying manifest"
-    STAGE_DIR="$(mktemp -d -t hermes-restore-XXXXXX)"
+    # Default staging location: same directory as the backup file. The
+    # backup itself lives there, so by definition there's at least enough
+    # space to hold its uncompressed extract (and likely more, since the
+    # backup landed there from elsewhere). Operator can override with
+    # --staging-dir=PATH for read-only mounts or to use faster local
+    # scratch.
+    #
+    # /tmp was the prior default but it's typically root FS (~50-100GB) --
+    # a 2TB backup would fill root and brick the host mid-restore.
+    local staging_parent
+    if [[ -n "$STAGING_DIR_OVERRIDE" ]]; then
+        staging_parent="$STAGING_DIR_OVERRIDE"
+        [[ -d "$staging_parent" ]] || fatal "--staging-dir does not exist: ${staging_parent}"
+        [[ -w "$staging_parent" ]] || fatal "--staging-dir is not writable: ${staging_parent}"
+    else
+        staging_parent="$(dirname "$BACKUP_FILE")"
+        if [[ ! -w "$staging_parent" ]]; then
+            fatal "Default staging dir (${staging_parent}) is not writable. Use --staging-dir=PATH to point elsewhere."
+        fi
+    fi
+    STAGE_DIR="$(mktemp -d -p "$staging_parent" hermes-restore-XXXXXX)" \
+        || fatal "Failed to create staging dir under ${staging_parent}"
     log "Staging dir: ${STAGE_DIR}"
     if (( DRY_RUN )); then
         printf '%s[dry-run]%s tar -xf %s -C %s\n' "$CYAN" "$NC" "$BACKUP_FILE" "$STAGE_DIR" | tee -a "$LOG_FILE"
