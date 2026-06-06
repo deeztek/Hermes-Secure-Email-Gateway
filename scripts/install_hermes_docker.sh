@@ -4022,6 +4022,14 @@ main() {
 # COMMAND LINE HANDLING
 # ============================================================================
 
+# When sourced (not executed), skip the dispatch entirely so other scripts
+# can import this file's helper + generator functions without triggering
+# an install. system_rehost.sh uses this to reuse generate_nginx_config /
+# generate_authelia_config / etc. after a restore.
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0
+fi
+
 case "${1:-}" in
     --init-db)
         # Recovery escape hatch: re-run phase 2 (post-container init) only.

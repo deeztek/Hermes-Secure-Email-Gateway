@@ -646,6 +646,22 @@ cleanup_stage() {
     if [[ -d "$STAGE_DIR" ]]; then rm -rf "$STAGE_DIR"; fi
 }
 
+detect_host_identity_mismatch() {
+    # After restore, the restored .env carries the OLD host's IP / hostname.
+    # If this host has a different identity, the restored config makes the
+    # system unreachable -- nginx server_name, Authelia cookie domain,
+    # Postfix HELO etc. all reference the wrong host. Detect + warn so the
+    # operator knows to run system_rehost.sh.
+    #
+    # Returns 0 if mismatch detected, 1 if no mismatch (or detection failed).
+    [[ -f "${HERMES_ROOT}/.env" ]] || return 1
+    local restored_ip current_ip
+    restored_ip=$(grep -E '^HOST_IP=' "${HERMES_ROOT}/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+    current_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
+    [[ -z "$restored_ip" || -z "$current_ip" ]] && return 1
+    [[ "$restored_ip" != "$current_ip" ]]
+}
+
 report() {
     header "Done"
     if (( DRY_RUN )); then
@@ -656,6 +672,31 @@ report() {
     log "Scope restored:        ${BK_SCOPE} (${BK_ARCHIVES[*]})"
     log "Log:                   ${LOG_FILE}"
     log ""
+
+    if detect_host_identity_mismatch; then
+        local restored_ip current_ip
+        restored_ip=$(grep -E '^HOST_IP=' "${HERMES_ROOT}/.env" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+        current_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
+        warn "================================================================"
+        warn "  HOST IDENTITY MISMATCH DETECTED"
+        warn "================================================================"
+        warn "  Restored .env HOST_IP = ${restored_ip}"
+        warn "  This host's IP        = ${current_ip}"
+        warn ""
+        warn "  The restored config references the old host. nginx, Authelia,"
+        warn "  Postfix, and Nextcloud are now configured for ${restored_ip} --"
+        warn "  the admin console will be UNREACHABLE at ${current_ip} until you"
+        warn "  rewire the host identity. Run:"
+        warn ""
+        warn "    sudo ${HERMES_ROOT}/scripts/system_rehost.sh"
+        warn ""
+        warn "  system_rehost.sh auto-detects this host's IP/hostname and"
+        warn "  rewires .env, DB rows, nginx, Authelia, Postfix, and"
+        warn "  Nextcloud in one step. See --help for non-default targets."
+        warn "================================================================"
+        return 0
+    fi
+
     log "Next steps:"
     log "  1. Verify you can log into the admin console (https://<console-host>/admin/)"
     log "  2. Verify mail flow (send + receive a test message)"
