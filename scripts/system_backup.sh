@@ -505,16 +505,23 @@ ensure_container_running() {
 }
 
 # Run a mariadb client command inside hermes_db_server using root auth.
-# Password is read from the mounted Docker secret at /run/secrets/MYSQL_ROOT_PASSWORD.
-# (docker exec does NOT inherit env vars set by the entrypoint at runtime, so
-# the FILE__MYSQL_ROOT_PASSWORD translation s6 does for mysqld is invisible here.)
-# Falls back to no-password if the secret isn't mounted (very old installs with
-# unix_socket grants). Pass -i as first arg to enable stdin (for piping SQL files).
+#
+# Auth strategy: try no-password FIRST, fall back to /run/secrets/MYSQL_ROOT_PASSWORD.
+#
+# Why: canonical LinuxServer mariadb installs set root@localhost with
+# unix_socket-style auth (empty plugin column, passwordless from inside
+# the container). With unix_socket, sending a password is REJECTED, not
+# ignored -- so always-supplying-password breaks the canonical case.
+# Older installs (DEV) provisioned root@localhost with an actual password
+# via FILE__MYSQL_ROOT_PASSWORD; for those the secret-file fallback works.
+# This logic handles both. Pass -i as first arg to enable stdin.
 db_exec() {
     local stdin_flag=""
     if [[ "${1:-}" == "-i" ]]; then stdin_flag="-i"; shift; fi
     docker exec $stdin_flag hermes_db_server bash -c '
-        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+        if mariadb -u root -e "SELECT 1" >/dev/null 2>&1; then
+            exec mariadb -u root "$@"
+        elif [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
             MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb -u root "$@"
         else
             exec mariadb -u root "$@"
@@ -524,7 +531,9 @@ db_exec() {
 
 db_dump() {
     docker exec hermes_db_server bash -c '
-        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+        if mariadb -u root -e "SELECT 1" >/dev/null 2>&1; then
+            exec mariadb-dump -u root --single-transaction --routines --triggers --events --databases "$1"
+        elif [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
             MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb-dump -u root --single-transaction --routines --triggers --events --databases "$1"
         else
             exec mariadb-dump -u root --single-transaction --routines --triggers --events --databases "$1"

@@ -142,9 +142,15 @@ read_env_value() {
 }
 
 # ---- DB helpers (mirrors backup/restore scripts' db_exec pattern) ----
+# Auth strategy: try no-password FIRST, fall back to secret-file. Canonical
+# LinuxServer mariadb installs use unix_socket-style root@localhost which
+# REJECTS passwords; older installs (DEV) use native_password requiring the
+# secret. See feedback_mariadb_unix_socket_via_docker_exec memory.
 db_exec() {
     docker exec hermes_db_server bash -c '
-        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+        if mariadb -u root -e "SELECT 1" >/dev/null 2>&1; then
+            exec mariadb -u root "$@"
+        elif [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
             MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb -u root "$@"
         else
             exec mariadb -u root "$@"
