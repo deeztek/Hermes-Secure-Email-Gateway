@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Hermes SEG Docker -- system backup (#219 Phase A)
+# Hermes SEG Docker -- system backup
 # ============================================================================
 # Backs up Hermes's databases, LDAP directory, configs, and storage tiers
 # WITHOUT downtime by default. Uses application-native hot-backup primitives
@@ -40,8 +40,6 @@
 #       config.tar.gz      (install root MINUS data tiers; system/all)
 #       data.tar.gz        (Data tier MINUS mysql/ ldap/ clamav/; system/all)
 #       archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz  (relevant tiers)
-#
-# Tracking: #219
 # ============================================================================
 
 set -uo pipefail
@@ -70,9 +68,11 @@ if [[ -z "${HERMES_ROOT:-}" ]]; then
     fi
 fi
 
-LOG_DIR="${HERMES_ROOT}/install-logs"
-mkdir -p "$LOG_DIR"
-LOG_FILE="${LOG_DIR}/system_backup_$(date '+%Y%m%d_%H%M%S').log"
+# Log lives in a temp file until preflight validates the backup path; then
+# it's moved alongside the backup tarball with a matching filename prefix.
+# That way backup + log + sha256 travel together, and a remote postmortem
+# (operator only has the remote share) has the full context.
+LOG_FILE="$(mktemp /tmp/hermes-backup-XXXXXX.log)"
 
 # ---- Colors ----
 GREEN=$'\033[0;32m'
@@ -209,7 +209,7 @@ usage() {
 Usage: $(basename "$0") -P <path> -B <scope> [--cold] [--no-nc-maintenance]
                        [--yes] [--dry-run] [--help]
 
-Hermes SEG Docker system backup (#219 Phase A).
+Hermes SEG Docker system backup.
 
 Required:
   -P <path>      Output directory for the backup tarball. Must exist and
@@ -323,6 +323,7 @@ if (( SHOW_HELP )); then usage; exit 0; fi
 if (( ! TEST_NOTIFY )); then
     if [[ -z "$BACKUP_PATH" ]]; then error "Required flag -P missing."; usage; exit 1; fi
     if [[ -z "$SCOPE" ]]; then error "Required flag -B missing."; usage; exit 1; fi
+    BACKUP_PATH="${BACKUP_PATH%/}"  # strip trailing slash so concatenated paths don't show //
     case "$SCOPE" in
         system|archive|vmail|nextcloud|all) ;;
         *) error "Invalid -B scope '${SCOPE}'. Must be one of: system, archive, vmail, nextcloud, all."; exit 1 ;;
@@ -384,8 +385,46 @@ cleanup_on_fatal() {
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
     fi
+    # Staging dir + .partial tarball cleanup. Auto-removed only for truly
+    # unattended runs: no TTY (cron) or --dry-run (nothing real to keep).
+    # --yes is orthogonal -- it skips the pre-run "proceed?" prompt, not
+    # this post-failure cleanup decision. An operator who said --yes still
+    # gets the chance to inspect partial dumps after a failure.
+    local auto_cleanup=0
+    if (( DRY_RUN )) || [[ ! -t 0 ]]; then
+        auto_cleanup=1
+    fi
+
     if [[ -d "${STAGE_DIR:-}" ]]; then
-        warn "Staging directory left at ${STAGE_DIR} for inspection. Remove it manually after diagnosing."
+        local remove_staging=$auto_cleanup
+        if (( ! auto_cleanup )); then
+            warn "Staging directory left at: ${STAGE_DIR}"
+            read -r -p "Remove it? (log already captured everything) [y/N] " reply
+            [[ "$reply" =~ ^[Yy]$ ]] && remove_staging=1
+        fi
+        if (( remove_staging )); then
+            warn "Removing staging directory: ${STAGE_DIR}"
+            rm -rf "$STAGE_DIR" 2>>"$LOG_FILE" || \
+                warn "Could not remove ${STAGE_DIR} -- delete manually."
+        else
+            warn "Staging preserved. Remove manually when done: rm -rf '${STAGE_DIR}'"
+        fi
+    fi
+
+    if [[ -f "${PARTIAL_TAR:-}" ]]; then
+        local remove_partial=$auto_cleanup
+        if (( ! auto_cleanup )); then
+            warn "Partial tarball left at: ${PARTIAL_TAR}"
+            read -r -p "Remove it? [y/N] " reply
+            [[ "$reply" =~ ^[Yy]$ ]] && remove_partial=1
+        fi
+        if (( remove_partial )); then
+            warn "Removing partial tarball: ${PARTIAL_TAR}"
+            rm -f "$PARTIAL_TAR" 2>>"$LOG_FILE" || \
+                warn "Could not remove ${PARTIAL_TAR} -- delete manually."
+        else
+            warn "Partial tarball preserved. Remove manually: rm -f '${PARTIAL_TAR}'"
+        fi
     fi
 }
 
@@ -430,15 +469,42 @@ ensure_container_running() {
     fi
 }
 
+# Run a mariadb client command inside hermes_db_server using root auth.
+# Password is read from the mounted Docker secret at /run/secrets/MYSQL_ROOT_PASSWORD.
+# (docker exec does NOT inherit env vars set by the entrypoint at runtime, so
+# the FILE__MYSQL_ROOT_PASSWORD translation s6 does for mysqld is invisible here.)
+# Falls back to no-password if the secret isn't mounted (very old installs with
+# unix_socket grants). Pass -i as first arg to enable stdin (for piping SQL files).
+db_exec() {
+    local stdin_flag=""
+    if [[ "${1:-}" == "-i" ]]; then stdin_flag="-i"; shift; fi
+    docker exec $stdin_flag hermes_db_server bash -c '
+        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+            MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb -u root "$@"
+        else
+            exec mariadb -u root "$@"
+        fi
+    ' bash "$@"
+}
+
+db_dump() {
+    docker exec hermes_db_server bash -c '
+        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+            MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb-dump -u root --single-transaction --routines --triggers --events --databases "$1"
+        else
+            exec mariadb-dump -u root --single-transaction --routines --triggers --events --databases "$1"
+        fi
+    ' bash "$1"
+}
+
 read_build_no() {
     ensure_container_running hermes_db_server
     local i
     for i in {1..15}; do
-        if docker exec hermes_db_server mariadb -u root -e 'SELECT 1' >/dev/null 2>&1; then break; fi
+        if db_exec -e 'SELECT 1' >/dev/null 2>&1; then break; fi
         sleep 2
     done
-    BUILD_NO="$(docker exec hermes_db_server mariadb -u root -N -s hermes \
-        -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE" | tr -d '[:space:]')"
+    BUILD_NO="$(db_exec -N -s hermes -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE" | tr -d '[:space:]')"
     [[ -n "$BUILD_NO" ]] || fatal "Could not read build_no from system_settings."
 }
 
@@ -454,9 +520,7 @@ dump_databases() {
             printf '%s[dry-run]%s mariadb-dump --single-transaction %s\n' "$CYAN" "$NC" "$db" | tee -a "$LOG_FILE"
             continue
         fi
-        if ! docker exec hermes_db_server \
-            mariadb-dump --single-transaction --routines --triggers --events --databases "$db" \
-            > "${db_stage}/${db}.sql" 2>>"$LOG_FILE"; then
+        if ! db_dump "$db" > "${db_stage}/${db}.sql" 2>>"$LOG_FILE"; then
             fatal "mariadb-dump failed for '${db}'. See $LOG_FILE."
         fi
     done
@@ -472,10 +536,13 @@ dump_ldap() {
     header "Dumping OpenLDAP directory (slapcat)"
     ensure_container_running hermes_ldap
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s docker exec hermes_ldap slapcat -b %s\n' "$CYAN" "$NC" "$LDAP_SUFFIX" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s docker exec hermes_ldap slapcat -F /etc/ldap/slapd.d -b %s\n' "$CYAN" "$NC" "$LDAP_SUFFIX" | tee -a "$LOG_FILE"
         return 0
     fi
-    if ! docker exec hermes_ldap slapcat -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
+    # -F points slapcat at the OLC config dir slapd actually uses; without it,
+    # slapcat falls back to /usr/local/etc/openldap/slapd.conf which is stale
+    # in the Hermes image and breaks with "invalid path" at line 72.
+    if ! docker exec hermes_ldap slapcat -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
         | gzip -c > "${STAGE_DIR}/ldap.ldif.gz"; then
         fatal "slapcat failed for ${LDAP_SUFFIX}. See $LOG_FILE."
     fi
@@ -531,14 +598,37 @@ tar_tier() {
             ;;
         data)
             # Excluded from the data tier tar:
-            #   mysql/  -- captured authoritatively by mariadb-dump
-            #   ldap/   -- captured authoritatively by slapcat
-            #   clamav/ -- signatures are regenerable, not worth backup space
-            exclude_args+=( --exclude='./mysql' --exclude='./ldap' --exclude='./clamav' )
+            #   ./dbase                       -- MariaDB datadir; mariadb-dump is authoritative
+            #   ./ldap/data                   -- OpenLDAP datadir; slapcat is authoritative
+            #                                    (logs at ./ldap/logs are kept)
+            #   ./mail_filter/data/clamav     -- ClamAV signatures; regenerable, ~1GB
+            exclude_args+=( \
+                --exclude='./dbase' \
+                --exclude='./ldap/data' \
+                --exclude='./mail_filter/data/clamav' \
+            )
+            # Also exclude sibling tiers nested under data (operators on small
+            # deployments collapse ARCHIVE_MOUNT=/mnt/data/amavis etc.; those
+            # paths belong to their own scope, not 'system').
+            for t in archive vmail nextcloud; do
+                local p="${TIER_PATH[$t]}"
+                if [[ "$p" == "$src"/* ]]; then
+                    exclude_args+=( --exclude="./${p#$src/}" )
+                fi
+            done
             ;;
     esac
-    tar -czf "$out" "${exclude_args[@]}" -C "$src" . 2>>"$LOG_FILE" \
-        || fatal "tar failed for tier '${tier}'"
+    # tar exit codes: 0=success, 1=warnings only (sockets, "file changed as
+    # we read it" -- expected on hot backup of a live system), 2+=real error.
+    # The script previously fatal'd on ANY non-zero; that misclassified
+    # successful hot backups as failures.
+    local tar_exit=0
+    tar -czf "$out" "${exclude_args[@]}" -C "$src" . 2>>"$LOG_FILE" || tar_exit=$?
+    case "$tar_exit" in
+        0) ;;
+        1) warn "  ${tier}: tar exited 1 (warnings only -- sockets ignored, live-file changes); archive is valid." ;;
+        *) fatal "tar failed for tier '${tier}' (exit ${tar_exit})" ;;
+    esac
     ARCHIVES_CREATED+=( "${tier}.tar.gz" )
 }
 
@@ -616,11 +706,23 @@ preflight() {
     [[ -e "$FINAL_TAR" || -e "$PARTIAL_TAR" || -e "$STAGE_DIR" ]] && \
         fatal "Target files already exist (timestamp collision): ${FINAL_TAR}*"
 
+    # Relocate the log from the bootstrap /tmp path to live alongside the
+    # backup tarball. Best-effort: if the rename fails (rare -- different
+    # filesystem with no link/rename support), keep using the /tmp path so
+    # nothing is lost.
+    local final_log="${BACKUP_PATH}/hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}.log"
+    if mv "$LOG_FILE" "$final_log" 2>/dev/null; then
+        LOG_FILE="$final_log"
+    else
+        warn "Could not relocate log from ${LOG_FILE} to ${final_log} -- continuing with /tmp path."
+    fi
+
     log "HERMES_ROOT:   ${HERMES_ROOT}"
     log "build_no:      ${BUILD_NO}"
     log "Scope:         ${SCOPE}"
     log "Mode:          $((( COLD_MODE )) && echo COLD || echo HOT)"
     log "Output:        ${FINAL_TAR}"
+    log "Log:           ${LOG_FILE}"
     log "Staging:       ${STAGE_DIR}"
     for t in "${TIERS[@]}"; do
         scope_includes_tier "$t" && log "Tier ${t}: ${TIER_PATH[$t]}"
@@ -675,8 +777,17 @@ assemble_outer() {
         ARCHIVE_SIZE[$a]="$(stat -c%s "${STAGE_DIR}/${a}")"
     done
     emit_manifest
-    tar -cf "$PARTIAL_TAR" -C "$STAGE_DIR" . 2>>"$LOG_FILE" \
-        || fatal "Outer tar assembly failed."
+    # Same exit-code treatment as tar_tier(): exit 1 = warnings only (e.g.
+    # CIFS's async dir-metadata updates can trigger "file changed as we
+    # read it" on the staging dir itself even though all the inner files
+    # are static and complete). Only exit >= 2 is a real failure.
+    local outer_exit=0
+    tar -cf "$PARTIAL_TAR" -C "$STAGE_DIR" . 2>>"$LOG_FILE" || outer_exit=$?
+    case "$outer_exit" in
+        0) ;;
+        1) warn "  outer tar exited 1 (warnings only -- CIFS metadata quirk); archive is valid." ;;
+        *) fatal "Outer tar assembly failed (exit ${outer_exit})." ;;
+    esac
     mv "$PARTIAL_TAR" "$FINAL_TAR" \
         || fatal "Atomic rename failed: ${PARTIAL_TAR} -> ${FINAL_TAR}"
     rm -rf "$STAGE_DIR"
@@ -745,7 +856,7 @@ test_notify_and_exit() {
 
 main() {
     if (( TEST_NOTIFY )); then test_notify_and_exit; fi
-    log "Hermes SEG system backup (#219 Phase A)"
+    log "Hermes SEG system backup"
     preflight
     run_backup
     assemble_outer

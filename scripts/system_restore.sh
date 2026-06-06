@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ============================================================================
-# Hermes SEG Docker -- system restore (#220 Phase A)
+# Hermes SEG Docker -- system restore
 # ============================================================================
 # Restores a backup tarball produced by scripts/system_backup.sh. Verifies
 # the manifest + per-archive SHA256 BEFORE any destructive action, refuses
@@ -13,8 +13,6 @@
 # Reads the backup's scope from manifest.json and only restores what's in
 # the backup -- so restoring a "vmail" backup overwrites just /mnt/vmail
 # and leaves everything else alone.
-#
-# Tracking: #220
 # ============================================================================
 
 set -uo pipefail
@@ -40,9 +38,12 @@ if [[ -z "${HERMES_ROOT:-}" ]]; then
     fi
 fi
 
-LOG_DIR="${HERMES_ROOT}/install-logs"
-mkdir -p "$LOG_DIR"
-LOG_FILE="${LOG_DIR}/system_restore_$(date '+%Y%m%d_%H%M%S').log"
+# Log lives in a temp file until preflight knows where the backup file is;
+# then it's moved to live alongside the backup with a matching filename
+# (same prefix, .restore.log extension so it doesn't collide with the
+# backup's own creation-time log). Operator postmortems from a remote share
+# see both the backup-time log and the restore-time log next to each other.
+LOG_FILE="$(mktemp /tmp/hermes-restore-XXXXXX.log)"
 
 # ---- Colors ----
 GREEN=$'\033[0;32m'
@@ -67,7 +68,7 @@ usage() {
     cat <<EOF
 Usage: $(basename "$0") -F <backup.tar> [--yes] [--dry-run] [--help]
 
-Hermes SEG Docker system restore (#220 Phase A).
+Hermes SEG Docker system restore.
 
 Required:
   -F <path>      Path to the backup tarball produced by system_backup.sh.
@@ -237,6 +238,24 @@ wait_for_container() {
     fatal "${name} did not become ready within 60s."
 }
 
+# Run a mariadb client command inside hermes_db_server using root auth.
+# Password is read from the mounted Docker secret at /run/secrets/MYSQL_ROOT_PASSWORD.
+# (docker exec does NOT inherit env vars set by the entrypoint at runtime, so
+# the FILE__MYSQL_ROOT_PASSWORD translation s6 does for mysqld is invisible here.)
+# Falls back to no-password if the secret isn't mounted (very old installs with
+# unix_socket grants). Pass -i as first arg to enable stdin (for piping SQL files).
+db_exec() {
+    local stdin_flag=""
+    if [[ "${1:-}" == "-i" ]]; then stdin_flag="-i"; shift; fi
+    docker exec $stdin_flag hermes_db_server bash -c '
+        if [[ -r /run/secrets/MYSQL_ROOT_PASSWORD ]]; then
+            MYSQL_PWD="$(cat /run/secrets/MYSQL_ROOT_PASSWORD)" exec mariadb -u root "$@"
+        else
+            exec mariadb -u root "$@"
+        fi
+    ' bash "$@"
+}
+
 # ---- Phases ----
 preflight() {
     header "Preflight"
@@ -246,6 +265,18 @@ preflight() {
         docker compose version >/dev/null 2>&1 || fatal "docker compose v2 not available"
     fi
     load_current_mounts
+
+    # Relocate the log from the bootstrap /tmp path to live alongside the
+    # backup file. Uses .restore.log so it doesn't collide with the backup
+    # script's own creation-time .log file. Best-effort: keep /tmp path
+    # if the rename fails (different filesystem etc.).
+    local final_log="${BACKUP_FILE%.tar}.restore.log"
+    if mv "$LOG_FILE" "$final_log" 2>/dev/null; then
+        LOG_FILE="$final_log"
+    else
+        warn "Could not relocate log from ${LOG_FILE} to ${final_log} -- continuing with /tmp path."
+    fi
+
     log "HERMES_ROOT:   ${HERMES_ROOT}"
     log "Backup file:   ${BACKUP_FILE}"
     log "Log:           ${LOG_FILE}"
@@ -296,9 +327,7 @@ check_version_match() {
         sleep 4
     fi
     local current_build
-    current_build="$(docker exec hermes_db_server mariadb -u root -N -s hermes \
-        -e "SELECT value FROM system_settings WHERE parameter='build_no';" \
-        2>>"$LOG_FILE" | tr -d '[:space:]')"
+    current_build="$(db_exec -N -s hermes -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>>"$LOG_FILE" | tr -d '[:space:]')"
     if [[ -z "$current_build" ]]; then
         warn "Could not read current build_no from system_settings -- proceeding without version check."
         warn "If this is a fresh install or a partially-initialized host, that's expected."
@@ -392,8 +421,7 @@ restore_databases() {
     log "Starting hermes_db_server briefly..."
     run bash -c "cd '$HERMES_ROOT' && docker compose start hermes_db_server"
     if (( ! DRY_RUN )); then
-        wait_for_container hermes_db_server \
-            "docker exec hermes_db_server mariadb -u root -e 'SELECT 1'"
+        wait_for_container hermes_db_server "db_exec -e 'SELECT 1'"
     fi
 
     if (( ! DRY_RUN )); then
@@ -411,12 +439,12 @@ restore_databases() {
         fi
         local sql="${STAGE_DIR}/databases/${db}.sql"
         [[ -f "$sql" ]] || fatal "Missing ${db}.sql in backup."
-        docker exec hermes_db_server mariadb -u root -e "DROP DATABASE IF EXISTS \`${db}\`;" 2>>"$LOG_FILE" \
+        db_exec -e "DROP DATABASE IF EXISTS \`${db}\`;" 2>>"$LOG_FILE" \
             || fatal "Failed to drop ${db}."
-        docker exec -i hermes_db_server mariadb -u root < "$sql" 2>>"$LOG_FILE" \
+        db_exec -i < "$sql" 2>>"$LOG_FILE" \
             || fatal "Failed to restore ${db}."
     done
-    docker exec hermes_db_server mariadb -u root -e "FLUSH PRIVILEGES;" 2>>"$LOG_FILE" || true
+    db_exec -e "FLUSH PRIVILEGES;" 2>>"$LOG_FILE" || true
 
     log "Stopping hermes_db_server..."
     run bash -c "cd '$HERMES_ROOT' && docker compose stop hermes_db_server"
@@ -430,7 +458,7 @@ restore_ldap() {
     if (( ! DRY_RUN )); then sleep 4; fi
 
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s gunzip ldap.ldif.gz | docker exec -i hermes_ldap slapadd -b %s\n' \
+        printf '%s[dry-run]%s gunzip ldap.ldif.gz | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b %s\n' \
             "$CYAN" "$NC" "$LDAP_SUFFIX" | tee -a "$LOG_FILE"
     else
         # slapadd writes to the on-disk LDAP DB. slapd must NOT be running
@@ -441,16 +469,16 @@ restore_ldap() {
         docker exec hermes_ldap bash -c 'pkill -f slapd || true; sleep 2' 2>>"$LOG_FILE" || true
 
         log "  running slapadd (wipe + reload)..."
-        # -c continues on errors so a single bad entry doesn't abort. -F
-        # for the on-disk slapd.d config dir if needed; default is fine
-        # on the Hermes image.
+        # -F points slapadd at the OLC config dir slapd uses (matches the
+        # backup-side slapcat invocation). -c would continue on errors but
+        # we want failures to abort so the operator notices.
         gunzip -c "${STAGE_DIR}/ldap.ldif.gz" \
-            | docker exec -i hermes_ldap slapadd -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
+            | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
             || fatal "slapadd failed."
 
-        # Fix permissions on the LDAP data files (slapadd ran as root inside
-        # the container but slapd runs as openldap user).
-        docker exec hermes_ldap chown -R openldap:openldap /var/lib/ldap 2>>"$LOG_FILE" || true
+        # Fix ownership on the LDAP data files. slapd in the Hermes image
+        # runs as root (-u root -g root in ps output), so chown to root:root.
+        docker exec hermes_ldap chown -R root:root /var/lib/ldap 2>>"$LOG_FILE" || true
 
         log "  restarting hermes_ldap container so slapd picks up the restored DB..."
         run bash -c "cd '$HERMES_ROOT' && docker compose restart hermes_ldap"
@@ -566,7 +594,7 @@ report() {
 }
 
 main() {
-    log "Hermes SEG system restore (#220 Phase A)"
+    log "Hermes SEG system restore"
     log "Mode: $((( DRY_RUN )) && echo DRY-RUN || echo LIVE)"
     preflight
     extract_and_verify
