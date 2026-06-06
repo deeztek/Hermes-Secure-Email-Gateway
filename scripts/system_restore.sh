@@ -2,13 +2,17 @@
 # ============================================================================
 # Hermes SEG Docker -- system restore
 # ============================================================================
-# Restores a backup tarball produced by scripts/system_backup.sh. Verifies
-# the manifest + per-archive SHA256 BEFORE any destructive action, refuses
-# with auto-remap to the current host's tier paths if topology differs, stops the stack for
-# the duration of the restore (always cold on the restore side because we
-# are overwriting tier contents), restores databases via socket auth +
-# `mariadb -u root`, restores OpenLDAP via slapadd, rsyncs each in-scope
-# tier from staging with --delete, restarts the stack.
+# Restores a backup DIRECTORY produced by scripts/system_backup.sh. The
+# backup directory contains manifest.json + per-scope tar.gz files; -F
+# points at the directory. No outer-tar extraction, no staging space.
+#
+# Reads manifest.json to learn the backup's scope, then for each archive:
+#   1. Verifies SHA256 in-place against manifest values
+#   2. Streams the archive directly to its destination (no intermediate)
+#
+# The stack is STOPPED for the duration of the restore (always cold on
+# the restore side; we're overwriting live tier contents). Auto-remaps
+# to this host's tier paths if backup topology differs.
 #
 # Reads the backup's scope from manifest.json and only restores what's in
 # the backup -- so restoring a "vmail" backup overwrites just /mnt/vmail
@@ -38,11 +42,10 @@ if [[ -z "${HERMES_ROOT:-}" ]]; then
     fi
 fi
 
-# Log lives in a temp file until preflight knows where the backup file is;
-# then it's moved to live alongside the backup with a matching filename
-# (same prefix, .restore.log extension so it doesn't collide with the
-# backup's own creation-time log). Operator postmortems from a remote share
-# see both the backup-time log and the restore-time log next to each other.
+# Log lives in a temp file initially; preflight relocates it to the host's
+# install-logs directory once HERMES_ROOT is known. We don't write into the
+# backup directory -- the backup is read-only conceptually (operator may
+# even mount it read-only) and may be a different mount than the host.
 LOG_FILE="$(mktemp /tmp/hermes-restore-XXXXXX.log)"
 
 # ---- Colors ----
@@ -60,32 +63,32 @@ header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
 
 # ---- Args ----
 BACKUP_FILE=""
-STAGING_DIR_OVERRIDE=""
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") -F <backup.tar> [--staging-dir=PATH] [--yes] [--dry-run] [--help]
+Usage: $(basename "$0") -F <backup-dir> [--yes] [--dry-run] [--help]
 
 Hermes SEG Docker system restore.
 
 Required:
-  -F <path>      Path to the backup tarball produced by system_backup.sh.
+  -F <path>      Path to a backup DIRECTORY produced by system_backup.sh
+                 (i.e. a hermes-backup-<scope>-<build>-<ts>/ directory
+                 containing manifest.json + per-scope tar.gz files).
 
 Options:
-  --staging-dir=PATH   Where to extract the outer + tier tars during restore.
-                       Defaults to the backup file's parent directory (where
-                       there is by definition enough space, since the backup
-                       itself lives there). Override when:
-                         - the backup file is on a read-only mount
-                         - you have fast local scratch and want better perf
-                           than extracting over CIFS/NFS
-                       Must have at least ~2x the backup size free.
   --yes          Skip the interactive confirmation prompt.
   --dry-run      Show what would be done without changing anything.
   --help         Show this help.
+
+Disk space:
+  ZERO scratch space required. Restore reads the backup directory in
+  place: SHA256 verifies each archive, then streams each archive
+  directly to its destination (mariadb pipe, slapadd pipe, tar -xzf
+  into TIER_PATH). No outer-tar extract, no staging dir, no copies.
+  Backup share can be read-only (CIFS -o ro is fine).
 
 Environment:
   FORCE_VERSION_MISMATCH=1
@@ -104,15 +107,13 @@ restoring a "vmail" backup only touches /mnt/vmail; restoring an
 
 Disaster-recovery flow (different host):
   1. Install Hermes fresh on the new host (install root + .env exist).
-  2. Mount your backup storage on the new host (CIFS / NFS / S3FS / etc.)
-     so the backup tarball is reachable directly. This is preferable to
-     scp -- the restore extracts the outer tar to a staging directory in
-     the same parent dir as the backup file (default), so a mounted
-     share with plenty of space "just works" without filling local
-     storage. Example:
+  2. Mount your backup storage on the new host so the backup directory
+     is reachable directly. Restore reads the backup in-place -- no
+     copy, no extraction, no scratch space. Read-only mount is fine.
+     Example:
          sudo mount -t cifs //backup-host/share /mnt/backups \
-             -o credentials=/root/.smbcreds
-  3. sudo $(basename "$0") -F /mnt/backups/hermes-backup-system-vXXXXXX.tar
+             -o credentials=/root/.smbcreds,ro
+  3. sudo $(basename "$0") -F /mnt/backups/hermes-backup-system-vXXXXXX-TS/
   4. After restore completes, if the new host's IP/hostname differs from
      the backup's, run scripts/system_rehost.sh to rewire identity.
 EOF
@@ -121,7 +122,6 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -F)                 BACKUP_FILE="$2"; shift 2 ;;
-        --staging-dir=*)    STAGING_DIR_OVERRIDE="${1#*=}"; shift ;;
         --yes|-y)           ASSUME_YES=1; shift ;;
         --dry-run|-n)       DRY_RUN=1; shift ;;
         --help|-h)          SHOW_HELP=1; shift ;;
@@ -131,7 +131,9 @@ done
 
 if (( SHOW_HELP )); then usage; exit 0; fi
 if [[ -z "$BACKUP_FILE" ]]; then error "Required flag -F missing."; usage; exit 1; fi
-if [[ ! -f "$BACKUP_FILE" ]]; then error "Backup file not found: ${BACKUP_FILE}"; exit 1; fi
+if [[ ! -d "$BACKUP_FILE" ]]; then error "Backup directory not found: ${BACKUP_FILE}"; exit 1; fi
+# Strip trailing slash so paths concat cleanly
+BACKUP_FILE="${BACKUP_FILE%/}"
 if [[ $EUID -ne 0 ]] && (( ! DRY_RUN )); then fatal "Must run as root (live mode)."; fi
 
 # ---- Constants ----
@@ -143,7 +145,6 @@ declare -A TIER_PATH       # current host's tier paths
 declare -A BK_TIER_PATH    # backup's tier paths (from manifest)
 declare -a BK_ARCHIVES     # archives actually present in the backup
 
-STAGE_DIR=""
 STACK_STOPPED=0
 
 # ---- Helpers ----
@@ -163,28 +164,12 @@ cleanup_on_fatal() {
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
     fi
-    # Auto-delete staging on failure. Restore staging contains only gzip'd
-    # inner archives (recoverable from the source backup) -- no diagnostic
-    # value, unlike backup staging which holds partial dumps. With staging
-    # now living next to the backup file (often on a backup share with
-    # finite space), leaving 20GB+ stranded on every aborted run is a real
-    # problem.
-    if [[ -d "${STAGE_DIR:-}" ]]; then
-        warn "Removing staging directory: ${STAGE_DIR}"
-        rm -rf "$STAGE_DIR" 2>>"$LOG_FILE" \
-            || warn "Could not remove ${STAGE_DIR} -- delete manually."
-    fi
+    # Restore writes nothing to a staging area in the directory-style format
+    # (everything streams from BACKUP_FILE directly to destinations). The
+    # mid-op state we DO leave behind is partial extraction at TIER_PATH
+    # destinations -- those can only be cleaned by the operator (re-run
+    # restore overwrites them, or wipe + reinstall). Documented in --help.
 }
-
-cleanup_on_signal() {
-    # Triggered by SIGINT (Ctrl+C) / SIGTERM. Without this, an operator-
-    # interrupted restore leaves the staging dir stranded on the backup
-    # share. Re-uses cleanup_on_fatal for the same auto-delete behavior.
-    warn "Interrupted by signal -- cleaning up..."
-    cleanup_on_fatal
-    exit 130
-}
-trap cleanup_on_signal INT TERM
 
 confirm() {
     if (( ASSUME_YES )) || (( DRY_RUN )); then return 0; fi
@@ -209,8 +194,8 @@ load_current_mounts() {
 }
 
 parse_manifest() {
-    local m="${STAGE_DIR}/backup_manifest.json"
-    [[ -f "$m" ]] || fatal "Backup is missing backup_manifest.json -- not a valid Hermes backup."
+    local m="${BACKUP_FILE}/manifest.json"
+    [[ -f "$m" ]] || fatal "Backup is missing manifest.json -- not a valid Hermes backup."
 
     local get_string
     get_string() {
@@ -251,12 +236,12 @@ bk_has_archive() {
 verify_archive_sha() {
     local archive="$1"
     local expected
-    expected="$(grep -oE "\"${archive}\"[[:space:]]*:[[:space:]]*\\{[^}]+\\}" "${STAGE_DIR}/backup_manifest.json" \
+    expected="$(grep -oE "\"${archive}\"[[:space:]]*:[[:space:]]*\\{[^}]+\\}" "${BACKUP_FILE}/manifest.json" \
         | grep -oE '"sha256"[[:space:]]*:[[:space:]]*"[^"]+"' \
         | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
     [[ -n "$expected" ]] || fatal "Manifest missing SHA256 for ${archive}"
     local actual
-    actual="$(sha256sum "${STAGE_DIR}/${archive}" | awk '{print $1}')"
+    actual="$(sha256sum "${BACKUP_FILE}/${archive}" | awk '{print $1}')"
     if [[ "$actual" != "$expected" ]]; then
         fatal "SHA256 mismatch for ${archive}: manifest=${expected} actual=${actual}. Backup is corrupt."
     fi
@@ -344,11 +329,13 @@ preflight() {
     fi
     load_current_mounts
 
-    # Relocate the log from the bootstrap /tmp path to live alongside the
-    # backup file. Uses .restore.log so it doesn't collide with the backup
-    # script's own creation-time .log file. Best-effort: keep /tmp path
-    # if the rename fails (different filesystem etc.).
-    local final_log="${BACKUP_FILE%.tar}.restore.log"
+    # Relocate the log from /tmp to the host's install-logs directory so
+    # operators have it in a known place (matches install_hermes_docker.sh
+    # convention). The backup directory may be a read-only mount we
+    # shouldn't write into; the host install-logs is always writable.
+    local log_dir="${HERMES_ROOT}/install-logs"
+    mkdir -p "$log_dir" 2>/dev/null || true
+    local final_log="${log_dir}/system_restore_$(date '+%Y%m%d_%H%M%S').log"
     if mv "$LOG_FILE" "$final_log" 2>/dev/null; then
         LOG_FILE="$final_log"
     else
@@ -356,97 +343,19 @@ preflight() {
     fi
 
     log "HERMES_ROOT:   ${HERMES_ROOT}"
-    log "Backup file:   ${BACKUP_FILE}"
+    log "Backup dir:    ${BACKUP_FILE}"
     log "Log:           ${LOG_FILE}"
 }
 
-extract_and_verify() {
-    header "Extracting backup + verifying manifest"
-    # Default staging location: same directory as the backup file. The
-    # backup itself lives there, so by definition there's at least enough
-    # space to hold its uncompressed extract (and likely more, since the
-    # backup landed there from elsewhere). Operator can override with
-    # --staging-dir=PATH for read-only mounts or to use faster local
-    # scratch.
-    #
-    # /tmp was the prior default but it's typically root FS (~50-100GB) --
-    # a 2TB backup would fill root and brick the host mid-restore.
-    local staging_parent
-    if [[ -n "$STAGING_DIR_OVERRIDE" ]]; then
-        staging_parent="$STAGING_DIR_OVERRIDE"
-        [[ -d "$staging_parent" ]] || fatal "--staging-dir does not exist: ${staging_parent}"
-        [[ -w "$staging_parent" ]] || fatal "--staging-dir is not writable: ${staging_parent}"
-    else
-        staging_parent="$(dirname "$BACKUP_FILE")"
-        if [[ ! -w "$staging_parent" ]]; then
-            fatal "Default staging dir (${staging_parent}) is not writable. Use --staging-dir=PATH to point elsewhere."
-        fi
-    fi
-    STAGE_DIR="$(mktemp -d -p "$staging_parent" hermes-restore-XXXXXX)" \
-        || fatal "Failed to create staging dir under ${staging_parent}"
-    log "Staging dir: ${STAGE_DIR}"
-
-    # Disk-space warning + sanity check. The staging directory only holds
-    # the extracted OUTER tar (= backup file size, since outer is -cf not
-    # -czf -- its contents are already gzip'd inner archives). Per-tier
-    # extracts stream directly to the destination filesystem (TIER_PATH),
-    # NOT through staging. So scratch requirement = ~1x backup size.
-    #
-    # The destination filesystem also needs space for the restored data,
-    # but that's typically the LIVE filesystem the data is being restored
-    # to (you wouldn't be restoring data you don't have room for). The
-    # operator is responsible for ensuring TIER_PATH dests have room.
-    #
-    # 1.1x conservative buffer for filesystem overhead + simultaneous
-    # writes during the extract.
-    local backup_size_bytes backup_size_h required_bytes required_h avail_bytes avail_h fs_label
-    backup_size_bytes=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)
-    backup_size_h=$(numfmt --to=iec "$backup_size_bytes" 2>/dev/null || echo "?")
-    required_bytes=$(( backup_size_bytes * 11 / 10 ))
-    required_h=$(numfmt --to=iec "$required_bytes" 2>/dev/null || echo "?")
-    avail_bytes=$(df --output=avail -B1 "$staging_parent" 2>/dev/null | tail -1 | tr -d ' ')
-    avail_h=$(numfmt --to=iec "${avail_bytes:-0}" 2>/dev/null || echo "?")
-    fs_label=$(df --output=target "$staging_parent" 2>/dev/null | tail -1)
-
-    echo "" | tee -a "$LOG_FILE"
-    warn "================================================================"
-    warn "  DISK SPACE CHECK -- staging directory"
-    warn "================================================================"
-    warn "  Restore extracts the OUTER tar to staging, then streams each"
-    warn "  inner tier tar DIRECTLY to its destination filesystem (no"
-    warn "  intermediate copy). Staging needs ~1x the backup size."
-    warn ""
-    warn "  Backup file size:     ${backup_size_h}"
-    warn "  Staging required:     ${required_h}  (~1.1x backup, buffer for overhead)"
-    warn "  Staging filesystem:   ${fs_label:-${staging_parent}}"
-    warn "  Available space:      ${avail_h}"
-    warn ""
-    warn "  NOTE: each tier's destination filesystem (DATA_MOUNT, VMAIL_MOUNT,"
-    warn "  etc.) also needs enough free space for the restored tier data."
-    warn "  This check covers ONLY the staging extract. Verify your tier"
-    warn "  destinations independently if you're not sure they fit."
-    warn ""
-    if (( avail_bytes < required_bytes )); then
-        warn "  *** INSUFFICIENT STAGING SPACE -- aborting before extraction. ***"
-        warn ""
-        warn "  Options:"
-        warn "    - Free space on ${fs_label:-${staging_parent}} and retry"
-        warn "    - Point staging elsewhere with --staging-dir=PATH"
-        warn "      (must have at least ${required_h} free)"
-        warn "================================================================"
-        fatal "Aborting before extraction. Free space or use --staging-dir."
-    fi
-    warn "  Looks OK. Proceeding."
-    warn "================================================================"
-    echo "" | tee -a "$LOG_FILE"
-    if (( DRY_RUN )); then
-        printf '%s[dry-run]%s tar -xf %s -C %s\n' "$CYAN" "$NC" "$BACKUP_FILE" "$STAGE_DIR" | tee -a "$LOG_FILE"
-        return 0
-    fi
-    start_heartbeat "extract outer tar" "" 60
-    tar -xf "$BACKUP_FILE" -C "$STAGE_DIR" 2>>"$LOG_FILE" \
-        || { stop_heartbeat; fatal "Failed to extract outer tarball."; }
-    stop_heartbeat
+verify_backup() {
+    header "Verifying backup"
+    # The backup is a directory containing manifest.json + per-scope
+    # tar.gz files. No outer tar to extract, no staging dir to create --
+    # we read manifest in place + verify SHA256 of each archive in place.
+    # Zero scratch space required.
+    [[ -d "$BACKUP_FILE" ]] || fatal "Backup path is not a directory: ${BACKUP_FILE}"
+    [[ -f "${BACKUP_FILE}/manifest.json" ]] || \
+        fatal "Backup directory has no manifest.json: ${BACKUP_FILE}"
 
     parse_manifest
 
@@ -458,7 +367,13 @@ extract_and_verify() {
     log "  hostname:   ${BK_HOSTNAME}"
     log "  archives:   ${BK_ARCHIVES[*]}"
 
-    log "Verifying SHA256 of inner archives..."
+    if (( DRY_RUN )); then
+        printf '%s[dry-run]%s would sha256sum each archive in %s against manifest\n' \
+            "$CYAN" "$NC" "$BACKUP_FILE" | tee -a "$LOG_FILE"
+        return 0
+    fi
+
+    log "Verifying SHA256 of archives in place (no extraction)..."
     local a
     for a in "${BK_ARCHIVES[@]}"; do verify_archive_sha "$a"; done
 }
@@ -564,7 +479,6 @@ confirm_destructive() {
     log ""
     if ! confirm "Proceed with restore?"; then
         log "Aborted by operator."
-        rm -rf "$STAGE_DIR" 2>/dev/null || true
         exit 0
     fi
 }
@@ -584,24 +498,25 @@ restore_databases() {
         wait_for_container hermes_db_server "db_exec -e 'SELECT 1'"
     fi
 
-    if (( ! DRY_RUN )); then
-        local db_stage="${STAGE_DIR}/databases"
-        mkdir -p "$db_stage"
-        tar -xzf "${STAGE_DIR}/databases.tar.gz" -C "$db_stage" 2>>"$LOG_FILE"
-    fi
-
     local db
     for db in "${DATABASES[@]}"; do
         log "  restoring ${db}..."
         if (( DRY_RUN )); then
-            printf '%s[dry-run]%s drop+restore database %s\n' "$CYAN" "$NC" "$db" | tee -a "$LOG_FILE"
+            printf '%s[dry-run]%s drop+restore database %s (streamed from %s)\n' \
+                "$CYAN" "$NC" "$db" "${BACKUP_FILE}/databases.tar.gz" | tee -a "$LOG_FILE"
             continue
         fi
-        local sql="${STAGE_DIR}/databases/${db}.sql"
-        [[ -f "$sql" ]] || fatal "Missing ${db}.sql in backup."
         db_exec -e "DROP DATABASE IF EXISTS \`${db}\`;" 2>>"$LOG_FILE" \
             || fatal "Failed to drop ${db}."
-        db_exec -i < "$sql" 2>>"$LOG_FILE" \
+        # Stream the .sql DIRECTLY out of databases.tar.gz into mariadb.
+        # tar -xzOf extracts to stdout, piped into db_exec -i (which reads
+        # stdin). No on-disk extraction, no scratch space. Verify that the
+        # archive contains the expected member before streaming.
+        if ! tar -tzf "${BACKUP_FILE}/databases.tar.gz" "./${db}.sql" >/dev/null 2>&1; then
+            fatal "Missing ./${db}.sql in databases.tar.gz."
+        fi
+        tar -xzOf "${BACKUP_FILE}/databases.tar.gz" "./${db}.sql" \
+            | db_exec -i 2>>"$LOG_FILE" \
             || fatal "Failed to restore ${db}."
     done
     db_exec -e "FLUSH PRIVILEGES;" 2>>"$LOG_FILE" || true
@@ -632,7 +547,7 @@ restore_ldap() {
         # -F points slapadd at the OLC config dir slapd uses (matches the
         # backup-side slapcat invocation). -c would continue on errors but
         # we want failures to abort so the operator notices.
-        gunzip -c "${STAGE_DIR}/ldap.ldif.gz" \
+        gunzip -c "${BACKUP_FILE}/ldap.ldif.gz" \
             | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
             || fatal "slapadd failed."
 
@@ -654,7 +569,7 @@ restore_tier() {
     local archive="${tier}.tar.gz"
     bk_has_archive "$archive" || return 0
 
-    local src_archive="${STAGE_DIR}/${archive}"
+    local src_archive="${BACKUP_FILE}/${archive}"
     local dest="${TIER_PATH[$tier]}"
 
     log "  ${tier}: extract directly to ${dest}"
@@ -665,11 +580,11 @@ restore_tier() {
 
     mkdir -p "$dest"
 
-    # Stream-extract the inner tier tar DIRECTLY to its final destination.
-    # No per-tier staging copy + no rsync intermediate = peak scratch space
-    # stays at ~1x the backup size (just the outer-tar extract in STAGE_DIR).
-    # The legacy non-Docker system_restore.sh worked this way (tar -xf to
-    # root); we kept the same shape, just per-tier instead of monolithic.
+    # Stream-extract the tier tar DIRECTLY from the backup directory to its
+    # final destination. No scratch space anywhere -- tar -xzf reads from
+    # the backup share, writes to TIER_PATH[$tier]. The legacy non-Docker
+    # system_restore.sh worked this way (tar -xf to root); we kept the same
+    # shape, just per-tier instead of monolithic.
     #
     # Trade-off: no --delete semantics. Files that exist at DEST but weren't
     # in the backup (e.g. mail received after the backup was taken, or
@@ -745,11 +660,6 @@ post_restore_nc_maintenance_off() {
         || warn "occ maintenance:mode --off failed -- the operator should run it manually."
 }
 
-cleanup_stage() {
-    if (( DRY_RUN )); then return 0; fi
-    if [[ -d "$STAGE_DIR" ]]; then rm -rf "$STAGE_DIR"; fi
-}
-
 detect_host_identity_mismatch() {
     # After restore, the restored .env carries the OLD host's IP / hostname.
     # If this host has a different identity, the restored config makes the
@@ -811,7 +721,7 @@ main() {
     log "Hermes SEG system restore"
     log "Mode: $((( DRY_RUN )) && echo DRY-RUN || echo LIVE)"
     preflight
-    extract_and_verify
+    verify_backup
     check_version_match
     check_topology
     confirm_destructive
@@ -822,7 +732,6 @@ main() {
     ensure_scripts_executable
     restart_stack
     post_restore_nc_maintenance_off
-    cleanup_stage
     report
 }
 

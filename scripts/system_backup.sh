@@ -33,13 +33,19 @@
 #                  ClamAV signatures are regenerable)
 #
 # Output:
-#   <-P>/hermes-backup-<scope>-<build_no>-<UTC-ts>.tar
-#       backup_manifest.json
+#   <-P>/hermes-backup-<scope>-<build_no>-<UTC-ts>/    (a DIRECTORY)
+#     +- contents:
+#       manifest.json      (scope, mode, topology, SHA256 per archive)
+#       backup.log         (log of this backup run)
 #       databases.tar.gz   (6 .sql; system/all only)
 #       ldap.ldif.gz       (slapcat output; system/all only)
 #       config.tar.gz      (install root MINUS data tiers; system/all)
 #       data.tar.gz        (Data tier MINUS mysql/ ldap/ clamav/; system/all)
 #       archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz  (relevant tiers)
+#
+# A backup is a SELF-CONTAINED DIRECTORY (no outer tar wrapper). Operators
+# move it around as a unit (rsync / cp -r / tar for archival / etc.).
+# Restore reads it in-place from any reachable mount -- ZERO scratch space.
 # ============================================================================
 
 set -uo pipefail
@@ -159,15 +165,15 @@ This message was sent by scripts/system_backup.sh on the Hermes Docker host.
 Investigate the log file above for the full failure context."
     else
         local sz="(unknown)"
-        [[ -n "${FINAL_TAR:-}" && -f "${FINAL_TAR}" ]] && \
-            sz="$(stat -c%s "$FINAL_TAR" | numfmt --to=iec --suffix=B 2>/dev/null || stat -c%s "$FINAL_TAR")"
+        [[ -n "${FINAL_DIR:-}" && -d "${FINAL_DIR}" ]] && \
+            sz="$(du -sb "$FINAL_DIR" 2>/dev/null | cut -f1 | numfmt --to=iec --suffix=B 2>/dev/null || echo "?")"
         body="The Hermes backup at $(date) succeeded.
 
 Host:        ${host}
 Scope:       ${SCOPE:-?}
 Mode:        $((( COLD_MODE )) && echo cold || echo hot)
-Output:      ${FINAL_TAR:-?}
-Size:        ${sz}
+Output dir:  ${FINAL_DIR:-?}
+Total size:  ${sz}
 Duration:    ${SECONDS}s
 Log file:    ${LOG_FILE}
 
@@ -212,8 +218,13 @@ Usage: $(basename "$0") -P <path> -B <scope> [--cold] [--no-nc-maintenance]
 Hermes SEG Docker system backup.
 
 Required:
-  -P <path>      Output directory for the backup tarball. Must exist and
-                 be writable.
+  -P <path>      Parent directory where the backup will be created. Must
+                 exist and be writable. Each backup run creates a NEW
+                 subdirectory:
+                   <-P>/hermes-backup-<scope>-<build_no>-<UTC-ts>/
+                 containing manifest.json + backup.log + per-scope tar.gz
+                 files. The backup directory IS the backup -- move it
+                 around as a unit (rsync / cp -r / etc.).
   -B <scope>     What to back up. One of:
                    system    -- Config + Data + 6 DB dumps + LDAP slapcat.
                                 Nightly default. Small + fast.
@@ -284,18 +295,24 @@ Examples:
        --notify-email=admin@example.com --notify-on-success   # both
   sudo $(basename "$0") --test-notify --notify-email=admin@example.com  # test only
 
-Output filename:
-  <path>/hermes-backup-<scope>-<build_no>-<UTC-timestamp>.tar
+Output directory:
+  <path>/hermes-backup-<scope>-<build_no>-<UTC-timestamp>/
 
-Inner archives (only the ones relevant to the chosen scope):
-  backup_manifest.json   (scope, mode, topology, SHA256 sums)
+Contents (only the ones relevant to the chosen scope):
+  manifest.json          (scope, mode, topology, SHA256 per archive)
+  backup.log             (log of this backup run)
   databases.tar.gz       (6 .sql files; system/all only)
   ldap.ldif.gz           (slapcat output; system/all only)
   config.tar.gz          (install root MINUS data tiers; system/all only)
-  data.tar.gz            (Data tier MINUS mysql/ ldap/ clamav/; system/all)
+  data.tar.gz            (Data tier MINUS dbase/ ldap/data/ mail_filter/data/clamav/; system/all)
   archive.tar.gz         (Archive tier; archive/all only)
   vmail.tar.gz           (Vmail tier; vmail/all only)
   nextcloud.tar.gz       (Nextcloud tier; nextcloud/all only)
+
+While a backup is in progress, the directory has a .staging- prefix
+(.staging-hermes-backup-...). On success it's atomic-renamed to the
+final name. On failure the staging dir is preserved with backup.log
+inside for inspection.
 EOF
 }
 
@@ -360,9 +377,12 @@ declare -A ARCHIVE_SHA
 declare -A ARCHIVE_SIZE
 TIMESTAMP="$(date -u '+%Y%m%dT%H%M%SZ')"
 BUILD_NO=""
-STAGE_DIR=""
-FINAL_TAR=""
-PARTIAL_TAR=""
+# A backup is a DIRECTORY containing manifest.json + per-scope tar.gz
+# files + the backup-time log. While the backup is running, it lives at
+# PARTIAL_DIR (.staging-* prefix); on success, atomic-renamed to FINAL_DIR.
+# Operators only ever see complete backups in normal listings.
+FINAL_DIR=""
+PARTIAL_DIR=""
 STACK_STOPPED=0
 NC_MAINT_TOGGLED=0
 ARCHIVES_CREATED=()
@@ -388,46 +408,16 @@ cleanup_on_fatal() {
         warn "Attempting to restart stack after failure..."
         ( cd "$HERMES_ROOT" && docker compose up -d ) >>"$LOG_FILE" 2>&1 || true
     fi
-    # Staging dir + .partial tarball cleanup. Auto-removed only for truly
-    # unattended runs: no TTY (cron) or --dry-run (nothing real to keep).
-    # --yes is orthogonal -- it skips the pre-run "proceed?" prompt, not
-    # this post-failure cleanup decision. An operator who said --yes still
-    # gets the chance to inspect partial dumps after a failure.
-    local auto_cleanup=0
-    if (( DRY_RUN )) || [[ ! -t 0 ]]; then
-        auto_cleanup=1
-    fi
-
-    if [[ -d "${STAGE_DIR:-}" ]]; then
-        local remove_staging=$auto_cleanup
-        if (( ! auto_cleanup )); then
-            warn "Staging directory left at: ${STAGE_DIR}"
-            read -r -p "Remove it? (log already captured everything) [y/N] " reply
-            [[ "$reply" =~ ^[Yy]$ ]] && remove_staging=1
-        fi
-        if (( remove_staging )); then
-            warn "Removing staging directory: ${STAGE_DIR}"
-            rm -rf "$STAGE_DIR" 2>>"$LOG_FILE" || \
-                warn "Could not remove ${STAGE_DIR} -- delete manually."
-        else
-            warn "Staging preserved. Remove manually when done: rm -rf '${STAGE_DIR}'"
-        fi
-    fi
-
-    if [[ -f "${PARTIAL_TAR:-}" ]]; then
-        local remove_partial=$auto_cleanup
-        if (( ! auto_cleanup )); then
-            warn "Partial tarball left at: ${PARTIAL_TAR}"
-            read -r -p "Remove it? [y/N] " reply
-            [[ "$reply" =~ ^[Yy]$ ]] && remove_partial=1
-        fi
-        if (( remove_partial )); then
-            warn "Removing partial tarball: ${PARTIAL_TAR}"
-            rm -f "$PARTIAL_TAR" 2>>"$LOG_FILE" || \
-                warn "Could not remove ${PARTIAL_TAR} -- delete manually."
-        else
-            warn "Partial tarball preserved. Remove manually: rm -f '${PARTIAL_TAR}'"
-        fi
+    # Preserve PARTIAL_DIR on failure. The log file lives inside it, and
+    # send_notification (called right after this) tails LOG_FILE for the
+    # failure email. The .staging- prefix means operators easily distinguish
+    # incomplete backups from completed ones in ls -- they can inspect the
+    # log inside, then `rm -rf` when done. No auto-prompt: keeps the
+    # behavior identical for cron vs interactive vs --yes runs.
+    if [[ -d "${PARTIAL_DIR:-}" ]]; then
+        warn "Partial backup preserved at: ${PARTIAL_DIR}"
+        warn "  Log inside: ${PARTIAL_DIR}/backup.log"
+        warn "  Remove manually when done: sudo rm -rf '${PARTIAL_DIR}'"
     fi
 }
 
@@ -555,7 +545,7 @@ read_build_no() {
 dump_databases() {
     header "Dumping databases (mariadb-dump --single-transaction)"
     ensure_container_running hermes_db_server
-    local db_stage="${STAGE_DIR}/databases"
+    local db_stage="${PARTIAL_DIR}/databases"
     mkdir -p "$db_stage"
     local db
     for db in "${DATABASES[@]}"; do
@@ -570,7 +560,7 @@ dump_databases() {
     done
     if (( ! DRY_RUN )); then
         log "  packaging databases.tar.gz..."
-        tar -czf "${STAGE_DIR}/databases.tar.gz" -C "$db_stage" . 2>>"$LOG_FILE"
+        tar -czf "${PARTIAL_DIR}/databases.tar.gz" -C "$db_stage" . 2>>"$LOG_FILE"
         rm -rf "$db_stage"
         ARCHIVES_CREATED+=( "databases.tar.gz" )
     fi
@@ -587,7 +577,7 @@ dump_ldap() {
     # slapcat falls back to /usr/local/etc/openldap/slapd.conf which is stale
     # in the Hermes image and breaks with "invalid path" at line 72.
     if ! docker exec hermes_ldap slapcat -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
-        | gzip -c > "${STAGE_DIR}/ldap.ldif.gz"; then
+        | gzip -c > "${PARTIAL_DIR}/ldap.ldif.gz"; then
         fatal "slapcat failed for ${LDAP_SUFFIX}. See $LOG_FILE."
     fi
     ARCHIVES_CREATED+=( "ldap.ldif.gz" )
@@ -622,7 +612,7 @@ nc_maintenance_off() {
 tar_tier() {
     local tier="$1"
     local src="${TIER_PATH[$tier]}"
-    local out="${STAGE_DIR}/${tier}.tar.gz"
+    local out="${PARTIAL_DIR}/${tier}.tar.gz"
     log "  ${tier}: tarring ${src} -> $(basename "$out")"
     if (( DRY_RUN )); then
         printf '%s[dry-run]%s tar -czf %s ...\n' "$CYAN" "$NC" "$out" | tee -a "$LOG_FILE"
@@ -683,7 +673,7 @@ compute_sha256() {
 }
 
 emit_manifest() {
-    local m="${STAGE_DIR}/backup_manifest.json"
+    local m="${PARTIAL_DIR}/manifest.json"
     log "  emitting manifest..."
     if (( DRY_RUN )); then
         printf '%s[dry-run]%s would write %s\n' "$CYAN" "$NC" "$m" | tee -a "$LOG_FILE"
@@ -746,20 +736,26 @@ preflight() {
     load_mounts
     read_build_no
 
-    FINAL_TAR="${BACKUP_PATH}/hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}.tar"
-    PARTIAL_TAR="${FINAL_TAR}.partial"
-    STAGE_DIR="${BACKUP_PATH}/.staging-${SCOPE}-${TIMESTAMP}"
-    [[ -e "$FINAL_TAR" || -e "$PARTIAL_TAR" || -e "$STAGE_DIR" ]] && \
-        fatal "Target files already exist (timestamp collision): ${FINAL_TAR}*"
+    # A backup is a directory. While the run is in progress it has a
+    # .staging- prefix so operators don't mistake an in-flight backup
+    # for a complete one. On success we atomic-rename (same FS) to the
+    # final name.
+    FINAL_DIR="${BACKUP_PATH}/hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}"
+    PARTIAL_DIR="${BACKUP_PATH}/.staging-hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}"
+    [[ -e "$FINAL_DIR" || -e "$PARTIAL_DIR" ]] && \
+        fatal "Target directory already exists (timestamp collision): ${FINAL_DIR}"
 
-    # Relocate the log from the bootstrap /tmp path to live alongside the
-    # backup tarball. Best-effort: if the rename fails (rare -- different
-    # filesystem with no link/rename support), keep using the /tmp path so
-    # nothing is lost.
-    local final_log="${BACKUP_PATH}/hermes-backup-${SCOPE}-${BUILD_NO}-${TIMESTAMP}.log"
-    if mv "$LOG_FILE" "$final_log" 2>/dev/null; then
+    if (( ! DRY_RUN )); then mkdir -p "$PARTIAL_DIR"; fi
+
+    # Relocate the log from the bootstrap /tmp path to live INSIDE the
+    # backup directory. The backup directory IS the self-contained backup
+    # unit -- log travels with manifest + tars wherever the backup is moved.
+    # Best-effort: if the rename fails (rare -- different filesystem with
+    # no link/rename support), keep using the /tmp path so nothing is lost.
+    local final_log="${PARTIAL_DIR}/backup.log"
+    if (( ! DRY_RUN )) && mv "$LOG_FILE" "$final_log" 2>/dev/null; then
         LOG_FILE="$final_log"
-    else
+    elif (( ! DRY_RUN )); then
         warn "Could not relocate log from ${LOG_FILE} to ${final_log} -- continuing with /tmp path."
     fi
 
@@ -767,9 +763,9 @@ preflight() {
     log "build_no:      ${BUILD_NO}"
     log "Scope:         ${SCOPE}"
     log "Mode:          $((( COLD_MODE )) && echo COLD || echo HOT)"
-    log "Output:        ${FINAL_TAR}"
+    log "Output dir:    ${FINAL_DIR}"
+    log "Working dir:   ${PARTIAL_DIR}  (renamed to Output dir on success)"
     log "Log:           ${LOG_FILE}"
-    log "Staging:       ${STAGE_DIR}"
     for t in "${TIERS[@]}"; do
         scope_includes_tier "$t" && log "Tier ${t}: ${TIER_PATH[$t]}"
     done
@@ -786,7 +782,6 @@ preflight() {
     fi
     log ""
     confirm "Proceed?" || { log "Aborted by operator."; exit 0; }
-    if (( ! DRY_RUN )); then mkdir -p "$STAGE_DIR"; fi
 }
 
 run_backup() {
@@ -811,34 +806,31 @@ run_backup() {
     nc_maintenance_off
 }
 
-assemble_outer() {
-    header "Assembling outer tarball"
+finalize_backup() {
+    header "Finalizing backup (SHA256s + manifest + atomic rename)"
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s would compute SHA256 + emit manifest + outer tar + atomic rename\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s would compute SHA256 + write manifest.json + rename %s -> %s\n' \
+            "$CYAN" "$NC" "$PARTIAL_DIR" "$FINAL_DIR" | tee -a "$LOG_FILE"
         return 0
     fi
+    # Compute SHA256 + size for each archive. The values land in the
+    # manifest restore reads to verify integrity per-file before destructive
+    # ops. No outer-tar wrapper, so a directory-level SHA isn't computed --
+    # restore checks each inner archive instead.
     local a
     for a in "${ARCHIVES_CREATED[@]}"; do
-        ARCHIVE_SHA[$a]="$(compute_sha256 "${STAGE_DIR}/${a}")"
-        ARCHIVE_SIZE[$a]="$(stat -c%s "${STAGE_DIR}/${a}")"
+        ARCHIVE_SHA[$a]="$(compute_sha256 "${PARTIAL_DIR}/${a}")"
+        ARCHIVE_SIZE[$a]="$(stat -c%s "${PARTIAL_DIR}/${a}")"
     done
     emit_manifest
-    # Same exit-code treatment as tar_tier(): exit 1 = warnings only (e.g.
-    # CIFS's async dir-metadata updates can trigger "file changed as we
-    # read it" on the staging dir itself even though all the inner files
-    # are static and complete). Only exit >= 2 is a real failure.
-    local outer_exit=0
-    start_heartbeat "outer tar" "$PARTIAL_TAR" 60
-    tar -cf "$PARTIAL_TAR" -C "$STAGE_DIR" . 2>>"$LOG_FILE" || outer_exit=$?
-    stop_heartbeat
-    case "$outer_exit" in
-        0) ;;
-        1) warn "  outer tar exited 1 (warnings only -- CIFS metadata quirk); archive is valid." ;;
-        *) fatal "Outer tar assembly failed (exit ${outer_exit})." ;;
-    esac
-    mv "$PARTIAL_TAR" "$FINAL_TAR" \
-        || fatal "Atomic rename failed: ${PARTIAL_TAR} -> ${FINAL_TAR}"
-    rm -rf "$STAGE_DIR"
+
+    # Backup log is currently being written INSIDE PARTIAL_DIR. About to
+    # rename PARTIAL_DIR to FINAL_DIR -- update LOG_FILE so subsequent
+    # log() calls keep writing to the same physical file at its new path.
+    local new_log="${FINAL_DIR}/$(basename "$LOG_FILE")"
+    mv "$PARTIAL_DIR" "$FINAL_DIR" \
+        || fatal "Atomic rename failed: ${PARTIAL_DIR} -> ${FINAL_DIR}"
+    LOG_FILE="$new_log"
 }
 
 restart_stack_if_cold() {
@@ -865,14 +857,17 @@ report() {
         return 0
     fi
     local sz
-    sz="$(stat -c%s "$FINAL_TAR" | numfmt --to=iec --suffix=B 2>/dev/null || stat -c%s "$FINAL_TAR")"
-    log "Backup written: ${FINAL_TAR}"
+    sz="$(du -sb "$FINAL_DIR" 2>/dev/null | cut -f1 | numfmt --to=iec --suffix=B 2>/dev/null || echo "?")"
+    log "Backup written: ${FINAL_DIR}/"
     log "Scope:          ${SCOPE} (${ARCHIVES_CREATED[*]})"
-    log "Size:           ${sz}"
+    log "Total size:     ${sz}"
     log "Log:            ${LOG_FILE}"
     log ""
+    log "Contents:"
+    ls -lh "$FINAL_DIR" 2>/dev/null | awk 'NR>1 {printf "  %s  %s\n", $5, $9}' | tee -a "$LOG_FILE"
+    log ""
     log "To restore:"
-    log "  sudo ./scripts/system_restore.sh -F '${FINAL_TAR}'"
+    log "  sudo ./scripts/system_restore.sh -F '${FINAL_DIR}'"
 }
 
 test_notify_and_exit() {
@@ -907,7 +902,7 @@ main() {
     log "Hermes SEG system backup"
     preflight
     run_backup
-    assemble_outer
+    finalize_backup
     restart_stack_if_cold
     report
     send_notification SUCCESS
