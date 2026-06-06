@@ -348,6 +348,53 @@ extract_and_verify() {
     STAGE_DIR="$(mktemp -d -p "$staging_parent" hermes-restore-XXXXXX)" \
         || fatal "Failed to create staging dir under ${staging_parent}"
     log "Staging dir: ${STAGE_DIR}"
+
+    # Disk-space warning + sanity check. The staging directory will hold:
+    #   1. The extracted outer tar (= backup file size, since the outer
+    #      tar is uncompressed -cf, not -czf -- its contents are already
+    #      gzip'd inner archives)
+    #   2. Per-tier extracts (each inner tier.tar.gz expanded into
+    #      extracted_<tier>/ -- raw uncompressed data, can be 2-3x the
+    #      gzip'd size on top of the outer-tar extract from step 1)
+    # Rough estimate: peak usage = backup_size + sum(uncompressed_tier_sizes)
+    # which can easily be 3-4x the .tar size for data-heavy backups.
+    local backup_size_bytes backup_size_h required_bytes required_h avail_bytes avail_h fs_label
+    backup_size_bytes=$(stat -c%s "$BACKUP_FILE" 2>/dev/null || echo 0)
+    backup_size_h=$(numfmt --to=iec "$backup_size_bytes" 2>/dev/null || echo "?")
+    # Conservative multiplier: 3x backup size as the safe required estimate
+    required_bytes=$(( backup_size_bytes * 3 ))
+    required_h=$(numfmt --to=iec "$required_bytes" 2>/dev/null || echo "?")
+    avail_bytes=$(df --output=avail -B1 "$staging_parent" 2>/dev/null | tail -1 | tr -d ' ')
+    avail_h=$(numfmt --to=iec "${avail_bytes:-0}" 2>/dev/null || echo "?")
+    fs_label=$(df --output=target "$staging_parent" 2>/dev/null | tail -1)
+
+    echo "" | tee -a "$LOG_FILE"
+    warn "================================================================"
+    warn "  DISK SPACE WARNING"
+    warn "================================================================"
+    warn "  Restore extracts the backup to a staging directory BEFORE"
+    warn "  rsync'ing data to the final tier paths. Peak disk use during"
+    warn "  restore is roughly 3x the backup size (outer tar extract +"
+    warn "  per-tier uncompressed extracts running in sequence)."
+    warn ""
+    warn "  Backup file size:     ${backup_size_h}"
+    warn "  Estimated required:   ${required_h}  (3x backup, conservative)"
+    warn "  Staging filesystem:   ${fs_label:-${staging_parent}}"
+    warn "  Available space:      ${avail_h}"
+    warn ""
+    if (( avail_bytes < required_bytes )); then
+        warn "  *** INSUFFICIENT SPACE -- restore will likely fail mid-extract. ***"
+        warn ""
+        warn "  Options:"
+        warn "    - Free space on ${fs_label:-${staging_parent}} and retry"
+        warn "    - Point staging elsewhere with --staging-dir=PATH"
+        warn "      (must have at least ${required_h} free)"
+        warn "================================================================"
+        fatal "Aborting before extraction. Free space or use --staging-dir."
+    fi
+    warn "  Looks OK. Proceeding."
+    warn "================================================================"
+    echo "" | tee -a "$LOG_FILE"
     if (( DRY_RUN )); then
         printf '%s[dry-run]%s tar -xf %s -C %s\n' "$CYAN" "$NC" "$BACKUP_FILE" "$STAGE_DIR" | tee -a "$LOG_FILE"
         return 0
