@@ -3969,7 +3969,17 @@ main() {
     # the default TTY-aware progress emits when stdout is piped through tee
     # (no carriage-return redraw -> every update gets its own line). plain
     # emits one line per real event (Pulling, Pulled, Built, Started).
-    if ! ( cd "$HERMES_ROOT" && docker compose up -d --build --progress=plain 2>&1 | tee -a "$LOG_FILE" ); then
+    #
+    # NOTE: --progress is a GLOBAL flag on the `docker compose` binary, not
+    # a flag for the `up` subcommand. Putting it after `up` produces:
+    #     "unknown flag: --progress"
+    # Place it BEFORE the subcommand.
+    #
+    # PIPESTATUS check: a default bash pipeline's exit code is the rightmost
+    # command's (tee, which almost always succeeds). Without checking
+    # PIPESTATUS, a docker compose failure here would be silently swallowed
+    # and the script would continue into Phase 2 against a half-up stack.
+    if ! ( cd "$HERMES_ROOT" && docker compose --progress=plain up -d --build 2>&1 | tee -a "$LOG_FILE"; exit "${PIPESTATUS[0]}" ); then
         error "docker compose up -d --build failed. Inspect ${LOG_FILE}, fix the issue, then re-run ./install_hermes_docker.sh (state guards will resume where you left off)."
     fi
     log "Containers started"
