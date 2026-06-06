@@ -4,7 +4,7 @@
 # ============================================================================
 # Restores a backup tarball produced by scripts/system_backup.sh. Verifies
 # the manifest + per-archive SHA256 BEFORE any destructive action, refuses
-# on storage-topology mismatch unless FORCE_REMAP=1, stops the stack for
+# with auto-remap to the current host's tier paths if topology differs, stops the stack for
 # the duration of the restore (always cold on the restore side because we
 # are overwriting tier contents), restores databases via socket auth +
 # `mariadb -u root`, restores OpenLDAP via slapadd, rsyncs each in-scope
@@ -79,10 +79,6 @@ Options:
   --help         Show this help.
 
 Environment:
-  FORCE_REMAP=1  Required if the backup's storage topology does NOT match
-                 this host's (different DATA_MOUNT etc.). Without it,
-                 restore refuses on topology mismatch.
-
   FORCE_VERSION_MISMATCH=1
                  Required if the backup's Hermes build_no does NOT match
                  this host's current build_no. Schema migrations between
@@ -349,7 +345,9 @@ check_version_match() {
     header "Version match check"
     # Reads build_no from the current host's system_settings table. If the
     # backup was taken on a different build, refuse unless FORCE_VERSION_MISMATCH=1.
-    # Same pattern as FORCE_REMAP=1 for topology mismatch.
+    # Version-mismatch is the ONE gate that does require an explicit override
+    # (FORCE_VERSION_MISMATCH=1) -- topology mismatch auto-remaps, but
+    # version mismatch can silently corrupt DBs via schema drift.
     #
     # Why: schema migrations between Hermes releases can change tables, so a DB
     # dump from build X restored onto a host running build Y leaves the schema
@@ -398,6 +396,12 @@ check_version_match() {
 
 check_topology() {
     header "Topology check"
+    # Auto-remap by default: rsync always targets the CURRENT host's tier
+    # paths regardless. Topology mismatch is the EXPECTED case for any
+    # new-hardware DR -- requiring an explicit FORCE_REMAP flag was friction
+    # without safety benefit. The destructive confirmation prompt already
+    # shows which paths data lands at, --yes already requires explicit
+    # operator opt-in, and version-match catches "wrong backup" scenarios.
     local mismatch=0
     local t
     for t in "${TIERS[@]}"; do
@@ -408,20 +412,17 @@ check_topology() {
         if [[ "$t" == "vmail" ]]   && ! bk_has_archive "vmail.tar.gz";   then continue; fi
         if [[ "$t" == "nextcloud" ]] && ! bk_has_archive "nextcloud.tar.gz"; then continue; fi
         if [[ "${BK_TIER_PATH[$t]}" != "${TIER_PATH[$t]}" ]]; then
-            warn "Topology mismatch for tier '${t}': backup=${BK_TIER_PATH[$t]} current=${TIER_PATH[$t]}"
+            warn "  ${t}: REMAP backup=${BK_TIER_PATH[$t]} -> current=${TIER_PATH[$t]}"
             mismatch=1
         else
             log "  ${t}: ${TIER_PATH[$t]} ✓"
         fi
     done
     if (( mismatch )); then
-        if [[ "${FORCE_REMAP:-0}" == "1" ]]; then
-            warn "FORCE_REMAP=1 -- proceeding with the CURRENT host's tier paths."
-        else
-            error "Topology mismatch. To restore anyway and remap to this host's paths:"
-            error "  FORCE_REMAP=1 $0 -F ${BACKUP_FILE}"
-            fatal "Refusing to restore on topology mismatch without explicit FORCE_REMAP=1."
-        fi
+        warn ""
+        warn "Auto-remap active: data will be restored to this host's tier paths"
+        warn "(shown above), not the backup's original paths. This is the normal"
+        warn "behavior for restoring on different hardware."
     fi
 }
 
