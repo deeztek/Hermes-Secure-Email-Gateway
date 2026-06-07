@@ -43,7 +43,9 @@
 #                           sa-bayes, sa-learn, dkim, arc, conf_files --
 #                           NOT docker-compose.yml / .env / secrets / scripts;
 #                           system/all)
-#       data.tar.gz        (Data tier MINUS mysql/ ldap/ clamav/; system/all)
+#       data.tar.gz        (USER DATA ONLY from data tier: sieve scripts +
+#                           Authelia SQLite if present. NOT logs, NOT queue,
+#                           NOT regenerable state; system/all)
 #       archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz  (relevant tiers)
 #
 # A backup is a SELF-CONTAINED DIRECTORY (no outer tar wrapper). Operators
@@ -312,7 +314,10 @@ Contents (only the ones relevant to the chosen scope):
                           docker-compose.yml, .env, host secrets, scripts,
                           or release artifacts -- those come from the
                           target install's checkout. system/all only.)
-  data.tar.gz            (Data tier MINUS dbase/ ldap/data/ mail_filter/data/clamav/; system/all)
+  data.tar.gz            (USER DATA ONLY -- sieve scripts (dovecot/sieve/)
+                          + Authelia SQLite (if present). NOT mariadb/ldap
+                          (captured via dumps), NOT logs, NOT postfix queue,
+                          NOT regenerable runtime state. system/all only.)
   archive.tar.gz         (Archive tier; archive/all only)
   vmail.tar.gz           (Vmail tier; vmail/all only)
   nextcloud.tar.gz       (Nextcloud tier; nextcloud/all only)
@@ -678,25 +683,43 @@ tar_tier() {
             log "  config: capturing user-data subdirs only: ${include_paths[*]#./}"
             ;;
         data)
-            # Excluded from the data tier tar:
-            #   ./dbase                       -- MariaDB datadir; mariadb-dump is authoritative
-            #   ./ldap/data                   -- OpenLDAP datadir; slapcat is authoritative
-            #                                    (logs at ./ldap/logs are kept)
-            #   ./mail_filter/data/clamav     -- ClamAV signatures; regenerable, ~1GB
-            exclude_args+=( \
-                --exclude='./dbase' \
-                --exclude='./ldap/data' \
-                --exclude='./mail_filter/data/clamav' \
-            )
-            # Also exclude sibling tiers nested under data (operators on small
-            # deployments collapse ARCHIVE_MOUNT=/mnt/data/amavis etc.; those
-            # paths belong to their own scope, not 'system').
-            for t in archive vmail nextcloud; do
-                local p="${TIER_PATH[$t]}"
-                if [[ "$p" == "$src"/* ]]; then
-                    exclude_args+=( --exclude="./${p#$src/}" )
+            # DATA TIER == USER DATA ONLY (same architectural fix as config tier).
+            #
+            # Earlier versions captured everything under DATA_MOUNT minus
+            # dbase / ldap/data / clamav. That still pulled in:
+            #   - postfix_dkim/queue, logs    (transient + ~10GB of logs)
+            #   - dovecot/logs, nginx/logs    (logs we don't need to restore)
+            #   - mail_filter/data/amavis     (runtime state, regenerable)
+            #   - mail_filter/data/fangfrisch (sig metadata, regenerable)
+            #   - commandbox                  (Lucee runtime, regenerable)
+            #   - ofelia                      (re-generated from DB)
+            # Net result: a `-B system` backup that should have been ~1GB
+            # was instead 14-20GB of mostly logs + transient state.
+            #
+            # Now: explicit allowlist of user-populated subdirs that aren't
+            # already captured by mariadb-dump or slapcat. Paths that don't
+            # exist on the source are skipped at construction time.
+            #   dovecot/sieve/    User-defined sieve scripts (filters,
+            #                     vacation auto-replies)
+            #   authelia/         Authelia SQLite DB (only present on
+            #                     installs that haven't migrated to the
+            #                     MariaDB-backed authelia DB; canonical
+            #                     post-#179 installs are on MariaDB)
+            include_paths=()
+            local data_user_subdir candidate
+            for data_user_subdir in dovecot/sieve authelia; do
+                candidate="${data_user_subdir}"
+                if [[ -e "${src}/${candidate}" ]]; then
+                    include_paths+=( "./${candidate}" )
                 fi
             done
+            if (( ${#include_paths[@]} == 0 )); then
+                warn "  data: no user-data subdirs found under ${src} -- writing empty archive."
+                tar -czf "$out" -T /dev/null 2>>"$LOG_FILE" || fatal "empty data tar failed"
+                ARCHIVES_CREATED+=( "${tier}.tar.gz" )
+                return 0
+            fi
+            log "  data: capturing user-data subdirs only: ${include_paths[*]#./}"
             ;;
     esac
 
