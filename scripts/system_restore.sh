@@ -539,32 +539,49 @@ restore_ldap() {
     if (( ! DRY_RUN )); then sleep 4; fi
 
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s gunzip ldap.ldif.gz | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b %s\n' \
+        printf '%s[dry-run]%s stop hermes_ldap, run slapadd via one-shot container (wipe DB + load %s), start hermes_ldap\n' \
             "$CYAN" "$NC" "$LDAP_SUFFIX" | tee -a "$LOG_FILE"
     else
-        # slapadd writes to the on-disk LDAP DB. slapd must NOT be running
-        # while slapadd writes -- so we stop slapd inside the container,
-        # run slapadd, then start slapd. The Hermes image's entrypoint
-        # starts slapd; we kill+restart it inline.
-        log "  stopping slapd inside hermes_ldap..."
-        docker exec hermes_ldap bash -c 'pkill -f slapd || true; sleep 2' 2>>"$LOG_FILE" || true
+        # The Hermes OpenLDAP container runs slapd as PID 1 -- pkill'ing
+        # slapd just kills the container (Docker restart policy then spins
+        # it back up). So we have to STOP the container properly, then run
+        # slapadd via a one-shot container that mounts the same volumes but
+        # uses slapadd as its entrypoint (not slapd). After slapadd
+        # finishes, start the original container.
+        #
+        # slapadd ALSO requires the DB directory to be empty -- it only
+        # ADDs entries, won't overwrite. Fresh installs bootstrap the
+        # dc=hermes,dc=local root entry, which conflicts. So the one-shot
+        # container wipes the DB dir before slapadd. The DB directory path
+        # is read from olcDbDirectory in the slapd config (slapadd-internal
+        # path; varies between custom builds and distro packages).
+        log "  stopping hermes_ldap container fully (slapd is PID 1; container exits)..."
+        run bash -c "cd '$HERMES_ROOT' && docker compose stop hermes_ldap"
+        sleep 2
 
-        log "  running slapadd (wipe + reload)..."
-        # -F points slapadd at the OLC config dir slapd uses (matches the
-        # backup-side slapcat invocation). -c would continue on errors but
-        # we want failures to abort so the operator notices.
-        start_heartbeat "slapadd: loading LDIF" "" 60
-        gunzip -c "${BACKUP_FILE}/ldap.ldif.gz" \
-            | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
-            || { stop_heartbeat; fatal "slapadd failed."; }
+        log "  running one-shot wipe + slapadd container..."
+        start_heartbeat "slapadd: wipe + load LDIF" "" 60
+        # NB: We capture stderr to the log so failure surfaces clearly.
+        # sh -c chain: read DB dir from olcDbDirectory, wipe its contents,
+        # run slapadd reading LDIF from stdin.
+        gunzip -c "${BACKUP_FILE}/ldap.ldif.gz" | ( \
+            cd "$HERMES_ROOT" && \
+            docker compose run --rm -i --entrypoint sh hermes_ldap -c '
+                DB_DIR=$(grep -h "olcDbDirectory" /etc/ldap/slapd.d/cn=config/olcDatabase=*.ldif 2>/dev/null \
+                         | head -1 | cut -d: -f2- | tr -d " ")
+                if [ -z "$DB_DIR" ] || [ ! -d "$DB_DIR" ]; then
+                    echo "ERROR: could not determine LDAP DB directory from olcDbDirectory" >&2
+                    exit 1
+                fi
+                echo "Wiping ${DB_DIR}/* before slapadd..." >&2
+                rm -rf "${DB_DIR}"/* 2>/dev/null || true
+                slapadd -F /etc/ldap/slapd.d -b "'"$LDAP_SUFFIX"'"
+            ' 2>>"$LOG_FILE" \
+        ) || { stop_heartbeat; fatal "slapadd via one-shot container failed -- check ${LOG_FILE} for the wipe / slapadd error."; }
         stop_heartbeat
 
-        # Fix ownership on the LDAP data files. slapd in the Hermes image
-        # runs as root (-u root -g root in ps output), so chown to root:root.
-        docker exec hermes_ldap chown -R root:root /var/lib/ldap 2>>"$LOG_FILE" || true
-
-        log "  restarting hermes_ldap container so slapd picks up the restored DB..."
-        run bash -c "cd '$HERMES_ROOT' && docker compose restart hermes_ldap"
+        log "  starting hermes_ldap container with restored DB..."
+        run bash -c "cd '$HERMES_ROOT' && docker compose start hermes_ldap"
         sleep 4
     fi
 
