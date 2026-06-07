@@ -515,9 +515,15 @@ restore_databases() {
         if ! tar -tzf "${BACKUP_FILE}/databases.tar.gz" "./${db}.sql" >/dev/null 2>&1; then
             fatal "Missing ./${db}.sql in databases.tar.gz."
         fi
+        # Heartbeat without watch_file -- mariadb's on-disk datadir location
+        # varies by install (host bind vs Docker named volume), so just
+        # emit elapsed-time ticks so the operator sees the restore is alive
+        # during long INSERTs on big tables (e.g. msgs, SystemEvents).
+        start_heartbeat "${db}: restoring" "" 60
         tar -xzOf "${BACKUP_FILE}/databases.tar.gz" "./${db}.sql" \
             | db_exec -i 2>>"$LOG_FILE" \
-            || fatal "Failed to restore ${db}."
+            || { stop_heartbeat; fatal "Failed to restore ${db}."; }
+        stop_heartbeat
     done
     db_exec -e "FLUSH PRIVILEGES;" 2>>"$LOG_FILE" || true
 
@@ -547,9 +553,11 @@ restore_ldap() {
         # -F points slapadd at the OLC config dir slapd uses (matches the
         # backup-side slapcat invocation). -c would continue on errors but
         # we want failures to abort so the operator notices.
+        start_heartbeat "slapadd: loading LDIF" "" 60
         gunzip -c "${BACKUP_FILE}/ldap.ldif.gz" \
             | docker exec -i hermes_ldap slapadd -F /etc/ldap/slapd.d -b "$LDAP_SUFFIX" 2>>"$LOG_FILE" \
-            || fatal "slapadd failed."
+            || { stop_heartbeat; fatal "slapadd failed."; }
+        stop_heartbeat
 
         # Fix ownership on the LDAP data files. slapd in the Hermes image
         # runs as root (-u root -g root in ps output), so chown to root:root.
