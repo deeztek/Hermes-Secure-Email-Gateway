@@ -39,7 +39,10 @@
 #       backup.log         (log of this backup run)
 #       databases.tar.gz   (6 .sql; system/all only)
 #       ldap.ldif.gz       (slapcat output; system/all only)
-#       config.tar.gz      (install root MINUS data tiers; system/all)
+#       config.tar.gz      (USER DATA ONLY: keys, .gnupg, ssl, templates,
+#                           sa-bayes, sa-learn, dkim, arc, conf_files --
+#                           NOT docker-compose.yml / .env / secrets / scripts;
+#                           system/all)
 #       data.tar.gz        (Data tier MINUS mysql/ ldap/ clamav/; system/all)
 #       archive.tar.gz, vmail.tar.gz, nextcloud.tar.gz  (relevant tiers)
 #
@@ -303,7 +306,12 @@ Contents (only the ones relevant to the chosen scope):
   backup.log             (log of this backup run)
   databases.tar.gz       (6 .sql files; system/all only)
   ldap.ldif.gz           (slapcat output; system/all only)
-  config.tar.gz          (install root MINUS data tiers; system/all only)
+  config.tar.gz          (USER DATA ONLY -- DKIM/PGP/SSL keys, custom
+                          amavis templates, SpamAssassin bayes corpus,
+                          OpenDKIM/ARC tables. Does NOT include
+                          docker-compose.yml, .env, host secrets, scripts,
+                          or release artifacts -- those come from the
+                          target install's checkout. system/all only.)
   data.tar.gz            (Data tier MINUS dbase/ ldap/data/ mail_filter/data/clamav/; system/all)
   archive.tar.gz         (Archive tier; archive/all only)
   vmail.tar.gz           (Vmail tier; vmail/all only)
@@ -618,17 +626,56 @@ tar_tier() {
         printf '%s[dry-run]%s tar -czf %s ...\n' "$CYAN" "$NC" "$out" | tee -a "$LOG_FILE"
         return 0
     fi
+
     local exclude_args=()
+    local include_paths=( "." )       # default: archive everything under $src
+
     case "$tier" in
         config)
-            exclude_args+=( --exclude='./install-logs' --exclude='./.git' )
-            # Exclude any data tier paths nested inside the install root.
-            for t in data archive vmail nextcloud; do
-                local p="${TIER_PATH[$t]}"
-                if [[ "$p" == "$src"/* ]]; then
-                    exclude_args+=( --exclude="./${p#$src/}" )
+            # CONFIG TIER == USER DATA ONLY.
+            #
+            # Earlier versions captured the whole install root with excludes.
+            # That mixed user data with install-specific files (docker-
+            # compose.yml, .env, host secrets) and release artifacts
+            # (scripts/, Docker/, docs/). On cross-host restore, overlaying
+            # those clobbered the target install's stack definition --
+            # docker compose then prompted to recreate volumes because the
+            # restored compose's volume specs no longer matched the running
+            # Docker volumes. Catastrophic.
+            #
+            # Now: explicit allowlist of user-populated paths under
+            # config/hermes/opt/hermes/. Restore just overlays these onto
+            # the target install. Install-specific files and release
+            # artifacts come from the target install's own checkout.
+            #
+            # Paths captured (each is a relative directory under $src;
+            # tar will skip those that don't exist on the source via
+            # --ignore-failed-read):
+            #   keys/        DKIM private keys, host signing keys
+            #   .gnupg/      PGP keyrings for encryption
+            #   ssl/         admin-uploaded SSL certificates + bundles
+            #   templates/   custom amavis/disclaimer/signature templates
+            #   sa-bayes/    SpamAssassin bayes corpus
+            #   sa-learn/    SpamAssassin per-user training
+            #   dkim/        DKIM tables + keys
+            #   arc/         ARC keys + tables
+            #   conf_files/  admin custom config snippets
+            include_paths=()
+            local user_data_subdir candidate
+            for user_data_subdir in keys .gnupg ssl templates sa-bayes sa-learn dkim arc conf_files; do
+                candidate="config/hermes/opt/hermes/${user_data_subdir}"
+                if [[ -e "${src}/${candidate}" ]]; then
+                    include_paths+=( "./${candidate}" )
                 fi
             done
+            if (( ${#include_paths[@]} == 0 )); then
+                warn "  config: no user-data subdirs found under ${src}/config/hermes/opt/hermes/ -- writing empty archive."
+                # Write an empty archive so restore + manifest still see the tier.
+                tar -czf "$out" -T /dev/null 2>>"$LOG_FILE" || fatal "empty config tar failed"
+                ARCHIVES_CREATED+=( "${tier}.tar.gz" )
+                return 0
+            fi
+            log "  config: capturing user-data subdirs only: ${include_paths[*]#./}"
             ;;
         data)
             # Excluded from the data tier tar:
@@ -652,13 +699,14 @@ tar_tier() {
             done
             ;;
     esac
+
     # tar exit codes: 0=success, 1=warnings only (sockets, "file changed as
     # we read it" -- expected on hot backup of a live system), 2+=real error.
     # The script previously fatal'd on ANY non-zero; that misclassified
     # successful hot backups as failures.
     local tar_exit=0
     start_heartbeat "${tier}: tar" "$out" 60
-    tar -czf "$out" "${exclude_args[@]}" -C "$src" . 2>>"$LOG_FILE" || tar_exit=$?
+    tar -czf "$out" "${exclude_args[@]}" -C "$src" "${include_paths[@]}" 2>>"$LOG_FILE" || tar_exit=$?
     stop_heartbeat
     case "$tar_exit" in
         0) ;;
