@@ -564,9 +564,14 @@ restore_ldap() {
         # NB: We capture stderr to the log so failure surfaces clearly.
         # sh -c chain: read DB dir from olcDbDirectory, wipe its contents,
         # run slapadd reading LDIF from stdin.
+        # -T disables pseudo-TTY allocation (REQUIRED when piping stdin
+        # into a service that has tty:true in compose -- otherwise docker
+        # errors: "cannot attach stdin to a TTY-enabled container because
+        # stdin is not a terminal"). Verified empirically against the
+        # hermes_ldap service which has tty: true.
         gunzip -c "${BACKUP_FILE}/ldap.ldif.gz" | ( \
             cd "$HERMES_ROOT" && \
-            docker compose run --rm -i --entrypoint sh hermes_ldap -c '
+            docker compose run --rm -i -T --entrypoint sh hermes_ldap -c '
                 DB_DIR=$(grep -h "olcDbDirectory" /etc/ldap/slapd.d/cn=config/olcDatabase=*.ldif 2>/dev/null \
                          | head -1 | cut -d: -f2- | tr -d " ")
                 if [ -z "$DB_DIR" ] || [ ! -d "$DB_DIR" ]; then
@@ -574,8 +579,16 @@ restore_ldap() {
                     exit 1
                 fi
                 echo "Wiping ${DB_DIR}/* before slapadd..." >&2
-                rm -rf "${DB_DIR}"/* 2>/dev/null || true
-                slapadd -F /etc/ldap/slapd.d -b "'"$LDAP_SUFFIX"'"
+                rm -rf "${DB_DIR}"/* 2>&1 >&2 || { echo "wipe failed" >&2; exit 1; }
+                echo "Running slapadd..." >&2
+                slapadd -F /etc/ldap/slapd.d -b "'"$LDAP_SUFFIX"'" || { echo "slapadd failed" >&2; exit 1; }
+                # Sanity: verify slapadd actually loaded something. Empty
+                # stdin would let slapadd exit 0 silently with no data.
+                if [ ! -s "${DB_DIR}/data.mdb" ]; then
+                    echo "ERROR: slapadd produced no data.mdb -- LDIF stdin was likely empty" >&2
+                    exit 1
+                fi
+                echo "slapadd loaded LDIF into ${DB_DIR}/data.mdb ($(stat -c%s "${DB_DIR}/data.mdb") bytes)" >&2
             ' 2>>"$LOG_FILE" \
         ) || { stop_heartbeat; fatal "slapadd via one-shot container failed -- check ${LOG_FILE} for the wipe / slapadd error."; }
         stop_heartbeat
