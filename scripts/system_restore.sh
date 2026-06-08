@@ -63,13 +63,14 @@ header(){ printf '\n%s== %s ==%s\n' "$CYAN" "$*" "$NC" | tee -a "$LOG_FILE"; }
 
 # ---- Args ----
 BACKUP_FILE=""
+ONLY_SCOPE=""
 ASSUME_YES=0
 DRY_RUN=0
 SHOW_HELP=0
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") -F <backup-dir> [--yes] [--dry-run] [--help]
+Usage: $(basename "$0") -F <backup-dir> [--only=<scope>] [--yes] [--dry-run] [--help]
 
 Hermes SEG Docker system restore.
 
@@ -79,6 +80,20 @@ Required:
                  containing manifest.json + per-scope tar.gz files).
 
 Options:
+  --only=<scope> Restore only the archives matching <scope>. Useful for
+                 staged DR from a single -B all backup -- restore the
+                 system pieces first to get the stack up, then restore
+                 vmail / archive / nextcloud separately as time allows.
+                 Valid values (same as -B on the backup side):
+                   system     databases + ldap + config + data
+                   archive    archive.tar.gz only (Amavis quarantine)
+                   vmail      vmail.tar.gz only (Dovecot mailboxes)
+                   nextcloud  nextcloud.tar.gz only (NC files)
+                   all        everything in the backup (= no filter,
+                              default if --only is omitted)
+                 If --only=X requests archives not present in the backup
+                 (e.g. --only=vmail on a -B system backup), restore
+                 aborts before any destructive action.
   --yes          Skip the interactive confirmation prompt.
   --dry-run      Show what would be done without changing anything.
   --help         Show this help.
@@ -122,6 +137,7 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -F)                 BACKUP_FILE="$2"; shift 2 ;;
+        --only=*)           ONLY_SCOPE="${1#*=}"; shift ;;
         --yes|-y)           ASSUME_YES=1; shift ;;
         --dry-run|-n)       DRY_RUN=1; shift ;;
         --help|-h)          SHOW_HELP=1; shift ;;
@@ -134,6 +150,13 @@ if [[ -z "$BACKUP_FILE" ]]; then error "Required flag -F missing."; usage; exit 
 if [[ ! -d "$BACKUP_FILE" ]]; then error "Backup directory not found: ${BACKUP_FILE}"; exit 1; fi
 # Strip trailing slash so paths concat cleanly
 BACKUP_FILE="${BACKUP_FILE%/}"
+
+if [[ -n "$ONLY_SCOPE" ]]; then
+    case "$ONLY_SCOPE" in
+        system|archive|vmail|nextcloud|all) ;;
+        *) error "Invalid --only value '${ONLY_SCOPE}'. Must be: system, archive, vmail, nextcloud, all."; exit 1 ;;
+    esac
+fi
 if [[ $EUID -ne 0 ]] && (( ! DRY_RUN )); then fatal "Must run as root (live mode)."; fi
 
 # ---- Constants ----
@@ -366,6 +389,34 @@ verify_backup() {
     log "  timestamp:  ${BK_TIMESTAMP}"
     log "  hostname:   ${BK_HOSTNAME}"
     log "  archives:   ${BK_ARCHIVES[*]}"
+
+    # --only filter: narrow BK_ARCHIVES to just the requested scope's
+    # archive names. The rest of the restore (restore_databases,
+    # restore_ldap, restore_tier) all gate on bk_has_archive(), so this
+    # naturally skips any archive not in the filtered set.
+    if [[ -n "$ONLY_SCOPE" && "$ONLY_SCOPE" != "all" ]]; then
+        local -a want_archives=()
+        case "$ONLY_SCOPE" in
+            system)    want_archives=( databases.tar.gz ldap.ldif.gz config.tar.gz data.tar.gz ) ;;
+            archive)   want_archives=( archive.tar.gz ) ;;
+            vmail)     want_archives=( vmail.tar.gz ) ;;
+            nextcloud) want_archives=( nextcloud.tar.gz ) ;;
+        esac
+        local -a kept=()
+        local w a
+        for w in "${want_archives[@]}"; do
+            for a in "${BK_ARCHIVES[@]}"; do
+                [[ "$a" == "$w" ]] && kept+=( "$a" )
+            done
+        done
+        if (( ${#kept[@]} == 0 )); then
+            fatal "--only=${ONLY_SCOPE} requested but the backup contains none of: ${want_archives[*]}. Backup scope was '${BK_SCOPE}' with archives: ${BK_ARCHIVES[*]}"
+        fi
+        BK_ARCHIVES=( "${kept[@]}" )
+        log ""
+        log "  --only=${ONLY_SCOPE}: restoring only ${BK_ARCHIVES[*]}"
+        log "  (other archives in the backup will be left for a subsequent restore run)"
+    fi
 
     if (( DRY_RUN )); then
         printf '%s[dry-run]%s would sha256sum each archive in %s against manifest\n' \
