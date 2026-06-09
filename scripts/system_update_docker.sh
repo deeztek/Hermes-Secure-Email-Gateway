@@ -395,6 +395,45 @@ phase2_update_containers() {
 
     cd "$HERMES_ROOT"
 
+    # Pre-container migration hook: run each pending release's pre-scripts/
+    # BEFORE compose pull + up. Required when a release adds new bind-mount
+    # source paths in docker-compose.yml (e.g. new Docker secrets sourced
+    # from new files in creds/). Without this, `docker compose up` would
+    # fail on "bind source path does not exist" because the migration
+    # creating those files lives in Phase 3.
+    #
+    # Each release dir CAN have a pre-scripts/ directory (optional). Scripts
+    # are run in sorted order, must be idempotent. Conventionally numbered
+    # NN-name.sh.
+    local pending ver
+    pending="$(find_pending_releases "$CURRENT_BUILD")"
+    while IFS= read -r ver; do
+        [[ -z "$ver" ]] && continue
+        local pre_dir="${HERMES_ROOT}/updates/${ver}/pre-scripts"
+        if [[ -d "$pre_dir" ]]; then
+            shopt -s nullglob
+            local pre_files=( "${pre_dir}"/*.sh )
+            shopt -u nullglob
+            if (( ${#pre_files[@]} > 0 )); then
+                log "Running ${ver} pre-container scripts (${#pre_files[@]} file(s))..."
+                IFS=$'\n' pre_files=( $(printf '%s\n' "${pre_files[@]}" | sort) )
+                unset IFS
+                local f rel
+                for f in "${pre_files[@]}"; do
+                    rel="${f#${HERMES_ROOT}/}"
+                    log "  pre-scripts/ ${rel}"
+                    if (( DRY_RUN )); then
+                        echo -e "    ${CYAN}[dry-run]${NC} bash $f"
+                    else
+                        if ! bash "$f" 2>>"$LOG_FILE"; then
+                            fatal "Failed to run pre-container script ${rel} (see $LOG_FILE)"
+                        fi
+                    fi
+                done
+            fi
+        fi
+    done <<< "$pending"
+
     log "docker compose pull (--quiet, suppresses per-layer progress)..."
     run docker compose pull --quiet
 
@@ -644,6 +683,28 @@ main() {
     fi
 
     preflight
+
+    # SELF-UPDATE: After Phase 1 git checkout, this script file on disk may
+    # have changed (e.g. release adds new orchestrator features like the
+    # pre-scripts/ hook below). bash is running the OLD script from memory,
+    # so the new logic wouldn't fire unless we re-exec. Re-exec'ing the
+    # second incarnation runs phases 2-5 against the target tag's logic.
+    #
+    # HERMES_UPDATE_REEXEC env var marks the second incarnation so we don't
+    # infinite-loop. --skip-git skips the re-exec because operator pulled
+    # manually (so the script on disk = the running script already).
+    if [[ "${HERMES_UPDATE_REEXEC:-0}" != "1" ]] && (( ! SKIP_GIT )); then
+        phase1_pull_code
+        log ""
+        log "Re-executing system_update_docker.sh from the newly-checked-out tag"
+        log "so phases 2-5 run against the target version's orchestrator logic."
+        log ""
+        export HERMES_UPDATE_REEXEC=1
+        exec "$0" "$@"
+    fi
+
+    # Second incarnation (or --skip-git). phase1_pull_code is idempotent --
+    # if already at target tag it's a no-op. Safe to call again here.
     phase1_pull_code
     phase2_update_containers
     phase3_apply_release_artifacts

@@ -3983,19 +3983,24 @@ main() {
     generate_compose_override
     state_mark_done "04-compose-rendered"
 
-    if state_is_done "05-secrets-generated"; then
-        log "Skip: credentials already generated"
-    else
-        generate_secrets
-        state_mark_done "05-secrets-generated"
-    fi
+    # generate_secrets is INTENTIONALLY NOT state-guarded -- the function's
+    # internal _ensure_secret helper checks file existence before creating,
+    # so it's idempotent and fast on re-runs (skips all secrets that
+    # already exist). State-guarding it meant script-logic upgrades that
+    # add new secret files OR migration logic (e.g. moving secrets between
+    # creds/ and keys/ for cross-host DR alignment) would NEVER fire on
+    # existing installs -- 05-secrets-generated marker would skip the
+    # whole function. The state marker is kept for historical reference
+    # but no longer gates execution.
+    # See [[feedback-state-guards-only-for-slow-steps]].
+    generate_secrets
+    state_mark_done "05-secrets-generated"
 
-    # The next 3 render steps are intentionally NOT state-guarded -- same
-    # rationale as generate_compose_override. They're fast and idempotent,
-    # and MUST run before `docker compose up` since these files are
-    # file-bind-mounted by containers. Missing source files make Docker
-    # create empty dirs at the source path that then fail bind-mount with
-    # "not a directory".
+    # The next render steps are also intentionally NOT state-guarded --
+    # same rationale. They're fast and idempotent, and MUST run before
+    # `docker compose up` since these files are file-bind-mounted by
+    # containers. Missing source files make Docker create empty dirs at
+    # the source path that then fail bind-mount with "not a directory".
     generate_rsyslog_configs
     generate_amavis_50user_config
     generate_ciphermail_hibernate_configs
