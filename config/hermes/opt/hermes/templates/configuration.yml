@@ -241,8 +241,8 @@ storage:
   mysql:
     address: 'tcp://hermes_db_server:3306'
     database: 'authelia'
-    username: {{ secret "/keys/authelia_username" | msquote }}
-    password: {{ secret "/keys/authelia_password" | msquote }}
+    username: {{ secret "/run/secrets/AUTHELIA_STORAGE_USERNAME" | msquote }}
+    password: {{ secret "/run/secrets/AUTHELIA_STORAGE_PASSWORD" | msquote }}
     timeout: '5s'
 
 notifier:

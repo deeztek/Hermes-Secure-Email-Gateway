@@ -1456,6 +1456,28 @@ generate_secrets() {
     _ensure_secret "${CREDS_DIR}/syslog_username"          "$(generate_random_username)"
     _ensure_secret "${CREDS_DIR}/syslog_password"          "$(generate_password)"
 
+    # Authelia DB credentials. These were historically in keys/ (SECRETS_DIR)
+    # alongside Authelia's auth-layer crypto secrets, but they're functionally
+    # identical to the other DB user creds above (created with the same
+    # _create_db_user helper, used the same way at runtime). Moving them
+    # here means the slim config tier (which excludes creds/) never overlays
+    # them on cross-host restore -- the install-time mariadb 'authelia'
+    # user and the secret file stay aligned automatically.
+    #
+    # MIGRATION: existing installs may still have these in keys/. If the
+    # creds/ versions don't exist but keys/ versions do, copy them here so
+    # the install script's DB-user-creation step picks up the right values.
+    if [[ ! -f "${CREDS_DIR}/authelia_username" && -f "${SECRETS_DIR}/authelia_username" ]]; then
+        log "  migrating authelia_username from keys/ to creds/ (legacy install)..."
+        cp "${SECRETS_DIR}/authelia_username" "${CREDS_DIR}/authelia_username"
+    fi
+    if [[ ! -f "${CREDS_DIR}/authelia_password" && -f "${SECRETS_DIR}/authelia_password" ]]; then
+        log "  migrating authelia_password from keys/ to creds/ (legacy install)..."
+        cp "${SECRETS_DIR}/authelia_password" "${CREDS_DIR}/authelia_password"
+    fi
+    _ensure_secret "${CREDS_DIR}/authelia_username"        "$(generate_random_username)"
+    _ensure_secret "${CREDS_DIR}/authelia_password"        "$(generate_password)"
+
     # Nextcloud DB connection credentials (compose names these *_mysql_*)
     _ensure_secret "${CREDS_DIR}/nextcloud_mysql_username" "$(generate_random_username)"
     _ensure_secret "${CREDS_DIR}/nextcloud_mysql_password" "$(generate_password)"
@@ -1475,10 +1497,14 @@ generate_secrets() {
     # =========================================================================
     log "Generating keys/ files..."
 
-    # Authelia DB credentials (compose binds the password but the username
-    # lives alongside it for symmetry with the other DBs)
-    _ensure_secret "${SECRETS_DIR}/authelia_username" "$(generate_random_username)"
-    _ensure_secret "${SECRETS_DIR}/authelia_password" "$(generate_password)"
+    # NOTE: Authelia DB credentials now live in CREDS_DIR alongside the
+    # other DB user creds (hermes, opendmarc, syslog, ciphermail,
+    # nextcloud_mysql). They were historically in SECRETS_DIR (keys/),
+    # which caused a cross-host DR mismatch: restore overlaid keys/ with
+    # backup-host values but the mariadb 'authelia' user retained the
+    # target install's password. Moving them to creds/ (which the slim
+    # config tier does NOT include) keeps install-time + restore aligned
+    # automatically. See generate_secrets_creds() below.
 
     # Authelia core crypto secrets (64 hex chars = 256 bits each)
     _ensure_secret "${SECRETS_DIR}/authelia_session_secret_file"                                   "$(generate_hex 32)"
@@ -2554,8 +2580,8 @@ create_databases() {
     MYSQL_ROOT_PASS=$(cat "${CREDS_DIR}/mysql_root_password")
     HERMES_DB_USER=$(cat "${CREDS_DIR}/hermes_username")
     HERMES_DB_PASS=$(cat "${CREDS_DIR}/hermes_password")
-    AUTHELIA_DB_USER=$(cat "${SECRETS_DIR}/authelia_username")
-    AUTHELIA_DB_PASS=$(cat "${SECRETS_DIR}/authelia_password")
+    AUTHELIA_DB_USER=$(cat "${CREDS_DIR}/authelia_username")
+    AUTHELIA_DB_PASS=$(cat "${CREDS_DIR}/authelia_password")
     OPENDMARC_DB_USER=$(cat "${CREDS_DIR}/opendmarc_username")
     OPENDMARC_DB_PASS=$(cat "${CREDS_DIR}/opendmarc_password")
     SYSLOG_DB_USER=$(cat "${CREDS_DIR}/syslog_username")
@@ -3155,7 +3181,7 @@ nextcloud user/pw:  $(cat "${CREDS_DIR}/nextcloud_mysql_username" 2>/dev/null ||
 
 AUTHELIA
 --------
-DB user/pw:         $(cat "${SECRETS_DIR}/authelia_username" 2>/dev/null || echo "?") / $(cat "${SECRETS_DIR}/authelia_password" 2>/dev/null || echo "?")
+DB user/pw:         $(cat "${CREDS_DIR}/authelia_username" 2>/dev/null || echo "?") / $(cat "${CREDS_DIR}/authelia_password" 2>/dev/null || echo "?")
 JWT secret:         $(cat "${SECRETS_DIR}/authelia_identity_validation_reset_password_jwt_secret_file" 2>/dev/null || echo "<not-generated>")
 Session secret:     $(cat "${SECRETS_DIR}/authelia_session_secret_file" 2>/dev/null || echo "<not-generated>")
 Storage enc key:    $(cat "${SECRETS_DIR}/authelia_storage_encryption_key_file" 2>/dev/null || echo "<not-generated>")
@@ -3364,13 +3390,20 @@ configure_authelia_mysql() {
     fi
 
     # Verify required secret files exist
+    # Verify DB credentials (creds/) and auth-layer crypto (keys/) exist.
+    # authelia_username + authelia_password live in CREDS_DIR (DB creds);
+    # authelia_storage_encryption_key_file lives in SECRETS_DIR (crypto).
     local missing_secrets=0
-    for secret_file in authelia_username authelia_password authelia_storage_encryption_key_file; do
-        if [[ ! -f "${SECRETS_DIR}/${secret_file}" ]]; then
-            warn "Missing secret file: ${SECRETS_DIR}/${secret_file}"
+    for secret_file in authelia_username authelia_password; do
+        if [[ ! -f "${CREDS_DIR}/${secret_file}" ]]; then
+            warn "Missing DB credential file: ${CREDS_DIR}/${secret_file}"
             missing_secrets=1
         fi
     done
+    if [[ ! -f "${SECRETS_DIR}/authelia_storage_encryption_key_file" ]]; then
+        warn "Missing crypto secret file: ${SECRETS_DIR}/authelia_storage_encryption_key_file"
+        missing_secrets=1
+    fi
 
     if [[ $missing_secrets -eq 1 ]]; then
         error "Run --generate-secrets first to create missing secret files"
@@ -3379,8 +3412,9 @@ configure_authelia_mysql() {
 
     log "Authelia MySQL configuration verified"
     log "  Database: authelia (created in MariaDB)"
-    log "  Username: $(cat ${SECRETS_DIR}/authelia_username)"
-    log "  Secrets: ${SECRETS_DIR}/authelia_*"
+    log "  Username: $(cat ${CREDS_DIR}/authelia_username)"
+    log "  DB creds: ${CREDS_DIR}/authelia_{username,password}"
+    log "  Crypto:   ${SECRETS_DIR}/authelia_*"
 }
 
 # ============================================================================

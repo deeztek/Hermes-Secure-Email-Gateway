@@ -40,6 +40,15 @@ secrets:
   AUTHELIA_STORAGE_ENCRYPTION_KEY:
     file: ./config/hermes/opt/hermes/keys/authelia_storage_encryption_key_file
 
+  # Authelia DB credentials -- live in creds/ alongside the other DB user
+  # secrets (hermes, opendmarc, syslog, ciphermail, nextcloud_mysql). The
+  # slim config tier backup excludes creds/ so cross-host restore leaves
+  # these intact = mariadb authelia user + secret stay aligned.
+  AUTHELIA_STORAGE_USERNAME:
+    file: ./config/hermes/opt/hermes/creds/authelia_username
+  AUTHELIA_STORAGE_PASSWORD:
+    file: ./config/hermes/opt/hermes/creds/authelia_password
+
   NEXTCLOUD_MYSQL_USER:
     file: ./config/hermes/opt/hermes/creds/nextcloud_mysql_username
 
@@ -212,6 +221,8 @@ services:
       - AUTHELIA_SESSION_SECRET
       - AUTHELIA_SESSION_REDIS_PASSWORD
       - AUTHELIA_STORAGE_ENCRYPTION_KEY
+      - AUTHELIA_STORAGE_USERNAME
+      - AUTHELIA_STORAGE_PASSWORD
     logging:
       options:
         max-size: 10m

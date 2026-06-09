@@ -723,60 +723,6 @@ ensure_scripts_executable() {
     fi
 }
 
-sync_authelia_db_user() {
-    # Cross-host DR alignment: the mariadb 'authelia' user was created at
-    # INSTALL time on the target with the NEW install's secret in
-    # keys/authelia_password. After restore_tier overlays config tier
-    # user-data subdirs (including keys/), the on-disk secret = the BACKUP
-    # host's value, but the mariadb user grant still has the NEW install's
-    # password. Authelia then connects with the backup's secret -> mariadb
-    # rejects with "Access denied (using password: YES)".
-    #
-    # Fix: ALTER USER 'authelia'@'%' to match the restored secret. The
-    # mariadb user grant for everything else (hermes, opendmarc, syslog,
-    # ciphermail, nextcloud_mysql) stays aligned because their secrets
-    # live in creds/ which is NOT in the slim config tier allowlist.
-    # Only authelia's secret crosses the keys/ boundary.
-    #
-    # Restoring keys/ rather than excluding it is the right call: it keeps
-    # Authelia's session-secret / 2FA-encryption / OIDC-JWKs / LDAP-bind
-    # passwords all internally consistent with the restored authelia DB
-    # data + LDAP records. Mariadb auth is the one thing the database
-    # dump doesn't carry (dump excludes mysql.user), so we sync it here.
-
-    # Only relevant when config tier was restored
-    bk_has_archive "config.tar.gz" || return 0
-    local pw_file="${HERMES_ROOT}/config/hermes/opt/hermes/keys/authelia_password"
-    [[ -f "$pw_file" ]] || { log "  no authelia_password secret found at ${pw_file} -- skipping sync."; return 0; }
-
-    header "Syncing mariadb 'authelia' user to restored secret"
-    log "Starting hermes_db_server briefly..."
-    run bash -c "cd '$HERMES_ROOT' && docker compose start hermes_db_server"
-    if (( ! DRY_RUN )); then
-        wait_for_container hermes_db_server "db_exec -e 'SELECT 1'"
-    fi
-
-    if (( DRY_RUN )); then
-        printf '%s[dry-run]%s ALTER USER authelia@%% to value in %s\n' "$CYAN" "$NC" "$pw_file" | tee -a "$LOG_FILE"
-    else
-        local pw
-        pw="$(cat "$pw_file")"
-        # ALTER USER both @'%' (containers connecting via network) and
-        # @'localhost' (defensive -- in case install grants both).
-        # Errors on @'localhost' if no such user are harmless and logged.
-        if db_exec -e "ALTER USER 'authelia'@'%' IDENTIFIED BY '${pw}'; FLUSH PRIVILEGES;" 2>>"$LOG_FILE"; then
-            log "  ALTER USER 'authelia'@'%' applied ✓"
-        else
-            warn "ALTER USER 'authelia'@'%' failed -- Authelia will fail to connect to mariadb."
-            warn "Manual fix:"
-            warn "  docker exec hermes_db_server bash -c 'mariadb -u root -e \"ALTER USER \\\"authelia\\\"@\\\"%\\\" IDENTIFIED BY \\\"\$(cat /run/secrets/authelia_password)\\\";\"'"
-        fi
-    fi
-
-    log "Stopping hermes_db_server..."
-    run bash -c "cd '$HERMES_ROOT' && docker compose stop hermes_db_server"
-}
-
 restart_stack() {
     header "Restarting stack"
     run bash -c "cd '$HERMES_ROOT' && docker compose up -d"
@@ -878,7 +824,6 @@ main() {
     restore_ldap
     restore_tiers
     ensure_scripts_executable
-    sync_authelia_db_user
     restart_stack
     post_restore_nc_maintenance_off
     report
