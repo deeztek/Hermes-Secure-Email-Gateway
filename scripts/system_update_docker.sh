@@ -18,11 +18,28 @@
 #   docs/install/release-and-update-methodology.md
 #
 # Usage:
-#   ./scripts/system_update_docker.sh                    # latest release
+#   ./scripts/system_update_docker.sh                    # latest release on github (production)
 #   ./scripts/system_update_docker.sh v260601            # specific tag
+#   ./scripts/system_update_docker.sh --remote=gitlab    # auto-detect latest on gitlab (RC testing)
+#   ./scripts/system_update_docker.sh --remote=gitlab v260609   # specific tag on gitlab
 #   ./scripts/system_update_docker.sh --dry-run          # show what would happen, do nothing
 #   ./scripts/system_update_docker.sh --skip-git         # don't touch git (containers + artifacts only)
 #   ./scripts/system_update_docker.sh --skip-compose     # don't touch docker images (git + artifacts only)
+#
+# Remotes:
+#   Default --remote=origin -- which is github for real customer installs.
+#   With no positional arg, the script polls the GitHub Releases API for
+#   the latest published release and uses that tag.
+#
+#   --remote=gitlab is the test/RC workflow. The script fetches from the
+#   'gitlab' remote (operator must have it configured via
+#   `git remote add gitlab <gitlab-url>`) and picks the highest v* tag
+#   from that remote's tag list. Lets you test a release candidate that's
+#   tagged on gitlab but not yet promoted to github.
+#
+#   Any other --remote=NAME value works the same way as gitlab -- fetches
+#   from that remote, picks highest v* tag via ls-remote. Useful for
+#   testing against forks or mirror remotes.
 #
 # Prerequisites:
 #   - Run on the Docker host (not inside a container)
@@ -87,6 +104,11 @@ DRY_RUN=0
 SKIP_GIT=0
 SKIP_COMPOSE=0
 ASSUME_YES=0
+# REMOTE: which git remote to fetch from + use for auto-detecting latest tag.
+# Default is "origin" (= github for real customers; canonical production path).
+# Test/RC workflow uses --remote=gitlab to test a release candidate that's
+# tagged on gitlab but not yet promoted to github.
+REMOTE="origin"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -94,6 +116,7 @@ while [[ $# -gt 0 ]]; do
         --skip-git)     SKIP_GIT=1; shift ;;
         --skip-compose) SKIP_COMPOSE=1; shift ;;
         --yes|-y)       ASSUME_YES=1; shift ;;
+        --remote=*)     REMOTE="${1#*=}"; shift ;;
         --help|-h)
             sed -n '/^# Usage:/,/^# =/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
@@ -140,13 +163,42 @@ get_current_build_no() {
         -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>/dev/null
 }
 
-# Resolve the target tag (from arg, or by polling GitHub Releases API).
+# Resolve the target tag. Priority:
+#   1. Explicit TARGET_TAG positional arg from operator
+#   2. If REMOTE != "origin" (i.e. operator is using --remote=NAME for RC
+#      testing on a non-production remote): list tags from that remote
+#      directly via `git ls-remote --tags` and pick the highest v*. We do
+#      NOT hit the GitHub Releases API in this case -- the whole point of
+#      --remote=NAME is to test something that hasn't been promoted to a
+#      GitHub Release yet.
+#   3. Default (production path): poll GitHub Releases API for the latest
+#      published release. This is what real customers hit when they run
+#      `system_update_docker.sh` with no args.
 resolve_target_tag() {
     if [[ -n "$TARGET_TAG" ]]; then
         echo "$TARGET_TAG"
         return 0
     fi
-    # Poll GitHub Releases API for the latest release tag.
+
+    if [[ "$REMOTE" != "origin" ]]; then
+        # RC mode: use git ls-remote against the configured remote, find
+        # the highest v* tag. Skips the GitHub Releases API entirely
+        # (which won't see unpromoted release candidates).
+        local tag
+        tag=$(git ls-remote --tags --refs "$REMOTE" 2>/dev/null \
+              | awk '{print $2}' \
+              | sed 's|^refs/tags/||' \
+              | grep -E '^v[0-9]{6}(\.[0-9]+)?$' \
+              | sort -V \
+              | tail -1)
+        if [[ -z "$tag" ]]; then
+            fatal "No v* tag found on remote '${REMOTE}'. Is the remote configured and the tag pushed?"
+        fi
+        echo "$tag"
+        return 0
+    fi
+
+    # Default: GitHub Releases API for the latest published release.
     # The repo is hardcoded — same one referenced in schedule/check_for_update.cfm.
     local api_url="https://api.github.com/repos/deeztek/Hermes-Secure-Email-Gateway/releases/latest"
     local resp
@@ -366,13 +418,13 @@ phase1_pull_code() {
     fi
 
     cd "$HERMES_ROOT"
-    log "git fetch --tags origin..."
-    run git fetch --tags --quiet origin
+    log "git fetch --tags ${REMOTE}..."
+    run git fetch --tags --quiet "$REMOTE"
 
     # Verify the target tag actually exists locally after fetch.
     if (( ! DRY_RUN )); then
         if ! git rev-parse --verify --quiet "refs/tags/${TARGET_TAG}" >/dev/null; then
-            fatal "Tag ${TARGET_TAG} not found after fetch. Is the release tag pushed to origin?"
+            fatal "Tag ${TARGET_TAG} not found after fetch from ${REMOTE}. Is the release tag pushed to that remote?"
         fi
     fi
 
