@@ -13,15 +13,15 @@ Linked work: [#218](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issue
 
 ### Calendar versioning
 
-Versions are `vYYMMDD` — the date the release is **tagged**, not the date code first landed.
+Versions are `vYYMMDD` — a **label** named for a target/planning date. The digits are **not** the ship date and **not** the git tag date; a release is often named early and tagged months later as the work lands.
 
 ```
-v260119  =  2026-01-19    (first Docker release, the baseline)
-v260601  =  hypothetical: a release cut on 2026-06-01
-v270315  =  hypothetical: a release cut on 2027-03-15
+v260119  →  named for 2026-01-19, actually tagged 2026-05-30   (first Docker release, the baseline)
+v260609  →  named for 2026-06-09                                (backup/restore/DR + upgrade-tooling release)
+v270315  →  hypothetical: a release named for 2027-03-15
 ```
 
-There is **no v260120 unless we actually cut a release on 2026-01-20**. The next release tag is whatever date it ships, not an increment.
+The label does **not** auto-increment — there is no `v260120` just because a day passed. For the **actual** release timing of any tag, read the git tag date (`git log -1 <tag>`) or the GitHub Release page — never infer it from the digits.
 
 The version stamp is stored in two `system_settings` rows:
 
