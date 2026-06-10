@@ -146,16 +146,31 @@ for tbl in parameters parameters2 system_settings system_users system_updates; d
     fi
 done
 
-# Docker train markers
-for kv in "version_no:Docker" "build_no:v260119"; do
-    key="${kv%%:*}"; expected="${kv##*:}"
-    actual=$(db_query_db hermes "SELECT value FROM system_settings WHERE parameter='$key'")
-    if [[ "$actual" == "$expected" ]]; then
-        pass "system_settings.$key = '$expected'"
+# Docker train identity.
+# version_no distinguishes a Docker-era install ('Docker') from a legacy bare-metal one
+# -- a genuine, cheap assertion. (system_settings presence is already checked above.)
+actual=$(db_query_db hermes "SELECT value FROM system_settings WHERE parameter='version_no'")
+if [[ "$actual" == "Docker" ]]; then
+    pass "system_settings.version_no = 'Docker'"
+else
+    fail "system_settings.version_no = '$actual' (expected 'Docker')"
+fi
+
+# Release stamp. The smoke test cannot know which release *should* be installed (code
+# checked out in updates/ is not proof of what was applied to the DB), so by default we
+# just REPORT build_no as context -- not a pass/fail. A caller that knows the target
+# (install_hermes_docker.sh / system_update_docker.sh) can export EXPECTED_BUILD=vYYMMDD
+# to turn this into a hard assertion.
+build_actual=$(db_query_db hermes "SELECT value FROM system_settings WHERE parameter='build_no'")
+if [[ -n "${EXPECTED_BUILD:-}" ]]; then
+    if [[ "$build_actual" == "$EXPECTED_BUILD" ]]; then
+        pass "system_settings.build_no = '$build_actual' (matches expected)"
     else
-        fail "system_settings.$key = '$actual' (expected '$expected')"
+        fail "system_settings.build_no = '$build_actual' (expected '$EXPECTED_BUILD')"
     fi
-done
+else
+    detail "installed build_no = '${build_actual:-<unset>}' (informational; set EXPECTED_BUILD=vYYMMDD to assert)"
+fi
 
 # ============================================================
 # Tier 3 — Postfix + filter chain
