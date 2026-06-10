@@ -104,15 +104,23 @@ Flags:
                          Console Settings UI).
   --yes                  Skip the confirmation prompt (unattended use).
   --dry-run              Print what would change without modifying anything.
+  --force                Apply even if the new values already match .env. The
+                         normal no-op short-circuit compares .env ONLY; after a
+                         cross-host restore the database can hold the source
+                         host's identity while .env is already correct (the slim
+                         backup omits .env). --force rewrites parameters2 +
+                         parameters and re-renders configs regardless.
   --help                 Show this help.
 
 Examples:
   sudo $(basename "$0")                                # auto-detect, prompt
   sudo $(basename "$0") --to-ip=192.168.30.50          # override IP only
   sudo $(basename "$0") --to-ip=10.0.0.5 --to-hostname=mail.corp.example.com --yes
+  sudo $(basename "$0") --to-hostname=mail.corp.example.com --force   # resync DB after a cross-host restore
 EOF
 }
 
+FORCE=0
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --to-ip=*)       TO_IP="${1#*=}";       shift ;;
@@ -120,6 +128,7 @@ while [[ $# -gt 0 ]]; do
         --to-console=*)  TO_CONSOLE="${1#*=}";  shift ;;
         --yes)           ASSUME_YES=1;          shift ;;
         --dry-run)       DRY_RUN=1;             shift ;;
+        --force)         FORCE=1;               shift ;;
         --help|-h)       usage; exit 0 ;;
         *) error "Unknown option: $1"; usage; exit 1 ;;
     esac
@@ -206,9 +215,13 @@ main() {
     validate_ipv4 "$TO_CONSOLE" || validate_fqdn "$TO_CONSOLE" || \
         fatal "Invalid new console address (must be IPv4 or FQDN): ${TO_CONSOLE}"
 
-    if [[ "$cur_ip" == "$TO_IP" && "$cur_hostname" == "$TO_HOSTNAME" && "$cur_console" == "$TO_CONSOLE" ]]; then
-        log "No changes needed. Current .env already matches new values."
-        log "If you wanted to force a re-render anyway, pass explicit --to-* flags with different values."
+    if (( ! FORCE )) && [[ "$cur_ip" == "$TO_IP" && "$cur_hostname" == "$TO_HOSTNAME" && "$cur_console" == "$TO_CONSOLE" ]]; then
+        log "No changes needed: current .env already matches the new values."
+        log "NOTE: this compares .env ONLY -- it does NOT inspect the database. After a"
+        log "cross-host restore, the DB can still hold the SOURCE host's identity while"
+        log ".env is already correct (the slim backup does not include .env). In that case"
+        log "pass --force to rewrite parameters2/parameters + re-render configs anyway:"
+        log "  sudo $0 --to-hostname=${TO_HOSTNAME} --to-ip=${TO_IP} --to-console=${TO_CONSOLE} --force"
         exit 0
     fi
 
