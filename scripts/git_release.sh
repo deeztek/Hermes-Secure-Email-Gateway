@@ -8,14 +8,19 @@
 # Usage:
 #     ./scripts/git_release.sh                       # default: dev push to gitlab only
 #     ./scripts/git_release.sh --branch main         # explicit branch (default: current branch)
-#     ./scripts/git_release.sh --release v260120     # release cut: push branch + tag to BOTH remotes
-#                                                    # (tag push to github triggers GH Actions)
+#     ./scripts/git_release.sh --release v260120     # release cut: push branch + tag to BOTH
+#                                                    # remotes, then create the GitHub Release
+#                                                    # from updates/v260120/README.md
+#     ./scripts/git_release.sh --release v260120 --prerelease   # mark the Release as a pre-release
 #
 # Release pre-flight checks (--release mode):
 #     1. Both remotes configured (gitlab + github)?
 #     2. Tag matches v\d{6}?
 #     3. Working tree clean?
 #     4. Tag exists locally?
+#
+# The GitHub Release body is the per-release README at updates/<tag>/README.md.
+# (There is no GitHub Actions release workflow; this script creates the Release via `gh`.)
 #
 # Exit codes:
 #     0 = success
@@ -61,6 +66,7 @@ header()  { echo ""; echo "${BOLD}=== $* ===${RESET}"; }
 MODE="dev"
 RELEASE_TAG=""
 BRANCH=""
+PRERELEASE=0
 
 usage() {
     sed -n '2,/^$/p' "$0" | sed 's/^# \{0,1\}//'
@@ -84,6 +90,10 @@ while [[ $# -gt 0 ]]; do
                 exit 3
             fi
             shift 2
+            ;;
+        --prerelease)
+            PRERELEASE=1
+            shift
             ;;
         -h|--help)
             usage
@@ -193,9 +203,42 @@ case "$MODE" in
         push_to github "$BRANCH"   || exit 2
         push_to github "$RELEASE_TAG" || exit 2
 
+        # ---- Create (or refresh) the GitHub Release from the per-release README ----
+        # The per-release README (updates/<tag>/README.md) is the canonical Release body.
+        header "GitHub Release"
+        GH_REPO="deeztek/Hermes-Secure-Email-Gateway"
+        RELEASE_NOTES="updates/${RELEASE_TAG}/README.md"
+        PRE_FLAG=""
+        [[ "$PRERELEASE" == "1" ]] && PRE_FLAG="--prerelease"
+
+        if ! command -v gh >/dev/null 2>&1; then
+            warn "gh CLI not found; GitHub Release NOT created."
+            warn "Create it manually once gh is available:"
+            echo "    gh release create $RELEASE_TAG --repo $GH_REPO --title $RELEASE_TAG --notes-file $RELEASE_NOTES $PRE_FLAG"
+        elif [[ ! -f "$RELEASE_NOTES" ]]; then
+            warn "Per-release notes '$RELEASE_NOTES' not found; GitHub Release NOT created."
+            warn "Every release must ship updates/<tag>/README.md as its Release body. Add it, then:"
+            echo "    gh release create $RELEASE_TAG --repo $GH_REPO --title $RELEASE_TAG --notes-file $RELEASE_NOTES $PRE_FLAG"
+        elif gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            info "Release $RELEASE_TAG already exists; refreshing notes from $RELEASE_NOTES..."
+            if gh release edit "$RELEASE_TAG" --repo "$GH_REPO" --notes-file "$RELEASE_NOTES" $PRE_FLAG; then
+                info "Release notes updated."
+            else
+                warn "gh release edit failed."
+            fi
+        else
+            info "Creating GitHub Release $RELEASE_TAG from $RELEASE_NOTES..."
+            if gh release create "$RELEASE_TAG" --repo "$GH_REPO" --title "$RELEASE_TAG" --notes-file "$RELEASE_NOTES" $PRE_FLAG; then
+                info "Release $RELEASE_TAG created."
+            else
+                warn "gh release create failed; create it manually:"
+                echo "    gh release create $RELEASE_TAG --repo $GH_REPO --title $RELEASE_TAG --notes-file $RELEASE_NOTES $PRE_FLAG"
+            fi
+        fi
+
         echo ""
-        info "Release $RELEASE_TAG pushed to both remotes."
-        info "GitHub Actions should now build images + publish the release. Watch:"
+        info "Release $RELEASE_TAG pushed to both remotes; GitHub Release handled."
+        info "If image-build Actions are configured, watch:"
         echo "    https://github.com/deeztek/Hermes-Secure-Email-Gateway/actions"
         ;;
 esac
