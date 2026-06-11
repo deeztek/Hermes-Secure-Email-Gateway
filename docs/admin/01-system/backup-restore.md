@@ -11,7 +11,7 @@ Two scripts under [`scripts/`](../../../scripts/):
 | Script | Purpose |
 |---|---|
 | [`system_backup.sh`](../../../scripts/system_backup.sh) | **Hot mode by default — zero application downtime.** Uses application-native hot-backup primitives: `mariadb-dump --single-transaction`, `slapcat`, and live tar of mail tiers (Dovecot, Amavis, Postfix all use atomic-rename writes safe for live tar). Toggles `occ maintenance:mode --on` briefly during Nextcloud file tar to pause NC user writes (mail flow unaffected). `--cold` flag stops the full stack for legal-hold / forensic snapshots that need absolute byte-level consistency. |
-| [`system_restore.sh`](../../../scripts/system_restore.sh) | **Always cold on the restore side** (we're overwriting tier contents — concurrent reads/writes would corrupt). Verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless `FORCE_REMAP=1` is set, restores DBs via socket auth, restores OpenLDAP via `slapadd`, rsyncs in-scope tiers from staging to mount paths with `--delete`, restarts the stack. |
+| [`system_restore.sh`](../../../scripts/system_restore.sh) | **Always cold on the restore side** (we're overwriting tier contents — concurrent reads/writes would corrupt). Verifies the manifest + per-archive SHA256 BEFORE any destructive action, **auto-remaps** tiers to this host's paths (refuses only on a build-version mismatch unless `FORCE_VERSION_MISMATCH=1`), restores DBs via socket auth, restores OpenLDAP via `slapadd`, stream-extracts in-scope tiers directly to their mount paths, reconciles the Nextcloud DB user, restarts the stack, and on a cross-host restore offers to run `system_rehost.sh`. |
 
 ## Backup scopes
 
@@ -50,23 +50,26 @@ Hot mode is the daily backup. **Cold mode (`--cold`) is the escape hatch for use
 sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
 ```
 
-The script creates `/mnt/backups/hermes-backup-system-<build_no>-<UTC-timestamp>.tar`. The outer tar is uncompressed (each tier inside is already `.tar.gz`); operators can `tar -xf` it once to inspect the manifest before deciding to restore.
+The script creates a **backup directory** at `/mnt/backups/hermes-backup-<scope>-<build_no>-<UTC-timestamp>/` (e.g. `hermes-backup-all-v260609-20260609T183616Z/`). It is written under a `.staging-…` name and **atomic-renamed** into place only on success. **There is no outer tarball** — the per-tier archives sit directly in the directory, so the restore verifies and stream-extracts each one in place without unpacking a wrapper first (no ~2× scratch space). Read `manifest.json` directly to inspect a backup before restoring.
 
 ### Output layout
 
-Inside the outer `.tar` (only the archives relevant to the chosen scope are present):
+Inside the backup directory (only the archives relevant to the chosen scope are present):
 
 ```text
-backup_manifest.json           ← scope, mode (hot/cold), topology, SHA256 per archive
+manifest.json                  ← scope, mode (hot/cold), topology, source hostname,
+                                  build_no, SHA256 per archive
+backup.log                     ← the backup run's own log
 databases.tar.gz               ← 6 .sql files; system / all scopes only
 ldap.ldif.gz                   ← slapcat output; system / all scopes only
-config.tar.gz                  ← install root MINUS data tiers
-                                  (excludes install-logs/ and .git/);
+config.tar.gz                  ← Config tier USER-DATA subdirs only (keys, .gnupg,
+                                  ssl, templates, sa-bayes, sa-learn, dkim, arc,
+                                  conf_files) — NOT .env / secrets / compose / scripts
+                                  (those are host-specific and excluded by design);
                                   system / all scopes only
-data.tar.gz                    ← Data tier; system / all scopes only
-                                  (excludes mysql/ ldap/ clamav/ — captured
-                                  authoritatively by dumps / slapcat / are
-                                  regenerable)
+data.tar.gz                    ← Data tier user-data only (excludes mysql/ ldap/
+                                  clamav/ — captured by dumps / slapcat / regenerable);
+                                  system / all scopes only
 archive.tar.gz                 ← Archive tier; archive / all scopes only
 vmail.tar.gz                   ← Vmail tier; vmail / all scopes only
 nextcloud.tar.gz               ← Nextcloud tier; nextcloud / all scopes only
@@ -180,33 +183,28 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B syste
 ### Restore quick start
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-v260119-20260601T103000Z.tar
+sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-v260609-20260601T103000Z
 ```
+
+`-F` takes the backup **directory** (not a tarball).
 
 **The restore replaces the data in the backup's scope and leaves other scopes alone.** Restoring a `system` backup overwrites the install root + Data tier + DBs + LDAP; the Vmail / Archive / Nextcloud tiers are untouched. Restoring a `vmail` backup overwrites only `/mnt/vmail`. The stack is stopped for the duration of the restore (always — even hot-mode backups are restored cold).
 
-### Safety: SHA256, version, and topology gates
+### Safety: SHA256 + version gates, topology auto-remap
 
-Three gates fire BEFORE any destructive action:
+Two gates fire BEFORE any destructive action, plus automatic topology handling:
 
-1. **Manifest SHA256 verification.** Every inner archive's SHA256 is checked against the manifest. If any byte of the backup is corrupt or tampered with, the restore aborts BEFORE stopping the stack or touching any data.
-2. **Hermes build-version match.** The backup's `build_no` (captured at backup time from `system_settings.build_no`) is compared against the current host's `build_no`. If they differ, restore refuses unless `FORCE_VERSION_MISMATCH=1` is set. Schema migrations between Hermes builds make cross-version restore unsafe — restoring a v260119 DB dump onto a v260201 host leaves the schema in a state the running code does not expect, which breaks silently when something hits a missing or renamed column. **The correct procedure is to install Hermes at the matching build first (`git checkout <build>`), restore, then upgrade forward via `scripts/system_update_docker.sh`** — same model the legacy bare-metal install documented.
-3. **Storage-topology refusal.** If the backup's recorded mount paths (`/mnt/data`, `/mnt/vmail`, etc.) don't match this host's current mount paths from `.env`, the restore aborts with a clear error and instructions for forcing a remap.
-
-To restore a backup onto a host with a different storage topology (e.g., a 5-tier-split host restoring onto a single-mount host where everything lives under `/mnt/data`), set `FORCE_REMAP=1`:
-
-```bash
-sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/to/backup.tar
-```
-
-`FORCE_REMAP=1` is all-or-nothing in Phase A. A per-tier `--remap-tiers` flag will land in Phase B.
+1. **Manifest SHA256 verification.** Every archive's SHA256 is checked against `manifest.json` (verified in place — no unpacking). If any byte of the backup is corrupt or tampered with, the restore aborts BEFORE stopping the stack or touching any data.
+2. **Hermes build-version match.** The backup's `build_no` (captured at backup time from `system_settings.build_no`) is compared against the current host's `build_no`. If they differ, restore refuses unless `FORCE_VERSION_MISMATCH=1` is set. Schema migrations between Hermes builds make cross-version restore unsafe — restoring an older DB dump onto a newer host leaves the schema in a state the running code does not expect, which breaks silently when something hits a missing or renamed column. **The correct procedure is to install Hermes at the matching build first (`git checkout <build>`), restore, then upgrade forward via `scripts/system_update_docker.sh`.**
+3. **Storage-topology auto-remap.** If the backup's recorded mount paths (`/mnt/data`, `/mnt/vmail`, etc.) differ from this host's current mount paths in `.env` — typical when restoring onto different hardware — the restore **automatically retargets each tier to this host's paths** and prints a `REMAP` line per tier. No flag is needed; the old `FORCE_REMAP=1` gate was retired as needless friction for new-hardware DR.
 
 ### Disaster-recovery flow (different host)
 
 1. Install Hermes fresh on the new host using [`install_hermes_docker.sh`](../../../scripts/install_hermes_docker.sh). The install root + `.env` need to exist before restore can succeed.
-2. `scp` the backup tarball from off-site storage to the new host.
-3. Run `system_restore.sh -F /path/to/backup.tar`. If the new host's mount paths differ from the original (typical when restoring onto different hardware), prefix with `FORCE_REMAP=1`.
-4. Verify the admin console loads and a test message flows end-to-end.
+2. Make the backup directory reachable on the new host — **mount the backup storage** (off-site / NAS share) so the restore can stream-extract in place. (`scp -r` of the directory works too.)
+3. Run `system_restore.sh -F /path/to/hermes-backup-<scope>-<build>-<ts>`. Storage-topology differences are **auto-remapped** to this host's paths; a build-version difference still requires `FORCE_VERSION_MISMATCH=1` (better: install the matching build first).
+4. When the restore detects a **cross-host** restore (backup hostname ≠ this host), it **offers to run `system_rehost.sh` for you** — accept it to rewire host identity (`.env`, DB rows, all rendered configs, and the Nextcloud DB user).
+5. Verify the admin console loads and a test message flows end-to-end.
 
 > **A cross-host restore needs more than the restore itself.** The restored data
 > carries the *source* host's identity and credentials, so several things must be
@@ -218,11 +216,12 @@ sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/
 
 | Flag | Purpose |
 |---|---|
-| `-F <path>` | **Required.** Path to the backup tarball produced by `system_backup.sh`. |
-| `--yes` (or `-y`) | Skip the interactive confirmation prompt. |
+| `-F <path>` | **Required.** Path to the backup **directory** produced by `system_backup.sh`. |
+| `--yes` (or `-y`) | Skip the interactive confirmation prompt (and auto-accept the rehost offer on a cross-host restore). |
 | `--dry-run` (or `-n`) | Show what would happen without changing anything. |
+| `--only=<scope>` | Restore only one scope out of an `all` backup (e.g. `--only=vmail`). |
 | `--help` (or `-h`) | Show usage. |
-| `FORCE_REMAP=1` (env) | Required to proceed past the topology-mismatch refusal. |
+| `FORCE_VERSION_MISMATCH=1` (env) | Override the build-version refusal. Topology differences auto-remap — no flag needed. |
 
 ## When to use hypervisor snapshots instead
 
@@ -267,7 +266,7 @@ Whatever backup strategy you adopt, **practice the restore at least once on a no
 The Phase A scripts cover the common cases (hot daily system backup, scoped tier backups, cold-mode forensic snapshot, scope-aware restore). The Phase B refactor (post-Link-Guard) will add:
 
 - **Retention pruning** (`--retain-last=N` deletes older backups beyond N)
-- **Per-tier `--remap-tiers <old>:<new>`** replacing the all-or-nothing `FORCE_REMAP=1` env var
+- **Per-tier `--remap-tiers <old>:<new>`** to override individual tiers (today's default is whole-backup auto-remap to this host's paths)
 - **Selective container restart** instead of full `compose down` on the restore side (faster restart, smaller blast radius)
 - **Filesystem-snapshot integration** (LVM / ZFS / btrfs detection): if a tier lives on a snapshot-capable filesystem, take a filesystem snapshot and tar the snapshot rather than the live mount, for use cases where "best-effort hot tar" isn't good enough but `--cold` is too disruptive
 
