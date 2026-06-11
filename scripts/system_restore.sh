@@ -831,7 +831,17 @@ report() {
         warn "  system_rehost.sh auto-detects this host's IP/hostname and"
         warn "  rewires .env, DB rows, nginx, Authelia, Postfix, and"
         warn "  Nextcloud in one step. See --help for non-default targets."
+        warn ""
+        warn "  Cross-host restore ALSO requires (full checklist in the doc below):"
+        warn "    - Pro license: re-activate -- it is bound to host hardware and"
+        warn "      will read INVALID on new hardware until re-activated."
+        warn "    - Content Checks: re-save each enabled page (DKIM/DMARC/ARC/SPF)"
+        warn "      to re-apply the milter chain (smtpd_milters is not restored)."
         warn "================================================================"
+        log ""
+        log "Post-restore checklist (cross-host steps, in order):"
+        log "  ${HERMES_ROOT}/docs/admin/01-system/post-restore-steps.md"
+        log "  https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/post-restore-steps"
         return 0
     fi
 
@@ -839,6 +849,9 @@ report() {
     log "  1. Verify you can log into the admin console (https://<console-host>/admin/)"
     log "  2. Verify mail flow (send + receive a test message)"
     log "  3. If something looks off, check ${LOG_FILE} for warnings."
+    log "  4. Full post-restore checklist:"
+    log "       ${HERMES_ROOT}/docs/admin/01-system/post-restore-steps.md"
+    log "       https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/post-restore-steps"
 }
 
 main() {
