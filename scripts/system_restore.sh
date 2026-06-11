@@ -740,9 +740,9 @@ restart_stack() {
 
 post_restore_nc_maintenance_off() {
     bk_has_archive "nextcloud.tar.gz" || return 0
-    header "Post-restore: clear Nextcloud maintenance mode"
+    header "Post-restore: reconcile Nextcloud DB creds + clear maintenance mode"
     if (( DRY_RUN )); then
-        printf '%s[dry-run]%s occ maintenance:mode --off\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
+        printf '%s[dry-run]%s repoint NC config.php dbuser/dbpassword from creds/, then occ maintenance:mode --off\n' "$CYAN" "$NC" | tee -a "$LOG_FILE"
         return 0
     fi
     local i
@@ -750,6 +750,36 @@ post_restore_nc_maintenance_off() {
         if docker exec hermes_nextcloud true 2>/dev/null; then break; fi
         sleep 2
     done
+
+    # Credential reconciliation (fix #5). NC is the ONLY service whose config rides
+    # in a backed-up tier: config.php lives inside the nextcloud data tier, so a
+    # cross-host restore overwrites it with the SOURCE host's rotated DB user, which
+    # does not exist on this host -> "Access denied [1045]". creds/ is excluded from
+    # the backup (host-specific), so it holds THIS host's nextcloud DB user/password.
+    # Repoint config.php to creds/ so NC can authenticate. All other services use
+    # install-generated configs that are never in the backup, so they need no repoint.
+    local ncuser_file="${HERMES_ROOT}/config/hermes/opt/hermes/creds/nextcloud_mysql_username"
+    local ncpass_file="${HERMES_ROOT}/config/hermes/opt/hermes/creds/nextcloud_mysql_password"
+    if [[ -f "$ncuser_file" && -f "$ncpass_file" ]]; then
+        local ncuser ncpass euser epass
+        ncuser=$(tr -d '[:space:]' < "$ncuser_file")
+        ncpass=$(tr -d '\n'        < "$ncpass_file")
+        if [[ -n "$ncuser" && -n "$ncpass" ]]; then
+            euser=$(printf '%s' "$ncuser" | sed -e 's/[\\&|]/\\&/g')
+            epass=$(printf '%s' "$ncpass" | sed -e 's/[\\&|]/\\&/g')
+            log "  reconciling NC config.php DB creds from creds/nextcloud_mysql_*"
+            docker exec hermes_nextcloud sed -i \
+                -e "s|'dbuser' => '[^']*'|'dbuser' => '${euser}'|" \
+                -e "s|'dbpassword' => '[^']*'|'dbpassword' => '${epass}'|" \
+                /var/www/html/config/config.php >>"$LOG_FILE" 2>&1 \
+                || warn "  NC config.php repoint failed -- check ${LOG_FILE}"
+        else
+            warn "  NC creds/nextcloud_mysql_* empty -- skipping config.php repoint"
+        fi
+    else
+        warn "  NC creds/nextcloud_mysql_* missing -- skipping config.php repoint"
+    fi
+
     docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:mode --off >>"$LOG_FILE" 2>&1 \
         || warn "occ maintenance:mode --off failed -- the operator should run it manually."
 }
