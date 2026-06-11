@@ -840,8 +840,8 @@ report() {
         warn "================================================================"
         log ""
         log "Post-restore checklist (cross-host steps, in order):"
-        log "  ${HERMES_ROOT}/docs/admin/01-system/post-restore-steps.md"
-        log "  https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/post-restore-steps"
+        log "  ${HERMES_ROOT}/docs/install/post-restore-steps.md"
+        log "  https://docs.deeztek.com/books/installation-reference/page/post-restore-steps"
         return 0
     fi
 
@@ -850,8 +850,8 @@ report() {
     log "  2. Verify mail flow (send + receive a test message)"
     log "  3. If something looks off, check ${LOG_FILE} for warnings."
     log "  4. Full post-restore checklist:"
-    log "       ${HERMES_ROOT}/docs/admin/01-system/post-restore-steps.md"
-    log "       https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/post-restore-steps"
+    log "       ${HERMES_ROOT}/docs/install/post-restore-steps.md"
+    log "       https://docs.deeztek.com/books/installation-reference/page/post-restore-steps"
 }
 
 main() {

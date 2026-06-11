@@ -208,6 +208,12 @@ sudo FORCE_REMAP=1 /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /path/
 3. Run `system_restore.sh -F /path/to/backup.tar`. If the new host's mount paths differ from the original (typical when restoring onto different hardware), prefix with `FORCE_REMAP=1`.
 4. Verify the admin console loads and a test message flows end-to-end.
 
+> **A cross-host restore needs more than the restore itself.** The restored data
+> carries the *source* host's identity and credentials, so several things must be
+> reconciled by hand — run `system_rehost.sh`, re-activate the Pro license, and
+> re-save the Content Checks pages to re-apply the milter chain. Follow the full
+> checklist: **[Post-Restore Steps](../../install/post-restore-steps.md)**.
+
 ### Restore flags
 
 | Flag | Purpose |
