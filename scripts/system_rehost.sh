@@ -386,14 +386,28 @@ main() {
             --value='{"1":{"id":1,"name":"User Console","url":"https://'"${TO_CONSOLE}"'/users/","lang":"","type":"link","device":"","icon":"external.svg","groups":[],"redirect":true}}' \
             >>"$LOG_FILE" 2>&1 || warn "  external sites update failed"
 
-        # OIDC discovery URL update -- admin can also re-trigger via NC admin
-        # Settings > Authentication. Best-effort here.
-        log "  user_oidc: provider discovery URL update (best-effort)"
-        # Provider name 'authelia' matches what install_hermes_docker.sh seeds.
-        # If this fails (e.g. provider not yet configured), admin handles via UI.
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider authelia \
-            --discoveryuri="https://${TO_CONSOLE}/.well-known/openid-configuration" \
-            >>"$LOG_FILE" 2>&1 || warn "  OIDC provider update failed (configure via NC admin Settings if needed)"
+        # OIDC provider reconcile. The user_oidc provider lives in the NC DB
+        # (restored from the SOURCE host on a cross-host restore), named by the
+        # operator (e.g. 'Hermes_SEG') -- NOT a fixed name -- so enumerate the
+        # providers rather than hardcoding. Update BOTH the discovery and the
+        # end-session endpoints to this host. Skip silently if none exist.
+        local oidc_providers p
+        oidc_providers=$(docker exec -u www-data hermes_nextcloud \
+            php /var/www/html/occ user_oidc:provider 2>/dev/null \
+            | awk -F'|' '/^\| *[0-9]+ /{gsub(/^[ \t]+|[ \t]+$/,"",$3); print $3}')
+        if [[ -n "$oidc_providers" ]]; then
+            while IFS= read -r p; do
+                [[ -n "$p" ]] || continue
+                log "  user_oidc: repointing provider '${p}' (discovery + end-session) to ${TO_CONSOLE}"
+                docker exec -u www-data hermes_nextcloud php /var/www/html/occ user_oidc:provider "$p" \
+                    --discoveryuri="https://${TO_CONSOLE}/.well-known/openid-configuration" \
+                    --endsessionendpointuri="https://${TO_CONSOLE}/logout" \
+                    >>"$LOG_FILE" 2>&1 \
+                    || warn "  OIDC provider '${p}' update failed -- update manually if NC SSO is used."
+            done <<< "$oidc_providers"
+        else
+            log "  user_oidc: no OIDC provider configured -- nothing to repoint."
+        fi
     else
         warn "hermes_nextcloud not running -- skipping NC updates."
     fi
