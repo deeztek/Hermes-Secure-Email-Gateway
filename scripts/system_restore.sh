@@ -785,19 +785,25 @@ post_restore_nc_maintenance_off() {
 }
 
 detect_host_identity_mismatch() {
-    # After restore, the restored .env carries the OLD host's IP / hostname.
-    # If this host has a different identity, the restored config makes the
-    # system unreachable -- nginx server_name, Authelia cookie domain,
-    # Postfix HELO etc. all reference the wrong host. Detect + warn so the
-    # operator knows to run system_rehost.sh.
+    # Cross-host restore detection. The restored DATABASE carries the SOURCE
+    # host's identity (server_ip, console.host, Postfix myhostname, nginx
+    # server_name, Authelia cookie domain), so on a different host the system is
+    # misconfigured/unreachable until system_rehost.sh rewires it.
     #
-    # Returns 0 if mismatch detected, 1 if no mismatch (or detection failed).
+    # Detect by comparing the BACKUP's recorded hostname (the source host, from
+    # the manifest -> BK_HOSTNAME) against THIS host's configured hostname
+    # (.env HERMES_HOSTNAME). Do NOT compare .env values to each other: .env is
+    # EXCLUDED from the backup, so after a restore it still holds THIS host's
+    # identity and would never differ -- the old HOST_IP-based check here was a
+    # false-negative that never fired for the normal DR flow.
+    #
+    # Returns 0 if cross-host (mismatch), 1 if same-host (or detection failed).
+    [[ -n "${BK_HOSTNAME:-}" ]] || return 1
     [[ -f "${HERMES_ROOT}/.env" ]] || return 1
-    local restored_ip current_ip
-    restored_ip=$(grep -E '^HOST_IP=' "${HERMES_ROOT}/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-    current_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
-    [[ -z "$restored_ip" || -z "$current_ip" ]] && return 1
-    [[ "$restored_ip" != "$current_ip" ]]
+    local current_hostname
+    current_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
+    [[ -z "$current_hostname" ]] && return 1
+    [[ "$BK_HOSTNAME" != "$current_hostname" ]]
 }
 
 report() {
@@ -812,34 +818,51 @@ report() {
     log ""
 
     if detect_host_identity_mismatch; then
-        local restored_ip current_ip
-        restored_ip=$(grep -E '^HOST_IP=' "${HERMES_ROOT}/.env" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
-        current_ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src"){print $(i+1); exit}}')
+        local current_hostname
+        current_hostname=$(grep -E '^HERMES_HOSTNAME=' "${HERMES_ROOT}/.env" | head -1 | cut -d= -f2- | tr -d '"' | tr -d "'")
         warn "================================================================"
-        warn "  HOST IDENTITY MISMATCH DETECTED"
+        warn "  CROSS-HOST RESTORE DETECTED"
         warn "================================================================"
-        warn "  Restored .env HOST_IP = ${restored_ip}"
-        warn "  This host's IP        = ${current_ip}"
+        warn "  Backup is from host : ${BK_HOSTNAME}"
+        warn "  This host is        : ${current_hostname}"
         warn ""
-        warn "  The restored config references the old host. nginx, Authelia,"
-        warn "  Postfix, and Nextcloud are now configured for ${restored_ip} --"
-        warn "  the admin console will be UNREACHABLE at ${current_ip} until you"
-        warn "  rewire the host identity. Run:"
-        warn ""
-        warn "    sudo ${HERMES_ROOT}/scripts/system_rehost.sh"
-        warn ""
-        warn "  system_rehost.sh auto-detects this host's IP/hostname and"
-        warn "  rewires .env, DB rows, nginx, Authelia, Postfix, and"
-        warn "  Nextcloud in one step. See --help for non-default targets."
-        warn ""
-        warn "  Cross-host restore ALSO requires (full checklist in the doc below):"
-        warn "    - Pro license: re-activate -- it is bound to host hardware and"
-        warn "      will read INVALID on new hardware until re-activated."
+        warn "  The restored database carries the source host's identity --"
+        warn "  nginx server_name, Authelia cookie domain, Postfix hostname, and"
+        warn "  the Nextcloud DB user reference the old host. The console will be"
+        warn "  misconfigured until you rewire host identity with system_rehost.sh"
+        warn "  (it rewrites .env, DB rows, and re-renders all configs)."
+        warn "================================================================"
+
+        # Offer to chain rehost -- operator stays in control (auto-yes if --yes).
+        local do_rehost=0
+        if (( ASSUME_YES )); then
+            do_rehost=1
+            log "--yes set: running system_rehost.sh automatically."
+        else
+            printf '\n  Run system_rehost.sh now to rewire host identity? [y/N] '
+            local ans=""
+            read -r ans
+            [[ "$ans" == "y" || "$ans" == "Y" ]] && do_rehost=1
+        fi
+        if (( do_rehost )); then
+            log "Running: system_rehost.sh --force --yes"
+            if bash "${HERMES_ROOT}/scripts/system_rehost.sh" --force --yes 2>&1 | tee -a "$LOG_FILE"; then
+                log "Host identity rewired."
+            else
+                warn "system_rehost.sh reported errors -- review the output above or run it manually."
+            fi
+        else
+            log "Skipped. Rewire later with:  sudo ${HERMES_ROOT}/scripts/system_rehost.sh"
+        fi
+
+        log ""
+        warn "  Cross-host restore ALSO requires (NOT handled by rehost):"
+        warn "    - Pro license: re-activate -- bound to host hardware; reads"
+        warn "      INVALID on new hardware until re-activated."
         warn "    - Content Checks: re-save each enabled page (DKIM/DMARC/ARC/SPF)"
         warn "      to re-apply the milter chain (smtpd_milters is not restored)."
-        warn "================================================================"
         log ""
-        log "Post-restore checklist (cross-host steps, in order):"
+        log "Full post-restore checklist:"
         log "  ${HERMES_ROOT}/docs/install/post-restore-steps.md"
         log "  https://docs.deeztek.com/books/installation-reference/page/post-restore-steps"
         return 0

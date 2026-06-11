@@ -98,7 +98,8 @@ and prompts for confirmation.
 Flags:
   --to-ip=X.X.X.X        Force-set the new host IP. Default: auto-detect via
                          'ip -4 route get 1.1.1.1'.
-  --to-hostname=FQDN     Force-set the new mail hostname. Default: 'hostname -f'.
+  --to-hostname=FQDN     Force-set the new mail hostname. Default: .env
+                         HERMES_HOSTNAME (falls back to 'hostname -f').
   --to-console=IP|FQDN   Force-set the new console address. Default: same as
                          --to-ip (operator can change later via System >
                          Console Settings UI).
@@ -141,6 +142,17 @@ detect_new_ip() {
 }
 
 detect_new_hostname() {
+    # Prefer the mail hostname already configured in .env -- it is an FQDN and is
+    # the operator's intended identity (and, after a cross-host restore, .env
+    # holds THIS host's target hostname since .env is excluded from the backup).
+    # Fall back to the OS hostname, which is often a bare name (e.g.
+    # 'homedocker-ub-2404') that fails the FQDN validation.
+    local env_hostname
+    env_hostname=$(read_env_value HERMES_HOSTNAME 2>/dev/null)
+    if [[ -n "$env_hostname" ]]; then
+        printf '%s' "$env_hostname"
+        return 0
+    fi
     hostname -f 2>/dev/null || hostname
 }
 
