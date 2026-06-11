@@ -173,6 +173,64 @@ else
 fi
 
 # ============================================================
+# Tier 2b — Per-service DB authentication
+# ============================================================
+# Tier 2 confirms each database EXISTS; it does NOT confirm each service can
+# AUTHENTICATE to it. A cross-host restore can leave a service's config pointing
+# at the SOURCE host's rotated DB user (which doesn't exist here) -- the database
+# is present, but the service gets "Access denied [1045]". This tier closes that
+# gap two ways:
+#   1. connect as each service's creds/ user (confirms the MariaDB grant matches
+#      this host's creds/ -- catches rotation/restore drift at the DB layer);
+#   2. exercise the live service config path where cheap (NC occ, postfix maps) --
+#      catches a restored config that diverged from creds/ (the real NC failure mode).
+section "Tier 2b — Per-service DB authentication"
+
+CREDS_PATH="${HERMES_DIR}/config/hermes/opt/hermes/creds"
+
+# label : username-file : password-file : database
+DB_CRED_MAP="\
+hermes:hermes_username:hermes_password:hermes
+ciphermail:ciphermail_username:ciphermail_password:djigzo
+opendmarc:opendmarc_username:opendmarc_password:opendmarc
+syslog:syslog_username:syslog_password:Syslog
+authelia:authelia_username:authelia_password:authelia
+nextcloud:nextcloud_mysql_username:nextcloud_mysql_password:nextcloud"
+
+while IFS=: read -r label ufile pfile db; do
+    [[ -n "$label" ]] || continue
+    if [[ ! -f "${CREDS_PATH}/${ufile}" || ! -f "${CREDS_PATH}/${pfile}" ]]; then
+        warn "${label}: creds/${ufile} or creds/${pfile} missing -- skipped"
+        continue
+    fi
+    dbuser=$(tr -d '[:space:]' < "${CREDS_PATH}/${ufile}")
+    dbpass=$(tr -d '\n'        < "${CREDS_PATH}/${pfile}")
+    if [[ -z "$dbuser" || -z "$dbpass" ]]; then
+        warn "${label}: empty creds -- skipped"
+        continue
+    fi
+    # -h 127.0.0.1 forces TCP (matches the user@'%' grant, like the real service);
+    # MYSQL_PWD keeps the password out of the process list.
+    if docker exec -e MYSQL_PWD="$dbpass" hermes_db_server \
+         mariadb -u "$dbuser" -h 127.0.0.1 "$db" -e "SELECT 1;" >/dev/null 2>&1; then
+        pass "${label} DB auth OK (${dbuser}@${db})"
+    else
+        fail "${label} DB auth FAILED (${dbuser}@${db}) -- MariaDB user/grant missing or password drift"
+    fi
+done <<< "$DB_CRED_MAP"
+
+# Live-config reality check: NC's occ exercises config.php's ACTUAL dbuser/dbpassword,
+# so it catches a restored config.php that still points at the source host's user even
+# when creds/ (and thus the test above) is correct -- the exact NC cross-host failure.
+if docker ps --format '{{.Names}}' | grep -q '^hermes_nextcloud$'; then
+    if docker exec -u www-data hermes_nextcloud php /var/www/html/occ status >/dev/null 2>&1; then
+        pass "nextcloud occ status (config.php DB creds resolve)"
+    else
+        fail "nextcloud occ status FAILED -- config.php DB creds broken (cross-host restore?)"
+    fi
+fi
+
+# ============================================================
 # Tier 3 — Postfix + filter chain
 # ============================================================
 section "Tier 3 — Postfix + filter chain"
