@@ -14,9 +14,14 @@ baseline. Highlights:
   streamed restore (no double-staging), disk-space pre-checks, and email notifications
   (`--notify-email`, `--notify-on-success`). (#219)
 - **Cross-host disaster recovery + re-host.** Restore a backup onto fresh hardware:
-  `system_restore.sh` auto-remaps the storage topology when it differs from the source, and a
-  new `system_rehost.sh` rewires host identity after a restore-to-new-hardware. A version-match
-  gate guards against accidental cross-version restores. (#220)
+  `system_restore.sh` auto-remaps the storage topology when it differs from the source,
+  reconciles per-service DB credentials (including Nextcloud's `config.php`) to the target
+  host's own `creds/`, and **detects a cross-host restore and offers to run `system_rehost.sh`
+  for you**. `system_rehost.sh` then rewires host identity — console hostname, regenerated
+  service configs, and the Nextcloud OIDC provider's discovery + end-session URLs. A
+  version-match gate guards against accidental cross-version restores. After any restore, follow
+  the [Post-Restore Steps](https://docs.deeztek.com/books/installation-reference/page/post-restore-steps)
+  checklist. (#220)
 - **Smoother in-place upgrades.** The `system_update_docker.sh` orchestrator gains a
   pre-container `pre-scripts/` hook and self-re-exec, so upgrades that must migrate files or
   credentials *before* containers restart now work cleanly. (#221)
@@ -44,6 +49,21 @@ baseline. Highlights:
 - [#267](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/267) — `hermes_smoke_test.sh`
   hardcoded `build_no=v260119`, so the post-install smoke test falsely failed on every release after
   v260119. Now version-agnostic (reports `build_no`; optional `EXPECTED_BUILD=vYYMMDD` to assert).
+
+## After a cross-host restore
+
+Restoring onto fresh hardware is now largely automatic, but a few items remain operator-driven.
+The full checklist lives at
+[Post-Restore Steps](https://docs.deeztek.com/books/installation-reference/page/post-restore-steps)
+(also `docs/install/post-restore-steps.md` in the repo). In short:
+
+- Accept the restore script's **offer to run `system_rehost.sh`** when it detects a cross-host
+  restore (or run it manually with `--force`).
+- Re-validate the **Pro license** (the activation is host-bound).
+- **Re-save Content Checks** once, so the Postfix `smtpd_milters` chain is rewritten for this
+  host ([#268](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/268) — restore does
+  not yet reapply it automatically).
+- Turn Nextcloud **maintenance mode off** if the restore left it on, then run the smoke test.
 
 ## ⚠️ REQUIRED — upgrading from v260119 to v260609
 
