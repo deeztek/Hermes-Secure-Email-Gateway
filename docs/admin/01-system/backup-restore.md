@@ -201,7 +201,7 @@ Two gates fire BEFORE any destructive action, plus automatic topology handling:
 ### Disaster-recovery flow (different host)
 
 1. Install Hermes fresh on the new host using [`install_hermes_docker.sh`](../../../scripts/install_hermes_docker.sh). The install root + `.env` need to exist before restore can succeed.
-2. Make the backup directory reachable on the new host — **mount the backup storage** (off-site / NAS share) so the restore can stream-extract in place. (`scp -r` of the directory works too.)
+2. Make the backup directory reachable on the new host — **either** mount the backup storage (off-site / NAS share) on the new host (recommended: the restore stream-extracts in place, so there's no need to copy the whole backup), **or** `scp -r` the backup directory across to local disk.
 3. Run `system_restore.sh -F /path/to/hermes-backup-<scope>-<build>-<ts>`. Storage-topology differences are **auto-remapped** to this host's paths; a build-version difference still requires `FORCE_VERSION_MISMATCH=1` (better: install the matching build first).
 4. When the restore detects a **cross-host** restore (backup hostname ≠ this host), it **offers to run `system_rehost.sh` for you** — accept it to rewire host identity (`.env`, DB rows, all rendered configs, and the Nextcloud DB user).
 5. Verify the admin console loads and a test message flows end-to-end.
