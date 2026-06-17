@@ -2,5 +2,5 @@
 # This file is sourced by /usr/share/djigzo/scripts/pam-authenticate.sh
 
 # Set the path to the CipherMail/Djigzo JAR files
-# Using absolute path to ensure the script works regardless of working directory
-jars="/usr/share/djigzo/lib/*"
+# Using find to build the classpath with absolute paths
+jars="$(find /usr/share/djigzo/lib/ -type f -name '*.jar' | tr '\n' ':')"
