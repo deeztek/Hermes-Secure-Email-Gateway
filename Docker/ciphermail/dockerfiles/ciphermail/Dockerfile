@@ -13,6 +13,7 @@ COPY build/web.xml /build/
 COPY build/wrapper-additional-parameters.conf /build/
 COPY build/smtp_server_config.xml /build/
 COPY build/smtp_transport_config.xml /build/
+COPY config/ /config/
 
 # Install pre-requisites and ciphermail packages
 RUN echo "deb http://archive.ubuntu.com/ubuntu/ jammy universe" | tee /etc/apt/sources.list.d/jammy.list && \
@@ -49,12 +50,14 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu/ jammy universe" | tee /etc/apt/s
     cp /build/ciphermail.xml /etc/tomcat9/Catalina/localhost/ciphermail.xml && \
     cp /build/web.xml /etc/tomcat9/Catalina/localhost/web.xml && \
     cp /build/wrapper-additional-parameters.conf /usr/share/djigzo/wrapper/wrapper-additional-parameters.conf && \
+    mkdir -p /etc/default && \
+    cp /config/ciphermail/etc/cm-pam-authenticate /etc/default/cm-pam-authenticate && \
     cp /build/smtp_server_config.xml /usr/share/djigzo/conf/james/SAR-INF/smtp_server_config.xml && \
     cp /build/smtp_transport_config.xml /usr/share/djigzo/conf/james/SAR-INF/smtp_transport_config.xml && \
     # Fix permissions on scripts and binaries (dpkg -nosystemd repack may strip execute bit)
     chmod +x /usr/share/djigzo/scripts/*.sh /usr/share/djigzo/wrapper/wrapper-djigzo && \
     # Cleanup build files and apt cache
-    rm -rf /build && \
+    rm -rf /build /config && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
