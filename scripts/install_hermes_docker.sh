@@ -3162,6 +3162,9 @@ Admin username:     $(grep -E '^HERMES_ADMIN_USERNAME=' "${HERMES_ROOT}/.env" 2>
 Admin password:     $(cat "${SECRETS_DIR}/hermes_admin_password_file" 2>/dev/null || echo "<not-generated>")
                     (LDAP DN: cn=<username>,ou=users,dc=hermes,dc=local;
                      member of cn=admins. Authelia binds against this.)
+                    These SAME credentials also log into the CipherMail
+                    Advanced Settings UI (Encryption -> Advanced Settings,
+                    /ciphermail/) -- seeded as a cm_admin with full roles.
 
 SERVER IDENTITY
 ---------------
@@ -3554,6 +3557,41 @@ EOF
         WHERE NOT EXISTS (
           SELECT 1 FROM system_users WHERE username = '${hermes_admin_user}'
         );
+    " 2>>"$LOG_FILE"
+
+    # ---- 4. Seed the CipherMail (djigzo) admin with the SAME credentials ----
+    # The /ciphermail/ advanced-settings UI has its own auth realm (the
+    # cm_admin table in the djigzo DB) -- it does NOT consume Authelia's
+    # Remote-User header. To give admins a single credential, we seed a
+    # cm_admin row whose username + password match the Hermes bootstrap
+    # admin, so the same login that gets them through Authelia also works
+    # on the CipherMail UI behind it.
+    #
+    # cm_password_encoding=0 is CipherMail's plaintext comparison mode (the
+    # documented DB-bootstrap method); the djigzo DB is not world-readable
+    # and the password is replaced on first login anyway. The generated
+    # password is 16 alphanumerics (no SQL-special chars) so direct
+    # interpolation is safe. CipherMail authorization is DB-driven (LDAP/OIDC
+    # never grants roles), so we also grant every role in cm_authority for a
+    # full admin. Both inserts are idempotent (NOT EXISTS guards).
+    log "Seeding CipherMail admin (cm_admin) = ${hermes_admin_user} with full roles..."
+    docker exec hermes_db_server mysql -u root djigzo -e "
+        INSERT INTO cm_admin
+          (cm_built_in, cm_enabled, cm_password, cm_password_encoding, cm_salt, cm_username)
+        SELECT 0, 1, '${hermes_admin_pass}', 0, '', '${hermes_admin_user}'
+        WHERE NOT EXISTS (
+          SELECT 1 FROM cm_admin WHERE cm_username = '${hermes_admin_user}'
+        );
+
+        INSERT INTO cm_admin_cm_authorities (cm_admin, cm_authorities)
+        SELECT a.cm_id, r.cm_id
+          FROM cm_admin a
+          CROSS JOIN cm_authority r
+         WHERE a.cm_username = '${hermes_admin_user}'
+           AND NOT EXISTS (
+             SELECT 1 FROM cm_admin_cm_authorities x
+              WHERE x.cm_admin = a.cm_id AND x.cm_authorities = r.cm_id
+           );
     " 2>>"$LOG_FILE"
 
     log "LDAP application admin initialization completed (${hermes_admin_user})"

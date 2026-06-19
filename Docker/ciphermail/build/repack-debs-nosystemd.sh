@@ -29,19 +29,20 @@ repack_deb() {
     # Check if postinst exists and contains systemctl
     if [ -f "$extract_dir/DEBIAN/postinst" ]; then
         if grep -q "systemctl" "$extract_dir/DEBIAN/postinst"; then
-            echo "  Found systemctl in postinst, creating backup and replacing..."
+            echo "  Found systemctl in postinst, creating backup and neutralizing systemctl only..."
 
             # Backup original
             cp "$extract_dir/DEBIAN/postinst" "$extract_dir/DEBIAN/postinst.original"
 
-            # Create no-op postinst that just exits successfully
-            cat > "$extract_dir/DEBIAN/postinst" << 'EOF'
-#!/bin/bash
-# Modified for Docker build - systemctl commands removed
-# Original postinst backed up as postinst.original
-# Services are started by container entrypoint
-exit 0
-EOF
+            # Neutralize ONLY the systemctl lines and keep the rest of the postinst.
+            # The original postinst does critical init beyond starting services
+            # (e.g. configure_scripts creates the scripts.d symlinks that register
+            # pam-authenticate, configure_sudoers installs the sudoers fragment,
+            # user creation, ownership/permissions). Replacing the whole file with
+            # `exit 0` silently dropped all of that and broke web GUI PAM login.
+            # Services themselves are started by the container entrypoint instead.
+            sed -i -E 's/^([[:space:]]*)(systemctl[[:space:]].*)$/\1true # systemctl removed for Docker (was: \2)/' \
+                "$extract_dir/DEBIAN/postinst"
             chmod 755 "$extract_dir/DEBIAN/postinst"
             needs_repack=true
         else
