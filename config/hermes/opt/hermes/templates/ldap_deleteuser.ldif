@@ -1,0 +1,2 @@
+dn: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+changetype: delete

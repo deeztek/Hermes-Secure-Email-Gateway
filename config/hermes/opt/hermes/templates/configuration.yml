@@ -1,0 +1,292 @@
+# yamllint disable rule:comments-indentation
+---
+theme: light
+default_2fa_method: "totp"
+
+server:
+
+  address: 'tcp://0.0.0.0:9091/'
+  asset_path: /var/www/html/dist/img/
+  endpoints:
+    enable_pprof: false
+    enable_expvars: false
+  disable_healthcheck: false
+  tls:
+    key: ""
+    certificate: ""
+    client_certificates: []
+  headers:
+    csp_template: ""
+
+log:
+  level: hermes_log_level
+  format: hermes_log_format
+  file_path: /logs/authelia.log
+
+telemetry:
+  metrics:
+    enabled: false
+    address: tcp://0.0.0.0:9959
+
+totp:
+  disable: false
+  issuer: HermesSEG
+  algorithm: sha1
+  digits: 6
+  period: 30
+  skew: 1
+  secret_size: 32
+
+webauthn:
+  disable: false
+  timeout: 60s
+  display_name: HermesSEG
+  attestation_conveyance_preference: indirect
+  selection_criteria:
+    user_verification: preferred
+
+duo_api:
+  disable: hermes_duo_disable
+  hostname: hermes_duo_hostname
+  enable_self_enrollment: hermes_duo_self_enrollment
+
+ntp:
+  address: "time.cloudflare.com:123"
+  version: 4
+  max_desync: 30s
+  disable_startup_check: false
+  disable_failure: true
+
+authentication_backend:
+  password_reset:
+    disable: hermes_authentication_backend_disable_reset_password
+    # Custom URL for password reset - uses Hermes SEG custom password reset flow
+    custom_url: "https://hermes_access_control_domain/user-auth/forgot_password.cfm"
+  refresh_interval: 5m
+
+  ldap:
+    implementation: custom
+    address: 'ldap://hermes_ldap:389'
+    start_tls: false
+    base_dn: {{ env "LDAP_BASE_DN" }}
+    additional_users_dn: ou=users
+    users_filter: (&({username_attribute}={input})(objectClass=inetOrgPerson))
+    additional_groups_dn: ou=groups
+    groups_filter: (&(member={dn})(objectClass=groupOfNames))
+    user: cn={{ env "LDAP_USER_USERNAME" }},{{ env "LDAP_BASE_DN" }}
+    attributes:
+      username: uid
+      display_name: displayName
+      mail: mail
+      group_name: cn
+
+
+password_policy:
+
+  standard:
+    enabled: false
+    min_length: 8
+    max_length: 0
+    require_uppercase: true
+    require_lowercase: true
+    require_number: true
+    require_special: true
+  zxcvbn:
+    enabled: false
+    min_score: 3
+
+access_control:
+  default_policy: deny
+  rules:
+    #Bypass auth for Autehlia /auth endpoint
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/auth([/?].*)?$'
+      policy: bypass
+
+    # NOTE: Nextcloud DAV bypass rules (/nc/remote.php/dav and /nc/remote.php/webdav)
+    # have been removed. Authelia no longer gates /nc/ at all (auth_request
+    # removed from the nginx location block), so there is nothing to bypass.
+    # Nextcloud handles its own DAV authentication via app passwords.
+
+    # The /nc-admin-login bypass URL was retired (#262). Local Nextcloud
+    # admin access is now via the Maintenance Mode toggle on Email Server
+    # > Settings, which runs `occ app:disable user_oidc` from the admin
+    # UI -- no separate URL needs an Authelia rule.
+
+    #Deny Access to /admin for  mailboxes
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject:
+      - "group:mailboxes"
+      policy: deny
+
+    #Deny Access to /admin for relays
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject:
+      - "group:relays"
+      policy: deny
+
+    # NOTE: /nc (Nextcloud) access control rules have been removed from
+    # Authelia. Nextcloud handles its own authentication via the OIDC plugin
+    # with Authelia as the provider, and group-based access control is
+    # enforced by oidc_login_allowed_groups in Nextcloud's config.php
+    # (requires cn=nextcloud LDAP group membership). The Authelia
+    # auth_request layer was removed from the /nc nginx location block
+    # because it corrupts upstream 302 Location headers during the OIDC
+    # auto-redirect flow.
+
+    #Deny Access to /users for admins
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/users([/?].*)?$'
+      subject:
+      - "group:admins"
+      policy: deny
+
+
+      #/admin two_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject:
+      - ["group:two_factor", "group:admins"]
+      policy: two_factor
+
+      #/admin one_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/admin([/?].*)?$'
+      subject:
+      - ["group:one_factor", "group:admins"]
+      policy: one_factor
+
+      #/users mailboxes two_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/users([/?].*)?$'
+      subject:
+      - ["group:two_factor", "group:mailboxes"]
+      policy: two_factor
+
+      #/users mailboxes one_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/users([/?].*)?$'
+      subject:
+      - ["group:one_factor", "group:mailboxes"]
+      policy: one_factor
+
+      #/users relays two_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/users([/?].*)?$'
+      subject:
+      - ["group:two_factor", "group:relays"]
+      policy: two_factor
+
+      #/users relays one_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/users([/?].*)?$'
+      subject:
+      - ["group:one_factor", "group:relays"]
+      policy: one_factor
+
+      #/ciphermail — admin only, two_factor
+      # NOTE: /web/ is NOT protected by Authelia — it's used by external
+      # recipients to access encrypted PDF emails (no Hermes account needed)
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/ciphermail([/?].*)?$'
+      subject:
+      - ["group:two_factor", "group:admins"]
+      policy: two_factor
+
+      #/ciphermail — admin only, one_factor
+    - domain: hermes_access_control_domain
+      resources:
+      - '^/ciphermail([/?].*)?$'
+      subject:
+      - ["group:one_factor", "group:admins"]
+      policy: one_factor
+
+
+session:
+  cookies:
+  - domain: hermes_access_control_domain
+    authelia_url: https://hermes_access_control_domain/auth
+    default_redirection_url: https://hermes_access_control_domain/admin/
+    name: hermes_session
+    same_site: lax
+    expiration: hermes_session_expiration
+    inactivity: hermes_session_inactivity
+    remember_me: hermes_session_remember_me
+  redis:
+    host: hermes_authelia_redis
+    port: 6379
+
+
+regulation:
+  max_retries: hermes_regulation_max_retries
+  find_time: hermes_regulation_find_time
+  ban_time: hermes_regulation_ban_time
+
+storage:
+  # encryption_key is loaded via AUTHELIA_STORAGE_ENCRYPTION_KEY_FILE environment variable
+  # (Docker secret mounted at /run/secrets/AUTHELIA_STORAGE_ENCRYPTION_KEY)
+  mysql:
+    address: 'tcp://hermes_db_server:3306'
+    database: 'authelia'
+    username: {{ secret "/run/secrets/AUTHELIA_STORAGE_USERNAME" | msquote }}
+    password: {{ secret "/run/secrets/AUTHELIA_STORAGE_PASSWORD" | msquote }}
+    timeout: '5s'
+
+notifier:
+  disable_startup_check: true
+  smtp:
+    address: 'smtp://hermes_postfix_dkim:10026'
+    sender: "hermes_notifier_smtp_sender"
+    subject: "hermes_notifier_smtp_subject"
+    startup_check_address: test@authelia.com
+    disable_require_tls: true
+    tls:
+      skip_verify: true
+
+identity_providers:
+  oidc:
+    jwks:
+     - key: {{ secret "/keys/authelia_identity_providers_oidc_jwks_file" | mindent 10 "|" | msquote }}
+    enable_client_debug_messages: true
+    authorization_policies:
+      hermes_webmail:
+        default_policy: 'one_factor'
+        rules:
+          - policy: 'two_factor'
+            subject: 'group:two_factor'
+    claims_policies:
+      nextcloud:
+        id_token: ['groups', 'email', 'email_verified', 'preferred_username', 'name']
+    clients:
+      - client_id: 'Hermes_SEG_Webmail'
+        client_secret: {{ secret "/keys/authelia_identity_providers_oidc_clients_client_secret_digest_file" }}
+        public: false
+        authorization_policy: 'hermes_webmail'
+        claims_policy: 'nextcloud'
+        token_endpoint_auth_method: 'client_secret_post'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+        redirect_uris:
+          - 'https://hermes_access_control_domain/nc/apps/user_oidc/code'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'groups'
+        userinfo_signed_response_alg: 'none'
+        consent_mode: implicit
+
+

@@ -1,0 +1,4 @@
+dn: cn=nextcloud,ou=groups,dc=hermes,dc=local
+changetype: modify
+delete: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local

@@ -1,0 +1,5 @@
+hosts = hermes_db_server
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+query = SELECT bcc_to FROM bcc_maps WHERE address='%s' AND bcc_type='recipient' AND enabled=1

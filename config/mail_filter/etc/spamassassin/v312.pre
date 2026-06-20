@@ -1,0 +1,51 @@
+# ============================================================================
+# Hermes SEG override of SpamAssassin v312.pre (GitHub issue #234)
+#
+# The DKIM plugin loadplugin line below is commented out to prevent the
+# SpamAssassin DKIM plugin from loading at all. Once loaded, the plugin
+# has no runtime kill-switch (no `use_dkim` boolean like DCC/Razor2/Pyzor),
+# and any rule referencing its eval functions (DKIM_INVALID, DKIM_ADSP_*,
+# NML_ADSP_CUSTOM_*, etc.) becomes a permanent source of false-positive
+# spam scores on body-modified inbound mail (External Banner / Disclaimers /
+# Signatures injected by hermes_body_milter).
+#
+# DKIM verification authority for Hermes lives at OpenDKIM (:25 ingress).
+# That is the only verifier in the pipeline that sees the original,
+# unmodified body. The Authentication-Results header written by OpenDKIM
+# at :25 is the authoritative DKIM verdict for the message.
+#
+# This file is volume-mounted into hermes_mail_filter to override the
+# Debian package default. Compose mount:
+#   ./config/mail_filter/etc/spamassassin/v312.pre:/etc/spamassassin/v312.pre
+# ============================================================================
+
+# This is the right place to customize your installation of SpamAssassin.
+#
+# See 'perldoc Mail::SpamAssassin::Conf' for details of what can be
+# tweaked.
+#
+# This file was installed during the installation of SpamAssassin 3.1.2,
+# and contains plugin loading commands for the new plugins added in that
+# release.  It will not be overwritten during future SpamAssassin installs,
+# so you can modify it to enable some disabled-by-default plugins below,
+# if you so wish.
+#
+# There are now multiple files read to enable plugins in the
+# /etc/spamassassin directory; previously only one, "init.pre" was
+# read.  Now both "init.pre", "v310.pre", and any other files ending in
+# ".pre" will be read.  As future releases are made, new plugins will be
+# added to new files, named according to the release they're added in.
+
+###########################################################################
+
+# DKIM - perform DKIM verification
+#
+# Mail::DKIM module required for use, see INSTALL for more information.
+#
+# Note that if Mail::DKIM version 0.20 or later is installed, this
+# renders the DomainKeys plugin redundant.
+#
+# DISABLED PER HERMES #234 - see header comment at top of this file.
+# Do not re-enable without resolving the body-modification false-positive
+# problem (likely via pipeline restructure or ARC sealing #229).
+#loadplugin Mail::SpamAssassin::Plugin::DKIM

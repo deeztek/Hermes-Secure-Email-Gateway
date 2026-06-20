@@ -1,0 +1,49 @@
+# AUTO-GENERATED FILE - DO NOT EDIT!! Use ldapmodify.
+# CRC32 b0968cd9
+dn: olcDatabase={1}mdb
+objectClass: olcDatabaseConfig
+objectClass: olcMdbConfig
+olcDatabase: {1}mdb
+olcSuffix: dc=hermes,dc=local
+olcAddContentAcl: FALSE
+olcLastMod: TRUE
+olcLastBind: FALSE
+olcLastBindPrecision: 0
+olcMaxDerefDepth: 15
+olcReadOnly: FALSE
+olcRootDN: cn=hermes-ldap-admin,dc=hermes,dc=local
+olcSyncUseSubentry: FALSE
+olcMonitoring: TRUE
+olcDbDirectory: /var/lib/ldap/hermes.local
+olcDbNoSync: FALSE
+olcDbIndex: objectClass eq
+olcDbIndex: cn eq,sub
+olcDbIndex: uid eq
+olcDbIndex: uidNumber eq
+olcDbIndex: gidNumber eq
+olcDbIndex: memberUid eq
+olcDbIndex: sn eq,sub
+olcDbIndex: mail eq,sub
+olcDbMaxReaders: 0
+olcDbMaxSize: 1073741824
+olcDbMode: 0600
+olcDbSearchStack: 16
+olcDbMaxEntrySize: 0
+olcDbRtxnSize: 10000
+structuralObjectClass: olcMdbConfig
+entryUUID: 104ba112-4a9d-1040-82ff-8d39e88cbd81
+creatorsName: cn=config
+createTimestamp: 20251031120122Z
+olcAccess: {0}to * by dn.exact="gidNumber=0+uidNumber=0,cn=peercred,cn=externa
+ l,cn=auth" manage by * break
+olcAccess: {1}to * by dn.exact="cn=hermes-ldap-admin,dc=hermes,dc=local" manag
+ e by * break
+olcAccess: {2}to * by group.exact="cn=readers,ou=groups,dc=hermes,dc=local" re
+ ad by * break
+olcAccess: {3}to attrs=userPassword by anonymous auth by * break
+olcAccess: {4}to * by * none
+olcRootPW:: e0FSR09OMn0kYXJnb24yaSR2PTE5JG09NDA5Nix0PTMscD0xJFQ2VnM3UUpjS2NheH
+ VjM1h5R1JZWEEkeXAxaTRzZG0weEQxdUxQWGFLa1lhUGxkL1g1dlR1T3ZZZXQ1QURkU0MxNA==
+entryCSN: 20251226173159.736529Z#000000#000#000000
+modifiersName: gidNumber=0+uidNumber=0,cn=peercred,cn=external,cn=auth
+modifyTimestamp: 20251226173159Z

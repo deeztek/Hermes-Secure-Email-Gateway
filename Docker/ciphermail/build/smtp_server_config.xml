@@ -1,0 +1,11 @@
+<!--
+    The SMTP port the MPA listens on. The Postfix before queue filter sends mail to this port.
+
+    Note: if you change this port from the default (10025) you should also change the reinjection
+    port setting in the Postfix master.cf config file.
+-->
+<port> 10025 </port>
+<!--
+        <bind> 127.0.0.1 </bind>
+-->
+

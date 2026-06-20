@@ -1,0 +1,2946 @@
+<?xml version="1.0"?>
+<!DOCTYPE config SYSTEM "custom_dtd.dtd" [
+<!ENTITY smtphandlerchainConfig SYSTEM "../conf/james-smtphandlerchain.xml">
+<!ENTITY smtpTransportConfig SYSTEM "smtp_transport_config.xml">
+<!ENTITY smtpServerConfig SYSTEM "smtp_server_config.xml">
+<!ENTITY internalRemoteDeliveryProcessor SYSTEM "internal_remote_delivery_processor.xml">
+<!ENTITY dlpConfig SYSTEM "dlp.xml">
+<!ENTITY customProcessors SYSTEM "custom_processors.xml">
+<!ENTITY customMailetPackages SYSTEM "custom_mailet_packages.xml">
+<!ENTITY customMatcherPackages SYSTEM "custom_matcher_packages.xml">
+]>
+
+<!--
+    Copyright (c) 2008-2019, CipherMail.
+    
+    This file is part of CipherMail email encryption.
+    
+    CipherMail is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License 
+    version 3, 19 November 2007 as published by the Free Software 
+    Foundation.
+    
+    CipherMail is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU Affero General Public License for more details.
+    
+    You should have received a copy of the GNU Affero General Public 
+    License along with CipherMail. If not, see <http://www.gnu.org/licenses/>
+    
+    Additional permission under GNU AGPL version 3 section 7
+    
+    If you modify this Program, or any covered work, by linking or 
+    combining it with aspectjrt.jar, aspectjweaver.jar, tyrex-1.0.3.jar, 
+    freemarker.jar, dom4j.jar, mx4j-jmx.jar, mx4j-tools.jar, 
+    spice-classman-1.0.jar, spice-loggerstore-0.5.jar, spice-salt-0.8.jar, 
+    spice-xmlpolicy-1.0.jar, saaj-api-1.3.jar, saaj-impl-1.3.jar, 
+    wsdl4j-1.6.1.jar (or modified versions of these libraries), 
+    containing parts covered by the terms of Eclipse Public License, 
+    tyrex license, freemarker license, dom4j license, mx4j license,
+    Spice Software License, Common Development and Distribution License
+    (CDDL), Common Public License (CPL) the licensors of this Program grant 
+    you additional permission to convey the resulting work.
+-->
+
+<!-- NOTE: escaping in this xml file should not be done using double \\ but just a single \ -->
+<!-- Example: <mailet match="SubjectTrigger=matchOnError=false,(?i)\[\s*encrypt\s*\]" class="GotoProcessor"> -->
+
+<config>
+   <James>
+
+      <!-- This is the postmaster email address for this mail server. -->
+      <!-- Set this to the appropriate email address for error reports -->
+      <!-- If this is set to a non-local email address, the mail server -->
+      <!-- will still function, but will generate a warning on startup. -->
+      <postmaster>root@[127.0.0.1]</postmaster>
+
+      <!-- servernames identifies the DNS namespace served by this instance of James. -->
+      <!-- These servernames are used for both matcher/mailet processing and SMTP auth -->
+      <!-- to determine when a mail is intended for local delivery. -->
+      <!-- -->
+      <!-- If autodetect is TRUE, James wil attempt to discover its own host name AND -->
+      <!-- use any explicitly specified servernames. -->
+      <!-- If autodetect is FALSE, James will use only the specified servernames. -->
+      <!-- -->
+      <!-- If autodetectIP is not FALSE, James will also allow add the IP address for each servername. -->
+      <!-- The automatic IP detection is to support RFC 2821, Sec 4.1.3, address literals. -->
+      <!-- -->
+      <!-- To override autodetected server names simply add explicit servername elements. -->
+      <!-- In most cases this will be necessary. -->
+      <!-- By default, the servername 'localhost' is specified. This can be removed, if required. -->
+      <!-- -->
+      <!-- Warning: If you are using fetchmail it is important to include the -->
+      <!-- fetched domains in the server name list to prevent looping.       -->
+      <servernames autodetect="false" autodetectIP="true">
+         <servername>localhost</servername>
+      </servernames>
+
+      <!-- Set whether user names are case sensitive or case insensitive -->
+      <!-- Set whether to enable local aliases -->
+      <!-- Set whether to enable forwarding -->
+      <usernames ignoreCase="true" enableAliases="true" enableForwarding="true"/>
+
+      <!-- The inbox repository is the location for users inboxes -->
+      <!-- Default setting: file based repository - enter path ( use  "file:///" for absolute) -->
+      
+      <inboxRepository>
+         <repository destinationURL="file://var/mail/inboxes/" type="MAIL"/>
+      </inboxRepository>
+   </James>
+
+   <!-- 
+       This block is responsible for initializing global Djigzo resources.
+       
+       Paths are relative to the main directory. 
+   -->
+   <djigzo>
+       <springconfig> conf/spring/djigzo.xml </springconfig>
+       <additionalspringconfigdir> conf/spring/spring.d/ </additionalspringconfigdir>
+       <log4jconfig> conf/log4j.properties </log4jconfig>
+       <cipherSuites>
+            <!-- the override cipher suites used by HTTPClient, add ciphers as a comma separated list -->
+        </cipherSuites>
+   </djigzo>        
+    
+   <!-- Set the Java packages from which to load mailets and matchers -->
+   <mailetpackages>
+        &customMailetPackages;
+        <mailetpackage>mitm.application.djigzo.pro.james.mailets</mailetpackage>
+        <mailetpackage>mitm.application.djigzo.james.mailets</mailetpackage>
+        <mailetpackage>org.apache.james.transport.mailets</mailetpackage>
+   </mailetpackages>
+    
+   <matcherpackages>
+        &customMatcherPackages;
+        <matcherpackage>mitm.application.djigzo.pro.james.matchers</matcherpackage>
+        <matcherpackage>mitm.application.djigzo.james.matchers</matcherpackage>
+        <matcherpackage>org.apache.james.transport.matchers</matcherpackage>
+   </matcherpackages>
+
+   <!-- The James Spool Manager block  -->
+   <!-- -->
+   <!-- This block is responsible for processing messages on the spool. -->
+    <spoolmanager>
+        <!-- Number of spool threads -->
+        <threads> 4 </threads>
+        
+        <!-- The root processor is a required processor - James routes all mail on the spool -->
+        <!-- through this processor first. -->
+        <!-- -->
+                
+        <!-- This configuration is a sample configuration for the root processor. -->
+        <processor name="root">
+            
+            <!-- 
+            Important check to avoid looping. Because James will be deployed as a filter we need to
+            set the limit twice the standard
+            -->
+            <mailet match="MaxRelay=matchOnError=false,100" class="Null"/>
+
+            <!-- Create a unique ID for a message -->
+            <mailet match="All" class="CreateMailID" />
+                        
+            <mailet match="All" class="Log">
+                <logDetail> middle </logDetail>
+                <comment> incoming </comment>
+            </mailet>
+
+            <!--
+                We need to check whether the message was auto submitted by this server and
+                if so either drop the message or send it directly to the outgoing transport. 
+                This is done to prevent mail loops. For a quarantine notification messages 
+                that gets forwarded to an external address will be quarantined again if 
+                handled normally which will result in a quarantine notification messages
+                etc. etc.
+             -->
+            <mailet match="GlobalVerifyHMACHeader=matchOnError=false,X-Keep-Djigzo-Auto-Submitted,auto-replied,user.systemMailSecret,true" 
+                    class="GotoProcessor">
+                <processor> auto-submitted-incoming </processor>
+            </mailet>
+
+            <!-- We want to store the originator when an email comes in the first time if it's a valid email address -->
+            <mailet match="HasValidOriginator=matchOnError=false,true" class="MailAttributes">
+                <set>runtime.originator=${originator}</set>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-pre-processing </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="custom-pre-processing">
+            <!-- do nothing processor which can be overridden by the end user-->
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> subject-filter </processor>
+            </mailet>
+        </processor>
+
+        <!-- should be called by the overridden custom pre processor(s) -->
+        <processor name="post-custom-pre-processing">
+            <mailet match="All" class="GotoProcessor">
+                <processor> subject-filter </processor>
+            </mailet>
+        </processor>
+
+        <processor name="subject-filter">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.subjectFilter.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> Subject filter is disabled for the sender </log>
+                <processor> internal-external-splitter </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.subjectFilter.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> Subject filter is disabled for the recipient(s) </log>
+                <processor> internal-external-splitter </processor>
+            </mailet>
+
+            <mailet match="All" class="MailAttributes">
+                <set>runtime.subjectFilter=#{user.subjectFilter.regEx}</set>
+            </mailet>
+                
+            <mailet match="All" class="FilterSubject">
+                <log> Filtering subject </log>
+                <attribute>runtime.subjectFilter</attribute>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <logDetail> middle </logDetail>
+                <comment> Subject filtered </comment>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> internal-external-splitter </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="internal-external-splitter">
+            <mailet match="RecipientHasLocality=matchOnError=true, internal" class="GotoProcessor">
+                <log> To internal recipient(s) </log>
+                <processor> custom-pre-internal </processor>
+            </mailet>
+            
+            <!-- all non internal users are external users -->
+            <mailet match="All" class="GotoProcessor">
+                <log> To external recipient(s) </log>
+                <processor> custom-pre-external </processor>
+            </mailet>            
+        </processor>
+
+        <!--
+            The processor for email which was created by this gateway. A check is done to see whether the 
+            message was really generated by this gateway (using DKIM) and if so, it will be immediately
+            delivered. 
+         -->
+        <processor name="auto-submitted-incoming">
+            <mailet match="All" class="Log">
+                <comment> The message was generated by this server or by a different server with the same system mail secret </comment>
+            </mailet>
+            
+            <!--
+                The message was generated by this server. To prevent mail loops we either 
+                need to drop the message or send the message directly to the outgoing
+                transport. To prevent spoofing of auto generated email, all auto generated
+                email is DKIM signed by this server. Only if the signature verifies will 
+                the message be allowed to be send out. If only the header would have been
+                checked, adding the header to a message would make it possible for an 
+                insider to bypass the DLP checks. 
+             -->
+            <mailet match="All" class="SenderPropertyDKIMVerify">
+                <dkimHeader> X-Keep-Djigzo-DKIM-Signature </dkimHeader>
+                <resultAttribute> runtime.dkim.result </resultAttribute>
+                <keyProperty> user.dkim.keyPair </keyProperty>
+            </mailet>
+             
+            <mailet match="MailAttributeEvaluator=matchOnError=false,#{runtime.dkim.result}=='verified'" 
+                    class="GotoProcessor">
+                <log> DKIM signature is valid. Message will bypass all checks and directly be sent to transport </log>
+                <processor> auto-submitted-incoming-verified </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> auto-submitted-incoming-invalid-signature </processor>
+            </mailet>
+        </processor>
+
+        <processor name="auto-submitted-incoming-verified">
+            <mailet match="All" class="GotoProcessor">
+                <processor> dkim-sign </processor>
+            </mailet>
+        </processor>
+
+        <processor name="auto-submitted-incoming-invalid-signature">
+            <mailet match="All" class="GotoProcessor">
+                <log> DKIM signature is invalid. Message will be dropped </log>
+                <logLevel> WARN </logLevel>
+                <processor> ghost </processor>
+            </mailet>
+        </processor>
+
+        <!--
+            #####  #   #  #####  #####  ####   #   #    #    #     
+            #       # #     #    #      #   #  ##  #   # #   #     
+            ####     #      #    ####   ####   # # #  #   #  #     
+            #       # #     #    #      # #    #  ##  #####  #     
+            #####  #   #    #    #####  #  ##  #   #  #   #  #####
+        -->
+
+        <!-- do nothing processor which can be overridden by the end user-->
+        <processor name="custom-pre-external">
+            <mailet match="All" class="GotoProcessor">
+                <processor> external </processor>
+            </mailet>
+        </processor>
+
+        <processor name="external">
+            <mailet match="All" class="Stats">
+                <name>incoming-external</name>
+            </mailet>
+
+            <!-- check if the sender has DLP enabled -->
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.dlp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> DLP is disabled for the sender </log>
+                <processor> post-dlp </processor>
+            </mailet>
+
+            <!-- check if the recipient has DLP enabled -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.dlp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> DLP is disabled for the recipient(s) </log>
+                <processor> post-dlp </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <!-- the dlp processor is defined in the dlp.xml fragment -->
+                <processor> dlp </processor>
+            </mailet>
+        </processor>
+
+        <!-- include the dlp config fragment -->    
+        &dlpConfig;
+
+        <!-- 
+            The processor used when email is released from quarantine.
+            
+            !!! Note: if moved or renamed make sure you also rename the processor in the soap 
+            spring config (see quarantineMailRepositoryWSBean)!   
+        -->
+        <processor name="post-quarantine-release">
+            <mailet match="All" class="Stats">
+                <name>post-quarantine-release</name>
+                <log> Message was released from quarantine </log>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> post-dlp </processor>
+            </mailet>
+        </processor>
+
+        <!-- 
+            The processor used when email is released from quarantine with force encryption.
+            
+            !!! Note: if moved or renamed make sure you also rename the processor in the soap 
+            spring config (see quarantineMailRepositoryWSBean)!   
+        -->
+        <processor name="post-quarantine-force-encrypt">
+            <mailet match="All" class="Stats">
+                <name>post-quarantine-force-encrypt</name>
+                <log> Message was released from quarantine with "release encrypted" </log>
+            </mailet>
+
+            <mailet match="All" class="SetAttributes">
+                <log> The DLP engine has flagged the message as "must encrypt" </log>
+                <runtime.mustEncrypt> true </runtime.mustEncrypt>
+            </mailet>
+                        
+            <mailet match="All" class="GotoProcessor">
+                <processor> post-dlp </processor>
+            </mailet>
+        </processor>
+
+        <!-- 
+            The processor used when email is released from quarantine as-is.
+            
+            !!! Note: if moved or renamed make sure you also rename the processor in the soap 
+            spring config (see quarantineMailRepositoryWSBean)!   
+        -->
+        <processor name="post-quarantine-send-as-is">
+            <mailet match="All" class="Stats">
+                <name>post-quarantine-send-as-is</name>
+                <log> Message was released from quarantine with "release as-is" </log>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> transport </processor>
+            </mailet>
+        </processor>
+            
+        <!-- 
+            !!! Note: if moved or renamed make sure you also rename the processor in dlp.xml !!! 
+        -->
+        <processor name="post-dlp">
+            <mailet match="IsSMIME=matchOnError=false,encrypted" class="GotoProcessor">
+                <log> message is already S/MIME encrypted </log>
+                <processor> dkim-sign </processor>
+            </mailet>            
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='mandatory'" 
+                    class="SetAttributes">
+                <log> Encrypt mode is mandatory for the sender </log>
+                <runtime.mustEncrypt> true </runtime.mustEncrypt>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='mandatory'" 
+                    class="SetAttributes">
+                <log> Encrypt mode is mandatory for the recipient(s) </log>
+                <runtime.mustEncrypt> true </runtime.mustEncrypt>
+            </mailet>
+            
+            <mailet match="IsCalendar=matchOnError=false" class="GotoProcessor">
+                <log> Message is a calendar message </log>
+                <processor> calendar-message </processor>
+            </mailet>
+                        
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-subject-trigger </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="calendar-message">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.skipCalendar}!='true'" 
+                    class="GotoProcessor">
+                <log> "skip calendar" is disabled for the sender </log>
+                <processor> check-subject-trigger </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.skipCalendar}!='true'" 
+                    class="GotoProcessor">
+                <log> "skip calendar" is disabled for the recipient </log>
+                <processor> check-subject-trigger </processor>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <log> Message will not be futher processed and sent as is </log>
+                <processor> dkim-sign </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="check-subject-trigger">
+            <!-- check if the sender is allowed to trigger encryption using the subject -->
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.subjectTriggerEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> "subject trigger" is disabled for the sender </log>
+                <processor> check-force-encrypt-header </processor>
+            </mailet>
+                                                
+            <mailet match="SenderSubjectTrigger=matchOnError=false" class="GotoProcessor">
+                <log> The subject contains the "must encrypt" trigger for the sender and will therefore be encrypted </log>
+                <processor> sender-subject-trigger </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-force-encrypt-header </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-force-encrypt-header">          
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.forceEncryptAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> "force encrypt header trigger" is disabled for the sender </log>
+                <processor> check-encrypt-mode </processor>
+            </mailet>
+
+            <mailet match="SenderHeaderTrigger=matchOnError=false,user.forceEncryptHeaderTrigger" 
+                    class="SetAttributes">
+                <log> Force encrypt header detected. The message will therefore be encrypted </log>
+                <runtime.mustEncrypt> true </runtime.mustEncrypt>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-encrypt-mode </processor>
+            </mailet>
+        </processor>
+
+        <processor name="sender-subject-trigger">          
+            <mailet match="All" class="SetAttributes">
+                <runtime.mustEncrypt> true </runtime.mustEncrypt>
+            </mailet>
+            
+            <!-- check if the sender is allowed to add a telephone number to the subject -->
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.smsPhoneNumberSetAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> "phone number on the subject" is not allowed for the sender </log>
+                <processor> check-encrypt-mode </processor>
+            </mailet>
+            
+            <mailet match="SubjectPhoneNumber=matchOnError=false" class="GotoProcessor">
+                <log> Subject contains phone number </log>
+                <processor> phone-number-in-subject </processor>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-encrypt-mode </processor>
+            </mailet>
+        </processor>
+
+        <processor name="phone-number-in-subject">          
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{mail.recipients.size}==1" 
+                    class="GotoProcessor">
+                <log> The message has one recipient </log>
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+            
+            <!-- 
+              There is more than 1 recipient. This is not supported because we do not know to which recipient
+              the phone number in the subject belongs. We will therefore bounce the message. We will set
+              djigzo.message so the bounce will contain some more info about the bounce   
+            -->            
+            <mailet match="All" class="SetAttributes">
+                <log> The message has more than one recipient and can therefore not be ecrypted with SMS password </log>
+                <djigzo.message> The message has more than one recipient. </djigzo.message>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> notify-sender-not-encrypted </processor>
+            </mailet>
+        </processor>
+        
+        <processor name="check-encrypt-mode">          
+            <mailet match="MailAttributeEvaluator=matchOnError=false,#{runtime.mustEncrypt}=='true'" 
+                    class="GotoProcessor">
+                <log> must encrypt mail attribute is set </log>
+                <processor> check-smime </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='force'" 
+                    class="GotoProcessor">
+                <log> "encrypt mode" is "Allow (sender or recipient)" for the sender </log>
+                <processor> check-smime </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='force'" 
+                    class="GotoProcessor">
+                <log> "encrypt mode" is "Allow (sender or recipient)" for the recipient(s) </log>
+                <processor> check-smime </processor>
+            </mailet>
+            
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='noEncryption'" 
+                    class="GotoProcessor">
+                <log> "encrypt mode" is "no encryption" for the sender </log>
+                <processor> check-must-encrypt </processor>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.encryptMode}=='noEncryption'" 
+                    class="GotoProcessor">
+                <log> "encrypt mode" is "no encryption" for the recipient(s) </log>
+                <processor> check-must-encrypt </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-smime </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-smime">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.sMIMEEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> S/MIME is disabled for the sender </log>
+                <processor> check-pgp </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> S/MIME is disabled for the recipient(s) </log>
+                <processor> check-pgp </processor>
+            </mailet>
+
+            <mailet match="SenderIsSMIMESkipCalendar=matchOnError=false,skipSMIME" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME for calendar" is enabled for the sender </log>
+                <processor> check-pgp </processor>
+            </mailet>
+
+            <mailet match="RecipientIsSMIMESkipCalendar=matchOnError=false,skipSMIME" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME for calendar" is enabled for the recipient(s) </log>
+                <processor> check-pgp </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.maxSizeSMIME}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds senders S/MIME max size </log>
+                <processor> check-pgp </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.maxSizeSMIME}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds recipient(s) S/MIME max size </log>
+                <processor> check-pgp </processor>
+            </mailet>
+                        
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-retrieve-certificates </processor>
+            </mailet>
+        </processor>
+
+        <!-- Can be overridden by end users to get certificates from an external location -->
+        <processor name="smime-retrieve-certificates">
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-check-valid-recipient-certificates </processor>
+            </mailet>
+        </processor>
+
+        <!-- Should be called by smime-retrieve-certificates override after handling  -->
+        <processor name="post-smime-retrieve-certificates">
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-check-valid-recipient-certificates </processor>
+            </mailet>
+        </processor>
+
+        <processor name="smime-check-valid-recipient-certificates">
+            <mailet match="RecipientHasCertificates=matchOnError=false" class="GotoProcessor">
+                <log> There are valid S/MIME encryption certificates for the recipient(s) </log>
+                <processor> smime </processor>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> There are no valid S/MIME encryption certificates for the recipient(s) </comment>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pgp </processor>
+            </mailet>
+        </processor>
+           
+        <processor name="smime">
+            <mailet match="IsSenderNotLicensed=matchOnError=false,licenseChecker" class="GotoProcessor">
+                <log> Sender is not licensed to use encryption. </log>
+                <logLevel> WARN </logLevel>
+                <processor> check-must-encrypt </processor>
+            </mailet>
+
+            <mailet match="IsSMIME=matchOnError=false,signed" class="GotoProcessor">
+                <log> message is already signed </log>
+                <processor> setup-smime-encryption </processor>
+            </mailet>            
+
+            <mailet match="SenderIsSMIMESkipCalendar=matchOnError=false,skipSMIMEBoth" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME signing for calendar" is enabled for the sender </log>
+                <processor> setup-smime-encryption </processor>
+            </mailet>
+
+            <mailet match="RecipientIsSMIMESkipCalendar=matchOnError=false,skipSMIMEBoth" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME signing for calendar" is enabled for the recipient(s) </log>
+                <processor> setup-smime-encryption </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.autoRequestCertificate}=='true'" 
+                    class="RequestSenderCertificate">
+                <log> Check for sender signing certificate and request one if required </log>
+                <!-- If sender already has a valid signing certificate or a request is pending do not request another -->
+                <skipIfAvailable>true</skipIfAvailable>
+                <!-- Add the user object if a certificate was requested for the sender -->
+                <addUser>true</addUser>
+            </mailet>
+
+            <!-- Check for the signing algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA256WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA256WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA1WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA1WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA384WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA384WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA512WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA512WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='RIPEMD160WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> RIPEMD160WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA1WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA1WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA256WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA256WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA384WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA384WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA512WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA512WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign </processor>                                     
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> no matching S/MIME signing algorithm found. Using default SHA1. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-sign </processor>
+            </mailet>
+        </processor>
+
+        <processor name="smime-sign">
+            <mailet match="All" class="SMIMESign">
+                <log> Trying to S/MIME sign the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <algorithm> SHA1WITHRSA </algorithm>
+                <algorithmAttribute> runtime.smime.signingAlgorithm </algorithmAttribute>
+                <signMode> clear </signMode>
+                <!-- Warn: Outlook express does not like a from protected header -->
+                <!-- 
+                <protectedHeader> subject </protectedHeader>
+                 -->
+                <!-- If true the deprecated x-pkcs7-* headers will be used instead of pkcs7-* -->
+                <useDeprecatedContentTypes> false </useDeprecatedContentTypes>                
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> setup-smime-encryption </processor>
+            </mailet>
+        </processor>
+
+        <processor name="setup-smime-encryption">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.addAdditionalCerts}=='true'" 
+                    class="SenderAddAdditionalCertificates">
+                <log> Adding additional certificates of the sender </log>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.addAdditionalCerts}=='true'" 
+                    class="RecipientAddAdditionalCertificates">
+                <log> Adding additional certificates of the recipient(s)</log>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEProtectHeaders}=='true'"
+                    class="MailAttributes">
+                <log> Recipient(s) have "S/MIME protect headers" enabled. Adding protected headers </log>
+                
+                <!-- 
+                    add certain headers to the encrypted CMS so CipherMail for Android has access to the headers 
+                -->                
+                <add>djigzo.protectedHeaders=subject</add>             
+                <add>djigzo.protectedHeaders=to</add>             
+                <add>djigzo.protectedHeaders=cc</add>             
+                <add>djigzo.protectedHeaders=reply-to</add>             
+                <add>djigzo.protectedHeaders=from</add>             
+            </mailet>
+
+            <!-- Check for the encryption scheme's -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionScheme}=='RSAES-PKCS1-v1_5'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionScheme> RSAES-PKCS1-v1_5 </runtime.smime.encryptionScheme>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionScheme}=='RSAES-OAEP-SHA1'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionScheme> RSAES-OAEP-SHA1 </runtime.smime.encryptionScheme>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionScheme}=='RSAES-OAEP-SHA256'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionScheme> RSAES-OAEP-SHA256 </runtime.smime.encryptionScheme>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionScheme}=='RSAES-OAEP-SHA384'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionScheme> RSAES-OAEP-SHA384 </runtime.smime.encryptionScheme>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionScheme}=='RSAES-OAEP-SHA512'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionScheme> RSAES-OAEP-SHA512 </runtime.smime.encryptionScheme>
+            </mailet>
+                 
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='3DES'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> 3DES </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='AES128'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> AES128 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='AES256'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> AES256 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='AES192'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> AES192 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='RC2'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> RC2 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='CAST5'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> CAST5 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='SEED'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> SEED </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='CAMELLIA128'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> CAMELLIA128 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='CAMELLIA256'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> CAMELLIA256 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEncryptionAlgorithm}=='CAMELLIA192'"
+                    class="SetAttributes">
+                <runtime.smime.encryptionAlgorithm> CAMELLIA192 </runtime.smime.encryptionAlgorithm>
+                <processor> smime-encrypt </processor>                                     
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> no matching S/MIME encryption algorithm found. Using default 3DES. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+                                                                    
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-encrypt </processor>
+            </mailet>
+        </processor>
+
+        <processor name="smime-encrypt">
+            <mailet match="All" class="SMIMEEncrypt">
+                <log> Trying to S/MIME encrypt the message </log>
+                <!--
+                    The default encryption algorithm if the algorithmAttribute does not specify an encryption algorithm
+                -->
+                <algorithm> 3DES </algorithm>
+                <algorithmAttribute> runtime.smime.encryptionAlgorithm </algorithmAttribute>
+
+                <!--
+                    The default encryption scheme if the encryptionSchemeAttribute does not specify an encryption scheme
+                -->
+                <encryptionScheme> RSAES-PKCS1-v1_5 </encryptionScheme>
+                <encryptionSchemeAttribute> runtime.smime.encryptionScheme </encryptionSchemeAttribute>
+
+                <!-- 
+                <protectedHeader> subject </protectedHeader>
+                 -->
+                <!-- If true the deprecated x-pkcs7-* headers will be used instead of pkcs7-* -->
+                <useDeprecatedContentTypes> false </useDeprecatedContentTypes>
+                <!-- 
+                    the next processor after the message has been encrypted 
+                -->
+                <encryptedProcessor> post-smime-encryption </encryptedProcessor>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> S/MIME encryption failed. Trying PGP. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pgp </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="post-smime-encryption">
+            <mailet match="All" class="Stats">
+                <name>outgoing-smime-encrypted</name>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> encryption-notification </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="check-pgp">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.pgp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> PGP is disabled for the sender </log>
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> PGP is disabled for the recipient(s) </log>
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pgp.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds senders PGP max size </log>
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pgp.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds recipient(s) PGP max size </log>
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-retrieve-keys </processor>
+            </mailet>
+        </processor>
+
+        <!-- Can be overridden by end users to get keys from an external location -->
+        <processor name="pgp-retrieve-keys">
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-check-valid-keys </processor>
+            </mailet>
+        </processor>
+
+        <!-- Should be called by pgp-retrieve-keys override after handling -->
+        <processor name="post-pgp-retrieve-keys">
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-check-valid-keys </processor>
+            </mailet>
+        </processor>
+
+        <processor name="pgp-check-valid-keys">                        
+            <mailet match="RecipientHasPGPPublicKeys=matchOnError=false" class="GotoProcessor">
+                <log> There are valid PGP encryption keys for recipient(s) </log>
+                <processor> pgp-setup-signing </processor>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> There are no valid PGP encryption keys for recipient(s) </comment>
+            </mailet>
+
+            <!-- No PGP encryption since the recipient does not have a PGP key for encryption. Try PDF encryption -->            
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pdf-encrypt </processor>
+            </mailet>
+        </processor>
+
+        <processor name="pgp-setup-signing">
+            <mailet match="IsSenderNotLicensed=matchOnError=false,licenseChecker" class="GotoProcessor">
+                <log> Sender is not licensed to use encryption. </log>
+                <logLevel> WARN </logLevel>
+                <processor> check-must-encrypt </processor>
+            </mailet>
+        
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.pgp.autoRequestKey}=='true'" 
+                    class="RequestSenderPGPKey">
+                <log> Check for sender PGP key and request one if required </log>
+                <!-- If sender already has a valid key do not request another -->
+                <skipIfAvailable>true</skipIfAvailable>
+                <!-- Add the user object if a key was requested for the sender -->
+                <addUser>true</addUser>
+            </mailet>
+
+            <!-- Check for the signing algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA256'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA256 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-setup-compression </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='RIPEMD160'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> RIPEMD160 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-setup-compression </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA512'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA512 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-setup-compression </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA1'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA1 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-setup-compression </processor>                                     
+            </mailet>
+            
+            <mailet match="All" class="Log">
+                <comment> no matching PGP signing algorithm found. Using default SHA256. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-setup-compression </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="pgp-setup-compression">
+            <!-- Check for the compression algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.compressionAlgorithm}=='ZLIB'"
+                    class="SetAttributes">
+                <runtime.pgp.compressionAlgorithm> ZLIB </runtime.pgp.compressionAlgorithm>
+                <processor> pgp-setup-encryption </processor>                                     
+            </mailet>
+            
+            <!-- Check for the compression algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.compressionAlgorithm}=='UNCOMPRESSED'"
+                    class="SetAttributes">
+                <runtime.pgp.compressionAlgorithm> UNCOMPRESSED </runtime.pgp.compressionAlgorithm>
+                <processor> pgp-setup-encryption </processor>                                     
+            </mailet>
+            
+            <!-- Check for the compression algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.compressionAlgorithm}=='BZIP2'"
+                    class="SetAttributes">
+                <runtime.pgp.compressionAlgorithm> BZIP2 </runtime.pgp.compressionAlgorithm>
+                <processor> pgp-setup-encryption </processor>                                     
+            </mailet>
+            
+            <!-- Check for the compression algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.compressionAlgorithm}=='ZIP'"
+                    class="SetAttributes">
+                <runtime.pgp.compressionAlgorithm> ZIP </runtime.pgp.compressionAlgorithm>
+                <processor> pgp-setup-encryption </processor>                                     
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> no matching PGP compression algorithm found. Using default ZLIB. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-setup-encryption </processor>
+            </mailet>            
+        </processor>
+        
+        <processor name="pgp-setup-encryption">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pgp.addIntegrityPacket}!='true'" 
+                    class="SetAttributes">
+                <log> An integrity packet will not be added </log>
+                <runtime.pgp.addIntegrityPacket> false </runtime.pgp.addIntegrityPacket>
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='AES_128'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> AES_128 </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='AES_192'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> AES_192 </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='AES_256'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> AES_256 </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='CAST5'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> CAST5 </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='TWOFISH'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> TWOFISH </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='BLOWFISH'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> BLOWFISH </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+            
+            <!-- Check for the encryption algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encryptionAlgorithm}=='TRIPLE_DES'"
+                    class="SetAttributes">
+                <runtime.pgp.encryptionAlgorithm> TRIPLE_DES </runtime.pgp.encryptionAlgorithm>
+                <processor> pgp-check-encoding </processor>                                     
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> no matching PGP encryption algorithm found. Using default AES 128. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-check-encoding </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="pgp-check-encoding">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encoding}=='PGP_INLINE'"
+                    class="GotoProcessor">
+                <processor> pgp-inline </processor>                                     
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-mime-sign </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="pgp-mime-sign">
+            <mailet match="All" class="PGPMIMESign">
+                <log> Trying to PGP/MIME sign the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <signingAlgorithm> SHA256 </signingAlgorithm>
+                <signingAlgorithmAttribute> runtime.pgp.signingAlgorithm </signingAlgorithmAttribute>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-mime-encrypt </processor>
+            </mailet>            
+        </processor>
+                
+        <processor name="pgp-mime-encrypt">
+            <mailet match="All" class="PGPMIMEEncrypt">
+                <log> Trying to PGP/MIME encrypt the message </log>
+                <!-- 
+                    The default encryption algorithm if the attribute does not specify an encryption algorithm.
+                -->
+                <encryptionAlgorithm> AES_128 </encryptionAlgorithm>
+                <encryptionAlgorithmAttribute> runtime.pgp.encryptionAlgorithm </encryptionAlgorithmAttribute>
+
+                <!-- 
+                    The default compression algorithm if the attribute does not specify a compression algorithm.
+                -->
+                <compressionAlgorithm> ZLIB </compressionAlgorithm>
+                <compressionAlgorithmAttribute> runtime.pgp.compressionAlgorithm </compressionAlgorithmAttribute>
+                
+                <!-- 
+                    By default, add an integrity packet
+                -->
+                <addIntegrityPacket> true </addIntegrityPacket>
+                <addIntegrityPacketAttribute> runtime.pgp.addIntegrityPacket </addIntegrityPacketAttribute>
+                
+                <!-- 
+                    the next processor after the message has been encrypted 
+                -->
+                <encryptedProcessor> post-pgp-mime-encryption </encryptedProcessor>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> PGP/MIME encryption failed. Trying PDF. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pdf-encrypt </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="post-pgp-mime-encryption">
+            <mailet match="All" class="Stats">
+                <name>outgoing-pgp-encrypted</name>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> encryption-notification </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="pgp-inline">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pgp.convertHTMLToText}!='true'" 
+                    class="SetAttributes">
+                <log> HTML parts will not be converted to text </log>
+                <runtime.pgp.convertHTMLToText> false </runtime.pgp.convertHTMLToText>
+            </mailet>
+            
+            <mailet match="All" class="PGPInlineBuilder">
+                <log> Trying to PGP/INLINE encrypt the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <signingAlgorithm> SHA256 </signingAlgorithm>
+                <signingAlgorithmAttribute> runtime.pgp.signingAlgorithm </signingAlgorithmAttribute>
+                <!-- 
+                    The default encryption algorithm if the attribute does not specify an encryption algorithm.
+                -->
+                <encryptionAlgorithm> AES_128 </encryptionAlgorithm>
+                <encryptionAlgorithmAttribute> runtime.pgp.encryptionAlgorithm </encryptionAlgorithmAttribute>
+
+                <!-- 
+                    The default compression algorithm if the attribute does not specify a compression algorithm.
+                -->
+                <compressionAlgorithm> ZLIB </compressionAlgorithm>
+                <compressionAlgorithmAttribute> runtime.pgp.compressionAlgorithm </compressionAlgorithmAttribute>
+                
+                <!-- 
+                    By default, add an integrity packet
+                -->
+                <addIntegrityPacket> true </addIntegrityPacket>
+                <addIntegrityPacketAttribute> runtime.pgp.addIntegrityPacket </addIntegrityPacketAttribute>
+                
+                <!-- 
+                    By default, convert HTML parts to text
+                -->
+                <convertHTMLToText> true </convertHTMLToText>
+                <convertHTMLToTextAttribute> runtime.pgp.convertHTMLToText </convertHTMLToTextAttribute>
+                                
+                <!-- 
+                    the next processor after the message has been encrypted 
+                -->
+                <encryptedProcessor> post-pgp-inline-encryption </encryptedProcessor>
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> PGP/INLINE encryption failed. Trying PDF. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pdf-encrypt </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="post-pgp-inline-encryption">
+            <mailet match="All" class="Stats">
+                <name>outgoing-pgp-encrypted</name>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> encryption-notification </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="check-pdf-encrypt">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.pdf.encryptionAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> PDF encryption is disabled for the sender </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pdf.encryptionAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> PDF encryption is disabled for the recipient(s) </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.pdf.onlyEncryptIfMandatory}=='true' &amp;&amp; #{mail.attribute.runtime.mustEncrypt}!='true'" 
+                    class="GotoProcessor">
+                <log> "only PDF encrypt if mandatory" is enabled for the sender but "must encrypt" is not set. PDF encryption will be skipped </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pdf.onlyEncryptIfMandatory}=='true' &amp;&amp; #{mail.attribute.runtime.mustEncrypt}!='true'" 
+                    class="GotoProcessor">
+                <log> "only PDF encrypt if mandatory" is enabled for the recipient(s) but "must encrypt" is not set. PDF encryption will be skipped </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> setup-pdf-encrypt </processor>
+            </mailet>
+        </processor>
+
+        <processor name="setup-pdf-encrypt">
+            <mailet match="IsSenderNotLicensed=matchOnError=false,licenseChecker" class="GotoProcessor">
+                <log> Sender is not licensed to use encryption. </log>
+                <logLevel> WARN </logLevel>
+                <processor> check-must-encrypt </processor>
+            </mailet>
+        
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pdf.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds senders PDF max size </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pdf.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds recipient(s) PDF max size </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+                        
+            <mailet match="HasValidPassword=matchOnError=false" class="GotoProcessor">
+                <log> Recipient(s) have valid PDF passwords </log>
+                <processor> pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.passwordsSendToOriginator}!='true'" 
+                    class="GotoProcessor">
+                <log> "passwords send to originator" is disabled for the sender </log>
+                <processor> check-otp </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.passwordsSendToOriginator}!='true'" 
+                    class="GotoProcessor">
+                <log> "passwords send to originator" is disabled for the recipient(s) </log>
+                <processor> check-otp </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> generate-passwords-send-to-originator </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-otp">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.otpEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> OTP is disabled for the sender </log>
+                <processor> check-sms </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.otpEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> OTP is disabled for the recipient(s) </log>
+                <processor> check-sms </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> otp-setup </processor>
+            </mailet>
+        </processor>
+
+        <!-- a do-nothing processor which can be overridden by add-ins -->
+        <processor name="otp-setup">
+            <mailet match="All" class="GotoProcessor">
+                <processor> otp-setup-client-secret </processor>
+            </mailet>
+        </processor>
+
+        <processor name="otp-setup-client-secret">
+            <mailet match="HasClientSecret=matchOnError=false" class="GotoProcessor">
+                <log> Client secrets are available for the recipient(s) </log>
+                <processor> otp-generate-passwords </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.autoCreateClientSecret}!='true'" 
+                    class="GotoProcessor">
+                <log> "auto create client secret" is disabled for the recipient(s) </log>
+                <processor> check-sms </processor>
+            </mailet>
+
+            <mailet match="All" class="GenerateClientSecret">
+                <log> Generating client secret(s)</log>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> otp-generate-passwords </processor>
+            </mailet>
+        </processor>
+
+        <processor name="otp-generate-passwords">
+            <mailet match="All" class="OTPPasswordGenerator">
+                <log> Generating OTP passwords </log>
+                <defaultPasswordLength> 8 </defaultPasswordLength>
+            </mailet>
+            
+            <mailet match="RecipientHasPortalPassword=matchOnError=false" class="GotoProcessor">
+                <log> Recipient has a portal password </log>
+                <processor> otp-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.portal.autoInvite}!='true'" 
+                    class="GotoProcessor">
+                <log> The "portal auto invite" is disabled for the recipient(s) </log>
+                <processor> otp-pdf-encrypt </processor>
+            </mailet>
+
+            <mailet match="All" class="CreatePortalInvitation">
+                <log> Creating invition(s) </log>
+            </mailet>            
+
+            <mailet match="All" class="PDFEncrypt">
+                <log> Message will be PDF encrypted with invite </log>
+                <template> encrypted-pdf-otp-invite.ftl </template>
+                <templateProperty> user.template.encryptedPdfOTPInvite </templateProperty>
+                <userProperty>[{"name":"user.otpURL","encrypted":"false","checkParent":"false"}]</userProperty>
+                <encryptedProcessor> post-pdf-encryption </encryptedProcessor>
+                <notEncryptedProcessor> custom-encryption </notEncryptedProcessor>
+                <passwordMode> multiple </passwordMode>
+                <retainMessageID> true </retainMessageID>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- Should only come here if PDFEcrypt had an error -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="otp-pdf-encrypt">
+            <mailet match="All" class="PDFEncrypt">
+                <log> Message will be PDF encrypted with OTP </log>
+                <template> encrypted-pdf-otp.ftl </template>
+                <templateProperty> user.template.encryptedPdfOTP </templateProperty>
+                <userProperty>[{"name":"user.otpURL","encrypted":"false","checkParent":"false"}]</userProperty>
+                <encryptedProcessor> post-pdf-encryption </encryptedProcessor>
+                <notEncryptedProcessor> custom-encryption </notEncryptedProcessor>
+                <passwordMode> multiple </passwordMode>
+                <retainMessageID> true </retainMessageID>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- Should only come here if PDFEcrypt had an error -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="check-sms">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.smsSendAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> Sending SMS messages is not allowed for the sender </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.smsReceiveAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> Receiving SMS messages is not allowed for the recipent(s) </log>
+                <processor> custom-encryption </processor>
+            </mailet>
+            
+            <mailet match="HasPhoneNumber=matchOnError=false" class="GotoProcessor">
+                <log> Recipient(s) have phone numbers </log>
+                <processor> generate-passwords-sms </processor>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>
+        </processor>
+
+        <processor name="generate-passwords-sms">
+            <mailet match="All" class="GeneratePassword">
+                <log> Generating PDF password(s) </log>
+                <randomIDBound> 10000 </randomIDBound>
+                <defaultPasswordLength> 8 </defaultPasswordLength>
+            </mailet>
+
+            <mailet match="All" class="PDFEncrypt">
+                <log> Message will be PDF encrypted </log>
+                <template> encrypted-pdf-sms.ftl </template>
+                <templateProperty> user.template.encryptedPdfSms </templateProperty>
+                <encryptedProcessor> sms-password </encryptedProcessor>
+                <notEncryptedProcessor> custom-encryption </notEncryptedProcessor>
+                <passwordMode> multiple </passwordMode>
+                <retainMessageID> true </retainMessageID>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- Should only come here if PDFEcrypt had an error -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>
+        </processor>
+
+        <processor name="generate-passwords-send-to-originator">
+            <mailet match="All" class="GeneratePassword">
+                <log> Generating password(s) </log>
+                <randomIDBound> 10000 </randomIDBound>
+                <defaultPasswordLength> 8 </defaultPasswordLength>
+            </mailet>
+
+            <mailet match="All" class="PDFEncrypt">
+                <log> Message will be PDF encrypted </log>
+                <template> encrypted-pdf.ftl </template>
+                <templateProperty> user.template.encryptedPdf </templateProperty>
+                <!-- 
+                    The generated passwords will be sent to the sender. An optional encryption notification therefore
+                    should not be sent since the passwords email is already a notification
+                -->
+                <encryptedProcessor> check-pdf-sign-email </encryptedProcessor>
+                <notEncryptedProcessor> custom-encryption </notEncryptedProcessor>
+                <passwordMode> multiple </passwordMode>
+                <retainMessageID> true </retainMessageID>
+                <passThrough> true </passThrough>
+                <passThroughProcessor> send-passwords-to-originator </passThroughProcessor>
+            </mailet>
+            
+            <!-- Should only come here if PDFEcrypt had an error -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>
+        </processor>
+        
+        <processor name="pdf-encrypt">
+            <mailet match="All" class="PDFEncrypt">
+                <log> Message will be PDF encrypted </log>
+                <template> encrypted-pdf.ftl </template>
+                <templateProperty> user.template.encryptedPdf </templateProperty>
+                <encryptedProcessor> post-pdf-encryption </encryptedProcessor>
+                <notEncryptedProcessor> custom-encryption </notEncryptedProcessor>
+                <passwordMode> multiple </passwordMode>
+                <retainMessageID> true </retainMessageID>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- Should only come here if PDFEcrypt had an error -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-encryption </processor>
+            </mailet>
+        </processor>
+
+        <processor name="sms-password">
+            <mailet match="All" class="SenderTemplatePropertySMSPassword">
+                <log> SMS'ing passwords </log>
+                <template> sms.ftl </template>
+                <templateProperty> user.template.smsPassword </templateProperty>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> post-pdf-encryption </processor>
+            </mailet>
+        </processor>
+
+        <processor name="send-passwords-to-originator">
+            <!-- If the sender does not have a valid originator email address we cannot send the notification -->
+            <mailet match="IsMailAttributeNotSet=matchOnError=false,runtime.originator" class="GotoProcessor">
+                <log> Sender has no valid originator so the passwords notification cannot be sent </log>
+                <logLevel> WARN </logLevel>
+                <processor> ghost </processor>
+            </mailet>
+           
+            <mailet match="All" class="Notify">
+                <log> Sending password notification message </log>
+                <template> passwords-notification.ftl </template>
+                <templateProperty> user.template.passwordsNotification </templateProperty>
+                <subject> ${sameAsMessage} </subject>
+                <recipients> ${runtime.originator} </recipients>
+                <sender> #{user.system.email.sender} </sender>
+                <to> ${sameAsRecipients} </to>
+                <from> #{user.system.email.from} </from>
+                <processor> transport-auto-submitted </processor>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- should not happen. Can happen if template contains errors -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> error </processor>
+            </mailet>
+        </processor>
+
+        <processor name="post-pdf-encryption">
+            <!-- 
+                Set a runtime attribute that encryption notification might be enabled. Whether or not an encryption
+                notification is really sent depends on additional settings
+            -->
+            <mailet match="All" class="SetAttributes">
+                <runtime.encryptionNotification> true </runtime.encryptionNotification>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pdf-sign-email </processor>
+            </mailet>
+        </processor>
+                     
+        <processor name="check-pdf-sign-email">
+            <!-- check-pdf-sign-email will always be called after PDF encryption so we can set stats for PDF here -->
+            <mailet match="All" class="Stats">
+                <name>outgoing-pdf-encrypted</name>
+            </mailet>
+                
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.pdf.signEmail}!='true'" 
+                    class="GotoProcessor">
+                <log> "PDF sign email" is disabled for the sender </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pdf.signEmail}!='true'" 
+                    class="GotoProcessor">
+                <log> "PDF sign email" is disabled for the recipient(s) </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> setup-smime-sign-only </processor>
+            </mailet>
+        </processor>
+                             
+        <processor name="check-must-encrypt">
+            <mailet match="MailAttributeEvaluator=matchOnError=false,#{runtime.mustEncrypt}=='true'" 
+                    class="GotoProcessor">
+                <log> "must encrypt" is set but message was not encrypted </log>
+                <processor> notify-sender-not-encrypted </processor>
+            </mailet>
+
+            <!-- check if there was a delayed DLP policy violation -->
+            <mailet match="MailAttributeEvaluator=matchOnError=false,#{runtime.dlp.delayEvaluation}=='true'" 
+                    class="GotoProcessor">
+                <log> Delayed evaluation of the policy violation is set. Handle DLP violation. </log>
+                <logLevel> WARN </logLevel>
+                <processor> post-dlp-delayed-evaluation </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> no-encrypt-check-sign-only </processor>
+            </mailet>
+        </processor>
+
+        <processor name="no-encrypt-check-sign-only">
+            <mailet match="IsSMIME=matchOnError=false,signed" class="GotoProcessor">
+                <log> message is already S/MIME signed </log>
+                <processor> dkim-sign </processor>
+            </mailet>            
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.forceSigningAllowed}!='true'" 
+                    class="GotoProcessor">
+                <log> Force signing header not allowed for sender </log>
+                <processor> check-sign-subject-trigger </processor>
+            </mailet>
+
+            <mailet match="SenderHeaderTrigger=matchOnError=false,user.forceSigningHeaderTrigger" 
+                    class="GotoProcessor">
+                <log> The headers contain the "sign" trigger for the sender. Sign only is enabled </log>
+                <processor> setup-smime-sign-only </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-sign-subject-trigger </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-sign-subject-trigger">
+            <!-- check if the sender is allowed to trigger signing using the subject -->
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.signSubjectTriggerEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> "sign subject trigger" is disabled for the sender </log>
+                <processor> check-sign-only </processor>
+            </mailet>
+            
+            <mailet match="SenderSignSubjectTrigger=matchOnError=false" class="GotoProcessor">
+                <log> The subject contains the "sign" trigger for the sender. Sign only is enabled </log>
+                <processor> setup-smime-sign-only </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-sign-only </processor>
+            </mailet>
+        </processor>
+                    
+        <processor name="check-sign-only">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.onlySignWhenEncrypt}=='true'" 
+                    class="GotoProcessor">
+                <log> "only sign when encrypt" is enabled for the sender. Signing will be skipped </log>
+                <processor> dkim-sign </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.onlySignWhenEncrypt}=='true'" 
+                    class="GotoProcessor">
+                <log> "only sign when encrypt" is enabled for the recipient(s). Signing will be skipped </log>
+                <processor> dkim-sign </processor>
+            </mailet>
+                        
+            <mailet match="All" class="GotoProcessor">
+                <processor> setup-smime-sign-only </processor>
+            </mailet>
+        </processor>
+
+        <processor name="setup-smime-sign-only">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.sMIMEEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> S/MIME is disabled for the sender </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.sMIMEEnabled}!='true'" 
+                    class="GotoProcessor">
+                <log> S/MIME is disabled for the recipient(s) </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+        
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.maxSizeSMIME}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds senders S/MIME max size </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.maxSizeSMIME}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds recipient(s) S/MIME max size </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+            
+            <mailet match="SenderIsSMIMESkipCalendar=matchOnError=false,skipSMIMEBoth" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME signing for calendar" is enabled for the sender </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+
+            <mailet match="RecipientIsSMIMESkipCalendar=matchOnError=false,skipSMIMEBoth" class="GotoProcessor">
+                <log> Message is a text/calendar message and "skip S/MIME signing for calendar" is enabled for the recipient(s) </log>
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+            
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.autoRequestCertificate}=='true'" 
+                    class="RequestSenderCertificate">
+                <log> Check for sender signing certificate and request one if required </log>
+                <!-- If sender already has a valid signing certificate or a request is pending do not request another -->
+                <skipIfAvailable>true</skipIfAvailable>
+                <!-- Add the user object if a certificate was requested for the sender -->
+                <addUser>true</addUser>
+            </mailet>
+
+            <!-- Check for the signing algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA256WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA256WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA1WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA1WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA512WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA512WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='RIPEMD160WithRSAEncryption'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> RIPEMD160WithRSAEncryption </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA1WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA1WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA256WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA256WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA384WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA384WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMESigningAlgorithm}=='SHA512WithRSAAndMGF1'"
+                    class="SetAttributes">
+                <runtime.smime.signingAlgorithm> SHA512WithRSAAndMGF1 </runtime.smime.signingAlgorithm>
+                <processor> smime-sign-only </processor>                                     
+            </mailet>
+
+            <mailet match="All" class="Log">
+                <comment> no matching S/MIME signing algorithm found. Using default SHA1. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+                        
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-sign-only </processor>
+            </mailet>
+        </processor>
+                
+        <processor name="smime-sign-only">
+            <mailet match="All" class="SMIMESign">
+                <log> Trying to S/MIME sign the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <algorithm> SHA1WITHRSA </algorithm>
+                <algorithmAttribute> runtime.smime.signingAlgorithm </algorithmAttribute>
+                <signMode> clear </signMode>
+                <!-- Warn: Outlook express does not like a from protected header -->
+                <!-- 
+                <protectedHeader> subject </protectedHeader>
+                 -->
+                <!-- If true the deprecated x-pkcs7-* headers will be used instead of pkcs7-* -->
+                <useDeprecatedContentTypes> false </useDeprecatedContentTypes>
+                <!-- Next transport after the message has been signed -->
+                <signedProcessor> check-encryption-notification </signedProcessor>
+            </mailet>
+            
+            <!-- the message was not S/MIME signed -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pgp-sign-only </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-pgp-sign-only">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.pgp.skipSignOnly}=='true'" 
+                    class="GotoProcessor">
+                <log> PGP sign only is disabled for the sender </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.skipSignOnly}=='true'" 
+                    class="GotoProcessor">
+                <log> PGP sign only is disabled for the recipient(s) </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.pgp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> PGP is disabled for the sender </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> PGP is disabled for the recipient(s) </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pgp.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds senders PGP max size </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{mail.size}>toFloat(#{user.pgp.maxSize}, 52428800)" 
+                    class="GotoProcessor">
+                <log> Mail size exceeds recipient(s) PGP max size </log>
+                <processor> check-encryption-notification </processor>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> setup-pgp-sign-only </processor>
+            </mailet>            
+        </processor>
+
+        <processor name="setup-pgp-sign-only">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.pgp.autoRequestKey}=='true'" 
+                    class="RequestSenderPGPKey">
+                <log> Check for sender PGP key and request one if required </log>
+                <!-- If sender already has a valid key do not request another -->
+                <skipIfAvailable>true</skipIfAvailable>
+                <!-- Add the user object if a key was requested for the sender -->
+                <addUser>true</addUser>
+            </mailet>
+
+            <!-- Check for the signing algorithms from most likely to less likely (for optimization) -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA256'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA256 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-sign-only-check-encoding </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='RIPEMD160'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> RIPEMD160 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-sign-only-check-encoding </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA512'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA512 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-sign-only-check-encoding </processor>                                     
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.signingAlgorithm}=='SHA1'"
+                    class="SetAttributes">
+                <runtime.pgp.signingAlgorithm> SHA1 </runtime.pgp.signingAlgorithm>
+                <processor> pgp-sign-only-check-encoding </processor>                                     
+            </mailet>
+            
+            <mailet match="All" class="Log">
+                <comment> no matching PGP signing algorithm found. Using default SHA256. </comment>
+                <logLevel> WARN </logLevel>
+            </mailet>                                             
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-sign-only-check-encoding </processor>
+            </mailet>
+        </processor>
+
+        <processor name="pgp-sign-only-check-encoding">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.encoding}=='PGP_INLINE'"
+                    class="GotoProcessor">
+                <processor> pgp-sign-only-inline </processor>                                     
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-sign-only-mime </processor>
+            </mailet>
+        </processor>
+                                          
+        <processor name="pgp-sign-only-mime">
+            <mailet match="All" class="PGPMIMESign">
+                <log> Trying to PGP/MIME sign the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <signingAlgorithm> SHA256 </signingAlgorithm>
+                <signingAlgorithmAttribute> runtime.pgp.signingAlgorithm </signingAlgorithmAttribute>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-encryption-notification </processor>
+            </mailet>            
+        </processor>
+                     
+        <processor name="pgp-sign-only-inline">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.pgp.convertHTMLToText}!='true'" 
+                    class="SetAttributes">
+                <log> HTML parts will not be converted to text </log>
+                <runtime.pgp.convertHTMLToText> false </runtime.pgp.convertHTMLToText>
+            </mailet>
+            
+            <mailet match="All" class="PGPInlineBuilder">
+                <log> Trying to PGP/INLINE sign the message </log>
+                <!-- 
+                    The default signing algorithm if the algorithmAttribute does not specify a signing algorithm.
+                -->
+                <signingAlgorithm> SHA256 </signingAlgorithm>
+                <signingAlgorithmAttribute> runtime.pgp.signingAlgorithm </signingAlgorithmAttribute>
+                <!-- 
+                    The encryption algorithm
+                -->
+                <encryptionAlgorithm> NULL </encryptionAlgorithm>
+
+                <!-- 
+                    The compression algorithm
+                -->
+                <compressionAlgorithm> UNCOMPRESSED </compressionAlgorithm>
+                
+                <!-- 
+                    By default, convert HTML parts to text
+                -->
+                <convertHTMLToText> true </convertHTMLToText>
+                <convertHTMLToTextAttribute> runtime.pgp.convertHTMLToText </convertHTMLToTextAttribute>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-encryption-notification </processor>
+            </mailet>            
+        </processor>
+                                                
+        <processor name="check-encryption-notification">
+            <!-- check if the encryption notification runtime attribute was set -->        
+            <mailet match="MailAttributeEvaluator=matchOnError=false,#{runtime.encryptionNotification}=='true'" 
+                    class="GotoProcessor">
+                <processor> encryption-notification </processor>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> dkim-sign </processor>
+            </mailet>
+        </processor>
+        
+        <processor name="encryption-notification">
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.sendEncryptionNotification}!='true'"
+                    class="GotoProcessor">
+                <log> "encryption notification" is disabled for the sender </log>
+                <processor> dkim-sign </processor>
+            </mailet>
+            
+            <!-- If the sender does not have a valid originator email address we cannot send the notification -->
+            <mailet match="IsMailAttributeNotSet=matchOnError=false,runtime.originator" class="GotoProcessor">
+                <log> Sender has no valid originator so notification cannot be sent </log>
+                <logLevel> WARN </logLevel>
+                <processor> dkim-sign </processor>
+            </mailet>
+            
+            <mailet match="All" class="Notify">
+                <log> Sending encryption notification </log>
+                <template> encryption-notification.ftl </template>
+                <templateProperty> user.template.encryptionNotification </templateProperty>
+                <subject> ${sameAsMessage} </subject>
+                <recipients> ${runtime.originator} </recipients>
+                <sender> #{user.system.email.sender} </sender>
+                <to> ${sameAsRecipients} </to>
+                <from> #{user.system.email.from} </from>
+                <processor> transport-auto-submitted </processor>
+                <passThrough> true </passThrough>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> dkim-sign </processor>
+            </mailet>
+        </processor>
+
+        <processor name="custom-encryption">
+            <!-- do nothing processor which can be overridden by the end user-->
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-must-encrypt </processor>
+            </mailet>
+        </processor>
+
+        <!-- should be called by the overridden custom encryption processor(s) -->
+        <processor name="post-custom-encryption">
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-must-encrypt </processor>
+            </mailet>
+        </processor>
+
+        <processor name="notify-sender-not-encrypted">
+            <mailet match="All" class="Stats">
+                <name>encryption-failed</name>
+            </mailet>
+        
+            <!-- check if the sender has quarantine on failed encryption enabled -->
+            <mailet match="SenderEvaluateUserProperty=matchOnError=true,#{user.dlp.quarantineOnFailedEncryption}=='true'" 
+                    class="GotoProcessor">
+                <log> The message will be placed in the quarantine because "quarantine on failed encryption" is enabled for the sender </log>
+                <processor> failed-encryption-quarantine </processor>
+            </mailet>
+
+            <!-- check if the recipient has quarantine on failed encryption enabled -->
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=true,#{user.dlp.quarantineOnFailedEncryption}=='true'" 
+                    class="GotoProcessor">
+                <log> The message will be placed in the quarantine because "quarantine on failed encryption" is enabled for the recipient(s) </log>
+                <processor> failed-encryption-quarantine </processor>
+            </mailet>
+
+            <!-- If the sender does not have a valid originator email address we cannot send the notification -->
+            <mailet match="IsMailAttributeNotSet=matchOnError=false,runtime.originator" class="GotoProcessor">
+                <log> Sender has no valid originator so notification cannot be sent </log>
+                <logLevel> WARN </logLevel>
+                <processor> ghost </processor>
+            </mailet>
+
+            <mailet match="All" class="Notify">
+                <log> The message could not be encrypted. The sender will be notified </log>
+                <template> encryption-failed-notification.ftl </template>
+                <templateProperty> user.template.encryptionFailedNotification </templateProperty>
+                <subject> ${sameAsMessage} </subject>
+                <recipients> ${runtime.originator} </recipients>
+                <sender> #{user.system.email.sender} </sender>
+                <to> ${sameAsRecipients} </to>
+                <from> #{user.system.email.from} </from>
+                <processor> transport-auto-submitted </processor>
+                <passThrough> false </passThrough>
+            </mailet>
+            
+            <!-- should not happen. Can happen if template contains errors -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> error </processor>
+            </mailet>
+        </processor>
+
+        <processor name="failed-encryption-quarantine">
+            <!-- 
+                The runtime.mustEncrypt must be removed before quarantine. Otherwise the email will be
+                quarantined again after release. A runtime mail attribute will be added with the reason
+                why the message has been quarantined since we cannot use the djigzo.policyViolations
+                attribute because we can only set string values.  
+             -->
+            <mailet match="All" class="MailAttributes">
+                <serialized>djigzo.policyViolations=
+                        rO0ABXNyABRqYXZhLnV0aWwuTGlua2VkTGlzdAwpU11KYIgiAwAAeHB3BAAAAAFzcgAobWl0bS5j
+                        b21tb24uZGxwLmltcGwuUG9saWN5VmlvbGF0aW9uSW1wbHSPxQFH6a6eAgAETAAFbWF0Y2h0ABJM
+                        amF2YS9sYW5nL1N0cmluZztMAAZwb2xpY3lxAH4AA0wACHByaW9yaXR5dAApTG1pdG0vY29tbW9u
+                        L2RscC9Qb2xpY3lWaW9sYXRpb25Qcmlvcml0eTtMAARydWxlcQB+AAN4cHB0AAhidWlsdCBpbn5y
+                        ACdtaXRtLmNvbW1vbi5kbHAuUG9saWN5VmlvbGF0aW9uUHJpb3JpdHkAAAAAAAAAABIAAHhyAA5q
+                        YXZhLmxhbmcuRW51bQAAAAAAAAAAEgAAeHB0AApRVUFSQU5USU5FdAAiVGhlIG1lc3NhZ2UgY291
+                        bGQgbm90IGJlIGVuY3J5cHRlZHg=
+                </serialized>
+                <delete>runtime.mustEncrypt</delete>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> dlp-quarantine </processor>
+            </mailet>
+        </processor>
+
+        <!--
+            ###   #   #  #####  #####  ####   #   #    #    #     
+             #    ##  #    #    #      #   #  ##  #   # #   #     
+             #    # # #    #    ####   ####   # # #  #   #  #     
+             #    #  ##    #    #      # #    #  ##  #####  #     
+            ###   #   #    #    #####  #  ##  #   #  #   #  ##### 
+        -->
+
+        <!-- do nothing processor which can be overridden by the end user-->
+        <processor name="custom-pre-internal">
+            <mailet match="All" class="GotoProcessor">
+                <processor> internal </processor>
+            </mailet>
+        </processor>
+
+        <processor name="internal">
+            <mailet match="All" class="Stats">
+                <name>incoming-internal</name>
+            </mailet>
+
+            <!-- remove all X-Djigzo-* headers for incoming email -->
+            <mailet match="All" class="RemoveHeaders">
+                <pattern>(?i)^X-Djigzo.*</pattern>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.removeSMIMESignature}=='true'" 
+                    class="SetAttributes">
+                <log> "remove S/MIME signature" is enabled for the recipient(s) </log>
+                <runtime.smime.removeSignature> true </runtime.smime.removeSignature>
+            </mailet>
+            
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEEStrict}=='true'" 
+                    class="SetAttributes">
+                <log> "S/MIME strict mode" is enabled for the recipient(s) </log>
+                <runtime.smime.strict> true </runtime.smime.strict>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMECheckInvalid7BitChars}=='true'" 
+                    class="SetAttributes">
+                <log> "S/MIME Check Invalid 7bit chars" is enabled for the recipient(s) </log>
+                <runtime.smime.checkInvalid7BitChars> true </runtime.smime.checkInvalid7BitChars>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.sMIMEAbortDecryptionOnInvalid7BitChars}=='true'" 
+                    class="SetAttributes">
+                <log> "S/MIME Abort Decryption On Invalid 7Bit Chars" is enabled for the recipient(s) </log>
+                <runtime.smime.abortDecryptionOnInvalid7BitChars> true </runtime.smime.abortDecryptionOnInvalid7BitChars>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.securityInfo.add}=='true'" 
+                    class="AddSecurityInfoTags">
+                <log> "add security info" is enabled for the recipient(s) </log>
+            </mailet>
+
+            <!-- 
+                We want to remove possible subject triggers from email sent from external to internal
+                to prevent an external sender, spoofing someone's email address, from triggering
+                encryption when the message is forwarded. This only works when the sender 
+                enables "Remove match". 
+            -->                                            
+            <mailet match="SenderSubjectTrigger=matchOnError=false" class="Log">
+                <comment> Subject trigger detected for incoming message. Removing subject trigger </comment>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> smime-incoming </processor>
+            </mailet>
+        </processor>
+
+        <processor name="smime-incoming">
+            <!-- 
+            feed all emails through the SMIMEHandler so encrypted email can be decrypted,
+            certificates extracted etc.
+            -->
+            <mailet match="All" class="SMIMEHandler">
+                <removeSignature>false</removeSignature>
+                <addInfo>true</addInfo>
+                <decrypt>true</decrypt>
+                <!-- 
+                    uncompress will be disabled by default because the mail can become very large after 
+                    decompression. This can be used to 'inject' a extremely large email into the mail 
+                    system. The 'after filter' max message limit should be set to prevent decompressed
+                    mails to become too large. If decompression is required enable this option and make
+                    sure that the 'after filter' max message limit is set to a sane value. 
+                -->
+                <decompress>false</decompress>
+                <!--
+                <protectedHeader> subject </protectedHeader>
+                 -->
+                <removeSignatureAttribute> runtime.smime.removeSignature </removeSignatureAttribute>
+                <strictAttribute> runtime.smime.strict </strictAttribute>
+                <checkInvalid7BitCharsAttribute>runtime.smime.checkInvalid7BitChars</checkInvalid7BitCharsAttribute>
+                <abortDecryptionOnInvalid7BitCharsAttribute>runtime.smime.abortDecryptionOnInvalid7BitChars</abortDecryptionOnInvalid7BitCharsAttribute>
+                <handledProcessor> message-was-smime-handled-incoming </handledProcessor>
+            </mailet>
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> update-smime-stats-incoming </processor>
+            </mailet>
+        </processor>
+
+        <processor name="message-was-smime-handled-incoming">
+            <!-- do nothing processor which can be overridden by the end user-->
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> update-smime-stats-incoming </processor>
+            </mailet>
+        </processor>
+
+        <processor name="update-smime-stats-incoming">
+            <!-- if message is/was encrypted, set decryption stats -->
+            <mailet match="HeaderValueRegEx=matchOnError=false,X-Djigzo-Info-SMIME-Encrypted=^True$" class="Stats">
+                <name>incoming-smime-encrypted</name>
+            </mailet> 
+            
+            <mailet match="All" class="GotoProcessor">
+                <processor> pgp-incoming </processor>
+            </mailet>
+        </processor>
+
+        <processor name="pgp-incoming">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.incomingInlineEnabled}=='true'" 
+                    class="SetAttributes">
+                <log> PGP incoming inline is enabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.inlineEnabled> true </runtime.pgp.inlineEnabled>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.scanHTMLForPGP}=='false'" 
+                    class="SetAttributes">
+                <log> Scan HTML for PGP is disabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.scanHTMLForPGP> false </runtime.pgp.scanHTMLForPGP>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.skipNonPGPExtensions}=='false'" 
+                    class="SetAttributes">
+                <log> Skip non-PGP extensions is disabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.skipNonPGPExtensions> false </runtime.pgp.skipNonPGPExtensions>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.autoImportKeysFromMail}=='true'" 
+                    class="SetAttributes">
+                <log> PGP auto import keys from mail is enabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.autoImportKeysFromMail> true </runtime.pgp.autoImportKeysFromMail>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.autoRemoveKeysFromMail}=='true'" 
+                    class="SetAttributes">
+                <log> PGP auto remove keys from mail is enabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.autoRemoveKeysFromMail> true </runtime.pgp.autoRemoveKeysFromMail>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.removeSignature}=='true'" 
+                    class="SetAttributes">
+                <log> PGP remove signature is enabled for the recipient(s) </log>
+                <logLevel> DEBUG </logLevel>
+                <runtime.pgp.removeSignature> true </runtime.pgp.removeSignature>
+            </mailet>
+        
+            <mailet match="All" class="PGPHandler">
+                <removeSignature>false</removeSignature>
+                <inlinePGPEnabledAttribute>runtime.pgp.inlineEnabled</inlinePGPEnabledAttribute>
+                <scanHTMLForPGPAttribute>runtime.pgp.scanHTMLForPGP</scanHTMLForPGPAttribute>
+                <skipNonPGPExtensionsAttribute>runtime.pgp.skipNonPGPExtensions</skipNonPGPExtensionsAttribute>
+                <importKeysAttribute>runtime.pgp.autoImportKeysFromMail</importKeysAttribute>
+                <removeKeysAttribute>runtime.pgp.autoRemoveKeysFromMail</removeKeysAttribute>
+                <removeSignatureAttribute>runtime.pgp.removeSignature</removeSignatureAttribute>
+                <decrypt>true</decrypt>
+                <handledProcessor>post-pgp-incoming</handledProcessor>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-internal </processor>
+            </mailet>
+        </processor>
+
+        <processor name="post-pgp-incoming">
+            <!-- do nothing processor which can be overridden by the end user-->
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> check-pgp-partitioned-incoming </processor>
+            </mailet>
+        </processor>
+
+        <processor name="check-pgp-partitioned-incoming">
+            <!-- if message was encrypted, set decryption stats -->
+            <mailet match="HeaderValueRegEx=matchOnError=false,X-Djigzo-Info-PGP-Encrypted=^True$" class="Stats">
+                <name>incoming-pgp-encrypted</name>
+            </mailet> 
+        
+            <mailet match="HeaderValueRegEx=matchOnError=false,x-pgp-encoding-format=(?i)^partitioned$" 
+                    class="GotoProcessor">
+                <processor> pgp-partitioned-fix-up </processor>
+            </mailet>
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-internal </processor>
+            </mailet>
+        </processor>
+
+        <processor name="pgp-partitioned-fix-up">
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.pgp.partitionedFixup}=='true'" 
+                    class="PGPPartitionedFixup">
+                <log> Trying to fix-up PGP partitioned message </log>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> custom-internal </processor>
+            </mailet>
+        </processor>
+
+        <!--
+            Transport used for auto generated messages. Auto generated messages will get a special
+            server header with a server specific value and the message will be DKIM signed. This is
+            done to make it possible to detect whether the message was generated by this server. 
+            
+            !!! Note: do not rename this processor! the name is referenced from other configuration files!
+                      (see services.xml)
+         -->
+        <processor name="transport-auto-submitted">
+            <mailet match="All" class="Log">
+                <comment> This is a system generated message </comment>
+            </mailet>
+        
+            <!-- 
+                A header will be added to locally generated email which can be used to
+                detect that the message was sent by this server. This is done to prevent
+                mail loops when for example messages are forwarded. To prevent spoofing,
+                the message will be DKIM signed with a special Djigzo header 
+             -->
+            <mailet match="All" class="GlobalSetHMACHeader">
+                <header> X-Keep-Djigzo-Auto-Submitted </header>
+                <value> auto-replied </value>
+                <secretProperty> user.systemMailSecret </secretProperty>
+                <decrypt> true </decrypt>
+            </mailet>
+            
+            <!--
+                The DKIM signature will not use the standard header but a Djigzo specific header. The DKIM
+                signature is only used internally to make it possible to detect whether the email was
+                generated by this server. 
+             --> 
+            <mailet match="All" class="SenderPropertyDKIMSign">
+                <dkimHeader> X-Keep-Djigzo-DKIM-Signature </dkimHeader>
+                <foldSignature> true </foldSignature>
+                <keyProperty> user.dkim.keyPair </keyProperty>
+                <signatureTemplate> v=1; c=relaxed/relaxed; s=selector; d=djigzo; h=X-Keep-Djigzo-Auto-Submitted; a=rsa-sha256; bh=; b=; </signatureTemplate>
+            </mailet>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> dkim-sign </processor>
+            </mailet>        
+        </processor>
+
+        <processor name="custom-internal">
+            <!-- do nothing processor which can be overridden by the end user-->
+        
+            <mailet match="All" class="GotoProcessor">
+                <processor> transport-internal </processor>
+            </mailet>
+        </processor>
+
+        <processor name="transport-internal">
+            <!-- 
+               By default the transport-internal will use the transport for delivery. If you
+               want to use a different transport you are advised to change the processor
+               in the file internal_remote_delivery_processor.xml or alternatively change
+               it here.
+            -->
+            <mailet match="All" class="GotoProcessor">
+                &internalRemoteDeliveryProcessor;
+            </mailet>
+        </processor>
+
+        <!-- 
+           DKIM sign the message
+        -->
+        <processor name="dkim-sign">
+            <!-- only DKIM sign email sent to external recipients -->
+            <mailet match="RecipientHasLocality=matchOnError=true, internal" class="GotoProcessor">
+                <processor> transport </processor>
+            </mailet>
+
+            <mailet match="SenderEvaluateUserProperty=matchOnError=false,#{user.dkim.signing.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> DKIM signing is disabled for the sender </log>
+                <processor> transport </processor>
+            </mailet>
+
+            <mailet match="RecipientEvaluateUserProperty=matchOnError=false,#{user.dkim.signing.enabled}!='true'" 
+                    class="GotoProcessor">
+                <log> DKIM signing is disabled for the recipient(s) </log>
+                <processor> transport </processor>
+            </mailet>
+
+            <mailet match="All" class="DKIMSign"/>
+
+            <mailet match="All" class="GotoProcessor">
+                <processor> transport </processor>
+            </mailet>
+        </processor>
+        
+        <!-- 
+          remote delivery mailet 
+        -->
+        <processor name="transport">
+            <mailet match="All" class="Log">
+                <comment> Message handling is finished. Sending to final recipient(s) </comment>
+                <logDetail> middle </logDetail>
+            </mailet>
+
+            <mailet match="All" class="Stats">
+                <name>outgoing</name>
+            </mailet>
+
+            <!-- add user defined headers (if configured) to mail for internal and external -->
+            <mailet match="RecipientHasLocality=matchOnError=false, internal"
+                class="MailAttributes">
+                <set>runtime.postProcessingHeader=#{user.postprocessing.header.internal}</set>
+            </mailet>
+
+            <mailet match="RecipientHasLocality=matchOnError=false, external"
+                class="MailAttributes">
+                <set>runtime.postProcessingHeader=#{user.postprocessing.header.external}</set>
+            </mailet>
+            
+            <mailet match="All" class="SetStaticHeader">
+                <attribute>runtime.postProcessingHeader</attribute>
+            </mailet>
+                         
+            <!-- Attempt remote delivery using the specified repository for the spool, -->            
+            <!-- using delay time to retry delivery and the maximum number of retries -->
+            <mailet match="All" class="RemoteDelivery">
+                <outgoing> file://var/mail/outgoing/ </outgoing>
+                <!-- alternative database repository example below -->
+                <!--
+                <outgoing> db://maildb/spool/outgoing </outgoing>
+                -->
+                
+                <!-- Delivery Schedule based upon RFC 2821, 4.5.4.1 -->
+                <!-- 5 day retry period, with 4 attempts in the first
+                hour, two more within the first 6 hours, and then
+                every 6 hours for the rest of the period. -->
+                <!--
+                <delayTime>  5 minutes </delayTime>
+                <delayTime> 10 minutes </delayTime>
+                <delayTime> 45 minutes </delayTime>
+                <delayTime>  2 hours </delayTime>
+                <delayTime>  3 hours </delayTime>
+                <delayTime>  6 hours </delayTime>
+                <maxRetries> 25 </maxRetries>
+                -->
+                <!-- 
+                Because we will use Postfix as a local MTA we can set the retry times much shorter
+                
+                it will be a 5 day retry timeout (to be precise 5 days + 8 mins and 30 secs) but 
+                retried every 10 minutes 
+                -->
+                <delayTime> 10 secs </delayTime>
+                <delayTime> 20 secs </delayTime>
+                <delayTime> 1 minute </delayTime>
+                <delayTime> 2 minutes </delayTime>
+                <delayTime> 5 minutes </delayTime>
+                <delayTime> 10 minutes </delayTime>
+                <maxRetries> 725 </maxRetries>
+                
+                
+                <!-- The number of threads that should be trying to deliver outgoing messages -->
+                <deliveryThreads> 5 </deliveryThreads>
+                
+                
+                <!-- If false the message will not be sent to given server if any recipients fail -->
+                <sendpartial> true </sendpartial>
+                
+                <!-- By default we send bounces to the "bounce" processor -->
+                <!-- By removing this configuration James will fallback to hardcoded bounce -->
+                <!-- notifications -->
+                <bounceProcessor> bounces </bounceProcessor>
+                
+                <!-- A single mail server to deliver all outgoing messages. -->
+                <!-- This is useful if this server is a backup or failover machine, -->
+                <!-- or if you want all messages to be routed through a particular mail server, -->
+                <!-- regardless of the email addresses specified in the message -->
+                <!-- The gateway element specifies the gateway SMTP server name. -->
+                <!-- If your gateway mail server is listening on a port other than 25, -->
+                <!-- you can set James to connect to it on that port using the gatewayPort -->
+                <!-- element. -->
+                
+                <!-- Although normally multiple addresses are implemented through proper -->
+                <!-- DNS configuration, the RemoteDelivery mail does allow specifying -->
+                <!-- multiple gateway elements, each of which may also have a port -->
+                <!-- e.g., mygateway:2525 -->
+                <!-- the gatewayPort element is used as a default -->
+                
+                <!-- gateway and port are read from external smtp_transport_config.xml -->
+                
+                <!--
+                <gateway> 127.0.0.1 </gateway>
+                <gatewayPort> 10026 </gatewayPort>
+                -->                
+                
+                <!-- If the gateway requires smtp authentication the following directives -->
+                <!-- (gatewayusername/gatewayPassword) can be used. -->
+                <!--
+                <gatewayusername>login</gatewayusername>
+                <gatewayPassword>pass</gatewayPassword>
+                -->
+                
+                <!-- Set the HELO/EHLO name to use when connectiong to remote SMTP-Server -->
+                <!--
+                <mail.smtp.localhost>myMailServer</mail.smtp.localhost>
+                -->
+                <xForward> true </xForward>
+                <extendedSMTPTransport> false </extendedSMTPTransport>
+                
+                &smtpTransportConfig;
+            </mailet>
+        </processor>
+            
+        <!-- The error processor is required.  James may internally set emails to the -->
+        <!-- error state.  The error processor is generally invoked when there is an -->
+        <!-- unexpected error either in the mailet chain or internal to James. -->
+        <!-- By default configuration all email that generates an error in placed in -->
+        <!-- an error repository. -->
+        <processor name="error">
+            <mailet match="All" class="Log">
+                <comment> **** Message is stored in ERROR spool ****  </comment>
+                <logLevel> ERROR </logLevel>
+                <logErrorMessage> true </logErrorMessage>
+            </mailet>
+        
+            <!-- stores messages to the error repository -->
+            <mailet match="All" class="ToRepository">
+                <repositoryPath> file://var/mail/error/</repositoryPath>
+            </mailet>
+        </processor>
+        
+        <!-- This processor handle the bounces from RemoteDelivery -->
+        <processor name="bounces">
+            <!-- 
+                Send bounces to the error processor. Normally messages should never bounce because
+                they should always be accepted by Postfix. 
+            -->
+            <mailet match="All" class="GotoProcessor">
+                <processor> error </processor>
+            </mailet>
+        </processor>
+
+        <!-- include the custom processors fragment -->        
+        &customProcessors;
+        
+    </spoolmanager>
+
+   <!-- DNS Server Block -->
+   <!-- -->
+   <!-- Specifies DNS Server information for use by various components inside -->
+   <!-- James. -->
+   <!-- -->
+   <!-- If autodiscover is true, James will attempt to autodiscover the DNS servers configured on your underlying system.-->
+   <!-- Currently, this works if the OS has a unix-like /etc/resolv.conf,-->
+   <!-- or the system is Windows based with ipconfig or winipcfg.-->
+   <!-- -->
+   <!-- If no DNS servers are found and you have not specified any below, 127.0.0.1 will be used-->
+   <!-- If you use autodiscover and add DNS servers manually a combination of all the dns servers will be used  -->
+   <!--  -->
+   <!-- Information includes a list of DNS Servers to be used by James.  These are -->
+   <!-- specified by the server elements, each of which is a child element of the -->
+   <!-- servers element.  Each server element is the IP address of a single DNS server. -->
+   <!-- The servers element can have multiple server children. -->
+   <dnsserver>
+      <servers>
+         <!--Enter ip address of your DNS server, one IP address per server -->
+         <!-- element. -->
+         <!--
+          <server>127.0.0.1</server>
+         -->
+      </servers>
+      <!-- Change autodiscover to false if you would like to turn off autodiscovery -->
+      <!-- and set the DNS servers manually in the <servers> section -->
+      <autodiscover> true </autodiscover>
+      <authoritative> false </authoritative>
+
+      <!-- Maximum number of entries to maintain in the DNS cache -->
+      <maxcachesize> 50000 </maxcachesize>
+   </dnsserver>
+
+    <!-- The SMTP server is enabled by default -->
+    <!-- Disabling blocks will stop them from listening, -->
+    <!-- but does not free as many resources as removing them would -->
+   <smtpserver enabled="true">
+      <!-- port 25 is the well-known/IANA registered port for SMTP -->
+      
+      <!-- server port is now read from external smtp_server_config.xml  -->
+      <!--      
+      <port> 10025 </port>
+      -->
+      
+      <!-- Uncomment this if you want to bind to a specific inetaddress -->
+      <!-- Please NOTE: you should add this IP also to your RemoteAddrNotInNetwork -->
+      <!-- in order to avoid relay check for locallly generated bounces -->
+      <!--
+      <bind> </bind>
+      -->
+      <!-- Uncomment this if you want to use TLS (SSL) on this port -->
+      <!--
+      <useTLS>true</useTLS>
+      -->
+ 
+      &smtpServerConfig;
+
+      <handler>
+         <!-- This is the name used by the server to identify itself in the SMTP -->
+         <!-- protocol.  If autodetect is TRUE, the server will discover its -->
+         <!-- own host name and use that in the protocol.  If discovery fails, -->
+         <!-- the value of 'localhost' is used.  If autodetect is FALSE, James -->
+         <!-- will use the specified value. -->
+         <helloName autodetect="true"> CipherMail </helloName>
+         <connectiontimeout> 360000 </connectiontimeout>
+
+         <!--  Uncomment this if you want to require SMTP authentication.
+
+               supported values:
+               true: required but announced only to not authorizedAddresses
+               false: don't use AUTH
+               announce: like true, but always announce AUTH capability to clients
+
+               The correct behaviour per RFC value would be false or announce
+               but we still support true for backward compatibility and because
+               some webmail client fails when AUTH is announced but no authentication
+               information has been provided
+          -->
+         <!--
+         <authRequired>true</authRequired>
+         -->
+
+         <!--  Uncomment this if you want to authorize specific addresses/networks.
+               If you use SMTP AUTH, addresses that match those specified here will
+               be permitted to relay without SMTP AUTH.  If you do not use SMTP
+               AUTH, and you specify addreses here, then only addresses that match
+               those specified will be permitted to relay.
+
+               Addresses may be specified as a an IP address or domain name, with an
+               optional netmask, e.g.,
+
+               127.*, 127.0.0.0/8, 127.0.0.0/255.0.0.0, and localhost/8 are all the same
+
+               See also the RemoteAddrNotInNetwork matcher in the transport processor.
+               You would generally use one OR the other approach.
+         -->
+         <authorizedAddresses> 127.0.0.0/8, 172.16.32.0/24 </authorizedAddresses>
+
+         <!--  Uncomment this if you want to verify sender addresses, ensuring that -->
+         <!--  the sender address matches the user who has authenticated. -->
+         <!--  This prevents a user of your mail server from acting as someone else -->
+         <!--
+         <verifyIdentity>true</verifyIdentity>
+         -->
+
+         <!--  This sets the maximum allowed message size (in kilobytes) for this -->
+         <!--  SMTP service. If unspecified, the value defaults to 0, which means no limit. -->
+         <maxmessagesize> 0 </maxmessagesize>
+         
+         <!--  This sets wether to enforce the use of HELO/EHLO salutation before a -->
+         <!--  MAIL command is accepted. If unspecified, the value defaults to true -->
+         <!-- 
+         <heloEhloEnforcement>true</heloEhloEnforcement>
+         -->
+
+         <!-- SMTP Handler Chain customization -->
+         <!-- Uncomment this and edit james-smtphandlerchain.xml configuration file to -->
+         <!-- enable the experimental fastfail features. Look at the james-smtphandlerchain.xml -->
+         <!-- for further informations -->
+         <!-- 
+         -->
+         &smtphandlerchainConfig;
+            
+      </handler>
+   </smtpserver>
+
+   <!-- Spool repository configuration -->
+   <!-- The spool repository is the location where incoming mails are temporarily stored -->
+   <!-- before being processed. -->
+   <spoolrepository destinationURL="file://var/mail/spool/" type="SPOOL"/>
+ 
+   <!-- The Mailstore block -->
+   <mailstore>
+      <repositories>
+
+         <!-- File based repositories.  These repositories store all message data -->
+         <!-- in the file system. -->
+         <repository class="org.apache.james.mailrepository.AvalonMailRepository">
+            <protocols>
+               <protocol>file</protocol>
+            </protocols>
+            <types>
+               <type>MAIL</type>
+            </types>
+         </repository>
+         <repository class="org.apache.james.mailrepository.AvalonSpoolRepository">
+            <protocols>
+               <protocol>file</protocol>
+            </protocols>
+            <types>
+               <type>SPOOL</type>
+            </types>
+         </repository>
+
+         <!-- JDBC based repositories.  These repositories store all message data -->
+         <!-- in the database. -->
+         <repository class="org.apache.james.mailrepository.JDBCMailRepository">
+            <protocols>
+               <protocol>db</protocol>
+            </protocols>
+            <types>
+               <type>MAIL</type>
+            </types>
+            <config>
+               <sqlFile>file://conf/sqlResources.xml</sqlFile>
+               <!-- Set the size threshold for in memory handling of storing operations -->
+               <!-- Default is currently 409600000 due to a bug with mysql and binary stream -->
+               <!-- currently under investigation. Please change this only if you know what -->
+               <!-- you do, this is EXPERIMENTAL -->
+               <!--
+               <inMemorySizeLimit>4096</inMemorySizeLimit>
+                -->
+            </config>
+         </repository>
+
+         <repository class="org.apache.james.mailrepository.JDBCSpoolRepository">
+            <protocols>
+               <protocol>db</protocol>
+            </protocols>
+            <types>
+               <type>SPOOL</type>
+            </types>
+            <config>
+               <sqlFile>file://conf/sqlResources.xml</sqlFile>
+               <maxcache>1000</maxcache>
+               <!-- Set the size threshold for in memory handling of storing operations -->
+               <!-- Default is currently 409600000 due to a bug with mysql and binary stream -->
+               <!-- currently under investigation. Please change this only if you know what -->
+               <!-- you do, this is EXPERIMENTAL -->
+               <!--
+               <inMemorySizeLimit>4096</inMemorySizeLimit>
+                -->
+            </config>
+         </repository>
+
+         <!-- These repositories store message delivery and headers in the DB, and the body to the filesystem -->
+         <repository class="org.apache.james.mailrepository.JDBCMailRepository">
+            <protocols>
+               <protocol>dbfile</protocol>
+            </protocols>
+            <types>
+               <type>MAIL</type>
+            </types>
+            <config>
+               <sqlFile>file://conf/sqlResources.xml</sqlFile>
+               <filestore>file://var/dbmail</filestore>
+            </config>
+         </repository>
+
+         <repository class="org.apache.james.mailrepository.JDBCSpoolRepository">
+            <protocols>
+               <protocol>dbfile</protocol>
+            </protocols>
+            <types>
+               <type>SPOOL</type>
+            </types>
+            <config>                
+               <sqlFile>file://conf/sqlResources.xml</sqlFile>
+               <filestore>file://var/dbmail</filestore>
+               <maxcache>1000</maxcache>
+            </config>
+         </repository>
+
+         <!-- The mbox repository is designed for MAIL only; SPOOL performance would be less than ideal-->
+         <repository class="org.apache.james.mailrepository.MBoxMailRepository">
+            <protocols>
+               <protocol>mbox</protocol>
+            </protocols>
+            <types>
+               <type>MAIL</type>
+            </types>
+         </repository>
+
+         <repository class="org.apache.james.mailrepository.filepair.File_Persistent_Object_Repository">
+            <protocols>
+               <protocol>file</protocol>
+            </protocols>
+            <types>
+               <type>OBJECT</type>
+            </types>
+            <models>
+               <model>SYNCHRONOUS</model>
+               <model>ASYNCHRONOUS</model>
+               <model>CACHE</model>
+            </models>
+         </repository>
+
+         <repository class="org.apache.james.mailrepository.filepair.File_Persistent_Stream_Repository">
+            <protocols>
+               <protocol>file</protocol>
+            </protocols>
+            <types>
+               <type>STREAM</type>
+            </types>
+            <models>
+               <model>SYNCHRONOUS</model>
+               <model>ASYNCHRONOUS</model>
+               <model>CACHE</model>
+            </models>
+         </repository>
+      </repositories>
+
+   </mailstore>
+
+
+   <!-- The User Storage block -->
+   <users-store>
+      <!-- Configure User Repositories here. -->
+      <!-- -->
+      <!-- User repositories are required for the following purposes: -->
+      <!--    - storing James user information, including forwards, aliases, -->
+      <!--      and authentication data. -->
+      <!--    - holding lists of users for the listserv mailet -->
+      <!-- Currently, two different storage options are available: -->
+      <!--    - file-based storage using Java serialization -->
+      <!--    - database-backed storage -->
+      <!-- (Use of database or file-system is defined on a "per-repository" basis) -->
+      <!-- -->
+      <!-- Note: One user repository is required for James: -->
+      <!--   LocalUsers - the users for whom you are providing POP3, NNTP, or SMTP service -->
+      <!-- -->
+      <!-- Other repositories may be used by matchers or mailets. -->
+
+      <!-- Default: File-based user repositories  Use these configurations to store user info in the filesystem  -->
+      <!-- The LocalUsers repository, for storing James' User info. -->
+      <repository name="LocalUsers" class="org.apache.james.userrepository.UsersFileRepository">
+         <destination URL="file://var/users/"/>
+      </repository>
+   </users-store>
+
+   <!-- The database-connections block -->
+   <database-connections>
+      <!-- To allow James to use a database you must configure the database connection here. -->
+   </database-connections>
+
+   <!-- Configuration for Cornerstone Services -->
+   <!-- -->
+   <!-- For a simple configuration, nothing beneath this line should require -->
+   <!-- alteration. -->
+   <!-- -->
+   <!-- You will need to adjust the Socket Manager service configuration if you want -->
+   <!-- to enable secure sockets (TLS) for any James service.                        -->
+   <!-- -->
+   <!-- Complex or high volume configurations may require changes to the parameters -->
+   <!-- in this section.  Please read the James and Avalon documentation before -->
+   <!-- attempting to adjust this section. -->
+   <!-- -->
+
+   <!-- The Connection Manager block -->
+   <!-- -->
+   <!-- The idle-timeout is the number of milliseconds that it will take for idle -->
+   <!-- client connections managed by this connection manager to be marked at timed out. -->
+   <!-- If no value is specified, the value defaults to 5 minutes, 300000 milliseconds -->
+   <!-- A value of 0 means that client sockets will not timeout. -->
+   <!-- -->
+   <!-- The max-connections parameter specifies the default maximum number of client -->
+   <!-- connections that this connection manager will allow per managed server socket. -->
+   <!-- This value can be overridden by each individual service. -->
+   <!-- If no value is specified, the value defaults to 30. -->
+   <!-- A value of 0 creates a maximum of 1 connection due to the use of the HardResourceLimiting -->
+   <!-- thread pool by the ServerConnection class. -->
+   <!-- Resource limitations imposed by other components (i.e. max # of threads) may -->
+   <!-- serve to limit the number of open connections. -->
+   <!-- -->
+   <connections>
+      <idle-timeout>300000</idle-timeout>
+      <max-connections>30</max-connections>
+   </connections>
+
+   <!-- The Socket Manager block -->
+   <!-- -->
+   <!-- The server-sockets element has a number of factory sub-elements. -->
+   <!-- Each of the factory elements has a name and class attribute -->
+   <!-- The name attribute for each factory element must be unique.  -->
+   <!-- The class attribute is the name of a class that implements the -->
+   <!-- interface org.apache.avalon.cornerstone.services.ServerSocketFactory -->
+   <!-- Specific factory elements may require some sub-elements.  This is -->
+   <!-- factory class dependent. -->
+   <!-- -->
+   <!-- The client-sockets element has a number of factory sub-elements. -->
+   <!-- Each of the factory elements has a name and class attribute -->
+   <!-- The name attribute for each factory element must be unique.  -->
+   <!-- The class attribute is the name of a class that implements the -->
+   <!-- interface org.apache.avalon.cornerstone.services.SocketFactory -->
+   <!-- Specific factory elements may require some sub-elements.  This is -->
+   <!-- factory class dependent. -->
+   <!-- -->
+   <!-- In order to use the ssl factory under Java 1.5 and support all Clients -->
+   <!-- (particularly Mozilla Thunderbird) you need to install the Sun JCE -->
+   <!-- provider in your environment (james/lib) -->
+   <!-- e.g: jre/lib/ext/sunjce_provider.jar -->
+   <!--  -->
+   <sockets>
+      <server-sockets>
+         <factory name="plain" class="org.apache.avalon.cornerstone.blocks.sockets.DefaultServerSocketFactory"/>
+         <!--
+         <factory name="ssl" class="org.apache.avalon.cornerstone.blocks.sockets.TLSServerSocketFactory">
+            <ssl-factory>
+               <keystore>
+                  <file>conf/keystore</file>
+                  <password>secret</password>
+                  <key-password>keysecret</key-password>
+                  <type>JKS</type>
+                  <protocol>TLS</protocol>
+                  <algorithm>SunX509</algorithm>
+                  <authenticate-client>false</authenticate-client>
+               </keystore>
+            </ssl-factory>
+         </factory>
+         -->
+      </server-sockets>
+      <client-sockets>
+         <factory name="plain" class="org.apache.avalon.cornerstone.blocks.sockets.DefaultSocketFactory"/>
+      </client-sockets>
+   </sockets>
+
+   <!-- The Thread Manager block -->
+   <!-- -->
+   <!-- The thread manager provides thread pools for use throughout the server. -->
+   <!-- -->
+   <!-- A thread pool with the name "default" must be defined in this thread manager -->
+   <!-- configuration. -->
+   <!-- -->
+   <!-- Each thread pool is defined with a "thread-group" element. -->
+   <!-- Each of these elements has the following required sub-elements: -->
+   <!--   name - the name of the thread pool, used by other components to -->
+   <!--          lookup the thread pool -->
+   <!--   priority - the thread priority for threads in the pool.  This is -->
+   <!--              a value between 0 and 10, with 5 being the normal -->
+   <!--              priority and 10 being the maximum. -->
+   <!--   is-daemon - whether the threads in the pool are daemon threads. -->
+   <!--   max-threads - the maximum number of threads allowed in the pool. -->
+   <!--   min-threads - the minimum number of threads allowed in the pool. (not implemented) -->
+   <!--   min-spare-threads - (not implemented) -->
+   <thread-manager>
+      <thread-group>
+         <name>default</name>
+         <priority>5</priority>
+         <is-daemon>false</is-daemon>
+         <max-threads>100</max-threads>
+         <min-threads>20</min-threads>
+         <min-spare-threads>20</min-spare-threads>
+      </thread-group>
+   </thread-manager>
+</config>

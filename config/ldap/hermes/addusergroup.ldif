@@ -1,0 +1,11 @@
+dn: cn=two_factor,ou=groups,dc=hermes,dc=local
+changetype: modify
+add: member
+member: cn=user@domain.tld,ou=users,dc=hermes,dc=local
+
+
+dn: cn=mailboxes,ou=groups,dc=hermes,dc=local
+changetype: modify
+add: member
+member: cn=user@domain.tld,ou=users,dc=hermes,dc=local
+

@@ -1,0 +1,2 @@
+dn: olcOverlay={THE_OVERLAY_INDEX}remoteauth,olcDatabase={THE_MDB_INDEX}mdb,cn=config
+changetype: delete

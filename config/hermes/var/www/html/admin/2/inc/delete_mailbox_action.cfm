@@ -1,0 +1,380 @@
+
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
+
+This file is part of Hermes Secure Email Gateway Community Edition.
+
+    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+--->
+
+<!---
+DELETE MAILBOX ACTION HANDLER
+Removes a mailbox user from all systems:
+1. Ciphermail (CLITool --delete-user + cert/keystore cleanup)
+2. LDAP (remove from mailbox groups + delete user entry)
+3. Cancel pending password reset requests
+4. recipients table + related tables (wblist, mailaddr, recipients_temp)
+5. user_settings table
+6. recipient_certificates + files
+7. recipient_keystores + PGP keys
+8. cert_generation_queue (pending jobs)
+9. mailboxes table (Dovecot userdb)
+--->
+
+<!--- VALIDATE MAILBOX ID --->
+<cfif NOT StructKeyExists(form, "delete_mailbox_id") OR NOT IsNumeric(form.delete_mailbox_id)>
+    <cfset session.m = 20>
+    <cflocation url="view_mailboxes.cfm" addtoken="no">
+</cfif>
+
+<!--- GET MAILBOX DETAILS --->
+<cfquery name="getMailbox" datasource="hermes">
+    SELECT m.id, m.username, m.domain_id
+    FROM mailboxes m
+    WHERE m.id = <cfqueryparam value="#form.delete_mailbox_id#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<cfif getMailbox.recordcount LT 1>
+    <cfset session.m = 21>
+    <cflocation url="view_mailboxes.cfm" addtoken="no">
+</cfif>
+
+<cfset recipient = getMailbox.username>
+
+<!--- GET RECIPIENT ID FROM RECIPIENTS TABLE --->
+<cfquery name="getRecipientId" datasource="hermes">
+    SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfset delete_id = "">
+<cfif getRecipientId.recordcount GTE 1>
+    <cfset delete_id = getRecipientId.id>
+</cfif>
+
+<!--- 1. REMOVE FROM LDAP MAILBOX GROUPS FIRST --->
+<!--- Must run BEFORE delete_internal_recipients.cfm because that include
+     calls ldap_delete_user_relay.cfm (which removes from relay groups).
+     We remove from mailbox groups here; the relay removal inside
+     delete_internal_recipients.cfm will get "No such object" (harmless). --->
+<cfquery name="getLdapUsernameForMailbox" datasource="hermes">
+    SELECT ldap_username FROM user_settings WHERE email = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfif getLdapUsernameForMailbox.recordcount GTE 1 AND getLdapUsernameForMailbox.ldap_username NEQ "">
+    <cftry>
+        <cfset ldapUsername = getLdapUsernameForMailbox.ldap_username>
+        <!--- Remove from cn=mailboxes group (ldap_delete_user_mailbox.cfm also
+             deletes the user entry, but delete_internal_recipients.cfm will
+             attempt it again via relay - "No such object" is handled gracefully) --->
+        <cfinclude template="generate_customtrans.cfm">
+        <cffile action="read" file="/opt/hermes/templates/ldap_removeusergroup_mailbox.ldif" variable="ldapRemoveGroupTemplate">
+        <cfset ldapRemoveLdif = REReplace(ldapRemoveGroupTemplate, "THE_USERNAME", ldapUsername, "ALL")>
+        <cffile action="write"
+            file="/opt/hermes/tmp/#customtrans3#_removeusergroup_mailbox.ldif"
+            output="#ldapRemoveLdif#"
+            addNewLine="no">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_ldap ldapmodify -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -c -f /opt/hermes/tmp/#customtrans3#_removeusergroup_mailbox.ldif"
+            variable="ldapResult"
+            errorVariable="ldapError"
+            timeout="60">
+        </cfexecute>
+        <cfset fileToDelete = "/opt/hermes/tmp/#customtrans3#_removeusergroup_mailbox.ldif">
+        <cfif fileExists(fileToDelete)>
+            <cffile action="delete" file="#fileToDelete#">
+        </cfif>
+
+        <!--- Also remove from cn=nextcloud group (idempotent - the include
+             handles "No such object" / "No such attribute" gracefully if
+             the user wasn't in the group). --->
+        <cftry>
+            <cfinclude template="ldap_remove_user_groups_nextcloud.cfm">
+        <cfcatch type="any"></cfcatch>
+        </cftry>
+    <cfcatch type="any">
+        <!--- Mailbox group removal is non-critical - continue with deletion --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 2. CIPHERMAIL + CERTS + KEYSTORES + LDAP USER DELETE + DB CLEANUP --->
+<!--- Reuse the relay recipient delete include which handles:
+     - Ciphermail CLITool --delete-user
+     - Cert/keystore cleanup from djigzo DB
+     - LDAP user delete (via ldap_delete_user_relay.cfm - will remove
+       from relay groups if applicable, then delete user entry)
+     - Cancel password reset requests
+     - DELETE from recipients, recipients_temp, wblist, user_settings, mailaddr
+     - DELETE cert files + PGP keystores --->
+<cfif delete_id NEQ "">
+    <cfinclude template="delete_internal_recipients.cfm">
+<cfelse>
+    <!--- No recipient row - still need basic cleanup --->
+    <cfif getLdapUsernameForMailbox.recordcount GTE 1 AND getLdapUsernameForMailbox.ldap_username NEQ "">
+        <cftry>
+            <cfset ldapUsername = getLdapUsernameForMailbox.ldap_username>
+            <cfinclude template="ldap_delete_user_mailbox.cfm">
+        <cfcatch type="any">
+            <!--- LDAP cleanup is non-critical --->
+        </cfcatch>
+        </cftry>
+    </cfif>
+
+    <cfquery datasource="hermes">
+        UPDATE password_reset_requests
+        SET status = 'cancelled', completed_at = NOW(), completed_by = 'system'
+        WHERE email = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+        AND status = 'pending'
+    </cfquery>
+
+    <cfquery datasource="hermes">
+        DELETE FROM user_settings WHERE email = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+</cfif>
+
+<!--- 2. CANCEL PENDING CERT GENERATION JOBS --->
+<cfif delete_id NEQ "">
+    <cfquery datasource="hermes">
+        DELETE FROM cert_generation_queue
+        WHERE recipient_id = <cfqueryparam value="#delete_id#" cfsqltype="cf_sql_integer">
+        AND status = 'pending'
+    </cfquery>
+</cfif>
+
+<!--- 3. DELETE SENDER LOGIN MAPS (own address + any aliases) --->
+<cfquery datasource="hermes">
+    DELETE FROM sender_login_maps
+    WHERE login_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 3b. CLEAN UP SHARED MAILBOX MEMBERSHIP.
+     If the deleted user had rights on any shared mailboxes, remove
+     their permission rows, the shared-namespace listing rows, and
+     dead 2.3-era dovecot_acl rows — then regenerate each affected
+     shared mailbox's vfile dovecot-acl file so the deleted user's
+     line is removed from disk. Without this the UI would keep
+     showing the deleted user as a member and a recreated user with
+     the same email would silently inherit the old rights. --->
+<cfquery name="getSharesToResync" datasource="hermes">
+    SELECT DISTINCT sm.address
+    FROM shared_mailbox_permissions smp
+    INNER JOIN shared_mailboxes sm ON sm.id = smp.shared_mailbox_id
+    WHERE smp.username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM shared_mailbox_permissions
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl_shared
+    WHERE to_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cfloop query="getSharesToResync">
+    <cfset sharedAddress = getSharesToResync.address>
+    <cftry>
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+    <cfcatch type="any">
+        <!--- Per-mailbox sync failure is non-fatal; DB state is correct --->
+    </cfcatch>
+    </cftry>
+</cfloop>
+
+<!--- 3c. CLEAN UP USER FOLDER SHARES (distinct from shared_mailboxes).
+     The user_folder_shares table is the canonical source for the
+     /users/2/view_shared_folders.cfm UI. Step 3b above handled the
+     dovecot_acl side broadly (recipient-side deletes) but NEVER
+     touched user_folder_shares — so a re-created mailbox at the same
+     email would still show ghost shares pointing at the deleted user.
+     Also plugs two owner-side gaps step 3b didn't cover: dovecot_acl
+     rows on folders OWNED by the deleted user, and dovecot_acl_shared
+     rows where the deleted user was the from_user. Finally rebuilds
+     each surviving owner's per-folder vfile dovecot-acl so the
+     deleted user is removed from disk too. --->
+
+<!--- Capture (owner, folder) pairs of shares TO the deleted user so
+     we can rebuild those vfiles after the share rows are gone. --->
+<cfquery name="getUserFolderSharesAsRecipient" datasource="hermes">
+    SELECT DISTINCT owner_username, folder_path
+    FROM user_folder_shares
+    WHERE shared_with_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Delete share rows where deleted user was RECIPIENT — fixes the
+     screenshot bug where the owner's UI kept showing a share to a
+     long-gone user. --->
+<cfquery datasource="hermes">
+    DELETE FROM user_folder_shares
+    WHERE shared_with_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Delete share rows where deleted user was OWNER. Their maildir is
+     about to be wiped (step 6), but the share rows would have lingered
+     and the recipient's UI would have kept listing a ghost owner. --->
+<cfquery datasource="hermes">
+    DELETE FROM user_folder_shares
+    WHERE owner_username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Mirror of step 3b's to_user delete: drop dovecot_acl_shared rows
+     where the deleted user was the FROM side. --->
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl_shared
+    WHERE from_user = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Drop dovecot_acl rows on folders OWNED by the deleted user.
+     Step 3b's WHERE username=recipient deleted rows where the deleted
+     user was the recipient of an ACL grant; this catches the mirror
+     case (rows whose mailbox identifier starts with "<deleted-user>/"). --->
+<cfquery datasource="hermes">
+    DELETE FROM dovecot_acl
+    WHERE mailbox LIKE <cfqueryparam value="#recipient#/%" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- Resync each surviving owner's vfile so the deleted user's line is
+     removed from /srv/mail/.../dovecot-acl. Must run AFTER the
+     user_folder_shares deletes above — sync_user_folder_acl_file.cfm
+     rebuilds the file from the current table state. --->
+<cfloop query="getUserFolderSharesAsRecipient">
+    <cfset ownerUser  = getUserFolderSharesAsRecipient.owner_username>
+    <cfset folderPath = getUserFolderSharesAsRecipient.folder_path>
+    <cftry>
+        <cfinclude template="sync_user_folder_acl_file.cfm">
+    <cfcatch type="any">
+        <!--- Per-folder sync failure is non-fatal; DB state is correct --->
+    </cfcatch>
+    </cftry>
+</cfloop>
+
+<!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
+<cfquery datasource="hermes">
+    DELETE FROM mailbox_aliases
+    WHERE delivers_to = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 4b. DELETE BCC MAP ENTRIES referencing this mailbox (as watched address
+     OR as BCC destination). Postfix reads bcc_maps via MySQL lookup tables
+     (mysql-*-bcc-maps.cf) so no postmap regeneration is required - lookups
+     hit the live DB on every message. --->
+<cfquery datasource="hermes">
+    DELETE FROM bcc_maps
+    WHERE address = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+       OR bcc_to  = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 4c. INVALIDATE USER SESSIONS (force immediate logout) --->
+<cftry>
+    <cfset targetSessionUser = recipient>
+    <cfinclude template="invalidate_user_sessions.cfm">
+<cfcatch type="any"></cfcatch>
+</cftry>
+
+<!--- 4d. DELETE NEXTCLOUD USER ACCOUNT.
+     occ user:delete removes everything: mail accounts, app passwords,
+     files, calendar, contacts — no need for separate cleanup steps. --->
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:delete #recipient#"
+        variable="ncUserDeleteResult"
+        errorVariable="ncUserDeleteError"
+        timeout="30" />
+<cfcatch type="any">
+    <!--- Non-fatal: user may not exist in NC --->
+</cfcatch>
+</cftry>
+
+<!--- 4g. DELETE VACATION AUTO-REPLY config (one row per user) --->
+<cfquery datasource="hermes">
+    DELETE FROM user_vacation
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 4h. DELETE APP PASSWORDS (#197 Phase 1).
+     Hard-delete all rows (active + revoked) so a re-created mailbox at
+     the same email cannot silently inherit any prior credentials. NC's
+     oc_authtoken side is wiped by `occ user:delete` in step 4d. --->
+<cfquery datasource="hermes">
+    DELETE FROM app_passwords
+    WHERE username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<!--- 5. DELETE USER SIEVE RULES + ON-DISK SCRIPT FILES.
+     ON DELETE CASCADE on sieve_rule_conditions/sieve_rule_actions handles
+     the child rows automatically when the parent sieve_rules row is deleted. --->
+<cfquery datasource="hermes">
+    DELETE FROM sieve_rules
+    WHERE scope = 'user'
+    AND username = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+</cfquery>
+
+<cftry>
+    <cfset sieveSrcFile = "/mnt/data/sieve/users/" & recipient & ".sieve">
+    <cfset sieveBinFile = "/mnt/data/sieve/users/" & recipient & ".svbin">
+    <cfif FileExists(sieveSrcFile)>
+        <cffile action="delete" file="#sieveSrcFile#">
+    </cfif>
+    <cfif FileExists(sieveBinFile)>
+        <cffile action="delete" file="#sieveBinFile#">
+    </cfif>
+<cfcatch type="any">
+    <!--- File cleanup is non-critical --->
+</cfcatch>
+</cftry>
+
+<!--- 6. DELETE MAILDIR FILES from Dovecot container.
+     Maildir path: /srv/mail/<domain>/<localpart>/
+     Uses docker exec since commandbox has the vmail volume read-only. --->
+<cfparam name="form.delete_maildir" default="0">
+<cfif form.delete_maildir EQ "1">
+    <cftry>
+        <cfset mailDomain = ListLast(recipient, "@")>
+        <cfset mailLocal = ListFirst(recipient, "@")>
+        <cfset mailDirPath = "/srv/mail/" & mailDomain & "/" & mailLocal>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_dovecot rm -rf #mailDirPath#"
+            variable="rmResult"
+            errorVariable="rmError"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Maildir deletion is non-critical --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
+<!--- 7. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
+<cfquery datasource="hermes">
+    DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<!--- #226 Phase 2B: drop the deleted mailbox from signature_by_sender
+     and sender_data.json so the milter no longer carries a stale
+     reference. Soft-fail; deletion shouldn't block on body milter
+     state. --->
+<cftry>
+    <cfset signatureRegenSilent = true>
+    <cfinclude template="signature_regen_map.cfm">
+<cfcatch type="any"></cfcatch>
+</cftry>
+
+<!--- SUCCESS --->
+<cfset session.m = 3>
+<cflocation url="view_mailboxes.cfm" addtoken="no">

@@ -1,0 +1,5 @@
+### Configuration file for rsyslog-mysql
+### Changes are preserved
+
+$ModLoad ommysql
+mail.* :ommysql:hermes_db_server,Syslog,__SYSLOG_USER__,__SYSLOG_PASS__

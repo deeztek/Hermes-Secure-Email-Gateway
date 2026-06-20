@@ -1,0 +1,80 @@
+
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+
+This file is part of Hermes Secure Email Gateway Community Edition.
+
+    Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+--->
+
+<cfinclude template="generate_customtrans.cfm">
+    
+    <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
+
+    <cfset decryptedPassword=decrypt(getkeyhex.pgp_keystore_password, #theKey#, "AES", "Base64")>
+    
+    <cffile action="read" file="/opt/hermes/scripts/export_pgp_private_key.sh" variable="temp">
+    
+    <cffile action = "write"
+        file = "/opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh"
+        output = "#REReplace("#temp#","THE_KEY","#getkeyhex.pgp_key_id#","ALL")#" addnewline="no">
+        
+    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh" variable="temp">
+    
+    <cffile action = "write"
+        file = "/opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh"
+        output = "#REReplace("#temp#","THE-PASSWORD","#decryptedPassword#","ALL")#" addnewline="no">
+    
+    <cfexecute name = "/bin/chmod"
+    arguments="+x /opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh"
+    timeout = "60">
+    </cfexecute>
+    
+    
+    <cfexecute name = "/opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh"
+    timeout = "240"
+    variable="thekeyid2"
+    arguments="-inputformat none">
+    </cfexecute>
+    
+    <!-- Delete File -->
+    <cfset FiletoDelete="/opt/hermes/tmp/#customtrans3#_export_pgp_private_key.sh">
+    <cfif fileExists(FiletoDelete)> 
+    <cffile action="delete" 
+    file = "#FiletoDelete#">
+
+    <!--- /CFIF FiletoDelete --->
+    </cfif>
+    
+    <cfset keyfile="/opt/hermes/tmp/#getkeyhex.pgp_key_id#_private.asc">
+    
+    
+    <cfif NOT fileExists(keyfile)> 
+
+        <cfset session.m = 18>
+        <cfoutput>
+        <cflocation url="#cgi.http_referer#" addtoken="no">
+        </cfoutput>
+        <cfabort>
+    
+    <cfelseif fileExists(keyfile)>
+    
+    <cfoutput>
+    <cfheader name="Content-disposition" value="attachment;filename=#getkeyhex.pgp_key_id#_private.asc">
+    <CFCONTENT FILE="/opt/hermes/tmp/#getkeyhex.pgp_key_id#_private.asc" type="application/unknown" DELETEFILE="Yes">
+    </cfoutput>
+    
+    <!-- /cfif fileExists(keyfile) -->
+    </cfif>
+    

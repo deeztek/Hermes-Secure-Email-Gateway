@@ -1,0 +1,10 @@
+dn: olcOverlay={THE_OVERLAY_INDEX}remoteauth,olcDatabase={THE_MDB_INDEX}mdb,cn=config
+objectClass: olcOverlayConfig
+objectClass: olcRemoteAuthCfg
+olcOverlay: {THE_OVERLAY_INDEX}remoteauth
+olcRemoteAuthDNAttribute: seeAlso
+olcRemoteAuthDomainAttribute: associatedDomain
+olcRemoteAuthDefaultDomain: THE_DEFAULT_DOMAIN
+THE_MAPPING_LINES
+olcRemoteAuthTLS: starttls=THE_STARTTLS tls_reqcert=THE_TLS_REQCERT THE_TLS_CACERT
+olcRemoteAuthRetryCount: THE_RETRY_COUNT

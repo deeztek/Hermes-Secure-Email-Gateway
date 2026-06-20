@@ -1,0 +1,13 @@
+dn: cn=user@example.com,ou=users,dc=hermes,dc=local
+objectClass: inetOrgPerson
+objectClass: organizationalPerson
+objectClass: person
+objectClass: top
+objectClass: domainRelatedObject
+associatedDomain: example
+seeAlso: CN=Example User,OU=Guacamole Users,DC=example,DC=com
+givenName: Dino
+sn: Edwards
+displayName: Example User
+mail: user@example.com
+uid: user@example.com

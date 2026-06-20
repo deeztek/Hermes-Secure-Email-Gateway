@@ -1,0 +1,18 @@
+# Normalize line endings to LF for all text files
+* text=auto eol=lf
+
+# Explicitly binary files - no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.p12 binary
+*.pem binary
+*.der binary
+*.crt binary
+*.key binary

@@ -1,0 +1,2 @@
+out="${1:-/dev/stdout}"
+/usr/sbin/dmidecode | grep UUID > "$out"

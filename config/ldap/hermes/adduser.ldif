@@ -1,0 +1,8 @@
+dn: cn=user@domain.tld,ou=users,dc=hermes,dc=local
+objectClass: inetOrgPerson
+givenName: Dino
+sn: Edwards
+displayName: Example User
+userPassword: {ARGON2}$argon2i$v=19$m=4096,t=3,p=1$A1heSvo26pH1TetvvuIicw$G9J6XAoqjrCojDCDAOX0PH2eoFsfXYoZWkMYbSjqGpk
+mail: user@domain.tld
+uid: user@domain.tld

@@ -1,0 +1,7 @@
+hosts = hermes_db_server
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+table = transport
+select_field = transport
+where_field = domain

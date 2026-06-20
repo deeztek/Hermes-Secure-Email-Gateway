@@ -1,0 +1,5 @@
+hosts = hermes_db_server
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+query = SELECT 1 FROM mailboxes WHERE username='%s'

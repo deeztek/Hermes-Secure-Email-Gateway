@@ -1,0 +1,5 @@
+hosts = hermes_db_server
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+query = SELECT maps FROM virtual_recipients WHERE virtual_address='%s' UNION SELECT delivers_to FROM mailbox_aliases WHERE alias_address='%s' AND delivers_to != 'discard:silently'

@@ -1,0 +1,261 @@
+<!---
+Hermes Secure Email Gateway Copyright Dionyssios Edwards. All Rights Reserved.
+
+This file is part of Hermes Secure Email Gateway Pro Edition.
+
+Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered under the Hermes Secure Email Gateway Pro Edition License.
+
+You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
+--->
+
+<!--- Include retention policy functions (lightweight, no cleanup operations) --->
+<cfinclude template="/schedule/retention_policy_functions.cfm">
+
+<!--- Include manifest verification functions (Pro Edition tamper detection) --->
+<cfinclude template="manifest_verify.cfm">
+
+<!--- Get UUID from hardware on EVERY request (hardware-locked; anti-piracy intact).
+     Write to a UNIQUE per-request temp file rather than a shared path, then read +
+     delete it -- concurrent logins/dashboard polls can't race on it. The file
+     redirect is the proven transport (it seeded the UUID reliably for years);
+     cfexecute's variable= capture returned empty in this Lucee/container. Invoke via
+     /bin/sh so the pipe + redirect inside the helper are interpreted. --->
+<cfset uuidTmpFile = "/opt/hermes/tmp/" & CreateUUID() & "_uuid">
+<cfexecute name="/bin/sh" arguments="/opt/hermes/scripts/dmidecode #uuidTmpFile#" timeout="10"></cfexecute>
+<cfset dmiRaw = "">
+<cfif FileExists(uuidTmpFile)>
+    <cffile action="read" file="#uuidTmpFile#" variable="dmiRaw" charset="utf-8">
+    <cffile action="delete" file="#uuidTmpFile#">
+</cfif>
+
+<cfset temp2="#REReplace("#dmiRaw#","#chr(10)#","","ALL")#">
+<cfset temp3="#REReplace("#temp2#","#chr(13)#","","ALL")#">
+<cfset temp4="#REReplace("#temp3#","","","ALL")#">
+<cfset temp5="#REReplace("#temp4#","UUID:","","ALL")#">
+<cfset theUuid = TRIM(temp5)>
+
+<!--- Get serial number from database --->
+<cfquery name="getserial" datasource="hermes">
+    SELECT value FROM system_settings WHERE parameter = 'serial'
+</cfquery>
+<cfset theSerial = "">
+<cfif getserial.recordcount GT 0>
+    <cfset theSerial = TRIM(getserial.value)>
+</cfif>
+
+<!--- Initialize session variables --->
+<cfset session.license = "N/A">
+<cfset session.edition = "Community">
+<cfset session.reason = "">
+<cfset session.licensevaliddays = "">
+<cfset session.licenseexpires = "">
+<cfset session.validationMode = "none"><!--- none, remote, cached --->
+
+<!--- Check if we have a serial number to validate --->
+<cfif Len(theSerial) GT 0>
+
+    <!--- Get current policy from database --->
+    <cfset currentPolicy = getRetentionPolicy()>
+
+    <!--- Attempt remote validation --->
+    <cfset remoteValidationSuccess = false>
+
+    <cftry>
+        <!--- Guard: never transmit a malformed payload. An empty hardware UUID
+             (e.g. a transient dmidecode read failure) collapses the leading "@",
+             putting the serial in the UUID slot -- the server then returns INVALID,
+             which tears down the Pro milter maps. Throw to the cfcatch so we fall
+             back to the database cache instead of poisoning remote validation. --->
+        <cfif Len(theUuid) EQ 0>
+            <cfthrow message="Empty hardware UUID -- skipping remote validation">
+        </cfif>
+
+        <!--- GENERATE CUSTOMTRANS for secure transmission --->
+        <cfinclude template="generate_customtrans.cfm">
+
+        <!--- Create validation payload --->
+        <cffile action="write" file="/opt/hermes/tmp/#customtrans3#_validatefile"
+            output="#theUuid##chr(64)##theSerial##chr(64)##currentPolicy.policyHash#" addnewline="no">
+
+        <!--- Encrypt with public key --->
+        <cfexecute name="/usr/bin/openssl"
+            arguments="rsautl -encrypt -inkey /opt/hermes/ssl/public.pem -pubin -in /opt/hermes/tmp/#customtrans3#_validatefile -out /opt/hermes/tmp/#customtrans3#_validatefile.ssl"
+            timeout="10">
+        </cfexecute>
+
+        <!--- Get build version and compute template fingerprint for tamper detection --->
+        <cfset buildVersion = getBuildVersion()>
+        <cfset templateFingerprint = getTemplateFingerprint()>
+
+        <!--- Send to validation server (5 second timeout for fast fallback) --->
+        <CFHTTP METHOD="Post" URL="https://validate.hermesseg.io" timeout="5">
+            <CFHTTPPARAM TYPE="File" NAME="#customtrans3#_validatefile.ssl" FILE="/opt/hermes/tmp/#customtrans3#_validatefile.ssl">
+            <CFHTTPPARAM TYPE="Formfield" VALUE="#customtrans3#" NAME="customtrans">
+            <CFHTTPPARAM TYPE="Formfield" VALUE="#buildVersion#" NAME="version">
+            <CFHTTPPARAM TYPE="Formfield" VALUE="#templateFingerprint#" NAME="template_fingerprint">
+        </CFHTTP>
+
+        <!--- Cleanup temp files --->
+        <cfset validatefile = "/opt/hermes/tmp/#customtrans3#_validatefile">
+        <cfif fileExists(validatefile)>
+            <cffile action="delete" file="#validatefile#">
+        </cfif>
+        <cfset validatefile_ssl = "/opt/hermes/tmp/#customtrans3#_validatefile.ssl">
+        <cfif fileExists(validatefile_ssl)>
+            <cffile action="delete" file="#validatefile_ssl#">
+        </cfif>
+
+        <!--- Process server response --->
+        <cfif cfhttp.status_code EQ "200">
+            <cfset serverResponse = TRIM(cfhttp.FileContent)>
+
+            <!--- Parse response: hash@expires[@fingerprint@signature] or ERROR/INVALID/REVOKED --->
+            <cfif serverResponse contains chr(64)>
+                <!--- Valid response format: hash@expires or hash@expires@fingerprint@signature --->
+                <cfset responseParts = ListToArray(serverResponse, chr(64))>
+                <cfset responseHash = TRIM(responseParts[1])>
+                <cfset responseExpires = TRIM(responseParts[2])>
+
+                <!--- Update retention policy in database --->
+                <cfset updateRetentionPolicy("VALID", responseExpires, theSerial, responseHash)>
+                <cfset remoteValidationSuccess = true>
+
+                <!--- Calculate days remaining --->
+                <cfset datenow = DateFormat(Now(), "yyyy-mm-dd")>
+                <cfset difference = datediff("d", datenow, responseExpires)>
+
+                <!--- Set session variables --->
+                <cfset session.license = "VALID">
+                <cfset session.edition = "Pro">
+                <cfset session.licensevaliddays = difference>
+                <cfset session.licenseexpires = DateFormat(responseExpires, "mm/dd/yyyy")>
+                <cfset session.validationMode = "remote">
+
+                <!--- Store signed fingerprint for offline verification (format: hash@expires@fingerprint@signature) --->
+                <cfif ArrayLen(responseParts) GTE 4>
+                    <cftry>
+                        <cfset responseFingerprint = TRIM(responseParts[3])>
+                        <cfset responseSignature = TRIM(responseParts[4])>
+
+                        <!--- Verify signature before storing --->
+                        <cfif verifyFingerprintSignature(responseFingerprint, responseSignature)>
+                            <cfset storeSignedFingerprint(responseFingerprint, responseSignature)>
+                        </cfif>
+                        <cfcatch>
+                            <!--- Silently ignore signature storage errors --->
+                        </cfcatch>
+                    </cftry>
+                </cfif>
+
+            <cfelseif serverResponse EQ "REVOKED">
+                <!--- License revoked --->
+                <cfset clearRetentionPolicy()>
+                <cfset session.license = "REVOKED">
+                <cfset session.edition = "Community">
+                <cfset remoteValidationSuccess = true>
+
+            <cfelseif serverResponse EQ "EXPIRED">
+                <!--- License expired --->
+                <cfset clearRetentionPolicy()>
+                <cfset session.license = "EXPIRED">
+                <cfset session.edition = "Community">
+                <cfset remoteValidationSuccess = true>
+
+            <cfelseif serverResponse EQ "INVALID">
+                <!--- Invalid/tampered license --->
+                <cfset clearRetentionPolicy()>
+                <cfset session.license = "INVALID">
+                <cfset session.edition = "Community">
+                <cfset remoteValidationSuccess = true>
+
+            <cfelseif serverResponse CONTAINS "TAMPERED">
+                <!--- Template files have been modified (Pro Edition tamper detection) --->
+                <cfset session.license = "TAMPERED">
+                <cfset session.edition = "Community">
+                <cfif ListLen(serverResponse, "|") GTE 2>
+                    <cfset session.tamperMessage = ListGetAt(serverResponse, 2, "|")>
+                <cfelse>
+                    <cfset session.tamperMessage = "Template integrity check failed">
+                </cfif>
+                <cfset remoteValidationSuccess = true>
+            </cfif>
+        </cfif>
+
+        <cfcatch type="any">
+            <!--- Remote validation failed (network error, timeout, etc.) --->
+            <cfset remoteValidationSuccess = false>
+        </cfcatch>
+    </cftry>
+
+    <!--- If remote validation failed, fall back to database cache --->
+    <cfif NOT remoteValidationSuccess>
+        <cfif currentPolicy.isValid AND currentPolicy.policyStatus EQ "VALID">
+            <!--- Use cached database value --->
+            <cfset datenow = DateFormat(Now(), "yyyy-mm-dd")>
+
+            <cfif Len(currentPolicy.retentionDays) AND currentPolicy.retentionDays GTE datenow>
+                <!--- License date is valid, now verify templates haven't been tampered with --->
+                <cfset offlineVerification = verifyOfflineFingerprint()>
+
+                <cfif offlineVerification.valid>
+                    <!--- Templates verified - check grace period (7 days from last remote validation) --->
+                    <cfset gracePeriodDays = 7>
+                    <cfset gracePeriodRemaining = gracePeriodDays>
+
+                    <cfif Len(currentPolicy.lastRemoteValidation) GT 0>
+                        <cfset daysSinceRemote = datediff("d", currentPolicy.lastRemoteValidation, datenow)>
+                        <cfset gracePeriodRemaining = gracePeriodDays - daysSinceRemote>
+                    </cfif>
+
+                    <cfif gracePeriodRemaining GT 0>
+                        <!--- Within grace period - allow Pro mode --->
+                        <cfset difference = datediff("d", datenow, currentPolicy.retentionDays)>
+                        <cfset session.license = "VALID">
+                        <cfset session.edition = "Pro">
+                        <cfset session.licensevaliddays = difference>
+                        <cfset session.licenseexpires = DateFormat(currentPolicy.retentionDays, "mm/dd/yyyy")>
+                        <cfset session.validationMode = "cached">
+                        <cfset session.gracePeriodRemaining = gracePeriodRemaining>
+                    <cfelse>
+                        <!--- Grace period expired - require online validation --->
+                        <cfset session.license = "GRACE_PERIOD_EXPIRED">
+                        <cfset session.edition = "Community">
+                        <cfset session.reason = "Offline grace period expired. Connect to internet and log in again to revalidate.">
+                    </cfif>
+                <cfelseif offlineVerification.reason EQ "No stored fingerprint">
+                    <!--- No fingerprint stored - require online validation before offline mode is allowed --->
+                    <cfset session.license = "PENDING_VALIDATION">
+                    <cfset session.edition = "Community">
+                    <cfset session.reason = "Online validation required to establish template fingerprint baseline">
+                <cfelse>
+                    <!--- Templates have been tampered with --->
+                    <cfset session.license = "TAMPERED">
+                    <cfset session.edition = "Community">
+                    <cfset session.tamperMessage = offlineVerification.reason>
+                </cfif>
+            <cfelse>
+                <!--- Cached license is expired --->
+                <cfset session.license = "EXPIRED">
+                <cfset session.edition = "Community">
+            </cfif>
+        <cfelse>
+            <!--- No valid cached data and no remote validation - Community Edition --->
+            <!--- Legacy file-based license validation removed (incompatible with Docker) --->
+        </cfif>
+    </cfif>
+
+</cfif>
+
+<!--- #276 Pro milter enforcement: stop NEW Pro body-modification at the milter
+     ONLY on a server-confirmed license loss (revoked / expired / invalid).
+     Deliberately EXCLUDES:
+       - TAMPERED: usually a benign fingerprint mismatch during an upgrade before
+         the manifest is republished -- NOT piracy. Tearing down on it is a
+         destructive false-positive. TAMPERED still gates the UI + shows the alert.
+       - N/A / PENDING_VALIDATION / GRACE_PERIOD_EXPIRED: transient no-validation
+         states (network blip, no cache yet) -- not a real loss.
+     The teardown itself is now non-destructive (keeps keys; only stops new
+     minting), so in-flight links keep resolving and age out via the token TTL. --->
+<cfif ListFindNoCase("REVOKED,EXPIRED,INVALID", session.license)>
+    <cfinclude template="pro_milter_enforce.cfm">
+</cfif>

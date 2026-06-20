@@ -1,0 +1,6 @@
+dn: dc=hermes,dc=local
+objectClass: top
+objectClass: dcObject
+objectClass: organization
+dc: hermes
+o: Hermes

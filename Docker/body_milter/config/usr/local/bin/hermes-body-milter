@@ -1,0 +1,2060 @@
+#!/usr/bin/env python3
+# Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2021. All Rights Reserved.
+#
+# This file is part of Hermes Secure Email Gateway Community Edition.
+#
+#     Hermes Secure Email Gateway Community Edition is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU Affero General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+#
+#     Hermes Secure Email Gateway Community Edition is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+#
+#     You should have received a copy of the GNU Affero General Public License
+#     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
+"""
+hermes-body-milter
+==================
+
+Postfix milter that applies admin-defined body modifications to mail in
+flight. v1 ships only the Disclaimer modifier (#214); the framework is
+designed so User Signatures (#226), External Banner (#228), and Link
+Guard (future) slot in as additional Modifier subclasses without
+touching the dispatcher.
+
+------------------------------------------------------------------------
+Pipeline position
+------------------------------------------------------------------------
+
+  Postfix smtpd   ->   Amavis  ->  Ciphermail  ->  Postfix :10026  ->  external
+        |
+        +-- smtpd_milters chain:
+              1. OpenDKIM    (existing)
+              2. OpenDMARC   (existing)
+              3. THIS MILTER (inet:hermes_body_milter:8893)
+
+Body modification happens at smtpd time, BEFORE content_filter routes
+to Amavis. By the time Amavis sees the message, the modification is
+already baked in. Amavis processes a normal-looking message; no
+internal-state coupling, no temp-file race.
+
+OpenDKIM signs at the :10026 re-injection AFTER all of the above, so
+Hermes' own DKIM covers the modified body. Ciphermail signs/encrypts
+server-side after amavis, so its signature also covers the modified
+body. Recipients get a valid signature AND any added text.
+
+------------------------------------------------------------------------
+Configuration root: /etc/hermes/body_milter/
+------------------------------------------------------------------------
+
+  disclaimers/disclaimer_by_sender         sender -> option name map (#214)
+  disclaimers/files/<option>/body.txt      plain-text disclaimer
+  disclaimers/files/<option>/body.html     html disclaimer (may have cid: refs)
+  disclaimers/files/<option>/images/N.png  per-disclaimer inline images (#230)
+  signatures/...                           #226, future
+  banners/...                              #228, future
+  linkguard/...                            future
+
+Each Modifier owns its subdirectory. Adding a new modifier means a new
+subdirectory, no path migrations.
+
+------------------------------------------------------------------------
+Failure modes (all "pass through unmodified", never lose mail)
+------------------------------------------------------------------------
+
+  - Map missing or unreadable                -> no match, pass through
+  - Sender doesn't match map                 -> pass through
+  - Modifier-specific skip condition matches -> pass through, log reason
+  - MIME parse exception in modifier         -> log + pass through
+  - Modifier raises any other exception      -> log + pass through
+  - replacebody() raises                     -> log + pass through
+
+Postfix's milter_default_action = accept ensures that even a milter
+crash leaves mail flowing unmodified. Worst case is a missed
+modification, never a delivery outage.
+
+------------------------------------------------------------------------
+Map auto-reload
+------------------------------------------------------------------------
+
+Each map self-stats on every lookup and reloads when its file's mtime
+changes. CFML regenerator just writes the file; the milter notices on
+the next message. No SIGHUP, no IPC.
+
+------------------------------------------------------------------------
+Postfix-side configuration (in main.cf)
+------------------------------------------------------------------------
+
+  smtpd_milters       = ... existing ... inet:hermes_body_milter:8893
+  non_smtpd_milters   = $smtpd_milters
+  milter_default_action = accept
+  milter_protocol     = 6
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import os
+import re
+import sqlite3
+import sys
+import threading
+import time
+import traceback
+from email import encoders, message_from_bytes, policy as email_policy
+from email.message import Message
+from email.mime.image import MIMEImage
+from email.mime.multipart import MIMEMultipart
+from typing import List, Optional, Tuple
+from urllib.parse import urlsplit, parse_qs
+
+import Milter
+from bs4 import BeautifulSoup
+
+
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
+CONFIG_ROOT = '/etc/hermes/body_milter'
+LISTEN_SOCKET = 'inet:8893'
+
+# Source-of-truth for "is this domain local?". Postfix already maintains
+# this file as the relay_domains lookup; we read it directly to determine
+# inbound vs outbound vs internal direction.
+LOCAL_DOMAINS_FILE = '/etc/postfix/relay_domains'
+
+
+# Skip-condition regexes. Operate on the raw RFC 5322 header section as
+# bytes (line-folded headers are unfolded before the search at runtime).
+RE_SMIME_SIGNED = re.compile(
+    rb'Content-Type:\s*multipart/signed[^\n]*?protocol="application/(pkcs7-signature|x-pkcs7-signature)"',
+    re.I | re.S,
+)
+RE_SMIME_OPAQUE = re.compile(
+    rb'Content-Type:\s*application/(pkcs7-mime|x-pkcs7-mime)', re.I,
+)
+RE_PGP_SIGNED = re.compile(
+    rb'Content-Type:\s*multipart/signed[^\n]*?protocol="application/pgp-signature"',
+    re.I | re.S,
+)
+RE_PGP_ENCRYPTED = re.compile(
+    rb'Content-Type:\s*multipart/encrypted[^\n]*?protocol="application/pgp-encrypted"',
+    re.I | re.S,
+)
+RE_PGP_INLINE = re.compile(rb'-----BEGIN PGP (SIGNED MESSAGE|MESSAGE)-----')
+RE_DKIM_HEADER = re.compile(rb'^DKIM-Signature\s*:', re.I | re.M)
+
+
+log = logging.getLogger('hermes_body_milter')
+
+
+# ---------------------------------------------------------------------------
+# Local-domain detection (drives direction = inbound | outbound | internal)
+# ---------------------------------------------------------------------------
+
+class LocalDomains:
+    """
+    Caches the set of local domains, refreshed when the file's mtime changes.
+
+    Postfix's relay_domains file format is one domain per line; this is
+    the canonical "domains we accept mail FOR" set, which doubles as the
+    "is this sender from one of our domains" set for outbound detection.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._domains = set()
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            try:
+                with open(self.path, 'r') as f:
+                    domains = set()
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        parts = line.split()
+                        if parts:
+                            domains.add(parts[0].lower())
+                    self._domains = domains
+                    self._mtime = m
+                    log.info('local domains: %d entries from %s', len(domains), self.path)
+            except IOError as e:
+                log.warning('cannot load local domains from %s: %s', self.path, e)
+
+    def contains(self, domain: str) -> bool:
+        self.refresh()
+        return domain.lower() in self._domains
+
+
+local_domains = LocalDomains(LOCAL_DOMAINS_FILE)
+
+
+# ---------------------------------------------------------------------------
+# Reusable mtime-watching map loader
+# ---------------------------------------------------------------------------
+
+class SenderMap:
+    """
+    Tab- or whitespace-delimited "<sender>\\t<option_name>" map.
+    <sender> is either a full email address (full match) or "@<domain>"
+    (domain wildcard). Most-specific match wins. Self-refreshes on
+    mtime change.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._map: dict = {}
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            new_map = {}
+            try:
+                with open(self.path, 'r') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#'):
+                            continue
+                        parts = line.split()
+                        if len(parts) >= 2:
+                            new_map[parts[0].lower()] = parts[1]
+                self._map = new_map
+                self._mtime = m
+                log.info('reloaded %s: %d entries', self.path, len(new_map))
+            except IOError as e:
+                log.warning('cannot load %s: %s', self.path, e)
+
+    def lookup(self, sender: str) -> Optional[str]:
+        self.refresh()
+        sender = sender.lower()
+        m = self._map.get(sender)
+        if m is None and '@' in sender:
+            domain = sender.split('@', 1)[1]
+            m = self._map.get('@' + domain)
+        return m
+
+
+# ---------------------------------------------------------------------------
+# Sender placeholder-substitution data map (#226 Phase 2B)
+# ---------------------------------------------------------------------------
+
+class SenderDataMap:
+    """
+    JSON-keyed sender -> {namespace.field: value} substitution dict.
+    Self-refreshes on mtime change.
+
+    Source file format (written by the CFML resolver):
+        {
+          "alice@example.com": {
+            "user.first_name": "Alice",
+            "user.last_name":  "Smith",
+            "org.name":        "Acme",
+            ...
+          },
+          ...
+        }
+
+    Modifiers call lookup(sender) to get a dict for the sender
+    (empty dict if no entry), then pass it to
+    Modifier._substitute_placeholders() to fill {{user.*}} /
+    {{org.*}} / {{dept.*}} tokens in the on-disk signature template.
+    """
+    def __init__(self, path: str):
+        self.path = path
+        self._map: dict = {}
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            try:
+                with open(self.path, 'r') as f:
+                    parsed = json.load(f)
+            except (IOError, ValueError) as e:
+                log.warning('cannot load %s: %s', self.path, e)
+                return
+            if not isinstance(parsed, dict):
+                log.warning('sender_data: %s did not parse as object', self.path)
+                return
+            # Lowercase BOTH sender keys (outer) and namespace.field
+            # keys (inner). Lucee 5's SerializeJSON uppercases struct
+            # keys by default, so the JSON file we read has keys like
+            # "USER.FIRST_NAME"; the milter substitutes against
+            # lowercase token names, so normalize on load. Drop entries
+            # whose value isn't an object (defensive).
+            new_map = {}
+            for k, v in parsed.items():
+                if isinstance(v, dict):
+                    new_map[k.lower()] = {
+                        ik.lower(): iv for ik, iv in v.items()
+                    }
+            self._map = new_map
+            self._mtime = m
+            log.info('reloaded %s: %d entries', self.path, len(new_map))
+
+    def lookup(self, sender: str) -> dict:
+        self.refresh()
+        return self._map.get(sender.lower(), {})
+
+
+# ---------------------------------------------------------------------------
+# Per-message context (built once at end-of-message)
+# ---------------------------------------------------------------------------
+
+class MessageContext:
+    def __init__(self, sender: str, recipients: List[str],
+                 raw_headers: bytes, body_bytes: bytes):
+        self.sender = sender.lower()
+        self.recipients = [r.lower() for r in recipients]
+        self.raw_headers = self._unfold(raw_headers)
+        self.body_bytes = body_bytes
+        self.modified = False
+        self.direction = self._detect_direction()
+        # Lazy-parsed full MIME message (built only if a modifier asks)
+        self._email_msg: Optional[Message] = None
+        # #230: per-message inline image queue. Modifiers call
+        # attach_image(cid, file_path) when their HTML disclaimer has
+        # cid: references. At serialize_body() time the message is
+        # wrapped as multipart/related with these images attached as
+        # sibling parts. Empty list = no wrap, message structure
+        # unchanged.
+        self.image_attachments: List[Tuple[str, str]] = []
+        self._was_wrapped: bool = False
+
+    @property
+    def sender_domain(self) -> str:
+        return self.sender.split('@', 1)[1] if '@' in self.sender else ''
+
+    @staticmethod
+    def _unfold(raw: bytes) -> bytes:
+        """RFC 5322 header line-folding: a continuation line begins with
+        WSP. Unfold so multi-line Content-Type headers match cleanly."""
+        return re.sub(rb'\r?\n[ \t]+', b' ', raw)
+
+    def _detect_direction(self) -> str:
+        if not self.sender:
+            return 'unknown'
+        sender_local = local_domains.contains(self.sender_domain)
+        recip_local = any(
+            local_domains.contains(r.split('@', 1)[1]) if '@' in r else False
+            for r in self.recipients
+        )
+        if sender_local and not recip_local:
+            return 'outbound'
+        if not sender_local and recip_local:
+            return 'inbound'
+        if sender_local and recip_local:
+            return 'internal'
+        return 'unknown'
+
+    def email_message(self) -> Message:
+        """Lazy-parse the full MIME message. Modifiers that need MIME
+        traversal call this; modifiers that only inspect headers/body
+        bytes don't pay the parse cost."""
+        if self._email_msg is None:
+            full = self.raw_headers + b'\r\n' + self.body_bytes
+            self._email_msg = message_from_bytes(full, policy=email_policy.SMTP)
+        return self._email_msg
+
+    def attach_image(self, cid: str, file_path: str) -> None:
+        """Modifier hook: queue an inline image part for attachment.
+        At serialize_body() time the message is wrapped as
+        multipart/related with the original message as the first part
+        and one image part per queued (cid, file) tuple.
+
+        cid: the Content-ID value (without angle brackets) referenced
+             by <img src="cid:..."> in the HTML disclaimer
+        file_path: absolute path to the image binary on disk
+        """
+        self.image_attachments.append((cid, file_path))
+
+    def serialize_body(self) -> bytes:
+        """Re-serialize the (possibly modified) MIME message and return
+        only the body portion (everything after the header/body
+        separator). If image attachments are queued, wrap the message
+        as multipart/related first.
+
+        Milter's replacebody() expects the body bytes; the dispatcher
+        is responsible for any chgheader call to update the top-level
+        Content-Type if wrapping occurred (see _was_wrapped)."""
+        msg = self.email_message()
+
+        if self.image_attachments and not self._was_wrapped:
+            msg = self._wrap_with_related(msg, self.image_attachments)
+            self._email_msg = msg
+            self._was_wrapped = True
+
+        # Python 3.12 has a bug in email_policy.SMTP's encoded-word folding
+        # path: when a header (e.g. Subject) contains non-ASCII characters
+        # (emoji in marketing email subjects, Unicode punctuation, etc.) the
+        # _fold_as_ew -> _ew.encode call attempts string.encode('ascii',
+        # 'surrogateescape') on already-bytes data and raises
+        # UnicodeEncodeError. When this fires from inside eom(), replacebody()
+        # is never called -- so the milter ships the original unmodified body
+        # downstream and any banner / disclaimer / signature injection is
+        # silently lost. Fall back to compat32 (the Python 2-era policy)
+        # which is forgiving on Unicode in headers and produces serializable
+        # output for the messages that trip SMTP policy.
+        try:
+            full = msg.as_bytes(policy=email_policy.SMTP)
+        except UnicodeEncodeError:
+            log.warning('serialize_body: SMTP policy raised UnicodeEncodeError '
+                        '(likely non-ASCII in header); falling back to compat32')
+            full = msg.as_bytes(policy=email_policy.compat32)
+        sep = full.find(b'\r\n\r\n')
+        if sep != -1:
+            return full[sep + 4:]
+        sep = full.find(b'\n\n')
+        if sep != -1:
+            return full[sep + 2:]
+        return full
+
+    @staticmethod
+    def _wrap_with_related(msg: Message,
+                            images: List[Tuple[str, str]]) -> Message:
+        """Wrap msg in multipart/related with image siblings attached.
+
+        Handles 5 input shapes:
+          1. text/plain only            -> related { plain, image* }
+          2. text/html only             -> related { html, image* }
+          3. multipart/alternative      -> related { alternative, image* }
+          4. multipart/related (already)-> attach images as more siblings
+          5. multipart/mixed (with attachments)
+                                        -> related { mixed, image* } (best
+                                           effort; readers should still
+                                           render the inline images)
+        """
+        ct = msg.get_content_type()
+
+        # Case 4: already multipart/related — just attach more parts
+        if ct == 'multipart/related':
+            for cid, file_path in images:
+                img_part = MessageContext._build_image_part(cid, file_path)
+                if img_part is not None:
+                    msg.attach(img_part)
+            return msg
+
+        # Cases 1, 2, 3, 5: build a fresh multipart/related, move the
+        # original payload in as the first part, attach images as siblings.
+        related = MIMEMultipart('related')
+
+        # Carry non-content top-level headers across (From, To, Subject,
+        # Date, Message-ID, etc.). Skip Content-* and MIME-Version which
+        # the new multipart/related sets fresh.
+        for header, value in msg.items():
+            h_lower = header.lower()
+            if h_lower.startswith('content-') or h_lower == 'mime-version':
+                continue
+            related[header] = value
+
+        # Build the inner submessage by serializing-and-reparsing the
+        # original. This preserves multipart structure if any, and
+        # gives us a Message we can attach. Only Content-* and
+        # MIME-Version stay on the inner; everything else is now on
+        # the outer related.
+        inner_bytes = msg.as_bytes(policy=email_policy.SMTP)
+        inner = message_from_bytes(inner_bytes, policy=email_policy.SMTP)
+        for header in list(inner.keys()):
+            h_lower = header.lower()
+            if not (h_lower.startswith('content-') or h_lower == 'mime-version'):
+                del inner[header]
+        related.attach(inner)
+
+        # Attach image parts.
+        for cid, file_path in images:
+            img_part = MessageContext._build_image_part(cid, file_path)
+            if img_part is not None:
+                related.attach(img_part)
+
+        return related
+
+    @staticmethod
+    def _build_image_part(cid: str, file_path: str) -> Optional[Message]:
+        """Construct a MIMEImage with Content-ID + Content-Disposition:
+        inline. Returns None if the file can't be read."""
+        try:
+            with open(file_path, 'rb') as f:
+                img_data = f.read()
+        except IOError as e:
+            log.warning('cannot read image %s: %s', file_path, e)
+            return None
+
+        ext = os.path.splitext(file_path)[1].lstrip('.').lower()
+        if ext == 'jpg':
+            ext = 'jpeg'
+        if ext not in ('png', 'jpeg', 'gif'):
+            log.warning('unexpected image extension %r for %s', ext, file_path)
+            return None
+
+        img_part = MIMEImage(img_data, _subtype=ext)
+        img_part.add_header('Content-ID', f'<{cid}>')
+        img_part.add_header('Content-Disposition', 'inline')
+        return img_part
+
+    # ----- skip-condition helpers (used by Modifier base class) -----
+
+    def headers_have_signed_envelope(self) -> Tuple[bool, str]:
+        """True if S/MIME or PGP envelope is present in the headers."""
+        if RE_SMIME_SIGNED.search(self.raw_headers):
+            return True, 'S/MIME signed (multipart/signed)'
+        if RE_SMIME_OPAQUE.search(self.raw_headers):
+            return True, 'S/MIME (application/pkcs7-mime)'
+        if RE_PGP_SIGNED.search(self.raw_headers):
+            return True, 'PGP/MIME signed'
+        if RE_PGP_ENCRYPTED.search(self.raw_headers):
+            return True, 'PGP/MIME encrypted'
+        return False, ''
+
+    def headers_have_dkim(self) -> bool:
+        return bool(RE_DKIM_HEADER.search(self.raw_headers))
+
+    def body_has_pgp_inline(self) -> bool:
+        return bool(RE_PGP_INLINE.search(self.body_bytes[:32768]))
+
+
+# ---------------------------------------------------------------------------
+# Modifier framework
+# ---------------------------------------------------------------------------
+
+class Modifier:
+    """
+    Subclass and override applies_to() and modify(). Standard skip rules
+    are checked by the dispatcher via standard_skip_check(); override
+    individual skip_on_* class attributes to tune behavior.
+
+    Each instance is constructed once at startup and reused for every
+    message; instances must be safe to call from the milter callback
+    thread.
+    """
+    name = 'abstract'
+    direction = 'both'           # 'outbound', 'inbound', 'both'
+    skip_on_signed = True        # skip if S/MIME or PGP envelope is present
+    skip_on_pgp_inline = True    # skip if body contains "BEGIN PGP ..." block
+    skip_on_dkim = True          # skip if pre-existing DKIM-Signature header
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        """Return True if this modifier wants to run on this message.
+        Direction filter is applied first; subclasses extend with their
+        own conditions (e.g. sender-map lookup, recipient checks)."""
+        if self.direction != 'both' and ctx.direction != self.direction:
+            return False
+        return True
+
+    def standard_skip_check(self, ctx: MessageContext) -> Optional[str]:
+        """Returns None to proceed; a reason string to skip with logging."""
+        if self.skip_on_signed:
+            sig, reason = ctx.headers_have_signed_envelope()
+            if sig:
+                return reason
+        if self.skip_on_pgp_inline and ctx.body_has_pgp_inline():
+            return 'PGP inline in body'
+        if self.skip_on_dkim and ctx.headers_have_dkim():
+            return 'pre-existing DKIM-Signature'
+        return None
+
+    def modify(self, ctx: MessageContext) -> None:
+        """Mutate ctx.email_message() in place; set ctx.modified = True
+        if any change was made."""
+        raise NotImplementedError
+
+    # -----------------------------------------------------------------
+    # Placeholder substitution helper (#226 Phase 2B)
+    # -----------------------------------------------------------------
+    # Token shape: {{namespace.field}} where namespace is a short
+    # identifier (user, org, dept, ...) and field is the data attribute
+    # within that namespace. Reusable across modifiers - any future
+    # modifier (External Sender Banner #228, Link Guard, etc.) can call
+    # _substitute_placeholders against its own SenderDataMap-backed
+    # data dict.
+    PLACEHOLDER_RE = re.compile(r'\{\{\s*([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\s*\}\}', re.IGNORECASE)
+
+    def _substitute_placeholders(self, text: str, data: dict) -> str:
+        """Replace {{namespace.field}} tokens in text with values from
+        data. Tokens whose key is missing in data resolve to empty
+        string so missing personal-info fields render as blank rather
+        than literal {{user.title}} in delivered mail.
+
+        Case-insensitive match; data keys are expected lowercase
+        'namespace.field' format (the CFML resolver writes them that
+        way)."""
+        if not text or '{{' not in text:
+            return text
+
+        def repl(m: 're.Match') -> str:
+            key = (m.group(1) + '.' + m.group(2)).lower()
+            val = data.get(key, '')
+            return val if isinstance(val, str) else str(val)
+
+        return self.PLACEHOLDER_RE.sub(repl, text)
+
+    # Pattern for "label-only" leaf divs after substitution. Matches
+    # things like "M:", "Phone:", "Tel: " - a short word/letters,
+    # optional whitespace, a colon, optional trailing whitespace, and
+    # nothing else. Bound by the regex to under 12 chars so we don't
+    # accidentally drop a div whose body happens to contain a colon
+    # (e.g. a long disclaimer "Note: this message is...").
+    _LABEL_ONLY_RE = re.compile(r'^\s*[A-Za-z]{1,12}\s*:\s*$')
+
+    @staticmethod
+    def _force_base64_encoding(part: Message) -> None:
+        """Force a text part to base64 Content-Transfer-Encoding.
+
+        Python's email library defaults to quoted-printable for text
+        content under the SMTP policy. QP wraps long lines with
+        `=\\r\\n` soft line breaks every 76 chars. If the receiving MUA
+        doesn't decode QP correctly (CTE header mismatch in transit,
+        broken serialization, etc.), those soft breaks render as
+        literal `=` characters in the visible body.
+
+        Base64 sidesteps the issue entirely - no soft line breaks, no
+        special characters in the encoded form, universal MUA support.
+
+        Call this AFTER set_content on a modified text/* part to
+        replace any QP encoding with base64. Idempotent.
+
+        Implementation: hand-rolled set_payload(string) + explicit CTE
+        header was tried first but is unreliable under email.policy.SMTP
+        (an EmailPolicy, not compat32) - the policy's content manager
+        re-evaluates the CTE during as_bytes() serialization and silently
+        overrides our explicit `base64` header back to `quoted-printable`
+        for single-part text/* messages. (Multipart inner parts use a
+        different code path that DOES honor the explicit header, which
+        is why this bug only manifested on single-part text/html mail.)
+
+        email.encoders.encode_base64 is the canonical policy-agnostic
+        path: it puts raw bytes in the payload, base64-encodes them in
+        place, and sets the CTE header in a way the generator honors
+        across both single- and multi-part shapes."""
+        try:
+            payload = part.get_content()
+        except Exception:
+            return
+        if not isinstance(payload, str):
+            return
+        try:
+            charset = part.get_content_charset() or 'utf-8'
+            raw = payload.encode(charset, errors='replace')
+        except Exception:
+            return
+        # Set the raw decoded bytes as the payload, then let the email
+        # encoders module handle base64 encoding AND the header update.
+        part.set_payload(raw)
+        del part['Content-Transfer-Encoding']
+        encoders.encode_base64(part)
+
+    def _drop_empty_contact_lines(self, html: str) -> str:
+        """Walk substituted HTML and drop leaf <div> elements that:
+          - contain no text content at all (a {{user.title}} that
+            substituted to empty in a div with no label), OR
+          - contain only a label-prefix like "M:" or "Phone:" (the
+            placeholder substituted to empty but the label is still
+            there), OR
+          - contain only separators / punctuation, no alphanumerics
+            (a pipe-joined contact line where every value substituted
+            to empty leaves "|  |  |" behind).
+
+        Skips divs that hold meaningful media or block layout
+        (img, table, ul, ol, hr) so we don't accidentally drop a
+        logo-bearing or layout cell. <a>, <span>, <strong> etc. are
+        treated as inline content - if their text content is also
+        empty/label-only the parent div drops."""
+        if not html or '<div' not in html.lower():
+            return html
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+        except Exception:
+            return html
+        for div in list(soup.find_all('div')):
+            # Preserve any div that contains structural / media content.
+            if div.find(['img', 'table', 'ul', 'ol', 'hr']):
+                continue
+            text = div.get_text(strip=True)
+            if not text:
+                div.decompose()
+                continue
+            if self._LABEL_ONLY_RE.match(text):
+                div.decompose()
+                continue
+            # No letters or digits anywhere - the content collapsed to
+            # punctuation / separators only. Drop.
+            if not re.search(r'[A-Za-z0-9]', text):
+                div.decompose()
+        return str(soup)
+
+
+# ---------------------------------------------------------------------------
+# DisclaimerModifier (the only modifier shipped in v1)
+# ---------------------------------------------------------------------------
+
+class DisclaimerModifier(Modifier):
+    """Append admin-defined disclaimer text to outbound mail.
+
+    Map: /etc/hermes/body_milter/disclaimers/disclaimer_by_sender
+    Per-disclaimer dir: /etc/hermes/body_milter/disclaimers/files/<option>/
+        body.txt           plain-text disclaimer
+        body.html          html disclaimer (may have cid: image references)
+        images/N.png       inline images referenced by cid: (#230)
+
+    Match: outbound + sender matches map (full address before @domain).
+    Skip: S/MIME or PGP envelope (recipient verification would fail),
+          PGP inline body block.
+    Does NOT skip on pre-existing DKIM-Signature: the multi-instance
+    OpenDKIM architecture (#232) places a sign-only OpenDKIM instance
+    at :10026 that re-signs the modified body after CipherMail rebuilds
+    MIME. The DKIM-Signature header written by the primary OpenDKIM
+    at :587/:465 submission is invalidated by our body modification,
+    but the :10026 re-sign step produces a fresh valid signature on
+    egress. Skipping on DKIM here would render this feature useless
+    on the ~100% of outbound mail that gets signed at submission.
+    No reply-chain dedup - every outbound message gets a fresh
+    disclaimer, matching industry norm (Exclaimer, Crossware, M365
+    transport rules) and compliance posture.
+    """
+    name = 'disclaimer'
+    direction = 'outbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False        # #232 multi-instance OpenDKIM re-signs at :10026
+
+    DIR = os.path.join(CONFIG_ROOT, 'disclaimers')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'disclaimer_by_sender')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+
+    # cid: references emitted by the CFML save-time base64 extractor.
+    # Format is `disclaimer_<option>_img_<N>` where <N> is the 1-based
+    # image index in the disclaimer's images/ subdirectory.
+    CID_REF_RE = re.compile(r'cid:(disclaimer_[\w.-]+_img_\d+)')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self.map.lookup(ctx.sender) is not None
+
+    def modify(self, ctx: MessageContext) -> None:
+        option = self.map.lookup(ctx.sender)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('disclaimer: refusing unsafe option name %r', option)
+            return
+
+        # Per-disclaimer subdirectory layout (post-#230 storage migration):
+        #   <FILES_DIR>/<option>/body.txt
+        #   <FILES_DIR>/<option>/body.html
+        #   <FILES_DIR>/<option>/images/<N>.<ext>   (#230 phase 2)
+        option_dir = os.path.join(self.FILES_DIR, option)
+        txt_path = os.path.join(option_dir, 'body.txt')
+        html_path = os.path.join(option_dir, 'body.html')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('disclaimer: missing per-scope files for %r at %s',
+                        option, option_dir)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_disc = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_disc = f.read().decode('utf-8', 'replace')
+        except IOError as e:
+            log.warning('disclaimer: cannot read per-scope files: %s', e)
+            return
+
+        msg = ctx.email_message()
+        plain_n, html_n = self._append_to_parts(msg, txt_disc, html_disc)
+        if plain_n or html_n:
+            ctx.modified = True
+            log.info('disclaimer applied: sender=%s option=%s plain=%d html=%d direction=%s',
+                     ctx.sender, option, plain_n, html_n, ctx.direction)
+
+            # #230: queue inline images for cid: refs in the html
+            # disclaimer ONLY if the message actually has a text/html
+            # part to render them in. A plain-text-only message that
+            # got the disclaimer applied to its text/plain part would
+            # carry orphan image attachments otherwise.
+            if html_n:
+                self._queue_cid_images(ctx, option_dir, html_disc)
+        else:
+            log.info('disclaimer: no text/plain or text/html parts to modify (sender=%s)',
+                     ctx.sender)
+
+    def _queue_cid_images(self, ctx: MessageContext,
+                          option_dir: str, html_disc: str) -> None:
+        """Find cid: refs in the html disclaimer; for each, locate the
+        matching image file and queue it on ctx for attachment at
+        serialize time."""
+        cid_refs = list(set(self.CID_REF_RE.findall(html_disc)))
+        if not cid_refs:
+            return
+        images_dir = os.path.join(option_dir, 'images')
+        if not os.path.isdir(images_dir):
+            log.warning('disclaimer: html has %d cid refs but %s is missing',
+                        len(cid_refs), images_dir)
+            return
+        for cid in cid_refs:
+            m = re.search(r'_img_(\d+)$', cid)
+            if not m:
+                continue
+            idx = m.group(1)
+            file_path = None
+            for ext in ('png', 'jpg', 'jpeg', 'gif'):
+                candidate = os.path.join(images_dir, f'{idx}.{ext}')
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+            if file_path is None:
+                log.warning('disclaimer: cid %s referenced in html but no '
+                            'matching image file in %s', cid, images_dir)
+                continue
+            ctx.attach_image(cid, file_path)
+            log.info('disclaimer: queued inline image cid=%s file=%s',
+                     cid, file_path)
+
+    def _append_to_parts(self, msg: Message, txt: str,
+                         html: str) -> Tuple[int, int]:
+        """Walk the MIME tree, append disclaimers to text/plain and
+        text/html leaf parts. Returns (plain_count, html_count) so the
+        caller can decide whether to queue inline image attachments
+        (which only make sense if a text/html part exists)."""
+        plain_count = 0
+        html_count = 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    part.set_content(payload + '\n\n' + txt + '\n')
+                    self._force_base64_encoding(part)
+                    plain_count += 1
+                except Exception:
+                    log.warning('disclaimer: text/plain modify failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new = self._inject_html(payload, html)
+                    part.set_content(new, subtype='html')
+                    self._force_base64_encoding(part)
+                    html_count += 1
+                except Exception:
+                    log.warning('disclaimer: text/html modify failed:\n%s',
+                                traceback.format_exc())
+        return (plain_count, html_count)
+
+    def _inject_html(self, body_html: str, disclaimer_html: str) -> str:
+        """Insert disclaimer_html as the last child of <body>; if no
+        <body> tag is present, append at the end of the document."""
+        try:
+            soup = BeautifulSoup(body_html, 'html.parser')
+            body = soup.find('body')
+            disc_fragment = BeautifulSoup(disclaimer_html, 'html.parser')
+            if body is not None:
+                body.append(disc_fragment)
+            else:
+                soup.append(disc_fragment)
+            return str(soup)
+        except Exception as e:
+            log.warning('disclaimer: html parse failed, falling back to append: %s', e)
+            return body_html + '\n' + disclaimer_html
+
+
+# ---------------------------------------------------------------------------
+# Active modifier registry. v1 = DisclaimerModifier only.
+#
+# To add User Signatures (#226), External Banner (#228), or Link Guard:
+# subclass Modifier, populate the appropriate config files under
+# /etc/hermes/body_milter/<feature>/, and append an instance to this list.
+# The dispatcher needs no changes.
+# ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# SignatureModifier (#226) - per-mailbox-user personal signature applied
+# to outbound mail. Sender-keyed against signature_by_sender.
+# Inherits the same MIME-restructuring + cid: image attachment that
+# DisclaimerModifier uses (via MessageContext.attach_image).
+# ---------------------------------------------------------------------------
+
+class SignatureModifier(Modifier):
+    """Append a per-mailbox-user signature to outbound mail.
+
+    Map: /etc/hermes/body_milter/signatures/signature_by_sender
+    Per-user dir: /etc/hermes/body_milter/signatures/files/<option>/
+        body.txt           plain-text signature
+        body.html          html signature (may have cid: image refs)
+        images/N.png       inline images referenced by cid: (#230)
+
+    The CFML signature regenerator filters out users whose domain has
+    allow_user_signatures=0, OR whose row is enabled=0, OR whose row
+    is source='ldap' but the user has manually overridden via the
+    user-portal editor (Pro-tier conflict resolution). If a sender's
+    full address is in the map, the signature applies; if not, no
+    signature.
+
+    Match: outbound + sender's full address matches map.
+    Skip: S/MIME or PGP envelope (recipient verification would fail),
+          PGP inline body block.
+    Does NOT skip on pre-existing DKIM-Signature: same rationale as
+    DisclaimerModifier - the #232 multi-instance OpenDKIM architecture
+    re-signs at :10026 after CipherMail rebuilds MIME, so we can
+    safely modify the body even though it carries a (now-invalid)
+    submission-time DKIM signature.
+    """
+    name = 'signature'
+    direction = 'outbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False        # #232 multi-instance OpenDKIM re-signs at :10026
+
+    DIR = os.path.join(CONFIG_ROOT, 'signatures')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'signature_by_sender')
+    DATA_PATH = os.path.join(DIR, 'sender_data.json')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+    CID_REF_RE = re.compile(r'cid:(signature_[\w.-]+_img_\d+)')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+        self.data_map = SenderDataMap(self.DATA_PATH)
+
+    def applies_to(self, ctx: MessageContext) -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self.map.lookup(ctx.sender) is not None
+
+    def modify(self, ctx: MessageContext) -> None:
+        option = self.map.lookup(ctx.sender)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('signature: refusing unsafe option name %r', option)
+            return
+
+        option_dir = os.path.join(self.FILES_DIR, option)
+        txt_path = os.path.join(option_dir, 'body.txt')
+        html_path = os.path.join(option_dir, 'body.html')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('signature: missing per-user files for %r at %s',
+                        option, option_dir)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_sig = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_sig = f.read().decode('utf-8', 'replace')
+        except IOError as e:
+            log.warning('signature: cannot read per-user files: %s', e)
+            return
+
+        # #226 Phase 2B: substitute {{user.*}} / {{org.*}} / {{dept.*}}
+        # placeholders against the sender's data. Personal Sigs typically
+        # contain no placeholders (user types literal text) so this is a
+        # no-op for them. Org Sigs store admin-form-rendered html with
+        # {{...}} tokens still in place; this is where they get filled
+        # in per recipient.
+        #
+        # Run substitution even if sender_data.lookup() returned {}
+        # so unknown placeholders cleanly resolve to "" instead of
+        # leaking literal {{org.name}} into delivered mail (race
+        # window between map and JSON reload, or sender not yet in
+        # the regenerated data file).
+        sender_data = self.data_map.lookup(ctx.sender)
+        txt_sig = self._substitute_placeholders(txt_sig, sender_data)
+        html_sig = self._substitute_placeholders(html_sig, sender_data)
+
+        # Drop now-empty contact lines. The CFML template's <cfif> gates
+        # only see the literal {{user.mobile}} string at admin save time
+        # (length > 0, so the line is rendered). The milter substitutes
+        # to empty here, leaving either a fully empty <div> or a
+        # label-only <div> like "<div><span>M:</span> </div>". The
+        # sanitizer drops both shapes so recipients don't see orphan
+        # labels.
+        html_sig = self._drop_empty_contact_lines(html_sig)
+
+        # Visual separation between the message body and the signature.
+        # Plain text gets two newlines via _append_to_parts; HTML needs
+        # an explicit spacer because BeautifulSoup's body.append puts
+        # the signature directly after the last child of <body> with
+        # no margin. Wrapping in a div with margin-top renders as a
+        # blank line in every major MUA. Only applies to signatures -
+        # disclaimers run in their own Modifier and don't get this.
+        html_sig = '<div style="margin-top:24px;">' + html_sig + '</div>'
+
+        msg = ctx.email_message()
+        plain_n, html_n = self._append_to_parts(msg, txt_sig, html_sig)
+        if plain_n or html_n:
+            ctx.modified = True
+            log.info('signature applied: sender=%s option=%s plain=%d html=%d direction=%s',
+                     ctx.sender, option, plain_n, html_n, ctx.direction)
+            if html_n:
+                self._queue_cid_images(ctx, option_dir, html_sig)
+        else:
+            log.info('signature: no text/plain or text/html parts to modify (sender=%s)',
+                     ctx.sender)
+
+    # _append_to_parts and _inject_html mirror DisclaimerModifier's; the
+    # behavior is identical so we just delegate (cleaner refactor would
+    # hoist these to a shared mixin once #228 also wants them).
+    def _append_to_parts(self, msg: Message, txt: str,
+                         html: str) -> Tuple[int, int]:
+        return DisclaimerModifier._append_to_parts(self, msg, txt, html)
+
+    def _inject_html(self, body_html: str, sig_html: str) -> str:
+        return DisclaimerModifier._inject_html(self, body_html, sig_html)
+
+    def _queue_cid_images(self, ctx: MessageContext,
+                          option_dir: str, html_sig: str) -> None:
+        """Find cid: refs in the html signature; for each, locate the
+        matching image file under <option_dir>/images/ and queue it on
+        ctx for attachment at serialize time. cid: refs follow the
+        pattern signature_<option>_img_<N> to avoid collisions with
+        DisclaimerModifier's cid: namespace."""
+        cid_refs = list(set(self.CID_REF_RE.findall(html_sig)))
+        if not cid_refs:
+            return
+        images_dir = os.path.join(option_dir, 'images')
+        if not os.path.isdir(images_dir):
+            log.warning('signature: html has %d cid refs but %s is missing',
+                        len(cid_refs), images_dir)
+            return
+        for cid in cid_refs:
+            m = re.search(r'_img_(\d+)$', cid)
+            if not m:
+                continue
+            idx = m.group(1)
+            file_path = None
+            for ext in ('png', 'jpg', 'jpeg', 'gif'):
+                candidate = os.path.join(images_dir, f'{idx}.{ext}')
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+            if file_path is None:
+                log.warning('signature: cid %s referenced in html but no '
+                            'matching image file in %s', cid, images_dir)
+                continue
+            ctx.attach_image(cid, file_path)
+            log.info('signature: queued inline image cid=%s file=%s',
+                     cid, file_path)
+
+
+# ---------------------------------------------------------------------------
+# ExternalBannerModifier (#228) - prepended (or appended) warning banner on
+# inbound mail from external senders to local recipients. Helps users spot
+# phishing / spoofing.
+#
+# Lookup is by RECIPIENT DOMAIN, not sender:
+#    /etc/hermes/body_milter/banners/banner_by_recipient_domain
+#       <recipient_domain>\t<option_name>
+#       _default\t<option_name>           special key, system-wide fallback
+#    /etc/hermes/body_milter/banners/files/<option>/
+#       body.txt                  plain-text banner
+#       body.html                 html banner with cid: img refs
+#       images/<N>.<ext>          inline images (#230 pattern)
+#       position                  "prepend" or "append" - where to place
+#
+# Skip rules:
+#    skip_on_signed = True       (S/MIME and PGP envelopes - recipient would
+#                                 fail to verify)
+#    skip_on_pgp_inline = True   (same)
+#    skip_on_dkim = False        (Inbound rationale: DKIM verification at :25
+#                                 already happened upstream of us; the
+#                                 verdict is locked into Authentication-Results
+#                                 headers. Modifying body breaks the original
+#                                 signature, but the recipient's MUA almost
+#                                 never re-verifies. The forwarding edge case
+#                                 is mitigated by ARC sealing - see #229.
+#                                 Skipping on DKIM would render this feature
+#                                 useless on the ~95% of inbound mail that
+#                                 carries a DKIM signature.
+#                                 Same flag is also False on outbound modifiers
+#                                 (Disclaimer, Signature) - the #232 multi-
+#                                 instance OpenDKIM re-signs the modified body
+#                                 at :10026 post-CipherMail rebuild, so we
+#                                 can safely modify even when the submission-
+#                                 time DKIM-Signature header is present.)
+# ---------------------------------------------------------------------------
+
+class ExternalBannerModifier(Modifier):
+    """Prepend a warning banner to inbound mail from external senders.
+
+    Match: inbound (sender external + at least one recipient is local) +
+    a banner option exists for the first local recipient's domain or the
+    system-wide default.
+    """
+    name = 'external_banner'
+    direction = 'inbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False
+
+    DIR = os.path.join(CONFIG_ROOT, 'banners')
+    FILES_DIR = os.path.join(DIR, 'files')
+    MAP_PATH = os.path.join(DIR, 'banner_by_recipient_domain')
+
+    SAFE_OPTION_RE = re.compile(r'^[\w.-]+\Z')
+    CID_REF_RE = re.compile(r'cid:(banner_[\w.-]+_img_\d+)')
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+
+    def _pick_option(self, ctx: 'MessageContext') -> Optional[str]:
+        """Find the first local recipient, look up its domain in the map.
+        Fall back to the '_default' system-wide entry if the recipient's
+        domain has no specific row. Returns None if neither matches."""
+        for r in ctx.recipients:
+            if '@' not in r:
+                continue
+            rdom = r.split('@', 1)[1].lower()
+            if not local_domains.contains(rdom):
+                continue
+            opt = self.map.lookup(rdom)
+            if opt is not None:
+                return opt
+            break  # only check the first local recipient
+        # Fall back to system default
+        return self.map.lookup('_default')
+
+    def applies_to(self, ctx: 'MessageContext') -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self._pick_option(ctx) is not None
+
+    def modify(self, ctx: 'MessageContext') -> None:
+        option = self._pick_option(ctx)
+        if option is None or not self.SAFE_OPTION_RE.match(option):
+            log.warning('external_banner: refusing unsafe option name %r', option)
+            return
+
+        option_dir = os.path.join(self.FILES_DIR, option)
+        txt_path = os.path.join(option_dir, 'body.txt')
+        html_path = os.path.join(option_dir, 'body.html')
+        pos_path = os.path.join(option_dir, 'position')
+        if not (os.path.isfile(txt_path) and os.path.isfile(html_path)):
+            log.warning('external_banner: missing per-option files for %r at %s',
+                        option, option_dir)
+            return
+
+        try:
+            with open(txt_path, 'rb') as f:
+                txt_banner = f.read().decode('utf-8', 'replace')
+            with open(html_path, 'rb') as f:
+                html_banner = f.read().decode('utf-8', 'replace')
+            position = 'prepend'
+            if os.path.isfile(pos_path):
+                with open(pos_path, 'rb') as f:
+                    raw_pos = f.read().decode('utf-8', 'replace').strip().lower()
+                if raw_pos in ('prepend', 'append'):
+                    position = raw_pos
+        except IOError as e:
+            log.warning('external_banner: cannot read per-option files: %s', e)
+            return
+
+        msg = ctx.email_message()
+        if position == 'append':
+            plain_n, html_n = self._append_to_parts(msg, txt_banner, html_banner)
+        else:
+            plain_n, html_n = self._prepend_to_parts(msg, txt_banner, html_banner)
+
+        if plain_n or html_n:
+            ctx.modified = True
+            log.info('external_banner applied: option=%s position=%s plain=%d html=%d direction=%s',
+                     option, position, plain_n, html_n, ctx.direction)
+            if html_n:
+                self._queue_cid_images(ctx, option_dir, html_banner)
+        else:
+            log.info('external_banner: no text/plain or text/html parts to modify')
+
+    def _append_to_parts(self, msg: Message, txt: str,
+                         html: str) -> Tuple[int, int]:
+        return DisclaimerModifier._append_to_parts(self, msg, txt, html)
+
+    def _prepend_to_parts(self, msg: Message, txt: str,
+                          html: str) -> Tuple[int, int]:
+        """Walk the MIME tree, prepend banner to text/plain and text/html
+        leaf parts. Counterpart to _append_to_parts."""
+        plain_count = 0
+        html_count = 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    part.set_content(txt + '\n\n' + payload)
+                    self._force_base64_encoding(part)
+                    plain_count += 1
+                except Exception:
+                    log.warning('external_banner: text/plain modify failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new = self._inject_html_prepend(payload, html)
+                    part.set_content(new, subtype='html')
+                    self._force_base64_encoding(part)
+                    html_count += 1
+                except Exception:
+                    log.warning('external_banner: text/html modify failed:\n%s',
+                                traceback.format_exc())
+        return (plain_count, html_count)
+
+    def _inject_html_prepend(self, body_html: str, banner_html: str) -> str:
+        """Insert banner_html as the FIRST child of <body>; if no <body>
+        tag is present, prepend at the start of the document."""
+        try:
+            soup = BeautifulSoup(body_html, 'html.parser')
+            body = soup.find('body')
+            banner_fragment = BeautifulSoup(banner_html, 'html.parser')
+            if body is not None:
+                body.insert(0, banner_fragment)
+            else:
+                # No <body> - prepend to root. Wrap in a div so the
+                # fragment doesn't get split if there's no top-level
+                # element.
+                soup.insert(0, banner_fragment)
+            return str(soup)
+        except Exception as e:
+            log.warning('external_banner: html parse failed, falling back to plain prepend: %s', e)
+            return banner_html + '\n' + body_html
+
+    def _queue_cid_images(self, ctx: 'MessageContext',
+                          option_dir: str, html_banner: str) -> None:
+        """Find cid: refs in the html banner; for each, locate the
+        matching image file and queue it for attachment at serialize time.
+        cid: refs follow pattern banner_<option>_img_<N> for namespace
+        separation from disclaimer_/signature_ cids."""
+        cid_refs = list(set(self.CID_REF_RE.findall(html_banner)))
+        if not cid_refs:
+            return
+        images_dir = os.path.join(option_dir, 'images')
+        if not os.path.isdir(images_dir):
+            log.warning('external_banner: html has %d cid refs but %s is missing',
+                        len(cid_refs), images_dir)
+            return
+        for cid in cid_refs:
+            m = re.search(r'_img_(\d+)$', cid)
+            if not m:
+                continue
+            idx = m.group(1)
+            file_path = None
+            for ext in ('png', 'jpg', 'jpeg', 'gif'):
+                candidate = os.path.join(images_dir, f'{idx}.{ext}')
+                if os.path.isfile(candidate):
+                    file_path = candidate
+                    break
+            if file_path is None:
+                log.warning('external_banner: cid %s referenced in html but no '
+                            'matching image file in %s', cid, images_dir)
+                continue
+            ctx.attach_image(cid, file_path)
+            log.info('external_banner: queued inline image cid=%s file=%s',
+                     cid, file_path)
+
+
+# ---------------------------------------------------------------------------
+# Link Guard (#186) — time-of-click safe links.
+#
+# Rewrites links in inbound mail (for protected recipient domains) to route
+# through the Link Guard endpoint, where the destination's reputation is
+# checked AT CLICK TIME. The token is a stateless HMAC signature, so this
+# modifier stays a pure function of (body, config, secret) — no DB on the SMTP
+# hot path.
+#
+# LG TOKEN: the mint logic below is a byte-for-byte mirror of
+# config/linkguard/app/lg_token.py (the Link Guard container VERIFIES what this
+# MINTS). DO NOT change the canonicalization on one side without the other.
+# ---------------------------------------------------------------------------
+
+_LG_TOKEN_VERSION = '1'
+
+
+def _lg_b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b'=').decode('ascii')
+
+
+def _lg_b64url_decode(s: str) -> bytes:
+    pad = '=' * (-len(s) % 4)
+    return base64.urlsafe_b64decode(s + pad)
+
+
+def _lg_verify(keys, token: str) -> Optional[str]:
+    """Mirror of lg_token.verify(), used by the OUTBOUND restore modifier.
+    Returns the original URL if `token` carries a valid signature from one of
+    `keys` (current, then previous). Expiry is intentionally IGNORED here: on
+    outbound we want to unwrap even an old link so it never leaks. Returns None
+    on any failure (so non-Link-Guard `t=` params are left untouched)."""
+    if isinstance(keys, str):
+        keys = [keys]
+    keys = [k for k in keys if k]
+    if not keys or not token or token.count('.') != 4:
+        return None
+    ver, dom_b64, url_b64, exp_b64, sig = token.split('.')
+    if ver != _LG_TOKEN_VERSION:
+        return None
+    sig = sig.lower()
+    if len(sig) != 64:
+        return None
+    try:
+        recipient_domain = _lg_b64url_decode(dom_b64).decode('utf-8').lower()
+        original_url = _lg_b64url_decode(url_b64).decode('utf-8')
+        expiry = int(_lg_b64url_decode(exp_b64).decode('ascii'))
+    except Exception:
+        return None
+    canonical = (
+        _LG_TOKEN_VERSION + '\n' + recipient_domain + '\n'
+        + original_url + '\n' + str(expiry)
+    ).encode('utf-8')
+    for k in keys:
+        cand = hmac.new(k.encode('ascii'), canonical, hashlib.sha256).hexdigest()
+        if hmac.compare_digest(cand, sig):
+            return original_url
+    return None
+
+
+def _lg_mint(key: str, recipient_domain: str, original_url: str,
+             ttl_days: int) -> str:
+    """Mirror of lg_token.mint(). Produces the `t` query-param value."""
+    expiry = int(time.time()) + int(ttl_days) * 86400
+    canonical = (
+        _LG_TOKEN_VERSION + '\n' + recipient_domain.lower() + '\n'
+        + original_url + '\n' + str(expiry)
+    ).encode('utf-8')
+    sig = hmac.new(key.encode('ascii'), canonical, hashlib.sha256).hexdigest()
+    return '.'.join([
+        _LG_TOKEN_VERSION,
+        _lg_b64url(recipient_domain.lower().encode('utf-8')),
+        _lg_b64url(original_url.encode('utf-8')),
+        _lg_b64url(str(expiry).encode('ascii')),
+        sig,
+    ])
+
+
+# ---------------------------------------------------------------------------
+# LG v2 STATEFUL TOKENS: short opaque id -> {url, rdom, expiry} kept in a shared
+# SQLite store the Link Guard container reads. The token is just "2.<id>", so it
+# is always tiny no matter how long the original URL is -> the over-length skip
+# that left long links UNPROTECTED under v1 is gone. This milter is the SOLE
+# WRITER; the container opens the same file read-only (store.urlmap_get).
+#
+# The store lives on the shared linkguard_data volume (default
+# /var/lib/linkguard/url_map.db) and uses a ROLLBACK JOURNAL (not WAL) so the
+# read-only container opener needs no writable -shm file. Writing here NEVER
+# blocks mail: any failure (volume absent on an off-box milter, disk error, lock
+# contention) just falls back to a stateless v1 token. That same fallback is the
+# path a remote/off-box deployment takes (it has no shared volume to write).
+# ---------------------------------------------------------------------------
+
+LG_URLMAP_DB = os.environ.get('LG_URLMAP_DB', '/var/lib/linkguard/url_map.db')
+
+
+def _lg_new_id() -> str:
+    """A high-entropy (128-bit) opaque token id, urlsafe-b64, no padding."""
+    return base64.urlsafe_b64encode(os.urandom(16)).rstrip(b'=').decode('ascii')
+
+
+class _LGUrlMapStore:
+    """Sole-writer SQLite store mapping v2 token ids -> original URLs.
+
+    Mappings are kept well past the token TTL so OUTBOUND restore can still
+    unwrap quoted links long after they expire; the container enforces the TTL
+    at click time. Best-effort and self-healing: a failure backs off briefly and
+    the caller falls back to a stateless token, so mail flow never depends on it.
+    """
+    RETAIN_DAYS = 180
+
+    def __init__(self, path: str):
+        self.path = path
+        self.dir = os.path.dirname(path) or '.'
+        self._conn = None
+        self._lock = threading.Lock()
+        self._cooldown_until = 0.0
+        self._puts = 0
+
+    def available(self) -> bool:
+        return time.time() >= self._cooldown_until and os.path.isdir(self.dir)
+
+    def _connect(self):
+        conn = sqlite3.connect(self.path, check_same_thread=False)
+        conn.execute('PRAGMA busy_timeout=3000')
+        conn.execute('PRAGMA synchronous=NORMAL')
+        conn.execute(
+            'CREATE TABLE IF NOT EXISTS url_map ('
+            'id TEXT PRIMARY KEY, original_url TEXT NOT NULL, '
+            'recipient_domain TEXT, created_at INTEGER NOT NULL, '
+            'expires_at INTEGER NOT NULL)')
+        conn.execute('CREATE INDEX IF NOT EXISTS idx_urlmap_created ON url_map(created_at)')
+        conn.commit()
+        try:
+            os.chmod(self.path, 0o644)   # the linkguard container reads it RO as a non-root uid
+        except OSError:
+            pass
+        return conn
+
+    def _fail(self):
+        # called while holding self._lock
+        self._cooldown_until = time.time() + 60.0
+        try:
+            if self._conn is not None:
+                self._conn.close()
+        except Exception:
+            pass
+        self._conn = None
+
+    def put(self, token_id: str, url: str, rdom: str, expires_at: int) -> bool:
+        """Store a mapping. Returns True on success, False on a (non-collision)
+        failure so the caller falls back to a stateless token. Raises
+        sqlite3.IntegrityError on an id collision so the caller can regenerate."""
+        if not self.available():
+            return False
+        with self._lock:
+            try:
+                if self._conn is None:
+                    self._conn = self._connect()
+                self._conn.execute(
+                    'INSERT INTO url_map (id, original_url, recipient_domain, created_at, expires_at) '
+                    'VALUES (?,?,?,?,?)',
+                    (token_id, url, rdom, int(time.time()), int(expires_at)))
+                self._conn.commit()
+                self._puts += 1
+                if self._puts % 1000 == 0:
+                    self._prune()
+                return True
+            except sqlite3.IntegrityError:
+                raise
+            except Exception:
+                log.warning('linkguard: url_map write failed; falling back to stateless token:\n%s',
+                            traceback.format_exc())
+                self._fail()
+                return False
+
+    def get(self, token_id: str):
+        """Return the original URL for a stored id (used by OUTBOUND restore in
+        this same process), or None."""
+        if not self.available():
+            return None
+        with self._lock:
+            try:
+                if self._conn is None:
+                    self._conn = self._connect()
+                row = self._conn.execute(
+                    'SELECT original_url FROM url_map WHERE id = ?', (token_id,)).fetchone()
+                return row[0] if row else None
+            except Exception:
+                self._fail()
+                return None
+
+    def _prune(self):
+        # called while holding self._lock
+        cutoff = int(time.time()) - self.RETAIN_DAYS * 86400
+        try:
+            self._conn.execute('DELETE FROM url_map WHERE created_at < ?', (cutoff,))
+            self._conn.commit()
+        except Exception:
+            pass
+
+
+_LG_URLMAP = _LGUrlMapStore(LG_URLMAP_DB)
+
+
+class WatchedFile:
+    """mtime-watched single-file reader; returns '' if absent."""
+    def __init__(self, path: str):
+        self.path = path
+        self._val = ''
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def value(self) -> str:
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return self._val
+        with self._lock:
+            if m != self._mtime:
+                try:
+                    with open(self.path, 'r', encoding='utf-8') as f:
+                        self._val = f.read().strip()
+                    self._mtime = m
+                except IOError:
+                    pass
+            return self._val
+
+
+class WatchedKeyValue:
+    """mtime-watched `key = value` settings file."""
+    def __init__(self, path: str):
+        self.path = path
+        self._map = {}
+        self._mtime = 0
+        self._lock = threading.Lock()
+
+    def _refresh(self):
+        try:
+            m = os.stat(self.path).st_mtime
+        except OSError:
+            return
+        with self._lock:
+            if m == self._mtime:
+                return
+            new = {}
+            try:
+                with open(self.path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith('#') or '=' not in line:
+                            continue
+                        k, v = line.split('=', 1)
+                        new[k.strip().lower()] = v.strip()
+                self._map = new
+                self._mtime = m
+            except IOError:
+                pass
+
+    def get(self, key, default=''):
+        self._refresh()
+        return self._map.get(key.lower(), default)
+
+    def get_int(self, key, default):
+        try:
+            return int(self.get(key, ''))
+        except (TypeError, ValueError):
+            return default
+
+
+class LinkGuardModifier(Modifier):
+    """Rewrite links in inbound mail to the Link Guard click-time endpoint.
+
+    Scope: inbound + at least one local recipient whose domain (or '_default')
+    is present in the linkguard_by_recipient_domain map. Skips signed/encrypted
+    mail (can't safely rewrite). Leaves over-length rewrites unmodified.
+    """
+    name = 'linkguard'
+    direction = 'inbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False
+
+    DIR = os.path.join(CONFIG_ROOT, 'linkguard')
+    MAP_PATH = os.path.join(DIR, 'linkguard_by_recipient_domain')
+    SETTINGS_PATH = os.path.join(DIR, 'settings')
+    KEY_PATH = os.path.join(CONFIG_ROOT, 'linkguard_hmac_key')
+
+    # URLs in plain text: http(s) up to whitespace or angle brackets; trailing
+    # sentence punctuation is trimmed back after the match.
+    TEXT_URL_RE = re.compile(r'https?://[^\s<>()\[\]"\']+', re.IGNORECASE)
+    _TRAIL = '.,;:!?\'")]}>'
+
+    def __init__(self):
+        self.map = SenderMap(self.MAP_PATH)
+        self.settings = WatchedKeyValue(self.SETTINGS_PATH)
+        self.key = WatchedFile(self.KEY_PATH)
+
+    # -- scope -----------------------------------------------------------
+    def _pick_domain(self, ctx: 'MessageContext') -> Optional[str]:
+        """Return the local recipient domain Link Guard should scope the token
+        to (specific map entry preferred, else '_default' applied to the first
+        local recipient domain). None if out of scope."""
+        first_local = None
+        for r in ctx.recipients:
+            if '@' not in r:
+                continue
+            rdom = r.split('@', 1)[1].lower()
+            if not local_domains.contains(rdom):
+                continue
+            if first_local is None:
+                first_local = rdom
+            if self.map.lookup(rdom) is not None:
+                return rdom
+            break
+        if first_local is not None and self.map.lookup('_default') is not None:
+            return first_local
+        return None
+
+    def applies_to(self, ctx: 'MessageContext') -> bool:
+        if not super().applies_to(ctx):
+            return False
+        if not self.key.value() or not self.settings.get('base_url'):
+            return False
+        return self._pick_domain(ctx) is not None
+
+    # -- rewrite ---------------------------------------------------------
+    def _rewrite_url(self, base: str, key: str, rdom: str, ttl: int,
+                     maxlen: int, original: str) -> Optional[str]:
+        """Return the rewritten URL, or None to leave the original in place."""
+        low = original.lower()
+        if low.startswith('mailto:') or low.startswith('tel:') \
+                or low.startswith('#') or low.startswith('cid:') \
+                or low.startswith('data:') or low.startswith('javascript:'):
+            return None
+        if not (low.startswith('http://') or low.startswith('https://')):
+            return None
+        # already a Link Guard link?
+        if base and original.startswith(base):
+            return None
+        sep = '&' if '?' in base else '?'
+        expiry = int(time.time()) + int(ttl) * 86400
+
+        # Preferred: STATEFUL v2 short-id token. The token is tiny regardless of
+        # URL length, so there is no over-length skip -> nothing is left
+        # unprotected. (Security note: the id is a 128-bit unguessable key into a
+        # store that only ever holds URLs we minted, so it cannot be forged into
+        # an open redirect.)
+        if _LG_URLMAP.available():
+            for _ in range(3):
+                tid = _lg_new_id()
+                try:
+                    ok = _LG_URLMAP.put(tid, original, rdom, expiry)
+                except sqlite3.IntegrityError:
+                    continue  # 128-bit id collision (astronomically rare) -> regen
+                if ok:
+                    return base + sep + 't=2.' + tid
+                break  # store error -> fall back to a stateless token
+
+        # Fallback: STATELESS v1 token (subject to the length cap). Also the path
+        # a remote/off-box milter takes when there is no shared store to write.
+        token = _lg_mint(key, rdom, original, ttl)
+        new = base + sep + 't=' + token
+        if maxlen and len(new) > maxlen:
+            return None  # over-length: leave original (counted by caller)
+        return new
+
+    def modify(self, ctx: 'MessageContext') -> None:
+        rdom = self._pick_domain(ctx)
+        if rdom is None:
+            return
+        key = self.key.value()
+        base = self.settings.get('base_url')
+        if not key or not base:
+            return
+        ttl = self.settings.get_int('token_ttl_days', 14)
+        maxlen = self.settings.get_int('max_inline_url', 1200)
+
+        msg = ctx.email_message()
+        html_n, text_n, skipped = 0, 0, 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new_html, n, sk = self._rewrite_html(payload, base, key, rdom, ttl, maxlen)
+                    if n:
+                        part.set_content(new_html, subtype='html')
+                        self._force_base64_encoding(part)
+                        html_n += n
+                    skipped += sk
+                except Exception:
+                    log.warning('linkguard: text/html rewrite failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    new_text, n, sk = self._rewrite_text(payload, base, key, rdom, ttl, maxlen)
+                    if n:
+                        part.set_content(new_text)
+                        self._force_base64_encoding(part)
+                        text_n += n
+                    skipped += sk
+                except Exception:
+                    log.warning('linkguard: text/plain rewrite failed:\n%s',
+                                traceback.format_exc())
+
+        if html_n or text_n:
+            ctx.modified = True
+        # Always log when LinkGuard ran (applies_to was true), even if it rewrote
+        # nothing -- otherwise an email whose links were ALL skipped (e.g. every
+        # URL over max_inline_url) is invisible and looks like LinkGuard never ran.
+        log.info('linkguard: domain=%s html_links=%d text_links=%d over_length_skipped=%d',
+                 rdom, html_n, text_n, skipped)
+
+    def _rewrite_html(self, body_html, base, key, rdom, ttl, maxlen):
+        soup = BeautifulSoup(body_html, 'html.parser')
+        n, skipped = 0, 0
+        for a in soup.find_all('a', href=True):
+            new = self._rewrite_url(base, key, rdom, ttl, maxlen, a['href'].strip())
+            if new is None:
+                low = a['href'].strip().lower()
+                if low.startswith('http://') or low.startswith('https://'):
+                    skipped += 1
+                continue
+            a['href'] = new
+            n += 1
+        return (str(soup), n, skipped)
+
+    def _rewrite_text(self, body_text, base, key, rdom, ttl, maxlen):
+        counters = {'n': 0, 'skipped': 0}
+
+        def repl(m):
+            url = m.group(0)
+            trail = ''
+            while url and url[-1] in self._TRAIL:
+                trail = url[-1] + trail
+                url = url[:-1]
+            new = self._rewrite_url(base, key, rdom, ttl, maxlen, url)
+            if new is None:
+                counters['skipped'] += 1
+                return m.group(0)
+            counters['n'] += 1
+            return new + trail
+
+        out = self.TEXT_URL_RE.sub(repl, body_text)
+        return (out, counters['n'], counters['skipped'])
+
+
+class LinkGuardRestoreModifier(Modifier):
+    """Restore original URLs in OUTBOUND mail by unwrapping Link Guard links.
+
+    When a local user replies to or forwards a protected message, the quoted
+    body may still contain `…/lg/?t=<token>` wrappers. On the way out we verify
+    each token's HMAC and replace the wrapper with the original URL, so external
+    recipients receive clean links, never load our endpoint, and don't consume
+    click-time checking resources. Only links bearing a `t=` param that verifies
+    against OUR keys are touched — anything else is left exactly as-is.
+
+    Default ON; disable via `restore_outbound = 0` in the linkguard settings.
+    """
+    name = 'linkguard_restore'
+    direction = 'outbound'
+    skip_on_signed = True
+    skip_on_pgp_inline = True
+    skip_on_dkim = False
+
+    KEY_PATH = os.path.join(CONFIG_ROOT, 'linkguard_hmac_key')
+    KEY_PREV_PATH = os.path.join(CONFIG_ROOT, 'linkguard_hmac_key_previous')
+    SETTINGS_PATH = os.path.join(CONFIG_ROOT, 'linkguard', 'settings')
+
+    TEXT_URL_RE = LinkGuardModifier.TEXT_URL_RE
+    _TRAIL = LinkGuardModifier._TRAIL
+
+    def __init__(self):
+        self.key = WatchedFile(self.KEY_PATH)
+        self.key_prev = WatchedFile(self.KEY_PREV_PATH)
+        self.settings = WatchedKeyValue(self.SETTINGS_PATH)
+
+    def _keys(self):
+        return [k for k in (self.key.value(), self.key_prev.value()) if k]
+
+    def _enabled(self):
+        return self.settings.get('restore_outbound', '1').strip() not in ('0', 'false', 'no', 'off')
+
+    def applies_to(self, ctx: 'MessageContext') -> bool:
+        if not super().applies_to(ctx):
+            return False
+        return self._enabled() and bool(self._keys())
+
+    def _restore_url(self, keys, url: str) -> Optional[str]:
+        try:
+            p = urlsplit(url)
+        except ValueError:
+            return None
+        if (p.scheme or '').lower() not in ('http', 'https') or not p.query:
+            return None
+        tok = (parse_qs(p.query).get('t') or [None])[0]
+        if not tok:
+            return None
+        # v2 stateful token: look the id up in the shared store (this milter
+        # wrote it). Expiry is intentionally ignored on outbound so even an old
+        # link is unwrapped and never leaks; mappings are retained well past TTL.
+        if tok[:2] == '2.' and len(tok) > 2:
+            return _LG_URLMAP.get(tok[2:])
+        # v1 stateless token: HMAC-verify and decode the embedded URL.
+        return _lg_verify(keys, tok)
+
+    def modify(self, ctx: 'MessageContext') -> None:
+        keys = self._keys()
+        if not keys:
+            return
+        msg = ctx.email_message()
+        html_n, text_n = 0, 0
+        for part in msg.walk():
+            if part.is_multipart():
+                continue
+            ctype = part.get_content_type()
+            if ctype == 'text/html':
+                try:
+                    payload = part.get_content()
+                    new_html, n = self._restore_html(payload, keys)
+                    if n:
+                        part.set_content(new_html, subtype='html')
+                        self._force_base64_encoding(part)
+                        html_n += n
+                except Exception:
+                    log.warning('linkguard_restore: text/html failed:\n%s',
+                                traceback.format_exc())
+            elif ctype == 'text/plain':
+                try:
+                    payload = part.get_content()
+                    new_text, n = self._restore_text(payload, keys)
+                    if n:
+                        part.set_content(new_text)
+                        self._force_base64_encoding(part)
+                        text_n += n
+                except Exception:
+                    log.warning('linkguard_restore: text/plain failed:\n%s',
+                                traceback.format_exc())
+        if html_n or text_n:
+            ctx.modified = True
+            log.info('linkguard_restore applied: html_links=%d text_links=%d direction=%s',
+                     html_n, text_n, ctx.direction)
+
+    def _restore_html(self, body_html, keys):
+        soup = BeautifulSoup(body_html, 'html.parser')
+        n = 0
+        for a in soup.find_all('a', href=True):
+            orig = self._restore_url(keys, a['href'].strip())
+            if orig is not None:
+                a['href'] = orig
+                n += 1
+        return (str(soup), n)
+
+    def _restore_text(self, body_text, keys):
+        counter = {'n': 0}
+
+        def repl(m):
+            url = m.group(0)
+            trail = ''
+            while url and url[-1] in self._TRAIL:
+                trail = url[-1] + trail
+                url = url[:-1]
+            orig = self._restore_url(keys, url)
+            if orig is None:
+                return m.group(0)
+            counter['n'] += 1
+            return orig + trail
+
+        out = self.TEXT_URL_RE.sub(repl, body_text)
+        return (out, counter['n'])
+
+
+# ---------------------------------------------------------------------------
+# Active modifier list. Order matters because each modifier appends its
+# content to the message; later modifiers append AFTER earlier ones.
+#
+# For outbound mail the typical layered output is:
+#
+#     [user body]
+#     [user signature]            <-- SignatureModifier appends first
+#     [domain disclaimer]         <-- DisclaimerModifier appends after
+#
+# For inbound mail:
+#
+#     [external banner]           <-- ExternalBannerModifier prepends
+#     [original message body]
+#
+# Outbound modifiers skip on inbound; the inbound modifier skips on
+# outbound. Both directions can coexist in the registry without ordering
+# conflicts.
+# ---------------------------------------------------------------------------
+
+MODIFIERS: List[Modifier] = [
+    LinkGuardModifier(),         # inbound: rewrite original links BEFORE the
+                                 # banner is prepended, so the banner's own
+                                 # links are never rewritten.
+    LinkGuardRestoreModifier(),  # outbound: unwrap /lg/ links so external
+                                 # recipients get clean URLs (default ON).
+    ExternalBannerModifier(),
+    SignatureModifier(),
+    DisclaimerModifier(),
+]
+
+
+# ---------------------------------------------------------------------------
+# Milter callback class
+# ---------------------------------------------------------------------------
+
+class HermesBodyMilter(Milter.Base):
+    def __init__(self):
+        self._sender = ''
+        self._recipients: List[str] = []
+        self._raw_headers = bytearray()
+        self._body_chunks: List[bytes] = []
+        # Lowercase header names seen on the inbound message - used in
+        # eom() to decide between chgheader (existing) vs addheader
+        # (new) when #230 wrapping changes Content-Type or adds
+        # MIME-Version.
+        self._header_names: set = set()
+
+    @staticmethod
+    def _strip_brackets(addr: str) -> str:
+        return addr.strip().lstrip('<').rstrip('>')
+
+    @Milter.noreply
+    def envfrom(self, mailfrom, *unused):
+        self._sender = self._strip_brackets(mailfrom)
+        self._recipients = []
+        self._raw_headers = bytearray()
+        self._body_chunks = []
+        self._header_names = set()
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def envrcpt(self, to, *unused):
+        self._recipients.append(self._strip_brackets(to))
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def header(self, name, val):
+        try:
+            line = f'{name}: {val}\r\n'.encode('utf-8', 'replace')
+            self._raw_headers.extend(line)
+            self._header_names.add(name.lower())
+        except Exception:
+            pass
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def eoh(self):
+        return Milter.CONTINUE
+
+    @Milter.noreply
+    def body(self, blk):
+        self._body_chunks.append(blk)
+        return Milter.CONTINUE
+
+    def eom(self):
+        try:
+            ctx = MessageContext(
+                sender=self._sender or '',
+                recipients=self._recipients,
+                raw_headers=bytes(self._raw_headers),
+                body_bytes=b''.join(self._body_chunks),
+            )
+
+            for mod in MODIFIERS:
+                try:
+                    if not mod.applies_to(ctx):
+                        continue
+                    skip = mod.standard_skip_check(ctx)
+                    if skip:
+                        log.info('%s skipped: %s (sender=%s, direction=%s)',
+                                 mod.name, skip, ctx.sender, ctx.direction)
+                        continue
+                    mod.modify(ctx)
+                except Exception:
+                    log.error('%s raised exception:\n%s',
+                              mod.name, traceback.format_exc())
+                    continue
+
+            if ctx.modified:
+                try:
+                    new_body = ctx.serialize_body()
+                    self.replacebody(new_body)
+
+                    # #230: if serialize_body() wrapped the message in
+                    # multipart/related to attach inline images, the
+                    # top-level Content-Type changed (e.g. from
+                    # multipart/alternative to multipart/related with
+                    # a fresh boundary). Update the milter-side header
+                    # via chgheader so the message postfix queues
+                    # matches our new body. Also ensure MIME-Version is
+                    # present, and clear top-level Content-Transfer-
+                    # Encoding (multipart can't have one at the root).
+                    if ctx._was_wrapped:
+                        wrapped = ctx.email_message()
+                        new_ct = wrapped.get('Content-Type')
+                        if new_ct:
+                            if 'content-type' in self._header_names:
+                                self.chgheader('Content-Type', 1, new_ct)
+                            else:
+                                self.addheader('Content-Type', new_ct)
+                        if 'mime-version' not in self._header_names:
+                            self.addheader('MIME-Version', '1.0')
+                        if 'content-transfer-encoding' in self._header_names:
+                            try:
+                                self.chgheader('Content-Transfer-Encoding', 1, '')
+                            except Exception:
+                                pass
+                        log.info('wrapped as multipart/related (images=%d)',
+                                 len(ctx.image_attachments))
+                    else:
+                        # Single-part path: _force_base64_encoding on a
+                        # text/* leaf that IS the whole message modifies
+                        # top-level CTE in the Python Message object;
+                        # replacebody() doesn't carry that change.
+                        # Without this, the queue file ends up with
+                        # `CTE: quoted-printable` from the sender + a
+                        # base64-encoded body, and MUAs render the body
+                        # as raw base64 text (medstar.net/Mailgun 2026-05-12,
+                        # DoorDash, etc.). Sync via chgheader so the
+                        # queued message's CTE matches the newly-encoded
+                        # body bytes. Multipart messages whose top-level
+                        # CTE wasn't touched simply re-set the original
+                        # value here, which is a safe no-op.
+                        wrapped = ctx.email_message()
+                        new_cte = wrapped.get('Content-Transfer-Encoding')
+                        if new_cte:
+                            try:
+                                if 'content-transfer-encoding' in self._header_names:
+                                    self.chgheader('Content-Transfer-Encoding', 1, new_cte)
+                                else:
+                                    self.addheader('Content-Transfer-Encoding', new_cte)
+                            except Exception:
+                                log.warning('CTE header sync failed:\n%s',
+                                            traceback.format_exc())
+                except Exception:
+                    log.error('replacebody failed:\n%s', traceback.format_exc())
+        except Exception:
+            log.error('eom dispatcher crashed:\n%s', traceback.format_exc())
+
+        return Milter.CONTINUE
+
+    def abort(self):
+        return Milter.CONTINUE
+
+    def close(self):
+        return Milter.CONTINUE
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s %(levelname)s %(name)s: %(message)s',
+        stream=sys.stderr,
+    )
+    log.info('hermes-body-milter starting on %s', LISTEN_SOCKET)
+    log.info('active modifiers: %s', [m.name for m in MODIFIERS])
+
+    Milter.factory = HermesBodyMilter
+    Milter.set_flags(Milter.CHGBODY | Milter.CHGHDRS | Milter.ADDHDRS)
+    Milter.runmilter('hermes_body_milter', LISTEN_SOCKET, timeout=60)
+    log.info('hermes-body-milter exiting')
+
+
+if __name__ == '__main__':
+    main()

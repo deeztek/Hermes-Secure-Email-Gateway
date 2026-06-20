@@ -1,0 +1,13 @@
+dn: olcOverlay={1}remoteauth,olcDatabase={2}mdb,cn=config
+objectClass: olcOverlayConfig
+objectClass: olcRemoteAuthCfg
+olcOverlay: {1}remoteauth
+olcRemoteAuthDNAttribute: seeAlso
+olcRemoteAuthDomainAttribute: associatedDomain
+#olcRemoteAuthDefaultRealm: example
+olcRemoteAuthDefaultDomain: example
+#olcRemoteAuthMapping: example file:///usr/local/openldap/etc/openldap/example.list
+olcRemoteAuthMapping: example dc01.example.com
+olcRemoteAuthTLS: starttls=no tls_reqcert=never
+olcRemoteAuthRetryCount: 3
+

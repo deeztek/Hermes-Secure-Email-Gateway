@@ -1,0 +1,5 @@
+dn: cn=example.org,ou=groups,dc=hermes,dc=local
+objectClass: groupOfNames
+objectClass: top
+member: cn=hermes-ldap-user,ou=users,dc=hermes,dc=local
+

@@ -1,0 +1,13 @@
+### Configuration file for rsyslog-mysql (LDAP/slapd)
+### Changes are preserved
+
+$ModLoad ommysql
+
+if ($programname == "slapd") then {
+  action(type="ommysql"
+         server="hermes_db_server"
+         db="Syslog"
+         uid="SYSLOG-USERNAME"
+         pwd="SYSLOG-PASSWORD")
+  stop
+}

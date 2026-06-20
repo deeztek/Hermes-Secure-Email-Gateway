@@ -1,0 +1,2 @@
+$shlib_directory/postfix-ldap.so:f:root:-:755
+$manpage_directory/man5/ldap_table.5.gz:f:root:-:644

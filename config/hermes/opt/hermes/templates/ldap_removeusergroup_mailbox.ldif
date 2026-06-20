@@ -1,0 +1,14 @@
+dn: cn=mailboxes,ou=groups,dc=hermes,dc=local
+changetype: modify
+delete: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+
+dn: cn=one_factor,ou=groups,dc=hermes,dc=local
+changetype: modify
+delete: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local
+
+dn: cn=two_factor,ou=groups,dc=hermes,dc=local
+changetype: modify
+delete: member
+member: cn=THE_USERNAME,ou=users,dc=hermes,dc=local

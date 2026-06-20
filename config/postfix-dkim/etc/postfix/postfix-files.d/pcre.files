@@ -1,0 +1,3 @@
+$shlib_directory/postfix-pcre.so:f:root:-:755
+#$config_directory/pcre_table:f:root:-:644:o
+$manpage_directory/man5/pcre_table.5.gz:f:root:-:644

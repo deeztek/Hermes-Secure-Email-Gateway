@@ -1,0 +1,67 @@
+# ============================================================================
+# Hermes SEG override of SpamAssassin init.pre (GitHub issue #234)
+#
+# The SPF plugin loadplugin line below is commented out to prevent the
+# SpamAssassin SPF plugin from loading at all. SPF authority in Hermes
+# lives at postfix-policyd-spf-python (smtpd policy service at :25),
+# which sees the connecting client IP directly and rejects on hardfail
+# AND softfail per /etc/postfix-policyd-spf-python/policyd-spf.conf.
+#
+# Why disable SA's SPF re-check:
+#   - It does a redundant DNS-heavy SPF lookup on every message after
+#     policyd-spf already verified at SMTP envelope time.
+#   - In multi-hop relay chains (federal mail, M365 GOV, Proofpoint
+#     Government, etc.), SA's plugin can pick up the wrong intermediate
+#     hop's IP from the Received chain - producing false-positive SPF
+#     fail/softfail verdicts on mail that postfix-policy-spf-python
+#     correctly verified as pass. Disabling makes postfix-policy the
+#     single authoritative verifier.
+#
+# Companion file: v312.pre has the DKIM plugin disabled (same #234).
+#
+# This file is volume-mounted into hermes_mail_filter via:
+#   ./config/mail_filter/etc/spamassassin/init.pre:/etc/spamassassin/init.pre
+# ============================================================================
+
+# This is the right place to customize your installation of SpamAssassin.
+#
+# See 'perldoc Mail::SpamAssassin::Conf' for details of what can be
+# tweaked.
+#
+# This file contains plugin activation commands for plugins included
+# in SpamAssassin 3.0.x releases.  It will not be installed if you
+# already have a file in place called "init.pre".
+#
+# There are now multiple files read to enable plugins in the
+# /etc/spamassassin directory; previously only one, "init.pre" was
+# read.  Now both "init.pre", "v310.pre", and any other files ending in
+# ".pre" will be read.  As future releases are made, new plugins will be
+# added to new files, named according to the release they're added in.
+###########################################################################
+
+# Version compatibility - Welcomelist/Blocklist
+# In SpamAssassin 4.0, rules containing "whitelist" or "blacklist" have been
+# renamed to contain more racially neutral "welcomelist" and "blocklist"
+# terms.  When this compatibility flag is enabled, old rule names from stock
+# rules will not hit anymore alongside the new ones.  For more information,
+# see: https://wiki.apache.org/spamassassin/WelcomelistBlocklist
+#
+enable_compat welcomelist_blocklist
+
+# RelayCountry - add metadata for Bayes learning, marking the countries
+# a message was relayed through
+#
+# Note: This requires the Geo::IP Perl module
+#
+# loadplugin Mail::SpamAssassin::Plugin::RelayCountry
+
+# URIDNSBL - look up URLs found in the message against several DNS
+# blocklists.
+#
+loadplugin Mail::SpamAssassin::Plugin::URIDNSBL
+
+# SPF - perform SPF verification.
+#
+# DISABLED PER HERMES #234 - postfix-policyd-spf-python is the
+# authoritative SPF verifier. See header comment at top of this file.
+#loadplugin Mail::SpamAssassin::Plugin::SPF
