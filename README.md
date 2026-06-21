@@ -7,8 +7,9 @@
 <h1 align="center">Hermes Secure Email Gateway and Email Server</h1>
 
 <p align="center">
-  <strong>Self-hosted email security, mail server, and Nextcloud — one stack.</strong><br>
-  Open-source SEG + Dovecot 2.4 mail server + Nextcloud + Authelia SSO, deployed as one Docker Compose file.
+  <strong>Self-hosted email security, mail server, and Nextcloud — one stack, one Docker Compose file.</strong><br>
+  Open-source spam &amp; malware filtering, S/MIME &amp; PGP encryption, DKIM/DMARC/ARC, mailboxes, webmail, and SSO.<br>
+  Pro adds time-of-click link protection — the inbound-link defense you'd otherwise pay Proofpoint or Mimecast for.
 </p>
 
 <p align="center">
@@ -173,7 +174,7 @@ Pro Edition adds the following capabilities on top of everything in Community. [
 | **Intrusion Prevention (IPS)** | Web UI for managing Fail2ban jails, ban thresholds, ban duration, whitelists. Real-time view of active bans. |
 | **Console firewall** | Web UI for managing the host firewall protecting the admin console (port allowlisting, source-IP restriction). |
 | **LDAP RemoteAuth** | Per-domain pass-through authentication to one or more external LDAP servers (including Microsoft Active Directory). End users authenticate against your existing directory; Hermes provisions mailboxes on first successful login. Supports STARTTLS and LDAPS. |
-| **Link Guard (safe links)** | Time-of-click URL protection for inbound mail. Links are rewritten to a Hermes redirect and the destination's reputation is checked at the moment the user clicks &mdash; catching links weaponized after delivery. Layered verdicts (heuristics + URLhaus / OpenPhish blocklist feeds + optional Google Safe Browsing / VirusTotal), open-redirect detection, an operator-managed list of abused cloud-storage / redirector hosts, and optional guarded redirect-chain following. Admin-configurable per-tier actions and outbound link restoration. Runs in-stack or on a separate host. |
+| **Link Guard** | Time-of-click URL protection for inbound mail — comparable to Microsoft Safe Links and Proofpoint URL Defense. Links are rewritten to a Hermes redirect and the destination's reputation is checked at the moment the user clicks &mdash; catching links weaponized after delivery. Layered verdicts (heuristics + URLhaus / OpenPhish blocklist feeds + optional Google Safe Browsing / VirusTotal), open-redirect detection, an operator-managed list of abused cloud-storage / redirector hosts, and optional guarded redirect-chain following. Admin-configurable per-tier actions and outbound link restoration. Runs in-stack or on a separate host. |
 
 <p align="center">
   <a href="https://www.hermesseg.io/pricing/">
