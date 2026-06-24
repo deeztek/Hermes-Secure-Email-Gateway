@@ -176,15 +176,9 @@ Pro Edition adds the following capabilities on top of everything in Community. [
 | **LDAP RemoteAuth** | Per-domain pass-through authentication to one or more external LDAP servers (including Microsoft Active Directory). End users authenticate against your existing directory; Hermes provisions mailboxes on first successful login. Supports STARTTLS and LDAPS. |
 | **Link Guard** | Time-of-click URL protection for inbound mail — comparable to Microsoft Safe Links and Proofpoint URL Defense. Links are rewritten to a Hermes redirect and the destination's reputation is checked at the moment the user clicks &mdash; catching links weaponized after delivery. Layered verdicts (heuristics + URLhaus / OpenPhish blocklist feeds + optional Google Safe Browsing / VirusTotal), open-redirect detection, an operator-managed list of abused cloud-storage / redirector hosts, and optional guarded redirect-chain following. Admin-configurable per-tier actions and outbound link restoration. Runs in-stack or on a separate host. |
 
-<p align="center">
-  <a href="https://www.hermesseg.io/pricing/">
-    <img alt="Get Pro" src="https://img.shields.io/badge/Get%20Hermes%20Pro-%24750%2Fyr-ee6c2b?style=for-the-badge">
-  </a>
-</p>
-
 ## Architecture
 
-Hermes SEG Docker Edition runs as **18 containers** orchestrated by Docker Compose:
+Hermes SEG Docker Edition runs as **19 containers** orchestrated by Docker Compose:
 
 | Container | Purpose |
 |---|---|
