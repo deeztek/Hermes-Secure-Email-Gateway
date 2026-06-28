@@ -112,7 +112,7 @@ form submit (Add SAN Prefix)  ──► san_actions.cfm
                   All SANs on a cert at dns=YES + ip=YES?
                               |
                               v
-              acme_request_san_certificate.cfm (Pro)
+              acme_request_san_certificate.cfm
               docker run --rm certbot/certbot:latest \
                 certonly --webroot --cert-name <domain> --expand \
                   -d example.com -d autoconfig.example.com \
@@ -254,10 +254,10 @@ the per-cert SAN sub-table show up on other pages:
 | `config/hermes/var/www/html/admin/2/view_mailbox_sans.cfm` | `hermes_commandbox` | Page + Add card + Delete modal + LE budget callout |
 | `config/hermes/var/www/html/admin/2/inc/san_actions.cfm` | `hermes_commandbox` | Add / Delete handler — validates, writes `additional_sans`, calls sync |
 | `config/hermes/var/www/html/admin/2/inc/sync_mailbox_sans.cfm` | `hermes_commandbox` | Cross-joins prefixes x mailbox domains into `mailbox_sans`; idempotent |
-| `config/hermes/var/www/html/admin/2/inc/acme_request_san_certificate.cfm` | `hermes_commandbox` | Pro — runs ephemeral certbot container for SAN-bearing certs |
-| `config/hermes/var/www/html/admin/2/inc/smtp_sni_generate_config.cfm` | `hermes_commandbox` | Pro — builds Postfix `sni_maps` from validated SANs |
+| `config/hermes/var/www/html/admin/2/inc/acme_request_san_certificate.cfm` | `hermes_commandbox` | Runs ephemeral certbot container for SAN-bearing certs |
+| `config/hermes/var/www/html/admin/2/inc/smtp_sni_generate_config.cfm` | `hermes_commandbox` | Builds Postfix `sni_maps` from validated SANs |
 | `config/hermes/var/www/html/admin/2/inc/generate_nginx_configuration.cfm` | `hermes_commandbox` | Per-domain nginx vhost generator (called from Domains; consumes validated SANs) |
-| `config/hermes/var/www/html/schedule/acme_validate_ip.cfm` | `hermes_commandbox` (Ofelia) | Pro — hourly validator; probes each SAN's IP via `verify.hermesseg.io` and updates `mailbox_sans.ip` / `dns` |
+| `config/hermes/var/www/html/schedule/acme_validate_ip.cfm` | `hermes_commandbox` (Ofelia) | Validator (every 30m); probes each SAN's IP via `verify.hermesseg.io` and updates `mailbox_sans.ip` / `dns` |
 | `additional_sans` table | `hermes_db_server` (`hermes` DB) | The prefix list this page edits |
 | `mailbox_sans` table | `hermes_db_server` (`hermes` DB) | Per-SAN rows with validation state and cert binding |
 | `system_certificates` table | `hermes_db_server` (`hermes` DB) | Per-cert metadata referenced via `mailbox_sans.certificate` |
@@ -266,7 +266,7 @@ the per-cert SAN sub-table show up on other pages:
 | `/etc/postfix/sni/*.pem` | `hermes_postfix_dkim` (mounted) | Combined key + fullchain PEM per cert, referenced from `sni_maps` |
 | Per-SAN nginx vhost files | `hermes_nginx` (mounted) | One vhost per validated SAN |
 | `certbot/certbot:latest` image | docker.io | Pulled on demand for SAN cert issuance + renewal |
-| `verify.hermesseg.io` | external (Pro) | Returns expected IP for a given SAN to gate ACME issuance |
+| `verify.hermesseg.io` | external | Returns expected IP for a given SAN to gate ACME issuance |
 
 Every certbot invocation is `docker run --rm` against the public
 `certbot/certbot:latest` image — same pattern as the single-domain
@@ -279,7 +279,7 @@ HTTP-01 challenge can reach port 80 on the public IP.
 - [System Certificates](../01-system/system-certificates.md) — the
   certificate store these SANs land on. The Mailbox certificate
   purpose on Generate CSR auto-fills its SAN list from this page;
-  Pro's auto-managed ACME path mints SAN certs from the same source.
+  the auto-managed ACME path mints SAN certs from the same source.
 - [Domains](domains.md) — per-mailbox-domain Cert Status column
   summarizes the per-SAN validation state this page's prefixes drive.
   Adding a domain calls `sync_mailbox_sans.cfm`, so new SANs appear

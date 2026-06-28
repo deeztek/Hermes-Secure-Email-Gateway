@@ -118,7 +118,7 @@ If outbound mail should route through an upstream provider (Gmail, Microsoft 365
 
 **Page**: System → Server Setup → License section
 
-Enter your serial number to unlock Pro features (organizational signatures, encrypted mail, ACME / Let's Encrypt automation, ARC sealing, Link Guard, etc.). Validation hits `validate.hermesseg.io` over HTTPS; the result is cached locally so Pro stays available during brief network outages.
+Enter your serial number to unlock Pro features (organizational signatures, encrypted mail, ARC sealing, Link Guard, etc.). Validation hits `validate.hermesseg.io` over HTTPS; the result is cached locally so Pro stays available during brief network outages.
 
 ### Real TLS Certificate — *all topologies*
 
@@ -128,7 +128,7 @@ Replace the bootstrap self-signed certificate with a real one before going live.
 
 | Path | Tier | Workflow |
 | --- | --- | --- |
-| **Request ACME** | Pro only | Click → enter domain → Let's Encrypt issues automatically, auto-renews |
+| **Request ACME** | Both tiers | Click → enter domain → Let's Encrypt issues automatically, auto-renews |
 | **Import Certificate** | Both tiers | Paste cert + key + chain from any CA you already have |
 | **Generate CSR** | Both tiers | Generate signing request → submit to CA → import the result via the **Import Certificate** path |
 

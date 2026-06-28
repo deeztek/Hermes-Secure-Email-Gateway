@@ -103,8 +103,8 @@ the writes after running dependency checks (see Delete below).
 | **Domain Name** | (empty) | Trimmed, lower-cased, validated by the email-trick. Rejected if the domain already exists in `domains` (as relay or mailbox). The `mailbox_domains` table is allowed to have a pre-existing row (left over from prior ACME work) — it gets UPSERTed in place. |
 | **Default Quota (GB)** | `5` | Per-domain default for new mailboxes. Stored in DB as MB (`default_quota_mb`). 0.5 GB minimum, 1024 GB max, 0.5 GB step. The per-mailbox quota is set on [Mailboxes](mailboxes.md); this is the value pre-filled when adding a new mailbox under the domain. |
 | **Catch-All Mailbox** | (empty) | Optional. An existing mailbox address that receives mail for any unknown recipient at the domain. Free-text — admin's responsibility to point at a real mailbox. |
-| **SAN Certificate — Auto-managed (Let's Encrypt)** | Pro: checked / Community: disabled | _Pro Edition only._ Creates a placeholder Acme row in `system_certificates`; the certificate validator then validates SAN DNS + IP, requests the cert, and auto-renews. Zero maintenance once DNS is in place. |
-| **SAN Certificate — Use existing certificate** | Community: checked | Pulls from `system_certificates` where `san='1'` OR the row is a system-flagged placeholder. The dropdown labels system placeholders as `TEMPORARY PLACEHOLDER (replace before production)` and sorts them last so the default is a real SAN cert. |
+| **SAN Certificate — Auto-managed (Let's Encrypt)** | Default (checked) | Creates a placeholder Acme row in `system_certificates`; the certificate validator then validates SAN DNS + IP, requests the cert, and auto-renews. Zero maintenance once DNS is in place. Available in all editions. |
+| **SAN Certificate — Use existing certificate** | Alternative | Pulls from `system_certificates` where `san='1'` OR the row is a system-flagged placeholder. The dropdown labels system placeholders as `TEMPORARY PLACEHOLDER (replace before production)` and sorts them last so the default is a real SAN cert. |
 | **Enable Nextcloud webmail for this domain** | unchecked | Per-domain default for new mailboxes. When checked, creates a Nextcloud group named after the domain (via `occ group:add`) and pre-fills the Nextcloud toggle on the [Add Mailbox](mailboxes.md#add-mailbox) form. Does **not** retroactively enable NC for existing mailboxes. |
 | **Require Two-Factor Authentication for this domain** | unchecked | Per-domain default for new mailboxes. Same convention as Nextcloud — defaults only, no cascade to existing rows. |
 
@@ -232,7 +232,7 @@ expected IP and DNS A/CNAME record, and updates `ip_result_msg` /
 `dns_result_msg`. The Cert Status column on the main table summarizes
 these results.
 
-For Pro Edition's auto-managed certs the validator then triggers a
+For auto-managed certs the validator then triggers a
 Let's Encrypt issuance once every SAN passes both probes. For
 imported certs the probes are informational only — the cert is
 trusted as-is.

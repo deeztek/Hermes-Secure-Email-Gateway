@@ -91,7 +91,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
 <!--- SAN prefix list for the Generate CSR mailbox-cert path (#246).
      Hermes' canonical model is one mailbox cert = one mailbox domain
-     (matching the Pro ACME path in inc/mailbox_domain_add_action.cfm).
+     (matching the auto ACME path in inc/mailbox_domain_add_action.cfm).
      Per-domain mandatory SANs are autoconfig + autodiscover (seeded
      system=1) plus any custom prefixes the admin has added in SAN
      Management. JS uses this list to render the live mandatory-SAN
@@ -255,7 +255,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <p class="mb-2 small text-muted">
               No separate Common Name field is needed when generating a mailbox CSR &mdash; the
               first SAN alphabetically (<code>autoconfig.&lt;domain&gt;</code> by default) also serves as the CN.
-              This produces a cert byte-for-byte identical to what Pro Edition's Auto mode would issue.
+              This produces a cert byte-for-byte identical to what Auto mode would issue.
             </p>
             <p class="mb-2">
               When ordering, ask your CA for a <strong>UCC certificate</strong>,
@@ -264,11 +264,13 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               &mdash; mail clients will fail TLS during autoconfig.
             </p>
 
-            <!--- Community-edition workflow callout (#245). Pro skips
-                 this because Auto mode generates per-domain ACME certs
-                 on the fly when adding the mailbox domain. --->
+            <!--- Manual / commercial-CA workflow callout (#245, #282).
+                 The automated path (Auto mode when adding a mailbox
+                 domain) issues a free Let's Encrypt SAN cert on the fly;
+                 this manual path is for admins who want to use a
+                 commercial CA cert instead. --->
             <div class="alert alert-info small mb-0 mt-3">
-              <strong>Community Edition workflow</strong> (Pro automates this):
+              <strong>Using a commercial CA</strong> instead of automated Let's Encrypt:
               <ol class="mb-0 mt-1 ps-3">
                 <li>Open <strong>Generate CSR</strong>, pick <em>Mailbox</em>,
                     list your planned mailbox domains</li>
@@ -296,17 +298,9 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
     <div class="mb-3">
       <cfoutput>
-      <cfif isDefined("session.license") AND session.license is "VALID">
-        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##requestModal">
-          <i class="fas fa-plus-square"></i> Request ACME Certificate
-        </button>
-      <cfelse>
-        <span title="Pro Edition license required" data-bs-toggle="tooltip">
-        <button type="button" class="btn btn-primary" disabled>
-          <i class="fas fa-plus-square"></i> Request ACME Certificate
-        </button>
-        </span>
-      </cfif>
+      <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##requestModal">
+        <i class="fas fa-plus-square"></i> Request ACME Certificate
+      </button>
       <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="##importModal">
         <i class="fas fa-upload"></i> Import Certificate
       </button>
@@ -663,10 +657,10 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
           </div>
           <!--- Common Name input (#247). Shown only for server certs.
                For mailbox certs, the CN is auto-derived server-side as
-               the first alphabetical SAN (matching Pro ACME's
+               the first alphabetical SAN (matching the auto ACME path's
                first-`-d`-flag behavior in inc/acme_request_san_certificate.cfm)
                so the resulting cert is byte-for-byte identical to what
-               Pro Auto mode would produce. --->
+               Auto mode would produce. --->
           <div id="csrCommonNameBlock" class="mb-3">
             <label class="form-label"><strong>Common Name</strong> (hostname this cert identifies, e.g. <code>mail.widgets.tld</code>)</label>
             <input type="text" class="form-control" name="commonname" placeholder="mail.widgets.tld">
@@ -674,7 +668,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 
           <!--- Singular mailbox-domain input (#246). Shown only when
                cert_purpose=mailbox. Hermes-canonical model is one cert
-               per mailbox domain (matches Pro ACME pattern in
+               per mailbox domain (matches the auto ACME pattern in
                inc/mailbox_domain_add_action.cfm). JS updates the
                mandatory-SAN preview below as admin types. --->
           <div id="csrMailboxDomainBlock" class="mb-3">
@@ -688,7 +682,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
             <div class="form-text">
               One mailbox cert covers one mailbox domain. If you host mailboxes
               for multiple email domains, generate a separate cert for each.
-              (Pro Edition's Auto mode handles this automatically when you add
+              (Auto mode handles this automatically when you add
               a domain in <a href="view_mailbox_domains.cfm">Email Server &rsaquo; Domains</a>.)
             </div>
           </div>
@@ -712,7 +706,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
               <br><br>
               The <strong>first SAN alphabetically</strong> also serves as the certificate's
               <strong>Common Name</strong> (no separate CN field is required) &mdash; this
-              produces a cert that's byte-for-byte identical to what Pro Edition's Auto
+              produces a cert that's byte-for-byte identical to what Auto
               mode would issue for the same domain.
             </div>
           </div>

@@ -38,11 +38,6 @@ re-validation).
   <cflocation url="view_mailbox_domains.cfm" addtoken="no">
 </cfif>
 
-<cfif form.cert_mode IS "auto" AND NOT isPro>
-  <cfset session.m = 14>
-  <cflocation url="view_mailbox_domains.cfm" addtoken="no">
-</cfif>
-
 <cfparam name="form.cert_id" default="">
 
 <!--- Resolve certificate id --->

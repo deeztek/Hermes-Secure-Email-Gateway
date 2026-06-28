@@ -9,7 +9,13 @@ beside each release below is the **actual release date**.
 
 ## Unreleased
 
-_Changes for the next release land here._
+### Changed
+
+- **Let's Encrypt / ACME certificate management is now available in all editions** (#282).
+  The console-certificate **Request ACME Certificate** button and the mailbox-domain
+  **Auto-managed (Let's Encrypt)** SAN certificate mode — automated issuance, SAN
+  validation, and auto-renewal — are no longer restricted to Pro Edition. Existing Pro
+  installations are unaffected.
 
 ## [v260612] — 2026-06-20
 

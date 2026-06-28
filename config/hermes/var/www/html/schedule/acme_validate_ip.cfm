@@ -8,13 +8,7 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
-<!--- Include retention policy functions (lightweight, no cleanup operations) --->
-<cfinclude template="retention_policy_functions.cfm">
-
-<cfif NOT isRetentionEnabled()>
-    <cfoutput>Advanced retention policies require valid configuration (Status: #getRetentionStatus()#). Exiting...</cfoutput><br>
-    <cfabort>
-</cfif>
+<!--- ACME SAN validation runs on all editions (#282). --->
 
 <cfparam name = "requestacme" default = "0">
 

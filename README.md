@@ -94,7 +94,7 @@ Hermes ships in two editions:
 | Edition | License | What you get |
 |---|---|---|
 | **Community** | [AGPL v3](https://www.gnu.org/licenses/agpl.html) &mdash; free, open source | The entire mail gateway and email server stack. All core security, encryption, mailbox hosting, and administration features. |
-| **Pro** | Commercial &mdash; see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 7 advanced features (see [Pro Features](#pro-features) below). [Pricing &rarr;](https://www.hermesseg.io/pricing/) |
+| **Pro** | Commercial &mdash; see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). [Pricing &rarr;](https://www.hermesseg.io/pricing/) |
 
 A Pro license is purchased separately. Community Edition needs no license file and works fully without one.
 
@@ -119,7 +119,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Multi-factor authentication (Authelia): TOTP, WebAuthn, Duo Push
 - Local LDAP user store (built-in OpenLDAP) for admins, mailbox users, and relay users
 - App passwords for SMTP / IMAP / DAV clients (separate from main account password)
-- 3rd-party SSL certificate support
+- Free Let's Encrypt (ACME) TLS certificates &mdash; automated issuance and auto-renewal for the admin console and per mailbox domain (SAN), plus import/CSR support for 3rd-party certificates
 - haveibeenpwned password check integration
 
 ### Email standards (Community)
@@ -168,7 +168,6 @@ Pro Edition adds the following capabilities on top of everything in Community. [
 
 | Pro Feature | What it does |
 |---|---|
-| **Let's Encrypt (ACME) automation** | Automated issuance and renewal of free Let's Encrypt SSL certificates for the console and per-domain. Community Edition can still request and use Let's Encrypt certificates, but the issuance and renewal automation is Pro-only. |
 | **Email disclaimers** | Per-domain outbound disclaimer templates, applied at the milter level. Form-based template renderer with reusable templates. |
 | **Organizational signatures** | Centrally-managed per-domain employee signature templates with placeholder substitution (employee name, title, phone, email, department, organization info). Renders on every outbound message. Community Edition has Personal Signatures (per-user, free-form) only. |
 | **Intrusion Prevention (IPS)** | Web UI for managing Fail2ban jails, ban thresholds, ban duration, whitelists. Real-time view of active bans. |
@@ -328,7 +327,7 @@ After the installer completes, the admin will be guided through first-run config
 2. **Configure DNS records** &mdash; install summary prints the recommended SPF, DKIM, DMARC, and MX records to add. Use a real DNS-resolvable hostname before requesting any production Let's Encrypt certificate.
 3. **Add domains** &mdash; under Email Server &gt; Domains (mailbox hosting) or Email Relay &gt; Domains (gateway / relay mode).
 4. **Create mailboxes or relay recipients** &mdash; under Email Server &gt; Mailboxes or Email Relay &gt; Recipients.
-5. **Set up SSL** &mdash; either upload a 3rd-party certificate (System &gt; System Certificates) or, on Pro, request a Let's Encrypt certificate via the same page.
+5. **Set up SSL** &mdash; either upload a 3rd-party certificate (System &gt; System Certificates) or request a free Let's Encrypt certificate via the same page.
 
 Detailed configuration walkthroughs &mdash; including SPF/DKIM/DMARC setup, mailbox provisioning, relay vs. mail-server modes, and the encryption gateway &mdash; live in the [Documentation](#documentation) section.
 

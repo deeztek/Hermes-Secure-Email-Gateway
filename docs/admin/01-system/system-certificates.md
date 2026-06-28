@@ -95,10 +95,10 @@ and nginx crashed with `BIO_new_file` errors on the missing file.
 
 ## Three ingest paths
 
-### 1. Request ACME Certificate (Pro feature)
+### 1. Request ACME Certificate
 
 The **Request ACME Certificate** button issues a Let's Encrypt cert via
-an ephemeral certbot container. Disabled when no Pro license is active.
+an ephemeral certbot container. Available in all editions.
 
 ```
 Admin clicks Request -> view_system_certificates.cfm action=requestacme
@@ -171,7 +171,7 @@ rest of the form:
 | Purpose | CN source | SANs |
 |---|---|---|
 | **Server certificate** (single-name DV, ~$10/yr) | Admin enters Common Name field directly | Admin-entered FQDNs only |
-| **Mailbox certificate** (SAN / UCC, $50–$200/yr) | Auto-derived as `<first-prefix>.<mailbox_domain>` matching Pro ACME's first-`-d`-flag behavior | Mandatory: `autoconfig.<domain>`, `autodiscover.<domain>`, plus every prefix from `additional_sans`. Additional admin entries auto-expand bare prefixes against the mailbox domain. |
+| **Mailbox certificate** (SAN / UCC, $50–$200/yr) | Auto-derived as `<first-prefix>.<mailbox_domain>` matching the auto ACME path's first-`-d`-flag behavior | Mandatory: `autoconfig.<domain>`, `autodiscover.<domain>`, plus every prefix from `additional_sans`. Additional admin entries auto-expand bare prefixes against the mailbox domain. |
 
 Smart default: if `mailbox_domains` has any rows, the modal defaults to
 **Mailbox**; otherwise it defaults to **Server**. The page-level

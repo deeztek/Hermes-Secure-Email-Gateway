@@ -71,9 +71,9 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
   </cfquery>
 
   <!--- CN derivation (#247). For mailbox certs, the CN is auto-derived
-       as <first-prefix>.<mailbox_domain> -- matches Pro ACME's
-       first-`-d`-flag behavior (inc/acme_request_san_certificate.cfm)
-       so the resulting cert is byte-for-byte identical to Pro Auto mode.
+       as <first-prefix>.<mailbox_domain> -- matches the auto ACME
+       path's first-`-d`-flag behavior (inc/acme_request_san_certificate.cfm)
+       so the resulting cert is byte-for-byte identical to Auto mode.
        For server certs, the admin-supplied form.commonname stands. --->
   <cfif form.cert_purpose IS "mailbox">
     <cfif getMandatoryPrefixes.recordcount EQ 0>
@@ -207,8 +207,7 @@ Routes to generate CSR, delete certificate, request ACME, or import certificate.
 
 <cfelseif action is "requestacme">
 
-  <!--- Pro Edition License Check --->
-  <cfinclude template="./license_check.cfm">
+  <!--- ACME issuance is available in all editions (#282). --->
 
   <!--- Validate certificate name --->
   <cfif NOT StructKeyExists(form, "certificate_name") OR trim(form.certificate_name) is "">

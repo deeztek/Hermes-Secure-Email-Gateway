@@ -6,7 +6,7 @@ Mailbox Domain Add Action Handler (Email Server > Domains).
 Flow:
   1. Validate domain name + cert mode
   2. Check domain does not already exist in domains table
-  3. cert_mode='auto' (Pro only):
+  3. cert_mode='auto':
        - Insert placeholder Acme cert into system_certificates
        - Use that cert id for the mailbox_domain
      cert_mode='existing':
@@ -24,8 +24,6 @@ Expects:
   form.domain_name, form.cert_mode ('auto'|'existing'), form.cert_id,
   form.default_quota_mb, form.catchall_mailbox, form.nextcloud_enabled
 --->
-
-<cfset isPro = isDefined("session.edition") AND session.edition EQ "Pro">
 
 <!--- Validate domain name --->
 <cfif NOT StructKeyExists(form, "domain_name") OR trim(form.domain_name) is "">
@@ -59,12 +57,6 @@ Expects:
 <cfparam name="form.cert_mode" default="existing">
 <cfif NOT ListFindNoCase("auto,existing", form.cert_mode)>
   <cfset session.m = 20>
-  <cflocation url="view_mailbox_domains.cfm" addtoken="no">
-</cfif>
-
-<!--- Enforce Pro edition for Auto mode --->
-<cfif form.cert_mode IS "auto" AND NOT isPro>
-  <cfset session.m = 14>
   <cflocation url="view_mailbox_domains.cfm" addtoken="no">
 </cfif>
 

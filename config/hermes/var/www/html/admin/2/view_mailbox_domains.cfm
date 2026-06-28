@@ -216,13 +216,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     Please select a valid SAN certificate.
   </div>
 </cfif>
-<cfif m is "14">
-  <div class="alert alert-danger alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Error</h4>
-    Auto-managed (Let's Encrypt) certificates require Pro Edition.
-  </div>
-</cfif>
 <cfif m is "15">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -276,19 +269,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset session.orphan_cert_id = "">
 <cfset session.orphan_cert_name = "">
 <cfset session.orphan_cert_type = "">
-</cfif>
-
-<!--- Pro upsell tip for Community edition --->
-<cfif NOT isPro>
-<div class="alert alert-warning alert-dismissible">
-  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-  <h5 class="alert-heading"><i class="fas fa-star"></i> Pro Tip</h5>
-  <p class="mb-0">
-    Upgrade to <strong>Pro Edition</strong> to automatically manage Let's Encrypt SAN certificates for
-    your mailbox domains &mdash; zero-touch validation, issuance, and renewal.
-    <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
-  </p>
-</div>
 </cfif>
 
 <!-- ADD MAILBOX DOMAIN CARD -->
@@ -349,31 +329,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!-- SAN CERTIFICATE SELECTION -->
       <label class="form-label"><strong>SAN Certificate</strong></label>
 
-      <div class="card mb-2 <cfif NOT isPro>border-warning<cfelse>border-success</cfif>">
+      <div class="card mb-2 border-success">
         <div class="card-body py-2">
           <div class="form-check">
             <input class="form-check-input" type="radio" name="cert_mode" value="auto"
-                   id="add_cert_mode_auto"
-                   <cfif NOT isPro>disabled</cfif>
-                   <cfif isPro>checked</cfif>>
+                   id="add_cert_mode_auto" checked>
             <label class="form-check-label w-100" for="add_cert_mode_auto">
               <strong>Auto-managed (Let's Encrypt)</strong>
-              <cfif NOT isPro>
-                <span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock"></i> PRO</span>
-              <cfelse>
-                <span class="badge bg-success ms-2">PRO</span>
-              </cfif>
             </label>
             <p class="text-muted small mb-0 mt-1 ms-4">
               System creates SANs, validates IP+DNS, requests cert, and auto-renews &mdash; zero maintenance.
             </p>
-            <cfif NOT isPro>
-            <div class="alert alert-warning mt-2 mb-0 py-2 small ms-4">
-              <i class="fas fa-star text-warning"></i>
-              <strong>Upgrade to Pro Edition</strong> to unlock automatic certificate management.
-              <a href="https://www.hermesseg.io" target="_blank">Learn More &rarr;</a>
-            </div>
-            </cfif>
           </div>
         </div>
       </div>
@@ -382,8 +348,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <div class="card-body py-2">
           <div class="form-check">
             <input class="form-check-input" type="radio" name="cert_mode" value="existing"
-                   id="add_cert_mode_existing"
-                   <cfif NOT isPro>checked</cfif>>
+                   id="add_cert_mode_existing">
             <label class="form-check-label w-100" for="add_cert_mode_existing">
               <strong>Use existing certificate</strong>
             </label>
@@ -599,19 +564,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
 
             <label class="form-label"><strong>SAN Certificate</strong></label>
-            <div class="card mb-2 <cfif NOT isPro>border-warning<cfelse>border-success</cfif>">
+            <div class="card mb-2 border-success">
               <div class="card-body py-2">
                 <div class="form-check">
                   <input class="form-check-input" type="radio" name="cert_mode" value="auto"
-                         id="edit_cert_mode_auto"
-                         <cfif NOT isPro>disabled</cfif>>
+                         id="edit_cert_mode_auto">
                   <label class="form-check-label w-100" for="edit_cert_mode_auto">
                     <strong>Auto-managed (Let's Encrypt)</strong>
-                    <cfif NOT isPro>
-                      <span class="badge bg-warning text-dark ms-2"><i class="fas fa-lock"></i> PRO</span>
-                    <cfelse>
-                      <span class="badge bg-success ms-2">PRO</span>
-                    </cfif>
                   </label>
                 </div>
               </div>
