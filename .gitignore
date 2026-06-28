@@ -17,6 +17,14 @@ Docker/build-single.sh
 Docker/build-single-ghcr.sh
 Docker/push-all.sh
 Docker/push-all-ghcr.sh
+Docker/retag-gl-to-ghcr.sh
+Docker/login-ghcr.sh
+Docker/check-ghcr-visibility.sh
+
+# Maintainer-only local git workflow wrappers (generic add/commit/push helpers,
+# not Hermes-specific). The documented release tool git_release.sh stays tracked.
+scripts/git_commit_push_gitlab.sh
+scripts/git_commit_push_github.sh
 
 # AdminLTE download (use dist/ for deployed files)
 AdminLTE-4.0.0-rc4/
