@@ -98,6 +98,8 @@ Hermes ships in two editions:
 
 A Pro license is purchased separately. Community Edition needs no license file and works fully without one.
 
+The project is licensed under **AGPLv3** ([`LICENSE`](LICENSE)); a small set of proprietary **Pro Edition** files are excluded from the AGPL grant and governed by the Pro EULA. See [`LICENSING.md`](LICENSING.md) for the authoritative breakdown — the per-file header controls which license applies.
+
 ## Features
 
 A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/) for the full feature page with screenshots.
