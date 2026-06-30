@@ -14,12 +14,12 @@ if [ `id -u` -ne 0 ]; then
 
 echo "Checking for newer update files..."
 #Download the latest versions of the update files
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/var/www/html/admin/2/inc/generate_customtrans.cfm?ref_type=heads -O /opt/hermes/tmp/generate_customtrans.cfm
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/var/www/html/admin/2/inc/check_system_update.cfm?ref_type=heads -O /opt/hermes/tmp/check_system_update.cfm
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/var/www/html/admin/2/inc/download_system_update.cfm?ref_type=heads -O /opt/hermes/tmp/download_system_update.cfm
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/var/www/html/admin/2/inc/verify_system_update.cfm?ref_type=heads -O /opt/hermes/tmp/verify_system_update.cfm
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/opt/hermes/scripts/system_update.sh?ref_type=heads -O /opt/hermes/tmp/system_update.sh
-wget -q https://gitlab.deeztek.com/dedwards/hermes-seg-18.04/-/raw/master/dirstructure/opt/hermes/scripts/shasum.sh?ref_type=heads -O /opt/hermes/tmp/shasum.sh
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/var/www/html/admin/2/inc/generate_customtrans.cfm -O /opt/hermes/tmp/generate_customtrans.cfm
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/var/www/html/admin/2/inc/check_system_update.cfm -O /opt/hermes/tmp/check_system_update.cfm
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/var/www/html/admin/2/inc/download_system_update.cfm -O /opt/hermes/tmp/download_system_update.cfm
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/var/www/html/admin/2/inc/verify_system_update.cfm -O /opt/hermes/tmp/verify_system_update.cfm
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/opt/hermes/scripts/system_update.sh -O /opt/hermes/tmp/system_update.sh
+wget -q https://raw.githubusercontent.com/deeztek/Hermes-Secure-Email-Gateway/legacy/dirstructure/opt/hermes/scripts/shasum.sh -O /opt/hermes/tmp/shasum.sh
 
 CUSTOMTRANSUPDATE1=/opt/hermes/tmp/generate_customtrans.cfm
 CUSTOMTRANSUPDATE2=/var/www/html/admin/2/inc/generate_customtrans.cfm
