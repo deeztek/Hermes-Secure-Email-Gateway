@@ -13,7 +13,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # ===========================================
 # LAYER 1: Block sensitive paths (catches what gitleaks misses)
 # ===========================================
-echo "[1/3] Checking for sensitive file paths..."
+echo "[1/4] Checking for sensitive file paths..."
 
 # Define sensitive path patterns (files that should NEVER be committed)
 SENSITIVE_PATHS=(
@@ -79,7 +79,7 @@ echo "      No sensitive paths detected."
 # Catches the dev-dump leak class (real customer domains/emails/IPs, dev hosts)
 # that gitleaks does NOT flag because it isn't a "secret" by shape.
 # ===========================================
-echo "[2/3] Scanning staged content for DEV/customer data..."
+echo "[2/4] Scanning staged content for DEV/customer data..."
 
 # High-confidence signatures only (keep false positives near zero).
 # NOTE: deeztek.com is legitimate (docs/support/license); only .net/.org are dev.
@@ -118,9 +118,46 @@ fi
 echo "      No DEV/customer data signatures detected."
 
 # ===========================================
-# LAYER 3: Content scanning with gitleaks
+# LAYER 3: Guard the scanner's own blind spot
+# gitleaks does NOT scan its own config file, so a real secret pasted into
+# .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 4.
+# This is exactly how a real DB password once shipped to the public repo.
 # ===========================================
-echo "[3/3] Scanning file contents for secrets..."
+echo "[3/4] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
+
+if echo "$STAGED_FILES" | grep -qx ".gitleaks.toml"; then
+    # Flag 12+ char alphanumeric tokens that mix UPPER, lower AND digit -- the
+    # shape of a real credential. Placeholders (EXAMPLE_REDACTED_PW,
+    # hermes_db_password, MARIADB_ROOT_PASSWORD) and the rules' own regex
+    # char-classes lack that mix or are broken by _ and -, so they don't match.
+    TOML_HITS=$(git show ":.gitleaks.toml" 2>/dev/null \
+        | grep -oE '[A-Za-z0-9]{12,}' \
+        | grep -E '[A-Z]' | grep -E '[a-z]' | grep -E '[0-9]' \
+        | grep -viE '^(EXAMPLE|REDACTED|CHANGEME|YOURPASSWORD)$' \
+        | head -5 || true)
+    if [ -n "$TOML_HITS" ]; then
+        echo ""
+        echo "=============================================="
+        echo "  REAL SECRET IN .gitleaks.toml - COMMIT BLOCKED"
+        echo "=============================================="
+        echo ""
+        echo ".gitleaks.toml appears to contain a real credential-shaped token."
+        echo "gitleaks never scans its own config, so this would ship undetected."
+        echo "Replace it with a fake placeholder (e.g. EXAMPLE_REDACTED_PW):"
+        echo "$TOML_HITS" | sed 's/^/      /'
+        echo ""
+        echo "If genuinely a false positive: git commit --no-verify"
+        echo ""
+        exit 1
+    fi
+fi
+
+echo "      No real secrets in .gitleaks.toml."
+
+# ===========================================
+# LAYER 4: Content scanning with gitleaks
+# ===========================================
+echo "[4/4] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then

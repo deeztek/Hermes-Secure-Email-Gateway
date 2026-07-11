@@ -9,8 +9,10 @@ useDefault = true
 
 # Custom rules for Hermes-specific secrets
 
-# Catches: password = bfrJJDnEb5mv8G8Is5T1 (Dovecot, Postfix mysql-*.cf)
-# Catches: password    = bfrJJDnEb5mv8G8Is5T1 (Postfix mysql-aliases.cf tab-indented)
+# Catches: password = EXAMPLE_REDACTED_PW (Dovecot, Postfix mysql-*.cf)
+# Catches: password    = EXAMPLE_REDACTED_PW (Postfix mysql-aliases.cf tab-indented)
+# NOTE: never paste a real secret here as an "example" -- gitleaks does not scan
+# its own config, so anything real placed in this file is invisible to the scan.
 # Catches: password = "quoted_value" (LDAP configs, general)
 # Does NOT flag: password = hermes_db_password (template placeholders)
 # Does NOT flag: password = $variable or password = ${ENV_VAR}
