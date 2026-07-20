@@ -34,6 +34,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
+  <!--- Resolve the real install root (compose project working_dir) so the
+        INSTALL_SUMMARY.txt path below is correct on ANY install path. --->
+  <cfinclude template="./inc/docker_get_directory.cfm" />
+
   <main class="app-main">
     <div class="content-header">
       <div class="container-fluid">
@@ -273,7 +277,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <p class="mb-2"><strong>Local admin credentials:</strong></p>
           <ul class="mb-3">
             <li>Username: <code>#ncAdminUsername#</code></li>
-            <li>Password: see <code>/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt</code> on the host (or whichever <code>HERMES_ROOT</code> your install uses)</li>
+            <li>Password: see <code>#DockerDir#/INSTALL_SUMMARY.txt</code> on the host</li>
           </ul>
         </cfif>
         </cfoutput>

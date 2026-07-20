@@ -8,17 +8,18 @@
 #
 # Prerequisites:
 #   - Docker and Docker Compose installed
-#   - Hermes SEG Docker repository cloned to /opt/hermes-seg
+#   - Hermes SEG Docker repository cloned anywhere (root is auto-detected)
 #   - Legacy backup file (hermes-system-*.tar.gz)
-#   - MySQL root password from the legacy system
+#   (no MySQL root password needed -- Docker MariaDB root auth is unix_socket)
 #
 # Usage:
-#   ./migrate_legacy_to_docker.sh -B /path/to/hermes-system-backup.tar.gz -R 'mysql_root_password'
+#   ./migrate_legacy_to_docker.sh -B /path/to/hermes-system-backup.tar.gz
 #
 # Flags:
 #   -B = Path to the legacy backup file (hermes-system-*.tar.gz)
-#   -R = MySQL root password (will be used for the new Docker MariaDB)
-#   -D = Docker Hermes root (default: /opt/hermes-seg)
+#   -R = MySQL root password (accepted for compatibility; UNUSED -- Docker
+#        MariaDB root auth is unix_socket, so no password is ever needed)
+#   -D = Docker Hermes root (default: auto-detected from this script's location)
 #   -M = Data mount point (default: /mnt/data)
 #   -V = Vmail mount point (default: /mnt/vmail)
 #
@@ -34,7 +35,23 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Defaults
-HERMES_ROOT="/opt/hermes-seg"
+# HERMES_ROOT self-locates by walking up from this script looking for
+# docker-compose.yml, so the install root can be anywhere (/opt/hermes-seg,
+# /opt/Hermes-Secure-Email-Gateway, /opt/hermes-seg-container-gl, ...).
+# -D still overrides. If the walk-up fails we do NOT silently substitute a
+# guessed path -- that is what produced the misleading
+# "Hermes Docker root not found: /opt/hermes-seg" when the real install was
+# elsewhere. Instead flag it and let validation say what actually went wrong.
+_SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+HERMES_ROOT="$_SCRIPT_DIR"
+while [[ "$HERMES_ROOT" != "/" ]] && [[ ! -f "$HERMES_ROOT/docker-compose.yml" ]]; do
+    HERMES_ROOT="$(dirname "$HERMES_ROOT")"
+done
+HERMES_ROOT_AUTODETECTED=1
+if [[ "$HERMES_ROOT" == "/" ]]; then
+    HERMES_ROOT=""
+    HERMES_ROOT_AUTODETECTED=0
+fi
 DATA_MOUNT="/mnt/data"
 ARCHIVE_MOUNT="/mnt/archive"  # #260: Amavis quarantine tier
 VMAIL_MOUNT="/mnt/vmail"
@@ -250,8 +267,8 @@ while [[ $# -gt 0 ]]; do
         --mode=*)       MODE="${1#*=}";        shift ;;
         -R)             MYSQL_ROOT_PASS="$2";  shift 2 ;;
         -R*)            MYSQL_ROOT_PASS="${1#-R}"; shift ;;
-        -D)             HERMES_ROOT="$2";      shift 2 ;;
-        -D*)            HERMES_ROOT="${1#-D}"; shift ;;
+        -D)             HERMES_ROOT="$2";      HERMES_ROOT_AUTODETECTED=0; shift 2 ;;
+        -D*)            HERMES_ROOT="${1#-D}"; HERMES_ROOT_AUTODETECTED=0; shift ;;
         -M)             DATA_MOUNT="$2";       shift 2 ;;
         -A)             ARCHIVE_MOUNT="$2";    shift 2 ;;
         -V)             VMAIL_MOUNT="$2";      shift 2 ;;
@@ -332,17 +349,22 @@ if [[ "$MODE" == "archive" || "$MODE" == "all" ]]; then
     check_backup_file "$ARCHIVE_FILE" archive
 fi
 
-# MySQL root password is only needed when we touch databases (system/all).
-if [[ "$MODE" != "archive" && -z "${MYSQL_ROOT_PASS}" ]]; then
-    echo ""
-    echo "Enter the MySQL root password for the Docker MariaDB instance."
-    read -s -p "MySQL root password: " MYSQL_ROOT_PASS
-    echo ""
-    [[ -n "${MYSQL_ROOT_PASS}" ]] || error "MySQL root password is required for a ${MODE} restore"
-fi
+# No MySQL root password prompt: root auth to the Docker MariaDB is via
+# unix_socket (docker exec hermes_db_server mariadb -u root, no -p), so the
+# script never needs one. -R is still accepted for backward compatibility with
+# existing runbooks, but its value is unused and deliberately never written
+# anywhere. Prompting for it asked the operator to type a real credential that
+# was then discarded.
 
 # Validate Hermes root
+if [[ -z "${HERMES_ROOT}" ]]; then
+    error "Could not auto-detect the Hermes Docker install root: no docker-compose.yml found walking up from ${_SCRIPT_DIR}. Run this script from inside the install tree, or pass -D /path/to/install/root."
+fi
+
 if [[ ! -d "${HERMES_ROOT}" ]]; then
+    if [[ "${HERMES_ROOT_AUTODETECTED}" == "0" ]]; then
+        error "Hermes Docker root not found: ${HERMES_ROOT} (from -D)"
+    fi
     error "Hermes Docker root not found: ${HERMES_ROOT}"
 fi
 

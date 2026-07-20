@@ -101,6 +101,11 @@ a, a:hover{
   <cfinclude template="./inc/top_navbar.cfm" />
   <cfinclude template="./inc/main_sidebar.cfm" />
 
+  <!--- Resolve the real install root (compose project working_dir) so the
+        example commands below are copy-pasteable on ANY install path
+        instead of assuming /opt/hermes-seg-docker-gl. Sets #DockerDir#. --->
+  <cfinclude template="./inc/docker_get_directory.cfm" />
+
   <!-- Content Wrapper. Contains page content -->
   <main class="app-main">
     <!-- Content Header (Page header) -->
@@ -176,15 +181,15 @@ id="btn-back-to-top"
       <li><code>nextcloud</code> &mdash; Nextcloud tier only (NC files).</li>
       <li><code>all</code> &mdash; Everything.</li>
     </ul>
-    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B vmail
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all  --yes \
-  --notify-email=admin@example.com   # email subject prefixed [SUCCESS] / [FAILURE]
+    <cfoutput><pre class="bg-body-secondary p-3 mb-2"><code>sudo #DockerDir#/scripts/system_backup.sh -P /mnt/backups -B system --yes
+sudo #DockerDir#/scripts/system_backup.sh -P /mnt/backups -B vmail
+sudo #DockerDir#/scripts/system_backup.sh -P /mnt/backups -B all  --yes \
+  --notify-email=admin@example.com   ## email subject prefixed [SUCCESS] / [FAILURE]
 
-# Verify the email path BEFORE wiring into cron (sends one [TEST] [SUCCESS]
-# and one [TEST] [FAILURE] sample, then exits -- no backup runs):
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh --test-notify \
-  --notify-email=admin@example.com</code></pre>
+## Verify the email path BEFORE wiring into cron (sends one [TEST] [SUCCESS]
+## and one [TEST] [FAILURE] sample, then exits -- no backup runs):
+sudo #DockerDir#/scripts/system_backup.sh --test-notify \
+  --notify-email=admin@example.com</code></pre></cfoutput>
     <p class="mb-0 text-muted small">Add <code>--notify-email=ADDR</code> for failure email (subject prefixed <code>[SUCCESS]</code> or <code>[FAILURE]</code>; delivered via Hermes's own Postfix container). Add <code>--notify-on-success</code> to also email on success. Use <code>--test-notify</code> to verify the notification path without running a backup. Add <code>--cold</code> for legal-hold / forensic snapshots that need absolute byte-level consistency at the cost of full-stack downtime. Add <code>--dry-run</code> to preview without changing anything. Run <code>system_backup.sh --help</code> for the full flag list.</p>
   </div>
 </div>
@@ -193,7 +198,7 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh --test-notify \
   <div class="card-header"><strong>Restore &mdash; replaces only the scopes present in the backup</strong></div>
   <div class="card-body">
     <p>Verifies the manifest + per-archive SHA256 BEFORE any destructive action, refuses on storage-topology mismatch unless <code>FORCE_REMAP=1</code> is set, stops the stack for the duration of the restore (always; even hot-mode backups restore cold), restores DBs via socket-auth <code>mariadb</code>, restores OpenLDAP via <code>slapadd</code>, rsyncs each in-scope tier from staging to its mount path with <code>--delete</code>, and restarts the stack. Reads the scope from the backup's manifest: restoring a <code>vmail</code> backup only touches <code>/mnt/vmail</code>; restoring an <code>archive</code> backup only touches <code>/mnt/archive</code>; etc.</p>
-    <pre class="bg-body-secondary p-3 mb-2"><code>sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre>
+    <cfoutput><pre class="bg-body-secondary p-3 mb-2"><code>sudo #DockerDir#/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-vYYMMDD-YYYYMMDDTHHMMSSZ.tar</code></pre></cfoutput>
     <p class="mb-0 text-muted small">If restoring onto a host with a different storage topology (different DATA_MOUNT etc.), prefix with <code>FORCE_REMAP=1</code>. Run <code>system_restore.sh --help</code> for full usage.</p>
   </div>
 </div>
