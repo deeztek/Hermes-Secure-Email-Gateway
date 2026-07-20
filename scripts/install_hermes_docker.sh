@@ -2233,6 +2233,10 @@ generate_opendkim_tables() {
 
     local dkim_dir="${HERMES_ROOT}/config/hermes/opt/hermes/dkim"
     mkdir -p "$dkim_dir"
+    # keys/ is where the DKIM admin UI drops generated keypairs. opendkim-genkey
+    # will not create its own -D directory, so it must exist before the first
+    # "Generate DKIM Key" in the UI (mirrors arc/keys/).
+    mkdir -p "${dkim_dir}/keys"
 
     local ipv4_subnet
     ipv4_subnet=$(grep -E '^IPV4SUBNET=' "${HERMES_ROOT}/.env" 2>/dev/null \
