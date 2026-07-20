@@ -103,7 +103,7 @@ a, a:hover{
 
   <!--- Resolve the real install root (compose project working_dir) so the
         example commands below are copy-pasteable on ANY install path
-        instead of assuming /opt/hermes-seg-docker-gl. Sets #DockerDir#. --->
+        instead of assuming a fixed one. Sets ##DockerDir##. --->
   <cfinclude template="./inc/docker_get_directory.cfm" />
 
   <!-- Content Wrapper. Contains page content -->

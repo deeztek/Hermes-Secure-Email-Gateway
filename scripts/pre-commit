@@ -13,7 +13,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # ===========================================
 # LAYER 1: Block sensitive paths (catches what gitleaks misses)
 # ===========================================
-echo "[1/4] Checking for sensitive file paths..."
+echo "[1/5] Checking for sensitive file paths..."
 
 # Define sensitive path patterns (files that should NEVER be committed)
 SENSITIVE_PATHS=(
@@ -91,7 +91,7 @@ echo "      No sensitive paths detected."
 # Catches the dev-dump leak class (real customer domains/emails/IPs, dev hosts)
 # that gitleaks does NOT flag because it isn't a "secret" by shape.
 # ===========================================
-echo "[2/4] Scanning staged content for DEV/customer data..."
+echo "[2/5] Scanning staged content for DEV/customer data..."
 
 # High-confidence signatures only (keep false positives near zero).
 # NOTE: deeztek.com is legitimate (docs/support/license); only .net/.org are dev.
@@ -132,10 +132,10 @@ echo "      No DEV/customer data signatures detected."
 # ===========================================
 # LAYER 3: Guard the scanner's own blind spot
 # gitleaks does NOT scan its own config file, so a real secret pasted into
-# .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 4.
+# .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 5.
 # This is exactly how a real DB password once shipped to the public repo.
 # ===========================================
-echo "[3/4] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
+echo "[3/5] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
 
 if echo "$STAGED_FILES" | grep -qx ".gitleaks.toml"; then
     # Flag 12+ char alphanumeric tokens that mix UPPER, lower AND digit -- the
@@ -167,9 +167,73 @@ fi
 echo "      No real secrets in .gitleaks.toml."
 
 # ===========================================
-# LAYER 4: Content scanning with gitleaks
+# LAYER 4: Hardcoded install roots
+# The install root varies per host (/opt/hermes-seg, /opt/hermes-seg-docker-gl,
+# /opt/hermes-seg-container-gl, /opt/Hermes-Secure-Email-Gateway, ...). Baking
+# one into executable code breaks every install that chose a different path.
+# This shipped three times: hermes_smoke_test.sh (#284) and
+# migrate_legacy_to_docker.sh both aborted outright, and two admin pages printed
+# copy-pasteable commands with the wrong path (one of them the DEV path).
+#
+# Use instead:
+#   shell -> the walk-up self-locator (find docker-compose.yml from BASH_SOURCE[0])
+#   CFML  -> <cfinclude template="./inc/docker_get_directory.cfm"> then #DockerDir#
+#
+# Comments are allowed (prose/examples); only live code is blocked.
 # ===========================================
-echo "[4/4] Scanning file contents for secrets..."
+echo "[4/5] Checking for hardcoded install roots..."
+
+ROOT_PAT='/opt/(hermes-seg|hermes-seg-docker-gl|hermes-seg-container-gl|Hermes-Secure-Email-Gateway)'
+ROOT_HITS=""
+
+for file in $STAGED_FILES; do
+    # Only executable surfaces. Docs/markdown legitimately name concrete paths.
+    case "$file" in
+        *.sh|*.cfm|*.cfc) ;;
+        *) continue ;;
+    esac
+    # The guard itself defines the patterns.
+    [ "$file" = "scripts/pre-commit" ] && continue
+
+    # Strip comment lines: shell (leading #) and CFML (any line containing <!--).
+    # Multi-line CFML comment bodies are NOT detected -- if one legitimately
+    # needs a literal path, reword it or use --no-verify with justification.
+    match=$(git show ":$file" 2>/dev/null | grep -nE "$ROOT_PAT" 2>/dev/null \
+            | grep -vE '^[0-9]+:[[:space:]]*#' \
+            | grep -vE '^[0-9]+:.*<!--' \
+            | head -3 || true)
+    if [ -n "$match" ]; then
+        ROOT_HITS="$ROOT_HITS\n  $file:\n$(echo "$match" | sed 's/^/      /')"
+    fi
+done
+
+if [ -n "$ROOT_HITS" ]; then
+    echo ""
+    echo "=============================================="
+    echo "  HARDCODED INSTALL ROOT - COMMIT BLOCKED"
+    echo "=============================================="
+    echo ""
+    echo "Live code must not assume a fixed install root:"
+    echo -e "$ROOT_HITS"
+    echo ""
+    echo "Resolve it at runtime instead:"
+    echo "  shell: walk up from BASH_SOURCE[0] looking for docker-compose.yml"
+    echo "         (see scripts/system_rehost.sh or hermes_smoke_test.sh)"
+    echo "  CFML:  <cfinclude template=\"./inc/docker_get_directory.cfm\">"
+    echo "         then use #DockerDir#"
+    echo ""
+    echo "If this is prose rather than code, make it a comment."
+    echo "If genuinely a false positive: git commit --no-verify"
+    echo ""
+    exit 1
+fi
+
+echo "      No hardcoded install roots detected."
+
+# ===========================================
+# LAYER 5: Content scanning with gitleaks
+# ===========================================
+echo "[5/5] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then
