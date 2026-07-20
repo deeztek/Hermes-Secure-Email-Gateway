@@ -223,24 +223,46 @@ GENSQL
     #    Apply Settings fails on the SPF, DKIM and DMARC pages alike, since all
     #    three regenerate the postfix config.
     log "  + backfilling parameters.parent_name from parameters.parent"
-    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'BACKFILL_SQL'
+    # Join and every guard go through CAST(... AS CHAR) so this works whatever
+    # type `parent` has: the legacy dump defines it int(11), the current
+    # baseline varchar(255), and schema-forward is additive so it keeps the
+    # legacy type. Two traps this avoids:
+    #   - CAST(parent AS UNSIGNED) throws "Truncated incorrect DECIMAL value"
+    #     under strict sql_mode (MariaDB 11.4) on any non-numeric/empty parent,
+    #     and the JOIN evaluates it across ALL rows before WHERE filters to
+    #     child=1 -- so a child=2 row's empty parent aborts the whole statement.
+    #   - `parent <> ''` compares an int column to a string literal, which also
+    #     trips the same strict-mode error on a write.
+    # CAST-to-CHAR never truncates, so both are sidestepped. Empty/0/NULL
+    # parents simply fail to match a real id and are left alone -- no separate
+    # guard needed.
+    # NOT wrapped in `if` on purpose: this MUST NOT silently abort the whole
+    # migration via set -e and leave a half-restored system. On failure we want
+    # a clear error at this step, so capture status and call error().
+    local backfill_rc=0
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'BACKFILL_SQL' || backfill_rc=$?
 UPDATE parameters c
-JOIN parameters p ON p.id = CAST(c.parent AS UNSIGNED)
+JOIN parameters p ON CAST(p.id AS CHAR) = CAST(c.parent AS CHAR)
 SET c.parent_name = p.parameter
 WHERE c.child = 1
   AND c.parent IS NOT NULL
-  AND c.parent <> ''
   AND (c.parent_name IS NULL OR c.parent_name = '');
 BACKFILL_SQL
+    if [[ "$backfill_rc" -ne 0 ]]; then
+        error "parameters.parent_name backfill failed (mariadb exit ${backfill_rc}). See ${LOG_FILE}. The databases are restored but configs/LDAP/rehost/archive have NOT run; fix the cause and re-run -- the DB restore and schema-forward are idempotent."
+    fi
 
     # Count only rows the backfill SHOULD have fixed, i.e. those that HAVE a
     # numeric parent. The current baseline also ships child rows with parent
     # NULL and parent_name pre-set (added after parent_name became the canonical
     # link, e.g. tls_server_sni_maps); those are unbackfillable by definition and
     # must not be reported as failures.
+    # CAST(parent AS CHAR) NOT IN ('','0') is the type-agnostic "has a real
+    # parent" test (see the backfill note); a bare `parent <> ''` would hit the
+    # same strict-mode error on the int column.
     local orphan_children
     orphan_children=$(docker exec hermes_db_server mariadb -u root -N \
-        -e "SELECT COUNT(*) FROM hermes.parameters WHERE child=1 AND (parent_name IS NULL OR parent_name='') AND parent IS NOT NULL AND parent <> '';" 2>/dev/null)
+        -e "SELECT COUNT(*) FROM hermes.parameters WHERE child=1 AND (parent_name IS NULL OR parent_name='') AND parent IS NOT NULL AND CAST(parent AS CHAR) NOT IN ('','0');" 2>/dev/null)
     if [[ "${orphan_children:-0}" != "0" ]]; then
         warn "  ${orphan_children} parameters child row(s) still have no parent_name."
         warn "  Postfix directive generation may emit empty values; check ${LOG_FILE}."
