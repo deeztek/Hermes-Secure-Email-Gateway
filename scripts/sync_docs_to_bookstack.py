@@ -64,6 +64,7 @@ BOOKS = [
             REPO_ROOT / "docs" / "install" / "release-and-update-methodology.md",
             REPO_ROOT / "docs" / "install" / "storage-topology.md",
             REPO_ROOT / "docs" / "install" / "post-restore-steps.md",
+            REPO_ROOT / "docs" / "install" / "legacy-to-docker-post-migration.md",
             REPO_ROOT / "docs" / "general" / "email-flow.md",
             # Intentionally NOT syncing:
             #   docs/general/introduction.md  -- still a "_Placeholder_" stub

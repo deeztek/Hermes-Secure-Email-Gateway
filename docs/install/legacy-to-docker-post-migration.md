@@ -46,11 +46,13 @@ from the restored database and need no action.
 config from the database; their `TrustedHosts` lists must carry the Docker
 subnet. The DKIM signing keys are already migrated (`opt/hermes/dkim/keys`).
 
-1. Sidebar → **DKIM Settings** → **Save & Apply Settings** — regenerates OpenDKIM
-   KeyTable / SigningTable / TrustedHosts referencing the migrated keys. Confirm
-   each domain's published DNS TXT record still matches.
-2. Sidebar → **SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
-3. Sidebar → **DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
+All three live under the **Content Checks** section of the sidebar.
+
+1. **Content Checks → DKIM Settings** → **Save & Apply Settings** — regenerates
+   OpenDKIM KeyTable / SigningTable / TrustedHosts referencing the migrated keys.
+   Confirm each domain's published DNS TXT record still matches.
+2. **Content Checks → SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
+3. **Content Checks → DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
 
 ## 3. Verify Relay Networks (mynetworks)
 

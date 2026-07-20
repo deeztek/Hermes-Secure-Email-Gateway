@@ -206,7 +206,49 @@ GENSQL
         printf '%s\n' "$alters" | docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1
     fi
 
-    # 3) Verify no baseline columns remain missing.
+    # 3) Backfill values DERIVED from existing data.
+    #    Adding a column only creates it NULL. Any column whose value is derived
+    #    from data the legacy DB already has must be populated explicitly --
+    #    schema-forward alone leaves it empty and the app reads nothing.
+    #
+    #    parameters.parent_name: legacy linked a child row to its parent via
+    #    parameters.parent (the PARENT ROW'S id). Current code joins on
+    #    parent_name (the parent's `parameter` string), e.g.
+    #    inc/generate_postfix_configuration.cfm:
+    #        select parameter from parameters
+    #        where child='1' and parent_name = '<directive>' and enabled='1'
+    #    Left NULL that matches nothing for EVERY postfix directive, so the
+    #    generated postconf script emits a bare `message_size_limit =` and
+    #    postfix aborts with "bad numerical configuration". Symptom: Save &
+    #    Apply Settings fails on the SPF, DKIM and DMARC pages alike, since all
+    #    three regenerate the postfix config.
+    log "  + backfilling parameters.parent_name from parameters.parent"
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'BACKFILL_SQL'
+UPDATE parameters c
+JOIN parameters p ON p.id = CAST(c.parent AS UNSIGNED)
+SET c.parent_name = p.parameter
+WHERE c.child = 1
+  AND c.parent IS NOT NULL
+  AND c.parent <> ''
+  AND (c.parent_name IS NULL OR c.parent_name = '');
+BACKFILL_SQL
+
+    # Count only rows the backfill SHOULD have fixed, i.e. those that HAVE a
+    # numeric parent. The current baseline also ships child rows with parent
+    # NULL and parent_name pre-set (added after parent_name became the canonical
+    # link, e.g. tls_server_sni_maps); those are unbackfillable by definition and
+    # must not be reported as failures.
+    local orphan_children
+    orphan_children=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters WHERE child=1 AND (parent_name IS NULL OR parent_name='') AND parent IS NOT NULL AND parent <> '';" 2>/dev/null)
+    if [[ "${orphan_children:-0}" != "0" ]]; then
+        warn "  ${orphan_children} parameters child row(s) still have no parent_name."
+        warn "  Postfix directive generation may emit empty values; check ${LOG_FILE}."
+    else
+        log "  + parent_name backfill verified (0 child rows unlinked)"
+    fi
+
+    # 4) Verify no baseline columns remain missing.
     local remaining
     remaining=$(docker exec hermes_db_server mariadb -u root -N \
         -e "SELECT COUNT(*) FROM information_schema.columns r WHERE r.table_schema='hermes_ref' AND NOT EXISTS (SELECT 1 FROM information_schema.columns h WHERE h.table_schema='hermes' AND h.table_name=r.table_name AND h.column_name=r.column_name);" 2>/dev/null)
@@ -886,10 +928,15 @@ echo "  - Host identity rewired + postfix/amavis/authelia/nginx re-rendered by"
 echo "    system_rehost.sh (unless you skipped that step above)"
 echo ""
 echo -e "${YELLOW}REQUIRED post-migration steps -- the system is NOT fully configured yet.${NC}"
-echo "Follow the checklist:  docs/install/legacy-to-docker-post-migration.md"
+echo "Follow the checklist -- online (no repo access needed):"
+echo "  https://docs.deeztek.com/books/installation-reference"
+echo "  ('Post-Migration Checklist: Legacy -> Docker')"
+echo "Offline copy: ${HERMES_ROOT}/docs/install/legacy-to-docker-post-migration.md"
 echo ""
-echo "  1. Regenerate mail auth: admin console -> DKIM Settings, SPF Settings,"
-echo "     DMARC Settings (each -> Save & Apply Settings)"
+echo "  1. Regenerate mail auth. In the admin console, under Content Checks:"
+echo "       Content Checks -> SPF Settings    -> Save & Apply Settings"
+echo "       Content Checks -> DKIM Settings   -> Save & Apply Settings"
+echo "       Content Checks -> DMARC Settings  -> Save & Apply Settings"
 echo "  2. Reconfigure admin 2FA (all migrated admins are ONE-FACTOR; see warning above)"
 echo "  3. Reactivate the Pro license (UUID changed on the new host -- contact support"
 echo "     with the serial to deactivate/reactivate)"
