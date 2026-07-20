@@ -1046,8 +1046,13 @@ echo "  3. Reactivate the Pro license (UUID changed on the new host -- contact s
 echo "     with the serial to deactivate/reactivate)"
 echo "  4. Verify Relay Networks (mynetworks) + TLS cert selection; then send a"
 echo "     test message inbound and outbound (check delivery, DKIM, spam, TLS)"
-echo "  5. (Deferred) Restore the email archive: run this script with the"
-echo "     hermes-archive-<build>-...tar.gz backup, or answer the prompt below"
+if [[ "$MODE" == "all" ]]; then
+    echo "  5. Email archive -- restoring automatically once this checklist prints."
+    echo "     You do NOT have to wait for it; see the notice below."
+else
+    echo "  5. (Deferred) Restore the email archive: run this script with the"
+    echo "     hermes-archive-<build>-...tar.gz backup, or answer the prompt below"
+fi
 echo ""
 echo -e "${YELLOW}NOTE:${NC} if you SKIPPED host rewiring, also run:"
 echo "  ${HERMES_ROOT}/scripts/system_rehost.sh --force"
@@ -1063,6 +1068,32 @@ echo ""
 # after the system is up. For 'system' mode we skip it; the operator restores
 # the archive later with:  migrate_legacy_to_docker.sh --archive-only --archive <file>
 if [[ "$MODE" == "all" ]]; then
+    # The system half is finished and the stack is serving. The archive restore
+    # is a bulk file extract onto the Archive tier -- it touches NO database and
+    # NO config, so the operator can work through the checklist in parallel
+    # instead of watching a multi-hour tar run. Say so explicitly: without this
+    # the script just goes quiet and looks hung.
+    echo ""
+    echo -e "${GREEN}============================================================${NC}"
+    echo -e "${GREEN}  SYSTEM MIGRATION DONE -- SAFE TO LOG IN NOW${NC}"
+    echo -e "${GREEN}============================================================${NC}"
+    echo ""
+    echo "The gateway is up and serving. Start the checklist above NOW in a"
+    echo "browser / second SSH session -- do not wait for the archive."
+    echo ""
+    echo "The archive restore below only lays down quarantine FILES on the"
+    echo "Archive tier. It touches no database and no configuration, so it"
+    echo "cannot conflict with the settings changes you make while it runs."
+    echo ""
+    echo "While it runs:"
+    echo "  - Mail flow, admin console and user portal all work normally."
+    echo "  - Quarantine entries already appear in the UI (their metadata came"
+    echo "    in with the system restore), but older messages are not openable"
+    echo "    until their files land. This resolves as the restore progresses."
+    echo "  - Leave this script running to completion. It can take hours on a"
+    echo "    large quarantine; interrupting it leaves the archive incomplete"
+    echo "    (re-runnable later with --archive-only)."
+    echo ""
     restore_email_archive "$ARCHIVE_FILE"
 else
     echo ""
