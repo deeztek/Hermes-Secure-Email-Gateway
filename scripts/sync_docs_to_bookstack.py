@@ -261,6 +261,10 @@ def sync_book(spec):
 
 GITHUB_REPO_URL = "https://github.com/deeztek/Hermes-Secure-Email-Gateway"
 GITHUB_BLOB_BASE = f"{GITHUB_REPO_URL}/blob/main"
+# Directories need /tree/, not /blob/. `git ls-files` lists FILES only, so a
+# link to a tracked directory can never match GIT_TRACKED and would otherwise
+# be left as a relative path that means nothing on BookStack.
+GITHUB_TREE_BASE = f"{GITHUB_REPO_URL}/tree/main"
 MD_LINK_RE = re.compile(r"(?<!\!)\[([^\]]+)\]\(([^)]+)\)")
 # (?<!\!) = negative lookbehind to skip image links (![alt](src))
 
@@ -366,6 +370,19 @@ def rewrite_links_in_content(content, src_path, url_cache):
                 return m.group(0)
             stats["rewritten_repo"] += 1
             return f"[{text}]({GITHUB_BLOB_BASE}/{rel}{fragment})"
+
+        # Directory link. GIT_TRACKED holds files only, so a tracked directory
+        # never matches above. Treat it as tracked if it contains at least one
+        # tracked file (which also rules out gitignored dirs), and point at the
+        # GitHub tree view.
+        if resolved.is_dir():
+            try:
+                rel = resolved.relative_to(REPO_ROOT)
+            except ValueError:
+                return m.group(0)
+            if any(resolved in p.parents for p in GIT_TRACKED):
+                stats["rewritten_repo"] += 1
+                return f"[{text}]({GITHUB_TREE_BASE}/{rel}{fragment})"
 
         # Target exists but is gitignored, or doesn't exist at all.
         stats["broken"] += 1
