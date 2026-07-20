@@ -5,8 +5,10 @@
 # Verifies container health, DB integrity, mail-chain config, LDAP/Authelia,
 # scheduled tasks, and fail2ban. Does NOT send or receive real mail.
 #
-# Run on the Docker host:
-#   bash /opt/hermes-seg-docker-gl/scripts/hermes_smoke_test.sh
+# Run on the Docker host from anywhere in the install tree:
+#   bash <install-root>/scripts/hermes_smoke_test.sh
+# The install root is located automatically; override with HERMES_DIR=... if
+# the script has been copied outside the tree.
 #
 # Exit code 0 = no failures, 1 = one or more failures (CI-friendly).
 #
@@ -14,7 +16,21 @@
 
 set -uo pipefail
 
-HERMES_DIR="${HERMES_DIR:-/opt/hermes-seg-docker-gl}"
+# ---- Self-locate HERMES_DIR ----
+# Walk up from this script's location looking for docker-compose.yml. This is
+# depth-independent and survives the install root being anywhere (/opt/hermes-seg,
+# /opt/Hermes-Secure-Email-Gateway, /opt/hermes-seg-container-gl, ...).
+# HERMES_DIR=... in the environment still overrides.
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+if [[ -z "${HERMES_DIR:-}" ]]; then
+    HERMES_DIR="$SCRIPT_DIR"
+    while [[ "$HERMES_DIR" != "/" ]]; do
+        if [[ -f "$HERMES_DIR/docker-compose.yml" ]]; then
+            break
+        fi
+        HERMES_DIR="$(dirname "$HERMES_DIR")"
+    done
+fi
 COMPOSE_FILE="${HERMES_DIR}/docker-compose.yml"
 
 # ---- Color (TTY only) ----
@@ -39,7 +55,7 @@ if ! command -v docker >/dev/null 2>&1; then
     exit 2
 fi
 if [[ ! -f "$COMPOSE_FILE" ]]; then
-    echo "${RED}ERROR${RESET} compose file not found at $COMPOSE_FILE (set HERMES_DIR=... if installed elsewhere)"
+    echo "${RED}ERROR${RESET} could not locate docker-compose.yml walking up from ${SCRIPT_DIR} (set HERMES_DIR=... to point at the install root)"
     exit 2
 fi
 
