@@ -353,7 +353,61 @@ SEED_SQL
         warn "    relying on the missing rows will be unconfigured until added by hand."
     fi
 
-    # 5) Verify no baseline columns remain missing.
+    # 5) Generic unpopulated-column check.
+    #    Adding a column creates it NULL. If its correct value must be DERIVED
+    #    from data the legacy DB already holds, schema-forward leaves it empty
+    #    and the app silently reads nothing. parameters.parent_name was exactly
+    #    this and it broke every postfix directive; it is explicitly backfilled
+    #    in step 3, so it will not appear here any more.
+    #
+    #    Rather than enumerate such columns by name -- which only catches the
+    #    ones someone thought of -- flag the whole CLASS: any column that the
+    #    baseline populates but which is 100% NULL in the restored DB.
+    #
+    #    Scoped to tables the baseline actually seeds (read from the shipped
+    #    SQL), so this never runs COUNT(*) over huge runtime tables like msgs.
+    #    Report only -- backfilling requires knowing each column's derivation,
+    #    which is a per-column judgement call, not something to guess at.
+    local seeded_tables table_in_list
+    seeded_tables=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+    table_in_list=$(printf "'%s'," $seeded_tables | sed 's/,$//')
+
+    if [[ -n "$table_in_list" ]]; then
+        local null_checks null_hits
+        # Pass 1: generate one probe per candidate column.
+        null_checks=$(docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null <<GEN_NULL_SQL
+SELECT CONCAT(
+  'SELECT CONCAT(''      ', c.TABLE_NAME, '.', c.COLUMN_NAME,
+  ' (', LOWER(c.DATA_TYPE), ')'') FROM DUAL',
+  ' WHERE (SELECT COUNT(*) FROM \`hermes\`.\`', c.TABLE_NAME, '\`) > 0',
+  '   AND (SELECT COUNT(*) FROM \`hermes\`.\`', c.TABLE_NAME, '\` WHERE \`', c.COLUMN_NAME, '\` IS NOT NULL) = 0',
+  '   AND (SELECT COUNT(*) FROM \`hermes_ref\`.\`', c.TABLE_NAME, '\` WHERE \`', c.COLUMN_NAME, '\` IS NOT NULL) > 0;')
+FROM information_schema.COLUMNS c
+WHERE c.TABLE_SCHEMA = 'hermes_ref'
+  AND c.TABLE_NAME IN (${table_in_list})
+  AND c.COLUMN_NAME <> 'id'
+  AND EXISTS (SELECT 1 FROM information_schema.TABLES t
+              WHERE t.TABLE_SCHEMA='hermes' AND t.TABLE_NAME=c.TABLE_NAME);
+GEN_NULL_SQL
+        )
+        # Pass 2: run them.
+        if [[ -n "$null_checks" ]]; then
+            null_hits=$(printf '%s\n' "$null_checks" \
+                | docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null | grep -v '^$' || true)
+            if [[ -n "$null_hits" ]]; then
+                warn "  Columns the baseline populates but which are EMPTY in the restored DB:"
+                printf '%s\n' "$null_hits" | tee -a "$LOG_FILE"
+                warn "  ^ each is a column whose value could not simply be defaulted."
+                warn "    Most are harmless (display-only). Any column the app FILTERS or"
+                warn "    JOINS on must be populated or the query silently returns nothing."
+            else
+                log "  + no unpopulated baseline-derived columns detected"
+            fi
+        fi
+    fi
+
+    # 6) Verify no baseline columns remain missing.
     local remaining
     remaining=$(docker exec hermes_db_server mariadb -u root -N \
         -e "SELECT COUNT(*) FROM information_schema.columns r WHERE r.table_schema='hermes_ref' AND NOT EXISTS (SELECT 1 FROM information_schema.columns h WHERE h.table_schema='hermes' AND h.table_name=r.table_name AND h.column_name=r.column_name);" 2>/dev/null)
