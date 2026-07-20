@@ -248,7 +248,112 @@ BACKFILL_SQL
         log "  + parent_name backfill verified (0 child rows unlinked)"
     fi
 
-    # 4) Verify no baseline columns remain missing.
+    # 4) Merge in baseline seed ROWS the legacy DB never had.
+    #    Steps 1-3 reconcile structure; they never add rows. A legacy DB is
+    #    missing every `parameters` directive added since its build, so those
+    #    features are silently unconfigured (not broken-loudly) -- e.g.
+    #    tls_server_sni_maps and the discard-recipients access check.
+    #
+    #    Identity is the natural key (module, child, parameter, parent_name),
+    #    NOT the id: baseline ids and legacy ids are unrelated numbering, so
+    #    inserting with explicit ids would collide. New rows are inserted with
+    #    id auto-assigned and parent NULL -- the baseline's `parent` holds
+    #    BASELINE row ids, meaningless here; parent_name is the link the app
+    #    actually uses.
+    #
+    #    Strictly additive: rows that already exist are left exactly as they
+    #    are, so operator customisations to existing directives survive. Runs
+    #    AFTER the parent_name backfill so legacy child rows already carry
+    #    their parent_name and are matched, not duplicated.
+    local before_rows after_rows max_id_before
+    before_rows=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters;" 2>/dev/null)
+    max_id_before=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COALESCE(MAX(id),0) FROM hermes.parameters;" 2>/dev/null)
+    docker exec -i hermes_db_server mariadb -u root >> "$LOG_FILE" 2>&1 <<'SEED_SQL'
+INSERT INTO hermes.parameters
+  (parameter, whitelist, blacklist, weight, smtpd_recipient_restrictions, name,
+   module, priority, default_value, editable, conf_file, description, parent,
+   parent_name, child, order1, enabled, applied, action, network_entry, note)
+SELECT r.parameter, r.whitelist, r.blacklist, r.weight, r.smtpd_recipient_restrictions,
+       r.name, r.module, r.priority, r.default_value, r.editable, r.conf_file,
+       r.description, NULL, r.parent_name, r.child, r.order1, r.enabled, r.applied,
+       r.action, r.network_entry, r.note
+FROM hermes_ref.parameters r
+WHERE
+  -- (a) child=2: a DIRECTIVE row. Its identity is the directive name.
+  (
+    r.child = 2
+    AND NOT EXISTS (
+      SELECT 1 FROM hermes.parameters h
+      WHERE h.module <=> r.module AND h.child = 2 AND h.parameter <=> r.parameter)
+  )
+  -- (b) child=1 under a SINGLE-valued directive: `parameter` holds the VALUE,
+  --     which the operator may legitimately have changed (e.g. a different
+  --     message_size_limit). Identity is therefore the parent link ALONE --
+  --     matching on the value too would treat an edited row as missing and
+  --     insert a second value for the same directive.
+  OR (
+    r.child = 1
+    AND (SELECT COUNT(*) FROM hermes_ref.parameters r2
+         WHERE r2.child = 1 AND r2.module <=> r.module
+           AND r2.parent_name <=> r.parent_name) = 1
+    AND NOT EXISTS (
+      SELECT 1 FROM hermes.parameters h
+      WHERE h.module <=> r.module AND h.child = 1
+        AND h.parent_name <=> r.parent_name)
+  )
+  -- (c) child=1 under a MULTI-valued directive (an ordered list such as
+  --     smtpd_recipient_restrictions): each distinct value IS its own row, so
+  --     the value belongs in the identity.
+  OR (
+    r.child = 1
+    AND (SELECT COUNT(*) FROM hermes_ref.parameters r2
+         WHERE r2.child = 1 AND r2.module <=> r.module
+           AND r2.parent_name <=> r.parent_name) > 1
+    AND NOT EXISTS (
+      SELECT 1 FROM hermes.parameters h
+      WHERE h.module <=> r.module AND h.child = 1
+        AND h.parent_name <=> r.parent_name
+        AND h.parameter <=> r.parameter)
+  );
+SEED_SQL
+    after_rows=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters;" 2>/dev/null)
+    if [[ "${after_rows:-0}" -gt "${before_rows:-0}" ]]; then
+        log "  + seeded $(( after_rows - before_rows )) new parameters row(s) absent from the legacy DB"
+        docker exec hermes_db_server mariadb -u root -N \
+            -e "SELECT CONCAT('      + ', COALESCE(parent_name, parameter), IF(child=1, CONCAT(' = ', parameter), '')) FROM hermes.parameters WHERE id > ${max_id_before};" 2>/dev/null | tee -a "$LOG_FILE"
+    else
+        log "  + parameters seed rows already complete (nothing to add)"
+    fi
+
+    # Other seeded tables are REPORTED, not merged. Their natural keys differ
+    # per table and a wrong guess would duplicate operator-edited rows, so this
+    # surfaces the delta for a human instead of silently writing.
+    # Exact COUNT(*) per table -- information_schema.table_rows is only an
+    # estimate for InnoDB and would give misleading numbers here.
+    log "  Seed-row delta in other config tables (informational -- NOT modified):"
+    local seed_delta_found=0
+    for t in parameters2 system_settings spam_settings ofelia_jobs encryption_settings \
+             remoteauth_settings policy file_types malware_feeds dns_forwarders message_rules; do
+        local ref_n cur_n
+        ref_n=$(docker exec hermes_db_server mariadb -u root -N -e "SELECT COUNT(*) FROM hermes_ref.\`${t}\`;" 2>/dev/null || echo "")
+        cur_n=$(docker exec hermes_db_server mariadb -u root -N -e "SELECT COUNT(*) FROM hermes.\`${t}\`;" 2>/dev/null || echo "")
+        [[ -z "$ref_n" || -z "$cur_n" ]] && continue
+        if [[ "$cur_n" -lt "$ref_n" ]]; then
+            warn "      ${t}: baseline has ${ref_n} row(s), restored DB has ${cur_n}"
+            seed_delta_found=1
+        fi
+    done
+    if [[ "$seed_delta_found" == "0" ]]; then
+        log "      no shortfall detected in the reported tables"
+    else
+        warn "  ^ these tables have fewer rows than the current baseline. Features"
+        warn "    relying on the missing rows will be unconfigured until added by hand."
+    fi
+
+    # 5) Verify no baseline columns remain missing.
     local remaining
     remaining=$(docker exec hermes_db_server mariadb -u root -N \
         -e "SELECT COUNT(*) FROM information_schema.columns r WHERE r.table_schema='hermes_ref' AND NOT EXISTS (SELECT 1 FROM information_schema.columns h WHERE h.table_schema='hermes' AND h.table_name=r.table_name AND h.column_name=r.column_name);" 2>/dev/null)
