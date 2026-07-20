@@ -46,6 +46,18 @@ STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 BLOCKED_FILES=""
 
 for file in $STAGED_FILES; do
+    # Exception: an EMPTY .gitkeep is a directory placeholder, not key material.
+    # Several sensitive dirs must exist in a fresh clone or the app breaks at
+    # runtime (e.g. opendkim-genkey cannot create its own -D dir, so a missing
+    # dkim/keys/ makes DKIM key generation fail on every fresh install).
+    # The emptiness check is what keeps this safe -- a non-empty file named
+    # .gitkeep still gets blocked.
+    if [[ "$(basename "$file")" == ".gitkeep" ]]; then
+        if [[ -s "$REPO_ROOT/$file" ]]; then
+            BLOCKED_FILES="$BLOCKED_FILES\n  - $file (non-empty .gitkeep)"
+        fi
+        continue
+    fi
     for pattern in "${SENSITIVE_PATHS[@]}"; do
         if [[ "$file" == $pattern ]]; then
             BLOCKED_FILES="$BLOCKED_FILES\n  - $file"
