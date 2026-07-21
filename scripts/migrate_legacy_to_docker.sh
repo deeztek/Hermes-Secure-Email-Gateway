@@ -1091,6 +1091,60 @@ else
 fi
 
 # ============================================================================
+# REBUILD POSTFIX LOOKUP TABLES (postmap the .db hashmaps)
+# ============================================================================
+# Postfix hash: maps need a compiled .db built by postmap. The install script
+# only touches EMPTY source stubs; the .db is built lazily the first time an
+# admin saves the matching UI page (which regenerates the source from the DB
+# and runs postmap). A migrated admin skips those saves -- the config is
+# already in the restored DB -- so any hash: map used in smtpd_*_restrictions
+# has no .db and smtpd 451-rejects every message with e.g.:
+#     open database /etc/postfix/amavis_senderbypass.db: No such file or directory
+# The container entrypoint does not postmap either, so a restart won't fix it.
+# Build every lookup table's .db now, from whatever source exists (empty source
+# -> empty .db, which matches nothing and is the correct default). This is the
+# same map list the install script stubs. Runs AFTER rehost so it postmaps the
+# final rendered sources.
+header "Rebuilding Postfix Lookup Tables"
+# Discover EXACTLY the hash: maps the live config references, rather than
+# hardcoding a list. Only these need a compiled .db; postmapping unrelated
+# files is wrong -- e.g. relay_domains is a bare-domain list (not hash:) and
+# aliases is sendmail-format (needs postalias, not postmap). The rendered set
+# also varies by topology (relay / mailbox / hybrid), so read it from the
+# actual main.cf + master.cf in the container.
+if docker exec hermes_postfix_dkim true 2>/dev/null; then
+    hash_maps=""
+    hash_maps=$(docker exec hermes_postfix_dkim sh -c \
+        'cat /etc/postfix/main.cf /etc/postfix/master.cf 2>/dev/null' 2>/dev/null \
+        | grep -oE 'hash:/etc/postfix/[a-zA-Z0-9_]+' \
+        | sed 's#hash:/etc/postfix/##' | sort -u)
+    if [[ -z "$hash_maps" ]]; then
+        warn "  no hash: maps found in the live postfix config -- nothing to postmap"
+    else
+        built=0 total=0
+        for m in $hash_maps; do
+            total=$((total+1))
+            # aliases uses sendmail 'name: value' format -> postalias, not postmap.
+            # Ensure the source exists first so smtpd never hits a missing map.
+            tool="postmap"
+            [[ "$m" == "aliases" ]] && tool="postalias"
+            if docker exec hermes_postfix_dkim sh -c \
+                 "touch /etc/postfix/${m} && /usr/sbin/${tool} /etc/postfix/${m}" >> "$LOG_FILE" 2>&1; then
+                built=$((built+1))
+            else
+                warn "  ${tool} failed for ${m} (see ${LOG_FILE})"
+            fi
+        done
+        docker exec hermes_postfix_dkim /usr/sbin/postfix reload >> "$LOG_FILE" 2>&1 || \
+            warn "  postfix reload reported errors (see ${LOG_FILE})"
+        log "  + built ${built}/${total} live lookup-table .db file(s) [${hash_maps//$'\n'/ }] and reloaded postfix"
+    fi
+else
+    warn "hermes_postfix_dkim not reachable -- skipped postmap. If mail is rejected with"
+    warn "  'open database /etc/postfix/<map>.db: No such file', run postmap by hand."
+fi
+
+# ============================================================================
 # SUMMARY
 # ============================================================================
 
