@@ -130,14 +130,29 @@ restore_email_archive() {
             || { warn "  archive extraction reported errors -- check ${LOG_FILE}."; return 1; }
     fi
 
-    # Ownership: match the pre-provisioned Archive tier owner (the amavis uid/gid
-    # the hermes_mail_filter container runs as).
-    local arc_owner
-    arc_owner=$(stat -c '%u:%g' "$dest" 2>/dev/null || true)
-    if [[ -n "$arc_owner" ]]; then
-        chown -R "$arc_owner" "$dest" >> "$LOG_FILE" 2>&1 || true
+    # Ownership: `tar -x` restored the LEGACY uid/gid onto the extracted tree --
+    # INCLUDING $dest itself -- so `stat $dest` now reports the legacy owner.
+    # Chowning to that (the old behavior) is a no-op that leaves the quarantine
+    # owned by the legacy uid; if that differs from the Docker amavis uid, amavis
+    # cannot write and every message defers:
+    #   .../clean/... refuse to write: Permission denied  ->  451, mail deferred.
+    # Chown to the amavis uid/gid the hermes_mail_filter container actually runs
+    # as, read from the container itself (do NOT assume 994).
+    local amavis_ug
+    amavis_ug="$(docker exec hermes_mail_filter id -u amavis 2>/dev/null):$(docker exec hermes_mail_filter id -g amavis 2>/dev/null)"
+    if [[ "$amavis_ug" =~ ^[0-9]+:[0-9]+$ ]]; then
+        chown -R "$amavis_ug" "$dest" >> "$LOG_FILE" 2>&1 \
+            || warn "  chown -R ${amavis_ug} ${dest} reported errors (see ${LOG_FILE})"
+        log "Email archive restored to ${dest} (owner ${amavis_ug} = amavis in hermes_mail_filter)"
+    else
+        # Fallback if the container is unreachable: keep the prior behavior but
+        # flag it, since the quarantine may be unwritable by amavis.
+        local arc_owner
+        arc_owner=$(stat -c '%u:%g' "$dest" 2>/dev/null || true)
+        [[ -n "$arc_owner" ]] && chown -R "$arc_owner" "$dest" >> "$LOG_FILE" 2>&1 || true
+        warn "Could not read amavis uid from hermes_mail_filter; left ${dest} owned by ${arc_owner:-legacy uid}."
+        warn "  If amavis logs 'refuse to write: Permission denied', chown ${dest} to the amavis uid by hand."
     fi
-    log "Email archive restored to ${dest} (owner ${arc_owner:-unchanged})"
 }
 
 # ----------------------------------------------------------------------------
