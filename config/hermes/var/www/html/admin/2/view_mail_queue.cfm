@@ -178,6 +178,62 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     Mail Queue settings saved successfully. Postfix reloaded.
   </div>
 </cfif>
+<cfif m is "30">
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-pause"></i> Outbound Delivery Paused</h4>
+    All outbound mail is now HELD in the queue &mdash; nothing will leave the box until you Resume.
+  </div>
+</cfif>
+<cfif m is "31">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-play"></i> Outbound Delivery Resumed</h4>
+    Outbound delivery is active again and the queue has been flushed &mdash; held mail is being delivered.
+  </div>
+</cfif>
+
+<!-- OUTBOUND DELIVERY CONTROL CARD -->
+<cfoutput>
+<div class="card mb-4 <cfif OutboundPaused>card-danger<cfelse>card-success</cfif> card-outline">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-paper-plane"></i> Outbound Delivery</h3>
+  </div>
+  <div class="card-body">
+    <cfif OutboundPaused>
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+          <span class="badge bg-danger" style="font-size:0.95rem;"><i class="fas fa-pause"></i> PAUSED</span>
+          <span class="ms-2">Outbound mail is <strong>held in the queue</strong> &mdash; nothing is leaving this box.
+          Review the queue below (delete anything you do not want sent), then resume.</span>
+        </div>
+        <form method="post" autocomplete="off" class="mb-0 no-preloader">
+          <input type="hidden" name="action" value="resume_outbound">
+          <button type="submit" class="btn btn-success"
+            onclick="return confirm('Resume outbound delivery and flush the queue? All queued mail that is not On-Hold will be delivered.');">
+            <i class="fas fa-play"></i> Resume Outbound Delivery
+          </button>
+        </form>
+      </div>
+    <cfelse>
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div>
+          <span class="badge bg-success" style="font-size:0.95rem;"><i class="fas fa-play"></i> ACTIVE</span>
+          <span class="ms-2">Outbound mail is delivering normally. Pausing holds all outgoing mail in the
+          queue (e.g. maintenance windows) without affecting inbound or filtering.</span>
+        </div>
+        <form method="post" autocomplete="off" class="mb-0 no-preloader">
+          <input type="hidden" name="action" value="pause_outbound">
+          <button type="submit" class="btn btn-warning"
+            onclick="return confirm('Pause outbound delivery? All outgoing mail will be held in the queue until you Resume. Inbound and filtering are unaffected.');">
+            <i class="fas fa-pause"></i> Pause Outbound Delivery
+          </button>
+        </form>
+      </div>
+    </cfif>
+  </div>
+</div>
+</cfoutput>
 
 <!-- QUEUE SETTINGS CARD -->
 <div class="card card-primary card-outline mb-4">

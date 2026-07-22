@@ -118,4 +118,40 @@ Expects: form.action, form.msg_id (comma-separated for message actions)
 
   <cfset session.m = 9>
   <cflocation url="view_mail_queue.cfm" addtoken="no">
+
+<cfelseif action is "pause_outbound">
+  <!--- Hold ALL outbound: flip the defer_transports rows on, then re-render
+        postfix config from the parameters table so main.cf carries
+        `defer_transports = smtp relay`. Mail parks in the queue; nothing
+        leaves the box until Resume. --->
+  <cfquery datasource="hermes">
+    UPDATE parameters SET enabled = 1
+    WHERE parameter = 'defer_transports' AND child = 2 AND module = 'postfix'
+  </cfquery>
+  <cfquery datasource="hermes">
+    UPDATE parameters SET enabled = 1
+    WHERE parent_name = 'defer_transports' AND child = 1
+  </cfquery>
+  <cfinclude template="./generate_postfix_configuration.cfm">
+
+  <cfset session.m = 30>
+  <cflocation url="view_mail_queue.cfm" addtoken="no">
+
+<cfelseif action is "resume_outbound">
+  <!--- Resume outbound: flip the defer_transports rows off, re-render config
+        (drops the directive -> postfix default = deliver), then flush the
+        queue so held mail goes out immediately. --->
+  <cfquery datasource="hermes">
+    UPDATE parameters SET enabled = 0
+    WHERE parameter = 'defer_transports' AND child = 2 AND module = 'postfix'
+  </cfquery>
+  <cfquery datasource="hermes">
+    UPDATE parameters SET enabled = 0
+    WHERE parent_name = 'defer_transports' AND child = 1
+  </cfquery>
+  <cfinclude template="./generate_postfix_configuration.cfm">
+  <cfinclude template="./mail_queue_flush_mailqueue.cfm">
+
+  <cfset session.m = 31>
+  <cflocation url="view_mail_queue.cfm" addtoken="no">
 </cfif>

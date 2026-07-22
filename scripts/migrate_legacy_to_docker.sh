@@ -93,6 +93,32 @@ cleanup() {
 trap cleanup EXIT
 
 # ----------------------------------------------------------------------------
+# hold_outbound
+# ----------------------------------------------------------------------------
+# Directly park ALL outbound mail (smtp + relay transports) in the queue via
+# postconf, so nothing leaves the box. This is the SAFE-CUTOVER hold: a freshly
+# migrated gateway comes up with the legacy quarantine + notification schedule
+# live, and left alone it will blast stale quarantine-notification digests to
+# every real recipient in the restored data. We hold outbound the entire
+# migration and hand the admin a clean queue to review + release from the Web UI.
+#
+# Direct postconf (not the parameters render) because it must take effect
+# immediately and independently of DB/CFML state. It is applied at two points --
+# early (before any restore) and again after system_rehost (whose template copy
+# wipes it) -- with the persistent parameters flag (enabled=1) set in between so
+# the admin's later config-saves keep outbound held until they explicitly Resume.
+hold_outbound() {
+    if docker exec hermes_postfix_dkim /usr/sbin/postconf -e 'defer_transports = smtp relay' >> "$LOG_FILE" 2>&1 \
+       && docker exec hermes_postfix_dkim /usr/sbin/postfix reload >> "$LOG_FILE" 2>&1; then
+        log "  OUTBOUND DELIVERY HELD -- nothing leaves the box (defer_transports = smtp relay)"
+    else
+        warn "  Could not hold outbound delivery (see ${LOG_FILE})."
+        warn "  Set it by hand NOW to avoid mailing real recipients:"
+        warn "    docker exec hermes_postfix_dkim postconf -e 'defer_transports = smtp relay' && docker exec hermes_postfix_dkim postfix reload"
+    fi
+}
+
+# ----------------------------------------------------------------------------
 # restore_email_archive <archive-tarball>
 # ----------------------------------------------------------------------------
 # Restores the legacy email quarantine (physical files) onto the Docker Archive
@@ -364,6 +390,20 @@ SEED_SQL
     else
         log "  + parameters seed rows already complete (nothing to add)"
     fi
+
+    # Safe-cutover persistent hold. The defer_transports rows now exist (seeded
+    # above if the legacy DB lacked them). Flip them to enabled=1 so EVERY
+    # config render -- including the admin's required post-migration SPF/DKIM/
+    # DMARC "Save & Apply" -- keeps outbound held. Without this, the first
+    # Save & Apply would silently un-hold outbound and drain to real recipients.
+    # The live postconf hold (stages 1 + 3) covers the migration itself; this
+    # row is what makes the hold survive the admin's own follow-up steps until
+    # they explicitly Resume from the Web UI.
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'HOLD_SQL'
+UPDATE parameters SET enabled = 1 WHERE parameter = 'defer_transports' AND child = 2 AND module = 'postfix';
+UPDATE parameters SET enabled = 1 WHERE parent_name = 'defer_transports' AND child = 1;
+HOLD_SQL
+    log "  + outbound delivery set to PAUSED in config (survives config re-renders; admin resumes from Web UI)"
 
     # Other seeded tables are REPORTED, not merged. Their natural keys differ
     # per table and a wrong guess would duplicate operator-edited rows, so this
@@ -679,6 +719,22 @@ if ! docker exec hermes_db_server mariadb -u root -e "SELECT 1;" >/dev/null 2>&1
     error "Cannot connect to MariaDB as root via docker exec (unix_socket)."
 fi
 log "MariaDB connection successful"
+
+# ============================================================================
+# HOLD OUTBOUND (safe-cutover, stage 1 -- earliest possible)
+# ============================================================================
+# Do this BEFORE restoring anything, so from this moment nothing can leave the
+# box even if a quarantine-notification job fires mid-migration. Re-asserted
+# after system_rehost (which wipes it) and backed by the persistent parameters
+# flag set during schema-forward. The admin releases it from the Web UI.
+if [[ "$MODE" != "archive" ]]; then
+    header "Holding Outbound Delivery (safe cutover)"
+    echo "Outbound mail is being HELD for the entire migration so this box does"
+    echo "not blast stale quarantine notifications to real recipients in the"
+    echo "restored data. You will release it deliberately from the Web UI after"
+    echo "reviewing the queue. (See the completion notice at the end.)"
+    hold_outbound
+fi
 
 # ============================================================================
 # EXTRACT BACKUP
@@ -1106,6 +1162,19 @@ else
 fi
 
 # ============================================================================
+# RE-ASSERT OUTBOUND HOLD (safe-cutover, stage 3 -- after rehost)
+# ============================================================================
+# system_rehost re-rendered main.cf from the template, which drops the live
+# defer_transports set in stage 1 (its bash renderer does not apply parameters
+# directives). Re-assert the live hold NOW so nothing leaves during the archive
+# restore below, which can run for hours. The persistent parameters flag
+# (enabled=1, set during schema-forward) keeps it held through the admin's later
+# config-saves; this postconf makes it live for the rest of THIS run.
+if [[ "$MODE" != "archive" ]]; then
+    hold_outbound
+fi
+
+# ============================================================================
 # REBUILD POSTFIX LOOKUP TABLES (postmap the .db hashmaps)
 # ============================================================================
 # Postfix hash: maps need a compiled .db built by postmap. The install script
@@ -1168,6 +1237,26 @@ header "Migration Complete"
 echo ""
 echo -e "${GREEN}Migration completed successfully!${NC}"
 echo ""
+if [[ "$MODE" != "archive" ]]; then
+    echo -e "${RED}============================================================${NC}"
+    echo -e "${RED}  OUTBOUND EMAIL IS PAUSED -- READ THIS BEFORE ANYTHING${NC}"
+    echo -e "${RED}============================================================${NC}"
+    echo ""
+    echo "This box came up with the restored quarantine + notification schedule"
+    echo "live. To stop it blasting stale notifications to real recipients, ALL"
+    echo "outbound delivery is HELD -- mail is piling up in the queue, nothing is"
+    echo "leaving the box. This is deliberate."
+    echo ""
+    echo "Before you release it, in the admin console open:"
+    echo "    Mail Queue"
+    echo "  - REVIEW the queued mail. Delete the stale quarantine-notification"
+    echo "    storm; keep anything real."
+    echo "  - When you are satisfied, click  Resume Outbound Delivery."
+    echo ""
+    echo "Outbound stays paused through the config-save steps below (by design),"
+    echo "so do those FIRST, review the queue, and Resume LAST."
+    echo ""
+fi
 echo "Summary:"
 echo "  - Databases restored: hermes (+ schema-forwarded), djigzo, opendmarc, Syslog"
 echo "  - New databases created: authelia, nextcloud"
@@ -1198,6 +1287,11 @@ else
     echo "  5. (Deferred) Restore the email archive: run this script with the"
     echo "     hermes-archive-<build>-...tar.gz backup, or answer the prompt below"
 fi
+echo "  6. RELEASE OUTBOUND -- THE LAST STEP. Outbound is HELD (see the red"
+echo "     notice above). After the steps above and after reviewing the queue:"
+echo "     admin console -> Mail Queue -> delete the stale notification storm,"
+echo "     keep anything real -> click 'Resume Outbound Delivery'. Until you do"
+echo "     this, NOTHING leaves the box."
 echo ""
 echo -e "${YELLOW}NOTE:${NC} if you SKIPPED host rewiring, also run:"
 echo "  ${HERMES_ROOT}/scripts/system_rehost.sh --force"

@@ -1315,6 +1315,8 @@ INSERT IGNORE INTO `parameters` VALUES (449, 'hash:/etc/postfix/sni_maps', NULL,
 INSERT IGNORE INTO `parameters` VALUES (473, 'check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf', NULL, NULL, NULL, NULL, 'Discard Recipients Access Check', 'postfix', NULL, NULL, 0, 'main.cf', 'Silent discard for mailbox aliases configured to silently drop messages', NULL, 'smtpd_recipient_restrictions', 1, 1.050, 1, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (474, 'inet:hermes_body_milter:8893', NULL, NULL, NULL, NULL, 'Hermes Body Milter', 'postfix', NULL, NULL, 1, 'main.cf', NULL, '351', 'smtpd_milters', 1, 3.100, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (475, 'inet:hermes_body_milter:8893', NULL, NULL, NULL, NULL, 'Hermes Body Milter', 'postfix', NULL, NULL, 1, 'main.cf', NULL, '352', 'non_smtpd_milters', 1, 3.100, 1, 1, NULL, NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (476, 'defer_transports', NULL, NULL, NULL, NULL, 'Pause Outbound Delivery', 'postfix', NULL, NULL, 0, 'main.cf', 'When enabled, holds all outbound mail in the queue (renders defer_transports = smtp relay). Toggled by the Mail Queue Pause/Resume control; set to paused automatically during legacy-to-Docker migration. enabled=0 = normal delivery.', NULL, NULL, 2, NULL, 0, 1, 'NONE', NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (477, 'smtp relay', NULL, NULL, NULL, NULL, 'Deferred Transports', 'postfix', NULL, NULL, 0, 'main.cf', NULL, NULL, 'defer_transports', 1, 1.000, 0, 1, 'NONE', NULL, NULL);
 
 -- -------- parameters2                          [scrub] --------
 CREATE TABLE IF NOT EXISTS `parameters2` (

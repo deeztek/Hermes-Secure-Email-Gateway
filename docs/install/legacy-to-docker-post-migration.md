@@ -12,6 +12,21 @@ Docker-managed service configs. This checklist covers what remains.
 
 ---
 
+> ## ⚠️ Outbound email is PAUSED until you release it
+>
+> The migration deliberately brings the gateway up with **all outbound delivery
+> held**. A freshly migrated box has the restored quarantine and its
+> notification schedule live — left alone, it will blast **stale quarantine
+> notifications to every real recipient** in the restored data (this is not
+> hypothetical; it will happen). So nothing leaves the box: outgoing mail parks
+> in the queue.
+>
+> Work through this checklist, then **[release outbound as the very last step](#9-release-outbound-delivery)**
+> — after you've reviewed the queue and deleted anything you don't want sent.
+> Inbound mail and filtering run normally the whole time; only egress is held.
+
+---
+
 ## What the migration already did for you
 
 - Restored `hermes` (schema-forwarded to the current baseline), `djigzo`,
@@ -105,4 +120,31 @@ convenient — it needs no gateway downtime.
 ## 8. Final end-to-end test
 
 1. Send a test message **inbound** and **outbound**.
-2. Verify: delivery, DKIM = pass, spam scoring, and TLS on both legs.
+2. Verify: DKIM = pass, spam scoring, and TLS on both legs.
+
+> Outbound is still **paused** at this point, so an outbound test message
+> **parks in the queue** rather than delivering. That's expected — you confirm
+> actual outbound delivery in step 9 after releasing.
+
+## 9. Release outbound delivery
+
+**This is the last step. Do it only after everything above checks out.**
+
+While migrating, outbound has been held so the box could not mail real
+recipients (see the notice at the top). Now release it — deliberately, after
+reviewing what's queued.
+
+1. Sidebar → **Mail Queue**. At the top, the **Outbound Delivery** card shows
+   **PAUSED**.
+2. **Review the queued mail.** Expect a large batch of quarantine-notification
+   messages (`from postmaster@…`) generated from the restored quarantine.
+   **Select and delete** those — they are stale and should not go out. Keep any
+   genuine mail you want delivered.
+3. Click **Resume Outbound Delivery**. This clears the hold and flushes the
+   queue; the **Outbound Delivery** card flips to **ACTIVE**.
+4. Confirm the outbound test from step 8 now delivers, and watch the mail log
+   to be sure only the mail you kept goes out.
+
+> The **Outbound Delivery** control (Mail Queue page) is a permanent pause/resume
+> switch — useful for maintenance windows too. Pausing holds all outgoing mail
+> in the queue without affecting inbound or filtering.

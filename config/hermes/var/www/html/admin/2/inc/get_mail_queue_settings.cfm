@@ -49,4 +49,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cfif></cfif> 
       
       
+      <!--- Outbound delivery pause state. enabled=1 on the defer_transports
+            directive row => outbound is HELD. Read from parameters (the
+            source of truth that survives config re-renders), not from live
+            postconf. --->
+      <cfquery name="get_defer_transports_state" datasource="hermes">
+        select enabled from parameters
+        where parameter = 'defer_transports' and child = '2' and module = 'postfix'
+      </cfquery>
+      <cfset OutboundPaused = ( get_defer_transports_state.recordcount GT 0
+                                AND val(get_defer_transports_state.enabled) EQ 1 )>
+
     <!--- GET MAIL QUEUE SETTINGS ENDS HERE --->
