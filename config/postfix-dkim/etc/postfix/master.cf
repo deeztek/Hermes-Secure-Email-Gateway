@@ -104,18 +104,39 @@ policy-spf  unix  -       n       n       -       -       spawn
 cleanup_reinject unix  n       -       -       -       0       cleanup
             -o hopcount_limit=100
 
-127.0.0.1:10026 inet  n       -       n       -       10      smtpd
+# CipherMail (djigzo) re-injection port. Post-content-filter mail arrives here
+# from the ciphermail container, so this listener MUST bind on the Docker
+# network (not 127.0.0.1) and permit the Docker subnet.
+# #232: milters RUN here (no no_milters) so the sign-only OpenDKIM secondary
+# (opendkim-sign.conf, inet:8892) + OpenARC (hermes_openarc:8893) sign the
+# ACTUAL bytes that egress, AFTER CipherMail's MIME rebuild. Signing before
+# CipherMail breaks the body hash on complex multipart mail. See
+# opendkim-sign.conf and the postfix_dkim entrypoint's secondary instance.
+10026 inet  n       -       n       -       10      smtpd
             -o content_filter=
-            -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks,no_milters
+            -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks
             -o smtpd_helo_restrictions=
             -o smtpd_client_restrictions=
             -o smtpd_sender_restrictions=
             -o smtpd_recipient_restrictions=permit_mynetworks,reject
-            -o mynetworks=127.0.0.0/8
+            -o mynetworks=127.0.0.0/8,172.16.32.0/24
             -o smtpd_authorized_xforward_hosts=127.0.0.0/8
             -o smtpd_authorized_xclient_hosts=127.0.0.0/8
             -o cleanup_service_name=cleanup_reinject
-            -o smtpd_milters=inet:127.0.0.1:8891
+            -o smtpd_milters=inet:localhost:8892,inet:hermes_openarc:8893
+
+# Injection port for mail composed in the CipherMail (djigzo) web GUI. Same
+# cross-container reachability requirement as :10026. Uses the primary
+# OpenDKIM (:8891) since this mail does not pass back through CipherMail.
+10027 inet  n       -       -       -       10      smtpd
+            -o smtpd_helo_restrictions=
+            -o smtpd_client_restrictions=
+            -o smtpd_sender_restrictions=
+            -o smtpd_recipient_restrictions=permit_mynetworks,reject
+            -o smtpd_tls_security_level=
+            -o mynetworks=127.0.0.0/8,172.16.32.0/24
+            -o syslog_name=postfix/10027
+            -o smtpd_milters=inet:localhost:8891
 
 sa-wrapper unix  -     n      n     -     -     pipe 
            user=amavis argv=/etc/sal-wrapper-0.2.1/sal-wrapper.pl --${mailbox}
