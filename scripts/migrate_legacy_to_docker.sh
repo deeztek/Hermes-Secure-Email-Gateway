@@ -311,6 +311,32 @@ BACKFILL_SQL
         log "  + parent_name backfill verified (0 child rows unlinked)"
     fi
 
+    # 3b) Backfill msgrcpt.notification_sent for RESTORED historical quarantine.
+    #     notification_sent (Docker-era, #180) gates the every-60s quarantine
+    #     notifier (schedule/quarantine_notify.cfm): it emails a [Quarantine
+    #     Notice] for every msgrcpt row with ds IN ('B','D') AND
+    #     notification_sent = 0. The legacy dump predates the column, so step 2's
+    #     additive ALTER just added it DEFAULT 0 -- stamping EVERY restored
+    #     historical quarantine row as "never notified." Left as-is the notifier
+    #     treats the entire quarantine history as brand-new and floods the queue
+    #     (observed: 49k+ stale notices). These messages were quarantined on the
+    #     LEGACY box long ago; there is nothing new to tell the recipient. Mark
+    #     them handled (= 1, the notifier's own "sent" state) so only mail
+    #     quarantined AFTER cutover notifies. Idempotent: only touches rows still
+    #     at 0. (The notifier also has its own recency backstop, but this fixes
+    #     the flood at the source so it never even reaches that guard.)
+    local notif_rc=0
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'NOTIF_SQL' || notif_rc=$?
+UPDATE msgrcpt SET notification_sent = 1
+WHERE ds IN ('B', 'D') AND notification_sent = 0;
+NOTIF_SQL
+    if [[ "$notif_rc" -ne 0 ]]; then
+        warn "  Could not backfill msgrcpt.notification_sent (mariadb exit ${notif_rc}); see ${LOG_FILE}."
+        warn "  The outbound hold still contains any flood, but review the mail queue for stale [Quarantine Notice] mail before Resume."
+    else
+        log "  + restored quarantine marked already-notified (no stale notices for historical mail)"
+    fi
+
     # 4) Merge in baseline seed ROWS the legacy DB never had.
     #    Steps 1-3 reconcile structure; they never add rows. A legacy DB is
     #    missing every `parameters` directive added since its build, so those

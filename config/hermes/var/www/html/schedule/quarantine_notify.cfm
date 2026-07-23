@@ -25,13 +25,27 @@ See GitHub issue #180
 <cfset postmasterEmail = getpostmaster.value>
 <cfset consoleHost = getportal.value2>
 
-<!--- Find all quarantined messages that haven't been notified yet --->
-<!--- Step 1: Get pending mail_ids from msgrcpt (uses idx_msgrcpt_notify index) --->
+<!--- Recency backstop (days). The notifier gates ONLY on notification_sent = 0,
+      so ANY event that introduces old quarantine rows at 0 -- a legacy->Docker
+      migration, a cross-host restore/DR rehost, a manual DB import -- otherwise
+      makes it treat the entire quarantine history as brand-new and blast a
+      notification for every message ever held (observed: 49k+ queued after a
+      migration). This window makes that structurally impossible: a message
+      older than the window is never notified regardless of the flag. Trade-off:
+      if the notifier (or the box) is down longer than the window, quarantines
+      that age past it are silently skipped -- acceptable for a courtesy notice. --->
+<cfset notifyWindowDays = 7>
+
+<!--- Find quarantined messages that haven't been notified yet AND are recent --->
+<!--- Step 1: Get pending mail_ids from msgrcpt (uses idx_msgrcpt_notify index),
+      joined to msgs for the age filter (msgs_idx_time_num). --->
 <cfquery name="getPendingIds" datasource="hermes">
     SELECT mr.mail_id, mr.rid
     FROM msgrcpt mr
+    INNER JOIN msgs m ON m.mail_id = mr.mail_id
     WHERE mr.ds IN ('B', 'D')
       AND mr.notification_sent = 0
+      AND m.time_num >= (UNIX_TIMESTAMP() - (86400 * <cfqueryparam value="#notifyWindowDays#" cfsqltype="cf_sql_integer">))
     LIMIT 100
 </cfquery>
 
