@@ -109,6 +109,25 @@ ASSUME_YES=0
 # tagged on gitlab but not yet promoted to github.
 REMOTE="origin"
 
+# Preserve argv before the parser consumes it.
+#
+# This loop runs at TOP LEVEL and shifts every argument away, so `main "$@"`
+# at the bottom of the file receives NOTHING -- and the self-update re-exec
+# inside main therefore relaunched with no arguments at all. Everything the
+# operator asked for was silently dropped on the second incarnation (#288):
+#
+#   system_update_docker.sh v260731  -> re-exec resolved "latest release"
+#                                       instead, and reported "already up to
+#                                       date" while doing nothing
+#   --remote=gitlab                  -> reverted to the GitHub Releases API,
+#                                       defeating the entire RC workflow
+#   --yes                            -> prompted again (visible as a second
+#                                       "Proceed with upgrade?")
+#   --dry-run                        -> THE SECOND INCARNATION RAN FOR REAL
+#
+# That last one is the dangerous case: a dry run performed an actual upgrade.
+ORIG_ARGV=("$@")
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --dry-run)      DRY_RUN=1; shift ;;
@@ -893,7 +912,9 @@ main() {
         log "so phases 2-5 run against the target version's orchestrator logic."
         log ""
         export HERMES_UPDATE_REEXEC=1
-        exec "$0" "$@"
+        # ORIG_ARGV, not "$@" -- see the note at the parser. `main "$@"` is
+        # handed an already-emptied argv, so "$@" here forwards nothing.
+        exec "$0" "${ORIG_ARGV[@]}"
     fi
 
     # Second incarnation (or --skip-git). phase1_pull_code is idempotent --
