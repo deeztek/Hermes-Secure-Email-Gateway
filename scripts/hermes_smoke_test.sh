@@ -81,14 +81,61 @@ check_container() {
     fi
 }
 
-# db_query <sql>  -- returns row data via socket auth (no -p)
+# Admin DB access.
+#
+# The documented design (install_hermes_docker.sh create_databases()) is that
+# LinuxServer's mariadb image gives root@localhost the unix_socket plugin, so
+# `docker exec ... mariadb -u root` with no password authenticates as OS root.
+# Every Hermes script relies on that.
+#
+# Observed 2026-08-01 on DEV: root@localhost rejected socket auth outright --
+# "ERROR 1045 Access denied for user 'root'@'localhost' (using password: NO)"
+# -- i.e. that account is password-authenticated there, contrary to the design.
+# Whether that is one box's drift or a real variation is still open (#288), but
+# a diagnostic tool must not be the thing that falls over: resolve the working
+# method once, then use it. The password is read from the Docker secret already
+# mounted inside the container, so it never appears in argv or shell history.
+# Probed in order; first that works wins. `default` is the historical form and
+# stays FIRST -- the image ships a root client config, so a bare invocation
+# picks up whatever credentials it holds. Adding an explicit `-u root` DISCARDS
+# that and was a regression introduced 2026-08-01; it is kept only as a
+# fallback for boxes without the client config.
+DB_AUTH="unresolved"
+
+resolve_db_auth() {
+    if docker exec hermes_db_server mariadb -N -s -e "SELECT 1" >/dev/null 2>&1; then
+        DB_AUTH="default"
+    elif docker exec hermes_db_server mariadb -u root -N -s -e "SELECT 1" >/dev/null 2>&1; then
+        DB_AUTH="root"
+    elif docker exec hermes_db_server sh -c \
+            'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD 2>/dev/null); export MYSQL_PWD; mariadb -u root -N -s -e "SELECT 1"' \
+            >/dev/null 2>&1; then
+        DB_AUTH="password"
+    else
+        DB_AUTH="none"
+    fi
+}
+
+# db_query <sql>
 db_query() {
-    docker exec hermes_db_server mariadb -N -s -e "$1" 2>/dev/null
+    case "$DB_AUTH" in
+        root)     docker exec hermes_db_server mariadb -u root -N -s -e "$1" 2>/dev/null ;;
+        password) docker exec hermes_db_server sh -c \
+                      'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD); export MYSQL_PWD; exec mariadb -u root -N -s -e "$1"' \
+                      _ "$1" 2>/dev/null ;;
+        *)        docker exec hermes_db_server mariadb -N -s -e "$1" 2>/dev/null ;;
+    esac
 }
 
 # db_query_db <db> <sql>
 db_query_db() {
-    docker exec hermes_db_server mariadb -N -s "$1" -e "$2" 2>/dev/null
+    case "$DB_AUTH" in
+        root)     docker exec hermes_db_server mariadb -u root -N -s "$1" -e "$2" 2>/dev/null ;;
+        password) docker exec hermes_db_server sh -c \
+                      'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD); export MYSQL_PWD; exec mariadb -u root -N -s "$1" -e "$2"' \
+                      _ "$1" "$2" 2>/dev/null ;;
+        *)        docker exec hermes_db_server mariadb -N -s "$1" -e "$2" 2>/dev/null ;;
+    esac
 }
 
 # ============================================================
@@ -138,6 +185,35 @@ fi
 # Tier 2 — Database integrity
 # ============================================================
 section "Tier 2 — Database integrity"
+
+# Probe the admin connection ONCE, with stderr visible, before running any
+# real check.
+#
+# Every helper below suppresses stderr, so an unusable admin connection used
+# to surface as twelve identical "database <x> missing" failures on a box
+# whose databases are demonstrably fine -- Tier 2b authenticates to those same
+# databases moments later and passes. That is a diagnosis the operator has to
+# reverse-engineer, and it trains people to ignore this tier. Show the actual
+# error instead, and say plainly that the failures below are downstream of it.
+resolve_db_auth
+case "$DB_AUTH" in
+    socket)
+        pass "admin DB access via unix_socket (root@localhost, as designed)"
+        ;;
+    password)
+        warn "admin DB access requires a PASSWORD -- root@localhost is not unix_socket on this box"
+        echo "          Every Hermes script assumes socket auth. system_update_docker.sh"
+        echo "          reads build_no that way and calls fatal() when it comes back empty,"
+        echo "          so THE UPDATE ORCHESTRATOR CANNOT RUN HERE. See issue #288."
+        ;;
+    none)
+        fail "admin DB connection unusable by either method -- this tier is unreliable"
+        echo "          command: docker exec hermes_db_server mariadb -u root -N -s -e 'SELECT 1'"
+        docker exec hermes_db_server mariadb -u root -N -s -e "SELECT 1" 2>&1 >/dev/null \
+            | sed 's/^/          /'
+        echo "          Tier 2b below uses per-service credentials and is unaffected."
+        ;;
+esac
 
 EXPECTED_DBS=(hermes djigzo authelia opendmarc nextcloud Syslog)
 for db in "${EXPECTED_DBS[@]}"; do
@@ -357,6 +433,59 @@ else
     else
         warn "ofelia_jobs has no active rows"
     fi
+fi
+
+# The DB is the source of truth; /etc/ofelia/config.ini is RENDERED from it.
+# Nothing enforced that the two agreed, and they silently diverged for four
+# releases (#288): the repo shipped a config.ini snapshot frozen at v260612,
+# it was bind-mounted straight into place, and nothing regenerated it at
+# install or upgrade. Result -- four seeded jobs never ran on a fresh install
+# (including the fangfrisch malware-feed refresh) and the update check called
+# a script removed at #218, so the dashboard read UPDATE CHECK PENDING
+# forever. Every one of those jobs LOOKED fine in the DB.
+#
+# This compares what is scheduled against what should be, so the divergence
+# can never be invisible again. Fix with:
+#     ./scripts/install_hermes_docker.sh --render-ofelia
+OFELIA_RENDERED=$(docker exec hermes_ofelia grep -c '^\[job-exec' /etc/ofelia/config.ini 2>/dev/null || echo "")
+if [[ -z "$OFELIA_RENDERED" ]]; then
+    warn "Could not read /etc/ofelia/config.ini from hermes_ofelia"
+elif [[ -z "$OFELIA_ACTIVE" ]]; then
+    # Say so out loud. A comparison that quietly does not run reports the same
+    # as one that passed -- which is the entire failure mode this check exists
+    # to prevent, so it must never be silent about being unable to run.
+    warn "config.ini vs ofelia_jobs NOT COMPARED -- DB unreachable ($OFELIA_RENDERED job(s) scheduled, DB count unknown)"
+elif [[ "$OFELIA_RENDERED" -eq "$OFELIA_ACTIVE" ]]; then
+    pass "config.ini matches ofelia_jobs ($OFELIA_RENDERED job(s) scheduled)"
+else
+    fail "config.ini is STALE: $OFELIA_RENDERED job(s) scheduled, $OFELIA_ACTIVE active in DB"
+    echo "          Jobs in the DB but NOT scheduled (these are not running):"
+    # Both sides hold the same shape -- [job-exec "name"] -- so one extraction
+    # serves both and the two lists are guaranteed comparable.
+    RENDERED_NAMES=$(docker exec hermes_ofelia grep '^\[job-exec' /etc/ofelia/config.ini 2>/dev/null \
+                     | sed 's/.*"\(.*\)".*/\1/' | sort)
+    DB_NAMES=$(db_query_db hermes "SELECT job_name FROM ofelia_jobs WHERE active=1" \
+                     | sed 's/.*"\(.*\)".*/\1/' | sort)
+    comm -13 <(echo "$RENDERED_NAMES") <(echo "$DB_NAMES") | sed 's/^/            - /'
+    echo "          Fix: ./scripts/install_hermes_docker.sh --render-ofelia"
+fi
+
+# The update-check job is the ONLY channel that tells this box a release
+# exists (dashboard widget + notification e-mail are both fed by the cache
+# file it writes). It shipped pointed at /opt/hermes/schedule/update_check.sh,
+# a pre-#218 wrapper that still runs but POSTs to a removed endpoint -- so it
+# failed silently every night and the box could never learn it was behind.
+# A job that LOOKS scheduled but cannot work is worse than a missing one.
+UPDATE_CMD=$(docker exec hermes_ofelia sh -c \
+    "grep -A3 'hermes-update-check' /etc/ofelia/config.ini | grep '^command'" 2>/dev/null || echo "")
+if [[ -z "$UPDATE_CMD" ]]; then
+    warn "hermes-update-check job not found in config.ini -- update notifications are OFF"
+elif [[ "$UPDATE_CMD" == *check_for_update.cfm* ]]; then
+    pass "hermes-update-check calls check_for_update.cfm"
+else
+    fail "hermes-update-check calls a stale target -- update notifications are silently dead"
+    echo "          ${UPDATE_CMD#*= }"
+    echo "          Fix: ./scripts/install_hermes_docker.sh --render-ofelia"
 fi
 
 # ============================================================

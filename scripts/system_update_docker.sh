@@ -43,7 +43,6 @@
 #
 # Prerequisites:
 #   - Run on the Docker host (not inside a container)
-#   - Working tree clean (no uncommitted changes)
 #   - hermes_db_server container running (needed to read build_no)
 #   - Docker Compose v2
 #   - Git + curl
@@ -157,10 +156,74 @@ run_capture() {
     "$@"
 }
 
+# Admin DB access: socket first, password as fallback.
+#
+# The design (install_hermes_docker.sh create_databases()) is that LinuxServer's
+# mariadb image gives root@localhost the unix_socket plugin, so `docker exec`
+# authenticates as OS root with no password -- MYSQL_ROOT_PASSWORD configures
+# only root@'%'. That holds on a correctly-built box, and a password sent to a
+# unix_socket account is REJECTED, so socket must stay the first choice.
+#
+# It does not hold everywhere. Observed on DEV 2026-08-01: root@localhost
+# rejected socket auth outright ("Access denied ... using password: NO"). With
+# socket-only access, get_current_build_no() returned empty and preflight
+# called fatal() -- the orchestrator could not run AT ALL on that box. Since
+# the root password is already on disk in creds/ and mounted into the container
+# as a Docker secret, falling back to it costs nothing and makes the upgrade
+# path work under either configuration. Read from the in-container secret so it
+# never appears in argv, `ps`, or shell history. See #288.
+DB_AUTH="unresolved"
+
+resolve_db_auth() {
+    if docker exec hermes_db_server mysql -u root -e "SELECT 1" >/dev/null 2>&1; then
+        DB_AUTH="root"
+        log "Admin DB access: root via socket ✓"
+    elif docker exec hermes_db_server mysql -N -s -e "SELECT 1" >/dev/null 2>&1; then
+        # Bare invocation -- picks up the image's root client config. Kept as a
+        # probe because an explicit `-u root` DISCARDS those credentials on
+        # boxes that rely on them.
+        DB_AUTH="default"
+        log "Admin DB access: default client credentials ✓"
+    elif docker exec hermes_db_server sh -c \
+            'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD 2>/dev/null); export MYSQL_PWD; mysql -u root -e "SELECT 1"' \
+            >/dev/null 2>&1; then
+        DB_AUTH="password"
+        warn "Admin DB access: socket auth rejected; using the root password from"
+        warn "the mounted Docker secret. root@localhost is mysql_native_password"
+        warn "on this box, contrary to the documented design (#288)."
+    else
+        DB_AUTH="none"
+        fatal "Cannot authenticate to hermes_db_server as root by socket OR password.
+Check:  docker exec hermes_db_server mysql -u root -e 'SELECT 1'
+and that config/hermes/opt/hermes/creds/mysql_root_password matches the running DB."
+    fi
+}
+
+# db_root_query <db> <sql>  -- returns rows, silent on failure
+db_root_query() {
+    case "$DB_AUTH" in
+        default)  docker exec hermes_db_server mysql -N -s "$1" -e "$2" 2>/dev/null ;;
+        password) docker exec hermes_db_server sh -c \
+                      'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD); export MYSQL_PWD; exec mysql -u root -N -s "$1" -e "$2"' \
+                      _ "$1" "$2" 2>/dev/null ;;
+        *)        docker exec hermes_db_server mysql -u root -N -s "$1" -e "$2" 2>/dev/null ;;
+    esac
+}
+
+# db_root_import <db> < file  -- applies SQL from stdin
+db_root_import() {
+    case "$DB_AUTH" in
+        default)  docker exec -i hermes_db_server mysql "$1" 2>>"$LOG_FILE" ;;
+        password) docker exec -i hermes_db_server sh -c \
+                      'MYSQL_PWD=$(cat /run/secrets/MYSQL_ROOT_PASSWORD); export MYSQL_PWD; exec mysql -u root "$1"' \
+                      _ "$1" 2>>"$LOG_FILE" ;;
+        *)        docker exec -i hermes_db_server mysql -u root "$1" 2>>"$LOG_FILE" ;;
+    esac
+}
+
 # Read current build_no from the live database.
 get_current_build_no() {
-    docker exec hermes_db_server mysql -u root -N -s hermes \
-        -e "SELECT value FROM system_settings WHERE parameter='build_no';" 2>/dev/null
+    db_root_query hermes "SELECT value FROM system_settings WHERE parameter='build_no';"
 }
 
 # Resolve the target tag. Priority:
@@ -395,6 +458,12 @@ preflight() {
     fi
     log "hermes_db_server running ✓"
 
+    # Decide how to authenticate as root BEFORE anything reads the DB --
+    # get_current_build_no() below is a hard fatal on empty, so an unresolved
+    # connection would abort the upgrade with a misleading "could not read
+    # build_no" instead of naming the real problem.
+    resolve_db_auth
+
     # Read current build_no
     CURRENT_BUILD="$(get_current_build_no)"
     if [[ -z "$CURRENT_BUILD" ]]; then
@@ -584,9 +653,9 @@ phase3_apply_release_artifacts() {
                     local rel="${f#${HERMES_ROOT}/}"
                     log "  sql/  ${rel}"
                     if (( DRY_RUN )); then
-                        echo -e "    ${CYAN}[dry-run]${NC} docker exec -i hermes_db_server mysql -u root hermes < $f"
+                        echo -e "    ${CYAN}[dry-run]${NC} db_root_import hermes < $f"
                     else
-                        if ! docker exec -i hermes_db_server mysql -u root hermes < "$f" 2>>"$LOG_FILE"; then
+                        if ! db_root_import hermes < "$f"; then
                             fatal "Failed to apply ${rel} (see $LOG_FILE for details)"
                         fi
                     fi
@@ -691,6 +760,45 @@ phase4_finalize() {
             fi
             sleep 2
         done
+    fi
+
+    # Ofelia schedule re-render (#288).
+    #
+    # Two reasons this must run on EVERY upgrade, not just the release that
+    # introduced it:
+    #
+    #  1. config/ofelia/config.ini is a generated artifact that is tracked in
+    #     the repo and bind-mounted onto /etc/ofelia. Phase 1's `git` step
+    #     therefore OVERWRITES the live, correctly-rendered schedule with the
+    #     repo's snapshot on every single upgrade -- discarding the admin's
+    #     substituted notification addresses and any job rows added since.
+    #     Re-rendering from `ofelia_jobs` afterwards makes that self-healing.
+    #
+    #  2. Installs predating #288 are running the snapshot frozen at v260612:
+    #     missing the mail-queue health check, DMARC reports, Authelia log
+    #     rotation and the fangfrisch malware-feed refresh, and still calling
+    #     the pre-#218 update_check.sh (the cause of a permanent "UPDATE CHECK
+    #     PENDING" on the dashboard).
+    #
+    # apply_schema_updates() has always deferred this here by design -- see its
+    # closing note that service config regens are the orchestrator's concern.
+    # Non-fatal: a failed render leaves the previous schedule in place.
+    if (( DRY_RUN )); then
+        echo -e "${CYAN}[dry-run]${NC} docker exec hermes_commandbox curl --silent http://localhost:8888/schedule/regen_ofelia_config.cfm"
+    else
+        log "Re-rendering Ofelia schedule from ofelia_jobs..."
+        local ofelia_resp
+        if ! ofelia_resp=$(docker exec hermes_commandbox /usr/bin/curl --silent --max-time 300 \
+                               http://localhost:8888/schedule/regen_ofelia_config.cfm 2>&1); then
+            warn "Ofelia schedule render failed. Output:"
+            echo "$ofelia_resp" | tee -a "$LOG_FILE"
+            warn "Continuing — re-run later with: ./scripts/install_hermes_docker.sh --render-ofelia"
+        elif [[ "$ofelia_resp" == *OFELIA_CONFIG_REGEN_OK* ]]; then
+            log "  Ofelia schedule rendered; hermes_ofelia restarted ✓"
+        else
+            echo "$ofelia_resp" | tee -a "$LOG_FILE"
+            warn "Ofelia render did not confirm success — check the scheduler after the upgrade."
+        fi
     fi
 
     # NCVERSION change detection + automated upgrade (#264).

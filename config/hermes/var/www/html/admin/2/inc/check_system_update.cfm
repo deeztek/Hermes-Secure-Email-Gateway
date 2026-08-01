@@ -19,8 +19,41 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
      (The legacy bare-metal path that RSA-encrypted a payload and POSTed it to
      updates.deeztek.com/update_comm.cfm was removed -- it never ran on Docker
      and the product is Docker-only. History is in git if ever needed.) --->
+
+<!--- Staleness signalling (#288).
+
+     The cache is only ever written by the hermes-update-check Ofelia job. If
+     that job is not running, this file never appears and the widget sat on a
+     bland "UPDATE CHECK PENDING" forever -- indistinguishable from the benign
+     "installed an hour ago, the 04:30 check hasn't fired yet" case. That is
+     precisely how a dead scheduler stayed invisible on affected installs.
+
+     So: expose whether the reading is TRUSTWORTHY alongside the reading
+     itself, and let the dashboard offer a one-click on-demand check rather
+     than leaving the admin with a dead-end string.
+
+       hermesupdatestale  1 = do not trust this value; something needs doing
+       hermesupdatehint   short actionable sentence (already HTML-safe)
+       hermesupdatechecked  when the cache was last written, or "" if never
+--->
+<cfset hermesupdatestale   = 0>
+<cfset hermesupdatehint    = "">
+<cfset hermesupdatechecked = "">
+<cfset staleAfterDays      = 3>
+
 <cfset cacheFile = "/opt/hermes/updates/check_system_update.txt">
 <cfif fileExists(cacheFile)>
+    <cftry>
+        <cfset cacheInfo = GetFileInfo(cacheFile)>
+        <cfset hermesupdatechecked = DateFormat(cacheInfo.lastmodified, "yyyy-mm-dd") & " " & TimeFormat(cacheInfo.lastmodified, "HH:mm")>
+        <cfif DateDiff("d", cacheInfo.lastmodified, Now()) GT staleAfterDays>
+            <cfset hermesupdatestale = 1>
+            <cfset hermesupdatehint  = "Last successful check was #hermesupdatechecked#. The daily update-check job may not be running.">
+        </cfif>
+        <cfcatch type="any">
+            <!--- Unreadable timestamp is not worth failing the dashboard over. --->
+        </cfcatch>
+    </cftry>
     <cffile action="read" file="#cacheFile#" variable="cachedContent">
     <cfset cachedContent = trim(cachedContent)>
     <cfif Len(cachedContent) GT 0>
@@ -41,11 +74,21 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
         <cfelse>
             <!--- "UPDATE CHECK UNAVAILABLE" passes through verbatim --->
             <cfset hermesupdate = status>
+            <cfset hermesupdatestale = 1>
+            <cfset hermesupdatehint  = "The last check could not reach the GitHub Releases API. Verify outbound HTTPS and DNS.">
         </cfif>
     <cfelse>
         <cfset hermesupdate = "UPDATE CHECK UNAVAILABLE">
+        <cfset hermesupdatestale = 1>
+        <cfset hermesupdatehint  = "The update-check cache is empty. Run a check to repopulate it.">
     </cfif>
 <cfelse>
-    <!--- Cache file not yet written; first Ofelia run hasn't happened. --->
+    <!--- Cache file has never been written. Benign on a box installed within
+         the last day (the job runs at 04:30); otherwise the job is not
+         running -- which is the state every install shipped in before #288,
+         because the scheduler was calling a long-removed script. Either way
+         the honest presentation is "unverified", with a way to resolve it. --->
     <cfset hermesupdate = "UPDATE CHECK PENDING">
+    <cfset hermesupdatestale = 1>
+    <cfset hermesupdatehint  = "No update check has completed yet. This clears after the nightly check; if it persists, the scheduler is not running.">
 </cfif>

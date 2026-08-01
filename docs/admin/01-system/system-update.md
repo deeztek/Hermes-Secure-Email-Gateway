@@ -72,15 +72,17 @@ load; only the once-a-day Ofelia job actually hits the API.
 [job-exec "hermes-update-check"]
 schedule =  0 30 04 * * *
 container = hermes_commandbox
-command = /opt/hermes/schedule/update_check.sh
+command = /usr/bin/curl --silent http://localhost:8888/schedule/check_for_update.cfm
 ```
 
-The shell wrapper resolves to a `curl --silent
-http://localhost:8888/schedule/check_for_update.cfm` against the
-internal Lucee port — no auth dance, no X-Token header, same
-convention as `hermes-message-cleanup`, `hermes-quarantine-notify`,
-and every other Hermes scheduled job. The CFML target does the
-actual work:
+The job curls the internal Lucee port directly — no auth dance, no
+X-Token header, same convention as `hermes-message-cleanup`,
+`hermes-quarantine-notify`, and every other Hermes scheduled job.
+(Through v260723 the shipped `config.ini` still ran the pre-#218
+`/opt/hermes/schedule/update_check.sh` wrapper, which POSTed through
+the since-removed `/hermes-api/` endpoint and therefore never wrote
+the cache file — leaving the dashboard permanently on **UPDATE CHECK
+PENDING**. See #288.) The CFML target does the actual work:
 
 1. Read current `build_no` from `system_settings`.
 2. `GET https://api.github.com/repos/deeztek/Hermes-Secure-Email-Gateway/releases/latest`

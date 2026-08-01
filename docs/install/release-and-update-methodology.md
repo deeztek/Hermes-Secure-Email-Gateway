@@ -28,7 +28,7 @@ The version stamp is stored in two `system_settings` rows:
 | Parameter | Value | Meaning |
 |---|---|---|
 | `version_no` | `'Docker'` | Code train identifier (post-bare-metal era) |
-| `build_no` | `'v260119'` | Specific release tag the install is currently at |
+| `build_no` | e.g. `'v260723'` | Specific release tag the install is currently at. On a fresh install, written by `install_hermes_docker.sh` from the newest `updates/v<YYMMDD>/` directory; on an upgrade, advanced by each release's `schema_updates.sql`. |
 
 ### Image registry
 
@@ -307,6 +307,9 @@ For maintainers preparing a release:
    UPDATE system_settings SET value='v<DATE>' WHERE parameter='build_no';
    UPDATE system_settings SET value='Docker'  WHERE parameter='version_no';
    ```
+   While you are in the baseline, bump its own `build_no` literal to `v<DATE>` too. That row is only a floor — `install_hermes_docker.sh` overwrites it in `seed_install_specific_values()` from the newest `updates/v<YYMMDD>/` directory, precisely so a missed bump here can no longer surface as a wrong version on the dashboard. Keeping it in step still matters for anyone importing the baseline by hand.
+
+   > **Why the derivation exists.** `schema_updates.sql` advances `build_no` on **upgrades only** (`--apply-schema`); a fresh install imports the baseline and stops. From v260612 through v260723 the baseline literal was never re-bumped, so every fresh install of four consecutive releases reported `v260612`. Fixed 2026-07-31 (#288).
 4. **Add CFML / bash migrations** as needed under `updates/v<DATE>/cfml/` and `updates/v<DATE>/scripts/`.
 5. **Update `.env.template`**: bump `HERMES_DOCKER_IMG_VERSION=v<DATE>` and (if NC bumped) `NCVERSION=...`. `NCVERSION` is release-managed per [#261](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/261) — operators never edit it; bumps land here only after the integration check in step 6 passes.
 6. **(If `NCVERSION` was bumped in step 5) Run the NC integration check on a Test box**:
@@ -388,7 +391,7 @@ The orchestrator applies BOTH release directories in order:
 |---|---|
 | Baseline (`hermes_install.sql`) | Self-contained at v260119 (audit completed 2026-05-26) |
 | Per-release directory (`updates/v260119/`) | Empty by design — v260119 IS the baseline; first real per-release directory is the NEXT release |
-| `install_hermes_docker.sh --init-db` | Imports baseline only; no schema_updates.sql call |
+| `install_hermes_docker.sh --init-db` | Imports baseline only; no schema_updates.sql call. Stamps `build_no` from the newest `updates/v<YYMMDD>/` dir and renders the Ofelia schedule from `ofelia_jobs` (both added 2026-07-31, #288). |
 | `install_hermes_docker.sh --apply-schema` | Globs `updates/v*/sql/schema_updates.sql`, applies in version order; no-op on v260119-only |
 | `scripts/system_update_docker.sh` (#221) | **MVP shipped 2026-05-26** — phases 1-5 functional; some v2 polish deferred (see "Known MVP limitations" below) |
 | `schedule/post_upgrade.cfm` framework | Stub shipped 2026-05-26 — framework + helpers + `migrations` table in place, zero blocks registered (first one lands when first migration is needed) |

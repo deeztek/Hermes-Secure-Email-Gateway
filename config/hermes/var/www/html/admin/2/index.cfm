@@ -253,6 +253,21 @@ select property, value from encryption_settings where property='user.systemMailS
   <a href="##" data-bs-toggle="modal" data-bs-target="##releaseNotesModal" data-build="#build#" class="release-notes-link">UPDATE BUILD #build# FOUND</a>
 </td>
 
+<cfelseif IsDefined("hermesupdatestale") AND hermesupdatestale EQ 1>
+
+  <!--- Unverified reading (issue 288). PENDING / UNAVAILABLE used to render as
+       plain text identical in weight to a healthy "LATEST VERSION", so a
+       scheduler that had stopped feeding this cell looked like a normal
+       state and went unnoticed indefinitely. Flag it, say why, and offer
+       the one-click check so it is resolvable from here. --->
+  <td>
+    <span class="text-warning" title="#EncodeForHTMLAttribute(hermesupdatehint)#">
+      <i class="fas fa-exclamation-triangle"></i> #hermesupdate#
+    </span>
+    <br>
+    <a href="inc/run_update_check.cfm" class="small">Check now</a>
+  </td>
+
 <cfelse>
 
   <td>#hermesupdate#</td>

@@ -176,18 +176,24 @@ prompt_with_default() {
 }
 
 derive_install_version() {
-    # Returns the version string corresponding to this checkout, e.g. "v260119".
-    # Sourced from the `updates/hermes-NNNNNN/` directory name so the value
+    # Returns the version string corresponding to this checkout, e.g. "v260723".
+    # Sourced from the newest `updates/v<YYMMDD>/` directory name so the value
     # auto-updates per release (no manual editing of the script at release
     # cut). Used by:
     #   - the banner displayed at the top of main()
     #   - the HERMES_DOCKER_IMG_VERSION substitution in .env, so the install
     #     pulls images that match the cloned source tree instead of :latest
+    #   - the build_no release stamp written by seed_install_specific_values()
+    #
+    # Release directories were renamed `hermes-NNNNNN/` -> `v<YYMMDD>/` at the
+    # #218 release-engineering pivot, but this matcher was not. It therefore
+    # returned EMPTY for every release from v260612 on: the banner printed
+    # "Version unknown" and .env kept its `latest` default rather than the
+    # tag matching the source tree. Fixed 2026-07-31 -- match `v<YYMMDD>`.
     ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
-        | grep -oE 'hermes-[0-9]+' \
+        | grep -oE '^v[0-9]{6}$' \
         | sort \
-        | tail -1 \
-        | sed 's/hermes-/v/'
+        | tail -1
 }
 
 validate_mount_point() {
@@ -1152,18 +1158,38 @@ generate_compose_override() {
     fi
 
     # Substitute HERMES_DOCKER_IMG_VERSION so `docker compose pull` fetches
-    # images matching this source tree's release (e.g. v260119) instead of
+    # images matching this source tree's release (e.g. v260723) instead of
     # the .env.template default of "latest" -- which fails when no image has
     # been promoted to :latest in the registry yet.
+    #
+    # Guarded by an existence probe (#288). derive_install_version() was
+    # silently returning EMPTY from v260612 onwards, so this substitution had
+    # not actually run in a long time and every install quietly used `latest`.
+    # Repairing the derivation re-arms it -- and would hard-couple a fresh
+    # install to images tagged for THIS release, breaking the install outright
+    # on a code-only release where no new images were pushed. Probe first, and
+    # fall back to whatever .env.template ships rather than pulling a tag that
+    # does not exist. An explicit --image-version is the operator's call and
+    # is applied without probing.
     local img_version
     img_version=$(derive_install_version)
     # operator override: --image-version=<tag> (pull a specific image tag)
     if [[ -n "${OPT_IMG_VERSION:-}" ]]; then
-        img_version="$OPT_IMG_VERSION"
-    fi
-    if [[ -n "$img_version" ]]; then
-        log "Substituting HERMES_DOCKER_IMG_VERSION = ${img_version}..."
-        sed -i -e "s|^HERMES_DOCKER_IMG_VERSION=.*|HERMES_DOCKER_IMG_VERSION=${img_version}|" "$ENV_FILE"
+        log "Substituting HERMES_DOCKER_IMG_VERSION = ${OPT_IMG_VERSION} (operator override)..."
+        sed -i -e "s|^HERMES_DOCKER_IMG_VERSION=.*|HERMES_DOCKER_IMG_VERSION=${OPT_IMG_VERSION}|" "$ENV_FILE"
+    elif [[ -n "$img_version" ]]; then
+        local registry probe_ref
+        registry="${OPT_REGISTRY:-ghcr.io/deeztek}"
+        probe_ref="${registry}/hermes-commandbox:${img_version}"
+        if docker manifest inspect "$probe_ref" >/dev/null 2>&1; then
+            log "Substituting HERMES_DOCKER_IMG_VERSION = ${img_version}..."
+            sed -i -e "s|^HERMES_DOCKER_IMG_VERSION=.*|HERMES_DOCKER_IMG_VERSION=${img_version}|" "$ENV_FILE"
+        else
+            log "No images tagged ${img_version} in ${registry} -- keeping the"
+            log "  HERMES_DOCKER_IMG_VERSION already in .env (normal for a"
+            log "  code-only release that shipped no new images)."
+            log "  Override with: --image-version=<tag>"
+        fi
     fi
 
     # operator override: --registry=<host/path> (image registry to pull service
@@ -2849,6 +2875,28 @@ seed_install_specific_values() {
     # for parameters2.console.host + parameters2.server_ip.
     header "Seeding install-specific values"
 
+    # Release stamp. `hermes_install.sql` carries a build_no literal frozen at
+    # whatever release last re-snapshotted the baseline, and the per-release
+    # `updates/v<DATE>/sql/schema_updates.sql` that advances build_no runs only
+    # on UPGRADES via --apply-schema -- never on a fresh install. So a fresh
+    # install of any release cut after the baseline snapshot reported the
+    # BASELINE's build_no forever (fresh v260628 / v260630 / v260722 / v260723
+    # installs all displayed v260612 on the dashboard). Deriving it from the
+    # checkout's newest updates/v<YYMMDD>/ dir keeps it correct automatically,
+    # with no per-release checklist step left to forget. Done before the
+    # host-IP guard below so a missing IP can't skip the stamp.
+    local install_version
+    install_version=$(derive_install_version)
+    if [[ -n "$install_version" ]]; then
+        log "Writing system_settings.build_no = ${install_version}..."
+        docker exec hermes_db_server mysql -u root hermes -e "
+            UPDATE system_settings SET value='${install_version}' WHERE parameter='build_no';
+        " 2>>"$LOG_FILE"
+    else
+        warn "Could not derive release version from ${HERMES_ROOT}/updates/ --"
+        warn "build_no left at the hermes_install.sql baseline value."
+    fi
+
     local ip
     ip=$(state_get_value "03-host-ip-confirmed")
     if [[ -z "$ip" ]]; then
@@ -3597,6 +3645,61 @@ EOF
 }
 
 # ============================================================================
+# OFELIA SCHEDULE RENDER
+# ============================================================================
+
+render_ofelia_config() {
+    # Renders /etc/ofelia/config.ini from the `ofelia_jobs` table and restarts
+    # hermes_ofelia, via the headless schedule page.
+    #
+    # Why this exists: config/ofelia/config.ini is a GENERATED artifact that
+    # was nonetheless committed to the repo (a snapshot off a host, frozen at
+    # the v260612 release) and compose bind-mounts ./config/ofelia directly
+    # onto /etc/ofelia. Nothing regenerated it at install -- the generator runs
+    # only from admin action pages -- so every fresh install ran that stale
+    # snapshot: four seeded jobs missing entirely (health-check-mailqueue,
+    # dmarc-report, authelia-log-rotate, fangfrisch-refresh) and
+    # hermes-update-check still calling the pre-#218 update_check.sh, which
+    # left the dashboard on "UPDATE CHECK PENDING" permanently.
+    #
+    # Deliberately NOT state-guarded: it is a fast, idempotent render, so
+    # re-running --init-db should always re-assert the schedule from the DB.
+    header "Rendering Ofelia schedule from ofelia_jobs"
+
+    # The app has to be serving before the render page can be fetched. By this
+    # point in phase 2 Lucee has usually finished its first-boot warmup, but a
+    # cold image pull can still be behind -- poll rather than assume.
+    local ready=0 i
+    for i in $(seq 1 24); do
+        if docker exec hermes_commandbox curl -sf -o /dev/null \
+               http://localhost:8888/schedule/get_retention_status.cfm 2>/dev/null; then
+            ready=1
+            break
+        fi
+        sleep 5
+    done
+
+    if [[ $ready -eq 0 ]]; then
+        warn "CFML app not responding after 120s -- Ofelia schedule not rendered."
+        warn "The stack still runs, but scheduled jobs stay on the shipped defaults."
+        warn "Re-run once the app is up:  ./scripts/install_hermes_docker.sh --render-ofelia"
+        return 0
+    fi
+
+    local out
+    out=$(docker exec hermes_commandbox curl -s \
+              http://localhost:8888/schedule/regen_ofelia_config.cfm 2>>"$LOG_FILE")
+    echo "$out" >> "$LOG_FILE"
+
+    if [[ "$out" == *OFELIA_CONFIG_REGEN_OK* ]]; then
+        log "  Ofelia schedule rendered from ofelia_jobs; hermes_ofelia restarted"
+    else
+        warn "Ofelia schedule render did not confirm success (see $LOG_FILE)."
+        warn "Re-run with:  ./scripts/install_hermes_docker.sh --render-ofelia"
+    fi
+}
+
+# ============================================================================
 # PHASE 2: POST-CONTAINER-UP INITIALIZATION
 # ============================================================================
 # All steps that require the docker compose stack to be running. Called
@@ -3839,6 +3942,8 @@ run_phase2_db_init() {
         fi
         state_mark_done "11-creds-injected"
     fi
+
+    render_ofelia_config
 
     state_mark_done "99-completed"
     log "Phase 2 (post-container) initialization completed"
@@ -4193,6 +4298,15 @@ case "${1:-}" in
         touch "$LOG_FILE"
         apply_schema_updates
         ;;
+    --render-ofelia)
+        # Re-render /etc/ofelia/config.ini from the ofelia_jobs table and
+        # restart hermes_ofelia. Runs automatically at the end of phase 2;
+        # exposed standalone as the recovery path for when the app wasn't
+        # serving yet at that point, and for landing ofelia_jobs seed changes
+        # after an upgrade.
+        touch "$LOG_FILE"
+        render_ofelia_config
+        ;;
     --show-config)
         # Display current configuration
         if [[ -f "$CONFIG_FILE" ]]; then
@@ -4284,6 +4398,10 @@ case "${1:-}" in
         echo "  --apply-schema       Apply the current release's schema_updates.sql to"
         echo "                       the hermes DB. Run after 'git pull' to land any new"
         echo "                       schema deltas. Idempotent + safe to re-run."
+        echo "  --render-ofelia      Re-render /etc/ofelia/config.ini from the ofelia_jobs"
+        echo "                       table and restart hermes_ofelia. Runs automatically"
+        echo "                       at the end of install; use standalone to land"
+        echo "                       ofelia_jobs changes. Idempotent + safe to re-run."
         echo ""
         echo "Recovery:"
         echo "  --init-db            Re-run phase-2 (post-container) initialization only."

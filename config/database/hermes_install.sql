@@ -2273,8 +2273,15 @@ INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_signing
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_authserv_id', '');
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 'sv');
 -- Release stamp (the version_no/build_no rows that schema_updates.sql used to set in two steps)
+--
+-- build_no here is only a FLOOR. install_hermes_docker.sh overwrites it in
+-- seed_install_specific_values() with the version derived from the newest
+-- updates/v<YYMMDD>/ directory in the checkout, because the per-release
+-- schema_updates.sql that normally advances build_no runs on UPGRADES only.
+-- Keep this value in step with the baseline's actual content anyway, so a
+-- hand-run `mysql < hermes_install.sql` (no install script) is not misleading.
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
-INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260612');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260723');
 
 -- -------- system_updates                       [seed] --------
 CREATE TABLE IF NOT EXISTS `system_updates` (
