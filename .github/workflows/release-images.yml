@@ -1,0 +1,126 @@
+# ============================================================================
+# Tag release images + verify generated artifacts
+# ============================================================================
+#
+# Fires when a release tag is pushed. Two jobs:
+#
+#   verify  — re-runs the generated-artifact drift check, so a clone without
+#             the pre-commit hook installed (it lives in scripts/, not
+#             .git/hooks/, and needs `git config core.hooksPath scripts`)
+#             still cannot ship a stale config/ofelia/config.ini.
+#
+#   retag   — copies every service image from :latest to :<tag>.
+#
+# Why retag exists (#288): docker-compose resolves ALL service images through
+# a single ${HERMES_DOCKER_IMG_VERSION}, so pinning is all-or-nothing -- tag
+# only the images a release rebuilt and `docker compose pull` fails on the
+# rest. Until this ran, ghcr.io carried nothing but :latest, which means a git
+# tag did NOT correspond to a known set of containers: two installs from the
+# same tag weeks apart got different images, `--image-version` had nothing to
+# point at, and there was no image-level rollback.
+#
+# This is deliberately NOT a checklist step. The baseline build_no bump was a
+# checklist step and was missed four releases running (#288). Triggering on the
+# tag push couples it to the one action that cannot be skipped when cutting a
+# release.
+#
+# `buildx imagetools create` is a server-side manifest copy -- no layers are
+# pulled or pushed, and multi-arch manifest lists are preserved. Twelve of them
+# take seconds.
+#
+# ORDERING THIS DEPENDS ON: images must already be promoted to :latest before
+# the git tag is pushed, because that is what gets snapshotted.
+# ============================================================================
+
+name: Release images
+
+on:
+  push:
+    tags:
+      - 'v[0-9][0-9][0-9][0-9][0-9][0-9]'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  verify:
+    name: Verify generated artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ofelia schedule matches its seed
+        run: ./scripts/check_ofelia_seed_drift.sh
+
+  retag:
+    name: Tag images with the release version
+    runs-on: ubuntu-latest
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - hermes-body-milter
+          - hermes-ciphermail
+          - hermes-commandbox
+          - hermes-dmarc
+          - hermes-dovecot
+          - hermes-linkguard
+          - hermes-mail-filter
+          - hermes-nginx
+          - hermes-openarc
+          - hermes-openldap
+          - hermes-postfix-dkim
+          - hermes-unbound
+    steps:
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Copy :latest to :${{ github.ref_name }}
+        env:
+          IMAGE: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          # Already tagged? Leave it alone. Tags are immutable once a release
+          # is published; silently overwriting one would change what an
+          # existing install pulls on its next `docker compose pull`.
+          if docker manifest inspect "${IMAGE}:${TAG}" >/dev/null 2>&1; then
+            echo "::notice::${IMAGE}:${TAG} already exists - not overwriting"
+            exit 0
+          fi
+
+          if ! docker manifest inspect "${IMAGE}:latest" >/dev/null 2>&1; then
+            echo "::error::${IMAGE}:latest not found - cannot tag the release."
+            echo "::error::Push the image to :latest before pushing the git tag."
+            exit 1
+          fi
+
+          docker buildx imagetools create --tag "${IMAGE}:${TAG}" "${IMAGE}:latest"
+          echo "::notice::${IMAGE}:${TAG} <- :latest"
+
+  summary:
+    name: Summary
+    runs-on: ubuntu-latest
+    needs: retag
+    if: always()
+    steps:
+      - name: Report
+        run: |
+          if [ "${{ needs.retag.result }}" = "success" ]; then
+            echo "All service images tagged ${{ github.ref_name }}." >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "Installs can now pin this release with:" >> "$GITHUB_STEP_SUMMARY"
+            echo '`./scripts/install_hermes_docker.sh --image-version=${{ github.ref_name }}`' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Image tagging did NOT fully succeed - this release is not pinnable." >> "$GITHUB_STEP_SUMMARY"
+            echo "Installs fall back to :latest (the version probe handles this)." >> "$GITHUB_STEP_SUMMARY"
+          fi

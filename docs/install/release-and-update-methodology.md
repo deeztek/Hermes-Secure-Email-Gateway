@@ -327,8 +327,15 @@ For maintainers preparing a release:
    If anything fails, fix the integration (or revert the `NCVERSION` bump and pin to the prior NC) before continuing. Do not publish a release that ships a failing NC integration.
 
 7. **Draft the GitHub Release body for `v<DATE>`**: list every change in the release. Per-release notes live on the GitHub Release page (created when the tag is pushed) — the cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
-8. **Build + push images**: `./Docker/build-all-ghcr.sh && ./Docker/push-all-ghcr.sh` (or wait for GitHub Actions per #218 Session C).
-9. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub).
+8. **Build + push images to `:latest`**: `./Docker/build-all-ghcr.sh && ./Docker/push-all-ghcr.sh`.
+
+   > **Order matters.** `:latest` must be current **before** the git tag is pushed. The `Release images` workflow (`.github/workflows/release-images.yml`) fires on the tag and copies whatever `:latest` points at into `:v<DATE>` for all 12 service images — so pushing the tag first snapshots the *previous* release's containers under this release's version.
+   >
+   > Per-release image tags are what make a release reproducible. `docker-compose.yml` resolves every service through a single `${HERMES_DOCKER_IMG_VERSION}`, so pinning is all-or-nothing: the workflow tags all 12 regardless of which were rebuilt (a `buildx imagetools create` manifest copy, no layers moved). Before this existed, ghcr.io carried only `:latest` — a git tag did not correspond to a known set of containers, `--image-version` had nothing to point at, and there was no image-level rollback (#288).
+   >
+   > The workflow refuses to overwrite an image tag that already exists. Release image tags are immutable once published.
+
+9. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub). This is what triggers the image-tagging workflow.
 10. **Verify**: GitHub Release page exists, ghcr.io packages updated, run `./scripts/system_update_docker.sh v<DATE>` on Test box and confirm clean upgrade.
 
 ## Common scenarios

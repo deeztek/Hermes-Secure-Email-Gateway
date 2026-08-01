@@ -13,7 +13,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # ===========================================
 # LAYER 1: Block sensitive paths (catches what gitleaks misses)
 # ===========================================
-echo "[1/5] Checking for sensitive file paths..."
+echo "[1/6] Checking for sensitive file paths..."
 
 # Define sensitive path patterns (files that should NEVER be committed)
 SENSITIVE_PATHS=(
@@ -91,7 +91,7 @@ echo "      No sensitive paths detected."
 # Catches the dev-dump leak class (real customer domains/emails/IPs, dev hosts)
 # that gitleaks does NOT flag because it isn't a "secret" by shape.
 # ===========================================
-echo "[2/5] Scanning staged content for DEV/customer data..."
+echo "[2/6] Scanning staged content for DEV/customer data..."
 
 # High-confidence signatures only (keep false positives near zero).
 # NOTE: deeztek.com is legitimate (docs/support/license); only .net/.org are dev.
@@ -135,7 +135,7 @@ echo "      No DEV/customer data signatures detected."
 # .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 5.
 # This is exactly how a real DB password once shipped to the public repo.
 # ===========================================
-echo "[3/5] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
+echo "[3/6] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
 
 if echo "$STAGED_FILES" | grep -qx ".gitleaks.toml"; then
     # Flag 12+ char alphanumeric tokens that mix UPPER, lower AND digit -- the
@@ -181,7 +181,7 @@ echo "      No real secrets in .gitleaks.toml."
 #
 # Comments are allowed (prose/examples); only live code is blocked.
 # ===========================================
-echo "[4/5] Checking for hardcoded install roots..."
+echo "[4/6] Checking for hardcoded install roots..."
 
 ROOT_PAT='/opt/(hermes-seg|hermes-seg-docker-gl|hermes-seg-container-gl|Hermes-Secure-Email-Gateway)'
 ROOT_HITS=""
@@ -231,9 +231,37 @@ fi
 echo "      No hardcoded install roots detected."
 
 # ===========================================
-# LAYER 5: Content scanning with gitleaks
+# LAYER 5: Generated-artifact drift
 # ===========================================
-echo "[5/5] Scanning file contents for secrets..."
+# config/ofelia/config.ini is generated from the ofelia_jobs seed rows but is
+# tracked anyway (hermes_ofelia needs a valid file at first container start,
+# before the DB exists to render from). It was committed at v260612 and never
+# updated again -- four seeded jobs silently stopped shipping and the update
+# check kept calling a script removed at #218. See #288.
+#
+# Only runs when one of the two files is actually staged.
+echo "[5/6] Checking generated artifacts against their seed..."
+
+if echo "$STAGED_FILES" | grep -qxE "config/ofelia/config\.ini|config/database/hermes_install\.sql"; then
+    DRIFT_CHECK="$(git rev-parse --show-toplevel)/scripts/check_ofelia_seed_drift.sh"
+    if [[ -x "$DRIFT_CHECK" ]]; then
+        if ! "$DRIFT_CHECK"; then
+            echo ""
+            echo "COMMIT BLOCKED: shipped Ofelia schedule is out of sync with its seed."
+            echo ""
+            exit 1
+        fi
+    else
+        echo "      WARNING: $DRIFT_CHECK missing or not executable - skipping."
+    fi
+else
+    echo "      Neither config.ini nor hermes_install.sql staged - skipped."
+fi
+
+# ===========================================
+# LAYER 6: Content scanning with gitleaks
+# ===========================================
+echo "[6/6] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then
