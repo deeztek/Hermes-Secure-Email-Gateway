@@ -80,9 +80,17 @@ the `docs/admin/` operator-documentation buildout.
 
 ## Legacy releases (pre-Docker)
 
-Before the Docker era, Hermes shipped for years as a bare-metal Ubuntu install under the
-`build-YYMMDD` tag line — e.g. `build-240815` (Aug 2024) back through `build-211207` and
-`build-211019` (2021). Those releases predate the Dockerized rewrite and the move to GitHub
-Releases, and are not itemized here.
+Before the Docker era, Hermes shipped as a bare-metal Ubuntu install under the `build-YYMMDD`
+tag line: `build-240815` (Aug 2024) back through `build-211207` and `build-211019` (2021). This
+repository was created 2017-12-21 and the project has been public on GitHub since. Those releases
+predate the Dockerized rewrite and the move to GitHub Releases, and are not itemized here.
+
+The full pre-Docker history, **186 commits spanning 2017 to 2025**, is preserved on the
+[`legacy`](https://github.com/deeztek/Hermes-Secure-Email-Gateway/tree/legacy) branch, along with
+its seven `build-*` releases.
+
+`legacy` is a **separate codebase** from `main`, not an earlier stage of it. The Docker Edition is
+a ground-up rewrite of the bare-metal monolith rather than a continuation, which is why `main`
+carries none of those commits. See [Project history](README.md#project-history) in the README.
 
 [v260612]: https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases/tag/v260612
