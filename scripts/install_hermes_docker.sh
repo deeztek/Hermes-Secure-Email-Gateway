@@ -1020,7 +1020,19 @@ provision_mount_dirs() {
     # Archive subdirectory (Amavis quarantine, #260). Promoted from a
     # Data-tier subdir to its own tier so it can live on cheap bulk
     # storage independent of the latency-sensitive DBs/logs.
+    #
+    # The five quarantine subdirectories are NOT optional. 50-user.HERMES sets
+    # $QUARANTINEDIR plus local:<subdir>/%m for each of them, and Amavis rejects
+    # mail outright when the target directory is missing -- the clean/ one bites
+    # first because $clean_quarantine_method routes every delivered message
+    # through it. The pre-Docker installer created all five and the Docker
+    # rewrite dropped the step (#292). Ownership is fixed up post-container in
+    # run_phase2_db_init(), where the amavis uid resolves by name.
     mkdir -p "${ARCHIVE_MOUNT}/amavis"                  # amavis_data
+    for _q in clean virus spam banned bad_header; do
+        mkdir -p "${ARCHIVE_MOUNT}/amavis/${_q}"
+    done
+    unset _q
 
     # Vmail subdirectory (email storage)
     mkdir -p "${VMAIL_MOUNT}/dovecot"                   # dovecot_mail
@@ -1128,15 +1140,23 @@ generate_compose_override() {
     mail_host="${HERMES_MAIL_HOSTNAME:-$(state_get_value "04-mail-hostname-confirmed")}"
     console_host="${HERMES_CONSOLE_HOST:-$(state_get_value "05-console-host-confirmed")}"
 
-    # NEXTCLOUD_TRUSTED_DOMAINS is a comma-separated list. Include every
-    # address from which Nextcloud may legitimately be reached. Deduped to
-    # avoid "192.168.1.1,192.168.1.1" when mail_host == console_host == IP.
+    # NEXTCLOUD_TRUSTED_DOMAINS is a SPACE-separated list. The Nextcloud
+    # image's entrypoint iterates it as `for DOMAIN in $NEXTCLOUD_TRUSTED_DOMAINS`,
+    # which word-splits on whitespace -- a comma-joined string arrives as ONE
+    # token, lands in trusted_domains[1] verbatim, and every host is then
+    # rejected with "Access through untrusted domain". That included the host
+    # IP the installer points the console at, so /nc was unreachable on every
+    # fresh install until an admin saved Console Settings (#292).
+    #
+    # Include every address from which Nextcloud may legitimately be reached.
+    # Deduped so the same value is not listed twice when mail_host or
+    # console_host is itself the host IP.
     {
         echo "$ip"
         [[ -n "$mail_host"    && "$mail_host"    != "$ip" ]] && echo "$mail_host"
         [[ -n "$console_host" && "$console_host" != "$ip" && "$console_host" != "$mail_host" ]] && echo "$console_host"
     } >/tmp/.hermes_trusted.$$ 2>/dev/null || true
-    trusted=$(paste -sd ',' /tmp/.hermes_trusted.$$ 2>/dev/null)
+    trusted=$(paste -sd ' ' /tmp/.hermes_trusted.$$ 2>/dev/null)
     rm -f /tmp/.hermes_trusted.$$
 
     if [[ -n "$ip" ]]; then
@@ -2222,10 +2242,20 @@ generate_nginx_config() {
 # ============================================================================
 
 generate_spamassassin_config() {
-    # Plain copy from the .HERMES template -- no placeholders. SpamAssassin
-    # would start with built-in defaults if local.cf is absent, but the
-    # template carries Hermes-tuned scores and tweaks.
-    # Linked: #179
+    # Renders config/mail_filter/etc/spamassassin/local.cf from the canonical
+    # template at config/hermes/opt/hermes/conf_files/local.cf.HERMES.
+    #
+    # This used to be a plain `cp`, with a comment asserting the template had no
+    # placeholders. It has nine. SpamAssassin cannot parse `USE-DCC` and friends,
+    # so it warns, discards those lines, and falls back to its BUILT-IN defaults
+    # -- which enable DCC, Pyzor, Razor2 and Bayes auto-learning, none of which
+    # we want on by default (#292).
+    #
+    # Like generate_dovecot_config, this runs before the database exists, so the
+    # values below must mirror what hermes_install.sql seeds into spam_settings.
+    # From the admin's first settings save onward, update_spamassassin_config_files.cfm
+    # re-renders the same template from the live DB.
+    # Linked: #179, #292
     header "Rendering SpamAssassin local.cf"
 
     local template="${HERMES_ROOT}/config/hermes/opt/hermes/conf_files/local.cf.HERMES"
@@ -2236,8 +2266,39 @@ generate_spamassassin_config() {
         return 0
     fi
 
+    mkdir -p "$(dirname "$target")"
     [[ -e "$target" ]] && rm -rf "$target"
-    cp "$template" "$target"
+
+    # Collaborative network checks ship disabled: each transmits a digest of
+    # every scanned message to a third party, which is the operator's decision
+    # to make. DCC is additionally absent from the published mail_filter image
+    # for licensing reasons, so leaving it on would do nothing anyway.
+    #
+    # Bayes stays enabled but is inert until trained (SpamAssassin applies no
+    # Bayes score below ~200 spam + 200 ham). Auto-learn ships off: it trains on
+    # the rule set's own verdicts, so it reinforces their mistakes as readily as
+    # their successes, and skews badly on a gateway that sees mostly spam.
+    sed \
+        -e "s|^USE-DCC$|use_dcc 0|" \
+        -e "s|^USE-PYZOR$|use_pyzor 0|" \
+        -e "s|^USE-RAZOR2$|use_razor2 0|" \
+        -e "s|^USE-BAYES$|use_bayes 1|" \
+        -e "s|^BAYES-AUTO-LEARN$|bayes_auto_learn 0|" \
+        -e "s|^BAYESAUTOLEARN-SPAM$|bayes_auto_learn_threshold_spam 15|" \
+        -e "s|^BAYESAUTOLEARN-HAM$|bayes_auto_learn_threshold_nonspam -5|" \
+        -e "s|^#CUSTOM-TESTS$||" \
+        -e "s|^#CUSTOM-MESSAGE-RULES$||" \
+        "$template" > "$target"
+
+    # Nothing template-shaped should survive. A leftover here is the exact
+    # failure mode this function was rewritten to prevent.
+    local leftovers
+    leftovers=$(grep -oE '^(USE-[A-Z0-9]+|BAYES[A-Z-]*|#CUSTOM-[A-Z-]+)$' "$target" | sort -u || true)
+    if [[ -n "$leftovers" ]]; then
+        warn "SpamAssassin local.cf has unsubstituted placeholders:"
+        warn "$leftovers"
+    fi
+
     log "  + config/mail_filter/etc/spamassassin/local.cf"
     log "SpamAssassin local.cf rendered"
 }
@@ -2516,6 +2577,19 @@ generate_dovecot_config() {
     mkdir -p "$target_dir"
     [[ -e "$target" ]] && rm -rf "$target"
 
+    # This runs BEFORE the database exists (main() renders configs, then
+    # `compose up`, then apply_schema_updates), so it cannot read
+    # parameters2. Every value below must therefore mirror what
+    # hermes_install.sql seeds, or config and DB disagree until the admin's
+    # first settings save silently reconciles them.
+    #
+    # crypt_write_algorithm is the case that bit: it used to be hardcoded to
+    # ecdh-aes-256-gcm-sha256 while parameters2 seeds mail.encryption='no',
+    # so every fresh install enabled mailbox encryption against the empty
+    # placeholder keys and Dovecot failed IMAP/SMTP auth (#292). Emitting it
+    # empty matches the seed and keeps the placeholder keys inert. The mail_crypt
+    # plugin stays loaded by design so previously encrypted mail stays readable.
+    #
     # Note ordering: do whole-line BLOCK replacements first (sed `^...$` to
     # zap the entire line cleanly), then scalar substitutions. None of the
     # placeholder names are prefixes of each other so ordering is safe.
@@ -2523,7 +2597,7 @@ generate_dovecot_config() {
         -e "s|^hermes_log_debug_line$||" \
         -e "s|^hermes_compress_level_line$||" \
         -e "s|^hermes_crypt_pubkey_line$||" \
-        -e "s|^hermes_crypt_write_algorithm_line$|crypt_write_algorithm = ecdh-aes-256-gcm-sha256|" \
+        -e "s|^hermes_crypt_write_algorithm_line$|crypt_write_algorithm =|" \
         -e "s|^[[:space:]]*hermes_acl_dict_block[[:space:]]*$||" \
         -e "s|^hermes_acl_config_block$||" \
         -e "s|^hermes_shared_namespace_block$||" \
@@ -3707,6 +3781,47 @@ render_ofelia_config() {
 # the `--init-db` CLI flag as a recovery escape hatch for re-running phase 2
 # without going through phase-1 prompts (state guards skip completed steps).
 
+fix_service_data_ownership() {
+    # provision_mount_dirs() runs before `compose up`, as host root, so every
+    # directory it creates is root-owned. The services that write to them run as
+    # non-root inside their containers, so ownership has to be corrected once the
+    # containers exist -- which is also the only point where the uid resolves by
+    # NAME instead of being hardcoded to whatever the image happens to use.
+    #
+    # The pre-Docker installer did this as a final chown pass; the Docker rewrite
+    # dropped it (#292). Observed consequences:
+    #   - amavis could not write the quarantine subdirectories, so mail was
+    #     rejected outright
+    #   - amavis could not write /opt/hermes/sa-bayes, so autolearn was silently
+    #     dead. Admin-driven "train as spam/ham" still worked, but only because
+    #     the UI invokes sa-learn as root via docker exec, which masked it.
+    #
+    # Always runs: chown is fast and idempotent, and a restored or hand-recreated
+    # directory needs it again. Non-fatal, so a partially-up stack cannot abort
+    # the install.
+    header "Correcting Service Data Ownership"
+
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "hermes_mail_filter"; then
+        warn "hermes_mail_filter is not running -- skipping ownership fixup"
+        warn "Re-run './install_hermes_docker.sh --init-db' once the stack is up."
+        return 0
+    fi
+
+    # Container-side paths: /mnt/data/amavis is the amavis_data volume (host
+    # ${ARCHIVE_MOUNT}/amavis) and /opt/hermes/sa-bayes is bind-mounted from the
+    # repo working tree, so both arrive owned by whoever ran git clone.
+    local p
+    for p in /mnt/data/amavis /opt/hermes/sa-bayes; do
+        if docker exec hermes_mail_filter chown -R amavis:amavis "$p" >>"$LOG_FILE" 2>&1; then
+            log "  chown amavis:amavis ${p}"
+        else
+            warn "  chown failed for ${p} -- check ${LOG_FILE}"
+        fi
+    done
+
+    log "Service data ownership corrected"
+}
+
 run_phase2_db_init() {
     touch "$LOG_FILE"
     log "Phase 2 (post-container) initialization started at $(date)"
@@ -3726,6 +3841,10 @@ run_phase2_db_init() {
     # Lucee, ofelia can't resolve hermes_postfix_dkim, etc. Not
     # state-guarded -- DNS health can change between re-runs.
     preflight_dns_check
+
+    # Not state-guarded: idempotent, and a wiped or restored data tier needs it
+    # again. Runs before the DB work so it still happens if a later step fails.
+    fix_service_data_ownership
 
     if state_is_done "06-databases-created"; then
         log "Skip: databases already created"

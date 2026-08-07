@@ -9,8 +9,46 @@ beside each release below is the **actual release date**.
 
 ## Unreleased
 
+### Fixed
+
+- **First-run provisioning defects on fresh installs** (#292). Reported by an outside
+  user on a clean install. Each has been present since the Docker edition shipped and
+  is invisible on any gateway where an administrator saved the relevant settings page,
+  because the application layer silently corrects the installer's output.
+  - Amavis quarantine subdirectories (`clean`, `virus`, `spam`, `banned`, `bad_header`)
+    were never created, so Amavis could reject mail outright. The pre-Docker installer
+    created all five and the Docker rewrite dropped the step, along with the ownership
+    pass that let amavis write the quarantine tier and the Bayes corpus.
+  - The installer enabled mailbox encryption against empty placeholder keys regardless
+    of the database setting, which defaults to off, breaking IMAP and SMTP
+    authentication.
+  - SpamAssassin's `local.cf` was copied rather than rendered, so nine placeholders
+    reached SpamAssassin verbatim. It discarded them and fell back to built-in
+    defaults, which enable the collaborative network checks and automatic Bayes
+    learning.
+  - `NEXTCLOUD_TRUSTED_DOMAINS` was written comma-separated where a space-separated
+    list is expected, so Nextcloud rejected the console address the installer
+    configures before DNS exists.
+  - Enabling Nextcloud on an existing mailbox never provisioned the Nextcloud Mail
+    profile, and the failure was silently discarded. It was built from the account's
+    login password, which Dovecot cannot accept: IMAP and SMTP authenticate only
+    against app passwords.
+
 ### Changed
 
+- **Collaborative spam checks now ship disabled** (#292). Razor, Pyzor and DCC each
+  transmit a digest of every scanned message to a third-party network, so new installs
+  leave that decision to the operator. Existing installs keep their current settings.
+  Razor had never been registered on any install and so returned no result regardless.
+- **Bayes ships untrained, and automatic learning is off by default** (#292). Hermes
+  had been shipping a pre-trained corpus built from unrelated mail; upgrading clears it
+  once so each gateway learns from its own traffic. Auto-learning trains on the rule
+  set's own verdicts, reinforcing its mistakes as readily as its successes.
+- **DCC is no longer in the published mail filter image** (#292). Its licence is free
+  only to organisations that do not sell filtering devices or services except to their
+  own users, and does not permit redistributing binaries. Most self-hosted operators
+  qualify; Deeztek does not. `docker-compose.yml` carries a commented build block for
+  operators who want it, fetching DCC from Rhyolite directly.
 - **Let's Encrypt / ACME certificate management is now available in all editions** (#282).
   The console-certificate **Request ACME Certificate** button and the mailbox-domain
   **Auto-managed (Let's Encrypt)** SAN certificate mode — automated issuance, SAN

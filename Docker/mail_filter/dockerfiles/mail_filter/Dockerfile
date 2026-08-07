@@ -41,21 +41,6 @@ RUN apt-get update && \
     altermime && \
     adduser clamav amavis && \
     mkdir -p /mnt/data/amavis && \
-    wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z -P /tmp && \
-    tar -xvzf /tmp/dcc.tar.Z -C /tmp/ --strip-components=1 && \
-    chmod +x /tmp/configure && \
-    chmod +x /tmp/autoconf/install-sh && \
-    cd /tmp && \
-    ./configure --with-uid=amavis && \
-    make && \
-    make install && \
-    chown -R amavis:amavis /var/dcc && \
-    ln -s /var/dcc/libexec/dccifd /usr/local/bin/dccifd && \
-    cd / && \
-    rm -rf /tmp/* && \
-    cdcc info && \
-    cp /etc/spamassassin/v310.pre /etc/spamassassin/v310.ORIGINAL && \
-    sed -i -e "s|#loadplugin Mail::SpamAssassin::Plugin::DCC|loadplugin Mail::SpamAssassin::Plugin::DCC|g" "/etc/spamassassin/v310.pre" && \
     spamassassin --lint && \
     mkdir -m 0770 -p /var/lib/fangfrisch && \
     mkdir -m 0770 -p /var/lib/fangfrisch/signatures && \
@@ -70,6 +55,49 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/* && \
     chown -R amavis:amavis /mnt/data/amavis && \
     freshclam
+
+# ---------------------------------------------------------------------------
+# Optional: DCC (Distributed Checksum Clearinghouse)
+#
+# NOT built into the published image. The DCC licence is free only to
+# organisations that "do not sell filtering devices or services except to their
+# own users", and it does not permit redistributing binaries. Most self-hosted
+# operators filtering their own mail DO qualify; Deeztek sells Hermes Pro and
+# does not, so we cannot ship the binaries on anyone's behalf.
+#
+# Operators who qualify enable it by uncommenting the build: block for
+# hermes_mail_filter in docker-compose.yml and rebuilding. That build fetches
+# DCC from Rhyolite directly, so the licence relationship is theirs.
+# See docs/admin/04-content-checks/antispam-settings.md
+#
+# Debian/Ubuntu ship the DCC plugin line commented out in v310.pre, so with the
+# default WITH_DCC=false SpamAssassin never loads the plugin either. Build tools
+# are installed only inside this block, so the default image carries no compiler.
+# ---------------------------------------------------------------------------
+ARG WITH_DCC=false
+RUN if [ "$WITH_DCC" = "true" ]; then \
+      set -eux; \
+      export DEBIAN_FRONTEND=noninteractive; \
+      apt-get update; \
+      apt-get install -y --no-install-recommends build-essential; \
+      wget https://www.dcc-servers.net/dcc/source/dcc.tar.Z -P /tmp; \
+      tar -xvzf /tmp/dcc.tar.Z -C /tmp/ --strip-components=1; \
+      chmod +x /tmp/configure /tmp/autoconf/install-sh; \
+      cd /tmp; \
+      ./configure --with-uid=amavis; \
+      make; \
+      make install; \
+      chown -R amavis:amavis /var/dcc; \
+      ln -s /var/dcc/libexec/dccifd /usr/local/bin/dccifd; \
+      cd /; \
+      rm -rf /tmp/*; \
+      cdcc info; \
+      cp /etc/spamassassin/v310.pre /etc/spamassassin/v310.ORIGINAL; \
+      sed -i -e "s|#loadplugin Mail::SpamAssassin::Plugin::DCC|loadplugin Mail::SpamAssassin::Plugin::DCC|g" /etc/spamassassin/v310.pre; \
+      spamassassin --lint; \
+      apt-get clean -y; \
+      rm -rf /var/lib/apt/lists/*; \
+    fi
 
 #Copy necessary files
 

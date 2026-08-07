@@ -33,6 +33,13 @@ regexes = [
     '''(?i)password\s*=\s*['"]?PASS_WORD['"]?''',
     '''(?i)password\s*=\s*['"]?YOUR_PASSWORD['"]?''',
     '''(?i)password\s*=\s*['"]?CHANGE_ME''',
+    # CFML variable-to-variable assignment: the NC Mail profile credential is
+    # handed over as a variable, never a literal.
+    #   <cfset ncMailPassword = mintedAppPasswordPlain>
+    # Named explicitly rather than shape-matched, so renaming the variable
+    # re-trips the rule and forces a fresh look. Set by
+    # inc/mint_system_app_password.cfm.
+    '''(?i)password\s*=\s*mintedAppPasswordPlain''',
     '''(?i)password\s*=\s*['"]?password['"]?''',
     # Variable references (shell, CFML, Perl)
     '''(?i)password\s*=\s*['"]?\$''',

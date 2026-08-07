@@ -159,11 +159,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     Password must be at least 12 characters.
   </div>
-<cfelseif m EQ 51>
-  <div class="alert alert-danger alert-dismissible">
+<cfelseif m EQ 55>
+  <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Password Required</h4>
-    A password must be set when enabling Nextcloud webmail for an existing user. The password is needed to create the user's email profile in the Nextcloud Mail app. Please edit the mailbox again with both Nextcloud enabled and a new password.
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Mailbox Saved, Webmail Not Provisioned</h4>
+    The mailbox was saved, but the Nextcloud Mail account could not be set up, so webmail will show no mail account for this user. Everything else about the mailbox is working: IMAP, SMTP and the user portal are unaffected. Save the mailbox again to retry.
+    <cfif StructKeyExists(session, "cmdOutput") AND Len(Trim(session.cmdOutput))>
+      <br><br><code><cfoutput>#HTMLEditFormat(session.cmdOutput)#</cfoutput></code>
+    </cfif>
   </div>
 <cfelseif m EQ 99>
   <div class="alert alert-danger alert-dismissible">

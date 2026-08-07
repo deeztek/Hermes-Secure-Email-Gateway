@@ -459,6 +459,27 @@ services:
 
   hermes_mail_filter:
     image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-mail-filter:${HERMES_DOCKER_IMG_VERSION}
+    # --- Optional: rebuild locally with DCC ---------------------------------
+    # DCC is deliberately NOT in the published image. Its licence is free only
+    # to organisations that do not sell filtering devices or services except to
+    # their own users, and it forbids redistributing binaries. Most self-hosted
+    # operators qualify; Deeztek sells Hermes Pro and does not, so we cannot
+    # ship the binaries for you.
+    #
+    # To enable, uncomment the build: block below and run:
+    #   docker compose build hermes_mail_filter
+    #   docker compose up -d hermes_mail_filter
+    # then set Content Checks > Antispam Settings > DCC = Enabled.
+    #
+    # NOTE: system_update_docker.sh pulls images, which replaces your local
+    # build and removes DCC. Re-run the two commands above after every upgrade.
+    # See docs/admin/04-content-checks/antispam-settings.md
+    #
+    # build:
+    #   context: ./Docker/mail_filter
+    #   dockerfile: dockerfiles/mail_filter/Dockerfile
+    #   args:
+    #     WITH_DCC: "true"
     container_name: hermes_mail_filter
     logging:
       options:

@@ -1107,6 +1107,14 @@ CREATE TABLE IF NOT EXISTS `migrations` (
   UNIQUE KEY `uq_name` (`name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- Pre-seed the v260807 repair migrations as already complete.
+-- Both exist only to fix state created by pre-v260807 installers. A fresh
+-- install has neither the shipped Bayes corpus nor the broken Nextcloud Mail
+-- provisioning, so running them later would destroy legitimate training and
+-- recreate working mail profiles for no reason. See schedule/post_upgrade.cfm.
+INSERT IGNORE INTO `migrations` (`name`) VALUES ('clear-seeded-bayes-corpus-v1');
+INSERT IGNORE INTO `migrations` (`name`) VALUES ('repair-missing-nc-mail-profiles-v1');
+
 -- -------- mobile_setup_tokens                  [truncate] --------
 CREATE TABLE IF NOT EXISTS `mobile_setup_tokens` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -2132,11 +2140,11 @@ INSERT IGNORE INTO `spam_settings` VALUES (5,'final_banned_destiny','D_BOUNCE',N
 INSERT IGNORE INTO `spam_settings` VALUES (6,'final_spam_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (7,'final_bad_header_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (1460,'BAYES_99','3.6',NULL,NULL,NULL,NULL,'Bayes spam probability is 99 to 100%',1,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (9,'use_dcc','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (10,'use_pyzor','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (11,'use_razor2','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (9,'use_dcc','0',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (10,'use_pyzor','0',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (11,'use_razor2','0',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (12,'use_bayes','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (13,'bayes_auto_learn','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (13,'bayes_auto_learn','0',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (1455,'RCVD_IN_RP_SAFE','0',NULL,NULL,NULL,NULL,'Sender is in Return Path Safe (trusted relay)',1,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (1456,'RP_MATCHES_RCVD','0.001',NULL,NULL,NULL,NULL,'Checks if domain name of an envelope sender address matches the domain name of the first untrusted relay (if any), or any trusted relay otherwise.',1,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (1464,'RCVD_IN_RP_CERTIFIED','0',NULL,NULL,NULL,NULL,'Detects messages sent from IP addresses on the Return Path Certified whitelist, and reduces the spam score by 3. Every IP on Certified is also on Safe, so it’s actually reduced by 5.',1,1,1,0);

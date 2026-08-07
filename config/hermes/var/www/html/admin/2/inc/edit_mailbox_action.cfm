@@ -141,13 +141,15 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     <cfset form.edit_enforce_mfa = 0>
 </cfif>
 
-<!--- Require a password when enabling Nextcloud on a user that didn't have it.
-     The password is needed to create the email profile in the NC Mail app.
-     Without it the user would see an empty Mail app with no account. --->
-<cfif Val(form.edit_nextcloud_enabled) EQ 1 AND Val(getMailbox.prev_nextcloud_enabled) EQ 0 AND trim(form.edit_password) EQ "">
-    <cfset session.m = 51>
-    <cflocation url="view_mailboxes.cfm" addtoken="no">
-</cfif>
+<!--- No password is required to enable Nextcloud. This used to demand one
+     because the NC Mail profile was built from form.edit_password, which was
+     wrong: Dovecot authenticates IMAP and SMTP only against app_passwords, so
+     the login password could never work as a mail credential and
+     `occ mail:account:create` failed every time. The failure was swallowed by
+     an empty cfcatch, so the save reported success and the user got a working
+     /nc login with an empty Mail app (#292). The profile is now built from a
+     freshly minted "Hermes System" app password instead. --->
+
 
 <!--- UPDATE MAILBOXES TABLE.
      enforce_mfa is on recipients, not mailboxes — see UPDATE recipients
@@ -210,7 +212,11 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
      to /nc, so this takes effect immediately on the next page load.
      Idempotent: the include scripts catch "already a member" / "no such
      attribute" errors. --->
-<cfif Val(form.edit_nextcloud_enabled) NEQ Val(getMailbox.prev_nextcloud_enabled)>
+<cfset ncEnabledNow  = Val(form.edit_nextcloud_enabled)>
+<cfset ncFlagChanged = (ncEnabledNow NEQ Val(getMailbox.prev_nextcloud_enabled))>
+<cfset ncMailWarning = "">
+
+<cfif ncEnabledNow EQ 1 OR ncFlagChanged>
     <cftry>
         <!--- Look up the LDAP username (may not be the same as the email) --->
         <cfquery name="getLdapUsernameForNc" datasource="hermes">
@@ -223,21 +229,64 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
             <cfset ldapUsername = LCase(getMailbox.username)>
         </cfif>
 
-        <cfif Val(form.edit_nextcloud_enabled) EQ 1>
+        <cfif ncEnabledNow EQ 1>
             <cfinclude template="ldap_add_user_groups_nextcloud.cfm">
 
-            <!--- Create NC Mail account if a password is also being set.
-                 If no password in this form submission, the mail account
-                 will be created on the next password change. --->
-            <cfif trim(form.edit_password) NEQ "">
+            <!--- Provision the NC Mail profile when Nextcloud is being turned
+                 on, and also when an already-enabled mailbox has no profile.
+                 The second case is what makes a plain re-save a valid repair:
+                 without it the only route back was toggling Nextcloud off,
+                 saving, and turning it on again. Probing costs one docker exec
+                 and only runs when the flag did not change, so the common save
+                 is unaffected. --->
+            <cfset ncNeedsMailProfile = ncFlagChanged>
+            <cfif NOT ncNeedsMailProfile>
                 <cftry>
-                    <cfset ncMailAction = "create">
-                    <cfset ncMailUser = getMailbox.username>
-                    <cfset ncMailName = editDisplayName>
-                    <cfset ncMailEmail = getMailbox.username>
-                    <cfset ncMailPassword = trim(form.edit_password)>
+                    <cfexecute name="/usr/local/bin/docker"
+                        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ mail:account:export #getMailbox.username# --output=json"
+                        variable="ncMailProbe"
+                        errorVariable="ncMailProbeErr"
+                        timeout="60" />
+                    <cfif NOT FindNoCase("""email""", ncMailProbe)>
+                        <cfset ncNeedsMailProfile = true>
+                    </cfif>
+                <cfcatch type="any">
+                    <!--- Probe failed, so we cannot tell. Leave the profile
+                         alone rather than risk recreating a working one. --->
+                    <cfset ncNeedsMailProfile = false>
+                </cfcatch>
+                </cftry>
+            </cfif>
+
+            <cfif ncNeedsMailProfile>
+                <cftry>
+                    <!--- Mint a fresh "Hermes System" app password and hand the
+                         plaintext to occ. The login password is NOT usable here:
+                         Dovecot authenticates only against app_passwords, so a
+                         profile built from it fails on every poll (#292). Only
+                         the ARGON2ID hash is stored, so the existing system row
+                         cannot be reused and has to be re-minted. --->
+                    <cfset mintAppPwUser = getMailbox.username>
+                    <cfinclude template="mint_system_app_password.cfm">
+                    <cfif mintedAppPasswordPlain EQ "">
+                        <cfthrow message="could not mint the Hermes System app password: #mintedAppPasswordError#">
+                    </cfif>
+
+                    <!--- "update" is delete-then-create inside the include, so it
+                         is safe whether or not a row already exists. --->
+                    <cfset ncMailAction   = "update">
+                    <cfset ncMailUser     = getMailbox.username>
+                    <cfset ncMailName     = editDisplayName>
+                    <cfset ncMailEmail    = getMailbox.username>
+                    <cfset ncMailPassword = mintedAppPasswordPlain>
                     <cfinclude template="nextcloud_mail_account.cfm">
-                <cfcatch type="any"></cfcatch>
+                <cfcatch type="any">
+                    <!--- Surface it. This was an empty cfcatch, which is exactly
+                         why the original defect stayed invisible: the save
+                         reported success while webmail was left with no account
+                         and no error anywhere (#292). --->
+                    <cfset ncMailWarning = cfcatch.message>
+                </cfcatch>
                 </cftry>
             </cfif>
         <cfelse>
@@ -416,6 +465,16 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     </cftry>
 </cfif>
 
-<!--- SUCCESS --->
-<cfset session.m = 2>
+<!--- SUCCESS.
+     The mailbox itself saved. If Nextcloud Mail provisioning failed we still
+     report the save, but with a warning rather than a plain success, because a
+     silent success is what made #292 so hard to diagnose. Setting session.m
+     here rather than at the failure site is deliberate: this block runs last
+     and would otherwise overwrite it. --->
+<cfif Len(Trim(ncMailWarning))>
+    <cfset session.m = 55>
+    <cfset session.cmdOutput = ncMailWarning>
+<cfelse>
+    <cfset session.m = 2>
+</cfif>
 <cflocation url="view_mailboxes.cfm" addtoken="no">

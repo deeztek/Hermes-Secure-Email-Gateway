@@ -1,0 +1,34 @@
+-- =====================================================================
+-- Hermes SEG schema updates -- v260807
+--
+-- Idempotent (safe to re-run). Applied by apply_schema_updates() /
+-- system_update_docker.sh for installs upgrading from an earlier build;
+-- NOT run on fresh installs (those get the current schema from
+-- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
+--
+-- This release (#292) repairs first-run provisioning defects found on a
+-- clean install by an outside reporter. Almost all of the work is in the
+-- installer, in schedule/post_upgrade.cfm, and in the rebuilt mail_filter
+-- image rather than in the schema, so this file is deliberately small.
+--
+-- DELIBERATELY ABSENT, and both would be actively wrong here:
+--
+--   1. The spam_settings default flips. hermes_install.sql now seeds
+--      use_dcc / use_pyzor / use_razor2 / bayes_auto_learn to 0 so new
+--      installs do not silently transmit message digests to third parties
+--      or auto-train Bayes. Existing installs keep whatever their admin
+--      chose. Flipping a live gateway's spam configuration during an
+--      unattended upgrade would change filtering behaviour without
+--      consent, which is not ours to do.
+--
+--   2. Pre-seeding the two v260807 migrations. hermes_install.sql seeds
+--      them as already complete so a FRESH install never runs them.
+--      Existing installs are exactly the population that needs them, so
+--      they must stay unseeded here and let post_upgrade.cfm do the work.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- the update orchestrator records this release as applied).
+-- ---------------------------------------------------------------------
+UPDATE system_settings SET value = 'v260807' WHERE parameter = 'build_no';
