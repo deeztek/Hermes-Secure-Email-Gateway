@@ -22,9 +22,12 @@ ClamAV and the malware feeds. Bayes contributes no score until it has learned ro
 200 spam and 200 ham, which you build with **Train as Spam** and **Train as Ham** in
 Quarantine and Message History.
 
-If you have deliberately trained this gateway and want to keep that corpus anyway,
-back up `<install-root>/config/hermes/opt/hermes/sa-bayes/` before upgrading. It will
-still contain the seeded data.
+This applies even if you have trained the gateway yourself. A corpus that contains
+the seeded data is not worth keeping at any ratio, and there is no way to separate
+the two, so the database is cleared outright rather than preserved in a compromised
+state. Restoring a backup of it afterwards would reintroduce the foreign training
+permanently: the upgrade records the clearing as done, so nothing would ever remove
+it again.
 
 ### Amavis quarantine directories were never created
 
