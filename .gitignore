@@ -339,3 +339,12 @@ __pycache__/
 /Docker/linkguard/
 Docker/ciphermail/build/*_all.deb
 Docker/ciphermail/build/data.tar.xz
+
+# SpamAssassin Bayes corpus: runtime state, not shippable config (#292).
+# Hermes previously shipped a pre-trained corpus built from unrelated mail,
+# so every install scored against someone else's training. The directories
+# must still exist because they are bind-mount sources, hence .gitkeep.
+config/hermes/opt/hermes/sa-bayes/*
+!config/hermes/opt/hermes/sa-bayes/.gitkeep
+config/mail_filter/sa-bayes/*
+!config/mail_filter/sa-bayes/.gitkeep

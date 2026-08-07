@@ -183,7 +183,15 @@ legitimate state it accumulated later.
      trained locally since is inseparable from it, so a partial cleanup
      is not possible. Cleared once; the gateway relearns from its own
      traffic. Ownership is fixed in section 1 above, which must run
-     first or sa-learn writes into a directory amavis cannot use. --->
+     first or sa-learn writes into a directory amavis cannot use.
+
+     Note that phase 1 of the orchestrator has usually already removed
+     the corpus files by the time this runs: v260807 untracked them, so
+     `git checkout -f` deletes them from the working tree. A .gitkeep
+     keeps the directories, which are bind-mount sources and must exist.
+     This block is therefore belt-and-braces rather than the primary
+     mechanism, and covers a box where the files survived the checkout.
+     sa-learn --clear on an already-empty store is harmless. --->
 <cfset blockName = "clear-seeded-bayes-corpus-v1">
 <cfset arrayAppend(migrationsAttempted, blockName)>
 <cfif hasRun(blockName)>
