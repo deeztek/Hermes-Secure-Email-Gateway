@@ -60,10 +60,10 @@ the same way for the other three Amavis verdict categories.
 | Amavis config | `/etc/amavis/conf.d/50-user` (rendered from `/opt/hermes/conf_files/50-user.HERMES` on every save) |
 | SpamAssassin config | `/etc/spamassassin/local.cf` (rendered from `/opt/hermes/conf_files/local.cf.HERMES` on every save) |
 | Bayes DB | Lives in the SpamAssassin user dir inside `hermes_mail_filter` (`sa-learn --dump magic` reports the actual path) |
-| Network plugin state | `/etc/razor/identity` (Razor), Pyzor's per-user config dir, DCC's local socket — all inside `hermes_mail_filter` |
+| Network plugin state | `/etc/razor/identity` (Razor), Pyzor's per-user config dir, DCC's local socket, all inside `hermes_mail_filter` |
 | Reload mechanism | `spamassassin --lint` + `docker container restart hermes_mail_filter` on every save |
 
-The container exposes **no host ports** — Amavis is reached only by
+The container exposes **no host ports**. Amavis is reached only by
 Postfix internally at `hermes_mail_filter:10024` and re-injects to
 `hermes_postfix_dkim:10026`.
 
@@ -75,7 +75,7 @@ Storage: `spam_settings.value` for parameters `use_dcc`, `use_razor2`,
 
 | Plugin | What it does | Maintenance action |
 | --- | --- | --- |
-| DCC (Distributed Checksum Clearinghouse) | Fuzzy-checksum bulk-mail detection; matches a message against a network of receivers' checksum counters | None — `cdcc` runs as part of the SpamAssassin call chain |
+| DCC (Distributed Checksum Clearinghouse) | Fuzzy-checksum bulk-mail detection; matches a message against a network of receivers' checksum counters | None. `cdcc` runs as part of the SpamAssassin call chain |
 | Razor2 (Vipul's Razor v2) | Collaborative spam catalog; checksum + signature lookup against the Razor network | **Initialize Razor** (see Maintenance) before first use |
 | Pyzor | Collaborative digest-based spam detection | **Initialize Pyzor** before first use |
 
@@ -83,12 +83,50 @@ Each toggle substitutes into `local.cf` via the placeholders `USE-DCC`,
 `USE-PYZOR`, `USE-RAZOR2` -> `use_dcc 0|1`, `use_pyzor 0|1`,
 `use_razor2 0|1`.
 
-> **Operational consequence — network DB connectivity.** All three
+> **Operational consequence: network DB connectivity.** All three
 > plugins make outbound queries (DCC over UDP, Razor and Pyzor over
 > TCP) at scan time. If outbound to the public Internet is blocked
 > from `hermes_mail_filter`, the plugins quietly time out per
 > message and add measurable per-scan latency. Disable plugins the
 > gateway cannot actually reach.
+
+### Defaults
+
+**All three ship disabled from v260807.** They are effective, but each one
+transmits a digest or checksum of every scanned message to a third-party
+network. Whether that is acceptable is a decision for the operator, so
+Hermes does not make it silently. Installs predating v260807 had all three
+enabled in the database while Razor was never registered, so it returned no
+result regardless.
+
+Enabling a plugin the gateway has not been provisioned for is harmless but
+useless; see the maintenance actions above.
+
+### DCC is not included in the published image
+
+DCC is **absent from the shipped `hermes_mail_filter` image**, so leaving
+`use_dcc` enabled has no effect unless you add it yourself.
+
+This is a licensing constraint, not a technical one. The DCC licence is free
+only to organisations that "do not sell filtering devices or services except
+to their own users," and it does not permit redistributing binaries. Most
+self-hosted operators filtering their own mail **do** qualify; Deeztek sells
+Hermes Pro and does not, so we cannot ship the binaries on your behalf.
+
+To add it, uncomment the `build:` block for `hermes_mail_filter` in
+`docker-compose.yml` and rebuild:
+
+```bash
+docker compose build hermes_mail_filter
+docker compose up -d hermes_mail_filter
+```
+
+Then set **DCC = Enabled** on this page. The build fetches DCC directly from
+Rhyolite, so your relationship with that licence is your own.
+
+> **Re-run the rebuild after every Hermes upgrade.** The update orchestrator
+> pulls images, which replaces your locally built one and removes DCC until
+> you rebuild.
 
 ## Subject Tagging card
 
@@ -113,12 +151,12 @@ value as follows:
 | Spam Messages | `final_spam_destiny` | Quarantined silently | DSN sent |
 | Bad-Header Messages | `final_bad_header_destiny` | Quarantined silently | DSN sent |
 
-The labels are deliberately conservative — `D_DISCARD` does **not**
+The labels are deliberately conservative; `D_DISCARD` does **not**
 delete the message, it routes it to Amavis's quarantine where Message
 History can review and release it. Defaults: virus + banned send DSN;
 spam + bad-header quarantine silently.
 
-> **Operational consequence — Send DSN on spam.** Setting
+> **Operational consequence: Send DSN on spam.** Setting
 > `final_spam_destiny = D_BOUNCE` means Hermes will deliver a
 > non-delivery report to the envelope sender of every quarantined
 > spam. Because the envelope sender is almost always forged on spam,
@@ -144,7 +182,33 @@ and `bayes_auto_learn_threshold_nonspam` directives. JavaScript on
 the page collapses the thresholds when Bayes or auto-learning is
 disabled.
 
-> **Operational consequence — Bayes poisoning.** Auto-learning
+### Defaults and first use
+
+From v260807, `use_bayes` ships **enabled** and `bayes_auto_learn` ships
+**disabled**. Bayes is local-only (it transmits nothing anywhere), so
+leaving it on costs nothing, but it is trained deliberately rather than
+automatically for the reason described below.
+
+The database ships **empty**. SpamAssassin applies no Bayes score at all
+until it has learned roughly **200 spam and 200 ham** messages; below that
+threshold it stays silent rather than guessing from thin evidence. A new
+gateway therefore shows Bayes as enabled and contributing nothing, which is
+correct behaviour and not a fault.
+
+Train it from Quarantine and Message History with **Train as Spam** and
+**Train as Ham**. Mailbox users can train from their own portal as well, so
+the corpus grows from real classification decisions rather than from the
+rule set's guesses.
+
+> **Installs predating v260807** shipped with a pre-trained Bayes corpus
+> built from unrelated mail between 2020 and 2025. Because SpamAssassin
+> merges all learning into a single token store, anything trained locally
+> since was inseparable from it. The v260807 upgrade clears the database
+> once so the gateway learns from its own traffic.
+
+Auto-learning remains available but is not recommended for general use.
+
+> **Operational consequence: Bayes poisoning.** Auto-learning
 > trusts the final score (which already includes Bayes's own
 > contribution) to decide whether to train. A bad spam wave that
 > sneaks past the score threshold can train Bayes to think more spam
@@ -248,6 +312,10 @@ Use only when the database is known-poisoned or when migrating between
 servers without preserving training. The button is gated behind a
 JavaScript `confirm()` and renders inside a yellow warning card.
 
+You do **not** need to run this after upgrading to v260807; that upgrade
+clears the previously shipped corpus once, automatically. Fresh v260807
+installs start with an empty database and are unaffected.
+
 ## Failure semantics
 
 | Failure | Behavior |
@@ -265,7 +333,7 @@ JavaScript `confirm()` and renders inside a yellow warning card.
 | Razor init output without `Register successful` or `created` | session.m=14, similar surfacing |
 | Bayes clear `cfcatch` | session.m=16 with the catch message |
 
-`spamassassin --lint` is the canonical pre-restart sanity check —
+`spamassassin --lint` is the canonical pre-restart sanity check:
 when a custom rule (added via Score Overrides or message rules) has
 invalid syntax, the lint catches it before the container restart
 finishes and prevents Amavis from starting against a broken config.
