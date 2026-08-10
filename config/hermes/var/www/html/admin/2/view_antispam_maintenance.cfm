@@ -232,6 +232,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfcatch>
 </cftry>
 
+<!--- Razor registration probe. Razor needs a one-time registration before it
+     returns any result, and it ships disabled from v260807, so an admin can
+     switch it on and get silence with no indication why. `razor-admin -register`
+     writes identity files into /etc/razor; a stock image has only
+     razor-agent.conf. Same reasoning as the DCC probe above: no shell
+     metacharacters, and any failure is treated as "not registered". --->
+<cfset razorRegistered = false>
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_mail_filter ls /etc/razor"
+        variable="razorProbeOut"
+        errorVariable="razorProbeErr"
+        timeout="30" />
+    <cfif FindNoCase("identity", razorProbeOut) GT 0>
+        <cfset razorRegistered = true>
+    </cfif>
+<cfcatch type="any">
+    <cfset razorRegistered = false>
+</cfcatch>
+</cftry>
+
 <!--- ======================== --->
 <!--- SETTINGS FORM --->
 <!--- ======================== --->
@@ -278,6 +299,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <label class="form-check-label" for="use_razor2"><strong>Razor2</strong>: Vipul's Razor v2</label>
           </div>
           <small class="text-muted ms-4">Collaborative spam identification network</small>
+          <cfif NOT razorRegistered>
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+              <i class="fas fa-exclamation-triangle"></i>
+              <strong>Not registered.</strong> Razor returns no result until it has been
+              registered once with the Razor network. Enabling this on its own changes
+              nothing. Use <strong>Initialize Razor</strong> in the Maintenance section
+              below, which needs outbound internet access.
+            </div>
+          </cfif>
         </div>
         <div class="col-md-4 mb-3">
           <div class="form-check form-switch">
