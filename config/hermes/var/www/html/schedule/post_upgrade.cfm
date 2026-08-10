@@ -150,13 +150,18 @@ every existing install without requiring anyone to notice.
 <!--- Amavis quarantine subdirectories and service data ownership. The
      installer creates these now, but every box installed before v260807
      is missing them: mail is rejected because $clean_quarantine_method
-     has nowhere to write, and amavis cannot write the Bayes corpus. --->
+     has nowhere to write, and amavis cannot write the Bayes corpus.
+
+     /etc/razor is in the chown for the same reason. Razor's home is written
+     at scan time (it refreshes servers.*.lst and the per-server .conf files),
+     and SpamAssassin runs as amavis, so a root-owned /etc/razor leaves Razor
+     mute even on a box where registration landed correctly. --->
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
         arguments="exec hermes_mail_filter mkdir -p /mnt/data/amavis/clean /mnt/data/amavis/virus /mnt/data/amavis/spam /mnt/data/amavis/banned /mnt/data/amavis/bad_header"
         variable="quarMkdirOut" errorVariable="quarMkdirErr" timeout="120" />
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_mail_filter chown -R amavis:amavis /mnt/data/amavis /opt/hermes/sa-bayes"
+        arguments="exec hermes_mail_filter chown -R amavis:amavis /mnt/data/amavis /opt/hermes/sa-bayes /etc/razor"
         variable="quarChownOut" errorVariable="quarChownErr" timeout="240" />
     <cfset arrayAppend(repairsRun, "amavis-quarantine-dirs-and-ownership")>
 <cfcatch type="any">
