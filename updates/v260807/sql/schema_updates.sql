@@ -28,7 +28,63 @@
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- 1. DNSBL return-code filters (#293)
+--
+-- Four seeded postscreen entries shipped with no =returncode filter, so
+-- postscreen counted ANY answer in 127.0.0.0/8 as a hit. That range
+-- includes the 127.255.255.0/24 codes lists use for "refused" and "over
+-- quota", so a gateway whose resolver is being refused scores those
+-- refusals as listings. Two of these four answering with error codes
+-- reach postscreen_dnsbl_threshold = 3 by themselves and reject
+-- legitimate mail.
+--
+-- This is applied to existing installs, unlike the spam_settings flips
+-- below, because it is a correctness fix rather than a preference: it
+-- removes no list the admin chose and changes no weight. The weight is
+-- carried over from whatever the row already had, so an admin who
+-- retuned one keeps their value.
+--
+-- Idempotent: after the update the row contains '=', which the
+-- NOT LIKE '%=%' guard excludes on any re-run.
+-- ---------------------------------------------------------------------
+UPDATE parameters
+   SET parameter = CONCAT('bl.spamcop.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.spamcop.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.spamcop.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('bl.suomispam.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.suomispam.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.suomispam.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('bl.spameatingmonkey.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.spameatingmonkey.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.spameatingmonkey.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('backscatter.spameatingmonkey.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('backscatter.spameatingmonkey.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'backscatter.spameatingmonkey.net*%' AND parameter NOT LIKE '%=%';
+
+-- ALSO DELIBERATELY ABSENT: b.barracudacentral.org is no longer seeded for
+-- fresh installs (it needs the querying IP registered before it answers, and
+-- its weight of 7 exceeds the threshold of 3), but it is NOT deleted here.
+-- An existing operator may have registered, and silently removing a block
+-- list from a live gateway is the same class of act as flipping their spam
+-- settings. The upgrade README tells them how to remove it if they want to.
+--
+-- NOTE: these UPDATEs change the database only. main.cf still holds the old
+-- directive until generate_postfix_configuration.cfm re-renders it, which
+-- happens on the next save of any Postfix-backed settings page or on Apply
+-- under System / RBL Configuration. The upgrade README makes that a step.
+
+-- ---------------------------------------------------------------------
+-- 2. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260807' WHERE parameter = 'build_no';

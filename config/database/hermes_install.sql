@@ -1270,9 +1270,16 @@ INSERT IGNORE INTO `parameters` VALUES (114, '3', NULL, NULL, NULL, NULL, NULL, 
 INSERT IGNORE INTO `parameters` VALUES (113, 'postscreen_dnsbl_threshold', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (187, 'postscreen_bare_newline_enable', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (186, 'postscreen_non_smtp_command_enable', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (415, 'backscatter.spameatingmonkey.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 13.000, 1, 1, 'insert', NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (416, 'bl.spameatingmonkey.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 14.000, 1, 1, 'insert', NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (417, 'b.barracudacentral.org=127.0.0.2*7', NULL, NULL, 7, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 15.000, 1, 1, 'NONE', NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (415, 'backscatter.spameatingmonkey.net=127.0.0.[2..11]*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 13.000, 1, 1, 'insert', NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (416, 'bl.spameatingmonkey.net=127.0.0.[2..11]*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 14.000, 1, 1, 'insert', NULL, NULL);
+-- b.barracudacentral.org is deliberately NOT seeded. The Barracuda Reputation
+-- Block List requires the querying IP to be registered before it will answer,
+-- so on a stock install it returns nothing and its weight of 7 is dead. Worse,
+-- 7 exceeds postscreen_dnsbl_threshold = 3, so it would single-handedly reject
+-- if it ever did answer, on the strength of a list the operator never enrolled
+-- in. Operators who register can add it back via System / RBL Configuration.
+-- Note this was enabled in the legacy installer too; it is an original default
+-- being corrected, not Docker drift (#293).
 INSERT IGNORE INTO `parameters` VALUES (185, 'postscreen_pipelining_enable', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (188, 'no', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '185', 'postscreen_pipelining_enable', 1, 1.000, 1, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (189, 'no', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '186', 'postscreen_non_smtp_command_enable', 1, 1.000, 1, 1, 'NONE', NULL, NULL);
@@ -1292,7 +1299,7 @@ INSERT IGNORE INTO `parameters` VALUES (216, 'smtpd_tls_CAfile', NULL, NULL, NUL
 INSERT IGNORE INTO `parameters` VALUES (217, NULL, NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '216', 'smtpd_tls_CAfile', 1, 1.000, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (414, 'hostkarma.junkemailfilter.com=127.0.1.2*1', NULL, NULL, 1, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 12.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (243, 'yes', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '242', 'smtp_tls_note_starttls_offer', 1, 1.000, 1, 1, NULL, NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (411, 'bl.suomispam.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 9.000, 1, 1, 'insert', NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (411, 'bl.suomispam.net=127.0.0.[2..11]*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 9.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (412, 'hostkarma.junkemailfilter.com=127.0.0.2*3', NULL, NULL, 3, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 10.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (413, 'hostkarma.junkemailfilter.com=127.0.0.4*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 11.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (321, '30d', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, NULL, 'main.cf', NULL, '320', 'maximal_queue_lifetime', 1, NULL, 1, 1, 'NONE', NULL, NULL);
@@ -1309,7 +1316,7 @@ INSERT IGNORE INTO `parameters` VALUES (356, 'inet:hermes_dmarc:54321', NULL, NU
 INSERT IGNORE INTO `parameters` VALUES (357, '127.0.0.1', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '3', 'mynetworks', 1, 41.000, 1, 1, 'NONE', NULL, 'localhost');
 INSERT IGNORE INTO `parameters` VALUES (368, 'smtp_tls_security_level', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 0, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (369, 'encrypt', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '368', 'smtp_tls_security_level', 1, NULL, 0, 1, 'NONE', NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (410, 'bl.spamcop.net*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 8.000, 1, 1, 'insert', NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (410, 'bl.spamcop.net=127.0.0.[2..11]*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 8.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (408, 'list.dnswl.org=127.0.[0..255].3*-8', NULL, NULL, -8, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 6.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (407, 'list.dnswl.org=127.0.[0..255].2*-6', NULL, NULL, -6, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 5.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (406, 'list.dnswl.org=127.0.[0..255].1*-4', NULL, NULL, -4, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 4.000, 1, 1, 'insert', NULL, NULL);

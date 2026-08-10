@@ -76,5 +76,17 @@ smtpd_milters =
 non_smtpd_milters = 
 smtpd_sender_restrictions = check_sender_access hash:/etc/postfix/amavis_senderbypass
 
-postscreen_dnsbl_sites = wl.mailspike.net=127.0.0.[18;19;20]*-2, hostkarma.junkemailfilter.com=127.0.0.1*-2, list.dnswl.org=127.0.[0..255].0*-2, list.dnswl.org=127.0.[0..255].1*-4, list.dnswl.org=127.0.[0..255].2*-6, list.dnswl.org=127.0.[0..255].3*-8, ix.dnsbl.manitu.net*2, bl.spamcop.net*2, bl.suomispam.net*2, hostkarma.junkemailfilter.com=127.0.0.2*3, hostkarma.junkemailfilter.com=127.0.0.4*2, hostkarma.junkemailfilter.com=127.0.1.2*1, backscatter.spameatingmonkey.net*2, bl.spameatingmonkey.net*2, b.barracudacentral.org=127.0.0.2*7, bl.mailspike.net=127.0.0.2*5, bl.mailspike.net=127.0.0.[10;11;12]*4, dnsbl.sorbs.net=127.0.0.10*8, dnsbl.sorbs.net=127.0.0.5*6, dnsbl.sorbs.net=127.0.0.7*3, dnsbl.sorbs.net=127.0.0.8*2, dnsbl.sorbs.net=127.0.0.6*2, dnsbl.sorbs.net=127.0.0.9*2, zen.spamhaus.org=127.0.0.[10;11]*8, zen.spamhaus.org=127.0.0.[4..7]*6, zen.spamhaus.org=127.0.0.3*4, zen.spamhaus.org=127.0.0.2*3
+# postscreen_dnsbl_sites must match the seeded parameters rows in
+# config/database/hermes_install.sql exactly. This file is what a fresh install
+# actually runs on; the database list only reaches main.cf once an admin saves a
+# settings page, at which point generate_postfix_configuration.cfm postconf's the
+# directive from the DB. When the two disagreed, a fresh install filtered on a
+# list nobody could see in the UI (#292 root pattern, found again in #293).
+#
+# Every entry carries an explicit =returncode filter. Without one, postscreen
+# counts ANY answer in 127.0.0.0/8 as a hit, including the 127.255.255.0/24
+# range that lists use for "refused" and "over quota". Two unfiltered lists
+# answering with error codes reach postscreen_dnsbl_threshold = 3 on their own
+# and reject legitimate mail. See docs and #293.
+postscreen_dnsbl_sites = wl.mailspike.net=127.0.0.[18;19;20]*-2, hostkarma.junkemailfilter.com=127.0.0.1*-2, list.dnswl.org=127.0.[0..255].0*-2, list.dnswl.org=127.0.[0..255].1*-4, list.dnswl.org=127.0.[0..255].2*-6, list.dnswl.org=127.0.[0..255].3*-8, bl.spamcop.net=127.0.0.[2..11]*2, bl.suomispam.net=127.0.0.[2..11]*2, hostkarma.junkemailfilter.com=127.0.0.2*3, hostkarma.junkemailfilter.com=127.0.0.4*2, hostkarma.junkemailfilter.com=127.0.1.2*1, backscatter.spameatingmonkey.net=127.0.0.[2..11]*2, bl.spameatingmonkey.net=127.0.0.[2..11]*2, zen.spamhaus.org=127.0.0.[10;11]*8, zen.spamhaus.org=127.0.0.[4..7]*6, zen.spamhaus.org=127.0.0.3*4, zen.spamhaus.org=127.0.0.2*3
 
