@@ -68,7 +68,13 @@ LOG_DIR="${HERMES_ROOT}/install-logs"
 mkdir -p "$LOG_DIR"
 LOG_FILE="${LOG_DIR}/system_rehost_$(date '+%Y%m%d_%H%M%S').log"
 
-RED='\033[0;31m'; YELLOW='\033[1;33m'; GREEN='\033[0;32m'; CYAN='\033[0;36m'; NC='\033[0m'
+# ANSI-C quoting ($'...'), not plain single quotes. The log helpers below pass
+# these through printf's %s, which does not interpret backslash escapes, so
+# '\033[0;32m' would print literally and every line of output would be prefixed
+# with visible escape codes. system_restore.sh and system_backup.sh already use
+# this form; install_hermes_docker.sh gets away with plain quotes only because it
+# uses `echo -e`.
+RED=$'\033[0;31m'; YELLOW=$'\033[1;33m'; GREEN=$'\033[0;32m'; CYAN=$'\033[0;36m'; NC=$'\033[0m'
 
 log()   { printf '%s[%s] INFO:%s  %s\n'  "$GREEN"  "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
 warn()  { printf '%s[%s] WARN:%s  %s\n'  "$YELLOW" "$(date '+%Y-%m-%d %H:%M:%S')" "$NC" "$*" | tee -a "$LOG_FILE"; }
@@ -189,6 +195,22 @@ validate_ipv4() {
     return 0
 }
 
+# RFC1918 plus loopback and link-local. Used only to phrase the console-address
+# warning correctly: a private local address with a public DNS answer is the
+# signature of NAT, which means the hostname is probably right even though this
+# host cannot prove it.
+is_private_ipv4() {
+    validate_ipv4 "$1" || return 1
+    local IFS='.' o1 o2 _o3 _o4
+    read -r o1 o2 _o3 _o4 <<< "$1"
+    (( o1 == 10 ))                          && return 0
+    (( o1 == 127 ))                         && return 0
+    (( o1 == 192 && o2 == 168 ))            && return 0
+    (( o1 == 172 && o2 >= 16 && o2 <= 31 )) && return 0
+    (( o1 == 169 && o2 == 254 ))            && return 0
+    return 1
+}
+
 validate_fqdn() {
     [[ "$1" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$ ]]
 }
@@ -216,11 +238,125 @@ main() {
 
     [[ -z "$TO_IP"       ]] && TO_IP="$(detect_new_ip)"
     [[ -z "$TO_HOSTNAME" ]] && TO_HOSTNAME="$(detect_new_hostname)"
-    [[ -z "$TO_CONSOLE"  ]] && TO_CONSOLE="$TO_IP"
+
+    # TO_CONSOLE is the console's IDENTITY, not just a Nextcloud detail. It is
+    # written to parameters2.console.host below, and every generator reads that:
+    # the Nginx vhost server_name, the auth.conf portal URL, Authelia's session
+    # cookie domain, Nextcloud's config.php trusted domains, and the hostname
+    # autoconfig/autodiscover hand to mail clients as their IMAP and SMTP server.
+    #
+    # It used to default to TO_IP, which was wrong in three ways on a rehost:
+    #   - OIDC broke. Nextcloud fetched discovery at https://<IP>/... while
+    #     Authelia's issuer is the console FQDN, so the issuer did not match and
+    #     the certificate did not cover the IP either.
+    #   - Mail clients were handed an IP as their server name, which no
+    #     certificate covers.
+    #   - It left the operator having to change the console host in the UI as
+    #     their first action after a rehost.
+    # It also contradicted the line below it, which already treats TO_HOSTNAME as
+    # the primary identity for trusted_domains[0] and the IP as the secondary (#295).
+    #
+    # detect_new_hostname() prefers .env's HERMES_HOSTNAME because it is an FQDN
+    # and is the operator's intended identity. But it is NOT safe to trust
+    # blindly, and this is the trap the first version of this fix walked into:
+    #
+    #   - .env.template ships HERMES_HOSTNAME=mail.example.com.
+    #   - migrate_legacy_to_docker.sh never sets HERMES_HOSTNAME at all.
+    #   - Both migrate_legacy_to_docker.sh and system_restore.sh invoke this
+    #     script with --force and WITHOUT --to-console, so they take this
+    #     default path unattended.
+    #
+    # So on a migration whose .env still holds the placeholder, defaulting the
+    # console to TO_HOSTNAME would set console.host, Authelia's cookie domain and
+    # the Nginx portal URL to a name that does not point at this host, taking the
+    # console from "reachable at the IP" to "not reachable at all". The old IP
+    # default was wrong but it did preserve reachability, and that property must
+    # survive.
+    #
+    # DNS therefore decides, rather than a warning that scrolls past under
+    # --force: the FQDN is adopted only when it actually resolves to this host.
+    # Otherwise fall back to the IP, exactly as before, and say why. An explicit
+    # --to-console is always honoured, since that is a deliberate operator
+    # statement; it only gets a warning.
+    #
+    # NAT is deliberately NOT auto-adopted. A host behind NAT can never resolve
+    # its own public address to a local one, so on such a deployment the FQDN
+    # correctly points at the public address while TO_IP is an RFC1918 address,
+    # and this check declines a name that is in fact right. That case is called
+    # out explicitly in the message below so the operator is told to pass
+    # --to-console rather than being told their DNS is broken.
+    #
+    # It is not adopted automatically because from inside the script the NAT case
+    # and the dangerous case are indistinguishable: "public record for this
+    # NAT'd host" looks exactly like "stale record still pointing at the host we
+    # are migrating AWAY from", and the second would hand the console an identity
+    # belonging to another machine. Only the operator knows which it is, so the
+    # script asks for one flag rather than guessing.
+    local console_resolves=""
+    if [[ -n "$TO_CONSOLE" ]]; then
+        log "  CONSOLE_HOST set explicitly: ${TO_CONSOLE}"
+    elif [[ "$TO_HOSTNAME" == *.* ]] && ! validate_ipv4 "$TO_HOSTNAME"; then
+        console_resolves=$(getent hosts "$TO_HOSTNAME" 2>/dev/null | awk '{print $1}' | head -1)
+        if [[ "$console_resolves" == "$TO_IP" ]]; then
+            TO_CONSOLE="$TO_HOSTNAME"
+            log "  CONSOLE_HOST defaulted to ${TO_HOSTNAME} (resolves to ${TO_IP}, this host)"
+        else
+            TO_CONSOLE="$TO_IP"
+            warn "  CONSOLE_HOST defaulted to ${TO_IP}, not ${TO_HOSTNAME}."
+            if [[ -z "$console_resolves" ]]; then
+                warn "  ${TO_HOSTNAME} does not resolve, so it cannot be used as the console"
+                warn "  address without making the console unreachable."
+                warn "  Mail clients and Nextcloud OIDC will be pointed at an IP, which no"
+                warn "  certificate covers. Once DNS points ${TO_HOSTNAME} at ${TO_IP}, set the"
+                warn "  console address under System / Console Settings, or re-run with"
+                warn "  --to-console=${TO_HOSTNAME}."
+            elif is_private_ipv4 "$TO_IP" && ! is_private_ipv4 "$console_resolves"; then
+                # This host is on a private address while the name resolves to a
+                # public one. Almost certainly NAT, in which case the name is
+                # correct and this fallback is the conservative choice, not a
+                # diagnosis. Say so plainly.
+                warn "  ${TO_HOSTNAME} resolves to ${console_resolves}, a public address, while"
+                warn "  this host is on ${TO_IP}. If ${console_resolves} is this host's public"
+                warn "  address (NAT or port forwarding), then ${TO_HOSTNAME} IS the correct"
+                warn "  console address and you should re-run with:"
+                warn "    --to-console=${TO_HOSTNAME}"
+                warn "  The IP was used instead only because a host behind NAT cannot confirm"
+                warn "  its own public address from the inside. If ${console_resolves} is a"
+                warn "  DIFFERENT machine, leaving this as ${TO_IP} is correct: update DNS first."
+            else
+                warn "  ${TO_HOSTNAME} resolves to ${console_resolves}, not this host (${TO_IP})."
+                warn "  Mail clients and Nextcloud OIDC will be pointed at an IP, which no"
+                warn "  certificate covers. Once DNS points ${TO_HOSTNAME} at ${TO_IP}, set the"
+                warn "  console address under System / Console Settings, or re-run with"
+                warn "  --to-console=${TO_HOSTNAME}."
+            fi
+        fi
+    else
+        TO_CONSOLE="$TO_IP"
+        warn "  No usable FQDN for the console, defaulting CONSOLE_HOST to ${TO_IP}."
+        warn "  Mail clients and Nextcloud OIDC will be pointed at an IP, which no"
+        warn "  certificate covers. Re-run with --to-console=<fqdn> to set it properly."
+    fi
 
     log "  New HOST_IP:         ${TO_IP}"
     log "  New HERMES_HOSTNAME: ${TO_HOSTNAME}"
     log "  New CONSOLE_HOST:    ${TO_CONSOLE}"
+
+    # An explicitly supplied FQDN console address still gets checked, because the
+    # operator can be ahead of their own DNS. Warn only: DNS is often mid
+    # propagation and the rehost itself is still correct.
+    if [[ -n "$TO_CONSOLE" ]] && ! validate_ipv4 "$TO_CONSOLE" && [[ "$TO_CONSOLE" != "$TO_HOSTNAME" || -z "$console_resolves" ]]; then
+        local explicit_resolves
+        explicit_resolves=$(getent hosts "$TO_CONSOLE" 2>/dev/null | awk '{print $1}' | head -1)
+        if [[ -z "$explicit_resolves" ]]; then
+            warn "  ${TO_CONSOLE} does not resolve yet. Point it at ${TO_IP} before"
+            warn "  relying on the console, or the login redirect will go nowhere."
+        elif [[ "$explicit_resolves" != "$TO_IP" ]]; then
+            warn "  ${TO_CONSOLE} resolves to ${explicit_resolves}, not ${TO_IP} (this host)."
+            warn "  Update DNS before relying on the console: the login redirect will"
+            warn "  send you to ${explicit_resolves}."
+        fi
+    fi
 
     validate_ipv4 "$TO_IP"      || fatal "Invalid new IP: ${TO_IP}"
     validate_fqdn "$TO_HOSTNAME" || fatal "Invalid new hostname (must be FQDN): ${TO_HOSTNAME}"
