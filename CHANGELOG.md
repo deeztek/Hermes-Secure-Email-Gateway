@@ -11,6 +11,122 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **`system_rehost.sh` pointed the rehosted console at an IP instead of its hostname**
+  (#295).
+  `CONSOLE_HOST` defaulted to the new IP when `--to-console` was not given, even though
+  the script had already detected the FQDN and was using it as `trusted_domains[0]`. That
+  value is written to `parameters2.console.host`, which is the console's identity: every
+  generator reads it for the Nginx `server_name`, the `auth.conf` portal URL, Authelia's
+  session cookie domain, Nextcloud's trusted domains, and the hostname
+  autoconfig/autodiscover hand to mail clients as their IMAP and SMTP server. So a rehost
+  broke Nextcloud OIDC (discovery fetched from the IP while Authelia's issuer is the FQDN,
+  against a certificate covering neither), handed mail clients an IP no certificate
+  covers, and left changing the console host as the operator's first task after a rehost.
+  It now adopts the detected FQDN **only when DNS confirms that name points at the new
+  host**, and otherwise falls back to the IP exactly as before, saying why. DNS decides
+  rather than a warning, because `migrate_legacy_to_docker.sh` and `system_restore.sh` both
+  invoke the script with `--force` and without `--to-console`, the migration script never
+  sets `HERMES_HOSTNAME`, and `.env.template` ships a placeholder: trusting the hostname
+  blindly there would have moved the console from "reachable at the IP" to unreachable. An
+  explicit `--to-console` is always honoured and only warned about.
+- **Changing the console host locked the administrator out of the console** (#294). This
+  affected every new install, because `install_hermes_docker.sh` sets `console.host` to the
+  host IP on purpose (no DNS yet) and expects the administrator to change it afterwards, so
+  the broken operation was step one of every deployment. Saving a new
+  console address restarted Authelia, whose session cookie is scoped to a single domain,
+  so it immediately had no session configuration for the address the browser was still
+  on. The save then handed the browser a redirect to `preload_restart_nginx.cfm` to
+  perform the Nginx restart, but that page and the `inc/restart_nginx_post.cfm` its
+  JavaScript calls both live under `/admin/2/` and are auth-protected. Neither could
+  load, so the one thing that triggers the Nginx restart sat behind the auth flow the
+  hostname change had just invalidated. Nginx kept serving the previous portal URL
+  indefinitely, the browser was redirected to the old address with "unable to determine
+  user state", and the only way back in was restarting `hermes_nginx` by hand from the
+  Docker host. A host change now fires the restart from the save request itself, the
+  last one that is still authenticated, and renders a page that waits out the restart
+  before moving the operator to the new address, so their next sign-in happens after
+  Nginx is back rather than during the restart. Certificate, HSTS, OCSP and DH-parameter
+  changes leave the address and the session intact and keep the existing restart path.
+- **DNSBL lookups could be silently dead, and the diagnostics said they were healthy**
+  (#293). Found while verifying #292 on a test gateway whose Unbound forwards to a LAN
+  router: ordinary DNS resolved normally while `zen.spamhaus.org` returned nothing at
+  all for a test point that is guaranteed listed. Reputation scoring, both postscreen
+  weights and the SpamAssassin `RCVD_IN_*` rules, contributes nothing in that state,
+  and allowlists such as `list.dnswl.org` stop applying too.
+  - **Four block lists counted refusals as listings.** `bl.spamcop.net`,
+    `bl.suomispam.net`, `bl.spameatingmonkey.net` and
+    `backscatter.spameatingmonkey.net` shipped with no `=returncode` filter, so
+    postscreen counted any answer in `127.0.0.0/8` as a listing, including the
+    `127.255.255.0/24` codes lists use for "refused" and "over quota". Each carries a
+    weight of 2 against a threshold of 3, so two of them answering with error codes
+    reject legitimate mail. All four now filter on `127.0.0.[2..11]`, and existing
+    installs are corrected with their weights preserved.
+  - **The RBL Test button never made a DNS query at all, and reported every list as
+    healthy.** It shelled out to `docker exec hermes_postfix_dkim dig`, but the
+    postfix-dkim image has never contained `dnsutils`, so every probe failed with an OCI
+    "executable file not found" error. Neither probe captured stderr, so Lucee folded
+    docker's error message into the output variable, and the SOA fallback only tested that
+    the output was non-empty. An error message is not empty, so it read as a successful SOA
+    lookup and every entry displayed green "Zone active (SOA)". The probe now runs `dig`
+    locally in `hermes_commandbox`, which has `dnsutils` and is pointed at
+    `hermes_unbound` by compose, so it goes through the same resolver postscreen uses.
+    Every `cfexecute` captures stderr separately, no probe treats stderr as data, the SOA
+    response is validated as an actual SOA record by its five timers rather than by being
+    non-empty, and a missing `dig` is reported as its own verdict instead of being
+    laundered into a DNS result. The same flaw was present in the new install-time DNSBL
+    preflight and is fixed there too.
+  - **System > RBL Configuration had no Apply button.** `inc/rbl_apply_settings.cfm` had
+    existed since the page was written but nothing ever invoked it, so the only way to push
+    a block list change into `main.cf` was to edit an entry and save it without changing
+    anything. It is now wired to an Apply button, which confirms first because it
+    regenerates the Postfix configuration from the database and reloads Postfix. The
+    success message it sets also had no handler on the page, so even a successful apply
+    would have reported nothing.
+  - **The RBL Test button also mis-read the answers it did get.** It accepted
+    any answer beginning `12` as success, so `127.255.255.254` displayed as live data,
+    and its SOA fallback reported green for a zone that returned no data at all. It now
+    runs a two-point probe and reports data returned, zone present but silent, or refused
+    and wildcarded, which a single probe cannot distinguish from a healthy list. The
+    wildcard test compares the two points as **sets** and requires them to be identical,
+    rather than treating any answer at `1.0.0.127.` as a wildcard: reputation services
+    return a verdict for every query, not only for listed senders, so
+    `hostkarma.junkemailfilter.com` answers both points with different code sets and an
+    "any answer" test marked a healthy service as broken. What makes a wildcarded or
+    hijacked zone dangerous is that it returns the **same** answer to everything, so every
+    connecting IP scores identically; a zone that discriminates is doing its job. A zone
+    that answers the never-listed point while the always-listed point stays silent is
+    reported as inverted rather than as either healthy or wildcarded.
+  - **The Postfix template and the database shipped different block lists.** A fresh
+    install filtered on the 27 entries hardcoded in `main.cf.HERMES`, including six
+    retired `dnsbl.sorbs.net` entries at weights up to 8, while the admin console
+    showed the 17 seeded in the database. The template only converged on the database
+    when someone saved a settings page. Both lists now match exactly. This is the same
+    root pattern as #292: generated config written before or independently of the
+    database, with the file winning until an admin happens to save.
+  - **`b.barracudacentral.org` is no longer seeded.** It answers only once the querying
+    IP is registered with Barracuda, so on a stock gateway it returned nothing while
+    carrying a weight of 7, above the rejection threshold of 3 on its own. Existing
+    entries are left in place, since an operator may have registered.
+  - **The installer now tests block list reachability.** Forward mode remains the
+    install default for bootstrap reliability, and switching to recursive remains the
+    operator's call, but the cost of forward mode was invisible: ordinary DNS resolving
+    normally says nothing about whether reputation answers survive the trip. Routers
+    commonly strip `127.0.0.0/8` replies as DNS rebinding protection, returning NOERROR
+    with an empty ANSWER and empty AUTHORITY, and public resolvers are refused by the
+    lists outright. The new preflight distinguishes reachable, refused, stripped,
+    synthesised, and off-zone answers, and reports the remedy. It warns rather than
+    aborting, since mail still flows in that state, it just filters badly. The DNS
+    forwarder prompt now states the consequence instead of framing recursive mode as a
+    privacy preference.
+- **Razor could not work even once registration landed in the right place** (#292
+  follow-up). `-home=/etc/razor` corrected where `razor-admin` writes, but `docker exec`
+  runs as root, so the identity and server discovery files were created root-owned while
+  SpamAssassin runs as `amavis`. Razor writes its home directory at scan time, refreshing
+  `servers.*.lst` and the per-server configs, so root ownership left it mute. The
+  ownership pass in the installer, the post-upgrade repair, and the Initialize Razor
+  handler all now include `/etc/razor`, and registering removes the stale `/root/.razor`
+  identity that earlier attempts left behind.
+
 - **First-run provisioning defects on fresh installs** (#292). Reported by an outside
   user on a clean install. Each has been present since the Docker edition shipped and
   is invisible on any gateway where an administrator saved the relevant settings page,

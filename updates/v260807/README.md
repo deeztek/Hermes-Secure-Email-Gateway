@@ -103,7 +103,12 @@ they stay enabled. Two things are worth knowing:
 
 - **Razor has never been registered on any Hermes install**, so it has been returning
   no result whether or not it was switched on. Register it once under
-  **Content Checks > Antispam Maintenance > Initialize Razor**.
+  **Content Checks > Antispam Maintenance > Initialize Razor**. Two separate faults
+  were in the way, and both are fixed: registration was writing to `/root/.razor`
+  while SpamAssassin reads `/etc/razor`, and the files it writes there were owned by
+  root while SpamAssassin runs as `amavis`. Razor writes its home directory at scan
+  time, not just at registration, so ownership had to be corrected too. Registering
+  now also removes the stale `/root/.razor` identity left behind by earlier attempts.
 - **DCC is no longer in the published image.** Its licence is free only to
   organisations that do not sell filtering devices or services except to their own
   users, and it does not permit redistributing binaries. Most self-hosted operators
@@ -128,6 +133,96 @@ separated, producing one unusable entry. Reaching the console by IP, which is wh
 installer configures before DNS exists, returned "Access through untrusted domain".
 The upgrade re-renders it.
 
+### Changing the console address locked you out of the console
+
+This one hit every new install, because the installer deliberately sets the console
+address to the host IP (there is no DNS yet) and expects you to change it to your real
+hostname afterwards. That change was the operation that broke.
+
+Saving a new address restarted Authelia, whose session cookie is scoped to a single
+hostname, so it instantly had no session for the address your browser was still on. The
+save then handed your browser a redirect to the page that performs the Nginx restart, and
+that page is itself behind authentication. It could not load, so Nginx was never
+restarted and kept redirecting you to the **old** address with "unable to determine user
+state". The configuration files on disk were correct the whole time. The only way back in
+was restarting Nginx by hand:
+
+```bash
+docker container restart hermes_nginx
+```
+
+A console address change now performs the restart from the save itself, the last request
+that is still authenticated, and shows you a page that waits for Nginx to come back
+before moving you to the new address. Your next sign-in happens after the restart rather
+than during it. Certificate, HSTS, OCSP and DH-parameter changes leave your session
+intact and are unaffected.
+
+If you are mid-change and locked out right now, run the command above, then open the
+console at your new address.
+
+### Four block lists were counting refusals as listings
+
+Four seeded entries shipped with no return-code filter: `bl.spamcop.net`,
+`bl.suomispam.net`, `bl.spameatingmonkey.net` and `backscatter.spameatingmonkey.net`.
+Without one, postscreen counts **any** answer in `127.0.0.0/8` as a listing, and that
+range includes the `127.255.255.0/24` codes these lists return for "query refused" and
+"over quota". A gateway whose DNS resolver is being refused therefore scored the
+refusals as listings. Each of these carries a weight of 2 against a
+`postscreen_dnsbl_threshold` of 3, so two of them answering with error codes reject
+legitimate mail on their own.
+
+The upgrade adds `=127.0.0.[2..11]` to all four, preserving whatever weight you had set.
+No list is removed and no weight changes.
+
+Related, and worth checking on your own gateway: the **Test** button under
+**System > RBL Configuration** used to report any `127.x` answer as healthy, including
+those refusal codes, and reported a list with a live SOA record as healthy even when it
+returned no data at all. It now distinguishes three outcomes: data returned, zone
+present but silent, and refused or wildcarded. If your lists come back yellow after
+this upgrade, they were never contributing, and the old button was telling you they
+were fine.
+
+### Check whether your gateway receives block list answers at all
+
+This is worth two minutes on every existing install. Ordinary DNS resolving normally
+tells you nothing here, because reputation answers live in `127.0.0.0/8` and that is
+exactly what upstream resolvers treat specially.
+
+```bash
+docker exec hermes_postfix_dkim dig +short 2.0.0.127.zen.spamhaus.org
+```
+
+| Answer | Meaning |
+| --- | --- |
+| `127.0.0.2` and similar | Working. Nothing to do |
+| nothing at all | Your forwarder is discarding the answer, usually DNS rebinding protection refusing to relay loopback addresses |
+| `127.255.255.254` | The list is refusing your resolver, which it treats as public or shared |
+
+In the last two cases **no reputation data is reaching the gateway**: postscreen adds no
+weight, SpamAssassin's `RCVD_IN_*` rules stay silent, and allowlists such as
+`list.dnswl.org` stop applying, so every sender scores as though no reputation data
+exists. Spam that should be quarantined gets delivered.
+
+The fix is to switch to recursive resolution under **System > DNS Resolver**, then
+re-test with **Test All** under **System > RBL Configuration**. Forward mode remains the
+install default because it works on networks that block outbound port 53, and recursive
+requires that port be open to the DNS root servers. New installs now run this same check
+automatically and report the result.
+
+### Two default block lists changed
+
+`b.barracudacentral.org` is **no longer seeded on new installs.** It only answers once
+the querying IP is registered with Barracuda, so on a stock gateway it returned nothing
+while carrying a weight of 7, which is above the rejection threshold of 3 on its own.
+**Your existing entry is left alone**, on the same principle as your spam settings. If
+you have not registered, remove it under **System > RBL Configuration**. If you have,
+keep it.
+
+Fresh installs also stop shipping `dnsbl.sorbs.net`, `ix.dnsbl.manitu.net` and
+`bl.mailspike.net` in the Postfix template. SORBS was retired in 2024, and the other two
+were already absent from the database, so a fresh install was filtering against a list
+that differed from the one shown in the admin console. The two lists now match.
+
 ## What to do
 
 ```bash
@@ -135,9 +230,28 @@ cd <install-root>
 sudo ./scripts/system_update_docker.sh
 ```
 
-Nothing else is required. The upgrade re-renders the affected configuration from your
-database, creates the missing directories, corrects ownership, and runs the two
-one-time repairs.
+Then, **once**, do this to finish applying the block list fix:
+
+1. Open **System > RBL Configuration**.
+2. Click the blue **Edit** (pencil) button on any entry.
+3. Save it without changing anything.
+
+That looks odd, and it is: the return-code fix lands in the database during the upgrade,
+but Postfix only picks up a changed `postscreen_dnsbl_sites` when that directive is
+re-rendered, and saving an entry is what triggers the re-render and the Postfix reload.
+Saving any other Postfix-backed settings page, such as **System > Server Setup**, does the
+same thing. Until one of those happens, `main.cf` keeps the old unfiltered list.
+
+Confirm it applied. This should print nothing, meaning every entry now carries a return
+code:
+
+```bash
+docker exec hermes_postfix_dkim postconf -h postscreen_dnsbl_sites | tr ',' '\n' | grep -v '='
+```
+
+Everything else in this upgrade applies on its own: the affected configuration is
+re-rendered from your database, missing directories are created, ownership is corrected,
+and the two one-time repairs run.
 
 ## How to confirm it worked
 
@@ -160,6 +274,23 @@ it under **Email Server > Settings**:
 
 ```bash
 grep crypt_write_algorithm config/dovecot-2.4/conf/dovecot.conf
+```
+
+Every block list carries a return-code filter, and none is left bare. After clicking
+Apply, the running configuration should agree with the database:
+
+```bash
+# No entry without an '=' return code
+docker exec hermes_postfix_dkim postconf -h postscreen_dnsbl_sites | tr ',' '\n' | grep -v '='
+```
+
+If Razor is enabled, confirm registration landed where SpamAssassin reads it and that
+`amavis` can use it. An identity file in `/etc/razor` owned by `amavis`, and nothing
+left in `/root/.razor`, is the correct end state:
+
+```bash
+docker exec hermes_mail_filter ls -la /etc/razor
+docker exec -u amavis hermes_mail_filter sh -c 'touch /etc/razor/.t && rm -f /etc/razor/.t && echo WRITABLE || echo NOT-WRITABLE'
 ```
 
 ## Why it happened
