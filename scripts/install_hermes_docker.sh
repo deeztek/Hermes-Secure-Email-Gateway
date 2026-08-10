@@ -469,10 +469,23 @@ below. This works in every network environment, including restrictive
 ones that block direct outbound DNS to the public root servers.
 
 RECOMMENDED FOLLOW-UP: once your install is up and verified, switch to
-RECURSIVE mode via System > DNS Resolver in the admin UI. Recursive
-resolution is more private (no third-party sees your queries) and avoids
-upstream rate-limiting on DNSBL lookups -- but requires your network
-to allow outbound UDP/TCP 53 to the public DNS root servers.
+RECURSIVE mode via System > DNS Resolver in the admin UI.
+
+This is not only a privacy preference. Block list answers live in
+127.0.0.0/8, and most forwarders mishandle them: routers commonly strip
+loopback answers as DNS rebinding protection, and public resolvers are
+refused outright by the lists themselves. In either case NO reputation
+data reaches the gateway, postscreen adds no weight, SpamAssassin's
+RCVD_IN_* rules stay silent, and allowlists stop applying. Spam scores
+as though no reputation data exists.
+
+Recursive resolution avoids all of that, but requires your network to
+allow outbound UDP/TCP 53 to the public DNS root servers, which is why
+forward mode is the default here.
+
+This installer tests block list reachability after the containers are up
+and will tell you if your forwarder has this problem. You can re-test any
+time with Test All under System > RBL Configuration.
 
 EOF
 
@@ -1427,6 +1440,10 @@ EOF
     log "Resolving ${test_host} via unbound (exercises recursive path)..."
     if docker exec hermes_db_server getent hosts "$test_host" >/dev/null 2>&1; then
         log "External DNS resolution working"
+        # Ordinary DNS working says nothing about DNSBL lookups, which are the
+        # one thing a mail gateway cannot do without and the one thing forward
+        # mode tends to break. Non-fatal by design: mail still flows.
+        preflight_dnsbl_check
         return 0
     fi
 
@@ -1441,16 +1458,18 @@ from forgebox.io, and the Hermes admin UI will never start.
 
 Most likely causes:
 
-  1. Outbound port 53 (DNS) blocked by host firewall / network policy.
-     Unbound performs full recursive resolution against the DNS root
-     servers; some networks block this.
+  1. The upstream forwarder you chose at install time is not answering.
+     Check which one is in use:
+       grep forward-addr config/unbound/conf.d/forward.conf
 
-     Workaround: enable upstream forwarders. Edit
-     config/unbound/conf.d/forward.conf and uncomment the
-     forward-zone block with public resolvers (1.1.1.1, 8.8.8.8),
-     then:
+     Point it at a resolver that works, then:
        docker compose restart hermes_unbound
      and re-run --init-db.
+
+     If no forwarder works, switch to recursive resolution by emptying
+     the forward-zone block in config/unbound/conf.d/forward.conf.
+     Recursive queries the DNS root servers directly, which some
+     networks block outbound on port 53.
 
   2. DNSSEC validation failing on root anchor or recursive query
      errors. Check unbound logs:
@@ -1463,6 +1482,146 @@ Most likely causes:
 EOF
     error "DNS preflight check failed"
     return 1
+}
+
+# ============================================================================
+# PREFLIGHT: DNSBL REACHABILITY
+# ============================================================================
+# Ordinary name resolution working tells you nothing about whether DNSBL
+# answers survive the trip. Reputation answers live in 127.0.0.0/8, and that
+# is exactly what upstream resolvers treat specially:
+#
+#   - Consumer and business routers apply DNS rebinding protection and strip
+#     loopback answers, returning NOERROR with an empty ANSWER *and* empty
+#     AUTHORITY section. Nothing looks broken; the data is simply gone.
+#   - Public resolvers (1.1.1.1, 8.8.8.8) are ACL'd by the lists themselves
+#     and get an explicit refusal code, 127.255.255.254 in Spamhaus's case.
+#
+# Either way postscreen adds no weight, the SpamAssassin RCVD_IN_* rules stay
+# silent, and allowlists like list.dnswl.org stop applying, so a gateway scores
+# every sender as though no reputation data exists. Forward mode is the install
+# default for bootstrap reliability and stays that way; this check exists so
+# the operator learns the cost immediately instead of discovering it from spam
+# in inboxes months later (#293).
+#
+# Non-fatal. Mail flows fine in this state, it just filters badly.
+preflight_dnsbl_check() {
+    header "Preflight: DNSBL Reachability Check"
+
+    # Probe from hermes_commandbox, NOT hermes_postfix_dkim. The postfix image
+    # has never contained dnsutils, so `dig` is not there; commandbox installs it
+    # and compose points it at hermes_unbound (dns: ${IPV4SUBNET}.117), so the
+    # query goes through the same resolver postscreen uses. The address the block
+    # list sees is unbound's egress either way, since unbound performs the
+    # outbound query and the asking container never contacts the list.
+    #
+    # Verify dig is actually present before drawing conclusions. Probing with a
+    # missing binary yields empty output, which is indistinguishable from
+    # "answers are being stripped" and would produce a confidently wrong
+    # diagnosis (this is exactly how the admin console's RBL test button reported
+    # every list as healthy for months).
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "hermes_commandbox"; then
+        warn "hermes_commandbox is not running -- skipping DNSBL check"
+        return 0
+    fi
+    if ! docker exec hermes_commandbox test -x /usr/bin/dig 2>/dev/null; then
+        warn "dig not found in hermes_commandbox -- skipping DNSBL check"
+        warn "(install dnsutils in the commandbox image to enable it)"
+        return 0
+    fi
+
+    local zone="zen.spamhaus.org"
+    local listed control upstream
+    # 127.0.0.2 is the conventional listed test point. 127.0.0.1 must never be
+    # listed, so an answer there means something is synthesising replies.
+    listed=$(docker exec hermes_commandbox dig +short +time=3 +tries=1 A "2.0.0.127.${zone}" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    control=$(docker exec hermes_commandbox dig +short +time=3 +tries=1 A "1.0.0.127.${zone}" 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+    upstream=$(grep -E '^\s*forward-addr:' "${HERMES_ROOT}/config/unbound/conf.d/forward.conf" 2>/dev/null | awk '{print $2}' | paste -sd', ' -)
+    [[ -z "$upstream" ]] && upstream="none (recursive mode)"
+
+    if [[ -n "$control" ]]; then
+        warn "DNSBL check: ${zone} answered the control point (${control})"
+        cat <<EOF >&2
+
+[WARNING] Something is synthesising DNS answers
+
+1.0.0.127.${zone} answered ${control}. That address must never be
+listed by any block list, so an answer means your resolver path is
+fabricating replies (captive portal, ad-blocking resolver, or a
+wildcard). Every connecting IP will score as listed, which will
+reject legitimate mail once filtering is live.
+
+Current upstream: ${upstream}
+
+Fix this before putting the gateway into production.
+
+EOF
+        return 0
+    fi
+
+    case "$listed" in
+        127.255.255.*)
+            warn "DNSBL check: refused (${listed}) -- reputation scoring is disabled"
+            cat <<EOF >&2
+
+[WARNING] DNSBL queries are being refused
+
+${zone} answered ${listed}, which is a refusal code, not a listing.
+The lists ACL public and shared resolvers, so no reputation data is
+reaching this gateway. postscreen will add no weight, SpamAssassin's
+RCVD_IN_* rules will stay silent, and allowlists will not apply.
+
+Current upstream: ${upstream}
+
+To fix: switch to recursive resolution under System > DNS Resolver in
+the admin console, then re-test with Test All under System > RBL
+Configuration.
+
+EOF
+            ;;
+        127.*)
+            log "DNSBL check: ${zone} returned ${listed} -- reputation data reaching this host"
+            ;;
+        "")
+            warn "DNSBL check: ${zone} returned nothing -- reputation scoring is disabled"
+            cat <<EOF >&2
+
+[WARNING] DNSBL answers are not reaching this gateway
+
+2.0.0.127.${zone} returned no answer, though ordinary DNS resolves
+fine. That test point is always listed, so an empty reply means the
+answer is being discarded upstream. The usual cause is DNS rebinding
+protection on the forwarder: reputation answers are in 127.0.0.0/8 and
+many routers refuse to relay loopback addresses.
+
+postscreen will add no weight, SpamAssassin's RCVD_IN_* rules will
+stay silent, and allowlists such as list.dnswl.org will not apply, so
+every sender scores as though no reputation data exists.
+
+Current upstream: ${upstream}
+
+To fix: switch to recursive resolution under System > DNS Resolver in
+the admin console, then re-test with Test All under System > RBL
+Configuration.
+
+EOF
+            ;;
+        *)
+            warn "DNSBL check: ${zone} answered ${listed}, outside 127.0.0.0/8"
+            cat <<EOF >&2
+
+[WARNING] Unexpected DNSBL answer
+
+${zone} answered ${listed}, which is not a reputation code. The zone
+may be hijacked or parked, or your resolver is redirecting queries.
+
+Current upstream: ${upstream}
+
+EOF
+            ;;
+    esac
+
+    return 0
 }
 
 # ============================================================================
@@ -3810,8 +3969,14 @@ fix_service_data_ownership() {
     # Container-side paths: /mnt/data/amavis is the amavis_data volume (host
     # ${ARCHIVE_MOUNT}/amavis) and /opt/hermes/sa-bayes is bind-mounted from the
     # repo working tree, so both arrive owned by whoever ran git clone.
+    #
+    # /etc/razor is image-owned (root), not a mount, but it belongs here for the
+    # same reason: Razor's home directory is written at scan time, not just read.
+    # The razor agent refreshes servers.*.lst and the per-server .conf files, and
+    # SpamAssassin runs as amavis, so a root-owned /etc/razor leaves Razor mute
+    # even once registration lands in the right place (#292).
     local p
-    for p in /mnt/data/amavis /opt/hermes/sa-bayes; do
+    for p in /mnt/data/amavis /opt/hermes/sa-bayes /etc/razor; do
         if docker exec hermes_mail_filter chown -R amavis:amavis "$p" >>"$LOG_FILE" 2>&1; then
             log "  chown amavis:amavis ${p}"
         else
