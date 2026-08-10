@@ -92,6 +92,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/rbl_delete_entry.cfm">
 <cfelseif action is "edit_entry">
   <cfinclude template="./inc/rbl_edit_entry.cfm">
+<cfelseif action is "apply">
+  <!--- inc/rbl_apply_settings.cfm has existed since this page was written but
+       nothing ever invoked it, so the only way to push a database change into
+       main.cf was to edit an entry and save it without changing anything. That
+       also meant the upgrade notes documented an Apply button that did not
+       exist. Wired up here (#293). --->
+  <cfinclude template="./inc/rbl_apply_settings.cfm">
 </cfif>
 
 <!--- Clear session message --->
@@ -110,6 +117,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Entry Deleted</h4>
     <p>RBL entry has been deleted and Postfix configuration applied successfully.</p>
+  </div>
+</cfif>
+<cfif m is 3>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Configuration Applied</h4>
+    <p>Pending changes were committed and the Postfix configuration was regenerated and reloaded.</p>
   </div>
 </cfif>
 <cfif m is 4>
@@ -205,10 +219,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="card-body">
     <div class="callout callout-warning mb-3">
       <h5><i class="fas fa-exclamation-triangle"></i> Warning on RBL Tests</h5>
-      <p class="mb-1">The <i class="fas fa-vial"></i> test performs a live DNS probe against each RBL zone using the same DNS resolver as Postfix. <span class="badge bg-success">Green</span> means the zone has an active SOA record &mdash; the authoritative nameservers are responding. <span class="badge bg-danger">Red</span> means the zone is unreachable, has no SOA, or does not exist. Note: many DNSBL providers block data center IP ranges from live data queries, so green only confirms zone infrastructure &mdash; not that the list is actively publishing data.</p>
+      <p class="mb-1">The <i class="fas fa-vial"></i> test performs a two-point DNS probe against each RBL zone using the same DNS resolver and source IP as Postfix. It queries <code>2.0.0.127.<em>zone</em></code>, which should be listed, and <code>1.0.0.127.<em>zone</em></code>, which must never be listed.</p>
+      <p class="mb-1"><span class="badge bg-success">Green</span> means the zone returned real reputation data. <span class="badge bg-warning text-dark">Yellow</span> means the zone exists but no data reached us: either the list publishes no test entry, or its answers are being blocked or stripped somewhere between here and the list. <span class="badge bg-danger">Red</span> means the query was refused, the zone answers every query (wildcard), or the zone is dead. Hover any badge for the detail.</p>
+      <p class="mb-1">Yellow is not a pass. A list that returns nothing contributes nothing, so its weight silently drops out of the DNSBL score. Many providers also refuse queries from public or shared resolvers, which shows as red with a <code>127.255.255.254</code> code; recursive mode under System &gt; DNS Resolver avoids that.</p>
       <p class="mb-1">A dead or misconfigured <strong>Block List</strong> that returns wildcard matches will add to the DNSBL score for every connecting IP, potentially blocking all legitimate inbound mail.</p>
       <p class="mb-0">A dead or misconfigured <strong>Allow List (DNSWL)</strong> that returns wildcard matches will subtract from the DNSBL score for every connecting IP, potentially allowing spam through that would otherwise be blocked.</p>
     </div>
+    <!--- Standalone form, deliberately a SIBLING of bulkDeleteForm rather than
+         nested inside it: the DataTable below is already wrapped in that form,
+         and nesting forms around a DataTable silently strips fields. The Apply
+         button lives in the toolbar and submits this one via JS. --->
+    <form id="applyForm" method="post" style="display:none">
+      <input type="hidden" name="action" value="apply">
+    </form>
+
     <form id="bulkDeleteForm" method="post">
       <input type="hidden" name="action" value="bulk_delete">
       <input type="hidden" name="selected_ids" id="selectedIds" value="">
@@ -218,13 +242,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           onclick="submitBulkDelete();">
           <i class="fas fa-trash"></i> Delete Selected
         </button>
+        <button type="button" class="btn btn-sm btn-primary" onclick="submitApply();">
+          <i class="fas fa-sync"></i> Apply
+        </button>
         <button type="button" class="btn btn-sm btn-info" onclick="testAll();">
           <i class="fas fa-vial"></i> Test All
         </button>
         <span class="ms-2 text-muted small">
           <i class="fas fa-vial"></i> Test results:
-          <span class="badge bg-success ms-1"><i class="fas fa-check-circle"></i> Zone Active</span> SOA found, zone is responding &nbsp;
-          <span class="badge bg-danger ms-1"><i class="fas fa-times-circle"></i> Error</span> Zone dead or unreachable
+          <span class="badge bg-success ms-1"><i class="fas fa-check-circle"></i> Data OK</span> list returned reputation data &nbsp;
+          <span class="badge bg-warning text-dark ms-1"><i class="fas fa-exclamation-triangle"></i> No Data</span> zone exists, nothing returned &nbsp;
+          <span class="badge bg-danger ms-1"><i class="fas fa-times-circle"></i> Error</span> refused, wildcard, or dead
         </span>
       </div>
 
@@ -396,6 +424,13 @@ function deleteSingle(id, name) {
   document.getElementById('deleteForm').submit();
 }
 
+function submitApply() {
+  // Regenerates main.cf from the database and reloads Postfix, so it reverts any
+  // postconf edits made by hand outside the admin console. Worth a confirmation.
+  if (!confirm('Apply the current block list configuration?\n\nThis regenerates the Postfix configuration from the database and reloads Postfix.')) return;
+  document.getElementById('applyForm').submit();
+}
+
 function testEntry(id) {
   var badge = document.getElementById('status-' + id);
   badge.className = 'badge bg-secondary';
@@ -406,7 +441,11 @@ function testEntry(id) {
     .then(function(data) {
       if (data.status === 'ok') {
         badge.className = 'badge bg-success';
-        badge.innerHTML = '<i class="fas fa-check-circle"></i> Zone Active';
+        badge.innerHTML = '<i class="fas fa-check-circle"></i> Data OK';
+        badge.title = data.message;
+      } else if (data.status === 'warn') {
+        badge.className = 'badge bg-warning text-dark';
+        badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i> No Data';
         badge.title = data.message;
       } else {
         badge.className = 'badge bg-danger';
