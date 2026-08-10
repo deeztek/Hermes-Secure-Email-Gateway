@@ -275,13 +275,19 @@ Three buttons, each running a single `docker exec` against
 Action handler: `antispam_init_pyzor.cfm`
 
 ```
-docker exec hermes_mail_filter /usr/bin/pyzor ping
+docker exec -u amavis hermes_mail_filter /usr/bin/pyzor ping
 ```
 
 Pings the Pyzor servers; success is detected by the literal string
-`200` in the output. The command both verifies connectivity and writes
-the per-user Pyzor config the first time it runs. Required before
-`use_pyzor = 1` returns meaningful results.
+`200` in the output. It runs as **amavis** because that is the user
+SpamAssassin invokes pyzor as, so it tests the identity that actually
+matters rather than root's.
+
+This is a connectivity check, not a registration step. Pyzor writes no
+per-user configuration here and reaches `public.pyzor.org` from a
+built-in default, so enabling `use_pyzor = 1` is sufficient on its own.
+Contrast Razor, which does need a one-time registration and stores an
+identity file that SpamAssassin locates via `razor_config`.
 
 ### Initialize Razor
 
