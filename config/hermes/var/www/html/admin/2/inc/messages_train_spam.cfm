@@ -92,7 +92,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfinclude template="generate_customtrans.cfm">
         <cffile action="write"
             file="/opt/hermes/tmp/#customtrans3#_sa_learn.sh"
-            output="docker exec hermes_mail_filter /usr/bin/sa-learn -u amavis --no-sync --spam #quarfile# 2>&1">
+            output="docker exec -u amavis hermes_mail_filter /usr/bin/sa-learn --no-sync --spam #quarfile# 2>&1">
 
         <cftry>
             <cfexecute name="/bin/chmod" arguments="+x /opt/hermes/tmp/#customtrans3#_sa_learn.sh" timeout="60"></cfexecute>

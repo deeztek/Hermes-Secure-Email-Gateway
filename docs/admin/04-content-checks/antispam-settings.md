@@ -309,8 +309,14 @@ network rejects the existing identity).
 Action handler: `antispam_clear_bayes.cfm`
 
 ```
-docker exec hermes_mail_filter /usr/bin/sa-learn --clear
+docker exec -u amavis hermes_mail_filter /usr/bin/sa-learn --clear
 ```
+
+Every `sa-learn` call in Hermes runs as **amavis**, in the admin console, the
+user portal and the upgrade hook alike. SpamAssassin reads and writes the Bayes
+database as amavis, so training as root left root-owned files in a directory
+amavis must write to. It worked only because `bayes_file_mode 0777` made them
+world-writable.
 
 Wipes the learned spam/ham corpus. SpamAssassin will need to re-learn
 from scratch before Bayes rules contribute meaningful scores again.

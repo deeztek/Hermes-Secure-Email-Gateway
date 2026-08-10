@@ -199,7 +199,7 @@ legitimate state it accumulated later.
 <cfelse>
     <cftry>
         <cfexecute name="/usr/local/bin/docker"
-            arguments="exec hermes_mail_filter /usr/bin/sa-learn --clear"
+            arguments="exec -u amavis hermes_mail_filter /usr/bin/sa-learn --clear"
             variable="bayesClearOut" errorVariable="bayesClearErr" timeout="240" />
         <cfset markComplete(blockName)>
         <cfset arrayAppend(migrationsApplied, blockName)>
