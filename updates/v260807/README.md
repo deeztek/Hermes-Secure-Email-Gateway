@@ -29,6 +29,27 @@ state. Restoring a backup of it afterwards would reintroduce the foreign trainin
 permanently: the upgrade records the clearing as done, so nothing would ever remove
 it again.
 
+### Mail clients could not send: SMTP submission was never enabled
+
+`master.cf` shipped with the `submission` (587) and `smtps` (465) listeners commented
+out, in every variant in the repository. Docker published those ports and the mailbox
+domain page told you to advertise them over SRV, but Postfix was not listening on
+either.
+
+On a mailbox or hybrid install this means **no user could send mail from Thunderbird,
+a phone, or any other client**. Receiving worked, and webmail worked, because
+Nextcloud Mail reaches Postfix on port 25 across the Docker network rather than
+through submission. That is why the gap survived: the two paths most people test
+first were both unaffected.
+
+Both listeners are now enabled, with SASL answered by Dovecot and
+`reject_sender_login_mismatch` so an authenticated user cannot send as somebody else.
+
+> **If you enabled submission by hand**, the upgrade replaces `master.cf` with the
+> repository version and your edit is lost. The shipped configuration is a superset
+> of the usual manual fix, so submission keeps working, but check the file afterwards
+> if you customised anything else in it.
+
 ### Amavis quarantine directories were never created
 
 The installer creates the quarantine root but not the five subdirectories that

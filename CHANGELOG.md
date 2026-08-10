@@ -15,6 +15,18 @@ beside each release below is the **actual release date**.
   user on a clean install. Each has been present since the Docker edition shipped and
   is invisible on any gateway where an administrator saved the relevant settings page,
   because the application layer silently corrects the installer's output.
+  - **SMTP submission was never enabled.** `master.cf` shipped with the `submission`
+    (587) and `smtps` (465) listeners commented out in every variant, while Docker
+    published both ports and the mailbox domain page advertised them over SRV. On a
+    mailbox or hybrid install no user could send mail from any client. Receiving and
+    webmail were unaffected, because Nextcloud Mail reaches Postfix on port 25 over
+    the Docker network, which is why the gap went unnoticed. Both listeners are now
+    enabled with Dovecot SASL and `reject_sender_login_mismatch`.
+  - The update orchestrator restarted only `hermes_commandbox`, so a release that
+    changed `master.cf` or `main.cf` without also rebuilding images would not have
+    applied it: Postfix reads both at startup, and Compose recreates a container when
+    its definition changes, not when a bind-mounted file's contents change. Phase 4
+    now restarts `hermes_postfix_dkim` as well.
   - Amavis quarantine subdirectories (`clean`, `virus`, `spam`, `banned`, `bad_header`)
     were never created, so Amavis could reject mail outright. The pre-Docker installer
     created all five and the Docker rewrite dropped the step, along with the ownership

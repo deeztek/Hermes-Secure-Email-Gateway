@@ -766,6 +766,23 @@ phase4_finalize() {
     log "Restarting hermes_commandbox (MVP: always)..."
     run docker compose restart hermes_commandbox
 
+    # Postfix reads master.cf and main.cf ONCE at startup. Both are tracked and
+    # bind-mounted, so phase 1's checkout can change them under a running
+    # container without Postfix noticing: `compose up -d` recreates a container
+    # when its DEFINITION changes (image, env, ports, volume list), not when the
+    # CONTENTS of a bind-mounted file change.
+    #
+    # That bit in v260807, which enabled the submission and smtps listeners in
+    # master.cf. It happened to apply anyway because every image was rebuilt that
+    # release, so all containers were recreated. A release that ships only a
+    # config change would have gone unapplied and looked fine (#292).
+    #
+    # Restarting unconditionally rather than diffing: Postfix restarts in about a
+    # second, the queue is on disk so nothing is lost, and a missed config change
+    # is far more expensive to diagnose than a second of downtime.
+    log "Restarting hermes_postfix_dkim (picks up master.cf / main.cf changes)..."
+    run docker compose restart hermes_postfix_dkim
+
     # Wait briefly for it to come back up.
     if ! (( DRY_RUN )); then
         local i

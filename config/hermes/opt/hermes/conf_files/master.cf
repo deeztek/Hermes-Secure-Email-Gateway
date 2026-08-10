@@ -45,16 +45,48 @@ amavis unix - - - - 2 smtp
 #        -o receive_override_options=no_unknown_recipient_checks,no_header_body_checks
 #        -o smtpd_bind_address=127.0.0.1
 
-#submission inet n       -       n       -       -       smtpd
-#  -o smtpd_tls_security_level=encrypt
-#  -o smtpd_sasl_auth_enable=yes
-#  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
-#  -o milter_macro_daemon_name=ORIGINATING
-#smtps     inet  n       -       n       -       -       smtpd
-#  -o smtpd_tls_wrappermode=yes
-#  -o smtpd_sasl_auth_enable=yes
-#  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
-#  -o milter_macro_daemon_name=ORIGINATING
+# Mail submission from user clients (Thunderbird, phones, Outlook). Required by
+# any mailbox or hybrid install: without these two listeners Postfix never binds
+# 587/465, so users can receive mail but cannot send from a client. Webmail still
+# works because Nextcloud Mail reaches port 25 over the Docker network, which is
+# why this stayed hidden (#292).
+#
+# SASL is answered by Dovecot at hermes_dovecot:9587 (also set globally in
+# main.cf; repeated here so each listener is explicit about its auth backend).
+#
+# smtpd_sender_login_maps + reject_sender_login_mismatch stop an authenticated
+# user sending as somebody else. The map is populated per mailbox at creation
+# (add_mailbox_action.cfm step 3b), per alias with send-as, and per shared
+# mailbox, so an ordinary mailbox owns its own address and nothing else.
+#
+# smtpd_reject_unlisted_recipient=no lets authenticated users send outbound to
+# recipients this server does not host.
+submission inet n       -       n       -       -       smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_sasl_type=dovecot
+  -o smtpd_sasl_path=inet:hermes_dovecot:9587
+  -o smtpd_reject_unlisted_recipient=no
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_sender_login_maps=mysql:/etc/postfix/mysql-sender-login-maps.cf
+  -o smtpd_sender_restrictions=reject_sender_login_mismatch
+  -o milter_macro_daemon_name=ORIGINATING
+
+# Implicit-TLS submission (465). Same policy as 587; the only difference is
+# wrappermode, which negotiates TLS before the SMTP greeting instead of via
+# STARTTLS.
+smtps     inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_sasl_type=dovecot
+  -o smtpd_sasl_path=inet:hermes_dovecot:9587
+  -o smtpd_reject_unlisted_recipient=no
+  -o smtpd_client_restrictions=permit_sasl_authenticated,reject
+  -o smtpd_sender_login_maps=mysql:/etc/postfix/mysql-sender-login-maps.cf
+  -o smtpd_sender_restrictions=reject_sender_login_mismatch
+  -o milter_macro_daemon_name=ORIGINATING
 #628       inet  n       -       n       -       -       qmqpd
 pickup    fifo  n       -       n       60      1       pickup
         -o content_filter=
