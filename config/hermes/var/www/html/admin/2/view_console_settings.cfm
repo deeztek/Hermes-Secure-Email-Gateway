@@ -80,11 +80,45 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ACTION HANDLERS --->
 <cfif action is "edit">
+
+  <!--- Captured before the handler overwrites it. get_console_settings.cfm ran
+       above, so this is the address the console is reachable at right now. --->
+  <cfset previousConsoleHost = Trim(console_host.value2)>
+
   <cfinclude template="./inc/edit_console_settings.cfm">
+
+  <!--- Re-read what actually landed in the database rather than trusting
+       form.console_host: one validation path (IPv6) accepts the input without
+       writing it, so the form value can differ from the stored value. --->
+  <cfinclude template="./inc/get_console_settings.cfm">
+  <cfset newConsoleHost = Trim(console_host.value2)>
+  <cfset consoleHostChanged = (newConsoleHost IS NOT previousConsoleHost)>
+
   <cfinclude template="./inc/restart_authelia.cfm">
   <cfinclude template="./inc/restart_ciphermail.cfm">
   <cfset session.m = 27>
-  <cflocation url="preload_restart_nginx.cfm?returnUrl=/admin/2/view_console_settings.cfm" addtoken="no">
+
+  <cfif consoleHostChanged>
+    <!--- The console has just changed identity. Authelia's session cookie is
+         scoped to a single domain, so it no longer has any configuration for
+         the address this browser is on, and every further request to /admin/2/
+         here will fail with "unable to determine user state". That is why the
+         Nginx restart cannot be deferred to preload_restart_nginx.cfm, which is
+         itself auth-protected: it would never load, Nginx would keep serving
+         the old portal URL, and the operator would be locked out with no way
+         back except restarting hermes_nginx from the Docker host.
+
+         So this fires the restart from this request, the last authenticated
+         one, and renders a holding page that waits out the restart before
+         moving the operator to the new address. It aborts, so nothing below
+         runs. --->
+    <cfinclude template="./inc/console_host_change_apply.cfm">
+  <cfelse>
+    <!--- Certificate, HSTS, OCSP and DH changes leave the address, and
+         therefore the session, intact, so the normal spinner-and-poll restart
+         path still applies. --->
+    <cflocation url="preload_restart_nginx.cfm?returnUrl=/admin/2/view_console_settings.cfm" addtoken="no">
+  </cfif>
 
 </cfif>
 
