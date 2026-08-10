@@ -109,13 +109,21 @@ BAYESAUTOLEARN-HAM
 # CERTIFIED and SAFE are ALLOWLISTS carrying large negative scores, intended for
 # the small set of senders who pay Validity to be certified.
 #
-# Validity refuses queries from unregistered resolvers and answers
-# 127.255.255.255. SpamAssassin matches that as a hit, so both allowlist rules
-# fire on EVERY message and hand it a 5 point discount. Every Hermes install
-# resolves through its own recursive Unbound instance, so the query always comes
-# from an unregistered IP: there is no configuration in which a stock install
-# would be registered. The effect is that policy thresholds behave 5 points
-# higher than configured, and spam that should be quarantined is delivered.
+# Validity serves 10,000 anonymous queries per rolling month per querying IP.
+# Past that it answers 127.255.255.255, meaning "blocked, no reputation data".
+# SpamAssassin matches that as a hit, so both allowlist rules fire on EVERY
+# message and hand it a 5 point discount. Policy thresholds then behave 5 points
+# higher than configured and spam that should be quarantined is delivered.
+#
+# This is NOT caused by our resolver choice. Hermes runs a local caching
+# non-forwarding Unbound, which is exactly what Validity recommends; forwarding
+# to a public resolver would be worse, since those are ACL'd outright. The
+# quota is simply low for a mail gateway: 10k a month is around 330 a day, and
+# one message can trigger several lookups across its trust path.
+#
+# The only real fix is registering the querying IP with Validity, which is a
+# per-operator commercial arrangement we cannot ship. So the safe default is to
+# stop trusting the answer.
 #
 # Zeroed rather than removed so the rules still evaluate and remain visible in
 # X-Spam-Status for diagnosis. An operator who registers with Validity can
