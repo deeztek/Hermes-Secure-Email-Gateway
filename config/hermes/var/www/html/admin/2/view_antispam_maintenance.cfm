@@ -204,6 +204,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- ======================== --->
+<!--- DCC AVAILABILITY PROBE --->
+<!--- ======================== --->
+<!--- DCC is deliberately absent from the published mail_filter image: its
+     licence is free only to organisations that do not sell filtering devices or
+     services except to their own users, and it forbids redistributing binaries
+     (#292). Operators who qualify rebuild with WITH_DCC=true.
+
+     Probe rather than hardcode a warning, so it disappears for anyone who has
+     rebuilt. `ls` is used instead of `which` or a `sh -c` test because cfexecute
+     is unreliable with quoting, pipes and redirects; this passes no shell
+     metacharacters at all. The probed path is the one local.cf's dcc_path
+     points at, so it answers the question that actually matters.
+     Any failure is treated as "not present", which is the safe default. --->
+<cfset dccAvailable = false>
+<cftry>
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_mail_filter ls /usr/local/bin/dccproc"
+        variable="dccProbeOut"
+        errorVariable="dccProbeErr"
+        timeout="30" />
+    <cfif FindNoCase("dccproc", dccProbeOut) GT 0>
+        <cfset dccAvailable = true>
+    </cfif>
+<cfcatch type="any">
+    <cfset dccAvailable = false>
+</cfcatch>
+</cftry>
+
+<!--- ======================== --->
 <!--- SETTINGS FORM --->
 <!--- ======================== --->
 <form method="post" autocomplete="off">
@@ -225,15 +254,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="use_dcc" id="use_dcc" value="1"
               <cfif get_use_dcc.value EQ "1">checked</cfif>>
-            <label class="form-check-label" for="use_dcc"><strong>DCC</strong> &mdash; Distributed Checksum Clearinghouse</label>
+            <label class="form-check-label" for="use_dcc"><strong>DCC</strong>: Distributed Checksum Clearinghouse</label>
           </div>
           <small class="text-muted ms-4">Detects bulk mail via distributed checksums</small>
+          <cfif NOT dccAvailable>
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+              <i class="fas fa-exclamation-triangle"></i>
+              <strong>Not installed.</strong> Enabling this has no effect until the mail
+              filter container is rebuilt with DCC included. DCC is not in the published
+              image because its licence is free only to organisations that do not sell
+              filtering devices or services except to their own users, and it does not
+              permit redistributing binaries. Most self-hosted operators qualify, and
+              <code>docker-compose.yml</code> carries a commented build block for exactly
+              this. See the
+              <a href="https://docs.deeztek.com/books/administrator-guide/page/antispam-settings" target="_blank" rel="noopener">Antispam Settings documentation</a>.
+            </div>
+          </cfif>
         </div>
         <div class="col-md-4 mb-3">
           <div class="form-check form-switch">
             <input class="form-check-input" type="checkbox" name="use_razor2" id="use_razor2" value="1"
               <cfif get_use_razor2.value EQ "1">checked</cfif>>
-            <label class="form-check-label" for="use_razor2"><strong>Razor2</strong> &mdash; Vipul's Razor v2</label>
+            <label class="form-check-label" for="use_razor2"><strong>Razor2</strong>: Vipul's Razor v2</label>
           </div>
           <small class="text-muted ms-4">Collaborative spam identification network</small>
         </div>
