@@ -104,6 +104,27 @@ BAYESAUTOLEARN-SPAM
 BAYESAUTOLEARN-HAM
 #override bayes default scores
 
+#validity reputation lists (#292)
+# SpamAssassin ships three rules querying Validity (formerly Return Path).
+# CERTIFIED and SAFE are ALLOWLISTS carrying large negative scores, intended for
+# the small set of senders who pay Validity to be certified.
+#
+# Validity refuses queries from unregistered resolvers and answers
+# 127.255.255.255. SpamAssassin matches that as a hit, so both allowlist rules
+# fire on EVERY message and hand it a 5 point discount. Every Hermes install
+# resolves through its own recursive Unbound instance, so the query always comes
+# from an unregistered IP: there is no configuration in which a stock install
+# would be registered. The effect is that policy thresholds behave 5 points
+# higher than configured, and spam that should be quarantined is delivered.
+#
+# Zeroed rather than removed so the rules still evaluate and remain visible in
+# X-Spam-Status for diagnosis. An operator who registers with Validity can
+# restore the scores through Score Overrides, which render into #CUSTOM-TESTS
+# below: SpamAssassin honours the last score directive, so those win.
+score RCVD_IN_VALIDITY_CERTIFIED 0
+score RCVD_IN_VALIDITY_SAFE 0
+score RCVD_IN_VALIDITY_RPBL 0
+
 #CUSTOM-TESTS
 
 

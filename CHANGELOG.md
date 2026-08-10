@@ -15,6 +15,15 @@ beside each release below is the **actual release date**.
   user on a clean install. Each has been present since the Docker edition shipped and
   is invisible on any gateway where an administrator saved the relevant settings page,
   because the application layer silently corrects the installer's output.
+  - **Every message received a 5 point spam-score discount.** SpamAssassin's
+    `RCVD_IN_VALIDITY_CERTIFIED` and `RCVD_IN_VALIDITY_SAFE` rules are allowlists
+    carrying `-3` and `-2`. Validity refuses queries from unregistered resolvers
+    and answers `127.255.255.255`, which SpamAssassin matches as a hit, so both
+    fired on every message. Hermes resolves through its own recursive Unbound
+    instance, so the query always originates from an unregistered address and no
+    stock install escaped it. Configured thresholds therefore behaved five points
+    higher than they read. All three Validity rules now score `0`; operators
+    registered with Validity can restore them through Score Overrides.
   - **SMTP submission was never enabled.** `master.cf` shipped with the `submission`
     (587) and `smtps` (465) listeners commented out in every variant, while Docker
     published both ports and the mailbox domain page advertised them over SRV. On a

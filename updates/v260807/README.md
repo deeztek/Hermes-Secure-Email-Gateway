@@ -29,6 +29,32 @@ state. Restoring a backup of it afterwards would reintroduce the foreign trainin
 permanently: the upgrade records the clearing as done, so nothing would ever remove
 it again.
 
+### Spam was getting a 5 point discount on every message
+
+SpamAssassin ships three rules querying Validity, the sender-reputation service
+formerly known as Return Path. Two of them are **allowlists** with large negative
+scores, meant for the small number of senders who pay Validity to be certified.
+
+Validity refuses queries from unregistered resolvers and answers
+`127.255.255.255`. SpamAssassin matches that as a hit, so both allowlist rules
+fire on **every** message and award it `-5`. Every Hermes install resolves through
+its own recursive Unbound instance, so the query always comes from an
+unregistered address and there is no configuration in which a stock install
+avoids this.
+
+The practical effect is that your configured thresholds have been behaving five
+points higher than they read. On the default policy, a message needed to score 7
+to be quarantined rather than 2.
+
+The three rules are now scored `0`. They still evaluate and still appear in
+`X-Spam-Status`, so nothing becomes harder to diagnose. If you are registered
+with Validity and want them back, set the scores through **Score Overrides**;
+those render after these defaults and SpamAssassin honours the last one.
+
+**Expect more mail to be caught after upgrading.** That is the intended
+correction, but if you had tuned thresholds around the old behaviour, review
+them.
+
 ### Mail clients could not send: SMTP submission was never enabled
 
 `master.cf` shipped with the `submission` (587) and `smtps` (465) listeners commented
