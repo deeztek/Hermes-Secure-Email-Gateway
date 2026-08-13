@@ -19,6 +19,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- GET NEXTCLOUD FILESYSTEM USAGE --->
 
+<!--- Default first. cfexecute only creates `variable` when the command
+     produces output, so an empty result leaves it undefined and the
+     dashboard dies with "variable [NEXTCLOUDUSAGE] doesn't exist" rather than
+     showing a zero ring. Every tier probe shares this shape. --->
+<cfset nextcloudusage = "0">
+
 <cftry>
 
   <cfexecute name="/opt/hermes/scripts/disk_space_usage_nextcloud.sh"
