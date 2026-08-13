@@ -94,7 +94,7 @@ whatever you actually chose is what you get.
 
 ### Collaborative spam checks are now opt-in
 
-Razor, Pyzor and DCC each transmit a digest of every scanned message to a third-party
+Razor and Pyzor each transmit a digest of every scanned message to a third-party
 network. That is a decision for the operator, so new installs now ship with them
 disabled.
 
@@ -103,18 +103,12 @@ they stay enabled. Two things are worth knowing:
 
 - **Razor has never been registered on any Hermes install**, so it has been returning
   no result whether or not it was switched on. Register it once under
-  **Content Checks > Antispam Maintenance > Initialize Razor**. Two separate faults
+  **Content Checks > Antispam Settings > Initialize Razor**. Two separate faults
   were in the way, and both are fixed: registration was writing to `/root/.razor`
   while SpamAssassin reads `/etc/razor`, and the files it writes there were owned by
   root while SpamAssassin runs as `amavis`. Razor writes its home directory at scan
   time, not just at registration, so ownership had to be corrected too. Registering
   now also removes the stale `/root/.razor` identity left behind by earlier attempts.
-- **DCC is no longer in the published image.** Its licence is free only to
-  organisations that do not sell filtering devices or services except to their own
-  users, and it does not permit redistributing binaries. Most self-hosted operators
-  qualify; we sell Hermes Pro and do not, so we cannot ship it on your behalf.
-  `docker-compose.yml` now carries a commented build block that rebuilds the mail
-  filter with DCC included, fetching it from Rhyolite directly.
 
 ### Nextcloud Mail was not provisioned when Nextcloud was enabled after the fact
 
@@ -175,7 +169,7 @@ The upgrade adds `=127.0.0.[2..11]` to all four, preserving whatever weight you 
 No list is removed and no weight changes.
 
 Related, and worth checking on your own gateway: the **Test** button under
-**System > RBL Configuration** used to report any `127.x` answer as healthy, including
+**Content Checks > RBL Configuration** used to report any `127.x` answer as healthy, including
 those refusal codes, and reported a list with a live SOA record as healthy even when it
 returned no data at all. It now distinguishes three outcomes: data returned, zone
 present but silent, and refused or wildcarded. If your lists come back yellow after
@@ -204,7 +198,7 @@ weight, SpamAssassin's `RCVD_IN_*` rules stay silent, and allowlists such as
 exists. Spam that should be quarantined gets delivered.
 
 The fix is to switch to recursive resolution under **System > DNS Resolver**, then
-re-test with **Test All** under **System > RBL Configuration**. Forward mode remains the
+re-test with **Test All** under **Content Checks > RBL Configuration**. Forward mode remains the
 install default because it works on networks that block outbound port 53, and recursive
 requires that port be open to the DNS root servers. New installs now run this same check
 automatically and report the result.
@@ -215,7 +209,7 @@ automatically and report the result.
 the querying IP is registered with Barracuda, so on a stock gateway it returned nothing
 while carrying a weight of 7, which is above the rejection threshold of 3 on its own.
 **Your existing entry is left alone**, on the same principle as your spam settings. If
-you have not registered, remove it under **System > RBL Configuration**. If you have,
+you have not registered, remove it under **Content Checks > RBL Configuration**. If you have,
 keep it.
 
 Fresh installs also stop shipping `dnsbl.sorbs.net`, `ix.dnsbl.manitu.net` and
@@ -294,7 +288,7 @@ sudo ./scripts/system_update_docker.sh
 
 Then, **once**, do this to finish applying the malware feed fix:
 
-1. Open **System > Malware Feeds**.
+1. Open **Content Checks > Malware Feeds**.
 2. Save the page without changing anything.
 
 The size limit lands in the database during the upgrade, but the fangfrisch configuration file
@@ -309,7 +303,7 @@ You want `INFO: ... updated`, not `ERROR: ... size exceeds defined limit`.
 
 Then, **once**, do this to finish applying the block list fix:
 
-1. Open **System > RBL Configuration**.
+1. Open **Content Checks > RBL Configuration**.
 2. Click the blue **Edit** (pencil) button on any entry.
 3. Save it without changing anything.
 
@@ -400,8 +394,6 @@ installer and were dropped during the Docker rewrite.
   system app password instead of the account's login password, which Dovecot could
   never have accepted. Provisioning failures are now reported instead of discarded, and
   saving a mailbox again is a valid repair.
-- `Docker/mail_filter`: DCC moved behind a build argument and removed from the
-  published image.
 - Documentation: getting started and antispam settings pages rewritten around what a
   fresh install actually looks like.
 

@@ -31,7 +31,7 @@ You don't need to redo any of this; `install_hermes_docker.sh` handled it during
 | Console settings | `parameters2.console.host` set to the **host IP**, not your FQDN. See the note below |
 | Postfix identity | `myhostname` / `myorigin` set from the install-time mail-hostname prompt |
 | Authelia | LDAP backend wired up; 2FA enrollment available on first login |
-| Mail filtering | Amavis, SpamAssassin and ClamAV running. Network checks and Bayes still need setup. See [Antispam Maintenance](#antispam-maintenance-pyzor--razor--bayes-all-topologies) |
+| Mail filtering | Amavis, SpamAssassin and ClamAV running. Network checks and Bayes still need setup. See [Antispam Settings](#antispam-settings-pyzor--razor--bayes-all-topologies) |
 
 > **Why the console address is an IP.** At install time there is usually no DNS record yet for the FQDN you intend to use, so the installer deliberately points the console, Nginx, Authelia and Nextcloud at the host IP. That way you can log in immediately. Once DNS resolves, save **System → Console Settings** with your FQDN and Hermes re-renders the whole web stack. Do this before handing the console to anyone else.
 
@@ -231,14 +231,14 @@ For mailbox-hosting domains, see the in-app "Choosing the Right Certificate Type
 > **Dashboard nudge**: blue informational callout `Self-signed cert` fires when the only row in `system_certificates` is the install-generated bootstrap (no real cert has been imported yet). Mail flows on the bootstrap certificate and clients get a TLS warning, but on mail server and hybrid installs the consequence is larger than a warning: **Nextcloud login does not work at all** until a real certificate covering the console FQDN is in place. See [Step 2](#step-2-console-fqdn-and-a-real-certificate).
 
 ### DKIM Signing *(all topologies)*
-**Page**: Content Checks → DKIM
+**Page**: Content Checks → DKIM Settings
 
 **A fresh install has no DKIM keys, and that is expected.** Keys are per-domain, so they cannot exist before your domains do. Until you generate one, `KeyTable`, `SigningTable` and the `dkim_sign` table are all empty and `/opt/hermes/dkim/keys` holds nothing. OpenDKIM is running correctly the whole time; it simply has nothing to sign with.
 
 The order matters:
 
 1. **Add the domain first**: Email Relay → Domains, or Email Server → Domains
-2. **Generate the key**: Content Checks → DKIM, select the domain, choose a selector and key size
+2. **Generate the key**: Content Checks → DKIM Settings, select the domain, choose a selector and key size
 3. **Publish the TXT record** the page gives you at your DNS provider
 4. **Verify**: the page re-checks the published record and reports a match
 
@@ -253,7 +253,7 @@ Beyond the gateway itself, DNS is what makes mail actually arrive. The install s
 | `A` for the mail hostname | Hermes public IP | Resolves the MX target |
 | Reverse DNS (PTR) for the IP | The mail hostname | Outbound deliverability; most receivers reject mismatched PTR |
 | `SPF` for each sending domain | Includes Hermes IP | Authenticates outbound; reduces spam-folder rate |
-| `DKIM` selector → public key | Generated under Content Checks → DKIM | Cryptographic signing of outbound |
+| `DKIM` selector → public key | Generated under Content Checks → DKIM Settings | Cryptographic signing of outbound |
 | `DMARC` policy | TXT at `_dmarc.example.com` | Defines what receivers do with SPF/DKIM failures |
 
 ### Review the Admin Account Email *(all topologies)*
@@ -261,8 +261,8 @@ Beyond the gateway itself, DNS is what makes mail actually arrive. The install s
 
 The install created the admin account with a generated email of the form `<admin-username>@<your-mail-domain>` (e.g. `apologise4567@example.com`). That address is where Hermes sends **admin notifications and password-reset mail**, so unless it maps to a real, monitored mailbox, change it to one that does.
 
-### Antispam Maintenance (Pyzor / Razor / Bayes) *(all topologies)*
-**Pages**: Content Checks → **Antispam Settings** (the on/off switches) and **Antispam Maintenance** (the one-time actions)
+### Antispam Settings (Pyzor / Razor / Bayes) *(all topologies)*
+**Page**: Content Checks → **Antispam Settings** (both the on/off switches and the one-time actions)
 
 Spam filtering works out of the box from SpamAssassin's rule set, RBLs, ClamAV and the malware feeds. Three optional components need a deliberate decision from you.
 
@@ -278,7 +278,7 @@ Once enabled:
 | Check | What it needs |
 | --- | --- |
 | **Pyzor** | Nothing. It works as soon as it's enabled (outbound internet required). |
-| **Razor** | A one-time registration via **Antispam Maintenance → Initialize Razor**. Until this runs, Razor returns no result. |
+| **Razor** | A one-time registration via **Content Checks → Antispam Settings → Initialize Razor**. Until this runs, Razor returns no result. |
 | **DCC** | Not included in the published image for licensing reasons. See [Antispam Settings](../admin/04-content-checks/antispam-settings.md) if you want to add it. |
 
 #### Bayes
@@ -314,7 +314,7 @@ A fresh install leaves several things deliberately empty. If you go looking unde
 | **No DKIM keys.** `KeyTable`, `SigningTable` and `dkim_sign` are empty; `/opt/hermes/dkim/keys` holds nothing | Keys are per-domain and can't precede your domains | [Generate them](#dkim-signing-all-topologies) after adding a domain |
 | **MariaDB root has no password.** `docker exec hermes_db_server mariadb -u root` connects with no credentials | `root@localhost` uses the **`unix_socket`** plugin, so it only trusts a process already running as root inside the container. The password in `INSTALL_SUMMARY.txt` belongs to `root@'%'`, the remote entry, and port 3306 is not published to the host | Nothing. This is the intended design |
 | **The `migrations` table is empty** | It records one-time upgrade migrations. A fresh install has never upgraded, so there is nothing to record | Nothing |
-| **Bayes reports no data / no effect on scores** | It ships empty and stays inert until ~200 spam + 200 ham are learned | [Train it](#antispam-maintenance-pyzor--razor--bayes-all-topologies) |
+| **Bayes reports no data / no effect on scores** | It ships empty and stays inert until ~200 spam + 200 ham are learned | [Train it](#antispam-settings-pyzor--razor--bayes-all-topologies) |
 | **`ecprivkey.pem` and `ecpubkey.pem` are empty files** | Mailbox encryption is off by default. The placeholder files exist only so Docker doesn't create directories in their place | Enable it under Email Server → Settings, which generates the real keypair. **Back the keys up**: losing them makes encrypted mail permanently unreadable |
 
 ### Nextcloud login needs the console FQDN and a real certificate first
@@ -357,7 +357,7 @@ Each banner links directly to the page where you'd fix the underlying condition 
 1. **Inbound test**: send a message from an external account to a recipient on one of your domains. Check Reports → Mail Log to confirm it reached Hermes and was handed off (relay) or delivered to the mailbox (mail server).
 2. **Outbound test** *(relay / hybrid)*: send a message from your customer MTA (the one whose IP you added to Relay Networks) to an external recipient. Confirm DKIM/SPF pass on the receiver side.
 3. **Webmail test** *(mail server / hybrid)*: log in to `https://<console-host>/nc/` as one of your new mailbox users (Authelia SSO) and confirm send/receive. If this fails with "Could not reach the OpenID Connect provider", [Step 2](#step-2-console-fqdn-and-a-real-certificate) is incomplete: the console is still on an IP, or the certificate does not cover the name in use.
-4. Visit **System → Dashboard** and confirm both setup nudges are gone (placeholder hostname + self-signed cert).
+4. Open the **Admin Console** home page and confirm both setup nudges are gone (placeholder hostname + self-signed cert).
 5. If you set up Pro features, verify `session.edition` reads "Pro" in the top-right corner of any admin page.
 
 You're done. Welcome to Hermes SEG.
