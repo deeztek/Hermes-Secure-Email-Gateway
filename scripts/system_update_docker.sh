@@ -563,8 +563,17 @@ phase1_pull_code() {
     fi
 
     cd "$HERMES_ROOT"
-    log "git fetch --tags ${REMOTE}..."
-    run git fetch --tags --quiet "$REMOTE"
+    # --force is REQUIRED, not defensive. Without it `git fetch --tags` refuses
+    # to update a tag that already exists locally and aborts the whole fetch
+    # with "would clobber existing tag", which kills the upgrade in Phase 1.
+    # Moving a tag is normal in exactly the workflow this script supports:
+    # --remote=gitlab re-points a release candidate tag at a new commit while
+    # it is being tested, so any box that fetched the earlier one can never
+    # fetch the later one. It also bites a release that is re-tagged after a
+    # late fix. The tag is a pointer to the release we were asked to install,
+    # so taking the remote's version is the correct behaviour.
+    log "git fetch --tags --force ${REMOTE}..."
+    run git fetch --tags --force --quiet "$REMOTE"
 
     # Verify the target tag actually exists locally after fetch.
     if (( ! DRY_RUN )); then
