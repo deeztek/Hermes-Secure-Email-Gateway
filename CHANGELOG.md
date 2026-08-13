@@ -11,6 +11,58 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **OpenDMARC rejected a domain's own authenticated users** (#300). `submission` and `smtps`
+  did not override `smtpd_milters`, so they inherited the global chain including OpenDMARC,
+  which then evaluated authenticated outbound mail as though it were inbound. That fails by
+  construction: the client address is never in the sending domain's SPF record, and the
+  OpenDKIM instance on that path signs rather than verifies, so there is no DKIM result to
+  consume either. With the shipped `RejectFailures true`, a domain publishing `p=reject` had
+  its own users rejected at DATA with `550 5.7.1 rejected by DMARC policy`. Both listeners now
+  carry an explicit chain that keeps OpenDKIM and body_milter and drops OpenDMARC, using the
+  same per-service override pattern `:10026` and `:10027` already use. Port 25 is unchanged,
+  which is where DMARC belongs. Invisible before this release only because submission itself
+  was never bound (#292).
+- **The URLhaus malware feed silently stopped updating** (#302). `malware_feeds_config` seeded
+  `urlhaus` with `max_size = 2MB` and the feed has grown past 3MB, so fangfrisch refused the
+  download on every run while still exiting 0. Ofelia recorded the job as successful and
+  nothing surfaced, so the ClamAV third-party URLhaus signatures were never refreshed. Raised
+  to 10MB in the baseline, the shipped configuration and an idempotent upgrade statement
+  guarded on the old value, so a tuned setting is preserved.
+- **Ofelia could never deliver its failure notifications** (#303). `hermes_ofelia` was the only
+  service with no `networks:` block, so Compose attached it to an auto-created default bridge
+  outside the Docker subnet. Its `[global] smtp-host` could not resolve `hermes_postfix_dkim`,
+  `:10026` would have rejected it on `mynetworks` regardless, and its configured resolver was
+  unreachable. Jobs ran correctly because they dispatch over the docker socket, so the only
+  broken path was alerting, which `mail-only-on-error` means is exercised only when something
+  has already gone wrong. Given a static address on `hermes_net_ext`.
+- **Adding a Local DNS Record took DNS down for the whole gateway** (#304).
+  `generate_unbound_local_conf.cfm` emitted bare `local-zone:` and `local-data:` lines, but
+  `unbound.conf` includes `forward.conf` first, and when forwarding is enabled (the default
+  install mode) its `forward-zone:` clause closes the `server:` clause. The generated entries
+  then landed inside `forward-zone:`, where neither is valid, and unbound refused to start and
+  crash-looped. Every container resolves through it, and the console needs DNS, so the admin UI
+  could not undo it. The file now declares its own `server:` clause. Two further defects on the
+  same page: the DNS lookup tool rejected underscore labels, excluding `_dmarc`,
+  `_domainkey` and the `_submission._tcp` SRV records this product instructs admins to publish;
+  and the generator could not express any TXT value containing a space or semicolon, so SPF,
+  DKIM and DMARC records were silently truncated at the first semicolon. Hostname and value are
+  now stripped of CR/LF before rendering, since both are admin-supplied and land in a config
+  file.
+- **CipherMail and OpenLDAP ran on UTC and stamped it into mail** (#305). Both images are built
+  `FROM ubuntu:24.04` with `--no-install-recommends`, which never pulls `tzdata`. Without a zone
+  database, glibc cannot resolve `TZ=America/New_York` as a zone path, falls back to parsing it
+  as a POSIX string, takes `America` as the abbreviation and defaults the offset to zero. The
+  result was UTC labelled `America`, four hours from every other container, written into the
+  `Received:` header of every message CipherMail handled and into the slapd events that reach
+  the Syslog database. `tzdata` is now installed explicitly in both, and `hermes_ldap`, which
+  had no `TZ` at all, now receives one.
+- **Amavis trusted a private range that was not the Docker subnet** (#297). The shipped
+  `mynetworks` file was a stale snapshot carrying a development LAN, so a fresh install granted
+  originating treatment to an unrelated `192.168.50.0/24` until an administrator saved a Postfix
+  settings page and the file was re-rendered from the database. It now matches the seeded rows.
+- **Four administrative pages rendered a raw error instead of the error page.** `create_new.cfm`,
+  `deletedomain.cfm`, `edit_smtp_tls_settings.cfm` and `send_smime_certificate.cfm` included
+  `./inc/error.cfm` from inside `inc/`, resolving to `inc/inc/error.cfm`, which does not exist.
 - **`system_rehost.sh` pointed the rehosted console at an IP instead of its hostname**
   (#295).
   `CONSOLE_HOST` defaulted to the new IP when `--to-console` was not given, even though
@@ -173,6 +225,19 @@ beside each release below is the **actual release date**.
 
 ### Changed
 
+- **`system_update_docker.sh --remote` now selects code, images and tag from one source**
+  (#298). Previously it chose only where the code came from, while images resolved from
+  `IMAGE_REGISTRY` and `HERMES_DOCKER_IMG_VERSION` in `.env`, which the orchestrator never read
+  or wrote. The upgrade path could therefore never advance the image version, so image-level
+  fixes could not reach an existing install, and testing a release candidate meant hand-editing
+  `.env` first. The remote now maps to a registry and the resolved tag is written before
+  `docker compose pull`, guarded by a `docker manifest inspect` probe so the per-release tag is
+  pinned only when the registry actually has it. An upgrade that works today cannot start
+  failing, and the production path begins pinning automatically once per-release tags exist
+  (#289). `--image-registry=` and `--image-tag=` override the mapping; `.env` is backed up
+  before either key changes, and `--skip-compose` leaves it untouched.
+
+
 - **Collaborative spam checks now ship disabled** (#292). Razor, Pyzor and DCC each
   transmit a digest of every scanned message to a third-party network, so new installs
   leave that decision to the operator. Existing installs keep their current settings.
@@ -191,6 +256,26 @@ beside each release below is the **actual release date**.
   **Auto-managed (Let's Encrypt)** SAN certificate mode — automated issuance, SAN
   validation, and auto-renewal — are no longer restricted to Pro Edition. Existing Pro
   installations are unaffected.
+
+### Documentation
+
+- **The console FQDN and a real certificate are now documented as a hard prerequisite** (#299).
+  Nextcloud login cannot work on a fresh install, because OIDC requires the Nextcloud container
+  to make a server-side HTTPS call back to the console address, and the bootstrap certificate is
+  self-signed with the common name `localhost`. Importing it into the container's trust store
+  does not help, since trust and name are separate checks. Get Started gains a Step 2 covering
+  both parts, and the mail-client half: **the Console Certificate and the SMTP TLS certificate
+  are separate bindings**, and setting only the first leaves the console perfect in a browser
+  while every mail client is offered `CN=localhost`, because `autoconfig` hands clients the
+  console host as their SMTP server. The `Self-signed cert` dashboard nudge previously described
+  this as producing only a client TLS warning, which understated it.
+- **The CipherMail console's stock `admin` / `admin` credentials are now stated explicitly**
+  (#306), rather than referred to obliquely as "its default administrator password".
+- **`master.cf` has exactly one copy in the repository.** A duplicate under
+  `conf_files/` drifted for three months onto the pre-#232 configuration that caused the
+  `:10026` outage, because commit `9e90bc9a` fixed the real file and not the copy, and nothing
+  read the copy so nothing detected it. Both it and an equally stale `master.cf.postscreen` are
+  removed, and `docs/general/email-flow.md` records why a second copy must not be reintroduced.
 
 ## [v260612] — 2026-06-20
 

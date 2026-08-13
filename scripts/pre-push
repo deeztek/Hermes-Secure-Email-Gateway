@@ -1,36 +1,99 @@
 #!/bin/bash
-# Hermes SEG Pre-push Hook
-# This hook runs a full gitleaks scan before pushing
+# Hermes SEG pre-push hook
+#
+# Scans the commits actually being pushed for secrets, and nothing else.
+#
+# History: this hook was committed non-executable, so it never ran, and it
+# called `gitleaks detect --source=<repo root>`, which scans the ENTIRE git
+# history rather than the push. On this repository that returns ~987 findings,
+# almost all of them in untracked or gitignored files, plus a stable set of
+# known false positives in tracked files (PEM header literals inside Replace()
+# calls, manifest.json fingerprints, the environment variable NAME
+# MYSQL_PASSWORD). Enabling it as written would have blocked every push
+# forever, so the only usable outcome was --no-verify, which defeats the
+# point. Scoping it to the push range fixes that: history is already pushed,
+# and staged content is covered by the pre-commit hook's gitleaks layer.
+#
+# Activate with:  git config core.hooksPath scripts
+#
+# See .claude/rules/commit.md. GitHub is public and a leaked secret on a
+# release or tag cannot be recalled.
 
-set -e
+set -uo pipefail
 
-echo "Running full secret detection scan before push..."
+ZERO_SHA="0000000000000000000000000000000000000000"
 
-# Check if gitleaks is installed
-if ! command -v gitleaks &> /dev/null; then
-    echo "ERROR: gitleaks is not installed."
-    echo "Push aborted. Install gitleaks first."
+if ! command -v gitleaks >/dev/null 2>&1; then
+    echo "ERROR: gitleaks is not installed, so the push cannot be scanned."
+    echo "Install it rather than bypassing this hook:"
+    echo "  https://github.com/gitleaks/gitleaks"
     exit 1
 fi
 
-# Get the repo root directory
-REPO_ROOT=$(git rev-parse --show-toplevel)
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CONFIG="${REPO_ROOT}/.gitleaks.toml"
 
-# Run gitleaks on the entire repo
-if gitleaks detect --source="$REPO_ROOT" --config="$REPO_ROOT/.gitleaks.toml" --verbose; then
-    echo "No secrets detected. Proceeding with push."
+# git feeds the hook one line per ref:  <local ref> <local sha> <remote ref> <remote sha>
+ranges=()
+while read -r _local_ref local_sha _remote_ref remote_sha; do
+    # Blank or malformed line (git sends none, but be defensive: an empty
+    # local_sha would otherwise build the range ".." and gitleaks would error).
+    [[ -z "${local_sha:-}" || -z "${remote_sha:-}" ]] && continue
+
+    # Branch or tag deletion: nothing to scan.
+    [[ "$local_sha" == "$ZERO_SHA" ]] && continue
+
+    if [[ "$remote_sha" == "$ZERO_SHA" ]]; then
+        # New ref on the remote. Scan what it introduces that no other remote
+        # already has, so a new branch off main does not re-scan all of main.
+        ranges+=("${local_sha} --not --remotes")
+    else
+        ranges+=("${remote_sha}..${local_sha}")
+    fi
+done
+
+if [[ ${#ranges[@]} -eq 0 ]]; then
+    echo "pre-push: nothing to scan."
     exit 0
-else
-    echo ""
-    echo "=============================================="
-    echo "  SECRETS DETECTED - PUSH BLOCKED"
-    echo "=============================================="
-    echo ""
-    echo "The scan found potential secrets in your repository."
-    echo "Review the findings and remove secrets before pushing."
-    echo ""
-    echo "To bypass (NOT RECOMMENDED):"
-    echo "  git push --no-verify"
-    echo ""
+fi
+
+echo "pre-push: scanning ${#ranges[@]} ref(s) for secrets..."
+
+failed=0
+for range in "${ranges[@]}"; do
+    echo "  range: ${range}"
+    # shellcheck disable=SC2086 -- range is intentionally word-split into log args
+    if ! gitleaks detect \
+            --source="$REPO_ROOT" \
+            --config="$CONFIG" \
+            --log-opts="$range" \
+            --redact \
+            --no-banner \
+            --verbose; then
+        failed=1
+    fi
+done
+
+if [[ $failed -ne 0 ]]; then
+    cat <<'MSG'
+
+==============================================
+  SECRETS DETECTED IN THE COMMITS BEING PUSHED
+==============================================
+
+Findings above are in commits this push would publish, not in old history.
+Remove or allowlist them before pushing.
+
+If a finding is genuinely a false positive, add it to .gitleaks.toml rather
+than bypassing this hook. Note that gitleaks never scans .gitleaks.toml
+itself, so the pre-commit hook guards that file separately.
+
+Bypassing with --no-verify needs a written, justified reason. GitHub is
+public and a secret published on a release or tag cannot be recalled.
+
+MSG
     exit 1
 fi
+
+echo "pre-push: no secrets detected in the pushed commits."
+exit 0

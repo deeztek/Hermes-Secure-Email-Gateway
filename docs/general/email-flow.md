@@ -355,6 +355,35 @@ signs nor adds Authentication-Results.
 
 ---
 
+## Where master.cf lives
+
+**There is exactly one `master.cf`, at `config/postfix-dkim/etc/postfix/master.cf`.**
+
+`docker-compose.yml` bind-mounts `./config/postfix-dkim/etc/postfix` onto `/etc/postfix`,
+so that file *is* what Postfix reads. It is not a template and it is not generated: it has
+no placeholders, no CFML page writes it, and `install_hermes_docker.sh` states plainly that
+it is "tracked directly at the render-target path ... nothing to render here". To change it,
+edit it and restart `hermes_postfix_dkim`.
+
+**Do not add a second copy.** A duplicate lived at
+`config/hermes/opt/hermes/conf_files/master.cf` from the v260612 root commit until it was
+deleted on 2026-08-12. Nothing read it, so nothing detected when it drifted, and it drifted
+badly: commit `9e90bc9a` restored the #232 `:10026` signing design in the real file and did
+not touch the copy, leaving it frozen for three months on the pre-#232 configuration that
+caused the outage documented above (`:10026` bound to `127.0.0.1`, `no_milters`,
+`mynetworks=127.0.0.0/8`, primary OpenDKIM instead of the sign-only secondary, and no
+`:10027` at all). A `master.cf.postscreen` variant carried the same defects and was
+referenced by nothing.
+
+The hazard was not that anything loaded it automatically. It was that the path looked
+canonical inside the three containers that mount `/opt/hermes`, so hand-copying it into
+place would silently reinstate a fixed outage.
+
+If a variant is ever genuinely needed, keep it out of a directory that is mounted into
+running containers, and give it a name that cannot be mistaken for the live file.
+
+---
+
 ## Open follow-ups that touch this flow
 
 - **#228** External Sender Banner re-enable — blocked on this diagram's
@@ -366,7 +395,7 @@ signs nor adds Authentication-Results.
 - **Dead-weight config-file audit** — `Docker/postfix_dkim/config/`,
   `Docker/mail_filter/config/`, `Docker/opendmarc/config/` are shadowed by
   volume mounts at runtime; ~85 files to consolidate or relocate.
-- **Install-template drift** — `config/hermes/opt/hermes/conf_files/master.cf`
-  still has the pre-#232 `no_milters` token on `:10026` and
-  `smtpd_milters=:8891` for `:10026`. Fresh installs would regress until
-  this template is brought into line with the active runtime config.
+- ~~**Install-template drift**~~ — **resolved 2026-08-12.** There is now exactly
+  one `master.cf` in the repository. See
+  [Where master.cf lives](#where-mastercf-lives) above for why a second copy
+  must never be reintroduced.

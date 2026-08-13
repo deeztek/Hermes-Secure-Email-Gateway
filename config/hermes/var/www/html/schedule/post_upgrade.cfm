@@ -133,18 +133,55 @@ every existing install without requiring anyone to notice.
 <cfset repairsRun = []>
 <cfset repairErrors = []>
 
+<!--- Each repair runs in its own thread, and this is not decoration.
+
+     Every generator these include ends its error paths with
+     <cfinclude template="error.cfm"><cfabort>. cfabort is NOT catchable by
+     cftry, so with a plain include a single failing generator would end the
+     whole request: the remaining repairs and BOTH one-time migrations below
+     would never run. Phase 5 of the orchestrator treats this hook as
+     non-fatal, so the upgrade would report success while silently skipping
+     most of its own repair work. That matters more now that this page is the
+     mechanism by which existing installs receive fixes at all.
+
+     cfabort inside a thread ends only that thread, so an aborting generator
+     costs its own repair and nothing else. thread.ok is set as the LAST
+     statement in the thread body and its absence is what detects an abort;
+     that is more reliable than interpreting thread.status, which differs
+     between an abort and a genuine failure.
+
+     The join timeout is generous because generate_postfix_configuration.cfm
+     shells out to docker for postconf and a postfix reload. A thread that
+     overruns it is reported rather than silently dropped. --->
 <cfloop array="#[
         {'name' = 'spamassassin-local-cf',  'tpl' = '../admin/2/inc/update_spamassassin_config_files.cfm'},
         {'name' = 'dovecot-conf',           'tpl' = '../admin/2/inc/generate_dovecot_configuration.cfm'},
-        {'name' = 'nextcloud-trusted-hosts','tpl' = '../admin/2/inc/generate_nextcloud_configuration.cfm'}
+        {'name' = 'nextcloud-trusted-hosts','tpl' = '../admin/2/inc/generate_nextcloud_configuration.cfm'},
+        {'name' = 'postfix-config',         'tpl' = '../admin/2/inc/generate_postfix_configuration.cfm'}
     ]#" index="repair">
-    <cftry>
-        <cfinclude template="#repair.tpl#">
+
+    <cfset repairThread = "repair_" & Replace(CreateUUID(), "-", "", "ALL")>
+    <cfthread action="run" name="#repairThread#" tpl="#repair.tpl#">
+        <cftry>
+            <cfinclude template="#attributes.tpl#">
+            <cfset thread.ok = true>
+        <cfcatch type="any">
+            <cfset thread.err = cfcatch.message>
+        </cfcatch>
+        </cftry>
+    </cfthread>
+    <cfthread action="join" name="#repairThread#" timeout="300000">
+
+    <cfset repairOutcome = cfthread[repairThread]>
+    <cfif StructKeyExists(repairOutcome, "ok")>
         <cfset arrayAppend(repairsRun, repair.name)>
-    <cfcatch type="any">
-        <cfset arrayAppend(repairErrors, repair.name & ": " & cfcatch.message)>
-    </cfcatch>
-    </cftry>
+    <cfelseif StructKeyExists(repairOutcome, "err")>
+        <cfset arrayAppend(repairErrors, repair.name & ": " & repairOutcome.err)>
+    <cfelse>
+        <cfset arrayAppend(repairErrors, repair.name
+            & ": aborted or timed out before completing (thread status "
+            & repairOutcome.status & "). The other repairs were unaffected.")>
+    </cfif>
 </cfloop>
 
 <!--- Amavis quarantine subdirectories and service data ownership. The
@@ -166,6 +203,53 @@ every existing install without requiring anyone to notice.
     <cfset arrayAppend(repairsRun, "amavis-quarantine-dirs-and-ownership")>
 <cfcatch type="any">
     <cfset arrayAppend(repairErrors, "amavis-quarantine-dirs-and-ownership: " & cfcatch.message)>
+</cfcatch>
+</cftry>
+
+<!--- Postfix hash: lookup tables. A hash: map with no compiled .db is a lookup
+     ERROR, not a miss, and smtpd_sender_restrictions uses check_sender_access
+     against one of them, so Postfix answers
+
+       451 4.3.5 <sender>: Sender address rejected: Server configuration error
+
+     to EVERY inbound message. The installer only touched empty source stubs and
+     left the .db to be built "on the admin's first save through the UI", so any
+     box whose admin never saved the Global Senders page has been rejecting all
+     mail. The container entrypoint does not postmap either, so restarting does
+     not help.
+
+     Discovered from the LIVE config rather than hardcoded: the rendered map set
+     varies by topology, relay_domains is a bare list rather than a hash: map,
+     and aliases is sendmail-format so it needs postalias. Same idiom as the
+     migration path, which fixed this for restores in 73d7c700.
+
+     Empty source produces an empty .db, which matches nothing and is the
+     correct default, so this is safe to repeat. --->
+<cftry>
+    <!--- Self-contained unique name: this page does not include
+         generate_customtrans.cfm and should not gain a dependency on it. --->
+    <cfset pfMapScript = "/opt/hermes/tmp/pu_" & Replace(CreateUUID(), "-", "", "ALL") & "_postfix_maps.sh">
+    <cfset pfMapBody = "##!/bin/bash" & chr(10)
+        & "set -u" & chr(10)
+        & "maps=$(cat /etc/postfix/main.cf /etc/postfix/master.cf 2>/dev/null \" & chr(10)
+        & "  | grep -oE 'hash:/etc/postfix/[a-zA-Z0-9_]+' \" & chr(10)
+        & "  | sed 's##hash:/etc/postfix/####' | sort -u)" & chr(10)
+        & "for m in $maps; do" & chr(10)
+        & "  tool=postmap; [ ""$m"" = aliases ] && tool=postalias" & chr(10)
+        & "  touch ""/etc/postfix/$m"" && /usr/sbin/$tool ""/etc/postfix/$m""" & chr(10)
+        & "done" & chr(10)
+        & "/usr/sbin/postfix reload" & chr(10)
+        & "echo ""maps: $maps""" & chr(10)>
+    <cffile action="write" file="#pfMapScript#" output="#pfMapBody#" addnewline="no">
+    <cfexecute name="/usr/bin/dos2unix" arguments="#pfMapScript#" timeout="10" />
+    <cfexecute name="/bin/chmod" arguments="+x #pfMapScript#" timeout="10" />
+    <cfexecute name="/usr/local/bin/docker"
+        arguments="exec hermes_postfix_dkim /bin/bash #pfMapScript#"
+        variable="pfMapOut" errorVariable="pfMapErr" timeout="120" />
+    <cffile action="delete" file="#pfMapScript#">
+    <cfset arrayAppend(repairsRun, "postfix-lookup-table-db")>
+<cfcatch type="any">
+    <cfset arrayAppend(repairErrors, "postfix-lookup-table-db: " & cfcatch.message)>
 </cfcatch>
 </cftry>
 
@@ -242,6 +326,8 @@ legitimate state it accumulated later.
              cannot be a join. --->
         <cfset ncRepaired = 0>
         <cfset ncSkippedExisting = 0>
+        <cfset ncFailed = 0>
+        <cfset ncFailures = []>
         <cfloop query="ncEnabledMailboxes">
             <cfset ncHasProfile = false>
             <cftry>
@@ -261,23 +347,84 @@ legitimate state it accumulated later.
             <cfif ncHasProfile>
                 <cfset ncSkippedExisting = ncSkippedExisting + 1>
             <cfelse>
-                <cfset mintAppPwUser = ncEnabledMailboxes.username>
-                <cfinclude template="../admin/2/inc/mint_system_app_password.cfm">
-                <cfif mintedAppPasswordPlain NEQ "">
-                    <cfset ncMailAction   = "create">
-                    <cfset ncMailUser     = ncEnabledMailboxes.username>
-                    <cfset ncMailName     = Len(Trim(ncEnabledMailboxes.name)) ? ncEnabledMailboxes.name : ncEnabledMailboxes.username>
-                    <cfset ncMailEmail    = ncEnabledMailboxes.username>
-                    <cfset ncMailPassword = mintedAppPasswordPlain>
-                    <cfinclude template="../admin/2/inc/nextcloud_mail_account.cfm">
-                    <cfset ncRepaired = ncRepaired + 1>
+                <!--- The Nextcloud USER must exist before a Mail account can
+                     attach to it; `occ mail:account:create` otherwise reports
+                     "User <x> does not exist" on STDOUT with a zero exit. A
+                     mailbox switched to Nextcloud AFTER creation never had one
+                     provisioned, because nextcloud_provision_user.cfm was only
+                     wired into add_mailbox_action.cfm -- which is exactly the
+                     population this migration targets. Provision it first,
+                     mirroring the add path. The include is idempotent and skips
+                     when the user already exists.
+
+                     The password is random and deliberately not the user's own:
+                     `occ user:add` creates a live DAV Basic Auth credential, so
+                     reusing the login password would let clients authenticate
+                     with it. OIDC takes over the account on first login. --->
+                <cfset ncProvisionAction      = "create">
+                <cfset ncProvisionUser        = ncEnabledMailboxes.username>
+                <cfset ncProvisionDisplayName = Len(Trim(ncEnabledMailboxes.name)) ? ncEnabledMailboxes.name : ncEnabledMailboxes.username>
+                <cfset ncProvisionEmail       = ncEnabledMailboxes.username>
+                <cfset ncProvisionAuthType    = "local">
+                <cfset ncProvisionPassword    = "">
+                <cfset _ncPwAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789">
+                <cfloop from="1" to="30" index="_ncPwIdx">
+                    <cfset ncProvisionPassword &= Mid(_ncPwAlphabet, RandRange(1, Len(_ncPwAlphabet), "SHA1PRNG"), 1)>
+                </cfloop>
+                <cfset ncProvisionResult = "">
+                <cfset ncProvisionError  = "">
+                <cfinclude template="../admin/2/inc/nextcloud_provision_user.cfm">
+
+                <cfif ncProvisionResult EQ "error">
+                    <cfset ncFailed = ncFailed + 1>
+                    <cfset arrayAppend(ncFailures, ncEnabledMailboxes.username & ": could not provision the Nextcloud user: " & ncProvisionError)>
+                <cfelse>
+                    <cfset mintAppPwUser = ncEnabledMailboxes.username>
+                    <cfinclude template="../admin/2/inc/mint_system_app_password.cfm">
+                    <cfif mintedAppPasswordPlain EQ "">
+                        <cfset ncFailed = ncFailed + 1>
+                        <cfset arrayAppend(ncFailures, ncEnabledMailboxes.username & ": could not mint the app password: " & mintedAppPasswordError)>
+                    <cfelse>
+                        <cfset ncMailAction   = "create">
+                        <cfset ncMailUser     = ncEnabledMailboxes.username>
+                        <cfset ncMailName     = Len(Trim(ncEnabledMailboxes.name)) ? ncEnabledMailboxes.name : ncEnabledMailboxes.username>
+                        <cfset ncMailEmail    = ncEnabledMailboxes.username>
+                        <cfset ncMailPassword = mintedAppPasswordPlain>
+                        <cfset ncMailResult   = "">
+                        <cfset ncMailError    = "">
+                        <cfinclude template="../admin/2/inc/nextcloud_mail_account.cfm">
+
+                        <!--- Count the OUTCOME, not the attempt. This previously
+                             incremented unconditionally, so the summary reported
+                             "repaired: 1" for a mailbox that still had no
+                             account, and the real diagnostic in ncMailError was
+                             discarded. The include signals failure by setting
+                             ncMailResult and never throws. --->
+                        <cfif ncMailResult EQ "success">
+                            <cfset ncRepaired = ncRepaired + 1>
+                        <cfelse>
+                            <cfset ncFailed = ncFailed + 1>
+                            <cfset arrayAppend(ncFailures, ncEnabledMailboxes.username & ": " & ncMailError)>
+                        </cfif>
+                    </cfif>
                 </cfif>
             </cfif>
         </cfloop>
 
-        <cfset markComplete(blockName)>
-        <cfset arrayAppend(migrationsApplied,
-            blockName & " (repaired: " & ncRepaired & ", already present: " & ncSkippedExisting & ")")>
+        <!--- Only burn the one-time guard when nothing failed. Marking it
+             complete regardless meant a failed repair could never be retried,
+             on this box or any customer's, and the failure was invisible in the
+             summary. --->
+        <cfif ncFailed EQ 0>
+            <cfset markComplete(blockName)>
+            <cfset arrayAppend(migrationsApplied,
+                blockName & " (repaired: " & ncRepaired & ", already present: " & ncSkippedExisting & ")")>
+        <cfelse>
+            <cfset arrayAppend(migrationErrors,
+                blockName & " NOT marked complete -- repaired: " & ncRepaired
+                & ", already present: " & ncSkippedExisting & ", failed: " & ncFailed
+                & ". Re-runnable. Failures: " & ArrayToList(ncFailures, " | "))>
+        </cfif>
     <cfcatch type="any">
         <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
     </cfcatch>

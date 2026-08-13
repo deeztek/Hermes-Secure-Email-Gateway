@@ -223,12 +223,89 @@ Fresh installs also stop shipping `dnsbl.sorbs.net`, `ix.dnsbl.manitu.net` and
 were already absent from the database, so a fresh install was filtering against a list
 that differed from the one shown in the admin console. The two lists now match.
 
+### Authenticated users were rejected by your own DMARC policy
+
+If your domain publishes `p=reject`, your own users could not send from a mail client. They
+authenticated successfully and were then rejected at the end of the message with
+`550 5.7.1 rejected by DMARC policy`.
+
+The submission listeners inherited the global milter chain, which includes OpenDMARC. That
+made DMARC evaluate authenticated outbound mail as though it had arrived from the internet,
+where it fails by construction: the sending address is a laptop or a phone, which is never in
+your SPF record, and the signing OpenDKIM instance on that path does not verify, so there is
+no DKIM result either. With `RejectFailures` on, a `p=reject` policy then rejected the mail.
+
+DMARC is an inbound check and no longer runs on submission. Port 25 is unchanged.
+
+This was invisible before this release only because submission itself was never enabled.
+
+### The malware feed from URLhaus had silently stopped updating
+
+The URLhaus signature set was capped at 2MB and the feed has grown past 3MB, so fangfrisch
+refused it on every run. It exited successfully while doing so, which means the scheduler
+recorded the job as fine and nothing surfaced. The ClamAV third-party URLhaus signatures were
+simply never refreshed.
+
+The limit is now 10MB. If you have tuned this yourself the upgrade leaves your value alone.
+
+### The scheduler could not deliver its own failure notifications
+
+`hermes_ofelia` was not attached to the mail network, so the address it uses to send job
+failure alerts could not be resolved or reached. Jobs ran correctly, which is why this went
+unnoticed: the only broken part was the alerting, and alerting is only exercised when
+something fails.
+
+### Local DNS records could take DNS down
+
+Adding any record under **System > DNS Resolver > Local DNS Records** wrote a configuration
+file that Unbound refused to parse when forwarding is enabled, which is the default. Unbound
+then failed to start and crash-looped, taking DNS down for every container. Because the
+console needs DNS, the admin UI could not be used to undo it.
+
+The same page also rejected hostnames containing an underscore, which excluded `_dmarc`,
+`_domainkey` and the `_submission._tcp` records this product tells you to publish, and could
+not store a TXT value containing a semicolon, which is every real SPF, DKIM and DMARC record.
+
+All three are fixed.
+
+### CipherMail logged and stamped mail in UTC
+
+The CipherMail container had no timezone database, so it ran on UTC regardless of your
+configured timezone and wrote `+0000 (America)` into the `Received:` header of every message
+it handled. Its log lines were also offset from every other container, which makes tracing a
+message across the pipeline misleading. The same omission affected the LDAP container.
+
+### Other fixes
+
+- Amavis shipped a default trusted network that was not the Docker subnet, so a fresh install
+  trusted an unrelated private range until an administrator saved a Postfix settings page.
+- Four administrative pages showed a raw error instead of the normal error page when they hit
+  a validation failure.
+- `system_update_docker.sh --remote` now selects the container registry and image tag as well
+  as the code, so one flag means one source. The per-release image tag is applied only if the
+  registry actually has it, so an upgrade that works today cannot start failing.
+
 ## What to do
 
 ```bash
 cd <install-root>
 sudo ./scripts/system_update_docker.sh
 ```
+
+Then, **once**, do this to finish applying the malware feed fix:
+
+1. Open **System > Malware Feeds**.
+2. Save the page without changing anything.
+
+The size limit lands in the database during the upgrade, but the fangfrisch configuration file
+is rendered from the database, and saving is what re-renders it. Until then the old limit
+stays in effect and URLhaus keeps failing quietly. Confirm with:
+
+```bash
+docker logs hermes_ofelia 2>&1 | grep urlhaus | tail -2
+```
+
+You want `INFO: ... updated`, not `ERROR: ... size exceeds defined limit`.
 
 Then, **once**, do this to finish applying the block list fix:
 

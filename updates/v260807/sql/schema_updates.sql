@@ -84,7 +84,30 @@ UPDATE parameters
 -- under System / RBL Configuration. The upgrade README makes that a step.
 
 -- ---------------------------------------------------------------------
--- 2. Version stamp -- MUST be the last statement (advances build_no so
+-- 2. URLhaus feed size limit (#302)
+--
+-- The urlhaus feed shipped with max_size = 2MB. The feed has since grown
+-- past that (observed 3169229 bytes), so fangfrisch refuses it on every
+-- run with "size exceeds defined limit" and the ClamAV third-party
+-- signatures silently stop updating. fangfrisch still exits 0, so Ofelia
+-- records the job as successful and nothing surfaces.
+--
+-- Raised to 10MB, matching the headroom already given to sanesecurity.
+-- Only touches the row still carrying the old default, so an operator who
+-- has tuned this value in the Malware Feeds UI keeps their setting.
+-- ---------------------------------------------------------------------
+UPDATE malware_feeds_config
+   SET max_size = '10MB'
+ WHERE section_name = 'urlhaus'
+   AND max_size = '2MB';
+
+-- NOTE: this changes the database only. /etc/fangfrisch/fangfrisch.conf
+-- still holds the old limit until generate_malware_feeds_configuration.cfm
+-- re-renders it, which happens on the next save under System / Malware
+-- Feeds. The upgrade README makes that a step.
+
+-- ---------------------------------------------------------------------
+-- 3. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260807' WHERE parameter = 'build_no';

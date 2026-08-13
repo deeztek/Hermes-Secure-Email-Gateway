@@ -41,6 +41,29 @@
 #   from that remote, picks highest v* tag via ls-remote. Useful for
 #   testing against forks or mirror remotes.
 #
+# Images (#298):
+#   --remote selects code AND images. The remote maps to a container registry
+#   and the resolved tag is written to .env before `docker compose pull`:
+#
+#     --remote=origin | github  ->  ghcr.io/deeztek
+#     --remote=gitlab           ->  hub.deeztek.com/dedwards/hermes-seg-docker-gl
+#
+#   So `--remote=gitlab v260807` now tests a release candidate end to end with
+#   no .env editing, which previously took two sed calls before every run.
+#
+#   The per-release tag is pinned ONLY if the registry actually has it, probed
+#   with `docker manifest inspect`. If it does not, .env is left exactly as it
+#   was and a warning is printed. That keeps an upgrade that works today from
+#   breaking while ghcr.io still lacks per-release tags (#289), and makes the
+#   production path start pinning automatically once they exist.
+#
+#   Overrides for the unusual case of code from one place and images another:
+#     --image-registry=HOST/PATH   # force the registry
+#     --image-tag=TAG              # force the image tag
+#
+#   .env is backed up to .env.bak.<timestamp> before either key is changed,
+#   and --skip-compose leaves it untouched entirely.
+#
 # Prerequisites:
 #   - Run on the Docker host (not inside a container)
 #   - hermes_db_server container running (needed to read build_no)
@@ -109,6 +132,19 @@ ASSUME_YES=0
 # tagged on gitlab but not yet promoted to github.
 REMOTE="origin"
 
+# Image source. --remote selects code AND images from one place (#298).
+# Before this, --remote chose only where the code came from; images were
+# resolved from IMAGE_REGISTRY / HERMES_DOCKER_IMG_VERSION in .env, which the
+# orchestrator never read or wrote. Two consequences: the upgrade path could
+# never advance the image version (so image-level fixes could not reach an
+# existing install at all), and testing an RC meant hand-editing .env because
+# RC images live in the GitLab registry while .env.template ships ghcr.io.
+#
+# These two override the mapping for the unusual case of code from one place
+# and images from another. Empty means "derive from --remote".
+IMAGE_REGISTRY_OVERRIDE=""
+IMAGE_TAG_OVERRIDE=""
+
 # Preserve argv before the parser consumes it.
 #
 # This loop runs at TOP LEVEL and shifts every argument away, so `main "$@"`
@@ -135,6 +171,8 @@ while [[ $# -gt 0 ]]; do
         --skip-compose) SKIP_COMPOSE=1; shift ;;
         --yes|-y)       ASSUME_YES=1; shift ;;
         --remote=*)     REMOTE="${1#*=}"; shift ;;
+        --image-registry=*) IMAGE_REGISTRY_OVERRIDE="${1#*=}"; shift ;;
+        --image-tag=*)      IMAGE_TAG_OVERRIDE="${1#*=}"; shift ;;
         --help|-h)
             sed -n '/^# Usage:/,/^# =/p' "$0" | sed 's/^# \{0,1\}//'
             exit 0
@@ -549,6 +587,103 @@ phase1_pull_code() {
 }
 
 # ---------------------------------------------------------------------------
+# Image source resolution (#298)
+# ---------------------------------------------------------------------------
+
+# Which container registry corresponds to a given git remote. Empty means we
+# have no mapping and must leave the operator's .env alone.
+registry_for_remote() {
+    case "$1" in
+        origin|github)  echo "ghcr.io/deeztek" ;;
+        gitlab)         echo "hub.deeztek.com/dedwards/hermes-seg-docker-gl" ;;
+        *)              echo "" ;;
+    esac
+}
+
+# Read a single key from .env. Last occurrence wins, matching how Compose
+# itself resolves duplicates.
+env_get() {
+    grep -E "^$1=" "$2" 2>/dev/null | tail -1 | cut -d= -f2-
+}
+
+# Set a single key in .env, preserving every other line. Appends if absent.
+env_set() {
+    local key="$1" val="$2" file="$3"
+    if grep -qE "^${key}=" "$file"; then
+        sed -i "s|^${key}=.*|${key}=${val}|" "$file"
+    else
+        printf '%s=%s\n' "$key" "$val" >> "$file"
+    fi
+}
+
+# Point .env at the images belonging to the release we are installing.
+#
+# Deliberately conservative: the per-release tag is pinned ONLY when the
+# registry actually has it, probed with `docker manifest inspect`. This is the
+# same guard install_hermes_docker.sh uses, and it matters because ghcr.io
+# does not yet carry per-release tags (#289) while the GitLab registry does.
+# So an upgrade that works today cannot start failing, and the moment #289
+# lands the production path starts pinning too, with no further change here.
+sync_image_source() {
+    local tag="$1"
+    local env_file="${HERMES_ROOT}/.env"
+
+    if [[ ! -f "$env_file" ]]; then
+        warn "No .env at ${env_file}. Leaving image source untouched."
+        return 0
+    fi
+
+    local cur_registry cur_tag
+    cur_registry="$(env_get IMAGE_REGISTRY "$env_file")"
+    cur_tag="$(env_get HERMES_DOCKER_IMG_VERSION "$env_file")"
+
+    local registry="$IMAGE_REGISTRY_OVERRIDE"
+    if [[ -z "$registry" ]]; then
+        registry="$(registry_for_remote "$REMOTE")"
+    fi
+    if [[ -z "$registry" ]]; then
+        warn "No registry mapping for remote '${REMOTE}'. Keeping IMAGE_REGISTRY=${cur_registry:-<unset>}."
+        warn "Pass --image-registry=HOST/PATH to select one explicitly."
+        registry="${cur_registry:-ghcr.io/deeztek}"
+    fi
+
+    local want_tag="${IMAGE_TAG_OVERRIDE:-$tag}"
+
+    log "Image source: remote='${REMOTE}' registry='${registry}' wanted tag='${want_tag}'"
+
+    # Probe one representative image rather than all of them; they are built
+    # and pushed as a set.
+    local probe="${registry}/hermes-commandbox:${want_tag}"
+    if ! docker manifest inspect "$probe" >/dev/null 2>&1; then
+        warn "Registry has no ${probe}."
+        warn "Leaving HERMES_DOCKER_IMG_VERSION=${cur_tag:-<unset>} and IMAGE_REGISTRY=${cur_registry:-<unset>} as they are."
+        warn "Images for this release were not published under that tag, so pinning it would break the pull."
+        return 0
+    fi
+
+    if [[ "$cur_registry" == "$registry" && "$cur_tag" == "$want_tag" ]]; then
+        log "  .env already points at ${registry} : ${want_tag}. Nothing to change."
+        return 0
+    fi
+
+    if (( DRY_RUN )); then
+        echo -e "    ${CYAN}[dry-run]${NC} would set IMAGE_REGISTRY=${registry} (was ${cur_registry:-<unset>})"
+        echo -e "    ${CYAN}[dry-run]${NC} would set HERMES_DOCKER_IMG_VERSION=${want_tag} (was ${cur_tag:-<unset>})"
+        return 0
+    fi
+
+    local backup="${env_file}.bak.$(date +%Y%m%d_%H%M%S)"
+    cp -p "$env_file" "$backup"
+    log "  .env backed up to $(basename "$backup")"
+
+    env_set IMAGE_REGISTRY "$registry" "$env_file"
+    env_set HERMES_DOCKER_IMG_VERSION "$want_tag" "$env_file"
+
+    log "  IMAGE_REGISTRY: ${cur_registry:-<unset>} -> ${registry}"
+    log "  HERMES_DOCKER_IMG_VERSION: ${cur_tag:-<unset>} -> ${want_tag}"
+}
+
+# ---------------------------------------------------------------------------
 # Phase 2 — Update containers
 # ---------------------------------------------------------------------------
 phase2_update_containers() {
@@ -560,6 +695,11 @@ phase2_update_containers() {
     fi
 
     cd "$HERMES_ROOT"
+
+    # Point .env at the images for this release before pulling (#298). Sits
+    # after the --skip-compose guard on purpose: if we are not pulling, we do
+    # not rewrite the operator's image source either.
+    sync_image_source "$TARGET_TAG"
 
     # Pre-container migration hook: run each pending release's pre-scripts/
     # BEFORE compose pull + up. Required when a release adds new bind-mount

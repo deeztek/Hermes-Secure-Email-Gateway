@@ -5,6 +5,13 @@ ARG OPENLDAP_VER=2.6.7
 
 ###############################################################################
 # Install build dependencies and runtime tooling (groff-base, rsyslog-mysql)
+#
+# tzdata is REQUIRED and easy to lose: ubuntu:24.04 does not ship it and
+# --no-install-recommends will not pull it in. Without /usr/share/zoneinfo,
+# glibc cannot resolve TZ=America/New_York as a zone path, falls back to
+# parsing it as a POSIX TZ string, and lands on UTC labelled "America".
+# slapd logs reach the Syslog database through rsyslog, so a container on the
+# wrong clock misaligns authentication events against mail events (#305).
 ###############################################################################
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
@@ -23,6 +30,7 @@ RUN apt-get update && \
         rsyslog \
         rsyslog-mysql \
         groff-base \
+        tzdata \
         && rm -rf /var/lib/apt/lists/*
 
 ###############################################################################

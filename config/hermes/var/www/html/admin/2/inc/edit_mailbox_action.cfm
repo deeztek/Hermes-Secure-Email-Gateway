@@ -39,6 +39,7 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
     SELECT m.id, m.username, m.domain_id,
            m.nextcloud_enabled AS prev_nextcloud_enabled,
            r.enforce_mfa       AS prev_enforce_mfa,
+           r.auth_type         AS mailbox_auth_type,
            d.domain
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id
@@ -260,6 +261,48 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
             <cfif ncNeedsMailProfile>
                 <cftry>
+                    <!--- The Nextcloud USER has to exist before a Mail account
+                         can attach to it. `occ mail:account:create` fails with
+                         "User <x> does not exist" otherwise, and it reports that
+                         on STDOUT without a non-zero exit, so nothing surfaced.
+                         nextcloud_provision_user.cfm was only ever called from
+                         add_mailbox_action.cfm, so a mailbox created with
+                         Nextcloud OFF and switched ON later got the LDAP group
+                         and no Nextcloud account at all. #292 assumed the
+                         account was already being provisioned here and only the
+                         Mail profile was missing; it was not, so that fix could
+                         not work for the case it was written for.
+
+                         Provision it first, mirroring add_mailbox_action.cfm.
+                         The password is a fresh 30-char random string and is
+                         deliberately NOT the user's own: the local password
+                         created by `occ user:add` is a live DAV Basic Auth
+                         credential, so reusing the login password would let
+                         clients authenticate with it and bypass the
+                         "main password = web only, app password = clients only"
+                         rule. Nobody needs to know this one; OIDC takes over the
+                         account on first login.
+
+                         Idempotent: the include skips when the user already
+                         exists, so this is a no-op on the common re-save. --->
+                    <cfset ncProvisionAction      = "create">
+                    <cfset ncProvisionUser        = getMailbox.username>
+                    <cfset ncProvisionDisplayName = editDisplayName>
+                    <cfset ncProvisionEmail       = getMailbox.username>
+                    <cfset ncProvisionAuthType    = Len(Trim(getMailbox.mailbox_auth_type)) ? getMailbox.mailbox_auth_type : "local">
+                    <cfset ncProvisionPassword    = "">
+                    <cfif ncProvisionAuthType NEQ "remote">
+                        <cfset _ncPwAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789">
+                        <cfset _ncPwAlphaLen = Len(_ncPwAlphabet)>
+                        <cfloop from="1" to="30" index="_ncPwIdx">
+                            <cfset ncProvisionPassword &= Mid(_ncPwAlphabet, RandRange(1, _ncPwAlphaLen, "SHA1PRNG"), 1)>
+                        </cfloop>
+                    </cfif>
+                    <cfinclude template="nextcloud_provision_user.cfm">
+                    <cfif ncProvisionResult EQ "error">
+                        <cfthrow message="could not provision the Nextcloud user: #ncProvisionError#">
+                    </cfif>
+
                     <!--- Mint a fresh "Hermes System" app password and hand the
                          plaintext to occ. The login password is NOT usable here:
                          Dovecot authenticates only against app_passwords, so a
@@ -280,6 +323,17 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
                     <cfset ncMailEmail    = getMailbox.username>
                     <cfset ncMailPassword = mintedAppPasswordPlain>
                     <cfinclude template="nextcloud_mail_account.cfm">
+
+                    <!--- nextcloud_mail_account.cfm reports failure by SETTING
+                         ncMailResult, not by throwing, so the cfcatch below
+                         never fired and the save reported success while no
+                         account existed. ncMailError carries the preflight and
+                         postflight oc_mail_accounts counts plus occ's STDOUT and
+                         STDERR, which is what identified the missing Nextcloud
+                         user. Check it explicitly. --->
+                    <cfif ncMailResult EQ "error">
+                        <cfthrow message="Nextcloud Mail profile was not created: #ncMailError#">
+                    </cfif>
                 <cfcatch type="any">
                     <!--- Surface it. This was an empty cfcatch, which is exactly
                          why the original defect stayed invisible: the save

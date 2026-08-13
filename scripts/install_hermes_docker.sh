@@ -2259,8 +2259,13 @@ generate_postfix_configs() {
 
     # master.cf is tracked directly at the render-target path (no
     # placeholders, no CFML writes -- it's a pure framework file).
-    # Nothing to render here. .dkim/.non-dkim/.postscreen variants are
-    # tracked as alternatives admins can swap in by hand.
+    # Nothing to render here. There is exactly ONE master.cf in the repo,
+    # at config/postfix-dkim/etc/postfix/master.cf, which docker-compose
+    # bind-mounts onto /etc/postfix. Do not add a second copy: the previous
+    # duplicate under conf_files/ drifted three months onto the pre-#232
+    # config that caused the :10026 outage, because nothing read it and so
+    # nothing caught it. Removed 2026-08-12; see docs/general/email-flow.md
+    # "Where master.cf lives".
 
     # ---- Lookup-table placeholder files ----
     # These files are gitignored (admin data managed by CFML or directly by
@@ -2649,12 +2654,20 @@ generate_self_signed_cert() {
 # files into hermes_dovecot. On a fresh install these files don't exist, so
 # Docker auto-creates EMPTY DIRECTORIES at those host paths and Dovecot dies
 # with "Is a directory" reading the key. Touch empty placeholder files so the
-# bind mounts resolve as files. The dovecot.conf template only emits the
-# crypt_global_public_key_file directive when a real PEM key is present (the
-# CFML inc/generate_dovecot_configuration.cfm checks for the BEGIN marker;
-# install-time bootstrap render leaves the line empty), so an empty placeholder
-# is safe. Admin generates the real keys via
-# inc/generate_mail_crypt_keys.cfm when enabling mail encryption.
+# bind mounts resolve as files. BOTH mail_crypt key directives are emitted only
+# when a real PEM is present -- crypt_global_public_key_file and the
+# crypt_global_private_key block -- so an empty placeholder is inert. The CFML
+# inc/generate_dovecot_configuration.cfm checks for the BEGIN marker in each;
+# this install-time bootstrap render leaves both empty. Admin generates the real
+# keys via inc/generate_mail_crypt_keys.cfm when enabling mail encryption, and
+# email_server_settings_action.cfm re-renders dovecot.conf immediately after, so
+# the directives appear at that point.
+#
+# The private-key block was hardcoded in the template with no placeholder until
+# now, so mail_crypt always parsed the empty placeholder and failed at user
+# init: LMTP Fatal (no delivery at all) and an IMAP session dropped straight
+# after a successful login. That is the second cause of #292, missed because the
+# first one was fixed without a runtime test.
 ensure_dovecot_key_placeholders() {
     header "Ensuring Dovecot Mail-Crypt Key Placeholders"
 
@@ -2756,6 +2769,7 @@ generate_dovecot_config() {
         -e "s|^hermes_log_debug_line$||" \
         -e "s|^hermes_compress_level_line$||" \
         -e "s|^hermes_crypt_pubkey_line$||" \
+        -e "s|^hermes_crypt_privkey_block$||" \
         -e "s|^hermes_crypt_write_algorithm_line$|crypt_write_algorithm =|" \
         -e "s|^[[:space:]]*hermes_acl_dict_block[[:space:]]*$||" \
         -e "s|^hermes_acl_config_block$||" \
@@ -3987,6 +4001,73 @@ fix_service_data_ownership() {
     log "Service data ownership corrected"
 }
 
+# ============================================================================
+# BUILD POSTFIX LOOKUP-TABLE .db FILES
+# ============================================================================
+# Postfix hash: maps need a compiled .db built by postmap. generate_postfix_configs()
+# only touches EMPTY source stubs, on the assumption recorded in its own comment
+# that "admin's first save through the UI triggers postmap to build the .db
+# hashmap files". But main.cf references those maps from the moment Postfix
+# starts, and a hash: map with no .db is a lookup ERROR, not a miss:
+#
+#   warning: hash:/etc/postfix/amavis_senderbypass is unavailable
+#   NOQUEUE: reject: RCPT from ...: 451 4.3.5 <sender>: Sender address rejected:
+#            Server configuration error
+#
+# smtpd_sender_restrictions uses check_sender_access on one of them, so a FRESH
+# INSTALL 451-rejects every inbound message until an admin happens to save the
+# Global Senders page. The container entrypoint does not postmap either, so a
+# restart does not help.
+#
+# This is the same defect #288 fixed for the migration path in 73d7c700; the
+# install path was left as it was. The discovery idiom is lifted from there
+# deliberately, rather than hardcoding a list, because the rendered map set
+# varies by topology (relay / mailbox / hybrid) and because some files must NOT
+# be postmapped: relay_domains is a bare-domain list, and aliases is
+# sendmail-format and needs postalias.
+#
+# Phase 2, so the containers are up. Always runs: postmap is fast, idempotent,
+# and an empty source produces an empty .db, which matches nothing and is the
+# correct default.
+build_postfix_lookup_tables() {
+    header "Building Postfix Lookup Tables"
+
+    if ! docker ps --format '{{.Names}}' 2>/dev/null | grep -qx "hermes_postfix_dkim"; then
+        warn "hermes_postfix_dkim is not running -- skipping postmap"
+        warn "Inbound mail will be 451-rejected until these are built. Re-run --init-db."
+        return 0
+    fi
+
+    local hash_maps
+    hash_maps=$(docker exec hermes_postfix_dkim sh -c \
+        'cat /etc/postfix/main.cf /etc/postfix/master.cf 2>/dev/null' 2>/dev/null \
+        | grep -oE 'hash:/etc/postfix/[a-zA-Z0-9_]+' \
+        | sed 's#hash:/etc/postfix/##' | sort -u)
+
+    if [[ -z "$hash_maps" ]]; then
+        warn "  no hash: maps found in the live postfix config -- nothing to postmap"
+        return 0
+    fi
+
+    local built=0 total=0 m tool
+    for m in $hash_maps; do
+        total=$((total+1))
+        tool="postmap"
+        [[ "$m" == "aliases" ]] && tool="postalias"
+        if docker exec hermes_postfix_dkim sh -c \
+             "touch /etc/postfix/${m} && /usr/sbin/${tool} /etc/postfix/${m}" >>"$LOG_FILE" 2>&1; then
+            built=$((built+1))
+        else
+            warn "  ${tool} failed for ${m} -- check ${LOG_FILE}"
+        fi
+    done
+
+    docker exec hermes_postfix_dkim /usr/sbin/postfix reload >>"$LOG_FILE" 2>&1 || \
+        warn "  postfix reload reported errors -- check ${LOG_FILE}"
+
+    log "  built ${built}/${total} lookup-table .db file(s): ${hash_maps//$'\n'/ }"
+}
+
 run_phase2_db_init() {
     touch "$LOG_FILE"
     log "Phase 2 (post-container) initialization started at $(date)"
@@ -4010,6 +4091,11 @@ run_phase2_db_init() {
     # Not state-guarded: idempotent, and a wiped or restored data tier needs it
     # again. Runs before the DB work so it still happens if a later step fails.
     fix_service_data_ownership
+
+    # Same rationale: idempotent and fast. Must run before the install is
+    # considered done, because until it does, Postfix 451-rejects every inbound
+    # message.
+    build_postfix_lookup_tables
 
     if state_is_done "06-databases-created"; then
         log "Skip: databases already created"

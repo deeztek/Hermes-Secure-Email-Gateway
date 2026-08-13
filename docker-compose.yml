@@ -164,6 +164,13 @@ services:
       # the docker socket so ofelia can docker run ...
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: unless-stopped
+    # Ofelia must sit on hermes_net_ext, not the default bridge: its [global]
+    # smtp-host in config/ofelia/config.ini resolves hermes_postfix_dkim by name
+    # and :10026 only accepts mynetworks (172.16.32.0/24). Without this the
+    # failure notifications can never be delivered (#303).
+    networks:
+      hermes_net_ext:
+        ipv4_address: ${IPV4SUBNET}.118
     depends_on:
       - hermes_commandbox
 
@@ -811,6 +818,11 @@ services:
       LDAP_USER_USERNAME: ${LDAP_USER_USERNAME}
       LDAP_GROUPS: ${LDAP_GROUPS}
       LDAP_LOG_LEVEL: ${LDAP_LOG_LEVEL}
+      # Without TZ this container runs UTC while the rest run local time,
+      # which misaligns slapd events against mail events in the Syslog DB.
+      # Needs tzdata in the image or glibc falls back to UTC labelled
+      # "America" -- see the openldap Dockerfile (#305).
+      TZ: ${TIMEZONE}
     healthcheck:
       test: ["CMD", "/usr/local/bin/ldapsearch", "-x", "-H", "ldap://localhost:389", "-b", "", "-s", "base", "(objectclass=*)"]
       interval: 10s

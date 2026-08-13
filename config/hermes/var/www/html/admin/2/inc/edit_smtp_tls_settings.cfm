@@ -15,7 +15,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfif NOT StructKeyExists(form, "tlsmode")>
   
   <cfset m="Set SMTP TLS Mode: form.tlsmode does not exist">
-  <cfinclude template="./inc/error.cfm">
+  <cfinclude template="error.cfm">
   <cfabort>
 
 <cfelseif StructKeyExists(form, "tlsmode")>

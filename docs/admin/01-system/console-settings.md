@@ -99,6 +99,24 @@ breaks on the trailing dot, hence the strip.
 > parameters and neither cascades to the other. The page surfaces this
 > in a warning callout.
 
+On a mail server or hybrid install the choice between an IP and an FQDN
+here is not cosmetic, because it decides whether webmail works at all:
+
+> **Nextcloud requires an FQDN here plus a certificate issued for it.**
+> `/nc` login goes through OIDC, which is not a browser-only flow: the
+> Nextcloud container makes its own server-side HTTPS call back to this
+> address to reach the identity provider. On a fresh install that call
+> fails, because the install-time bootstrap certificate is self-signed
+> and its common name is `localhost`, which matches neither the host IP
+> the installer sets nor the FQDN you intend to use. Importing the
+> bootstrap certificate into the container's trust store does **not**
+> fix it: trust and name are separate checks, and the name still does
+> not match. Until this page holds an FQDN and **Console Certificate**
+> below binds a certificate issued for that name, every user, including
+> the administrator, gets "Could not reach the OpenID Connect provider".
+> The admin console, the user portal and mail flow are unaffected, which
+> is why this often goes unnoticed until someone tries webmail.
+
 ### Console Certificate
 
 Free-text autocomplete that searches `system_certificates` via

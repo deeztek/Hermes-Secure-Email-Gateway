@@ -1064,7 +1064,7 @@ CREATE TABLE IF NOT EXISTS `malware_feeds_config` (
 
 -- 10 row(s) for `malware_feeds_config`
 INSERT IGNORE INTO `malware_feeds_config` VALUES (1,'sanesecurity','SaneSecurity',1,1,'https://ftp.swin.edu.au/sanesecurity/','1h','10M',NULL,NULL,NULL,NULL,NULL,'SaneSecurity ClamAV signatures (built-in feed)',10);
-INSERT IGNORE INTO `malware_feeds_config` VALUES (2,'urlhaus','URLhaus',1,1,NULL,NULL,'2MB',NULL,NULL,NULL,NULL,NULL,'URLhaus malicious URL signatures (built-in feed)',20);
+INSERT IGNORE INTO `malware_feeds_config` VALUES (2,'urlhaus','URLhaus',1,1,NULL,NULL,'10MB',NULL,NULL,NULL,NULL,NULL,'URLhaus malicious URL signatures (built-in feed)',20);
 INSERT IGNORE INTO `malware_feeds_config` VALUES (3,'malwarepatrol','MalwarePatrol',1,1,NULL,NULL,NULL,NULL,'receipt','','product','','MalwarePatrol commercial feed (requires receipt and product ID)',30);
 INSERT IGNORE INTO `malware_feeds_config` VALUES (4,'malwareexpert','MalwareExpert',0,1,'https://signatures.malware.expert','1d','20M',NULL,'serial_key',NULL,NULL,NULL,'MalwareExpert commercial feed (requires serial key)',40);
 INSERT IGNORE INTO `malware_feeds_config` VALUES (5,'securiteinfo','SecuriteInfo',0,1,NULL,NULL,NULL,NULL,'customer_id',NULL,NULL,NULL,'SecuriteInfo commercial feed (requires customer ID)',50);

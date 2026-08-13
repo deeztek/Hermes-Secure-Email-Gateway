@@ -61,6 +61,14 @@ amavis unix - - - - 2 smtp
 #
 # smtpd_reject_unlisted_recipient=no lets authenticated users send outbound to
 # recipients this server does not host.
+#
+# smtpd_milters is overridden to drop OpenDMARC (hermes_dmarc:54321) from this
+# path. DMARC is an inbound check; run against authenticated submission it fails
+# by construction, because the client address is never in the sending domain's
+# SPF record and the OpenDKIM instance here signs rather than verifies. With
+# RejectFailures=yes that rejects a domain's own users with
+# "550 5.7.1 rejected by DMARC policy" as soon as the domain publishes p=reject
+# (#300). OpenDKIM and body_milter stay; port 25 keeps the full chain.
 submission inet n       -       n       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_tls_security_level=encrypt
@@ -71,6 +79,7 @@ submission inet n       -       n       -       -       smtpd
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
   -o smtpd_sender_login_maps=mysql:/etc/postfix/mysql-sender-login-maps.cf
   -o smtpd_sender_restrictions=reject_sender_login_mismatch
+  -o smtpd_milters=inet:127.0.0.1:8891,inet:hermes_body_milter:8893
   -o milter_macro_daemon_name=ORIGINATING
 
 # Implicit-TLS submission (465). Same policy as 587; the only difference is
@@ -86,6 +95,7 @@ smtps     inet  n       -       n       -       -       smtpd
   -o smtpd_client_restrictions=permit_sasl_authenticated,reject
   -o smtpd_sender_login_maps=mysql:/etc/postfix/mysql-sender-login-maps.cf
   -o smtpd_sender_restrictions=reject_sender_login_mismatch
+  -o smtpd_milters=inet:127.0.0.1:8891,inet:hermes_body_milter:8893
   -o milter_macro_daemon_name=ORIGINATING
 #628       inet  n       -       n       -       -       qmqpd
 pickup    fifo  n       -       n       60      1       pickup

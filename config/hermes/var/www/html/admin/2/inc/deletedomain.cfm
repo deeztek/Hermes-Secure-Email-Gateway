@@ -139,7 +139,7 @@ where id = <cfqueryparam value = #form.domain_id# CFSQLType = "CF_SQL_INTEGER">
 
 
 <cfset m="/inc/deletedomain.cfm: checkdomain.recordcount LT 1">
-<cfinclude template="./inc/error.cfm">
+<cfinclude template="error.cfm">
 <cfabort>
 
 

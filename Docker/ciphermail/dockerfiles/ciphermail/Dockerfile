@@ -15,6 +15,15 @@ COPY build/smtp_server_config.xml /build/
 COPY build/smtp_transport_config.xml /build/
 
 # Install pre-requisites and ciphermail packages
+#
+# tzdata is REQUIRED and easy to lose: ubuntu:24.04 does not ship it and
+# --no-install-recommends will not pull it in. Without /usr/share/zoneinfo,
+# glibc cannot resolve TZ=America/New_York as a zone path, so it falls back to
+# parsing it as a POSIX TZ string, takes "America" as the abbreviation, fails
+# on "/New_York" as an offset and defaults to zero. The container then runs on
+# UTC while every other Hermes container runs local time, and stamps
+# "+0000 (America)" into the Received: header of every message it touches
+# (#305).
 RUN echo "deb http://archive.ubuntu.com/ubuntu/ jammy universe" | tee /etc/apt/sources.list.d/jammy.list && \
     apt-get update && \
     apt-get upgrade -y && \
@@ -26,6 +35,7 @@ RUN echo "deb http://archive.ubuntu.com/ubuntu/ jammy universe" | tee /etc/apt/s
     gpg \
     gzip \
     mawk \
+    tzdata \
     openjdk-11-jre \
     openjdk-11-jre-headless \
     sudo \

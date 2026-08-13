@@ -20,6 +20,17 @@ Reads local DNS overrides from dns_local_records table and generates
 <cfset conf = conf & chr(35) & " " & DateTimeFormat(Now(), "yyyy-MM-dd HH:nn:ss") & nl>
 <cfset conf = conf & nl>
 
+<!--- The `server:` header is REQUIRED, not cosmetic. unbound.conf opens a
+     server: clause and then includes conf.d/forward.conf BEFORE this file.
+     When forwarding is enabled (the default install mode) forward.conf
+     contains a `forward-zone:` clause, which closes server: -- so anything
+     emitted here lands inside forward-zone:, where local-zone and local-data
+     are not valid and unbound dies at startup with
+     "conf.d/local.conf:N: error: syntax error", taking DNS down for the whole
+     stack. Declaring our own server: clause makes this file valid regardless
+     of what precedes it (#304). --->
+<cfset conf = conf & "server:" & nl>
+
 <!--- Group records by hostname to create local-zone + local-data entries --->
 <cfset processedZones = StructNew()>
 <cfloop query="getLocalRecords">
@@ -33,12 +44,39 @@ Reads local DNS overrides from dns_local_records table and generates
 
     <!--- Add transparent zone declaration (only once per zone) --->
     <cfif NOT StructKeyExists(processedZones, zoneName)>
-        <cfset conf = conf & 'local-zone: "' & zoneName & '." transparent' & nl>
+        <cfset conf = conf & '    local-zone: "' & zoneName & '." transparent' & nl>
         <cfset processedZones[zoneName] = true>
     </cfif>
 
-    <!--- Add local-data entry --->
-    <cfset conf = conf & 'local-data: "' & getLocalRecords.hostname & '. IN ' & getLocalRecords.record_type & ' ' & getLocalRecords.value & '"' & nl>
+    <!--- Add local-data entry.
+
+         Strip CR/LF from both fields first. They are admin-supplied and land
+         verbatim in a config file, so a newline would let an operator append
+         arbitrary Unbound directives (#304).
+
+         TXT needs different quoting from every other type. Unbound's
+         local-data value is itself a quoted string, and a TXT record's rdata
+         must ALSO be quoted in zone-file syntax whenever it contains spaces
+         or semicolons -- which every realistic TXT value does (SPF, DKIM,
+         DMARC all contain both, and an unquoted semicolon starts a zone-file
+         comment that silently truncates the record). Double quotes cannot
+         nest inside double quotes, and escaping them as \" produces a literal
+         quote character in the rdata rather than a delimiter. Unbound accepts
+         single quotes for config values, so TXT is emitted single-quoted on
+         the outside with the value double-quoted inside.
+
+         Any quotes the admin typed, including the \" workaround people
+         discover for this bug, are stripped before re-quoting so the record
+         renders once, correctly. --->
+    <cfset ldHost  = Replace(Replace(getLocalRecords.hostname, Chr(13), "", "ALL"), Chr(10), "", "ALL")>
+    <cfset ldValue = Replace(Replace(getLocalRecords.value, Chr(13), "", "ALL"), Chr(10), "", "ALL")>
+
+    <cfif getLocalRecords.record_type EQ "TXT">
+        <cfset ldValue = Trim(REReplace(ldValue, '^[\\"]+|[\\"]+$', "", "ALL"))>
+        <cfset conf = conf & "    local-data: '" & ldHost & '. IN TXT "' & ldValue & '"' & "'" & nl>
+    <cfelse>
+        <cfset conf = conf & '    local-data: "' & ldHost & '. IN ' & getLocalRecords.record_type & ' ' & ldValue & '"' & nl>
+    </cfif>
 </cfloop>
 
 <cfif getLocalRecords.recordcount EQ 0>

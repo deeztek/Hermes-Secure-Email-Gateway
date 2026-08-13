@@ -31,7 +31,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
       <cfset step=0>
       <cfset m="Send Recipient Certificate: getencryptiondetails.recordcount LT 1">
-      <cfinclude template="./inc/error.cfm">
+      <cfinclude template="error.cfm">
       <cfabort>
 
     <cfelse>

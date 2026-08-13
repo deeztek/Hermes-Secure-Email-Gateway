@@ -213,6 +213,37 @@ Called from: email_server_settings_action.cfm (after saving form values)
     </cfif>
 </cfif>
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_crypt_pubkey_line", cryptPubKeyLine, "ALL")>
+
+<!--- crypt_global_private_key block: same rule as the public key above, and
+     for the same reason. This block used to be hardcoded in the template with
+     no placeholder, so mail_crypt was ALWAYS pointed at /keys/ecprivkey.pem
+     even though that file is an empty placeholder until an admin enables mail
+     encryption. The plugin parses it at user init and fails:
+
+       lmtp: Fatal: Raw user initialization failed: mail_crypt_plugin:
+             Couldn't parse private key /keys/ecprivkey.pem: Unknown key format
+       imap: Error: mail_crypt_plugin: ... Unknown key format
+
+     LMTP being FATAL means no mail is delivered to mailboxes at all, and on
+     IMAP the session is dropped immediately after a successful login, which
+     surfaces in Nextcloud Mail as "Connection failed" and in a client as an
+     auth failure.
+
+     This is the second cause of the symptom reported in #292. The first,
+     crypt_write_algorithm being hardcoded on, was fixed in v260807; this one
+     was missed because the fix was never runtime-tested. The public-key line
+     already had this guard, which is why only the private key bit. --->
+<cfset cryptPrivKeyBlock = "">
+<cfif FileExists("/opt/hermes/keys/ecprivkey.pem")>
+    <cfset privKeyContent = FileRead("/opt/hermes/keys/ecprivkey.pem")>
+    <cfif Find("-----BEGIN", privKeyContent) GT 0>
+        <cfset cryptPrivKeyBlock = "crypt_global_private_key main {" & chr(10)
+            & "  crypt_private_key_file = /keys/ecprivkey.pem" & chr(10)
+            & "}">
+    </cfif>
+</cfif>
+<cfset dovecotConf = REReplace(dovecotConf, "hermes_crypt_privkey_block", cryptPrivKeyBlock, "ALL")>
+
 <cfset dovecotConf = REReplace(dovecotConf, "hermes_crypt_curve", dov['mail.encryption_curve'], "ALL")>
 
 <!--- Quota warnings --->

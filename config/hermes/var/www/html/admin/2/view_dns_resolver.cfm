@@ -822,8 +822,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset lookupType = form.lookup_type>
       </cfif>
 
-      <!--- Validate domain: alphanumeric, hyphens, dots only --->
-      <cfif lookupDomain NEQ "" AND REFind("^[a-zA-Z0-9\.\-]+$", lookupDomain)>
+      <!--- Validate domain: alphanumeric, hyphens, dots, underscores only.
+           Underscore is required for the records a mail gateway most needs to
+           look up: _dmarc, <selector>._domainkey, _mta-sts, and the
+           _submission._tcp / _submissions._tcp SRV records this product tells
+           admins to publish (#304).
+           This allowlist is also the injection guard -- lookupDomain is
+           interpolated into a shell script below. Underscore is not a shell
+           metacharacter, so it is safe to add; do NOT widen this further. --->
+      <cfif lookupDomain NEQ "" AND REFind("^[a-zA-Z0-9\._\-]+$", lookupDomain)>
         <cfif containerRunning>
           <cftry>
             <cfinclude template="./inc/generate_customtrans.cfm">
@@ -854,7 +861,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfif>
       <cfelseif lookupDomain NEQ "">
         <div class="alert alert-warning mt-2">
-          <i class="icon fas fa-exclamation-triangle"></i> Invalid domain name. Use only letters, numbers, hyphens, and dots.
+          <i class="icon fas fa-exclamation-triangle"></i> Invalid domain name. Use only letters, numbers, hyphens, dots, and underscores.
         </div>
       </cfif>
     </cfif>

@@ -5,3 +5,20 @@ password = HERMES-PASSWORD
 table = domains
 select_field = domain
 where_field = domain
+# Exclude mailbox domains. `domains` is the master list of every domain with a
+# `type` discriminator ('relay' or 'mailbox'); adding a mailbox domain writes a
+# domains row with type='mailbox' AND a mailbox_domains row with the extended
+# metadata. This map feeds relay_domains, so without the filter every mailbox
+# domain was returned as a relay domain too and Postfix logged:
+#
+#   warning: do not list domain <d> in BOTH virtual_mailbox_domains and
+#            relay_domains
+#
+# Not cosmetic: relay_domains drives reject_unauth_destination and transport
+# selection, so a mailbox domain appearing in both can be relayed instead of
+# delivered locally.
+#
+# Written as "IS NULL OR <> 'mailbox'" rather than "= 'relay'" on purpose: an
+# older install may hold relay rows with an unset type, and "= 'relay'" would
+# silently stop relaying for them. This form only ever removes mailbox domains.
+additional_conditions = AND (type IS NULL OR type <> 'mailbox')

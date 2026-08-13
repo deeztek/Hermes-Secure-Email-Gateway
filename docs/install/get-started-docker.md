@@ -6,13 +6,13 @@ Skip these and Postfix will silently bounce or reject mail. The admin dashboard 
 
 ## Which steps apply to you?
 
-Hermes supports three deployment topologies. **Step 1 (System Identity) and the Optional/DNS sections apply to everyone**. The middle of this guide then splits into a **Relay** path and a **Mail server** path. Follow only the one(s) for your topology:
+Hermes supports three deployment topologies. **Step 1 (System Identity) and the Optional/DNS sections apply to everyone**, and **Step 2 (Console FQDN and a real certificate) is required for anything that uses Nextcloud**. The middle of this guide then splits into a **Relay** path and a **Mail server** path. Follow only the one(s) for your topology:
 
 | Topology | What it is | Follow |
 | --- | --- | --- |
 | **Relay-only** | Hermes filters mail and forwards it to a downstream mail server (MX) | Step 1 → **Relay configuration** |
-| **Mail-server-only** | Hermes hosts the mailboxes itself (Dovecot + webmail) | Step 1 → **Mail server configuration** |
-| **Hybrid** | Both: some domains relay out, others have local mailboxes | Step 1 → **Relay configuration** → **Mail server configuration** |
+| **Mail-server-only** | Hermes hosts the mailboxes itself (Dovecot + webmail) | Step 1 → **Step 2** → **Mail server configuration** |
+| **Hybrid** | Both: some domains relay out, others have local mailboxes | Step 1 → **Step 2** → **Relay configuration** → **Mail server configuration** |
 
 > **Legacy reference**: this page replaces the [pre-Docker 16-step page](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started). The Docker install script absorbs ~6 of those steps, so the list below is shorter.
 
@@ -50,6 +50,98 @@ The install script sets `myhostname` from what you typed at the FQDN prompt, but
 - **Time zone**: affects log timestamps and report scheduling
 
 > **Dashboard nudge**: an orange callout `Placeholder hostname` fires (any topology) if `myhostname` still equals the seed default `hermes.domain.tld` or `console.host` equals `smtp.domain.tld`. Both should never appear on a Docker install (the install script overrides them), but if they do, this is the page to fix.
+
+---
+
+## Step 2: Console FQDN and a real certificate
+
+**Required for mail server and hybrid. Optional for relay-only.**
+
+**Pages**: System → Console Settings, then System → System Certificates
+
+The installer leaves you with a console reachable at the host IP, secured by a self-signed
+bootstrap certificate whose common name is `localhost`. That is deliberate, and it is enough
+to log into the admin console and enough for mail to flow.
+
+**It is not enough for Nextcloud.** Until you finish both parts of this step,
+`https://<console-host>/nc/` login fails for every user, including the administrator. Webmail,
+the Nextcloud Mail client, and file access are all unreachable until it is done.
+
+### Why it fails
+
+Nextcloud signs users in through OIDC. That is not a browser-only flow: the Nextcloud
+container makes its own server-side HTTPS call back to the console address to reach the
+identity provider. On a fresh install that call is refused, because the bootstrap certificate
+is self-signed and its common name is `localhost`, which matches neither the host IP nor the
+FQDN you intend to use.
+
+Importing the bootstrap certificate into Nextcloud's trust store **does not fix this**. Trust
+and name are two separate checks, and the name still does not match. The only fix is a
+certificate issued for the console's real name.
+
+### Part 1: point the console at an FQDN
+
+Create a DNS A record for the name you want (for example `mail.example.tld`) pointing at this
+host, and wait for it to resolve. Then open **System → Console Settings**, enter that FQDN,
+and save. Hermes re-renders Nginx, Authelia and Nextcloud, and restarts the web stack.
+
+The save is gated on DNS: if the name does not resolve to this host, Hermes keeps the current
+address rather than locking you out.
+
+### Part 2: install a real certificate for that FQDN
+
+Go to **System → System Certificates** and issue or import a certificate covering the FQDN you
+just set. The three paths are described under
+[Real TLS Certificate](#real-tls-certificate-all-topologies) below.
+
+The certificate must cover the **console address specifically**. A certificate valid for your
+mail domain but not for the console name leaves Nextcloud login broken in exactly the same
+way.
+
+### Confirm it worked
+
+Open `https://<your-fqdn>/nc/` and log in as any mailbox user. A successful sign-in means the
+OIDC round trip completed, which is the thing that was failing.
+
+If you see "Could not reach the OpenID Connect provider", one of the two parts is incomplete:
+either the console is still on an IP, or the certificate does not cover the name in use.
+
+### Part 3: bind the certificate to SMTP as well
+
+**This is a separate setting and it is the one people miss.** Setting the Console Certificate
+does **not** configure Postfix. They are two independent bindings:
+
+| Role | Page | Serves |
+| --- | --- | --- |
+| Console Certificate | System → Console Settings | nginx on 443: `/admin`, `/users`, `/nc` |
+| SMTP TLS certificate | **System → SMTP TLS Settings** | Postfix on 587 and 465 |
+
+Go to **System → SMTP TLS Settings**, select the same certificate you bound to the console,
+and save.
+
+Skip this and the console looks perfect in a browser while **every mail client gets a
+certificate error**, because Postfix is still serving the install-time bootstrap certificate
+with common name `localhost`. Thunderbird, Outlook and phones either refuse the connection or
+train the user to click through a warning every time.
+
+It has to be the certificate covering the **console host**, because that is the name clients
+are told to use: `autoconfig.cfm` reads `console.host` and hands it out as both the IMAP and
+the SMTP server, and the SRV records on the Mailbox Domains page point at the same host.
+
+Confirm it took:
+
+```bash
+docker exec hermes_postfix_dkim postconf -n | grep smtpd_tls_cert_file
+```
+
+It should name your real certificate. If it still says `bootstrap_hermes.pem`, the setting was
+not saved. A browser check cannot tell you this, because the browser never connects to
+Postfix.
+
+> **Relay-only deployments** do not use Nextcloud, so the Nextcloud half of this step is not
+> blocking. The certificate still matters if your users connect any mail client. Do it before
+> handing the console to anyone else either way, so administrators are not training themselves
+> to click through certificate warnings.
 
 ---
 
@@ -123,7 +215,10 @@ Enter your serial number to unlock Pro features (organizational signatures, encr
 ### Real TLS Certificate *(all topologies)*
 **Page**: System → System Certificates
 
-Replace the bootstrap self-signed certificate with a real one before going live. Three paths:
+Replace the bootstrap self-signed certificate with a real one before going live. On mail
+server and hybrid installs this is **not optional**: Nextcloud login cannot work until the
+console has an FQDN and a certificate issued for it. See
+[Step 2](#step-2-console-fqdn-and-a-real-certificate). Three paths:
 
 | Path | Tier | Workflow |
 | --- | --- | --- |
@@ -133,7 +228,7 @@ Replace the bootstrap self-signed certificate with a real one before going live.
 
 For mailbox-hosting domains, see the in-app "Choosing the Right Certificate Type" panel on the System Certificates page; mailbox certs need SAN coverage for `autoconfig.<domain>` and `autodiscover.<domain>`.
 
-> **Dashboard nudge**: blue informational callout `Self-signed cert` fires when the only row in `system_certificates` is the install-generated bootstrap (no real cert has been imported yet). Lower priority than the other nudges; Hermes still works on bootstrap, just produces a TLS warning in clients.
+> **Dashboard nudge**: blue informational callout `Self-signed cert` fires when the only row in `system_certificates` is the install-generated bootstrap (no real cert has been imported yet). Mail flows on the bootstrap certificate and clients get a TLS warning, but on mail server and hybrid installs the consequence is larger than a warning: **Nextcloud login does not work at all** until a real certificate covering the console FQDN is in place. See [Step 2](#step-2-console-fqdn-and-a-real-certificate).
 
 ### DKIM Signing *(all topologies)*
 **Page**: Content Checks → DKIM
@@ -200,7 +295,13 @@ Hermes' Postfix `postscreen` DNSBL list includes **`b.barracudacentral.org`**, a
 ### CipherMail Console Admin Password *(all topologies (encryption))*
 **Page**: the CipherMail console at `/ciphermail` (behind Authelia SSO)
 
-The CipherMail encryption console has its **own** administrator account, separate from the Hermes/Authelia admin login. After install, sign in to the CipherMail console and change its default administrator password.
+The CipherMail encryption console has its **own** administrator account, separate from the Hermes/Authelia admin login. It ships with CipherMail's stock default credentials:
+
+| Username | Password |
+| --- | --- |
+| `admin` | `admin` |
+
+Sign in with those and change the password immediately. The account is not managed by Hermes, so nothing else will prompt you and no dashboard nudge fires for it. Authelia SSO gates the `/ciphermail` path, which means the default is not reachable from the internet, but it remains a stock credential on an admin interface and should not survive your first login.
 
 ---
 
@@ -215,6 +316,16 @@ A fresh install leaves several things deliberately empty. If you go looking unde
 | **The `migrations` table is empty** | It records one-time upgrade migrations. A fresh install has never upgraded, so there is nothing to record | Nothing |
 | **Bayes reports no data / no effect on scores** | It ships empty and stays inert until ~200 spam + 200 ham are learned | [Train it](#antispam-maintenance-pyzor--razor--bayes-all-topologies) |
 | **`ecprivkey.pem` and `ecpubkey.pem` are empty files** | Mailbox encryption is off by default. The placeholder files exist only so Docker doesn't create directories in their place | Enable it under Email Server → Settings, which generates the real keypair. **Back the keys up**: losing them makes encrypted mail permanently unreadable |
+
+### Nextcloud login needs the console FQDN and a real certificate first
+
+Before anything below matters, the console must be on an FQDN with a certificate issued for
+it. On a fresh install neither is true, and `/nc/` login fails for everyone with "Could not
+reach the OpenID Connect provider". This is the single most common reason webmail appears
+broken on a new deployment. See [Step 2](#step-2-console-fqdn-and-a-real-certificate).
+
+Trusting the bootstrap certificate inside the Nextcloud container does not help, because its
+common name is `localhost` and will never match the console address.
 
 ### Nextcloud must be enabled when you create the mailbox
 
@@ -245,7 +356,7 @@ Each banner links directly to the page where you'd fix the underlying condition 
 
 1. **Inbound test**: send a message from an external account to a recipient on one of your domains. Check Reports → Mail Log to confirm it reached Hermes and was handed off (relay) or delivered to the mailbox (mail server).
 2. **Outbound test** *(relay / hybrid)*: send a message from your customer MTA (the one whose IP you added to Relay Networks) to an external recipient. Confirm DKIM/SPF pass on the receiver side.
-3. **Webmail test** *(mail server / hybrid)*: log in to `https://<console-host>/nc/` as one of your new mailbox users (Authelia SSO) and confirm send/receive.
+3. **Webmail test** *(mail server / hybrid)*: log in to `https://<console-host>/nc/` as one of your new mailbox users (Authelia SSO) and confirm send/receive. If this fails with "Could not reach the OpenID Connect provider", [Step 2](#step-2-console-fqdn-and-a-real-certificate) is incomplete: the console is still on an IP, or the certificate does not cover the name in use.
 4. Visit **System → Dashboard** and confirm both setup nudges are gone (placeholder hostname + self-signed cert).
 5. If you set up Pro features, verify `session.edition` reads "Pro" in the top-right corner of any admin page.
 
