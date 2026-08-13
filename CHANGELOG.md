@@ -58,7 +58,7 @@ beside each release below is the **actual release date**.
   had no `TZ` at all, now receives one.
 - **Amavis trusted a private range that was not the Docker subnet** (#297). The shipped
   `mynetworks` file was a stale snapshot carrying a development LAN, so a fresh install granted
-  originating treatment to an unrelated `192.168.50.0/24` until an administrator saved a Postfix
+  originating treatment to an unrelated private range until an administrator saved a Postfix
   settings page and the file was re-rendered from the database. It now matches the seeded rows.
 - **Four administrative pages rendered a raw error instead of the error page.** `create_new.cfm`,
   `deletedomain.cfm`, `edit_smtp_tls_settings.cfm` and `send_smime_certificate.cfm` included

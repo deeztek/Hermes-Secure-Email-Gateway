@@ -19,6 +19,7 @@ Docker/push-all.sh
 Docker/push-all-ghcr.sh
 Docker/retag-gl-to-ghcr.sh
 Docker/login-ghcr.sh
+Docker/promote-gl-to-ghcr.sh
 Docker/check-ghcr-visibility.sh
 
 # Maintainer-only local git workflow wrappers (generic add/commit/push helpers,
