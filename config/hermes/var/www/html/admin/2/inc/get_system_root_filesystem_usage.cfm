@@ -34,12 +34,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
         
         <cfcatch type="any">
-  
-        <cfset m="/inc/get_system_root_filesystem_usage: There was an error executing /opt/hermes/scripts/disk_space_usage_root.sh">
-        <cfinclude template="error.cfm">
-        <cfabort>   
-  
-        </cfcatch>
+          <!--- Do NOT abort. A disk usage probe is decorative: the script can
+               be missing (an older install that predates this tier) or the
+               path can be unmounted, and neither is a reason to take the whole
+               admin dashboard down with an error page. The default set above
+               stands, the ring renders at 0, and every other panel still
+               loads. Aborting here is what turned a missing script into a
+               dead console. --->
+          </cfcatch>
         </cftry>
   
 
