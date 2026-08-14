@@ -74,7 +74,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset sslstaplingverify = console_ssl_stapling_verify.value2>
 
 <cfquery name="getcertdetails" datasource="hermes">
-  SELECT id, subject, issuer, serial, type, friendly_name FROM system_certificates
+  SELECT id, subject, issuer, serial, type, friendly_name, file_name, system
+  FROM system_certificates
   WHERE id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#consoleCertificate#">
 </cfquery>
 
@@ -131,9 +132,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset sslstaplingverify = console_ssl_stapling_verify.value2>
 
 <cfquery name="getcertdetails" datasource="hermes">
-  SELECT id, subject, issuer, serial, type, friendly_name FROM system_certificates
+  SELECT id, subject, issuer, serial, type, friendly_name, file_name, system
+  FROM system_certificates
   WHERE id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#consoleCertificate#">
 </cfquery>
+
+<!--- Is the certificate bound to this console one a browser will refuse?
+      A self-signed certificate has subject = issuer; the install-time
+      bootstrap certificate is additionally CN=localhost, so it fails name
+      matching as well.
+
+      This gates the HSTS control below. Enabling HSTS against an untrusted
+      certificate pins every browser that has visited this address to refuse
+      it for a year with no click-through, locking the administrator out of
+      the console they are in the middle of configuring. Recovery means
+      clearing the HSTS entry in each browser individually, which is not
+      something an operator can be expected to discover. --->
+<cfset consoleCertUntrusted = false>
+<cfif getcertdetails.recordcount GTE 1>
+  <cfif Trim(getcertdetails.file_name) is "bootstrap"
+        OR (Len(Trim(getcertdetails.subject)) GT 0
+            AND Trim(getcertdetails.subject) is Trim(getcertdetails.issuer))>
+    <cfset consoleCertUntrusted = true>
+  </cfif>
+</cfif>
 
 <cfset session.m = "">
 
@@ -218,9 +240,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="mb-3">
             <label class="form-label"><strong>HTTP Strict Transport Security (HSTS)</strong></label>
             <select class="form-select" name="hsts">
-              <option value="enable" <cfif hsts is "enable">selected</cfif>>Enable (Recommended)</option>
+              <option value="enable" <cfif hsts is "enable">selected</cfif>>Enable<cfif NOT consoleCertUntrusted> (Recommended)</cfif></option>
               <option value="disable" <cfif hsts is "disable">selected</cfif>>Disable</option>
             </select>
+            <cfif consoleCertUntrusted>
+              <div class="alert alert-warning py-2 px-3 mt-2 mb-0" role="alert">
+                <strong>Do not enable HSTS yet.</strong> The certificate bound to this console is
+                self-signed, so browsers do not trust it. Enabling HSTS tells every browser that
+                has visited this address to refuse an untrusted certificate here for one year,
+                with no option to continue anyway. You would lose access to this console, and
+                recovery means clearing the HSTS entry in each browser individually.
+                <br>
+                Bind a publicly trusted certificate first, confirm the console loads with no
+                warning, then come back and enable HSTS.
+              </div>
+            </cfif>
           </div>
 
           <div class="mb-3">

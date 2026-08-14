@@ -1410,9 +1410,21 @@ INSERT IGNORE INTO `parameters2` VALUES (106, 'console.certificate', '29', 'cons
 INSERT IGNORE INTO `parameters2` VALUES (107, 'smtp.certificate', '29', 'certificates', 1, 2);
 INSERT IGNORE INTO `parameters2` VALUES (109, 'console.host', 'smtp.domain.tld', 'console', 1, 2);
 INSERT IGNORE INTO `parameters2` VALUES (133, 'console.dhparam', 'enable', 'console', 1, 2);
-INSERT IGNORE INTO `parameters2` VALUES (134, 'console.hsts', 'enable', 'console', 1, 2);
-INSERT IGNORE INTO `parameters2` VALUES (135, 'console.ssl_stapling', 'enable', 'console', 1, 2);
-INSERT IGNORE INTO `parameters2` VALUES (136, 'console.ssl_stapling_verify', 'enable', 'console', 1, 2);
+-- These three seeded 'enable' while generate_postfix/nginx renders them
+-- COMMENTED OUT at install ("admin enables via UI"). The database and the
+-- live config therefore disagreed on a fresh install, and the first Console
+-- Settings save of any kind -- changing the console address to an FQDN, for
+-- instance, which is the documented happy path -- silently switched all three
+-- on against whatever certificate was bound.
+--
+-- For HSTS that is a self-inflicted lockout: enabled against the self-signed
+-- bootstrap certificate, the browser pins the host for a year and offers no
+-- bypass, so the operator loses the console they were in the middle of
+-- configuring. Seeded 'disable' so the database matches what the installer
+-- actually writes and nothing turns on without the admin choosing it.
+INSERT IGNORE INTO `parameters2` VALUES (134, 'console.hsts', 'disable', 'console', 1, 2);
+INSERT IGNORE INTO `parameters2` VALUES (135, 'console.ssl_stapling', 'disable', 'console', 1, 2);
+INSERT IGNORE INTO `parameters2` VALUES (136, 'console.ssl_stapling_verify', 'disable', 'console', 1, 2);
 INSERT IGNORE INTO `parameters2` VALUES (153, 'mail.certificate', '29', 'certificates', 1, 2);
 INSERT IGNORE INTO `parameters2` VALUES (137, 'HoldQuarantinedMessages', 'false', 'dmarc', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (143, 'duo.self_enrollment', 'true', 'authelia', 1, 1);

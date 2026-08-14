@@ -11,6 +11,23 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **Changing the console address to an FQDN could lock you out of the console for a year.**
+  `console.hsts`, `console.ssl_stapling` and `console.ssl_stapling_verify` were seeded `enable`
+  in the baseline while the installer renders all three **commented out** in the generated Nginx
+  config, its own comment reading "admin enables via UI". The database and the live config
+  therefore disagreed on every fresh install, and the first Console Settings save of any kind
+  regenerated Nginx from the database and silently switched all three on. Changing the console
+  address to an FQDN, which is the documented next step after install, is exactly such a save.
+  With the self-signed bootstrap certificate still bound, HSTS then pins every browser that has
+  visited the address to refuse an untrusted certificate there for a year, with no click-through,
+  so the operator loses the console mid-configuration and can only recover by clearing the HSTS
+  entry in each browser individually. All three now seed `disable`, matching what the installer
+  actually writes, so nothing turns on without the admin choosing it. Console Settings also drops
+  the unqualified "(Recommended)" from HSTS and warns explicitly whenever the bound certificate
+  is self-signed. Existing installs are deliberately left alone: silently disabling HSTS on a
+  gateway that is using it correctly would be a security downgrade applied without consent, and
+  the new warning covers the affected case the moment the page is opened.
+
 - **The console could die on a fresh install depending on which page you opened first.** Thirty
   three admin pages read `/opt/hermes/keys/hermes.key`, the AES-256 key used to encrypt
   credentials at rest, and exactly one page created it: the dashboard, which self-heals it on
