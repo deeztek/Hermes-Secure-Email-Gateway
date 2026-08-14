@@ -163,7 +163,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset _alerts = {
   "2":{type:"danger", msg:"You must select a valid Console Certificate."},
   "3":{type:"danger", msg:"The Console Address must be a valid FQDN or IP Address."},
-  "27":{type:"success", msg:"Console Settings saved successfully. Nginx restarted."}
+  "27":{type:"success", msg:"Console Settings saved successfully. Nginx restarted."},
+  "28":{type:"danger", msg:"HSTS was not enabled, and nothing was saved. The console is still using the self-signed bootstrap certificate (CN=localhost), which no browser trusts and which cannot match your console address. Enabling HSTS against it tells browsers to refuse this address for a year with no way to continue, locking you out of the console. Bind a publicly trusted certificate first, confirm the console loads with no warning, then enable HSTS."}
 }>
 
 <cfif StructKeyExists(_alerts, toString(m))>

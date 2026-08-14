@@ -26,6 +26,43 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
      see the same hostname. --->
 <cfset form.console_host = REReplace(Trim(form.console_host), "\.+$", "")>
 
+<!--- REFUSE HSTS AGAINST THE BOOTSTRAP CERTIFICATE ------------------------
+     Runs before ANY write below, so a refused save applies nothing at all
+     rather than leaving the console half-configured.
+
+     The bootstrap certificate is self-signed with CN=localhost, so it can
+     never be valid for a real console address, even for an operator who has
+     manually trusted it. Enabling HSTS against it therefore always ends the
+     same way: the browser is told to refuse an untrusted certificate at this
+     address for a year, offers no click-through, and the admin loses the
+     console mid-configuration. Recovery means clearing the HSTS entry in
+     every browser that touched the address.
+
+     Deliberately scoped to the bootstrap certificate ONLY, not to every
+     self-signed certificate. A private-CA certificate is not self-signed, and
+     an operator running a genuinely self-signed certificate they have
+     distributed to their own trust stores has a working setup that this must
+     not block. Those cases get the in-place warning on the settings page
+     instead.
+
+     Checks the certificate being SAVED, not the one currently bound, so
+     binding a real certificate and enabling HSTS in the same save is
+     allowed. --->
+<cfif StructKeyExists(form, "hsts") AND form.hsts is "enable"
+      AND StructKeyExists(form, "certificateno_1") AND Trim(form.certificateno_1) is not "">
+  <cfquery name="checkbootstrapcert" datasource="hermes">
+    SELECT id FROM system_certificates
+    WHERE id = <cfqueryparam value="#Trim(form.certificateno_1)#" cfsqltype="cf_sql_integer">
+      AND file_name = <cfqueryparam value="bootstrap" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif checkbootstrapcert.recordcount GTE 1>
+    <cfset session.m = 28>
+    <cfoutput>
+    <cflocation url="#cgi.http_referer#" addtoken="no">
+    </cfoutput>
+  </cfif>
+</cfif>
+
 <!--- CHECK IF IPv4 ADDRESS --->
 <cfif REFind("[0-9]",form.console_host) gt 0 AND REFind("[.]",form.console_host)>
 
