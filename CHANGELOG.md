@@ -7,6 +7,23 @@ Hermes uses **calendar versioning**: release tags are `vYYMMDD`, where the digit
 planning label named for a target date — **not** necessarily the ship date. The date shown
 beside each release below is the **actual release date**.
 
+## Unreleased
+
+### Fixed
+
+- **The console could die on a fresh install depending on which page you opened first.** Thirty
+  three admin pages read `/opt/hermes/keys/hermes.key`, the AES-256 key used to encrypt
+  credentials at rest, and exactly one page created it: the dashboard, which self-heals it on
+  first visit. Reaching any other consumer first produced
+  `source file [/opt/hermes/keys/hermes.key] is not a file` and an unusable page. Console
+  Settings is one of the thirty three, and is a plausible first click on a new install.
+  This is the same defect `ed9b9013` (#179) fixed in May for the dashboard alone, resurfacing
+  elsewhere because that fix covered the reported page rather than the class. The installer now
+  generates the key alongside every other secret, so no page depends on visit order. Byte
+  identical to what the CFML produced, and guarded so an existing key is never overwritten,
+  since replacing it would orphan every credential already encrypted with it. The dashboard
+  self-heal stays as a fallback for a deleted file or a partial restore.
+
 ## [v260814] — 2026-08-14
 
 ### Fixed

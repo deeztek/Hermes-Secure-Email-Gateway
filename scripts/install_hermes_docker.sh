@@ -1762,6 +1762,43 @@ generate_secrets() {
     AUTHELIA_VERSION=$(grep -E '^AUTHELIAVERSION=' "${HERMES_ROOT}/.env" 2>/dev/null         | cut -d= -f2 | tr -d '"' | tr -d "'")
     AUTHELIA_VERSION="${AUTHELIA_VERSION:-4.39.16}"
 
+    # -------------------------------------------------------------------------
+    # hermes.key -- the AES-256 key CFML uses to encrypt credentials at rest
+    # -------------------------------------------------------------------------
+    # Consumed by 30+ admin pages: CipherMail server/client secrets, relay host
+    # passwords, malware feed auth, PGP keyring passphrases, S/MIME imports.
+    #
+    # Nothing created this at install time until now. ed9b9013 (#179) made
+    # admin/2/index.cfm self-heal it on first dashboard visit, which fixed the
+    # page that had been reported and left every OTHER consumer reading it
+    # unguarded. Exactly one file creates it; 33 read it without a FileExists
+    # check. Reach any of those before the dashboard and the console dies with
+    #
+    #   source file [/opt/hermes/keys/hermes.key] is not a file
+    #
+    # Console Settings is one of the 33, and it is a plausible first click on a
+    # brand new install, which is how this resurfaced.
+    #
+    # Generating it here removes the ordering dependency for all of them at
+    # once, rather than adding a 34th guard. The index.cfm self-heal stays as a
+    # fallback for a deleted file or a partial restore.
+    #
+    # Byte-identical to what the CFML writes: generateSecretKey("AES", 256) is
+    # 32 random bytes base64-encoded to 44 characters, and cffile appends a
+    # newline, which is the 45-byte file observed on a healthy install.
+    # `openssl rand -base64 32` produces exactly that.
+    #
+    # Guarded with -s (missing OR empty), never overwritten: this key decrypts
+    # everything already stored, so replacing it on an existing install would
+    # silently orphan every encrypted credential in the database.
+    if [[ ! -s "${SECRETS_DIR}/hermes.key" ]]; then
+        openssl rand -base64 32 > "${SECRETS_DIR}/hermes.key"
+        chmod 644 "${SECRETS_DIR}/hermes.key"
+        log "  + hermes.key (AES-256, credential encryption)"
+    else
+        log "  = hermes.key (kept)"
+    fi
+
     # =========================================================================
     # CREDS_DIR  -- read by CFML, shell scripts, init flows
     # =========================================================================
