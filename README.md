@@ -239,6 +239,8 @@ See the canonical reference at [docs.deeztek.com &middot; Storage Topology (5 ti
 | RAM | 8 GB minimum, 16 GB+ recommended for production |
 | Disk | **Config / OS disk: 120 GB minimum**: OS, Docker engine, the full Hermes image set + running containers, the repo, and install/service logs. The four data tiers (**Data**, **Archive**, **Vmail**, **Nextcloud**) are sized to your anticipated usage; see [Storage topology](#storage-topology). For a small single-disk test install where all tiers collapse onto one disk, ~275 GB total (thin-provisioned) is a comfortable starting point. |
 | Network | Static IP or DHCP reservation. See [docs](https://www.hermesseg.io/download/) for the full inbound + outbound port list (anti-spam services need TCP/2703, UDP/6277, TCP/24441, etc.) |
+| Console address | A **resolvable FQDN with a DNS record**, plus a plan for a **publicly trusted certificate** on it. The installer bootstraps on the host IP with a self-signed certificate so you can log in on day one, but Nextcloud login cannot work until the console address is a real hostname carrying a real certificate: OIDC requires the Nextcloud container to make a server-side HTTPS call back to that address, and it validates the certificate. Note also that the **Console Certificate and the SMTP TLS certificate are separate bindings**: setting only the first leaves the console perfect in a browser while mail clients are still offered the self-signed one, because autoconfig hands clients the console host as their SMTP server. |
+| Host clock | **Must be correct and synchronised.** Hermes runs its own validating DNS resolver, and DNSSEC signatures are checked against the local clock, so a skewed clock invalidates every signature and takes all name resolution down with it. This bites hardest after restoring a VM snapshot. |
 
 ### Optional but recommended
 
@@ -265,6 +267,16 @@ Clone the repository wherever you'd like Hermes installed:
 sudo git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git
 cd Hermes-Secure-Email-Gateway
 ```
+
+**If you are reusing a clone made earlier, pull first:**
+
+```bash
+sudo git pull
+```
+
+The installer does not update itself. It runs whatever version of the script is
+in your working tree, so an older clone installs an older installer, including
+any first-run defects fixed since. A fresh clone is always current.
 
 ### 2. Run the installer
 
