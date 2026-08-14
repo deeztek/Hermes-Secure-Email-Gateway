@@ -11,6 +11,52 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **Nextcloud got one install attempt and could never recover from failing it** (#313). The
+  `nextcloud:apache` entrypoint runs `occ maintenance:install` exactly once, on first boot. If
+  MariaDB had not finished creating the Nextcloud database user by then, that attempt failed
+  and left a partial `config.php` carrying `dbname` and `dbhost` but no `dbuser`, no
+  `dbpassword` and no `installed` key. Every later boot read that file, concluded Nextcloud was
+  already configured, and never retried, so the container sat up and healthy and uninstalled
+  indefinitely. Not a timeout: the installer's advice to re-run `--init-db` could not work,
+  because the re-run reached the same already-configured short circuit, and widening the
+  two-minute poll would not help because nothing was still running to wait for. The installer
+  now drives the install itself when it finds `installed: false`, preserving the partial
+  `config.php` under a date-stamped name, confirming the database user can open the database,
+  then running `maintenance:install` with the credentials it already generated and applying
+  `NEXTCLOUD_TRUSTED_DOMAINS` afterwards, which the entrypoint would otherwise have done and
+  whose absence is the #292 untrusted-domain defect. The poll is kept as the fast path, so a
+  healthy install is unchanged. Present since the Docker edition's root commit.
+- **A wrong host clock took DNS down and the installer blamed the forwarders** (#314). Unbound
+  validates DNSSEC locally, against the host clock, on every answer it receives; forwarding
+  does not delegate that to the upstream resolver. With the clock skewed, every signature reads
+  as invalid, and because the failing signature is on the root zone, Unbound cannot establish
+  trust for anything beneath it, so all name resolution stops rather than only signed zones.
+  Unbound then caches the invalid key, so correcting the clock alone does not restore service,
+  and NTP hostnames no longer resolve so the clock cannot fix itself. The DNS preflight reported
+  this as a forwarder problem, which is the one thing it is not. It now inspects Unbound's log
+  for `signature before inception`, `signature expired` and `key for validation ... marked as
+  invalid`, and separately checks whether the host clock is behind the commit being installed,
+  which proves the clock is wrong without needing any network. Diagnosis only: no new check
+  gates a healthy install and nothing new runs unless DNS has already failed. Present since the
+  Docker edition's root commit.
+- **A failed disk probe could take down the whole admin console.** The dashboard's five storage
+  rings each ran a probe inside a `cftry` whose `cfcatch` rendered an error page and aborted, so
+  a missing probe script or an unmounted path killed `index.cfm` outright instead of losing one
+  ring. Reachable on any gateway installed before the archive tier was added in #260, since
+  those have no `disk_space_usage_archive.sh`. The catch now leaves the ring's default in place
+  and returns. Completes the fix begun in v260807, where the probes gained defaults so an empty
+  result could not leave the variable undefined.
+- **The release workflow could not run its own drift check.** `scripts/check_ofelia_seed_drift.sh`
+  was committed non-executable, so the release-images workflow failed at "Verify generated
+  artifacts" with permission denied and skipped the retag job. Same class as the pre-push hook
+  in #296: a script that only ever runs from a fresh checkout, where the git file mode is the
+  only mode that counts. No effect on v260807, whose images were promoted by hand from the
+  tested artifacts.
+
+## [v260807] — 2026-08-13
+
+### Fixed
+
 - **OpenDMARC rejected a domain's own authenticated users** (#300). `submission` and `smtps`
   did not override `smtpd_milters`, so they inherited the global chain including OpenDMARC,
   which then evaluated authenticated outbound mail as though it were inbound. That fails by
@@ -251,11 +297,6 @@ beside each release below is the **actual release date**.
   own users, and does not permit redistributing binaries. Most self-hosted operators
   qualify; Deeztek does not. `docker-compose.yml` carries a commented build block for
   operators who want it, fetching DCC from Rhyolite directly.
-- **Let's Encrypt / ACME certificate management is now available in all editions** (#282).
-  The console-certificate **Request ACME Certificate** button and the mailbox-domain
-  **Auto-managed (Let's Encrypt)** SAN certificate mode — automated issuance, SAN
-  validation, and auto-renewal — are no longer restricted to Pro Edition. Existing Pro
-  installations are unaffected.
 
 ### Documentation
 
@@ -276,6 +317,17 @@ beside each release below is the **actual release date**.
   `:10026` outage, because commit `9e90bc9a` fixed the real file and not the copy, and nothing
   read the copy so nothing detected it. Both it and an equally stale `master.cf.postscreen` are
   removed, and `docs/general/email-flow.md` records why a second copy must not be reintroduced.
+
+## [v260628] — 2026-06-28
+
+### Changed
+
+- **Let's Encrypt / ACME certificate management is now available in all editions** (#282).
+  The console-certificate **Request ACME Certificate** button and the mailbox-domain
+  **Auto-managed (Let's Encrypt)** SAN certificate mode — automated issuance, SAN
+  validation, and auto-renewal — are no longer restricted to Pro Edition. Existing Pro
+  installations are unaffected.
+
 
 ## [v260612] — 2026-06-20
 

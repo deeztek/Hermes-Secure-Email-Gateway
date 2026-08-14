@@ -1,0 +1,33 @@
+-- =====================================================================
+-- Hermes SEG schema updates -- v260814
+--
+-- Idempotent (safe to re-run). Applied by apply_schema_updates() /
+-- system_update_docker.sh for installs upgrading from an earlier build;
+-- NOT run on fresh installs (those get the current schema from
+-- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
+--
+-- This release has NO schema changes. It is a fresh-install release: the
+-- two defects it fixes (#313, #314) both live in the installer and are
+-- only reachable while a gateway is being built for the first time. The
+-- one change that matters to an existing install is a CFML fix to the
+-- dashboard, which needs no schema support.
+--
+-- So this file exists solely to advance build_no. That is not ceremony:
+-- the update orchestrator reads build_no to decide which release
+-- directories are still pending, and warns if a release finishes without
+-- stamping. A release with no schema work still has to stamp.
+--
+-- DELIBERATELY ABSENT:
+--
+--   Anything that would re-run the installer's Nextcloud or DNS logic
+--   against a live gateway. Both fixes are recovery paths for a first
+--   install that failed. On an established install Nextcloud is already
+--   installed and DNS already resolves, so there is nothing to recover
+--   and running the paths anyway would only add risk.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- the update orchestrator records this release as applied).
+-- ---------------------------------------------------------------------
+UPDATE system_settings SET value = 'v260814' WHERE parameter = 'build_no';
