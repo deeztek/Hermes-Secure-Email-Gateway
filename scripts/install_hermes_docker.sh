@@ -1378,6 +1378,56 @@ preflight_checks() {
     log "Pre-flight checks completed"
 }
 
+# ----------------------------------------------------------------------------
+# Is a DNS failure actually a wrong host clock? (#314)
+# ----------------------------------------------------------------------------
+# hermes_unbound sets auto-trust-anchor-file, which activates the validator.
+# Forwarding does NOT delegate validation: unbound checks RRSIG inception and
+# expiry itself, against the LOCAL clock, on every answer it receives. So a
+# skewed host clock makes every signature invalid, and because the failing
+# signature is on the root zone, unbound cannot establish trust for anything
+# below it. All DNS dies, not just signed zones.
+#
+# The trap is that this looks exactly like a dead forwarder, and the generic
+# error in preflight_dns_check names forwarders as cause 1. Reverting a VM
+# snapshot is the normal way to get here, and it cost us two misdiagnoses.
+#
+# Deliberately NOT a preflight gate. There is no degraded-but-working state to
+# warn about, and a standalone clock check would misfire on hosts whose time is
+# correct but managed outside systemd. This runs only after DNS has ALREADY
+# failed, so a healthy install never executes a line of it.
+_dns_failure_is_clock_skew() {
+    CLOCK_EVIDENCE=""
+    local found=0
+
+    # Signal 1: unbound's own validator saying so. Authoritative when present.
+    local val_hits
+    val_hits=$(docker logs --tail 200 hermes_unbound 2>&1 \
+        | grep -iE 'signature before inception|signature expired|key for validation.*marked as invalid' \
+        | tail -3 || true)
+    if [[ -n "$val_hits" ]]; then
+        CLOCK_EVIDENCE+="  unbound is rejecting DNSSEC signatures on time grounds:"$'\n'
+        CLOCK_EVIDENCE+="$(sed 's/^/    /' <<< "$val_hits")"$'\n'
+        found=1
+    fi
+
+    # Signal 2: the clock is behind the commit being installed. Free, needs no
+    # network, and proves the clock is wrong rather than merely unsynchronised
+    # -- you cannot be installing code from the future. Catches backward skew,
+    # which is what produces 'signature before inception'.
+    local head_epoch now_epoch
+    head_epoch=$(git -C "$HERMES_ROOT" log -1 --format=%ct 2>/dev/null || echo "")
+    now_epoch=$(date +%s)
+    if [[ -n "$head_epoch" ]] && (( now_epoch < head_epoch )); then
+        CLOCK_EVIDENCE+="  the host clock is BEHIND the code it is installing:"$'\n'
+        CLOCK_EVIDENCE+="    host clock:  $(date -d "@${now_epoch}" 2>/dev/null || date)"$'\n'
+        CLOCK_EVIDENCE+="    HEAD commit: $(date -d "@${head_epoch}" 2>/dev/null || echo "${head_epoch}")"$'\n'
+        found=1
+    fi
+
+    [[ $found -eq 1 ]]
+}
+
 # ============================================================================
 # PREFLIGHT DNS CHECK (phase 2 / --init-db)
 # ============================================================================
@@ -1447,7 +1497,47 @@ EOF
         return 0
     fi
 
-    # Failed. Give an actionable error message.
+    # Failed. Before blaming the forwarder, check whether the host clock is the
+    # real cause (#314) -- the symptom is identical and the fix is not.
+    if _dns_failure_is_clock_skew; then
+        cat <<EOF >&2
+
+[FATAL] DNS resolution failed -- the host clock is wrong
+
+This is NOT a forwarder problem. hermes_unbound validates DNSSEC against the
+local clock, on forwarded answers as well as recursive ones. With the clock
+skewed, every signature reads as invalid, including the root zone's, so no
+name resolves at all.
+
+Evidence:
+
+${CLOCK_EVIDENCE}
+Fix the clock first, then clear unbound's cache. The invalid-key state is
+cached, so correcting the time alone is not enough:
+
+  1. Set the clock by hand, in UTC. Do this first: NTP will not help yet,
+     because its server names cannot resolve while DNS is down, which is
+     why time.cloudflare.com may appear in the evidence above.
+       date -s "YYYY-MM-DD HH:MM:SS"
+
+  2. Confirm it is right:
+       date -u
+
+  3. Restart unbound so the cached invalid keys are discarded. Correcting
+     the clock alone will NOT restore DNS without this:
+       docker compose restart hermes_unbound
+
+  4. Re-run this script.
+
+  5. Once DNS is working again, hand back to NTP so it stays correct:
+       timedatectl set-ntp true
+
+EOF
+        error "DNS preflight check failed (host clock)"
+        return 1
+    fi
+
+    # Give an actionable error message.
     cat <<EOF >&2
 
 [FATAL] DNS resolution failed -- container cannot resolve ${test_host}
@@ -1474,6 +1564,10 @@ Most likely causes:
   2. DNSSEC validation failing on root anchor or recursive query
      errors. Check unbound logs:
        docker logs --tail 50 hermes_unbound
+
+     If you see "signature before inception", "signature expired" or
+     "key for validation ... marked as invalid", the host clock is wrong.
+     Correct it, then restart hermes_unbound to drop the cached bad keys.
 
   3. Host has no outbound DNS at all. Test from the host:
        dig @1.1.1.1 ${test_host}    # should succeed
@@ -4068,6 +4162,132 @@ build_postfix_lookup_tables() {
     log "  built ${built}/${total} lookup-table .db file(s): ${hash_maps//$'\n'/ }"
 }
 
+# ============================================================================
+# NEXTCLOUD: RECOVER A FAILED ONE-SHOT INSTALL (#313)
+# ============================================================================
+# The nextcloud:apache entrypoint runs `occ maintenance:install` exactly ONCE,
+# on first boot, when the admin credentials are present as Docker secrets. If
+# hermes_db_server has not finished creating the nextcloud DB user by the time
+# that runs, the attempt fails and leaves a PARTIAL config.php behind: it has
+# dbname and dbhost, but no dbuser, no dbpassword and no 'installed' key.
+#
+# On every subsequent boot the entrypoint sees that file, concludes Nextcloud
+# is already configured, and never retries. The container stays up and healthy
+# forever in an uninstalled state.
+#
+# That is why this is not a timeout problem. Widening the 120s poll cannot help
+# -- nothing is still running to wait for -- and the "re-run --init-db" advice
+# loops, because the re-run hits the same already-configured short circuit.
+#
+# So drive the install ourselves, using the credentials this script already
+# generated. Safe to call unconditionally: it returns immediately when
+# Nextcloud is genuinely installed, so it can only ever act on the dead path.
+nextcloud_ensure_installed() {
+    if docker exec -u www-data hermes_nextcloud \
+           php /var/www/html/occ status 2>&1 | grep -q "installed: true"; then
+        return 0
+    fi
+
+    log "  Nextcloud reports installed: false -- running maintenance:install directly (#313)"
+
+    # Read the credentials from /run/secrets rather than from CREDS_DIR on the
+    # host. Those are the exact bytes the entrypoint itself would have used, so
+    # this cannot drift from the container's own view of its configuration.
+    local nc_db_user nc_db_pass nc_admin_user nc_admin_pass
+    nc_db_user=$(docker exec hermes_nextcloud cat /run/secrets/NEXTCLOUD_MYSQL_USER 2>/dev/null || echo "")
+    nc_db_pass=$(docker exec hermes_nextcloud cat /run/secrets/NEXTCLOUD_MYSQL_PASSWORD 2>/dev/null || echo "")
+    nc_admin_user=$(docker exec hermes_nextcloud cat /run/secrets/NEXTCLOUD_ADMIN_USER 2>/dev/null || echo "")
+    nc_admin_pass=$(docker exec hermes_nextcloud cat /run/secrets/NEXTCLOUD_ADMIN_PASSWORD 2>/dev/null || echo "")
+
+    if [[ -z "$nc_db_user" || -z "$nc_db_pass" || -z "$nc_admin_user" || -z "$nc_admin_pass" ]]; then
+        warn "  Nextcloud secrets are not readable inside hermes_nextcloud."
+        warn "  Expected /run/secrets/NEXTCLOUD_{MYSQL,ADMIN}_{USER,PASSWORD}."
+        warn "  Check the secrets: block in docker-compose.yml against ${CREDS_DIR}/."
+        return 1
+    fi
+
+    # Confirm the DB user actually works before spending a minute on an install
+    # that would fail the same way. This is precisely the condition that lost
+    # the original race, so check it rather than assume create_databases won.
+    if ! docker exec hermes_db_server \
+             mysql -u "$nc_db_user" -p"$nc_db_pass" -e "USE nextcloud;" >> "$LOG_FILE" 2>&1; then
+        warn "  The nextcloud DB user still cannot open the nextcloud database."
+        warn "  MariaDB is not ready, or create_databases has not run. Re-run --init-db."
+        return 1
+    fi
+
+    # Move the partial config.php aside. Date-stamped and never deleted: if the
+    # install still fails, that file is the evidence of what went wrong.
+    local stamp
+    stamp=$(date +%Y%m%d-%H%M%S)
+    if docker exec hermes_nextcloud test -f /var/www/html/config/config.php 2>/dev/null; then
+        if docker exec hermes_nextcloud \
+               mv /var/www/html/config/config.php \
+                  "/var/www/html/config/config.php.partial-${stamp}" >> "$LOG_FILE" 2>&1; then
+            log "    Partial config.php preserved as config.php.partial-${stamp}"
+        else
+            warn "  Could not move the partial config.php aside -- cannot reinstall."
+            return 1
+        fi
+    fi
+
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ maintenance:install \
+        --database mysql \
+        --database-host hermes_db_server \
+        --database-name nextcloud \
+        --database-user "$nc_db_user" \
+        --database-pass "$nc_db_pass" \
+        --admin-user "$nc_admin_user" \
+        --admin-pass "$nc_admin_pass" \
+        --data-dir /var/www/html/data >> "$LOG_FILE" 2>&1 || true
+
+    if ! docker exec -u www-data hermes_nextcloud \
+             php /var/www/html/occ status 2>&1 | grep -q "installed: true"; then
+        warn "  maintenance:install did not complete. See ${LOG_FILE} for the occ output."
+        return 1
+    fi
+    log "    Nextcloud installed"
+
+    # The image entrypoint applies NEXTCLOUD_TRUSTED_DOMAINS only during ITS
+    # OWN maintenance:install. We just did that install instead, so that step
+    # never ran, and without it Nextcloud rejects every hostname with "Access
+    # through untrusted domain" -- the exact #292 defect fixed in v260807.
+    # Recovering the install while reintroducing that would be no recovery at
+    # all, so apply them here.
+    #
+    # Mirrors the entrypoint: whitespace-split (the unquoted expansion below is
+    # deliberate, and is why generate_compose_override writes the list
+    # space-separated rather than comma-joined), starting at index 1, because
+    # maintenance:install has already put localhost in index 0.
+    #
+    # Only trusted_domains needs this. The other env-driven settings (REDIS_*,
+    # OVERWRITE*, TRUSTED_PROXIES, SMTP_*) are read on every request by the
+    # image's own config/*.config.php files, so they are unaffected by which
+    # process ran the install.
+    local trusted_domains
+    trusted_domains=$(grep -E '^NEXTCLOUD_TRUSTED_DOMAINS=' "${HERMES_ROOT}/.env" 2>/dev/null \
+        | cut -d= -f2- | tr -d '"' | tr -d "'")
+
+    if [[ -z "$trusted_domains" ]]; then
+        warn "  NEXTCLOUD_TRUSTED_DOMAINS is empty in .env. Nextcloud will reject every"
+        warn "  hostname until an admin saves System > Console Settings."
+        return 0
+    fi
+
+    local idx=1 domain
+    for domain in $trusted_domains; do
+        if docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+               config:system:set trusted_domains "$idx" --value="$domain" >> "$LOG_FILE" 2>&1; then
+            log "    trusted_domains[${idx}] = ${domain}"
+        else
+            warn "  Could not set trusted_domains[${idx}] = ${domain}"
+        fi
+        idx=$((idx + 1))
+    done
+
+    return 0
+}
+
 run_phase2_db_init() {
     touch "$LOG_FILE"
     log "Phase 2 (post-container) initialization started at $(date)"
@@ -4180,10 +4400,21 @@ run_phase2_db_init() {
         done
 
         if [[ $NC_READY -eq 0 ]]; then
-            warn "Nextcloud did not finish auto-installing within 120s -- skipping post-install configuration"
-            warn "Re-run --init-db once Nextcloud is ready; state-guard will skip completed"
-            warn "steps and retry the Nextcloud block."
-            NC_SKIP=1
+            # The poll is the fast path, not the only path. Reaching here means
+            # either the auto-install is genuinely still running (rare, and a
+            # longer wait would fix it) or it already failed and left a partial
+            # config.php that stops it ever retrying (#313). Only the second
+            # case is common, and no amount of waiting recovers it, so attempt
+            # the install ourselves before giving up.
+            log "  Auto-install did not report success within 120s -- attempting recovery"
+            if nextcloud_ensure_installed; then
+                NC_READY=1
+            else
+                warn "Nextcloud is not installed and could not be installed -- skipping post-install configuration"
+                warn "The Nextcloud step is NOT marked complete, so re-running --init-db will retry it"
+                warn "once the underlying problem (see warnings above) is resolved."
+                NC_SKIP=1
+            fi
         fi
     fi
 
