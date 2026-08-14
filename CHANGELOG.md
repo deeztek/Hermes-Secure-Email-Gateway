@@ -7,7 +7,7 @@ Hermes uses **calendar versioning**: release tags are `vYYMMDD`, where the digit
 planning label named for a target date — **not** necessarily the ship date. The date shown
 beside each release below is the **actual release date**.
 
-## Unreleased
+## [v260814] — 2026-08-14
 
 ### Fixed
 
