@@ -41,6 +41,69 @@ beside each release below is the **actual release date**.
   since replacing it would orphan every credential already encrypted with it. The dashboard
   self-heal stays as a fallback for a deleted file or a partial restore.
 
+## Unreleased
+
+### Added
+
+- **Distribution lists, as aliases with more than one destination** (#311). An alias can now
+  deliver to several addresses. No new page and no new concept: a list is an alias with more
+  than one destination, so **Email Relay → Virtual Recipients** and **Email Server → Aliases**
+  gained the capability instead of a third page appearing beside them. Both group by address,
+  so twenty destinations render as one row with twenty chips rather than twenty near-identical
+  lines, each chip editable and removable on its own. Relay domains could always express this,
+  since that table never stopped an address appearing on several rows and Postfix concatenates
+  the rows it gets back into one recipient list; lists built by hand that way are already in the
+  right shape and simply display grouped.
+- **Reachable By**, controlling who may send *to* an address, which is a different question from
+  where it delivers (#311). Enforced by a new `check_recipient_access` MySQL map, following the
+  shape of the discard-recipients map already in that chain. `permit_mynetworks` short-circuits
+  ahead of it, so anything reaching the map arrived from outside and a plain `REJECT` is correct;
+  no sender-domain test is used, since trusting an unauthenticated claim to be from your own
+  domain would be worse than useless on a gateway. This is what makes external destinations
+  defensible: without it an alias fanning out to twenty external addresses is reachable by
+  anyone on the internet.
+
+### Changed
+
+- **External destinations are permitted on mailbox domains**, and flagged wherever they appear
+  on both pages (#311). Previously every destination had to be an existing local mailbox, while
+  relay domains allowed external freely, which was an inconsistency rather than a policy.
+  Forwarded mail leaves with the original sender's address, so SPF fails at the receiving end,
+  and content modification such as an External Banner invalidates the original DKIM signature,
+  which together can mean rejection for senders publishing a strict DMARC policy. Badged rather
+  than warned about once, because the person auditing in six months is not the person who
+  created it.
+- **Send-As is granted per mailbox** rather than per alias, under **Mailboxes → Actions → Send
+  As**. A single toggle on an alias worked while an alias had one destination and stopped making
+  sense the moment it could have twenty, since it would have granted send-as to every member of
+  a list at once. Membership and send-as are now independent. Existing grants are unchanged.
+  Editing an alias's destination no longer moves the grant with it, which is deliberate: the
+  grant means "this mailbox may send from this address" and has nothing to do with delivery.
+
+### Fixed
+
+- **Nextcloud group names were visible across tenants** (#316). Mail's recipient autocomplete
+  suggested every group on the instance, unfiltered by the requesting user's membership. Since
+  Hermes names its Nextcloud groups after domains, a user at one customer could type part of
+  another customer's domain and have it suggested by name, and the LDAP and Authelia
+  infrastructure groups were visible to every mailbox user. The installer already set
+  `shareapi_restrict_user_enumeration_to_group`, but that governs users; groups take a separate
+  path, so the protection had a hole its setting name gave no hint of. Group sharing is now
+  disabled on both new and existing installs, which closes it. Cost: a file can no longer be
+  shared with an entire group; user-to-user sharing, including cross-domain, is unaffected.
+- **`virtual_recipients` had no index on the column Postfix looks it up by**, so every message
+  caused a full table scan of that table. Unnoticed at a handful of rows, and about to matter
+  considerably more now that operators can build twenty-member lists there.
+- **A validator would have rejected a destination list outright.** The Virtual Recipients page
+  checked `forwards_1` as a single email address before its handler ever ran, so a
+  comma-separated list would have failed as "not a valid email". It now validates each entry,
+  failing on the first bad one rather than silently dropping it and reporting partial success.
+  Also added the missing guard for an empty destination list, which previously produced a
+  success page that had changed nothing.
+- **Removing the Send-As control would have silently zeroed the column on every alias edit**,
+  because the handler still read a form field that no longer existed and `cfparam` defaulted it
+  to 0. Caught before release; the column is now left exactly as found.
+
 ## [v260814] — 2026-08-14
 
 ### Fixed
