@@ -4523,6 +4523,34 @@ run_phase2_db_init() {
             && log "  User enumeration restricted to same-domain groups (full email match allowed for cross-domain shares)" \
             || log "  WARNING: Failed to set user enumeration restrictions"
 
+        # Stop GROUP names leaking across tenants (#316).
+        #
+        # The three settings above restrict enumeration of USERS. Groups take
+        # an entirely separate path, so the protection had a hole the setting
+        # names give no hint of: Mail's recipient autocomplete suggests every
+        # group on the instance, unfiltered by the requesting user's
+        # membership.
+        #
+        # On Hermes that matters more than it would elsewhere, because groups
+        # are named after domains. A user at one customer could type part of
+        # another customer's domain and have it suggested, and the LDAP and
+        # Authelia infrastructure groups (admins, one_factor, two_factor,
+        # nc_local_admins_2fa) were visible to every mailbox user.
+        #
+        # Mail's NextcloudGroupService::search() returns nothing when either
+        # of two core settings is off its default. This is the one to change:
+        # the alternative, shareapi_only_share_with_group_members=yes, also
+        # closes it but restricts sharing to users within your own groups,
+        # which would break the cross-domain full-email-match sharing enabled
+        # on the line above.
+        #
+        # Cost: a file can no longer be shared with an entire group.
+        # User-to-user sharing, including cross-domain, is unaffected.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:app:set core shareapi_allow_group_sharing --value=no >> "$LOG_FILE" 2>&1 \
+            && log "  Group sharing disabled (stops group names leaking across tenants, #316)" \
+            || log "  WARNING: Failed to disable group sharing"
+
         # External Sites: "User Console" link in NC top menu
         if [[ -n "$NC_HOSTNAME" ]]; then
             docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set external sites \
