@@ -49,15 +49,21 @@ beside each release below is the **actual release date**.
 ### Fixed
 
 
-- **Nextcloud group names were visible across tenants** (#316). Mail's recipient autocomplete
-  suggested every group on the instance, unfiltered by the requesting user's membership. Since
-  Hermes names its Nextcloud groups after domains, a user at one customer could type part of
-  another customer's domain and have it suggested by name, and the LDAP and Authelia
-  infrastructure groups were visible to every mailbox user. The installer already set
-  `shareapi_restrict_user_enumeration_to_group`, but that governs users; groups take a separate
-  path, so the protection had a hole its setting name gave no hint of. Group sharing is now
-  disabled on both new and existing installs, which closes it. Cost: a file can no longer be
-  shared with an entire group; user-to-user sharing, including cross-domain, is unaffected.
+- **Nextcloud sharing now stays inside your own domain by default** (#316). Two things at once.
+  First, isolation: a gateway can host unrelated organisations side by side, and Nextcloud groups
+  are named after domains, so restricting shares to members of your own groups stops a user
+  sharing a file into another customer's organisation. Second, it closes a disclosure: Mail's
+  recipient autocomplete suggested every group on the instance, unfiltered by the requesting
+  user's membership, so a user at one customer could type part of another customer's domain and
+  have it suggested by name, and the LDAP and Authelia infrastructure groups were visible to
+  every mailbox user. The installer already set `shareapi_restrict_user_enumeration_to_group`,
+  but that governs users; groups take a separate path, so the protection had a hole its setting
+  name gave no hint of. `shareapi_only_share_with_group_members` was chosen over disabling group
+  sharing outright, because the latter would also have removed sharing with a whole group
+  *within* a domain, which is useful and unrelated to the problem. A default rather than a
+  policy: an operator running one organisation across several domains turns it off under
+  Administration settings, Sharing. Hermes adds no setting of its own, since Nextcloud already
+  exposes one.
 - **`virtual_recipients` had no index on the column Postfix looks it up by**, so every message
   caused a full table scan of that table. Unnoticed at a handful of rows, and about to matter
   considerably more now that operators can build twenty-member lists there.

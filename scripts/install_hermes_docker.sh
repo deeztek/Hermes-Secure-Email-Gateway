@@ -4523,33 +4523,41 @@ run_phase2_db_init() {
             && log "  User enumeration restricted to same-domain groups (full email match allowed for cross-domain shares)" \
             || log "  WARNING: Failed to set user enumeration restrictions"
 
-        # Stop GROUP names leaking across tenants (#316).
+        # Keep sharing inside the tenant by default (#316).
         #
-        # The three settings above restrict enumeration of USERS. Groups take
-        # an entirely separate path, so the protection had a hole the setting
-        # names give no hint of: Mail's recipient autocomplete suggests every
-        # group on the instance, unfiltered by the requesting user's
-        # membership.
+        # Two things at once, and the second is why this setting rather than
+        # the obvious-looking alternative.
         #
-        # On Hermes that matters more than it would elsewhere, because groups
-        # are named after domains. A user at one customer could type part of
-        # another customer's domain and have it suggested, and the LDAP and
-        # Authelia infrastructure groups (admins, one_factor, two_factor,
-        # nc_local_admins_2fa) were visible to every mailbox user.
+        # First, isolation. A Hermes gateway may host unrelated organisations
+        # side by side, and groups are named after domains. Restricting shares
+        # to members of your own groups therefore means a user cannot share a
+        # file into another customer's organisation.
+        #
+        # Second, it closes a group-name disclosure. Mail's recipient
+        # autocomplete suggested EVERY group on the instance, unfiltered by
+        # the requesting user's membership, so a user at one customer could
+        # type part of another customer's domain and have it suggested by
+        # name, and the LDAP and Authelia infrastructure groups (admins,
+        # one_factor, two_factor, nc_local_admins_2fa) were visible to every
+        # mailbox user. The three settings above restrict enumeration of
+        # USERS; groups take a separate path, so that protection had a hole
+        # its setting names give no hint of.
         #
         # Mail's NextcloudGroupService::search() returns nothing when either
-        # of two core settings is off its default. This is the one to change:
-        # the alternative, shareapi_only_share_with_group_members=yes, also
-        # closes it but restricts sharing to users within your own groups,
-        # which would break the cross-domain full-email-match sharing enabled
-        # on the line above.
+        # shareapi_allow_group_sharing is off, or this is on. Choosing this
+        # one deliberately: disabling group sharing outright would also remove
+        # the ability to share with a whole group WITHIN a domain, which is
+        # useful and has nothing to do with the problem.
         #
-        # Cost: a file can no longer be shared with an entire group.
-        # User-to-user sharing, including cross-domain, is unaffected.
+        # A default, not a policy. An operator running a single organisation
+        # across several domains legitimately wants cross-domain sharing, and
+        # turns this off under Administration settings, Sharing, "Restrict
+        # users to only share with users in their groups". No Hermes UI for
+        # it, since Nextcloud already has one.
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-            config:app:set core shareapi_allow_group_sharing --value=no >> "$LOG_FILE" 2>&1 \
-            && log "  Group sharing disabled (stops group names leaking across tenants, #316)" \
-            || log "  WARNING: Failed to disable group sharing"
+            config:app:set core shareapi_only_share_with_group_members --value=yes >> "$LOG_FILE" 2>&1 \
+            && log "  Sharing restricted to same-domain members (tenant isolation, also closes #316)" \
+            || log "  WARNING: Failed to restrict sharing to group members"
 
         # External Sites: "User Console" link in NC top menu
         if [[ -n "$NC_HOSTNAME" ]]; then

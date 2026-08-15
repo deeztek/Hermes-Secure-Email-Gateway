@@ -74,21 +74,38 @@ alias's destination no longer moves the grant along with it. That is deliberate,
 since the grant now means "this mailbox may send from this address" and has
 nothing to do with where the address delivers.
 
-### Nextcloud group names were visible across tenants
+### Nextcloud sharing now stays inside your own domain by default
 
-Nextcloud Mail's recipient autocomplete suggested **every group on the instance**,
-unfiltered by who was asking. Hermes names its Nextcloud groups after domains, so
-a user at one customer could type part of another customer's domain and have it
-suggested by name. The infrastructure groups were visible to every mailbox user
-too: `admins`, `mailboxes`, `one_factor`, `two_factor`, `nc_local_admins_2fa`.
+Two things, and the second is the one that prompted it.
 
-The installer already restricted enumeration of **users** for exactly this reason.
-Groups take a separate path, so the protection had a hole its setting name gave no
-hint of.
+**Isolation.** A gateway can host unrelated organisations side by side. Sharing is
+now restricted to members of your own domain, so a user cannot share a file into
+another organisation on the same gateway.
 
-Group sharing is now disabled, which closes it. **Cost:** a file can no longer be
-shared with an entire group. Sharing with individual users, including across
-domains, is unaffected.
+**A group-name disclosure, now closed.** Nextcloud Mail's recipient autocomplete
+suggested **every group on the instance**, unfiltered by who was asking. Since
+Hermes names its Nextcloud groups after domains, a user at one customer could type
+part of another customer's domain and have it suggested by name. The
+infrastructure groups were visible to every mailbox user too: `admins`,
+`mailboxes`, `one_factor`, `two_factor`, `nc_local_admins_2fa`. The installer
+already restricted enumeration of **users** for exactly this reason; groups take a
+separate path, so that protection had a hole its setting name gave no hint of.
+
+**Sharing with a whole group still works**, within a domain. Only sharing *across*
+domains is restricted.
+
+### If you run one organisation across several domains, change this back
+
+This is a default, not a policy. If your gateway serves a single organisation that
+happens to use several domains, cross-domain sharing is entirely legitimate and you
+will want it back.
+
+Turn it off in Nextcloud under **Administration settings → Sharing → "Restrict
+users to only share with users in their groups"**.
+
+Hermes deliberately adds no setting of its own for this, since Nextcloud already
+exposes it. Be aware that turning it off also restores the group-name visibility
+described above.
 
 Applied automatically to both new and existing installs.
 
@@ -137,10 +154,10 @@ docker exec hermes_db_server mysql -u root hermes \
 # The new lookup map exists
 ls -l config/postfix-dkim/etc/postfix/mysql-internal-only-recipients.cf
 
-# Group sharing is off
+# Sharing is restricted to the same domain
 docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-  config:app:get core shareapi_allow_group_sharing
-# expect: no
+  config:app:get core shareapi_only_share_with_group_members
+# expect: yes
 ```
 
 Then create an alias with two destinations and confirm it renders as one row with
