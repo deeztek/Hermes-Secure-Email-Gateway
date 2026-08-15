@@ -14,7 +14,7 @@ Returns alias data as JSON. Expects: form.id
 </cfif>
 
 <cfquery name="getAlias" datasource="hermes">
-    SELECT id, alias_address, delivers_to, alias_type, send_as
+    SELECT id, alias_address, delivers_to, alias_type, internal_only, send_as
     FROM mailbox_aliases
     WHERE id = <cfqueryparam value="#form.id#" cfsqltype="cf_sql_integer">
 </cfquery>
@@ -31,6 +31,7 @@ Returns alias data as JSON. Expects: form.id
     "alias_address": "#JSStringFormat(getAlias.alias_address)#",
     "delivers_to": "#JSStringFormat(getAlias.delivers_to)#",
     "alias_type": "#JSStringFormat(getAlias.alias_type)#",
+    "internal_only": #Val(getAlias.internal_only)#,
     "send_as": #getAlias.send_as#
 }
 </cfprocessingdirective>

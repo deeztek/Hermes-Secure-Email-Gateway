@@ -145,6 +145,29 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
     <cfset form.send_as = 0>
 </cfif>
 
+<!--- VALIDATE INTERNAL-ONLY
+
+     Conceptually a property of the ADDRESS, not of any one destination, but
+     stored per row because that is where the rows live. Every row for this
+     alias therefore gets the same value, and the list view reads it with
+     MAX() so a mixed state, which should not arise, still reads as
+     restricted rather than open. --->
+<cfparam name="form.internal_only" default="0">
+<cfif form.internal_only NEQ "0" AND form.internal_only NEQ "1">
+    <cfset form.internal_only = 0>
+</cfif>
+
+<!--- Adding members to an alias that already exists must not silently
+     change its reachability. Inherit whatever the existing rows carry. --->
+<cfquery name="getExistingInternalOnly" datasource="hermes">
+    SELECT MAX(internal_only) AS internal_only
+    FROM mailbox_aliases
+    WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
+</cfquery>
+<cfif getExistingInternalOnly.recordcount GTE 1 AND IsNumeric(getExistingInternalOnly.internal_only)>
+    <cfset form.internal_only = getExistingInternalOnly.internal_only>
+</cfif>
+
 <!--- ====================================================================
      ALL VALIDATION PASSED - BEGIN CREATION
      ==================================================================== --->
@@ -158,11 +181,12 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
 <cfset aliasRowsAdded = 0>
 <cfloop index="oneDestination" list="#deliversToList#" delimiters=",">
     <cfquery name="insertAliasRow" datasource="hermes" result="insertAliasResult">
-        INSERT IGNORE INTO mailbox_aliases (alias_address, delivers_to, alias_type, send_as, domain_id)
+        INSERT IGNORE INTO mailbox_aliases (alias_address, delivers_to, alias_type, internal_only, send_as, domain_id)
         VALUES (
           <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">,
           <cfqueryparam value="#Trim(oneDestination)#" cfsqltype="cf_sql_varchar">,
           <cfqueryparam value="#form.alias_type#" cfsqltype="cf_sql_varchar">,
+          <cfqueryparam value="#form.internal_only#" cfsqltype="cf_sql_tinyint">,
           <cfqueryparam value="#form.send_as#" cfsqltype="cf_sql_tinyint">,
           <cfqueryparam value="#checkDomain.id#" cfsqltype="cf_sql_integer">
         )

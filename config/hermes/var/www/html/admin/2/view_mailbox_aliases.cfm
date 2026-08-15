@@ -168,14 +168,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <p class="mb-0"><small>To forward to external email addresses or for relay domains, use <a href="view_virtual_recipients.cfm">Email Relay &gt; Virtual Recipients</a> instead.</small></p>
 </div>
 
-<!--- GET ALL MAILBOX ALIASES --->
+<!--- GET ALL MAILBOX ALIASES, ONE ROW PER ALIAS
+
+     An alias now holds one row per destination, so a twenty-member list is
+     twenty rows. Rendering those raw would show twenty near-identical lines
+     that an admin cannot tell apart from twenty accidental duplicates, so
+     they are collapsed here and the destinations rendered as chips.
+
+     dest_ids and dest_list are parallel lists in the same order, so
+     position N in one lines up with position N in the other. That is what
+     lets each chip carry its own row id for edit and delete.
+
+     group_concat_max_len defaults to 1024, which is roughly forty addresses.
+     A list longer than that would render truncated; worth raising the
+     session variable here if anyone ever hits it. --->
 <cfquery name="getAliases" datasource="hermes">
-    SELECT ma.id, ma.alias_address, ma.delivers_to, ma.alias_type, ma.send_as,
-           d.domain
+    SELECT ma.alias_address,
+           MIN(ma.alias_type)    AS alias_type,
+           MAX(ma.internal_only) AS internal_only,
+           d.domain,
+           COUNT(*) AS dest_count,
+           GROUP_CONCAT(ma.id ORDER BY ma.delivers_to ASC)          AS dest_ids,
+           GROUP_CONCAT(ma.delivers_to ORDER BY ma.delivers_to ASC) AS dest_list
     FROM mailbox_aliases ma
     INNER JOIN domains d ON d.id = ma.domain_id AND d.type = 'mailbox'
+    GROUP BY ma.alias_address, d.domain
     ORDER BY ma.alias_address ASC
 </cfquery>
+
+<!--- Domains this gateway handles, used to mark a destination as external.
+     External is permitted, but it changes how the mail authenticates on the
+     way out, so it is flagged wherever a destination is shown rather than
+     only warned about once at creation. --->
+<cfquery name="getLocalDomainsForAliases" datasource="hermes">
+    SELECT domain FROM domains
+</cfquery>
+<cfset localDomainList = ValueList(getLocalDomainsForAliases.domain)>
 
 <!--- GET MAILBOX DOMAINS FOR DOMAIN FILTER --->
 <cfquery name="getFilterDomains" datasource="hermes">
@@ -223,7 +251,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>Domain</th>
           <th>Type</th>
           <th>Delivers To</th>
-          <th>Send-As</th>
+          <th>Reachable By</th>
         </tr>
       </thead>
       <tbody>
@@ -231,12 +259,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <tr>
           <td>
             <div class="d-flex gap-1 flex-nowrap">
-              <button type="button" class="btn btn-sm btn-primary" title="Edit"
-                      onclick="loadEditAliasModal(#id#)">
-                <i class="fas fa-edit"></i>
+              <button type="button" class="btn btn-sm btn-success" title="Add destinations to this alias"
+                      onclick="openAddForAlias('#JSStringFormat(alias_address)#')">
+                <i class="fas fa-plus"></i>
               </button>
-              <button type="button" class="btn btn-sm btn-danger" title="Delete"
-                      onclick="confirmDeleteAlias(#id#, '#JSStringFormat(alias_address)#')">
+              <button type="button" class="btn btn-sm btn-danger" title="Delete the whole alias"
+                      onclick="confirmDeleteWholeAlias('#JSStringFormat(alias_address)#', #dest_count#)">
                 <i class="fas fa-trash"></i>
               </button>
             </div>
@@ -248,22 +276,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <span class="badge bg-dark">Discard</span>
             <cfelse>
               <span class="badge bg-primary">Forward</span>
+              <cfif dest_count GT 1>
+                <span class="badge bg-info" title="#dest_count# destinations">#dest_count#</span>
+              </cfif>
             </cfif>
           </td>
           <td>
             <cfif alias_type EQ "discard">
               <span class="text-muted"><i class="fas fa-ban me-1"></i>Silently dropped</span>
             <cfelse>
-              #HTMLEditFormat(delivers_to)#
+              <div class="d-flex flex-wrap gap-1">
+                <cfloop from="1" to="#ListLen(dest_list)#" index="destIdx">
+                  <cfset thisDest   = ListGetAt(dest_list, destIdx)>
+                  <cfset thisDestId = ListGetAt(dest_ids, destIdx)>
+                  <cfset thisDestDomain = ListLast(thisDest, "@")>
+                  <cfset thisIsExternal = (ListFindNoCase(localDomainList, thisDestDomain) EQ 0)>
+                  <span class="badge <cfif thisIsExternal>bg-warning text-dark<cfelse>bg-light text-dark border</cfif> d-inline-flex align-items-center gap-1">
+                    <cfif thisIsExternal><i class="fas fa-external-link-alt" title="Outside your domains"></i></cfif>
+                    #HTMLEditFormat(thisDest)#
+                    <a href="##" class="text-primary" title="Change this destination"
+                       onclick="loadEditAliasModal(#thisDestId#); return false;"><i class="fas fa-pen fa-xs"></i></a>
+                    <a href="##" class="text-danger" title="Remove this destination"
+                       onclick="confirmDeleteAlias(#thisDestId#, '#JSStringFormat(thisDest)#'); return false;"><i class="fas fa-times fa-xs"></i></a>
+                  </span>
+                </cfloop>
+              </div>
             </cfif>
           </td>
           <td>
-            <cfif alias_type EQ "forward" AND send_as EQ 1>
-              <span class="badge bg-success">YES</span>
-            <cfelseif alias_type EQ "forward">
-              <span class="badge bg-secondary">NO</span>
+            <cfif internal_only EQ 1>
+              <span class="badge bg-secondary" title="Only senders in your own domains may mail this address">Internal only</span>
             <cfelse>
-              <span class="text-muted">&mdash;</span>
+              <span class="badge bg-light text-dark border" title="Anyone may mail this address">Open</span>
             </cfif>
           </td>
         </tr>
@@ -291,7 +335,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <!--- Alias Address --->
           <div class="form-group mb-3">
             <label><strong>Alias Address</strong></label>
-            <input type="email" class="form-control" name="alias_address" placeholder="noreply@domain.com" required>
+            <input type="email" class="form-control" name="alias_address" id="addAliasAddress" placeholder="noreply@domain.com" required>
+            <small class="text-muted">To add members to an alias that already exists, enter the same address here. Existing destinations are kept.</small>
             <small class="text-muted">Must be on a mailbox domain. Cannot be an existing mailbox address.</small>
           </div>
 
@@ -307,13 +352,39 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <!--- Delivers To (shown for forward only) --->
           <div class="form-group mb-3" id="addDeliversToGroup">
             <label><strong>Delivers To</strong></label>
-            <select class="form-control" name="delivers_to" id="addDeliversTo" placeholder="Type to search mailboxes...">
-              <option value=""></option>
+            <select class="form-control" name="delivers_to" id="addDeliversTo" multiple placeholder="Pick a mailbox, or type any address...">
               <cfoutput query="getMailboxes">
                 <option value="#HTMLEditFormat(username)#">#HTMLEditFormat(username)#</option>
               </cfoutput>
             </select>
-            <small class="text-muted">The mailbox that will receive mail sent to the alias address.</small>
+            <small class="text-muted">
+              One or more destinations. Mail sent to the alias is delivered to every one of
+              them, which is how a distribution list is made. Local mailboxes are listed;
+              any other address can be typed in.
+            </small>
+
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0">
+              <i class="fas fa-external-link-alt me-1"></i>
+              <strong>Destinations outside your own domains are allowed, with a caveat.</strong>
+              Forwarded mail leaves with the original sender's address, so SPF fails at the
+              receiving end, and if the message was modified on the way through, by an
+              External Banner or LinkGuard for instance, the original DKIM signature no
+              longer validates either. Senders whose domain publishes a strict DMARC policy
+              may have mail to those destinations rejected. Local destinations are unaffected.
+            </div>
+          </div>
+
+          <div class="form-group mb-3">
+            <label><strong>Reachable By</strong></label>
+            <select class="form-control" name="internal_only">
+              <option value="0">Anyone (default)</option>
+              <option value="1">Only senders in your own domains</option>
+            </select>
+            <small class="text-muted">
+              Controls who may send <em>to</em> this address, which is separate from where it
+              delivers. Worth restricting on a list with external destinations, otherwise
+              anyone on the internet can mail it and have this gateway relay to every member.
+            </small>
           </div>
 
           <!--- Send-As pointer (shown for forward only).
@@ -392,6 +463,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </select>
           </div>
 
+          <!--- Reachability is a property of the ADDRESS, so changing it here
+               applies to every destination the alias has, not just this row. --->
+          <div class="form-group mb-3">
+            <label><strong>Reachable By</strong></label>
+            <select class="form-control" name="edit_internal_only" id="editInternalOnly">
+              <option value="0">Anyone</option>
+              <option value="1">Only senders in your own domains</option>
+            </select>
+            <small class="text-muted">Applies to the whole alias, not just this destination.</small>
+          </div>
+
           <!--- Send-As pointer. See the note on the Add modal above. --->
           <div class="form-group mb-3" id="editSendAsGroup">
             <label><strong>Allow Send-As</strong></label>
@@ -430,13 +512,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <form method="post" action="view_mailbox_aliases.cfm">
         <input type="hidden" name="action" value="delete_alias">
         <input type="hidden" name="delete_alias_id" id="deleteAliasId">
+        <input type="hidden" name="delete_alias_address" id="deleteAliasWholeAddress">
+        <input type="hidden" name="delete_scope" id="deleteAliasScope" value="destination">
         <div class="modal-header">
-          <h5 class="modal-title"><i class="fas fa-trash me-2 text-danger"></i>Delete Alias</h5>
+          <h5 class="modal-title"><i class="fas fa-trash me-2 text-danger"></i>Delete</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <p>Are you sure you want to delete the alias <strong id="deleteAliasAddress"></strong>?</p>
-          <p class="text-muted">This will also remove any send-as permissions and Amavis policy entries for this alias.</p>
+          <div id="deleteScopeDestination">
+            <p>Remove the destination <strong id="deleteAliasAddress"></strong> from this alias?</p>
+            <p class="text-muted mb-0">The alias itself stays, along with any other destinations it has. If this is its last one, the alias disappears with it.</p>
+          </div>
+          <div id="deleteScopeWhole" style="display:none;">
+            <p>Delete the alias <strong id="deleteAliasAddressWhole"></strong> entirely?</p>
+            <p class="text-muted mb-0">All <strong id="deleteWholeCount"></strong> destinations go with it, along with any send-as permissions and Amavis policy entries for this address.</p>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -478,17 +568,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       table.column(2).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
     });
 
-    // Initialize Tom Select on Delivers To dropdowns (type-to-search, no custom entries)
+    // Add: many destinations, and custom entries allowed so an address
+    // outside your own domains can be typed rather than picked. Splits on
+    // comma, semicolon, space and newline so a pasted list just works.
     addDeliversToTS = new TomSelect('#addDeliversTo', {
-      create: false,
+      create: function(input) {
+        var v = input.trim().toLowerCase();
+        // Only accept something that looks like an address. Keeps obvious
+        // typos out before the server has to reject the whole save.
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { return false; }
+        return { value: v, text: v };
+      },
+      createFilter: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      persist: false,
+      plugins: ['remove_button'],
+      delimiter: ',',
+      splitOn: /[,;\s\n]+/,
       sortField: { field: 'text', direction: 'asc' },
-      placeholder: 'Type to search mailboxes...'
+      placeholder: 'Pick a mailbox, or type any address...'
     });
 
+    // Edit changes ONE destination, so this stays single-select. Adding
+    // members is the Add modal's job, removing one is the x on its chip.
     editDeliversToTS = new TomSelect('#editDeliversTo', {
-      create: false,
+      create: function(input) {
+        var v = input.trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { return false; }
+        return { value: v, text: v };
+      },
+      createFilter: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      persist: false,
       sortField: { field: 'text', direction: 'asc' },
-      placeholder: 'Type to search mailboxes...'
+      placeholder: 'Pick a mailbox, or type any address...'
     });
   });
 
@@ -533,17 +644,44 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         } else {
           editDeliversToTS.clear();
         }
-        $('#editSendAs').val(a.send_as);
+        $('#editInternalOnly').val(a.internal_only);
         new bootstrap.Modal(document.getElementById('editAliasModal')).show();
       } catch(e) { alert('Error loading alias data.'); }
     });
   }
 
   // Confirm delete
+  // Remove ONE destination from an alias. The alias itself survives as long
+  // as it still has another destination.
   function confirmDeleteAlias(aliasId, address) {
     $('#deleteAliasId').val(aliasId);
+    $('#deleteAliasWholeAddress').val('');
+    $('#deleteAliasScope').val('destination');
     $('#deleteAliasAddress').text(address);
+    $('#deleteScopeDestination').show();
+    $('#deleteScopeWhole').hide();
     new bootstrap.Modal(document.getElementById('deleteAliasModal')).show();
+  }
+
+  // Remove the alias entirely, every destination it has.
+  function confirmDeleteWholeAlias(address, destCount) {
+    $('#deleteAliasId').val('');
+    $('#deleteAliasWholeAddress').val(address);
+    $('#deleteAliasScope').val('alias');
+    $('#deleteAliasAddressWhole').text(address);
+    $('#deleteWholeCount').text(destCount);
+    $('#deleteScopeDestination').hide();
+    $('#deleteScopeWhole').show();
+    new bootstrap.Modal(document.getElementById('deleteAliasModal')).show();
+  }
+
+  // Add more destinations to an alias that already exists. Prefills the
+  // address so the admin only types the new members, and the add handler
+  // keeps whatever the alias already had.
+  function openAddForAlias(address) {
+    $('#addAliasAddress').val(address);
+    if (addDeliversToTS) { addDeliversToTS.clear(); }
+    new bootstrap.Modal(document.getElementById('addAliasModal')).show();
   }
 </script>
 

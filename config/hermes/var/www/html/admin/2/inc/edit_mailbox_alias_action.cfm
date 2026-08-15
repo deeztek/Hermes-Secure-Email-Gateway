@@ -50,7 +50,23 @@ Alias address is immutable after creation.
     <cfset form.edit_alias_type = "forward">
 </cfif>
 
-<!--- VALIDATE DELIVERS TO --->
+<!--- VALIDATE DELIVERS TO
+
+     This edits ONE destination row, identified by alias_id, rather than
+     replacing the whole set. Per-row editing was chosen over replace-the-set
+     because it is safer and more precise: there is no window in which the
+     list is empty, `created_at` survives on members that did not change, and
+     two admins working on the same list only collide if they touch the same
+     member. Adding members is the Add modal's job; removing one is a delete
+     on its own row.
+
+     The alias address is read-only in the modal, so a per-row edit can only
+     change where this one destination points. There is no way to split a
+     grouped alias by renaming a single row out of it.
+
+     Format validation only. The old "must be an existing mailbox" check is
+     gone, matching the add handler: it made external forwarding impossible on
+     mailbox domains while relay domains allowed it freely. --->
 <cfparam name="form.edit_delivers_to" default="">
 <cfif form.edit_alias_type EQ "forward">
     <cfset newDeliversTo = LCase(trim(form.edit_delivers_to))>
@@ -58,11 +74,21 @@ Alias address is immutable after creation.
         <cfset session.m = 15>
         <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
     </cfif>
-    <cfquery name="checkTarget" datasource="hermes">
-        SELECT id FROM mailboxes WHERE username = <cfqueryparam value="#newDeliversTo#" cfsqltype="cf_sql_varchar">
-    </cfquery>
-    <cfif checkTarget.recordcount LT 1>
+    <cfif NOT IsValid("email", newDeliversTo)>
         <cfset session.m = 16>
+        <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
+    </cfif>
+    <!--- Refuse a move that would collide with a destination this alias
+         already has. uq_alias_dest would reject it anyway; catching it here
+         turns a database error into a message the admin can act on. --->
+    <cfquery name="checkPairClash" datasource="hermes">
+        SELECT id FROM mailbox_aliases
+        WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
+          AND delivers_to   = <cfqueryparam value="#newDeliversTo#" cfsqltype="cf_sql_varchar">
+          AND id           <> <cfqueryparam value="#form.alias_id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfif checkPairClash.recordcount GTE 1>
+        <cfset session.m = 14>
         <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
     </cfif>
 <cfelse>
@@ -78,13 +104,35 @@ Alias address is immutable after creation.
     <cfset form.edit_send_as = 0>
 </cfif>
 
-<!--- UPDATE MAILBOX_ALIASES --->
+<!--- VALIDATE INTERNAL-ONLY --->
+<cfparam name="form.edit_internal_only" default="0">
+<cfif form.edit_internal_only NEQ "0" AND form.edit_internal_only NEQ "1">
+    <cfset form.edit_internal_only = 0>
+</cfif>
+
+<!--- UPDATE THIS DESTINATION ROW
+
+     send_as is deliberately NOT written. Its control is gone from the modal
+     now that the permission is granted per mailbox, so a cfparam default of
+     0 would silently zero the column on every edit. Nothing reads it for
+     permissions any more, but quietly rewriting stored data because a form
+     field disappeared is the kind of thing that is impossible to explain
+     later. Left exactly as it was found. --->
 <cfquery datasource="hermes">
     UPDATE mailbox_aliases
     SET delivers_to = <cfqueryparam value="#newDeliversTo#" cfsqltype="cf_sql_varchar">,
-        alias_type = <cfqueryparam value="#form.edit_alias_type#" cfsqltype="cf_sql_varchar">,
-        send_as = <cfqueryparam value="#form.edit_send_as#" cfsqltype="cf_sql_tinyint">
+        alias_type = <cfqueryparam value="#form.edit_alias_type#" cfsqltype="cf_sql_varchar">
     WHERE id = <cfqueryparam value="#form.alias_id#" cfsqltype="cf_sql_integer">
+</cfquery>
+
+<!--- Reachability belongs to the ADDRESS, not to one destination, so it is
+     applied across every row the alias has. Leaving it per-row would let an
+     alias end up half open and half restricted, which Postfix has no way to
+     express and an admin has no way to reason about. --->
+<cfquery datasource="hermes">
+    UPDATE mailbox_aliases
+    SET internal_only = <cfqueryparam value="#form.edit_internal_only#" cfsqltype="cf_sql_tinyint">
+    WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <!--- SENDER_LOGIN_MAPS is deliberately NOT resynced here any more.
