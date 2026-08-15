@@ -79,10 +79,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset errormessage = 1>
   <cfelseif NOT StructKeyExists(form, "forwards_1") OR trim(form.forwards_1) is "">
     <cfset errormessage = 2>
-  <cfelseif NOT IsValid("email", trim(form.forwards_1))>
-    <cfset errormessage = 3>
   <cfelse>
-    <cfinclude template="./inc/addvirtualrecipients.cfm">
+    <!--- Delivers To may now hold SEVERAL destinations, so it can no longer
+         be validated as a single address. Every entry must be a valid email;
+         the first one that is not fails the whole submission, which is
+         clearer than silently dropping it and reporting partial success. --->
+    <cfset badForward = "">
+    <cfloop index="fwdCheck" list="#Trim(form.forwards_1)#" delimiters=",; #chr(9)##chr(10)##chr(13)#">
+      <cfif Trim(fwdCheck) is "">
+        <cfcontinue>
+      </cfif>
+      <cfif NOT IsValid("email", Trim(fwdCheck))>
+        <cfset badForward = Trim(fwdCheck)>
+        <cfbreak>
+      </cfif>
+    </cfloop>
+    <cfif badForward is not "">
+      <cfset errormessage = 3>
+    <cfelse>
+      <cfinclude template="./inc/addvirtualrecipients.cfm">
+    </cfif>
   </cfif>
 <cfelseif action is "edit_entry">
   <cfinclude template="./inc/editvirtualrecipient.cfm">
@@ -101,10 +117,40 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cflocation url="view_virtual_recipients.cfm" addtoken="no">
 </cfif>
 
-<!--- Get data --->
+<!--- Get data, ONE ROW PER ADDRESS
+
+     This table has always allowed the same virtual address to appear more
+     than once, each row naming a different destination, and Postfix
+     concatenates the rows it gets back into a single recipient list. That
+     is how a distribution list is expressed here, and installs in the field
+     already contain lists built that way.
+
+     Rendering the rows raw showed a twenty-member list as twenty
+     near-identical lines, indistinguishable from twenty accidental
+     duplicates. Collapsed here instead, with destinations as chips.
+
+     dest_ids and dest_list are parallel ordered lists, so position N in one
+     lines up with position N in the other, which is what lets each chip
+     carry its own row id. --->
 <cfquery name="getvirtual" datasource="hermes">
-  SELECT id, virtual_address, maps FROM virtual_recipients ORDER BY virtual_address ASC
+  SELECT virtual_address,
+         MAX(internal_only) AS internal_only,
+         COUNT(*) AS dest_count,
+         GROUP_CONCAT(id ORDER BY maps ASC)   AS dest_ids,
+         GROUP_CONCAT(maps ORDER BY maps ASC) AS dest_list
+  FROM virtual_recipients
+  GROUP BY virtual_address
+  ORDER BY virtual_address ASC
 </cfquery>
+
+<!--- Domains this gateway handles, used to flag a destination as external.
+     External is allowed here and always has been, but it changes how the
+     mail authenticates on the way out, so it is marked wherever a
+     destination is shown rather than warned about once at creation. --->
+<cfquery name="getLocalDomainsForVirtual" datasource="hermes">
+  SELECT domain FROM domains
+</cfquery>
+<cfset localDomainList = ValueList(getLocalDomainsForVirtual.domain)>
 
 <cfset session.m = "">
 
@@ -175,6 +221,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     The recipient you are attempting to save already exists.
+  </div>
+</cfif>
+<cfif m is "15">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Enter at least one destination in <strong>Delivers To</strong>. Separate several with commas.
   </div>
 </cfif>
 
@@ -271,7 +324,20 @@ info@example.com
             <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1"
               placeholder="Start typing to search or enter address" value="" autocomplete="off">
             <small class="text-muted">
-              All entries will be delivered to this address.
+              One or more destinations, separated by commas. Every address on the left is
+              delivered to all of them, which is how a distribution list is made.
+            </small>
+          </div>
+
+          <div class="mb-3">
+            <label for="internal_only" class="form-label"><strong>Reachable By</strong></label>
+            <select class="form-control" name="internal_only" id="internal_only">
+              <option value="0">Anyone (default)</option>
+              <option value="1">Only senders in your own domains</option>
+            </select>
+            <small class="text-muted">
+              Who may send <em>to</em> these addresses, which is separate from where they
+              deliver.
             </small>
           </div>
         </div>
@@ -280,6 +346,21 @@ info@example.com
             onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
             <i class="fas fa-plus"></i> Add
           </button>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-12">
+          <div class="alert alert-warning py-2 px-3 mb-0">
+            <i class="fas fa-external-link-alt me-1"></i>
+            <strong>Destinations outside your own domains are allowed, with a caveat.</strong>
+            Forwarded mail leaves with the original sender's address, so SPF fails at the
+            receiving end, and if the message was modified on the way through the original
+            DKIM signature no longer validates either. Senders whose domain publishes a
+            strict DMARC policy may have mail to those destinations rejected. Local
+            destinations are unaffected. Restricting <strong>Reachable By</strong> is worth
+            considering on any list with external destinations, otherwise anyone on the
+            internet can mail it and have this gateway relay to every member.
+          </div>
         </div>
       </div>
     </form>
@@ -308,20 +389,49 @@ info@example.com
             <th style="width: 5%"><input type="checkbox" id="selectAll"></th>
             <th>Recipient</th>
             <th>Delivers To</th>
+            <th style="width: 12%">Reachable By</th>
             <th style="width: 10%">Actions</th>
           </tr>
         </thead>
         <tbody>
           <cfoutput query="getvirtual">
             <tr>
-              <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
+              <!--- Carries every row id for this address, comma joined. The
+                   delete handler's caller already splits on comma and
+                   validates each as an integer, so selecting one box removes
+                   the whole entry regardless of how many destinations it
+                   has. --->
+              <td><input type="checkbox" class="row-checkbox" value="#encodeForHTMLAttribute(dest_ids)#"></td>
               <td>#encodeForHTML(virtual_address)#</td>
-              <td>#encodeForHTML(maps)#</td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary"
-                  onclick="openEditModal('#id#', '#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(maps)#');" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
+                <div class="d-flex flex-wrap gap-1">
+                  <cfloop from="1" to="#ListLen(dest_list)#" index="vDestIdx">
+                    <cfset vThisDest   = ListGetAt(dest_list, vDestIdx)>
+                    <cfset vThisDestId = ListGetAt(dest_ids, vDestIdx)>
+                    <cfset vThisDomain = ListLast(vThisDest, "@")>
+                    <cfset vIsExternal = (ListFindNoCase(localDomainList, vThisDomain) EQ 0)>
+                    <span class="badge <cfif vIsExternal>bg-warning text-dark<cfelse>bg-light text-dark border</cfif> d-inline-flex align-items-center gap-1">
+                      <cfif vIsExternal><i class="fas fa-external-link-alt" title="Outside your domains"></i></cfif>
+                      #encodeForHTML(vThisDest)#
+                      <a href="##" class="text-primary" title="Change this destination"
+                         onclick="openEditModal('#vThisDestId#', '#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(vThisDest)#', #Val(internal_only)#); return false;"><i class="fas fa-pen fa-xs"></i></a>
+                      <a href="##" class="text-danger" title="Remove this destination"
+                         onclick="removeOneDestination('#vThisDestId#', '#encodeForJavaScript(vThisDest)#'); return false;"><i class="fas fa-times fa-xs"></i></a>
+                    </span>
+                  </cfloop>
+                </div>
+              </td>
+              <td>
+                <cfif internal_only EQ 1>
+                  <span class="badge bg-secondary" title="Only senders in your own domains may mail this address">Internal only</span>
+                <cfelse>
+                  <span class="badge bg-light text-dark border" title="Anyone may mail this address">Open</span>
+                </cfif>
+              </td>
+              <td>
+                <cfif dest_count GT 1>
+                  <span class="badge bg-info" title="#dest_count# destinations">#dest_count#</span>
+                </cfif>
               </td>
             </tr>
           </cfoutput>
@@ -359,6 +469,15 @@ info@example.com
           <div class="mb-3">
             <label for="edit_forwards" class="form-label"><strong>Delivers To</strong></label>
             <input type="text" class="form-control forwards" id="edit_forwards" name="edit_forwards" required>
+            <small class="text-muted">This edits one destination. Add more from the form above, remove one with the x on its chip.</small>
+          </div>
+          <div class="mb-3">
+            <label for="edit_internal_only" class="form-label"><strong>Reachable By</strong></label>
+            <select class="form-control" name="edit_internal_only" id="edit_internal_only">
+              <option value="0">Anyone</option>
+              <option value="1">Only senders in your own domains</option>
+            </select>
+            <small class="text-muted">Applies to the whole address, not just this destination.</small>
           </div>
         </div>
         <div class="modal-footer">
@@ -397,9 +516,13 @@ $(document).ready(function() {
     stateSave: true,
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[1, 'asc']],
+    // Columns are now 0 checkbox, 1 Recipient, 2 Delivers To,
+    // 3 Reachable By, 4 Actions. Reachable By is deliberately left
+    // sortable and searchable, so an admin can pull up every open address
+    // at once. Was targets [0, 3] when Actions sat at index 3.
     columnDefs: [
-      { orderable: false, targets: [0, 3] },
-      { searchable: false, targets: [0, 3] }
+      { orderable: false, targets: [0, 4] },
+      { searchable: false, targets: [0, 4] }
     ]
   });
 
@@ -429,6 +552,17 @@ $(document).ready(function() {
     $('#deleteForm').submit();
   });
 
+  // Remove ONE destination from an entry. Reuses the same delete path as the
+  // bulk checkboxes, just with a single id, so there is one code path to
+  // reason about rather than two.
+  function removeOneDestination(rowId, destination) {
+    if (!confirm('Remove the destination ' + destination + ' from this entry?\n\n'
+               + 'Other destinations on the same address are kept. If this is the last '
+               + 'one, the entry disappears with it.')) { return; }
+    $('#selectedIds').val(rowId);
+    $('#deleteForm').submit();
+  }
+
   // Autocomplete for Delivers To fields
   $(document).on('keydown', '.forwards', function() {
     var id = this.id;
@@ -450,10 +584,13 @@ $(document).ready(function() {
   });
 });
 
-function openEditModal(id, address, forwards) {
+function openEditModal(id, address, forwards, internalOnly) {
   document.getElementById('edit_id').value = id;
   document.getElementById('edit_address').value = address;
   document.getElementById('edit_forwards').value = forwards;
+  // Reachability belongs to the address, so the chip passes the value the
+  // whole group carries rather than anything row-specific.
+  document.getElementById('edit_internal_only').value = (internalOnly ? '1' : '0');
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 </script>

@@ -60,13 +60,27 @@ Expects: form.edit_id (integer), form.edit_address (virtual address), form.edit_
     <cflocation url="view_virtual_recipients.cfm" addtoken="no">
   </cfif>
 
-  <!--- Update --->
+  <!--- Update this destination row --->
   <cfquery datasource="hermes">
     UPDATE virtual_recipients
     SET virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">,
         maps = <cfqueryparam value="#editForwards#" cfsqltype="cf_sql_varchar">,
         system = '2'
     WHERE id = <cfqueryparam value="#editId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <!--- Reachability belongs to the ADDRESS, not to one destination, so it is
+       applied across every row that address has. Leaving it per-row would let
+       an entry end up half open and half restricted, which Postfix cannot
+       express and an admin cannot reason about. --->
+  <cfparam name="form.edit_internal_only" default="0">
+  <cfif form.edit_internal_only NEQ "0" AND form.edit_internal_only NEQ "1">
+    <cfset form.edit_internal_only = 0>
+  </cfif>
+  <cfquery datasource="hermes">
+    UPDATE virtual_recipients
+    SET internal_only = <cfqueryparam value="#form.edit_internal_only#" cfsqltype="cf_sql_tinyint">
+    WHERE virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">
   </cfquery>
 
   <cfset session.m = 3>
