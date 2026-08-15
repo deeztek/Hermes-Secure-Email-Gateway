@@ -118,11 +118,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     This address already exists as a mailbox. Use the Mailboxes page to manage it.
   </div>
-<cfelseif m EQ 14>
+<cfelseif m EQ 18>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Error</h4>
-    An alias with this address already exists.
+    <h4><i class="icon fa fa-ban"></i> Type does not match</h4>
+    That address already exists with a different Type. An alias either forwards or
+    discards, never both. Change the existing alias's Type first, or use a different
+    address.
+  </div>
+<cfelseif m EQ 14>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Nothing to add</h4>
+    Every destination you entered is already on this alias, so nothing changed. An alias
+    address existing is not a problem in itself: entering it again is how you add members.
+    Only an exact repeat of the same address <em>and</em> the same destination is skipped.
   </div>
 <cfelseif m EQ 15>
   <div class="alert alert-danger alert-dismissible">
@@ -259,10 +269,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <tr>
           <td>
             <div class="d-flex gap-1 flex-nowrap">
-              <button type="button" class="btn btn-sm btn-success" title="Add destinations to this alias"
-                      onclick="openAddForAlias('#JSStringFormat(alias_address)#')">
-                <i class="fas fa-plus"></i>
-              </button>
+              <cfif alias_type EQ "discard">
+                <!--- A discard alias has no destination chips to carry an edit
+                     control, so it needs one on the row. Without this it would
+                     have no edit path at all. --->
+                <button type="button" class="btn btn-sm btn-primary" title="Edit this alias"
+                        onclick="loadEditAliasModal(#ListFirst(dest_ids)#)">
+                  <i class="fas fa-edit"></i>
+                </button>
+              <cfelse>
+                <button type="button" class="btn btn-sm btn-success" title="Add destinations to this alias"
+                        onclick="openAddForAlias('#JSStringFormat(alias_address)#')">
+                  <i class="fas fa-plus"></i>
+                </button>
+              </cfif>
               <button type="button" class="btn btn-sm btn-danger" title="Delete the whole alias"
                       onclick="confirmDeleteWholeAlias('#JSStringFormat(alias_address)#', #dest_count#)">
                 <i class="fas fa-trash"></i>
@@ -681,6 +701,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   function openAddForAlias(address) {
     $('#addAliasAddress').val(address);
     if (addDeliversToTS) { addDeliversToTS.clear(); }
+    // Force Forward and fire the change handler, so Delivers To is visible.
+    // Without this the modal keeps whatever Type was last selected, and
+    // opening it on an existing alias could submit the wrong kind.
+    $('#addAliasType').val('forward').trigger('change');
     new bootstrap.Modal(document.getElementById('addAliasModal')).show();
   }
 </script>

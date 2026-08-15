@@ -70,6 +70,20 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
 
 <!--- Was: blanket duplicate check on alias_address, session.m = 14 --->
 
+<!--- An alias is EITHER forward or discard, never both. Adding a forwarding
+     destination to an address that already discards, or the reverse, would
+     leave rows disagreeing about what the address does, which Postfix has no
+     way to express and the grouped list view could only render as one or the
+     other. Refuse it and say which it currently is. --->
+<cfquery name="checkExistingType" datasource="hermes">
+    SELECT DISTINCT alias_type FROM mailbox_aliases
+    WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
+</cfquery>
+<cfif checkExistingType.recordcount GTE 1 AND checkExistingType.alias_type NEQ form.alias_type>
+    <cfset session.m = 18>
+    <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
+</cfif>
+
 <!--- Check alias doesn't already exist in virtual_recipients (relay) --->
 <cfquery name="checkVirtual" datasource="hermes">
     SELECT id FROM virtual_recipients
