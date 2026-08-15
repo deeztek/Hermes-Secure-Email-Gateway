@@ -472,15 +472,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </select>
           </div>
 
-          <!--- Delivers To --->
+          <!--- Delivers To. Deliberately SINGLE-select: this edits one
+               destination, not the whole set. Per-row editing avoids the
+               window where a replace-the-set save has deleted the old rows
+               and not yet written the new ones, and keeps created_at on
+               members that did not change. --->
           <div class="form-group mb-3" id="editDeliversToGroup">
             <label><strong>Delivers To</strong></label>
-            <select class="form-control" name="edit_delivers_to" id="editDeliversTo" placeholder="Type to search mailboxes...">
+            <select class="form-control" name="edit_delivers_to" id="editDeliversTo" placeholder="Pick a mailbox, or type any address...">
               <option value=""></option>
               <cfoutput query="getMailboxes">
                 <option value="#HTMLEditFormat(username)#">#HTMLEditFormat(username)#</option>
               </cfoutput>
             </select>
+            <small class="text-muted">
+              <strong>One destination.</strong> This changes only the destination you clicked,
+              so typing a second address replaces the first rather than adding to it. To add
+              more, save this, then use the green <i class="fas fa-plus fa-xs"></i> on the alias
+              row. To remove one, use the <i class="fas fa-times fa-xs"></i> on its chip.
+            </small>
+          </div>
+
+          <!--- Only shown when an alias is being converted from Discard, where
+               there is no chip to add from afterwards and the two-step flow is
+               otherwise invisible. --->
+          <div class="alert alert-info py-2 px-3 mb-3" id="editDiscardToForwardHint" style="display:none;">
+            <i class="fas fa-info-circle me-1"></i>
+            Changing this alias from Discard to Forward. Give it one destination here and save.
+            The alias then appears with a destination chip, and the green
+            <i class="fas fa-plus fa-xs"></i> on its row adds as many more as you need.
           </div>
 
           <!--- Reachability is a property of the ADDRESS, so changing it here
@@ -637,8 +657,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     }
   });
 
-  // Edit modal: toggle forward/discard fields
+  // Edit modal: toggle forward/discard fields.
+  // editAliasTypeOriginal is set when the modal loads, so we can tell a
+  // discard-to-forward conversion apart from an alias that was already
+  // forwarding. Only the conversion needs the two-step hint, since it is the
+  // one case with no destination chip to add from afterwards.
+  var editAliasTypeOriginal = '';
   $('#editAliasType').on('change', function() {
+    var isConversion = (editAliasTypeOriginal === 'discard' && $(this).val() === 'forward');
+    $('#editDiscardToForwardHint').toggle(isConversion);
     if ($(this).val() === 'discard') {
       $('#editDeliversToGroup').hide();
       $('#editSendAsGroup').hide();
@@ -658,6 +685,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         if (a.error) { alert('Error: ' + a.error); return; }
         $('#editAliasId').val(a.id);
         $('#editAliasAddress').val(a.alias_address);
+        // Record what it was BEFORE the change handler runs, so the
+        // discard-to-forward hint can tell a conversion from an ordinary edit.
+        editAliasTypeOriginal = a.alias_type;
+        $('#editDiscardToForwardHint').hide();
         $('#editAliasType').val(a.alias_type).trigger('change');
         if (a.alias_type === 'forward') {
           editDeliversToTS.setValue(a.delivers_to);
