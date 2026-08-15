@@ -1,0 +1,5 @@
+hosts = hermes_db_server
+dbname = hermes
+user = HERMES-USERNAME
+password = HERMES-PASSWORD
+query = SELECT 'REJECT this address only accepts mail from inside the organization' FROM mailbox_aliases WHERE alias_address='%s' AND internal_only=1 UNION SELECT 'REJECT this address only accepts mail from inside the organization' FROM virtual_recipients WHERE virtual_address='%s' AND internal_only=1
