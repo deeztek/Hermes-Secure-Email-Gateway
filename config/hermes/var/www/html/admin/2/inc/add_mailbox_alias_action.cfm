@@ -60,15 +60,15 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
     <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
 </cfif>
 
-<!--- Check alias doesn't already exist in mailbox_aliases --->
-<cfquery name="checkDuplicate" datasource="hermes">
-    SELECT id FROM mailbox_aliases
-    WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
-</cfquery>
-<cfif checkDuplicate.recordcount GTE 1>
-    <cfset session.m = 14>
-    <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
-</cfif>
+<!--- The alias address existing already is NO LONGER a reason to refuse.
+     Adding a destination to an alias that already has one is precisely how
+     a list grows, so blocking it here would block the feature.
+
+     What is still refused is an exact repeat of the same address AND the
+     same destination, which is checked per pair at insert time below and
+     enforced by uq_alias_dest in the database. --->
+
+<!--- Was: blanket duplicate check on alias_address, session.m = 14 --->
 
 <!--- Check alias doesn't already exist in virtual_recipients (relay) --->
 <cfquery name="checkVirtual" datasource="hermes">
@@ -86,25 +86,54 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
     <cfset form.alias_type = "forward">
 </cfif>
 
-<!--- VALIDATE DELIVERS TO (required for forward, ignored for discard) --->
+<!--- VALIDATE DELIVERS TO (required for forward, ignored for discard)
+
+     Now accepts SEVERAL destinations. One row is written per destination,
+     and Postfix concatenates the rows it gets back into a single recipient
+     list, which is how an alias becomes a distribution list.
+
+     Split on comma, semicolon, whitespace and newline, so an admin can
+     paste a list from wherever they keep it without reformatting.
+
+     Destinations are NOT restricted to local mailboxes any more. The old
+     "must exist in mailboxes" check made external forwarding impossible on
+     mailbox domains while relay domains allowed it freely, which was an
+     inconsistency rather than a policy. External destinations carry real
+     caveats around SPF and DKIM, and the page warns about them, but that is
+     the operator's call to make. --->
 <cfparam name="form.delivers_to" default="">
+<cfset deliversToList = "">
+
 <cfif form.alias_type EQ "forward">
-    <cfset deliversTo = LCase(trim(form.delivers_to))>
-    <cfif deliversTo EQ "">
+    <cfset rawDestinations = Trim(form.delivers_to)>
+    <cfif rawDestinations EQ "">
         <cfset session.m = 15>
         <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
     </cfif>
-    <!--- Verify target mailbox exists --->
-    <cfquery name="checkTarget" datasource="hermes">
-        SELECT id FROM mailboxes WHERE username = <cfqueryparam value="#deliversTo#" cfsqltype="cf_sql_varchar">
-    </cfquery>
-    <cfif checkTarget.recordcount LT 1>
-        <cfset session.m = 16>
+
+    <cfloop index="destCandidate" list="#rawDestinations#" delimiters=",; #chr(9)##chr(10)##chr(13)#">
+        <cfset destCandidate = LCase(Trim(destCandidate))>
+        <cfif destCandidate EQ "">
+            <cfcontinue>
+        </cfif>
+        <!--- Format only. Anything that is a valid address is allowed,
+             local or external. --->
+        <cfif NOT IsValid("email", destCandidate)>
+            <cfset session.m = 16>
+            <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
+        </cfif>
+        <cfif ListFindNoCase(deliversToList, destCandidate) EQ 0>
+            <cfset deliversToList = ListAppend(deliversToList, destCandidate)>
+        </cfif>
+    </cfloop>
+
+    <cfif ListLen(deliversToList) EQ 0>
+        <cfset session.m = 15>
         <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
     </cfif>
 <cfelse>
-    <!--- Discard type --->
-    <cfset deliversTo = "discard:silently">
+    <!--- Discard type. Exactly one pseudo-destination, never a list. --->
+    <cfset deliversToList = "discard:silently">
 </cfif>
 
 <!--- VALIDATE SEND-AS (only for forward type) --->
@@ -120,28 +149,51 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
      ALL VALIDATION PASSED - BEGIN CREATION
      ==================================================================== --->
 
-<!--- 1. INSERT INTO MAILBOX_ALIASES --->
-<cfquery datasource="hermes">
-    INSERT INTO mailbox_aliases (alias_address, delivers_to, alias_type, send_as, domain_id)
-    VALUES (
-      <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">,
-      <cfqueryparam value="#deliversTo#" cfsqltype="cf_sql_varchar">,
-      <cfqueryparam value="#form.alias_type#" cfsqltype="cf_sql_varchar">,
-      <cfqueryparam value="#form.send_as#" cfsqltype="cf_sql_tinyint">,
-      <cfqueryparam value="#checkDomain.id#" cfsqltype="cf_sql_integer">
-    )
-</cfquery>
-
-<!--- 2. INSERT SENDER_LOGIN_MAPS (if send-as enabled) --->
-<cfif form.send_as EQ "1" AND form.alias_type EQ "forward">
-    <cfquery datasource="hermes">
-        INSERT IGNORE INTO sender_login_maps (sender, login_user)
+<!--- 1. INSERT ONE ROW PER DESTINATION.
+     INSERT IGNORE rather than checking first: uq_alias_dest already refuses
+     an exact address-plus-destination repeat, so a destination the alias
+     already has is silently skipped instead of failing the whole save. That
+     makes re-pasting a list with two new members on the end do the obvious
+     thing. --->
+<cfset aliasRowsAdded = 0>
+<cfloop index="oneDestination" list="#deliversToList#" delimiters=",">
+    <cfquery name="insertAliasRow" datasource="hermes" result="insertAliasResult">
+        INSERT IGNORE INTO mailbox_aliases (alias_address, delivers_to, alias_type, send_as, domain_id)
         VALUES (
           <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">,
-          <cfqueryparam value="#deliversTo#" cfsqltype="cf_sql_varchar">
+          <cfqueryparam value="#Trim(oneDestination)#" cfsqltype="cf_sql_varchar">,
+          <cfqueryparam value="#form.alias_type#" cfsqltype="cf_sql_varchar">,
+          <cfqueryparam value="#form.send_as#" cfsqltype="cf_sql_tinyint">,
+          <cfqueryparam value="#checkDomain.id#" cfsqltype="cf_sql_integer">
         )
     </cfquery>
+    <cfif StructKeyExists(insertAliasResult, "recordcount") AND insertAliasResult.recordcount GT 0>
+        <cfset aliasRowsAdded = aliasRowsAdded + 1>
+    </cfif>
+</cfloop>
+
+<!--- Everything submitted was already present. Say so rather than
+     reporting a success that changed nothing. --->
+<cfif aliasRowsAdded EQ 0>
+    <cfset session.m = 14>
+    <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
 </cfif>
+
+<cfset session.aliasRowsAdded = aliasRowsAdded>
+
+<!--- 2. SENDER_LOGIN_MAPS is deliberately NOT written here any more.
+     Send-As is now granted per mailbox, via Mailboxes > Actions > Send As,
+     which owns sender_login_maps in edit_mailbox_send_as_action.cfm.
+
+     It used to be a side effect of this page's Send-As toggle. That worked
+     while an alias had exactly one destination and stopped making sense the
+     moment an alias could have several: a single Yes/No here would have
+     granted send-as to every member of a distribution list at once, with no
+     way to say "these three may, the other seventeen may not".
+
+     The send_as column is still written above so existing rows keep their
+     value, but nothing reads it to decide permissions. Dropping it is a
+     later cleanup with no urgency. --->
 
 <!--- SUCCESS --->
 <cfset session.m = 1>

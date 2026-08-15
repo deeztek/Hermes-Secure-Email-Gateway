@@ -836,11 +836,21 @@ CREATE TABLE IF NOT EXISTS `mailbox_aliases` (
   `alias_address` varchar(255) NOT NULL,
   `delivers_to` varchar(255) NOT NULL,
   `alias_type` varchar(20) NOT NULL DEFAULT 'forward',
+  -- Who may SEND TO this address, which is a different question from where
+  -- it delivers. 1 = accept only from our own domains. Added in v260815;
+  -- defaults permissive, matching how every alias behaved before it existed.
+  `internal_only` tinyint(3) NOT NULL DEFAULT 0,
   `send_as` tinyint(3) NOT NULL DEFAULT 0,
   `domain_id` int(11) DEFAULT NULL,
   `created_at` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_alias_address` (`alias_address`)
+  -- One row per DESTINATION, not per alias: an alias with several
+  -- destinations is how a distribution list is expressed. The old
+  -- UNIQUE KEY on alias_address alone pinned this to one destination and
+  -- was dropped in v260815. idx_alias_address replaces the lookup index
+  -- that key was also providing for Postfix's per-message query.
+  KEY `idx_alias_address` (`alias_address`),
+  UNIQUE KEY `uq_alias_dest` (`alias_address`,`delivers_to`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- -------- mailbox_domains                      [truncate] --------
@@ -2949,10 +2959,18 @@ CREATE TABLE IF NOT EXISTS `virtual_recipients` (
   `virtual_address` varchar(255) NOT NULL,
   `maps` varchar(255) DEFAULT NULL,
   `alias_type` varchar(20) NOT NULL DEFAULT 'forward',
+  -- See the note on mailbox_aliases.internal_only. Same meaning, same
+  -- permissive default, kept in step so both topologies behave alike.
+  `internal_only` tinyint(3) NOT NULL DEFAULT 0,
   `send_as` tinyint(3) NOT NULL DEFAULT 0,
   `policy_id` int(11) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  -- Postfix looks this table up by virtual_address on every message.
+  -- Added in v260815; before that the only key was on id, so each
+  -- lookup was a full table scan. Not unique: the same address may
+  -- appear once per destination, which is how a list is expressed.
+  KEY `idx_virtual_address` (`virtual_address`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
 -- 4 row(s) for `virtual_recipients`

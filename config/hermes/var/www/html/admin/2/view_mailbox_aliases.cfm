@@ -316,17 +316,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <small class="text-muted">The mailbox that will receive mail sent to the alias address.</small>
           </div>
 
-          <!--- Send-As (shown for forward only) --->
+          <!--- Send-As pointer (shown for forward only).
+               The permission itself moved to the mailbox. An alias can have
+               several destinations, and a Yes/No here would have granted
+               send-as to every one of them at once. --->
           <div class="form-group mb-3" id="addSendAsGroup">
             <label><strong>Allow Send-As</strong></label>
-            <div class="alert alert-info">
+            <div class="alert alert-info mb-0">
               <i class="icon fas fa-info-circle"></i>
-              When enabled, the target mailbox user can send email as the alias address. They can configure it as an additional identity in their email client.
+              Send-As is granted per mailbox, not here. To let a mailbox send using this
+              address, go to <strong>Email Server &rarr; Mailboxes</strong>, open
+              <strong>Actions &rarr; Send As</strong> on that mailbox, and add the address.
+              It is independent of the destinations below: a mailbox does not have to
+              receive this alias in order to send from it, and receiving it does not grant
+              permission to send from it.
             </div>
-            <select class="form-control" name="send_as">
-              <option value="0">No</option>
-              <option value="1">Yes</option>
-            </select>
           </div>
 
           <!--- Discard info (shown for discard only) --->
@@ -388,13 +392,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </select>
           </div>
 
-          <!--- Send-As --->
+          <!--- Send-As pointer. See the note on the Add modal above. --->
           <div class="form-group mb-3" id="editSendAsGroup">
             <label><strong>Allow Send-As</strong></label>
-            <select class="form-control" name="edit_send_as" id="editSendAs">
-              <option value="0">No</option>
-              <option value="1">Yes</option>
-            </select>
+            <div class="alert alert-info mb-0">
+              <i class="icon fas fa-info-circle"></i>
+              Send-As is granted per mailbox, not here. Use
+              <strong>Email Server &rarr; Mailboxes &rarr; Actions &rarr; Send As</strong>
+              on the mailbox that should be allowed to send from this address.
+            </div>
           </div>
 
           <!--- Discard info --->

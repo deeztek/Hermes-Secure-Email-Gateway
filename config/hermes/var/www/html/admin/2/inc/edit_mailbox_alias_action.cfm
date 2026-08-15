@@ -87,26 +87,22 @@ Alias address is immutable after creation.
     WHERE id = <cfqueryparam value="#form.alias_id#" cfsqltype="cf_sql_integer">
 </cfquery>
 
-<!--- UPDATE SENDER_LOGIN_MAPS --->
-<!--- Remove old send-as entry if it existed --->
-<cfif oldSendAs EQ 1 AND oldDeliversTo NEQ "discard:silently">
-    <cfquery datasource="hermes">
-        DELETE FROM sender_login_maps
-        WHERE sender = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
-        AND login_user = <cfqueryparam value="#oldDeliversTo#" cfsqltype="cf_sql_varchar">
-    </cfquery>
-</cfif>
+<!--- SENDER_LOGIN_MAPS is deliberately NOT resynced here any more.
+     Send-As is granted per mailbox, via Mailboxes > Actions > Send As, which
+     owns that table in edit_mailbox_send_as_action.cfm. See the note in
+     add_mailbox_alias_action.cfm for why it moved.
 
-<!--- Add new send-as entry if enabled --->
-<cfif form.edit_send_as EQ "1" AND form.edit_alias_type EQ "forward">
-    <cfquery datasource="hermes">
-        INSERT IGNORE INTO sender_login_maps (sender, login_user)
-        VALUES (
-          <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">,
-          <cfqueryparam value="#newDeliversTo#" cfsqltype="cf_sql_varchar">
-        )
-    </cfquery>
-</cfif>
+     Consequence worth knowing: changing an alias's destination no longer
+     moves the send-as permission along with it. That is intentional. The
+     grant now says "this mailbox may send from this address", which has
+     nothing to do with where the address happens to deliver, so silently
+     transferring it on a destination change would be wrong.
+
+     Existing grants are untouched by an alias edit. Deleting the alias still
+     revokes them, in delete_mailbox_alias_action.cfm. --->
+
+<!--- oldSendAs / oldDeliversTo are still read above so the surrounding
+     validation keeps working; nothing acts on them here. --->
 
 <!--- SUCCESS --->
 <cfset session.m = 2>

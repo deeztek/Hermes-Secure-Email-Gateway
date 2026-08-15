@@ -73,6 +73,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/edit_mailbox_encryption_action.cfm">
 <cfelseif action is "edit_mailbox_access_control">
   <cfinclude template="./inc/edit_mailbox_access_control_action.cfm">
+<cfelseif action is "edit_mailbox_send_as">
+  <cfinclude template="./inc/edit_mailbox_send_as_action.cfm">
 <cfelseif action is "delete_mailbox">
   <cfinclude template="./inc/delete_mailbox_action.cfm">
 <cfelseif action is "rotate_nc_password">
@@ -205,6 +207,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Rotation Failed</h4>
     <p class="mb-0">Could not rotate the NC internal password. <cfif StructKeyExists(session, "rotateNcError")><cfoutput>Details: #HTMLEditFormat(session.rotateNcError)#</cfoutput><cfset session.rotateNcError = ""></cfif></p>
+  </div>
+<cfelseif m EQ 60>
+  <cfset sendAsTarget = StructKeyExists(session, "sendAsTarget") ? session.sendAsTarget : "">
+  <cfset sendAsCount  = StructKeyExists(session, "sendAsCount") ? session.sendAsCount : 0>
+  <cfset session.sendAsTarget = "">
+  <cfset session.sendAsCount = "">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Send As Updated</h4>
+    <p class="mb-0"><cfoutput><strong>#HTMLEditFormat(sendAsTarget)#</strong> may now send as <strong>#HTMLEditFormat(sendAsCount)#</strong> address<cfif sendAsCount NEQ 1>es</cfif>.</cfoutput> Any address not selected has had its permission revoked.</p>
+  </div>
+<cfelseif m EQ 61>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Send As Not Updated</h4>
+    <p class="mb-0">The Send As permissions could not be saved and nothing was changed. Reload the page and try again.</p>
   </div>
 <cfelseif m EQ 100>
   <div class="alert alert-warning alert-dismissible">
@@ -386,6 +404,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="##" onclick="loadEditModal(#id#); return false;"><i class="fas fa-edit me-2"></i>Edit Options</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Reset 2FA Devices</a></li>
+                <li><a class="dropdown-item" href="##" onclick="loadSendAsModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-paper-plane me-2"></i>Send As</a></li>
                 <li><a class="dropdown-item" href="view_mailbox_app_passwords.cfm?mailbox_id=#id#"><i class="fas fa-key me-2"></i>Manage App Passwords</a></li>
                 <li><a class="dropdown-item" href="##" onclick="confirmResendMobileSetup(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</a></li>
                 <cfif Val(mb_nextcloud) EQ 1>
@@ -736,6 +755,57 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </div>
 
 <!--- ================================================================
+     SEND AS MODAL
+
+     Owns sender_login_maps for this mailbox: which addresses it may put
+     in the From header. Lives here rather than on the alias page because
+     an alias can have many destinations, and a single Send-As toggle on
+     the alias would grant the permission to every member of a
+     distribution list at once.
+
+     Scoped to aliases on the mailbox's OWN domain. The action handler
+     re-derives that set server-side, so a crafted POST cannot grant an
+     address belonging to another domain.
+     ================================================================ --->
+<div class="modal fade" id="sendAsModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="view_mailboxes.cfm">
+        <input type="hidden" name="action" value="edit_mailbox_send_as">
+        <input type="hidden" name="mailbox_id" id="saMailboxId">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-paper-plane me-2"></i>Send As</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Addresses <strong id="saMailboxLabel"></strong> is allowed to send from.</p>
+
+          <div class="form-group mb-3">
+            <label><strong>Allowed Addresses</strong></label>
+            <select class="form-control" name="send_as_addresses" id="saAddresses" multiple placeholder="Type to search aliases..."></select>
+            <small class="text-muted">
+              Only aliases on this mailbox's own domain can be granted. This is
+              independent of the alias's destinations: a mailbox does not need to
+              receive an alias in order to send from it, and receiving one does not
+              grant permission to send from it.
+            </small>
+          </div>
+
+          <div class="alert alert-warning py-2 px-3 mb-0" id="saEmptyNotice" style="display:none;">
+            No aliases exist on this mailbox's domain yet, so there is nothing to grant.
+            Create one under <strong>Email Server &rarr; Aliases</strong> first.
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Send As</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!--- ================================================================
      ACCESS CONTROL MODAL
      ================================================================ --->
 <!--- RESET 2FA DEVICES MODAL (#225 Phase 1.5).
@@ -1062,6 +1132,54 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#encRecipientEmail').val(email);
     $('#encEmailDisplay').text(email);
     new bootstrap.Modal(document.getElementById('editEncryptionModal')).show();
+  }
+
+  // Load Send As modal. Rebuilds the TomSelect each time so the option
+  // list reflects the domain of the mailbox actually being edited.
+  var saTomSelect = null;
+  function loadSendAsModal(mailboxId, email) {
+    $('#saMailboxId').val(mailboxId);
+    $('#saMailboxLabel').text(email);
+    $('#saEmptyNotice').hide();
+
+    if (saTomSelect) { saTomSelect.destroy(); saTomSelect = null; }
+    $('#saAddresses').empty();
+
+    $.post('./inc/get_mailbox_send_as_json.cfm', { id: mailboxId }, function(data) {
+      if (typeof data === 'string') { data = JSON.parse(data); }
+      if (data.error) { alert('Could not load Send As settings: ' + data.error); return; }
+
+      var available = data.available || [];
+      var granted = data.granted || [];
+
+      available.forEach(function(addr) {
+        $('#saAddresses').append($('<option>').attr('value', addr).text(addr));
+      });
+
+      // Same guard the timezone picker above uses. Without TomSelect the
+      // plain multi-select still submits correctly, it is just less pleasant.
+      if (typeof TomSelect !== 'undefined') {
+        saTomSelect = new TomSelect('#saAddresses', {
+          plugins: ['remove_button'],
+          placeholder: 'Type to search aliases...'
+        });
+      }
+
+      // Only preselect grants that are still in the available set, so a
+      // stale row cannot show as a value the admin has no way to explain.
+      granted.forEach(function(addr) {
+        if (available.indexOf(addr) === -1) { return; }
+        if (saTomSelect) {
+          saTomSelect.addItem(addr, true);
+        } else {
+          $('#saAddresses option[value="' + addr + '"]').prop('selected', true);
+        }
+      });
+
+      if (available.length === 0) { $('#saEmptyNotice').show(); }
+
+      new bootstrap.Modal(document.getElementById('sendAsModal')).show();
+    });
   }
 
   // Load Reset 2FA Devices modal (#225 Phase 1.5)
