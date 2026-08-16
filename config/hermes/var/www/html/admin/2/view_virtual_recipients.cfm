@@ -129,9 +129,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      near-identical lines, indistinguishable from twenty accidental
      duplicates. Collapsed here instead, with destinations as chips.
 
-     dest_ids and dest_list are parallel ordered lists, so position N in one
-     lines up with position N in the other, which is what lets each chip
-     carry its own row id. --->
+     dest_list feeds both the display chips and the edit modal, which loads
+     the whole set at once. dest_ids is what the row checkbox carries, so
+     selecting one box removes every row for that address: the delete caller
+     already splits on comma and validates each as an integer. --->
 <cfquery name="getvirtual" datasource="hermes">
   SELECT virtual_address,
          MAX(internal_only) AS internal_only,
@@ -404,19 +405,15 @@ info@example.com
               <td><input type="checkbox" class="row-checkbox" value="#encodeForHTMLAttribute(dest_ids)#"></td>
               <td>#encodeForHTML(virtual_address)#</td>
               <td>
+                <!--- Display only. Adding and removing happens in Edit, where
+                     the same chips appear and can be changed as a set. --->
                 <div class="d-flex flex-wrap gap-1">
                   <cfloop from="1" to="#ListLen(dest_list)#" index="vDestIdx">
                     <cfset vThisDest   = ListGetAt(dest_list, vDestIdx)>
-                    <cfset vThisDestId = ListGetAt(dest_ids, vDestIdx)>
                     <cfset vThisDomain = ListLast(vThisDest, "@")>
                     <cfset vIsExternal = (ListFindNoCase(localDomainList, vThisDomain) EQ 0)>
-                    <span class="badge <cfif vIsExternal>bg-warning text-dark<cfelse>bg-light text-dark border</cfif> d-inline-flex align-items-center gap-1">
-                      <cfif vIsExternal><i class="fas fa-external-link-alt" title="Outside your domains"></i></cfif>
-                      #encodeForHTML(vThisDest)#
-                      <a href="##" class="text-primary" title="Change this destination"
-                         onclick="openEditModal('#vThisDestId#', '#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(vThisDest)#', #Val(internal_only)#); return false;"><i class="fas fa-pen fa-xs"></i></a>
-                      <a href="##" class="text-danger" title="Remove this destination"
-                         onclick="removeOneDestination('#vThisDestId#', '#encodeForJavaScript(vThisDest)#'); return false;"><i class="fas fa-times fa-xs"></i></a>
+                    <span class="badge <cfif vIsExternal>bg-warning text-dark<cfelse>bg-light text-dark border</cfif>">
+                      <cfif vIsExternal><i class="fas fa-external-link-alt me-1" title="Outside your domains"></i></cfif>#encodeForHTML(vThisDest)#
                     </span>
                   </cfloop>
                 </div>
@@ -429,9 +426,14 @@ info@example.com
                 </cfif>
               </td>
               <td>
-                <cfif dest_count GT 1>
-                  <span class="badge bg-info" title="#dest_count# destinations">#dest_count#</span>
-                </cfif>
+                <!--- The whole destination set is passed inline rather than
+                     fetched over AJAX: the grouped query already has it, so an
+                     endpoint would be a round trip for data that is on the
+                     page. --->
+                <button type="button" class="btn btn-sm btn-primary" title="Edit this entry"
+                  onclick="openEditModal('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_list)#', #Val(internal_only)#); return false;">
+                  <i class="fas fa-edit"></i>
+                </button>
               </td>
             </tr>
           </cfoutput>
@@ -454,8 +456,11 @@ info@example.com
   <div class="modal-dialog">
     <div class="modal-content">
       <form method="post">
+        <!--- Keyed on the ADDRESS, not a row id: the modal edits the whole
+             entry, and the handler diffs the submitted destination set
+             against what is stored. --->
         <input type="hidden" name="action" value="edit_entry">
-        <input type="hidden" name="edit_id" id="edit_id" value="">
+        <input type="hidden" name="edit_original_address" id="edit_original_address" value="">
         <div class="modal-header">
           <h5 class="modal-title">Edit Virtual Recipient</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -468,8 +473,12 @@ info@example.com
           </div>
           <div class="mb-3">
             <label for="edit_forwards" class="form-label"><strong>Delivers To</strong></label>
-            <input type="text" class="form-control forwards" id="edit_forwards" name="edit_forwards" required>
-            <small class="text-muted">This edits one destination. Add more from the form above, remove one with the x on its chip.</small>
+            <select class="form-control" id="edit_forwards" name="edit_forwards" multiple placeholder="Pick a recipient, or type any address..."></select>
+            <small class="text-muted">
+              Every destination this address delivers to. Click the <strong>&times;</strong> on
+              a chip to remove one, or type an address to add. Mail goes to all of them, which
+              is how a distribution list is made.
+            </small>
           </div>
           <div class="mb-3">
             <label for="edit_internal_only" class="form-label"><strong>Reachable By</strong></label>
@@ -526,6 +535,26 @@ $(document).ready(function() {
     ]
   });
 
+  // Chips for the edit modal's destination set, same options as the alias
+  // page so both behave identically. Declared at script scope further down,
+  // because openEditModal() is global and would not see a ready-scoped var.
+  if (typeof TomSelect !== 'undefined') {
+    editForwardsTS = new TomSelect('#edit_forwards', {
+      create: function(input) {
+        var v = input.trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { return false; }
+        return { value: v, text: v };
+      },
+      createFilter: /^[^@\s]+@[^@\s]+\.[^@\s]+$/,
+      persist: false,
+      plugins: ['remove_button'],
+      delimiter: ',',
+      splitOn: /[,;\s\n]+/,
+      sortField: { field: 'text', direction: 'asc' },
+      placeholder: 'Pick a recipient, or type any address...'
+    });
+  }
+
   var selectedIds = new Set();
 
   $('#selectAll').on('change', function() {
@@ -552,16 +581,6 @@ $(document).ready(function() {
     $('#deleteForm').submit();
   });
 
-  // Remove ONE destination from an entry. Reuses the same delete path as the
-  // bulk checkboxes, just with a single id, so there is one code path to
-  // reason about rather than two.
-  function removeOneDestination(rowId, destination) {
-    if (!confirm('Remove the destination ' + destination + ' from this entry?\n\n'
-               + 'Other destinations on the same address are kept. If this is the last '
-               + 'one, the entry disappears with it.')) { return; }
-    $('#selectedIds').val(rowId);
-    $('#deleteForm').submit();
-  }
 
   // Autocomplete for Delivers To fields
   $(document).on('keydown', '.forwards', function() {
@@ -584,13 +603,27 @@ $(document).ready(function() {
   });
 });
 
-function openEditModal(id, address, forwards, internalOnly) {
-  document.getElementById('edit_id').value = id;
+var editForwardsTS = null;
+
+function openEditModal(address, destCsv, internalOnly) {
+  document.getElementById('edit_original_address').value = address;
   document.getElementById('edit_address').value = address;
-  document.getElementById('edit_forwards').value = forwards;
-  // Reachability belongs to the address, so the chip passes the value the
-  // whole group carries rather than anything row-specific.
   document.getElementById('edit_internal_only').value = (internalOnly ? '1' : '0');
+
+  // Load the entry's whole destination set as chips. Options are added before
+  // items so an address that is not a known recipient, typed in earlier, still
+  // renders rather than being dropped as an unknown value.
+  if (editForwardsTS) {
+    editForwardsTS.clear(true);
+    editForwardsTS.clearOptions();
+    (destCsv || '').split(',').forEach(function(d) {
+      d = d.trim();
+      if (!d) { return; }
+      editForwardsTS.addOption({ value: d, text: d });
+      editForwardsTS.addItem(d, true);
+    });
+  }
+
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 </script>

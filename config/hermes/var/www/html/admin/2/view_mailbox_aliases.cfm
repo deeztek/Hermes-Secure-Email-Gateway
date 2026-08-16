@@ -513,6 +513,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
           </div>
 
+          <!--- Shown only when switching an alias that HAS destinations over to
+               Discard. That is destructive in a way the Discard notice above
+               does not convey: the destinations are deleted, not parked, and
+               switching back will not bring them back. --->
+          <div class="form-group mb-3" id="editForwardToDiscardWarning" style="display:none;">
+            <div class="alert alert-danger mb-0">
+              <h5><i class="icon fas fa-exclamation-triangle"></i> This removes every destination</h5>
+              <p class="mb-1">
+                Saving as Discard deletes the
+                <strong><span id="editDiscardLosingCount"></span> destination(s)</strong>
+                this alias currently has:
+              </p>
+              <p class="mb-1"><code id="editDiscardLosingList"></code></p>
+              <p class="mb-0">
+                They are not kept anywhere. Switching back to Forward later gives you an
+                empty alias, and the list has to be rebuilt by hand.
+              </p>
+            </div>
+          </div>
+
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -644,10 +664,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       $('#editDeliversToGroup').hide();
       $('#editSendAsGroup').hide();
       $('#editDiscardInfo').show();
+      // Warn only when there is something to lose. Switching a discard alias
+      // that is already discarding costs nothing and needs no alarm.
+      var losing = editDeliversToTS ? editDeliversToTS.getValue() : [];
+      if (typeof losing === 'string') { losing = losing ? losing.split(',') : []; }
+      if (losing.length > 0) {
+        $('#editDiscardLosingCount').text(losing.length);
+        $('#editDiscardLosingList').text(losing.join(', '));
+        $('#editForwardToDiscardWarning').show();
+      } else {
+        $('#editForwardToDiscardWarning').hide();
+      }
     } else {
       $('#editDeliversToGroup').show();
       $('#editSendAsGroup').show();
       $('#editDiscardInfo').hide();
+      $('#editForwardToDiscardWarning').hide();
     }
   });
 
