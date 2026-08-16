@@ -26,12 +26,6 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
   </cfif>
 </cfloop>
 
-<!--- Who may send TO these addresses. Separate question from where they
-     deliver, and the control that makes external destinations defensible. --->
-<cfparam name="form.internal_only" default="0">
-<cfif form.internal_only NEQ "0" AND form.internal_only NEQ "1">
-  <cfset form.internal_only = 0>
-</cfif>
 
 <!--- No usable destination. Without this the loops below simply do nothing
      and the admin gets a success page that changed nothing. --->
@@ -102,17 +96,6 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
     <cfcontinue>
   </cfif>
 
-  <!--- Adding destinations to an address that already exists must not
-       silently change its reachability. Inherit what its rows carry. --->
-  <cfquery name="getExistingVirtualInternal" datasource="hermes">
-    SELECT MAX(internal_only) AS internal_only
-    FROM virtual_recipients
-    WHERE virtual_address = <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">
-  </cfquery>
-  <cfset thisInternalOnly = form.internal_only>
-  <cfif getExistingVirtualInternal.recordcount GTE 1 AND IsNumeric(getExistingVirtualInternal.internal_only)>
-    <cfset thisInternalOnly = getExistingVirtualInternal.internal_only>
-  </cfif>
 
   <!--- One row per destination. The address existing already is no longer a
        reason to refuse: that is how a list grows. Only an exact repeat of
@@ -132,11 +115,10 @@ Expects: form.addresses (newline-delimited), form.forwards_1 (delivery address)
     </cfif>
 
     <cfquery datasource="hermes">
-      INSERT INTO virtual_recipients (virtual_address, maps, internal_only, system)
+      INSERT INTO virtual_recipients (virtual_address, maps, system)
       VALUES (
         <cfqueryparam value="#virtualAddress#" cfsqltype="cf_sql_varchar">,
         <cfqueryparam value="#oneForward#" cfsqltype="cf_sql_varchar">,
-        <cfqueryparam value="#thisInternalOnly#" cfsqltype="cf_sql_tinyint">,
         '2'
       )
     </cfquery>

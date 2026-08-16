@@ -135,7 +135,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      already splits on comma and validates each as an integer. --->
 <cfquery name="getvirtual" datasource="hermes">
   SELECT virtual_address,
-         MAX(internal_only) AS internal_only,
          COUNT(*) AS dest_count,
          GROUP_CONCAT(id ORDER BY maps ASC)   AS dest_ids,
          GROUP_CONCAT(maps ORDER BY maps ASC) AS dest_list
@@ -330,17 +329,6 @@ info@example.com
             </small>
           </div>
 
-          <div class="mb-3">
-            <label for="internal_only" class="form-label"><strong>Reachable By</strong></label>
-            <select class="form-control" name="internal_only" id="internal_only">
-              <option value="0">Anyone (default)</option>
-              <option value="1">Only senders in your own domains</option>
-            </select>
-            <small class="text-muted">
-              Who may send <em>to</em> these addresses, which is separate from where they
-              deliver.
-            </small>
-          </div>
         </div>
         <div class="col-md-2 d-flex align-items-end pb-4">
           <button type="submit" class="btn btn-primary"
@@ -358,9 +346,10 @@ info@example.com
             receiving end, and if the message was modified on the way through the original
             DKIM signature no longer validates either. Senders whose domain publishes a
             strict DMARC policy may have mail to those destinations rejected. Local
-            destinations are unaffected. Restricting <strong>Reachable By</strong> is worth
-            considering on any list with external destinations, otherwise anyone on the
-            internet can mail it and have this gateway relay to every member.
+            destinations are unaffected. Note that addresses on a relay domain are reachable
+            from the internet by design, so a list here with external destinations can be
+            mailed by anyone. If that matters, the list belongs on a mailbox domain, where
+            it can be restricted to senders inside your own organisation.
           </div>
         </div>
       </div>
@@ -390,7 +379,6 @@ info@example.com
             <th style="width: 5%"><input type="checkbox" id="selectAll"></th>
             <th>Recipient</th>
             <th>Delivers To</th>
-            <th style="width: 12%">Reachable By</th>
             <th style="width: 10%">Actions</th>
           </tr>
         </thead>
@@ -419,19 +407,12 @@ info@example.com
                 </div>
               </td>
               <td>
-                <cfif internal_only EQ 1>
-                  <span class="badge bg-secondary" title="Only senders in your own domains may mail this address">Internal only</span>
-                <cfelse>
-                  <span class="badge bg-light text-dark border" title="Anyone may mail this address">Open</span>
-                </cfif>
-              </td>
-              <td>
                 <!--- The whole destination set is passed inline rather than
                      fetched over AJAX: the grouped query already has it, so an
                      endpoint would be a round trip for data that is on the
                      page. --->
                 <button type="button" class="btn btn-sm btn-primary" title="Edit this entry"
-                  onclick="openEditModal('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_list)#', #Val(internal_only)#); return false;">
+                  onclick="openEditModal('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_list)#'); return false;">
                   <i class="fas fa-edit"></i>
                 </button>
               </td>
@@ -480,14 +461,6 @@ info@example.com
               is how a distribution list is made.
             </small>
           </div>
-          <div class="mb-3">
-            <label for="edit_internal_only" class="form-label"><strong>Reachable By</strong></label>
-            <select class="form-control" name="edit_internal_only" id="edit_internal_only">
-              <option value="0">Anyone</option>
-              <option value="1">Only senders in your own domains</option>
-            </select>
-            <small class="text-muted">Applies to the whole address, not just this destination.</small>
-          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -525,13 +498,10 @@ $(document).ready(function() {
     stateSave: true,
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[1, 'asc']],
-    // Columns are now 0 checkbox, 1 Recipient, 2 Delivers To,
-    // 3 Reachable By, 4 Actions. Reachable By is deliberately left
-    // sortable and searchable, so an admin can pull up every open address
-    // at once. Was targets [0, 3] when Actions sat at index 3.
+    // 0 checkbox, 1 Recipient, 2 Delivers To, 3 Actions.
     columnDefs: [
-      { orderable: false, targets: [0, 4] },
-      { searchable: false, targets: [0, 4] }
+      { orderable: false, targets: [0, 3] },
+      { searchable: false, targets: [0, 3] }
     ]
   });
 
@@ -605,10 +575,9 @@ $(document).ready(function() {
 
 var editForwardsTS = null;
 
-function openEditModal(address, destCsv, internalOnly) {
+function openEditModal(address, destCsv) {
   document.getElementById('edit_original_address').value = address;
   document.getElementById('edit_address').value = address;
-  document.getElementById('edit_internal_only').value = (internalOnly ? '1' : '0');
 
   // Load the entry's whole destination set as chips. Options are added before
   // items so an address that is not a known recipient, typed in earlier, still

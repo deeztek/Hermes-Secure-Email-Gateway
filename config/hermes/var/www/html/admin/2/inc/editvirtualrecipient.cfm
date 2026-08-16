@@ -1,10 +1,17 @@
 <!---
 Hermes Secure Email Gateway - Edit Virtual Recipient Action Handler
 
-Edits a whole entry: the address, its complete set of destinations, and its
-reachability. The modal shows every destination as a removable chip, the same
-way the list renders them, so what arrives here is the set the admin wants,
-not a single row.
+Edits a whole entry: the address and its complete set of destinations. The
+modal shows every destination as a removable chip, the same way the list
+renders them, so what arrives here is the set the admin wants, not a single
+row.
+
+There is deliberately no internal-only control here, unlike mailbox aliases.
+A relay domain exists so the internet can send to it, and the customer's own
+users never traverse this gateway for same-domain mail: their server is
+authoritative for the domain and resolves it locally. Restricting a relay
+address to internal senders would reject the only traffic that reaches it
+while permitting traffic that never arrives.
 
 The save is a DIFF against what is stored, not a rewrite. Insert what is new,
 delete what was taken off, leave the rest alone. That matters for three
@@ -16,7 +23,6 @@ Expects:
   form.edit_original_address  the address being edited, as it is stored
   form.edit_address           the address to save, possibly renamed
   form.edit_forwards          comma-delimited destination set
-  form.edit_internal_only     0 or 1
 --->
 
 <cfif StructKeyExists(form, "edit_original_address") AND Trim(form.edit_original_address) is not "">
@@ -80,10 +86,6 @@ Expects:
     <cflocation url="view_virtual_recipients.cfm" addtoken="no">
   </cfif>
 
-  <cfparam name="form.edit_internal_only" default="0">
-  <cfif form.edit_internal_only NEQ "0" AND form.edit_internal_only NEQ "1">
-    <cfset form.edit_internal_only = 0>
-  </cfif>
 
   <!--- Renaming the address must not collide with an entry that already
        exists under the new name, which would silently merge two lists. --->
@@ -124,11 +126,10 @@ Expects:
       <cfcontinue>
     </cfif>
     <cfquery datasource="hermes">
-      INSERT INTO virtual_recipients (virtual_address, maps, internal_only, system)
+      INSERT INTO virtual_recipients (virtual_address, maps, system)
       VALUES (
         <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">,
         <cfqueryparam value="#wantedOne#" cfsqltype="cf_sql_varchar">,
-        <cfqueryparam value="#form.edit_internal_only#" cfsqltype="cf_sql_tinyint">,
         '2'
       )
     </cfquery>
@@ -144,14 +145,9 @@ Expects:
     </cfif>
   </cfoutput>
 
-  <!--- Reachability belongs to the ADDRESS, so it applies to every row.
-       Leaving it per-row would let an entry end up half open and half
-       restricted, which Postfix cannot express and an admin cannot reason
-       about. --->
   <cfquery datasource="hermes">
     UPDATE virtual_recipients
-    SET internal_only = <cfqueryparam value="#form.edit_internal_only#" cfsqltype="cf_sql_tinyint">,
-        system = '2'
+    SET system = '2'
     WHERE virtual_address = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">
   </cfquery>
 

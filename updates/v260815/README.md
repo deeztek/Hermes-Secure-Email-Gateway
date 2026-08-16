@@ -15,8 +15,10 @@ pages you already use gained the capability.
 - Mailbox domains: **Email Server → Mailboxes → Aliases**
 
 Both pages now group by address. An alias with twenty destinations shows as one
-row with twenty chips rather than twenty near-identical lines. Each chip can be
-edited or removed on its own; the bin on the row removes the whole alias.
+row with twenty chips rather than twenty near-identical lines. **Edit** opens the
+whole set as removable chips: take one off with its **x**, add one by typing, save
+once. Nothing is deleted by editing except what you remove, and the bin on the row
+removes the alias entirely.
 
 Relay domains could always express this, because that table never stopped an
 address appearing on several rows and Postfix concatenates the rows it gets back
@@ -40,8 +42,8 @@ every destination to be an existing local mailbox.
 
 ### Reachable By, and why it matters if you use external destinations
 
-Each alias now carries a **Reachable By** setting controlling who may send *to*
-it, which is a different question from where it delivers.
+Aliases on **mailbox domains** now carry a **Reachable By** setting controlling
+who may send *to* them, which is a different question from where they deliver.
 
 Left at **Anyone**, an alias behaves exactly as before. Set to **Only senders in
 your own domains**, mail from outside is rejected.
@@ -50,6 +52,13 @@ This is what makes external destinations defensible. Without it, an alias fannin
 out to twenty external addresses is reachable by anyone on the internet, so one
 message in becomes twenty out with your gateway doing the relaying. Worth setting
 on any list with external members.
+
+**Not offered on relay domains, deliberately.** A relay domain exists so the
+internet can send to it, and the customer's own users never traverse the gateway
+for same-domain mail, since their own server is authoritative and resolves it
+locally. Restricting a relay address to internal senders would reject the only
+traffic that reaches it while permitting traffic that never arrives. A list that
+needs restricting belongs on a mailbox domain.
 
 Two limitations: catch-all entries cannot be restricted this way, and on an
 **existing** install the setting is stored but not enforced until Postfix
@@ -170,7 +179,7 @@ two chips.
 | Aliases | Several destinations per alias, grouped display, per-destination edit and remove | `#311` |
 | Virtual Recipients | Same, plus a fix to a validator that would have rejected a list outright | `#311` |
 | Aliases | External destinations allowed on mailbox domains, badged wherever shown | `#311` |
-| Both | Reachable By, enforced by a new Postfix recipient restriction | `#311` |
+| Aliases | Reachable By, enforced by a new Postfix recipient restriction. Mailbox domains only | `#311` |
 | Mailboxes | Send-As granted per mailbox instead of per alias | |
 | Nextcloud | Group sharing disabled, closing a cross-tenant name disclosure | `#316` |
 | Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed | |

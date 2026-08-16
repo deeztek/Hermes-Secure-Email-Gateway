@@ -21,7 +21,10 @@ beside each release below is the **actual release date**.
   the rows it gets back into one recipient list; lists built by hand that way are already in the
   right shape and simply display grouped.
 - **Reachable By**, controlling who may send *to* an address, which is a different question from
-  where it delivers (#311). Enforced by a new `check_recipient_access` MySQL map, following the
+  where it delivers (#311). Mailbox domains only: a relay domain exists so the internet can send
+  to it, and its own users never traverse the gateway for same-domain mail because their server
+  is authoritative and resolves it locally, so restricting a relay address to internal senders
+  would reject the only traffic that reaches it while permitting traffic that never arrives. Enforced by a new `check_recipient_access` MySQL map, following the
   shape of the discard-recipients map already in that chain. `permit_mynetworks` short-circuits
   ahead of it, so anything reaching the map arrived from outside and a plain `REJECT` is correct;
   no sender-domain test is used, since trusting an unauthenticated claim to be from your own

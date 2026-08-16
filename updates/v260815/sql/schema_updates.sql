@@ -72,10 +72,13 @@ CREATE INDEX IF NOT EXISTS idx_virtual_address
 -- aliases to restrictive during an unattended upgrade would start
 -- rejecting mail that currently gets delivered.
 -- ---------------------------------------------------------------------
+-- Mailbox domains only. Deliberately NOT added to virtual_recipients: a relay
+-- domain exists so the internet can send to it, and the customer's own users
+-- never traverse this gateway for same-domain mail, since their server is
+-- authoritative for the domain and resolves it locally. Restricting a relay
+-- address to internal senders would reject the only traffic that reaches it
+-- while permitting traffic that never arrives.
 ALTER TABLE mailbox_aliases
-  ADD COLUMN IF NOT EXISTS internal_only TINYINT(3) NOT NULL DEFAULT 0 AFTER alias_type;
-
-ALTER TABLE virtual_recipients
   ADD COLUMN IF NOT EXISTS internal_only TINYINT(3) NOT NULL DEFAULT 0 AFTER alias_type;
 
 -- ---------------------------------------------------------------------

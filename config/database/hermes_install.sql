@@ -2959,9 +2959,6 @@ CREATE TABLE IF NOT EXISTS `virtual_recipients` (
   `virtual_address` varchar(255) NOT NULL,
   `maps` varchar(255) DEFAULT NULL,
   `alias_type` varchar(20) NOT NULL DEFAULT 'forward',
-  -- See the note on mailbox_aliases.internal_only. Same meaning, same
-  -- permissive default, kept in step so both topologies behave alike.
-  `internal_only` tinyint(3) NOT NULL DEFAULT 0,
   `send_as` tinyint(3) NOT NULL DEFAULT 0,
   `policy_id` int(11) DEFAULT NULL,
   `system` int(11) DEFAULT NULL,
