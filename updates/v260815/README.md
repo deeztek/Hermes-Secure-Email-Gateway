@@ -226,6 +226,36 @@ on this install, you have some. Nothing else references them and no
 configuration is generated from them, so the cleanup is safe and needs no
 action from you. SAN rows not yet attached to a certificate are left alone.
 
+### Per-domain SMTP certificates could stop inbound mail entirely
+
+If a certificate's files went missing while its SAN rows still read validated,
+Postfix was told to consult a certificate map that had been deleted. Every TLS
+handshake offering SNI then failed and **inbound mail stopped**, with nothing to
+show for it but a warning in the log:
+
+```
+warning: hash:/etc/postfix/sni_maps is unavailable
+warning: tls_server_sni_maps: <host> map lookup problem
+SSL_accept error from <sender>
+```
+
+Two conditions had to agree and did not. The console enabled the directive by
+counting validated SAN rows in the database; the map itself was only written for
+certificates whose files were actually present. The directive is now decided by
+whether the map exists, so the two cannot diverge. Being wrong now leaves SNI
+disabled and mail flowing on the default certificate, rather than refusing mail.
+
+Three situations produced the mismatch, all seen in practice: a certificate that
+was deleted, one still Pending because it was requested but never issued, and one
+imported without its chain so no bundle file was ever created. The first of those
+is the certificate-delete bug fixed in this same release.
+
+**This upgrade repairs it.** Any certificate whose SANs are marked validated but
+whose files are absent has that flag cleared, and a dangling directive is removed
+from the live Postfix config. Validation flags are reset rather than deleted, so
+your SAN configuration survives and simply re-validates once a certificate is
+genuinely issued. A healthy install is left untouched.
+
 ## What to do
 
 Run the standard upgrade:
@@ -300,6 +330,7 @@ the interface and has no effect.
 | Nextcloud | Shares restricted to your own group members, closing a cross-tenant name disclosure | `#316` |
 | Console | Certificate and timezone fields are real dropdowns that open on click | `#310` |
 | Certificates | Deleting one no longer fails after having deleted it; stranded SAN rows cleaned up | |
+| SMTP TLS | A missing per-domain certificate map no longer stops inbound mail; stale validation flags reset on upgrade | |
 | Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed; orphaned `mailbox_sans` rows removed | |
 | Cleanup | Four unreachable files removed: two duplicate Virtual Recipient pages, two dead scheduler scripts | |
 

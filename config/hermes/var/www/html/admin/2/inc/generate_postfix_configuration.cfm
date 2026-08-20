@@ -55,12 +55,47 @@ timeout="10" />
     WHERE mailbox_domain = '1' AND DNS = 'YES'
 </cfquery>
 
+<!--- Try to build the map whenever the database thinks there is something to
+     build. The count alone is NOT the decision: it only decides whether it is
+     worth attempting. --->
 <cfif getValidatedCertCount.cnt GT 0>
-    <!--- Validated certificates exist - generate SNI files and enable the parameter --->
-
-    <!--- Generate SNI configuration files from validated certificates --->
     <cfinclude template="smtp_sni_generate_config.cfm">
+</cfif>
 
+<!--- The directive is decided by the ARTIFACT, not by the row count.
+
+     This used to enable tls_server_sni_maps whenever the count above was
+     non-zero, while smtp_sni_generate_config.cfm only writes the map for
+     certificates whose files are actually on disk, deleting it otherwise.
+     When those two disagreed Postfix was pointed at a map that did not
+     exist, every TLS handshake offering SNI failed, and inbound mail
+     stopped. It failed CLOSED, and said so only in a log warning.
+     They disagree whenever a certificate's files are gone while its SAN
+     rows still read DNS = 'YES': deleted, still Pending, or imported
+     without a chain so no bundle was ever produced.
+     
+     sni_maps.db is what Postfix actually opens, so that is what is tested,
+     rather than the source file or the generator's own opinion. If postmap
+     failed, the .db is absent and the directive stays off.
+     
+     Note the direction this errs in. Being wrong here leaves SNI disabled,
+     which serves the default certificate and keeps mail flowing. The old
+     behaviour was wrong in the other direction and refused mail outright. --->
+<cfset sniMapUsable = FileExists("/etc/postfix/sni_maps") AND FileExists("/etc/postfix/sni_maps.db")>
+
+<!--- Surface why the map could not be built. smtp_sni_generate_config.cfm
+     records the reason and nothing ever read it, so a certificate that was
+     silently skipped looked identical to one that was never configured. --->
+<cfif getValidatedCertCount.cnt GT 0 AND NOT sniMapUsable>
+    <cfset sniSkipReason = "no certificate files found for the validated SANs">
+    <cfif IsDefined("sniSyncError") AND Len(Trim(sniSyncError))>
+        <cfset sniSkipReason = sniSyncError>
+    </cfif>
+    <cflog file="hermes" type="warning"
+           text="tls_server_sni_maps left disabled: #sniSkipReason#. Run SAN validation again once the certificate has been issued.">
+</cfif>
+
+<cfif sniMapUsable>
     <!--- Enable tls_server_sni_maps parameter (both parent and child) --->
     <cfquery datasource="hermes">
         UPDATE parameters
@@ -73,7 +108,7 @@ timeout="10" />
         WHERE parent_name = 'tls_server_sni_maps' AND child = 1 AND module = 'postfix'
     </cfquery>
 <cfelse>
-    <!--- No validated certificates - disable tls_server_sni_maps parameter --->
+    <!--- No usable map - disable tls_server_sni_maps parameter --->
     <cfquery datasource="hermes">
         UPDATE parameters
         SET enabled = 0, applied = 2, action = 'APPLY'
@@ -85,7 +120,7 @@ timeout="10" />
         WHERE parent_name = 'tls_server_sni_maps' AND child = 1 AND module = 'postfix'
     </cfquery>
 
-    <!--- Clean up any existing SNI config files --->
+    <!--- Clean up any half-written SNI config files --->
     <cfif FileExists("/etc/postfix/sni_maps")>
         <cffile action="delete" file="/etc/postfix/sni_maps">
     </cfif>

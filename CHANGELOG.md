@@ -204,6 +204,27 @@ beside each release below is the **actual release date**.
   this way, the schema update for this release also removes SAN rows whose certificate no longer
   exists; rows not yet attached to a certificate are a legitimate state and are left alone.
 
+- **A missing per-domain certificate map stopped inbound mail.** `tls_server_sni_maps` was
+  enabled from a row count taken before the map was built, while the map itself was only
+  written for certificates whose files were actually on disk and deleted otherwise. When the two
+  disagreed Postfix was pointed at a map that did not exist, every TLS handshake offering SNI
+  failed with `SSL_accept error`, and inbound delivery stopped. It failed closed and announced
+  itself only as a log warning. The directive is now decided by whether `sni_maps.db` exists,
+  which is the file Postfix actually opens, so the two cannot diverge; being wrong now leaves
+  SNI disabled and mail flowing on the default certificate instead of refusing mail. The reason
+  a certificate was skipped is logged rather than discarded, which it had been.
+
+  Three situations produced the mismatch, all observed: a deleted certificate, one still Pending
+  because it was requested but never issued, and one imported without its chain so no bundle
+  existed. The first is the certificate-delete bug fixed above, and it is worse than it looks,
+  because `system_certificates` is InnoDB and its auto-increment counter is recalculated as
+  `MAX(id)+1` after a restart, so re-issuing can hand the replacement the same id the deleted
+  one had. The stale rows then point at a valid id again, which is why the SQL cleanup cannot
+  reach them: they are stale by history, not by foreign key. A phase script reconciles them
+  against the filesystem instead, clearing the validated flag rather than deleting the rows so
+  the operator's SAN configuration survives, and removing a dangling directive from the live
+  Postfix config with a single `postconf -X` rather than regenerating `main.cf` unattended.
+
 ### Removed
 
 - **Two unreachable duplicate pages**, `admin/2/add_virtual_recipients.cfm` and
