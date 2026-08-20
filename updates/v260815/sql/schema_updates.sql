@@ -82,7 +82,37 @@ ALTER TABLE mailbox_aliases
   ADD COLUMN IF NOT EXISTS internal_only TINYINT(3) NOT NULL DEFAULT 0 AFTER alias_type;
 
 -- ---------------------------------------------------------------------
--- 4. Version stamp -- MUST be the last statement (advances build_no so
+-- 4. Clean up SAN rows orphaned by the certificate-delete bug
+--
+-- delete_system_certificate.cfm removed the row from system_certificates
+-- and then tried to remove the matching SAN rows from a table called
+-- mailbox_domains_sans, which has never existed in this schema. The second
+-- statement threw every time, but only AFTER the first had committed, so
+-- every certificate deletion on every install to date left its SAN rows
+-- behind pointing at a certificate id that is gone.
+--
+-- The code fix (correct table `mailbox_sans`, correct column `certificate`,
+-- and child deleted before parent) stops new orphans. It cannot remove the
+-- ones already stranded, which is what this does.
+--
+-- Idempotent: a second run matches nothing, because the first removed
+-- everything that qualified.
+--
+-- NULL `certificate` means the SAN row is not attached to a certificate yet,
+-- which is a legitimate state rather than an orphan, so those are excluded
+-- explicitly. NOT EXISTS rather than NOT IN for the same reason: NOT IN
+-- yields NULL rather than TRUE when the compared value is NULL, which would
+-- silently skip rows for a different reason than the one intended.
+-- ---------------------------------------------------------------------
+DELETE ms FROM mailbox_sans ms
+WHERE ms.certificate IS NOT NULL
+  AND NOT EXISTS (
+        SELECT 1 FROM system_certificates sc
+        WHERE sc.id = ms.certificate
+      );
+
+-- ---------------------------------------------------------------------
+-- 5. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260815' WHERE parameter = 'build_no';

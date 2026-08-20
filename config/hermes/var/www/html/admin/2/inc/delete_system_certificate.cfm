@@ -190,14 +190,28 @@ delete from system_certificates where id=<cfqueryparam value = #form.certificate
 
     <cfif FindNoCase("Deleted all files relating to certificate", acmeOutput)>
 
+<!--- Delete the SAN rows FIRST, then the certificate they point at.
+
+     Child before parent: if the SAN delete fails, the certificate is still
+     there and the operation can be retried. The other order deletes the
+     certificate, then throws, leaving orphaned SAN rows behind and reporting
+     failure for something that half happened.
+
+     Table and column were BOTH wrong here. This read
+     `mailbox_domains_sans.acme_certificate`, and no such table has ever
+     existed in this schema: not in config/database/hermes_install.sql, not in
+     any updates/*/sql/schema_updates.sql. The real table is `mailbox_sans`
+     and its foreign key is `certificate`, which is what the Ofelia-scheduled
+     schedule/acme_validate_ip.cfm has always used. Deleting any certificate
+     therefore threw "Table 'hermes.mailbox_domains_sans' doesn't exist"
+     AFTER the certificate row had already gone. --->
+    <cfquery name = "deletesans" datasource="hermes">
+    delete from mailbox_sans where certificate=<cfqueryparam value = #form.certificate_id# CFSQLType = "CF_SQL_INTEGER">
+    </cfquery>
+
 <!--- Delete from system_certificates --->
     <cfquery name = "deletecert" datasource="hermes">
     delete from system_certificates where id=<cfqueryparam value = #form.certificate_id# CFSQLType = "CF_SQL_INTEGER">
-    </cfquery>
-
-<!--- Delete from mailbox_domains_sans --->
-    <cfquery name = "deletesans" datasource="hermes">
-    delete from mailbox_domains_sans where acme_certificate=<cfqueryparam value = #form.certificate_id# CFSQLType = "CF_SQL_INTEGER">
     </cfquery>
   
 

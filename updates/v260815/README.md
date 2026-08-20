@@ -131,6 +131,28 @@ removed, so alias lookups do not degrade.
 
 Tracked in `#311` and `#316`.
 
+### Deleting a certificate always failed, after deleting it
+
+Deleting any certificate ended on a Lucee error page rather than a success
+message. The certificate was nonetheless gone: the handler removed it, then
+tried to remove its SAN rows from a table that has never existed in this
+schema, and threw only after the first statement had committed.
+
+So the operation half happened every time. The certificate and its acme files
+were removed, the SAN rows for it were left behind pointing at an id that no
+longer resolves, and the admin was shown a stack trace suggesting nothing had
+worked.
+
+The handler now uses the real table and column, and deletes the SAN rows before
+the certificate rather than after, so any future failure leaves the certificate
+intact and the operation retryable.
+
+**This upgrade also cleans up after the bug.** The schema update removes SAN
+rows whose certificate no longer exists. If you have ever deleted a certificate
+on this install, you have some. Nothing else references them and no
+configuration is generated from them, so the cleanup is safe and needs no
+action from you. SAN rows not yet attached to a certificate are left alone.
+
 ## What to do
 
 Run the standard upgrade:
