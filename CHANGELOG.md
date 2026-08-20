@@ -32,6 +32,18 @@ beside each release below is the **actual release date**.
   defensible: without it an alias fanning out to twenty external addresses is reachable by
   anyone on the internet.
 
+  Registering that restriction takes a seed row, not a template edit. `main.cf.HERMES` is only
+  the file a fresh install starts from; on a running system
+  `generate_postfix_configuration.cfm` rebuilds `smtpd_recipient_restrictions` from the
+  `parameters` table, so the directive is assembled purely from `child = '1'` rows ordered by
+  `order1`. Adding the map to the template alone would have been silently undone by the first
+  Postfix settings save, which is exactly the save the release notes tell operators to perform.
+  Caught on the test box, where the map was rendered with real credentials and the console
+  stored the setting while `postconf -n` showed no sign of it. The row sits at `order1` 1.150,
+  after `permit_mynetworks`, the discard map and `permit_sasl_authenticated`, so internal and
+  authenticated senders short-circuit before it and anything reaching the map came from
+  outside.
+
 ### Changed
 
 - **External destinations are permitted on mailbox domains**, and flagged wherever they appear

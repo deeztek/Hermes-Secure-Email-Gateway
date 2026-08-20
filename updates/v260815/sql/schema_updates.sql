@@ -112,7 +112,57 @@ WHERE ms.certificate IS NOT NULL
       );
 
 -- ---------------------------------------------------------------------
--- 5. Version stamp -- MUST be the last statement (advances build_no so
+-- 5. Register the internal-only map as a recipient restriction
+--
+-- Reachable By is enforced by a check_recipient_access map named in
+-- smtpd_recipient_restrictions. That directive is NOT copied from
+-- main.cf.HERMES on a running system: generate_postfix_configuration.cfm
+-- rebuilds it from this table, taking every child='1' row whose parent_name
+-- is 'smtpd_recipient_restrictions' and ordering by order1.
+--
+-- Without a row here the map is rendered, the column exists and the console
+-- stores the setting, but Postfix is never told to consult it. Saving Postfix
+-- settings actively removes the line the template put there, because the
+-- regenerated directive is assembled purely from these rows.
+--
+-- order1 = 1.150 places it AFTER permit_mynetworks (1.000), the discard map
+-- (1.050) and permit_sasl_authenticated (1.100), and before
+-- reject_unauth_destination (2.000). That ordering is the whole design:
+-- senders on your own networks and authenticated submission users
+-- short-circuit before the check, so anything that reaches the map arrived
+-- from outside and a plain REJECT is correct.
+--
+-- parent is left NULL, matching the discard map row. The Perimeter Checks
+-- page lists rows by numeric parent, so a NULL keeps this out of a UI where
+-- an admin could disable it independently of the per-alias setting that
+-- drives it. The generator matches on parent_name, so it still emits.
+-- ---------------------------------------------------------------------
+INSERT INTO parameters
+    (parameter, name, module, editable, conf_file, description,
+     parent, parent_name, child, order1, enabled, applied, action)
+SELECT
+    'check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf',
+    'Internal Only Recipients Access Check',
+    'postfix',
+    0,
+    'main.cf',
+    'Rejects mail from outside your own domains to aliases marked Reachable By: internal only',
+    NULL,
+    'smtpd_recipient_restrictions',
+    1,
+    1.150,
+    1,
+    1,
+    'NONE'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM parameters) AS p
+    WHERE p.parameter = 'check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf'
+      AND p.parent_name = 'smtpd_recipient_restrictions'
+      AND p.child = 1
+);
+
+-- ---------------------------------------------------------------------
+-- 6. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260815' WHERE parameter = 'build_no';
