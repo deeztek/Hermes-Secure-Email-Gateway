@@ -64,6 +64,35 @@ Two limitations: catch-all entries cannot be restricted this way, and on an
 **existing** install the setting is stored but not enforced until Postfix
 regenerates its configuration. See "What to do" below.
 
+### Add creates, Edit changes
+
+On both Aliases and Virtual Recipients, entering an address that already exists
+is now refused, with the error pointing at that row's Edit button.
+
+Previously you could re-enter an existing address to add members to it. That gave
+two ways to do one thing, and it produced an answer you could not act on: if
+everything you entered was already stored, the only honest report was that
+nothing had changed, which reads as a failure for what was arguably a no-op.
+
+Everything about an existing entry, including adding and removing destinations,
+happens in Edit, where the whole set is shown as chips and the save is a diff.
+
+### Virtual Recipients now takes one address at a time
+
+The Add form was a box you could paste many addresses into at once. It is now a
+single address, entered in a modal, matching the Aliases page.
+
+**This removes a capability.** Creating ten addresses is now ten submissions.
+
+The bulk form is what forced every outcome to be a per-row tally across four
+separate result banners, and what made it impossible to refuse an address that
+already existed rather than merely mention it in a list. Fan-out in the direction
+that matters, one address to many destinations, is unaffected and is what the
+chips are for.
+
+If a bulk path is wanted again it should be a real import with its own report,
+not a shared text box whose failure mode is a tally.
+
 ### Send-As moved from the alias to the mailbox
 
 Permission to send using an address is now granted per mailbox, under
@@ -82,6 +111,31 @@ nothing, and granting send-as does not require them to be a member.
 alias's destination no longer moves the grant along with it. That is deliberate,
 since the grant now means "this mailbox may send from this address" and has
 nothing to do with where the address delivers.
+
+### Granting Send-As is not enough on its own
+
+Worth knowing before the first support ticket: **the grant alone changes nothing
+the user can see.** No mail protocol exposes send-as permissions to a client, so
+the user must also add the address as an identity in whatever they read mail
+with:
+
+| Client | Where |
+| --- | --- |
+| Webmail (Nextcloud Mail) | Mail, Account settings, Aliases, Add alias |
+| Thunderbird | Account Settings, Manage Identities, Add |
+| Outlook | Account Settings, additional email addresses |
+| Apple Mail | Account settings, Edit Email Addresses |
+
+Until they do, the From field stays a plain label and the alias is nowhere to be
+found, which looks exactly like the grant not working. In every client the From
+field only becomes a dropdown once the account has more than one identity.
+
+The reverse also holds and is useful for checking the grant is real: a client
+will happily let a user add an identity they have **not** been granted, and the
+message is refused at submission with `Sender address rejected: not owned by
+user ...`.
+
+Documented for users in `docs/users/set-up-your-devices.md`.
 
 ### Nextcloud sharing now stays inside your own domain by default
 
@@ -131,6 +185,25 @@ removed, so alias lookups do not degrade.
 
 Tracked in `#311` and `#316`.
 
+### Dropdowns that looked like text boxes
+
+Reported from testing, with the TLS certificate field named as the example: some
+fields holding a list of options had no arrow or any other sign that a list
+existed, so they read as ordinary text boxes.
+
+The Console Certificate, SMTP TLS Certificate, Dovecot Certificate and Timezone
+fields were exactly that. Worse, the list only attached itself once you started
+typing, so clicking did nothing and the first character you typed was swallowed
+setting it up. All four are proper dropdowns now, with a chevron, and they open
+on click.
+
+The destination pickers on Aliases and Virtual Recipients had a milder version of
+the same problem in their Edit modals and now open on click as well.
+
+One further fix found on the way: selecting a timezone had always thrown a
+JavaScript error, because the handler looked for a field that has never existed
+on that page. Saving worked regardless, which is why it went unnoticed.
+
 ### Deleting a certificate always failed, after deleting it
 
 Deleting any certificate ended on a Lucee error page rather than a success
@@ -178,21 +251,40 @@ Nothing else is required. Everything else applies automatically.
 
 ```bash
 # Build stamp advanced
-docker exec hermes_db_server mysql -u root hermes \
+docker exec hermes_db_server mariadb -u root hermes \
   -e "SELECT value FROM system_settings WHERE parameter = 'build_no';"
 # expect: v260815
+
+# No SAN rows left pointing at a certificate that no longer exists
+docker exec hermes_db_server mariadb -u root hermes -e \
+  "SELECT COUNT(*) AS orphans FROM mailbox_sans
+    WHERE certificate IS NOT NULL
+      AND certificate NOT IN (SELECT id FROM system_certificates);"
+# expect: 0
 
 # The new lookup map exists
 ls -l config/postfix-dkim/etc/postfix/mysql-internal-only-recipients.cf
 
-# Sharing is restricted to the same domain
+# Sharing is restricted to your own group members
 docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
   config:app:get core shareapi_only_share_with_group_members
 # expect: yes
 ```
 
-Then create an alias with two destinations and confirm it renders as one row with
-two chips.
+Note there is no `-p`: `hermes_db_server` authenticates root over a unix socket,
+so running as root inside the container needs no password.
+
+Then in the console:
+
+- Create an alias with two destinations and confirm it renders as one row with
+  two chips.
+- Open **System, Console Settings** and click the Certificate field without
+  typing. It should drop down a list.
+
+**Reachable By needs one extra step on an upgraded install.** The recipient
+restriction that enforces it is written into `main.cf` from a template, so it
+stays inert until you save Postfix settings once. Until then the setting shows in
+the interface and has no effect.
 
 ## What changed
 
@@ -202,9 +294,14 @@ two chips.
 | Virtual Recipients | Same, plus a fix to a validator that would have rejected a list outright | `#311` |
 | Aliases | External destinations allowed on mailbox domains, badged wherever shown | `#311` |
 | Aliases | Reachable By, enforced by a new Postfix recipient restriction. Mailbox domains only | `#311` |
-| Mailboxes | Send-As granted per mailbox instead of per alias | |
-| Nextcloud | Group sharing disabled, closing a cross-tenant name disclosure | `#316` |
-| Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed | |
+| Aliases, Virtual Recipients | Add creates only; an existing address is refused and points at Edit | `#311` |
+| Virtual Recipients | One address per submission, in a modal, replacing the bulk paste box | `#311` |
+| Mailboxes | Send-As granted per mailbox instead of per alias, and shown as a column on the list | |
+| Nextcloud | Shares restricted to your own group members, closing a cross-tenant name disclosure | `#316` |
+| Console | Certificate and timezone fields are real dropdowns that open on click | `#310` |
+| Certificates | Deleting one no longer fails after having deleted it; stranded SAN rows cleaned up | |
+| Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed; orphaned `mailbox_sans` rows removed | |
+| Cleanup | Four unreachable files removed: two duplicate Virtual Recipient pages, two dead scheduler scripts | |
 
 ## Known follow-up
 
