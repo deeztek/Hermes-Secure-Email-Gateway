@@ -21,8 +21,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif #form.request# is "1">
        
 
+    <!--- LIMIT added because the caller now fetches on FOCUS as well as on
+         keystroke, so an empty search reaches here and `LIKE '%%'` would
+         return every relay recipient on the system. 50 is a picker's worth:
+         enough to browse when the field is first clicked, and typing narrows
+         it. Sorted so the capped slice is stable rather than whatever order
+         the storage engine returns. --->
     <cfquery name = "getrecipients" datasource="hermes">
         select id, recipient from recipients where recipient like <cfqueryparam cfsqltype="cf_sql_varchar" value="%#form.search#%"> and domain is NULL and (recipient_type = 'relay' or recipient_type is null)
+        order by recipient asc
+        limit 50
         </cfquery>
 
         

@@ -53,34 +53,22 @@ Alias address is immutable after creation.
 
 <!--- VALIDATE DELIVERS TO
 
-     This edits ONE destination row, identified by alias_id, rather than
-     replacing the whole set. Per-row editing was chosen over replace-the-set
-     because it is safer and more precise: there is no window in which the
-     list is empty, `created_at` survives on members that did not change, and
-     two admins working on the same list only collide if they touch the same
-     member. Adding members is the Add modal's job; removing one is a delete
-     on its own row.
+     This handler owns the alias's WHOLE destination set. The modal shows every
+     destination as a removable chip and submits the set the admin wants to end
+     up with, so the save below is a diff against what is stored: insert what is
+     new, delete what was taken off, leave the rest untouched.
 
-     The alias address is read-only in the modal, so a per-row edit can only
-     change where this one destination points. There is no way to split a
-     grouped alias by renaming a single row out of it.
+     Adding and removing members both happen here, and only here. The Add modal
+     creates an alias that does not yet exist and refuses an address that does,
+     so there is exactly one route for each operation.
+
+     alias_id identifies which alias is being edited, not which row. The alias
+     address is read-only in the modal, so an edit can never split a grouped
+     alias by renaming one row out of it.
 
      Format validation only. The old "must be an existing mailbox" check is
      gone, matching the add handler: it made external forwarding impossible on
      mailbox domains while relay domains allowed it freely. --->
-<!--- Accepts SEVERAL destinations, not one.
-
-     Editing normally changes the single destination whose pen icon was
-     clicked, and passing one address still does exactly that. But converting
-     an alias from Discard to Forward is a case where one is not enough: a
-     discard alias has no destination chips, so there is nowhere else to add
-     from, and forcing the admin to save one and then add the rest from the
-     row is a two-step dance for something that should be one action.
-
-     Rather than special-casing the conversion, the field simply takes a list
-     everywhere. One value edits the row, as before. Several edit the row and
-     add the remainder, which reads naturally as "this destination becomes
-     these". Nothing is ever deleted by an edit. --->
 <cfparam name="form.edit_delivers_to" default="">
 <cfset editDestList = "">
 

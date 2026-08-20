@@ -60,27 +60,25 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
     <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
 </cfif>
 
-<!--- The alias address existing already is NO LONGER a reason to refuse.
-     Adding a destination to an alias that already has one is precisely how
-     a list grows, so blocking it here would block the feature.
+<!--- The alias address must not already exist. Add CREATES an alias. Adding
+     members to one that already exists is the Edit modal's job, where the
+     whole destination set is shown as chips and the save is a diff.
 
-     What is still refused is an exact repeat of the same address AND the
-     same destination, which is checked per pair at insert time below and
-     enforced by uq_alias_dest in the database. --->
+     Routing both operations through Add was ambiguous. Submitting an existing
+     address whose destinations were all already stored could only report
+     "nothing changed", which reads as a failure for what was arguably a no-op,
+     and it gave two ways to do the same thing. One entry point per operation
+     removes the question: Add creates, Edit manages members.
 
-<!--- Was: blanket duplicate check on alias_address, session.m = 14 --->
-
-<!--- An alias is EITHER forward or discard, never both. Adding a forwarding
-     destination to an address that already discards, or the reverse, would
-     leave rows disagreeing about what the address does, which Postfix has no
-     way to express and the grouped list view could only render as one or the
-     other. Refuse it and say which it currently is. --->
-<cfquery name="checkExistingType" datasource="hermes">
-    SELECT DISTINCT alias_type FROM mailbox_aliases
+     This also makes a type conflict impossible here. An alias is EITHER
+     forward or discard, never both, and a brand new address has no existing
+     type to disagree with. --->
+<cfquery name="checkAliasExists" datasource="hermes">
+    SELECT id FROM mailbox_aliases
     WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
 </cfquery>
-<cfif checkExistingType.recordcount GTE 1 AND checkExistingType.alias_type NEQ form.alias_type>
-    <cfset session.m = 18>
+<cfif checkAliasExists.recordcount GTE 1>
+    <cfset session.m = 14>
     <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
 </cfif>
 
@@ -171,30 +169,27 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
     <cfset form.internal_only = 0>
 </cfif>
 
-<!--- Adding members to an alias that already exists must not silently
-     change its reachability. Inherit whatever the existing rows carry. --->
-<cfquery name="getExistingInternalOnly" datasource="hermes">
-    SELECT MAX(internal_only) AS internal_only
-    FROM mailbox_aliases
-    WHERE alias_address = <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">
-</cfquery>
-<cfif getExistingInternalOnly.recordcount GTE 1 AND IsNumeric(getExistingInternalOnly.internal_only)>
-    <cfset form.internal_only = getExistingInternalOnly.internal_only>
-</cfif>
+<!--- No inheritance step is needed. The address is new, so there are no
+     existing rows to take a reachability setting from, and every row written
+     below gets the value the admin picked in the modal. --->
+
 
 <!--- ====================================================================
      ALL VALIDATION PASSED - BEGIN CREATION
      ==================================================================== --->
 
 <!--- 1. INSERT ONE ROW PER DESTINATION.
-     INSERT IGNORE rather than checking first: uq_alias_dest already refuses
-     an exact address-plus-destination repeat, so a destination the alias
-     already has is silently skipped instead of failing the whole save. That
-     makes re-pasting a list with two new members on the end do the obvious
-     thing. --->
-<cfset aliasRowsAdded = 0>
+     The address is known not to exist and the submitted destinations were
+     deduplicated above, so every row written here is new and uq_alias_dest
+     cannot be violated. INSERT IGNORE is kept purely as a guard against a
+     double submit racing itself, not as a duplicate-handling strategy.
+
+     Nothing reads the driver's affected-row count. It was the only place in
+     the console doing so, it is not needed once the address is guaranteed
+     new, and whether Lucee populates it on INSERT IGNORE is not a question
+     this handler should depend on. --->
 <cfloop index="oneDestination" list="#deliversToList#" delimiters=",">
-    <cfquery name="insertAliasRow" datasource="hermes" result="insertAliasResult">
+    <cfquery datasource="hermes">
         INSERT IGNORE INTO mailbox_aliases (alias_address, delivers_to, alias_type, internal_only, send_as, domain_id)
         VALUES (
           <cfqueryparam value="#aliasAddress#" cfsqltype="cf_sql_varchar">,
@@ -205,19 +200,7 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
           <cfqueryparam value="#checkDomain.id#" cfsqltype="cf_sql_integer">
         )
     </cfquery>
-    <cfif StructKeyExists(insertAliasResult, "recordcount") AND insertAliasResult.recordcount GT 0>
-        <cfset aliasRowsAdded = aliasRowsAdded + 1>
-    </cfif>
 </cfloop>
-
-<!--- Everything submitted was already present. Say so rather than
-     reporting a success that changed nothing. --->
-<cfif aliasRowsAdded EQ 0>
-    <cfset session.m = 14>
-    <cflocation url="view_mailbox_aliases.cfm" addtoken="no">
-</cfif>
-
-<cfset session.aliasRowsAdded = aliasRowsAdded>
 
 <!--- 2. SENDER_LOGIN_MAPS is deliberately NOT written here any more.
      Send-As is now granted per mailbox, via Mailboxes > Actions > Send As,

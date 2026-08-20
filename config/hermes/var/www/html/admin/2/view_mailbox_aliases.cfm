@@ -118,21 +118,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Error</h4>
     This address already exists as a mailbox. Use the Mailboxes page to manage it.
   </div>
-<cfelseif m EQ 18>
+<cfelseif m EQ 14>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Type does not match</h4>
-    That address already exists with a different Type. An alias either forwards or
-    discards, never both. Change the existing alias's Type first, or use a different
-    address.
-  </div>
-<cfelseif m EQ 14>
-  <div class="alert alert-warning alert-dismissible">
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-exclamation-triangle"></i> Nothing to add</h4>
-    Every destination you entered is already on this alias, so nothing changed. An alias
-    address existing is not a problem in itself: entering it again is how you add members.
-    Only an exact repeat of the same address <em>and</em> the same destination is skipped.
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    This alias already exists. To change where it delivers, or to add and remove
+    destinations, use the Edit button on its row.
   </div>
 <cfelseif m EQ 15>
   <div class="alert alert-danger alert-dismissible">
@@ -347,8 +338,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="form-group mb-3">
             <label><strong>Alias Address</strong></label>
             <input type="email" class="form-control" name="alias_address" id="addAliasAddress" placeholder="noreply@domain.com" required>
-            <small class="text-muted">To add members to an alias that already exists, enter the same address here. Existing destinations are kept.</small>
-            <small class="text-muted">Must be on a mailbox domain. Cannot be an existing mailbox address.</small>
+            <small class="text-muted">Must be on a mailbox domain. Cannot be an existing mailbox address, and cannot be an alias that already exists. To add members to an existing alias, use Edit on its row.</small>
           </div>
 
           <!--- Alias Type --->
@@ -703,6 +693,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           }
           editDeliversToTS.addItem(d, true);
         });
+
+        // Reset the query the programmatic adds leave behind. Without this the
+        // control still holds a search term, so clicking the field offers a
+        // filtered list instead of the mailbox list Add shows on click. Both
+        // selects carry the same server-rendered options; only the state after
+        // populating chips differed.
+        editDeliversToTS.setTextboxValue('');
+        editDeliversToTS.refreshOptions(false);
 
         $('#editInternalOnly').val(a.internal_only);
         new bootstrap.Modal(document.getElementById('editAliasModal')).show();

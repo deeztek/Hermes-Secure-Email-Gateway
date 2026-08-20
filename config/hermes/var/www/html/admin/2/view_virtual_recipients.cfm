@@ -56,13 +56,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfparam name="m" default="0">
 <cfparam name="action" default="">
+<!--- errormessage carries the single verdict for an add. The four separate
+     accumulating counters that used to live here (invalidemail, invaliddomain,
+     alreadyexists and their HTML companions) existed only because the form
+     submitted many addresses at once. --->
 <cfparam name="errormessage" default="0">
-<cfparam name="invalidemail" default="0">
-<cfparam name="invalidemailrecipient" default="">
-<cfparam name="invaliddomain" default="0">
-<cfparam name="invaliddomainrecipient" default="">
-<cfparam name="alreadyexists" default="0">
-<cfparam name="alreadyexistsrecipient" default="">
 <cfparam name="success" default="0">
 <cfparam name="successrecipient" default="">
 
@@ -75,7 +73,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ACTION HANDLERS --->
 <cfif action is "add">
-  <cfif NOT StructKeyExists(form, "addresses") OR trim(form.addresses) is "">
+  <cfif NOT StructKeyExists(form, "virtual_address") OR trim(form.virtual_address) is "">
     <cfset errormessage = 1>
   <cfelseif NOT StructKeyExists(form, "forwards_1") OR trim(form.forwards_1) is "">
     <cfset errormessage = 2>
@@ -130,8 +128,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      duplicates. Collapsed here instead, with destinations as chips.
 
      dest_list feeds both the display chips and the edit modal, which loads
-     the whole set at once. dest_ids is what the row checkbox carries, so
-     selecting one box removes every row for that address: the delete caller
+     the whole set at once. dest_ids is what the row's Delete button carries,
+     so one click removes every row for that address: the delete caller
      already splits on comma and validates each as an integer. --->
 <cfquery name="getvirtual" datasource="hermes">
   SELECT virtual_address,
@@ -171,14 +169,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    You must first select recipient(s) before clicking the Delete button.
+    Nothing was deleted: the request carried no recipient to remove. Reload the page and
+    try the Delete button on the row again.
   </div>
 </cfif>
 <cfif m is "2">
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success</h4>
-    Recipient(s) deleted successfully.
+    Virtual recipient deleted successfully.
   </div>
 </cfif>
 <cfif m is "3">
@@ -231,12 +230,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
-<!--- ADD FORM ALERTS --->
+<!--- ADD FORM ALERTS
+
+     One address per submission means one verdict, so these are plain messages
+     rather than the accumulating tallies the bulk textarea needed. --->
 <cfif success GTE 1>
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Success</h4>
-    <cfoutput>The following #success# virtual recipients were added successfully:</cfoutput><br>
+    <cfoutput>Virtual recipient created with #success# destination<cfif success NEQ 1>s</cfif>:</cfoutput><br>
     <cfoutput>#successrecipient#</cfoutput>
   </div>
 </cfif>
@@ -244,7 +246,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    Please enter at least one email address or catch-all pattern.
+    Virtual Address cannot be blank.
   </div>
 </cfif>
 <cfif errormessage is "2">
@@ -258,104 +260,56 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    The Delivers To field must be a valid email address.
+    One of the destinations is not a valid email address.
   </div>
 </cfif>
-<cfif invalidemail is not "0">
+<cfif errormessage is "4">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Invalid Entries</h4>
-    <cfoutput>The following #invalidemail# entries had invalid email address(es):</cfoutput><br>
-    <cfoutput>#invalidemailrecipient#</cfoutput>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    Invalid email address format. Enter a full address such as <code>user@example.com</code>,
+    or a catch-all pattern such as <code>@example.com</code>.
   </div>
 </cfif>
-<cfif invaliddomain is not "0">
+<cfif errormessage is "5">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Invalid Domain</h4>
-    <cfoutput>The following #invaliddomain# entries have domains the system does not relay:</cfoutput><br>
-    <cfoutput>#invaliddomainrecipient#</cfoutput>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    That domain does not exist in the system. Add it under Email Relay &gt; Domains first.
   </div>
 </cfif>
-<cfif alreadyexists is not "0">
+<cfif errormessage is "6">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Duplicate Entries</h4>
-    <cfoutput>The following #alreadyexists# virtual recipients already exist:</cfoutput><br>
-    <cfoutput>#alreadyexistsrecipient#</cfoutput>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    That is a mailbox domain. Use Email Server &gt; Aliases for addresses on it.
+  </div>
+</cfif>
+<cfif errormessage is "7">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    This address already exists as a mailbox alias under Email Server. Remove it there first.
+  </div>
+</cfif>
+<cfif errormessage is "8">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    This virtual recipient already exists. To change where it delivers, or to add and
+    remove destinations, use the Edit button on its row.
   </div>
 </cfif>
 
-<!--- WARNING CALLOUT --->
-<div class="callout callout-warning mb-4">
-  <h5><i class="fas fa-exclamation-triangle"></i> Important</h5>
-  <p class="mb-0">
-    Virtual Recipients allow you to add a virtual email address that will deliver email to an internal or external
-    recipient <strong>while bypassing ALL content checking</strong> (spam, virus, banned files).
-  </p>
-</div>
-
-<!-- ADD RECIPIENTS CARD -->
-<div class="card card-primary card-outline mb-4">
-  <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-plus-circle"></i> Add Virtual Recipients</h3>
-  </div>
-  <div class="card-body">
-    <form method="post" autocomplete="off">
-      <input type="hidden" name="action" value="add">
-      <div class="row">
-        <div class="col-md-6">
-          <div class="mb-3">
-            <label for="addresses" class="form-label"><strong>Virtual Address(es)</strong></label>
-            <textarea class="form-control" id="addresses" name="addresses" rows="4"
-              placeholder="user@example.com
-info@example.com
-@example.com"></textarea>
-            <small class="text-muted">
-              One entry per line. Enter a full email address (e.g., <code>user@example.com</code>)
-              or a catch-all pattern (e.g., <code>@example.com</code>).
-              The domain must exist in the system.
-            </small>
-          </div>
-        </div>
-        <div class="col-md-4">
-          <div class="mb-3">
-            <label for="forwards_1" class="form-label"><strong>Delivers To</strong></label>
-            <input type="text" name="forwards_1" class="forwards form-control" id="forwards_1"
-              placeholder="Start typing to search or enter address" value="" autocomplete="off">
-            <small class="text-muted">
-              One or more destinations, separated by commas. Every address on the left is
-              delivered to all of them, which is how a distribution list is made.
-            </small>
-          </div>
-
-        </div>
-        <div class="col-md-2 d-flex align-items-end pb-4">
-          <button type="submit" class="btn btn-primary"
-            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Adding...';this.form.submit();">
-            <i class="fas fa-plus"></i> Add
-          </button>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-12">
-          <div class="alert alert-warning py-2 px-3 mb-0">
-            <i class="fas fa-external-link-alt me-1"></i>
-            <strong>Destinations outside your own domains are allowed, with a caveat.</strong>
-            Forwarded mail leaves with the original sender's address, so SPF fails at the
-            receiving end, and if the message was modified on the way through the original
-            DKIM signature no longer validates either. Senders whose domain publishes a
-            strict DMARC policy may have mail to those destinations rejected. Local
-            destinations are unaffected. Note that addresses on a relay domain are reachable
-            from the internet by design, so a list here with external destinations can be
-            mailed by anyone. If that matters, the list belongs on a mailbox domain, where
-            it can be restricted to senders inside your own organisation.
-          </div>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
+<!--- The "bypassing ALL content checking" callout that used to sit here was
+     removed: it was not true. content_filter in main.cf is global with no
+     per-recipient exception, receive_override_options = no_address_mappings
+     defers virtual alias expansion until AFTER amavis so the original address
+     is what gets filtered, and adding a domain seeds an @domain row in
+     `recipients` carrying the default policy. The wording dated back to
+     build-220203 and described no part of this pipeline. The external
+     forwarding caveat, which IS real, lives in the Add modal beside the field
+     it applies to. --->
 
 <!-- RECIPIENTS TABLE CARD -->
 <div class="card card-primary card-outline mb-4">
@@ -363,34 +317,45 @@ info@example.com
     <h3 class="card-title"><i class="fas fa-envelope"></i> Virtual Recipients</h3>
   </div>
   <div class="card-body">
-    <form id="deleteForm" method="post">
-      <input type="hidden" name="action" value="deleterecipient">
-      <input type="hidden" name="recipient_id" id="selectedIds" value="">
-
       <div class="mb-2">
-        <button type="button" id="deleteBtn" class="btn btn-sm btn-danger" disabled>
-          <i class="fas fa-trash-alt"></i> Delete Selected
-        </button>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRecipientModal"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Virtual Recipient</button>
       </div>
 
       <table id="sortTable" class="table table-bordered table-hover table-striped" style="width:100%">
         <thead>
           <tr>
-            <th style="width: 5%"><input type="checkbox" id="selectAll"></th>
+            <th style="width: 10%">Actions</th>
             <th>Recipient</th>
             <th>Delivers To</th>
-            <th style="width: 10%">Actions</th>
           </tr>
         </thead>
         <tbody>
           <cfoutput query="getvirtual">
             <tr>
-              <!--- Carries every row id for this address, comma joined. The
-                   delete handler's caller already splits on comma and
-                   validates each as an integer, so selecting one box removes
-                   the whole entry regardless of how many destinations it
-                   has. --->
-              <td><input type="checkbox" class="row-checkbox" value="#encodeForHTMLAttribute(dest_ids)#"></td>
+              <!--- One Edit and one Delete for the whole entry, matching Email
+                   Server > Aliases. The select-all checkbox column that used to
+                   lead this table is gone: it existed because the legacy view
+                   rendered one row per destination, so an address with a large
+                   destination set filled the screen and needed bulk selection.
+                   The grouped query collapsed that to one row per address, and
+                   dest_ids below still carries every underlying row id, so a
+                   single Delete removes the whole entry. --->
+              <td>
+                <!--- The whole destination set is passed inline rather than
+                     fetched over AJAX: the grouped query already has it, so an
+                     endpoint would be a round trip for data that is on the
+                     page. --->
+                <div class="d-flex gap-1 flex-nowrap">
+                <button type="button" class="btn btn-sm btn-primary" title="Edit this entry"
+                  onclick="openEditModal('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_list)#'); return false;">
+                  <i class="fas fa-edit"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" title="Delete the whole entry"
+                  onclick="confirmDeleteRecipient('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_ids)#', #dest_count#); return false;">
+                  <i class="fas fa-trash"></i>
+                </button>
+                </div>
+              </td>
               <td>#encodeForHTML(virtual_address)#</td>
               <td>
                 <!--- Display only. Adding and removing happens in Edit, where
@@ -406,21 +371,10 @@ info@example.com
                   </cfloop>
                 </div>
               </td>
-              <td>
-                <!--- The whole destination set is passed inline rather than
-                     fetched over AJAX: the grouped query already has it, so an
-                     endpoint would be a round trip for data that is on the
-                     page. --->
-                <button type="button" class="btn btn-sm btn-primary" title="Edit this entry"
-                  onclick="openEditModal('#encodeForJavaScript(virtual_address)#', '#encodeForJavaScript(dest_list)#'); return false;">
-                  <i class="fas fa-edit"></i>
-                </button>
-              </td>
             </tr>
           </cfoutput>
         </tbody>
       </table>
-    </form>
   </div>
 </div>
 
@@ -430,6 +384,69 @@ info@example.com
 
   <cfinclude template="./inc/main_footer.cfm" />
 
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal fade" id="addRecipientModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" autocomplete="off">
+        <input type="hidden" name="action" value="add">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="fas fa-plus me-2"></i>Add Virtual Recipient</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+
+          <div class="form-group mb-3">
+            <label><strong>Virtual Address</strong></label>
+            <!--- One address, not a list. Was a textarea creating many at once,
+                 which forced every outcome to be a per-row tally instead of a
+                 plain answer. Matches Email Server > Aliases: one address in,
+                 delivered to every destination below. --->
+            <input type="text" class="form-control" id="virtual_address" name="virtual_address"
+              placeholder="user@example.com" autocomplete="off" required>
+            <small class="text-muted">
+              A full email address (e.g., <code>user@example.com</code>) or a catch-all
+              pattern (e.g., <code>@example.com</code>). The domain must already exist in the
+              system and must be a relay domain.
+            </small>
+          </div>
+
+          <div class="form-group mb-3">
+            <label><strong>Delivers To</strong></label>
+            <!--- Chips, not a comma-separated text box, so both destination
+                 fields on this page are entered the same way. --->
+            <select class="form-control" name="forwards_1" id="forwards_1" multiple
+              placeholder="Pick a recipient, or type any address..."></select>
+            <small class="text-muted">
+              One or more destinations. Mail sent to the address above is delivered to every
+              one of them, which is how a distribution list is made. Start typing to search
+              your relay recipients, or type any address and press Enter.
+            </small>
+
+            <div class="alert alert-warning py-2 px-3 mt-2 mb-0">
+              <i class="fas fa-external-link-alt me-1"></i>
+              <strong>Destinations outside your own domains are allowed, with a caveat.</strong>
+              Forwarded mail leaves with the original sender's address, so SPF fails at the
+              receiving end, and if the message was modified on the way through the original
+              DKIM signature no longer validates either. Senders whose domain publishes a
+              strict DMARC policy may have mail to those destinations rejected. Local
+              destinations are unaffected. Note that addresses on a relay domain are reachable
+              from the internet by design, so a list here with external destinations can be
+              mailed by anyone. If that matters, the list belongs on a mailbox domain, where
+              it can be restricted to senders inside your own organisation.
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Virtual Recipient</button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
 
 <!-- EDIT MODAL -->
@@ -475,17 +492,22 @@ info@example.com
 <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title">Delete Recipient(s)</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p>Are you sure you want to delete the selected recipient(s)? This action is irreversible!</p>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No</button>
-        <button type="button" class="btn btn-danger" id="confirmDelete">Yes, Delete</button>
-      </div>
+      <form method="post">
+        <input type="hidden" name="action" value="deleterecipient">
+        <input type="hidden" name="recipient_id" id="deleteRecipientIds" value="">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title">Delete Virtual Recipient</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p>Delete <strong id="deleteRecipientAddress"></strong> and <span id="deleteRecipientCount"></span>?</p>
+          <p class="mb-0 text-muted"><small>Mail sent to this address will no longer be forwarded anywhere. This cannot be undone.</small></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-danger">Yes, Delete</button>
+        </div>
+      </form>
     </div>
   </div>
 </div>
@@ -498,18 +520,32 @@ $(document).ready(function() {
     stateSave: true,
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[1, 'asc']],
-    // 0 checkbox, 1 Recipient, 2 Delivers To, 3 Actions.
+    // 0 Actions, 1 Recipient, 2 Delivers To.
+    // Actions sits on the left, matching Email Server > Aliases.
     columnDefs: [
-      { orderable: false, targets: [0, 3] },
-      { searchable: false, targets: [0, 3] }
-    ]
+      { orderable: false, targets: [0] },
+      { searchable: false, targets: [0] }
+    ],
+    // stateSave persists the sort by column INDEX, and this table lost its
+    // leading checkbox column, so every index shifted. DataTables discards a
+    // saved state whose column COUNT differs, which covers the 4-column
+    // layouts, but not a state saved between the two 3-column revisions.
+    // Reject any stored order pointing at the non-orderable Actions column.
+    stateLoadParams: function (settings, data) {
+      if (data.order && data.order.length && data.order[0][0] < 1) {
+        data.order = [[1, 'asc']];
+      }
+    }
   });
 
-  // Chips for the edit modal's destination set, same options as the alias
-  // page so both behave identically. Declared at script scope further down,
-  // because openEditModal() is global and would not see a ready-scoped var.
-  if (typeof TomSelect !== 'undefined') {
-    editForwardsTS = new TomSelect('#edit_forwards', {
+  // One options builder for BOTH destination fields, Add and Edit, so the two
+  // cannot drift apart again. Same behaviour as the alias page's chips.
+  //
+  // TomSelect's default value/text fields are kept rather than remapped, so
+  // create() below and openEditModal()'s addOption() further down keep working
+  // unchanged. The remote response is adapted in load() instead.
+  function forwardsTomSelectOptions() {
+    return {
       create: function(input) {
         var v = input.trim().toLowerCase();
         if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) { return false; }
@@ -521,59 +557,85 @@ $(document).ready(function() {
       delimiter: ',',
       splitOn: /[,;\s\n]+/,
       sortField: { field: 'text', direction: 'asc' },
-      placeholder: 'Pick a recipient, or type any address...'
-    });
+      placeholder: 'Pick a recipient, or type any address...',
+      // Fetch as soon as the field is focused, not only once the admin has
+      // typed. The alias page's equivalent renders its options into the page
+      // server-side, so clicking it shows the list immediately; these fields
+      // fetch remotely and would otherwise look like plain text inputs until
+      // you guessed that typing did something.
+      preload: 'focus',
+      // Relay recipient lists can be large, so options are searched on the
+      // server rather than rendered into the page. Replaces the jQuery UI
+      // autocomplete the old text input used, against the same endpoint.
+      //
+      // An empty query is passed through rather than short-circuited, because
+      // that is exactly the focus case above. The endpoint caps its result set
+      // so `LIKE '%%'` cannot return every recipient on the system.
+      load: function(query, callback) {
+        $.ajax({
+          url: './inc/getintrecipients.cfm',
+          type: 'post',
+          dataType: 'json',
+          data: { search: query, request: 1 },
+          success: function(data) {
+            // The endpoint returns {value: <recipients row id>, label:
+            // <address>}. What TomSelect stores is what gets submitted, and
+            // the handler writes it straight into virtual_recipients.maps, so
+            // the ADDRESS has to become the value, not the row id.
+            //
+            // Read the key case-insensitively: this endpoint builds its
+            // structs with bracket notation so the case survives, but Lucee
+            // uppercases struct keys on serialization by default and one
+            // refactor there would silently empty this list.
+            callback((data || []).map(function(r) {
+              var addr = r.label || r.LABEL || '';
+              return { value: addr, text: addr };
+            }).filter(function(o) { return o.value !== ''; }));
+          },
+          error: function() { callback(); }
+        });
+      }
+    };
   }
 
-  var selectedIds = new Set();
+  // Chips for the Add form's destination set.
+  // Declared at script scope further down, alongside the edit instance.
+  if (typeof TomSelect !== 'undefined') {
+    addForwardsTS = new TomSelect('#forwards_1', forwardsTomSelectOptions());
+  }
 
-  $('#selectAll').on('change', function() {
-    var checked = this.checked;
-    $('.row-checkbox:visible').each(function() {
-      this.checked = checked;
-      if (checked) selectedIds.add(this.value); else selectedIds.delete(this.value);
-    });
-    $('#deleteBtn').prop('disabled', selectedIds.size === 0);
-  });
+  // Chips for the edit modal's destination set. Declared at script scope
+  // further down, because openEditModal() is global and would not see a
+  // ready-scoped var.
+  if (typeof TomSelect !== 'undefined') {
+    editForwardsTS = new TomSelect('#edit_forwards', forwardsTomSelectOptions());
+  }
 
-  $(document).on('change', '.row-checkbox', function() {
-    if (this.checked) selectedIds.add(this.value); else selectedIds.delete(this.value);
-    $('#deleteBtn').prop('disabled', selectedIds.size === 0);
-  });
-
-  $('#deleteBtn').on('click', function() {
-    if (selectedIds.size === 0) return;
-    new bootstrap.Modal(document.getElementById('deleteModal')).show();
-  });
-
-  $('#confirmDelete').on('click', function() {
-    $('#selectedIds').val(Array.from(selectedIds).join(','));
-    $('#deleteForm').submit();
-  });
-
-
-  // Autocomplete for Delivers To fields
-  $(document).on('keydown', '.forwards', function() {
-    var id = this.id;
-    $('#' + id).autocomplete({
-      source: function(request, response) {
-        $.ajax({
-          url: "./inc/getintrecipients.cfm",
-          type: 'post',
-          dataType: "json",
-          data: { search: request.term, request: 1 },
-          success: function(data) { response(data); }
-        });
-      },
-      select: function(event, ui) {
-        $(this).val(ui.item.label);
-        return false;
-      }
-    });
-  });
+  // The select-all / row-checkbox / Delete Selected machinery that used to
+  // live here is gone with the checkbox column. Deleting is now one button per
+  // row, matching Email Server > Aliases, and confirmDeleteRecipient() below
+  // fills the same hidden field the bulk form used to.
+  //
+  // The jQuery UI autocomplete that used to bind to '.forwards' is gone with
+  // the text input it served. Its endpoint is now called by the TomSelect
+  // load() above, so recipient search still works and there is one code path
+  // instead of two.
 });
 
+var addForwardsTS = null;
 var editForwardsTS = null;
+
+// Delete the whole entry. destIds is every underlying virtual_recipients row
+// id for this address, comma joined by the grouped query; the handler already
+// splits on comma and validates each as an integer, so one button removes the
+// address and all of its destinations together.
+function confirmDeleteRecipient(address, destIds, destCount) {
+  document.getElementById('deleteRecipientIds').value = destIds;
+  document.getElementById('deleteRecipientAddress').textContent = address;
+  document.getElementById('deleteRecipientCount').textContent =
+    destCount === 1 ? 'its 1 destination' : 'all ' + destCount + ' of its destinations';
+  new bootstrap.Modal(document.getElementById('deleteModal')).show();
+}
 
 function openEditModal(address, destCsv) {
   document.getElementById('edit_original_address').value = address;
@@ -582,15 +644,24 @@ function openEditModal(address, destCsv) {
   // Load the entry's whole destination set as chips. Options are added before
   // items so an address that is not a known recipient, typed in earlier, still
   // renders rather than being dropped as an unknown value.
+  //
+  // clearOptions() is deliberately NOT called. It used to run here and wiped
+  // every option the recipient search had already fetched, so reopening the
+  // modal left the picker empty. Options are only suggestions; a stale one is
+  // harmless, whereas an empty list makes the field look like a text box.
   if (editForwardsTS) {
     editForwardsTS.clear(true);
-    editForwardsTS.clearOptions();
     (destCsv || '').split(',').forEach(function(d) {
       d = d.trim();
       if (!d) { return; }
       editForwardsTS.addOption({ value: d, text: d });
       editForwardsTS.addItem(d, true);
     });
+    // Reset the typed query left behind by the programmatic adds, so the next
+    // focus offers the whole list rather than a list filtered by whatever the
+    // control still thinks was typed.
+    editForwardsTS.setTextboxValue('');
+    editForwardsTS.refreshOptions(false);
   }
 
   new bootstrap.Modal(document.getElementById('editModal')).show();
