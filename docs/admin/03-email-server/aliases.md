@@ -6,18 +6,29 @@ Admin path: **Email Server > Aliases** (`view_mailbox_aliases.cfm`,
 
 This page manages **alternate email addresses for local mailboxes** on
 the Email Server topology. Each row in the `mailbox_aliases` table maps
-one inbound address (e.g., `sales@company.com`) to either an existing
-local mailbox or to Postfix's discard transport for silent disposal.
-The destination must be local — to an existing Dovecot mailbox on this
-server. For forwarding to external addresses or for relay-topology
-domains, use [Email Relay > Virtual Recipients](../02-email-relay/virtual-recipients.md)
-instead.
+one inbound address (e.g., `sales@company.com`) to one destination, or
+to Postfix's discard transport for silent disposal.
+
+An alias may have **several destinations**, one row each, in which case
+Postfix concatenates them into a single recipient list and one inbound
+message fans out to all of them. That is what a distribution list is
+here: an alias with more than one destination, not a separate concept
+with its own page. Destinations do not have to be local mailboxes; any
+valid address is accepted, including addresses outside your own domains,
+with the forwarding caveats described under
+[External destinations](#external-destinations).
 
 Aliases have **no SMTP authentication, no IMAP/POP3 access, and no
-password of their own**. They are rewrite rules consumed by Postfix
-before content filtering. The optional **Send-As** flag adds a row to
-`sender_login_maps` so the destination mailbox owner can send mail
-under the alias address from their existing IMAP/Submission session.
+password of their own**. They are rewrite rules consumed by Postfix.
+
+Two capabilities that used to live on this page have moved:
+
+- **Send-As** is granted per mailbox, under
+  [Mailboxes](mailboxes.md) > Actions > Send As. See
+  [Send-As moved to the mailbox](#send-as-moved-to-the-mailbox).
+- **Adding destinations to an existing alias** happens in the Edit
+  modal. Add creates an alias and refuses an address that already
+  exists.
 
 ## Not the same as Virtual Recipients
 
@@ -30,9 +41,11 @@ full distinction; the short version:
 |---|---|---|
 | Table | `mailbox_aliases` | `virtual_recipients` |
 | Domain type | Mailbox domains (`domains.type = 'mailbox'`) | Relay domains (`domains.type = 'relay'` or NULL) |
-| Delivery target | A local Dovecot mailbox, or `discard:silently` | Anywhere — internal or external |
-| UNIQUE on address | Yes (one delivery per alias) | No (fan-out via multiple rows) |
-| Send-As | Optional, surfaced as a toggle | Schema flag, not yet wired through |
+| Delivery target | Anywhere: a local Dovecot mailbox, any other address, or `discard:silently` | Anywhere, internal or external |
+| Several destinations | Yes, one row each | Yes, one row each |
+| UNIQUE constraint | `uq_alias_dest` on the `(alias_address, delivers_to)` pair | None; the console is the guard |
+| Reachable By (`internal_only`) | Supported | Not supported, and deliberately so |
+| Send-As | Granted per mailbox, not here | Vestigial schema flag, nothing reads it |
 | Catch-all (`@domain`) | Not supported | Supported |
 | Discard transport | Supported (silent drop) | Not supported |
 | Typical use | `support@company.com → alice@company.com` (both local) | `info@company.com → admin@externalpartner.example` |
@@ -53,77 +66,188 @@ with a pointer back to this page.
 
 ## Storage and lookup path
 
+The order here is not the obvious one. `main.cf` sets
+`receive_override_options = no_address_mappings` globally, which disables
+virtual alias expansion in the cleanup that runs for mail arriving on port
+25. The map is still consulted at `smtpd` to decide whether the recipient
+exists, but the **rewrite is deferred until after content filtering**, at
+the `:10026` reinjection listener which overrides that setting.
+
 ```
 inbound SMTP (port 25) ──► hermes_postfix_dkim
                                   │
                                   │  smtpd: helo, sender, recipient checks
-                                  │  virtual_alias_maps  ◄── mysql:/etc/postfix/mysql-virtual.cf
-                                  │                          │
-                                  │                          ▼
-                                  │      ┌──────────────────────────────────┐
-                                  │      │ hermes_db_server                  │
-                                  │      │  UNION across virtual_recipients  │
-                                  │      │   and mailbox_aliases             │
-                                  │      └──────────────────────────────────┘
+                                  │  recipient VALIDATED against
+                                  │  virtual_alias_maps
+                                  │     ◄── mysql:/etc/postfix/mysql-virtual.cf
+                                  │          │
+                                  │          ▼
+                                  │  ┌──────────────────────────────────┐
+                                  │  │ hermes_db_server                 │
+                                  │  │  UNION across virtual_recipients │
+                                  │  │   and mailbox_aliases            │
+                                  │  └──────────────────────────────────┘
+                                  │
+                                  │  check_recipient_access on the
+                                  │  internal-only map may REJECT here
+                                  │
+                                  │  cleanup runs with no_address_mappings,
+                                  │  so the recipient is NOT rewritten yet
+                                  ▼
+                       amavis (10021), then hermes_ciphermail
                                   │
                                   ▼
-                          rewritten recipient
+                    reinjection on :10026, which DOES
+                    expand virtual_alias_maps
+                                  │
+                                  ▼
+                     rewritten recipient(s), one per row
                                   │
                   ┌───────────────┴────────────────┐
                   │                                │
        forward (delivers_to =          discard (delivers_to =
-       a local mailbox username)       'discard:silently')
+       one or more destinations)       'discard:silently')
                   │                                │
                   ▼                                ▼
-       amavis (10024)                   discard(8) transport
-                  │                                │
-                  ▼                                ▼
-       LMTP → hermes_dovecot         message silently dropped
-       Maildir for target mailbox      no bounce, no DSN, no log entry
+       LMTP → hermes_dovecot            discard(8) transport
+       for local destinations,                    │
+       onward SMTP for external                   ▼
+                                       message silently dropped
+                                       no bounce, no DSN, no log entry
                                        beyond the queue acceptance
 ```
 
-The MySQL lookup is live — adding a row in this page takes effect on
+The MySQL lookup is live: adding a row in this page takes effect on
 the next inbound message, with no Postfix reload, no `postmap`, and
 no template regeneration.
+
+**Reachable By is the exception.** The `check_recipient_access` map that
+enforces it is referenced from `smtpd_recipient_restrictions` in
+`main.cf`, so on an install upgraded from an earlier release the setting
+is inert until Postfix settings are saved once, which regenerates
+`main.cf` from its template.
 
 ## The `mailbox_aliases` table
 
 | Column | Type | Role |
 |---|---|---|
 | `id` | INT PK | Surrogate key |
-| `alias_address` | VARCHAR(255), **UNIQUE** | The address being rewritten. Full email only — no catch-all syntax. The UNIQUE constraint enforces one delivery target per alias address. |
-| `delivers_to` | VARCHAR(255) | Destination. For `alias_type = 'forward'` this is the local mailbox username; for `alias_type = 'discard'` this is hardcoded to the literal string `discard:silently`, which Postfix routes through the discard(8) transport. |
-| `alias_type` | VARCHAR(20) | `forward` (default) or `discard` |
-| `send_as` | TINYINT(3) | `1` if the destination mailbox is allowed to send mail as the alias address. Wired into `sender_login_maps` on insert/update. |
+| `alias_address` | VARCHAR(255) | The address being rewritten. Full email only, no catch-all syntax. Indexed by `idx_alias_address`, which is what Postfix looks it up by. Repeats across rows when an alias has several destinations. |
+| `delivers_to` | VARCHAR(255) | One destination. For `alias_type = 'forward'` this is any valid address, local or external; for `alias_type = 'discard'` it is hardcoded to the literal string `discard:silently`, which Postfix routes through the discard(8) transport. |
+| `alias_type` | VARCHAR(20) | `forward` (default) or `discard`. Belongs to the **address**, so every row for one alias carries the same value. |
+| `internal_only` | TINYINT(3) | `1` if only senders inside your own domains may mail this address. Also a property of the address, written across every row for it. Defaults to `0`. |
+| `send_as` | TINYINT(3) | **Vestigial.** Nothing reads it. Send-As is granted per mailbox now. The column is still written on insert so existing rows keep their value; dropping it is a later cleanup with no urgency. |
 | `domain_id` | INT | FK to `domains.id`; set on insert from the parsed domain part of `alias_address`. Used to filter the page by domain and to enforce the mailbox-topology gate. |
-| `created_at` | DATETIME | Audit timestamp |
+| `created_at` | DATETIME | Audit timestamp. Survives an edit on rows that did not change, because the save is a diff rather than a rewrite. |
 
-The UNIQUE key on `alias_address` is the reason fan-out isn't supported
-here — one inbound address resolves to exactly one destination. To
-deliver one inbound address to several mailboxes, use a
-[shared mailbox](shared-mailboxes.md) (which gives multiple users
-access to a single inbox) or, for true fan-out, use the relay topology
-with virtual recipients.
+### Why the UNIQUE key changed
+
+Until v260815, `uq_alias_address` made `alias_address` unique, which
+pinned an alias to exactly one row and therefore one destination.
+Dropping that key is what allows several destinations, and it is the only
+schema change the feature needed.
+
+It was also the index Postfix used for every lookup, since
+`mysql-virtual.cf` queries `WHERE alias_address = '%s'` on each message.
+Dropping it without a replacement would have turned every alias lookup
+into a full table scan, so `idx_alias_address` took its place.
+
+The rule that replaced "one row per address" is "no exact duplicate
+pair", enforced by `uq_alias_dest` on `(alias_address, delivers_to)`.
+Existing data satisfied it by construction, since `alias_address` was
+unique until the moment the key was dropped.
+
+Note that the equivalent key was deliberately **not** added to
+`virtual_recipients`. Existing installs may already hold exact duplicates
+there, and `ADD UNIQUE` would abort the whole schema upgrade on the first
+one it met.
 
 ## The two alias types
 
 ### Forward
 
-Delivers mail to an existing local mailbox. The mailbox must exist in
-the `mailboxes` table — the add handler verifies this with `error 16`
-on failure. The `Delivers To` dropdown is sourced from the live
-mailbox list (`mailbox_type = 'user'`), so you can only pick a real
-target.
+Delivers mail to one or more destinations. The `Delivers To` picker is
+populated from the live mailbox list (`mailbox_type = 'user'`) so a real
+target can be chosen from a list, but any valid address can be typed in
+instead.
 
 ```
 sales@company.com    →   alice@company.com
-support@company.com  →   helpdesk@company.com
+support@company.com  →   helpdesk@company.com, alice@company.com,
+                         oncall@partner.example
 ```
 
-Both addresses must be on a mailbox domain that this server hosts.
-Cross-domain forwards are allowed as long as both sides are local
-mailbox domains.
+The **alias address** must be on a mailbox domain that this server hosts.
+Destinations have no such restriction: cross-domain and external
+destinations are both allowed.
+
+The old requirement that every destination already exist in the
+`mailboxes` table (`error 16`) is gone. It made external forwarding
+impossible on mailbox domains while relay domains allowed it freely,
+which was an inconsistency rather than a policy.
+
+### Distribution lists
+
+A distribution list is an alias with more than one destination. There is
+no separate page, no separate table, and no separate concept to learn.
+
+Add accepts several destinations at once; Edit shows the whole set as
+removable chips and diffs the save. The table groups by address, so a
+twenty-member list is one row with twenty chips rather than twenty
+near-identical lines.
+
+Consider setting **Reachable By** to internal-only on any list with
+external destinations. Without it, one message from anyone on the
+internet becomes twenty outbound messages relayed by this gateway.
+
+### External destinations
+
+Any valid address is accepted as a destination, and external ones are
+badged wherever they appear, both in the table and in the Add and Edit
+modals. The badge is deliberate: the person auditing an alias in six
+months is not the person who created it.
+
+The caveats are real and worth stating to whoever asks for the forward:
+
+- Forwarded mail leaves with the **original sender's address**, so SPF
+  fails at the receiving end.
+- If the message was modified on the way through, by an External Banner
+  or LinkGuard for instance, the **original DKIM signature no longer
+  validates** either.
+- Senders whose domain publishes a strict DMARC policy can therefore have
+  mail to those destinations rejected.
+
+Local destinations are unaffected by all three.
+
+### Reachable By (internal-only addresses)
+
+Controls who may send **to** an address, which is a different question
+from where that address delivers. `Anyone` is the default and matches the
+behaviour every alias had before v260815. `Only senders in your own
+domains` rejects mail from outside.
+
+Enforced by a `check_recipient_access mysql:` map in
+`smtpd_recipient_restrictions`, following the discard-recipients map
+already in that chain. `permit_mynetworks` short-circuits ahead of it, so
+anything reaching the map arrived from outside and a plain `REJECT` is
+correct. No sender-domain test is used, because trusting an
+unauthenticated claim to be from your own domain would be worse than
+useless on a gateway.
+
+The map uses `SELECT DISTINCT`. A twenty-member alias matches twenty rows,
+and without it Postfix would concatenate twenty `REJECT` strings into one
+malformed action.
+
+Two limits worth knowing:
+
+- **Catch-alls cannot be internal-only.** Postfix probes access maps by
+  bare domain, and this page does not support catch-all syntax anyway.
+- **Relay domains do not have this setting at all**, deliberately. A relay
+  domain exists so the internet can send to it, and the customer's own
+  users never traverse this gateway for same-domain mail because their
+  server is authoritative and resolves it locally. Internal-only there
+  would reject the only traffic that arrives and permit traffic that never
+  does.
 
 ### Discard
 
@@ -152,49 +276,87 @@ unsubscribe@company.com  →   discarded
 
 | Field | Notes |
 |---|---|
-| **Alias Address** | Full email. Must validate as an email, must be on a mailbox domain (`domains.type = 'mailbox'`), and must not already exist as a mailbox, an alias, or a virtual recipient. Conflicts produce errors 12 / 13 / 14 / 17 respectively. |
-| **Type** | `Forward (deliver to mailbox)` (default) or `Discard (silently drop all mail)`. JS toggles the Delivers To and Send-As fields based on selection. |
-| **Delivers To** | Tom Select typeahead populated from `mailboxes WHERE mailbox_type = 'user'`. Required for forward type, ignored for discard. The handler verifies the target mailbox exists at submit time. |
-| **Allow Send-As** | `No` (default) or `Yes`. Only applies to forward type. When `Yes`, an `INSERT IGNORE` into `sender_login_maps` allows the destination mailbox owner to send under the alias address from their existing Submission session. |
+| **Alias Address** | Full email. Must validate as an email, must be on a mailbox domain (`domains.type = 'mailbox'`), and must not already exist as a mailbox, an alias, or a virtual recipient. Conflicts produce errors 13 / 14 / 17, and a non-mailbox domain produces 12. |
+| **Type** | `Forward (deliver to mailbox)` (default) or `Discard (silently drop all mail)`. JS toggles the Delivers To field based on selection. |
+| **Delivers To** | Tom Select chips, **one or more**. The option list comes from `mailboxes WHERE mailbox_type = 'user'`, so clicking the field offers real targets, and any other address can be typed and accepted on Enter. Splits on comma, semicolon, whitespace and newline so a pasted list works. One row is written per chip. Required for forward, ignored for discard. |
+| **Reachable By** | `Anyone` (default) or `Only senders in your own domains`. See [Reachable By](#reachable-by-internal-only-addresses). |
+
+Add **creates**. An alias address that already exists is refused with
+error 14, pointing at that row's Edit button. Routing both operations
+through Add gave two ways to do one thing and produced an answer nobody
+could act on: submitting an existing address whose destinations were all
+already stored could only report that nothing had changed.
 
 ### Aliases table
 
-DataTables surface — searchable, sortable, paginated, `stateSave: true`.
-Columns:
+DataTables surface: searchable, sortable, paginated, `stateSave: true`.
+Rows are **grouped by address**, so an alias with twenty destinations is
+one row with twenty chips.
 
 | Column | Source |
 |---|---|
-| Actions | Edit (opens modal) / Delete (opens confirmation modal) |
+| Actions | Edit and Delete, both operating on the whole alias |
 | Alias | `mailbox_aliases.alias_address` |
 | Domain | `domains.domain` (joined via `domain_id`) |
-| Type | Badge — `Forward` (blue) or `Discard` (dark) |
-| Delivers To | `mailbox_aliases.delivers_to` for forwards; `Silently dropped` for discards |
-| Send-As | Badge — `YES` / `NO` for forwards; em-dash for discards |
+| Type | Badge, `Forward` (blue) or `Discard` (dark), plus a count badge when there is more than one destination |
+| Delivers To | Display-only chips, one per destination, external ones badged |
+| Reachable By | Badge, `Internal only` or `Open`. Read with `MAX(internal_only)` so a mixed state, which should not arise, reads as restricted rather than open |
 
 A Domain filter dropdown above the table narrows the visible rows to a
 single mailbox domain. The dropdown only lists domains that currently
 have at least one alias.
 
+Note for anyone changing this table: `order` and `columnDefs` are
+index-based and `stateSave` persists the sort by index, so inserting or
+removing a column means updating both.
+
 ### Edit modal
 
-Address is read-only after creation — changing the local-part would
-break any send-as mappings that already reference it. Type, Delivers
-To, and Send-As are all editable, with the same forward/discard
-toggle behavior as the Add modal. The handler diffs the old send-as
-state against the new one and adds or removes the
-`sender_login_maps` row accordingly so the change to send-as is
-reflected without rewriting unrelated maps.
+Owns the alias's **whole destination set**. The modal shows every
+destination as a removable chip and submits the set you want to end up
+with, so the save is a **diff**: insert what is new, delete what was
+taken off, leave the rest untouched.
+
+Diffing rather than delete-then-reinsert matters for three reasons. There
+is never a moment when the alias has no destinations and mail would
+bounce, `created_at` survives on members that did not change, and a
+failure partway through cannot leave the alias empty.
+
+Adding and removing destinations happens here and only here.
+
+The address is read-only after creation, so an edit can never split a
+grouped alias by renaming one row out of it. Type belongs to the address:
+converting to Discard deletes every real destination and replaces them
+with the single pseudo-destination, which cannot be done with an `UPDATE`
+because setting them all to `discard:silently` would collide with
+`uq_alias_dest` as soon as there was more than one row. The page warns
+before a conversion discards a multi-destination list.
+
+`send_as` is deliberately **not** written by this handler. Its control is
+gone from the modal, so a `cfparam` default of `0` would silently zero the
+column on every edit.
 
 ### Delete
 
-Per-row delete with a confirmation modal. The handler removes the
-alias row and any `sender_login_maps` entries for the alias address.
-Because aliases don't own a Maildir or any on-disk state, deletion is
-instant and reversible only by re-creating the alias.
+Per-row delete with a confirmation modal, naming the alias and its
+destination count. Removes every row for the address, plus any
+`sender_login_maps` entries for it. Because aliases don't own a Maildir or
+any on-disk state, deletion is instant and reversible only by re-creating
+the alias.
 
-## Send-As — what it actually does
+## Send-As moved to the mailbox
 
-When Send-As is enabled on a forward alias, the handler inserts:
+Send-As is granted under [Mailboxes](mailboxes.md) > Actions > Send As,
+not on this page. There is no Send-As control in the Add or Edit modal.
+
+**Why it moved.** A single Yes/No toggle on an alias worked while an alias
+had exactly one destination. It stopped making sense the moment an alias
+could have twenty, because one toggle would have granted send-as to every
+member of a list at once, with no way to say "these three may, the other
+seventeen may not". Membership and identity are separate questions.
+`sender_login_maps` now has exactly one writer.
+
+The grant itself is unchanged. Selecting an alias for a mailbox inserts:
 
 ```sql
 INSERT IGNORE INTO sender_login_maps (sender, login_user)
@@ -210,14 +372,50 @@ Postfix's `reject_sender_login_mismatch` would reject the submission
 because `alice@` is not the canonical owner of `sales@`.
 
 This makes Send-As a true alternate-identity grant, not just a "vanity
-From:". The user typically configures the alias as a secondary
-identity in their mail client (Outlook → Account Settings → multiple
-email addresses; Apple Mail → Edit Email Addresses; Thunderbird →
-Manage Identities) and picks it from the From: dropdown when composing.
+From:".
 
-The deletion handler removes the matching `sender_login_maps` row
-when the alias is deleted; the edit handler removes the old row and
-inserts the new one when Send-As is toggled or Delivers To changes.
+### Granting is necessary but not sufficient
+
+**The grant alone changes nothing the user can see.** No mail protocol
+exposes send-as permissions to a client, so the user must also add the
+address as an identity in whatever they read mail with. Until they do,
+the From: field stays a plain label and the alias is nowhere to be
+found.
+
+This is the single most common support question after a grant, and it
+looks exactly like the grant not working:
+
+| Client | Where the user adds it |
+|---|---|
+| Webmail (Nextcloud Mail) | **Mail > Account settings > Aliases > Add alias** |
+| Thunderbird | **Account Settings > Manage Identities > Add** |
+| Outlook | Account Settings, additional email addresses |
+| Apple Mail | Account settings, Edit Email Addresses |
+
+In every case the From: field only becomes a dropdown once the account
+has more than one identity.
+
+Worth knowing about the failure mode in the other direction: a user can
+add an identity for an address they have **not** been granted. The client
+accepts it happily and Postfix refuses the message at submission with
+`Sender address rejected: not owned by user ...`. That is
+`reject_sender_login_mismatch` doing its job, and it is also a clean way
+to verify the grant is genuinely being enforced rather than submission
+being open to any From: address.
+
+The user-facing version of this is in
+[Set Up Your Devices](../../users/set-up-your-devices.md), under
+"Sending from an alias".
+
+Grants are scoped to aliases on the mailbox's own domain, re-derived
+server-side rather than trusted from the form.
+
+**Consequence worth knowing:** changing an alias's destination no longer
+moves the send-as grant with it. That is intentional. The grant says
+"this mailbox may send from this address", which has nothing to do with
+where the address happens to deliver, so silently transferring it on a
+destination change would be wrong. Deleting the alias still revokes the
+grant.
 
 ## Conflict checks at insert time
 
@@ -226,7 +424,7 @@ The add handler runs four duplicate checks before the INSERT:
 | Check | Error | What it prevents |
 |---|---|---|
 | `mailboxes WHERE username = alias_address` | 13 | Alias collides with an actual mailbox. The mailbox itself would always win the lookup, so the alias would be dead weight. |
-| `mailbox_aliases WHERE alias_address = alias_address` | 14 | Duplicate alias row (also enforced by the UNIQUE key, but caught earlier with a friendlier message). |
+| `mailbox_aliases WHERE alias_address = alias_address` | 14 | The alias already exists. Add creates; changing an existing alias, including adding and removing destinations, is the Edit modal's job, and the message says so. Note the database no longer backs this check: v260815 dropped the UNIQUE key on `alias_address` (that is what allows several destinations) and replaced it with `uq_alias_dest` on the `(alias_address, delivers_to)` pair, so this handler check is the only thing preventing a second alias row for an address that already has one. |
 | `virtual_recipients WHERE virtual_address = alias_address` | 17 | Alias collides with a relay-topology virtual recipient. The UNION lookup would return both rows and the resulting fan-out is almost never the intent — the error tells the admin to remove the relay-side row first. |
 | `domains WHERE domain = X AND type = 'mailbox'` | 12 | Alias's domain isn't on the mailbox-topology side. Use Virtual Recipients for relay domains. |
 
@@ -254,8 +452,8 @@ practice: delete aliases first, then mailboxes, then the domain.
 | Address already exists as a mailbox | error 13 |
 | Address already exists as an alias | error 14 |
 | Address already exists as a virtual recipient | error 17 |
-| Forward type with blank Delivers To | error 15 |
-| Delivers To target mailbox doesn't exist | error 16 |
+| Forward type with blank Delivers To, or a list that deduplicates to nothing | error 15 |
+| Any destination is not a valid email address | error 16. Fails the whole submission on the first bad entry rather than silently dropping it and reporting partial success. No longer means "target mailbox doesn't exist"; external destinations are allowed |
 | Edit with missing alias_id | error 20 |
 | Edit / delete with stale alias_id | error 21 |
 | MySQL `hermes_db_server` down | Postfix `virtual_alias_maps` lookups fail. Default behavior is to defer affected mail with a temporary error and retry — legitimate mail is held, not bounced. |
@@ -265,11 +463,14 @@ practice: delete aliases first, then mailboxes, then the domain.
 | Path | Owner | Role |
 |---|---|---|
 | `config/hermes/var/www/html/admin/2/view_mailbox_aliases.cfm` | `hermes_commandbox` | Page + table + Add / Edit / Delete modals |
-| `config/hermes/var/www/html/admin/2/inc/add_mailbox_alias_action.cfm` | `hermes_commandbox` | Add handler with the four-way conflict check |
-| `config/hermes/var/www/html/admin/2/inc/edit_mailbox_alias_action.cfm` | `hermes_commandbox` | Edit handler — toggles `sender_login_maps` on send-as changes |
-| `config/hermes/var/www/html/admin/2/inc/delete_mailbox_alias_action.cfm` | `hermes_commandbox` | Delete handler — removes alias row + any send-as map entry |
-| `config/hermes/var/www/html/admin/2/inc/get_mailbox_alias_json.cfm` | `hermes_commandbox` | AJAX endpoint that hydrates the Edit modal |
+| `config/hermes/var/www/html/admin/2/inc/add_mailbox_alias_action.cfm` | `hermes_commandbox` | Add handler with the four-way conflict check; writes one row per destination |
+| `config/hermes/var/www/html/admin/2/inc/edit_mailbox_alias_action.cfm` | `hermes_commandbox` | Edit handler; diffs the submitted destination set against what is stored |
+| `config/hermes/var/www/html/admin/2/inc/delete_mailbox_alias_action.cfm` | `hermes_commandbox` | Delete handler; removes every row for the address plus any send-as map entry |
+| `config/hermes/var/www/html/admin/2/inc/get_mailbox_alias_json.cfm` | `hermes_commandbox` | AJAX endpoint that hydrates the Edit modal with the whole destination set |
+| `config/hermes/var/www/html/admin/2/inc/edit_mailbox_send_as_action.cfm` | `hermes_commandbox` | The only writer of `sender_login_maps`. Reached from the Mailboxes page |
+| `config/hermes/var/www/html/admin/2/inc/get_mailbox_send_as_json.cfm` | `hermes_commandbox` | AJAX endpoint listing aliases on the mailbox's own domain |
 | `/etc/postfix/mysql-virtual.cf` | `hermes_postfix_dkim` (volume-mounted) | The UNION lookup definition shared with `virtual_recipients` |
+| `/etc/postfix/mysql-internal-only-recipients.cf` | `hermes_postfix_dkim` (volume-mounted) | The `check_recipient_access` map behind Reachable By. Uses `SELECT DISTINCT` |
 | `mailbox_aliases`, `sender_login_maps`, `mailboxes`, `domains`, `virtual_recipients` | `hermes_db_server` | Storage and conflict-detection tables |
 
 Nothing on this page shells out to Postfix — no `postmap`, no
@@ -278,17 +479,23 @@ new rows on the next inbound message.
 
 ## Related
 
-- [Email Relay > Virtual Recipients](../02-email-relay/virtual-recipients.md)
-  — the relay-topology equivalent. Use that page when the destination
-  is external (Gmail, partner domain) or when fan-out to multiple
-  destinations from one address is needed.
+- [Email Relay > Virtual Recipients](../02-email-relay/virtual-recipients.md):
+  the relay-topology equivalent. Pick the page by the **alias address's own
+  domain**, not by the destination. Both pages now support external
+  destinations and fan-out to several destinations, so those are no longer
+  the deciding factor. Relay domains additionally support catch-alls;
+  mailbox domains additionally support Reachable By and the discard
+  transport.
 - [Domains](domains.md) — the mailbox-domain list this page filters
   against. An alias's domain must exist there with `type = 'mailbox'`.
 - [Mailboxes](mailboxes.md) — the destination mailbox list. The
   Delivers To dropdown is populated from active user mailboxes.
-- [Shared Mailboxes](shared-mailboxes.md) — when several users need
-  to read the same incoming mail (rather than one user receiving
-  forwards), use a shared mailbox instead of a forward alias.
+- [Shared Mailboxes](shared-mailboxes.md): when several users need to read
+  the same incoming mail, use a shared mailbox rather than an alias. The
+  distinction is one copy or many. A shared mailbox is a single inbox
+  several people open, so a message read by one is read by all and replies
+  come from a common address. A distribution list delivers a separate copy
+  into each member's own mailbox, and each acts on it independently.
 - [Mailbox Rules](mailbox-rules.md) — Sieve-based filtering that runs
   on the destination mailbox after alias rewrite. Aliases route mail
   to a mailbox; Sieve rules then sort it within that mailbox.

@@ -48,6 +48,35 @@ beside each release below is the **actual release date**.
   a list at once. Membership and send-as are now independent. Existing grants are unchanged.
   Editing an alias's destination no longer moves the grant with it, which is deliberate: the
   grant means "this mailbox may send from this address" and has nothing to do with delivery.
+  Documented alongside it: the grant alone changes nothing the user can see, because no mail
+  protocol exposes send-as permissions to a client. The address must also be added as an
+  identity in whatever they read mail with, which is **Mail > Account settings > Aliases > Add
+  alias** in Nextcloud webmail and **Manage Identities** in Thunderbird. That step being
+  undocumented made a working grant look broken, which is the first thing anyone reports.
+- **Add creates, Edit manages members.** On both pages, adding an address that already exists is
+  now refused outright and points at that row's Edit button, instead of quietly merging into it.
+  Routing both operations through Add gave two ways to do one thing, and it produced an answer
+  nobody could act on: submitting an existing address whose destinations were all already stored
+  could only report that nothing had changed, which reads as a failure for what was arguably a
+  no-op. Edit already owned the whole destination set as chips with a diff save, so it was
+  already the better route; it is now the only one.
+- **Virtual Recipients is one address per submission**, matching Aliases. The Add card was a
+  newline-delimited textarea creating many addresses at once, which is what forced every outcome
+  to be an accumulating per-row tally across four separate callouts, and what made it impossible
+  to refuse an address that already existed rather than merely report it. One address means one
+  verdict, so those four callouts collapse to plain error messages. Fan-out in the useful
+  direction, one address to many destinations, is unaffected. Creating several addresses now
+  takes several submissions; if a bulk path is wanted again it should be a real import with its
+  own report rather than a shared text field whose failure mode is a tally.
+- **Virtual Recipients now matches the Aliases page surface.** Add moved from an always-visible
+  card into a modal behind an Add button; the Delivers To field became the same chip picker used
+  everywhere else on both pages, having been the last plain comma-separated text input among the
+  four such fields, including its own Edit modal; the Actions column moved to the left; and the
+  select-all checkbox column with its bulk Delete Selected button was replaced by one Delete per
+  row. The checkboxes existed because the pre-grouping table rendered one row per destination, so
+  an address with a large destination set filled the screen and needed sweeping. Grouping by
+  address removed the reason, and the row still carries every underlying row id, so one Delete
+  removes the address and all of its destinations together.
 
 ### Fixed
 
@@ -107,6 +136,76 @@ beside each release below is the **actual release date**.
   identical to what the CFML produced, and guarded so an existing key is never overwritten,
   since replacing it would orphan every credential already encrypted with it. The dashboard
   self-heal stays as a fallback for a deleted file or a partial restore.
+- **Virtual Recipients claimed to bypass all content checking. It never did.** The page carried a
+  callout stating mail through a virtual recipient was delivered "while bypassing ALL content
+  checking (spam, virus, banned files)", and the admin documentation had a section explaining the
+  mechanism behind it. Neither described this system. `content_filter` is set globally in
+  `main.cf` with no per-recipient exception, and the only bypass lane, the `BYPASSALLCHECKS`
+  policy bank on `:10030`, is reachable solely through a `FILTER` action keyed on the **sender**.
+  The documentation additionally had the pipeline backwards, stating that Postfix rewrites the
+  recipient before Amavis sees it: `receive_override_options = no_address_mappings` defers
+  expansion until the `:10026` reinjection listener, so what Amavis filters is the original
+  virtual address. And a domain-scoped policy always applies anyway, because adding a domain
+  seeds an `@domain` row in `recipients` carrying the default policy. The wording traced back to
+  `build-220203` and had survived every rewrite since. An operator reading it would reasonably
+  have avoided virtual recipients for anything sensitive, or assumed a hole that was not there.
+- **Pickers looked like plain text inputs until you guessed to type in them** (#310). Reported
+  from testing, with the TLS certificate field named as the example. Two families of the same
+  complaint, fixed separately.
+
+  **Destination pickers.** Clicking Delivers To opened the list on the Add Alias modal but did
+  nothing on the other three, which are the same control. On Virtual Recipients the options are
+  fetched remotely and the loader returned early on an empty query, so focus fetched nothing; it
+  now fetches on focus, with the shared endpoint ordered and capped at 50 rows since an empty
+  search would otherwise match every relay recipient. On both Edit modals the destination chips
+  are added programmatically, which left a query behind in the control so the next focus offered
+  a filtered list; the query is now reset after populating. The Virtual Recipients edit modal was
+  additionally calling `clearOptions()`, discarding every option the search had already fetched.
+
+  **Certificate and timezone pickers.** The Console Certificate, SMTP TLS Certificate, Dovecot
+  Certificate and Timezone fields were plain text inputs with a jQuery UI autocomplete bound on
+  **keydown**, so the widget did not exist until the first keystroke and that keystroke was spent
+  constructing it rather than searching. They render as TomSelect controls now, with a chevron,
+  and open on click. The four near-identical copies of the handler are replaced by one shared
+  include, `inc/remote_picker_js.cfm`, driven by `data-target-*` attributes declaring which
+  detail field each response key fills, because four copies of the same forty lines is how they
+  drifted apart in the first place. The certificate id the server actually reads is still written
+  by the same two-request endpoint contract, unchanged.
+- **Selecting a timezone threw a JavaScript exception every time.** The handler derived an index
+  by splitting the field id on `_`, but that field is called `timezone` with no underscore, so
+  the index was `undefined` and it wrote into `timezoneid_undefined`, an element that has never
+  existed on that page. Saving appeared to work only because the visible field was set on the
+  line before the throw. Found while converting the picker above; the element it wanted is gone
+  entirely, since `edit_system_settings.cfm` validates the timezone by name.
+
+- **Deleting a certificate always failed, after deleting it.** `delete_system_certificate.cfm`
+  ran two statements: it removed the row from `system_certificates`, then removed the matching
+  SAN rows from `mailbox_domains_sans`. No such table has ever existed in this schema, in the
+  baseline or in any release's schema updates, so the second statement threw every time. Because
+  it threw only after the first had committed, the certificate really was deleted, its acme files
+  really were removed, and the admin was shown a Lucee stack trace instead of a success message,
+  with any SAN rows for it orphaned. The real table is `mailbox_sans` and its foreign key is
+  `certificate`, which is what the Ofelia-scheduled `acme_validate_ip.cfm` has always used, so
+  the table and the column were both wrong. The two statements also now run child before parent,
+  so a future failure leaves the certificate intact and the operation retryable rather than
+  half applied. Because every certificate deleted on every install to date stranded its SAN rows
+  this way, the schema update for this release also removes SAN rows whose certificate no longer
+  exists; rows not yet attached to a certificate are a legitimate state and are left alone.
+
+### Removed
+
+- **Two unreachable duplicate pages**, `admin/2/add_virtual_recipients.cfm` and
+  `admin/2/edit_virtual_recipient.cfm`. Both were standalone full-page copies of flows that live
+  as cards and modals on `view_virtual_recipients.cfm`, and nothing in the repository linked to
+  either. Both had also drifted: the add page still validated its destination field as a single
+  email address, the bug fixed on the live page earlier in this release, so multi-destination had
+  never worked there, and the edit page still used the superseded one-row-per-destination model.
+  Dead pages that duplicate a live flow are worse than absent ones, because they get found later
+  and mistaken for the real thing.
+- **Two dead scheduler files**, `schedule/test.cfm` and `schedule/acme_validate_ip_copy.cfm`.
+  Neither was referenced anywhere or run by Ofelia, which schedules `acme_validate_ip.cfm`, and
+  both queried the same non-existent `mailbox_domains_sans` table as the certificate-delete bug
+  above, so either would have thrown the moment anything reached it.
 
 ## [v260814] — 2026-08-14
 

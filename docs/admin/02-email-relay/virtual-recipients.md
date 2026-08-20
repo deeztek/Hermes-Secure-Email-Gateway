@@ -7,11 +7,13 @@ Admin path: **Email Relay > Virtual Recipients** (`view_virtual_recipients.cfm`,
 This page manages **forward-only address aliases** on the relay-topology
 domains configured under [Domains](domains.md). Each row in the
 `virtual_recipients` table maps one inbound address (or a domain-wide
-catch-all) to exactly one delivery address. The delivery target can be
+catch-all) to one delivery address, and an address that delivers to
+several destinations simply has several rows. The delivery target can be
 internal to Hermes, on another relay domain, on a mailbox domain, or
-anywhere on the public Internet — the row is consumed by Postfix's
-`virtual_alias_maps` and rewritten at SMTP time, so the forward is
-transparent to the original sender.
+anywhere on the public Internet. The rows are consumed by Postfix's
+`virtual_alias_maps`, which concatenates every row it gets back into a
+single recipient list, so one inbound message fans out to all of them and
+the forward stays transparent to the original sender.
 
 Virtual recipients have **no SMTP authentication, no IMAP/POP3 access,
 and no password**. They are not user accounts. They are rewrite rules.
@@ -47,27 +49,47 @@ UI separates them so the rule for each topology stays focused.
 
 ## Storage and lookup path
 
+The order of these steps matters, and it is not the obvious one. The
+**rewrite is deferred until after content filtering**, because `main.cf`
+sets `receive_override_options = no_address_mappings` globally, which
+disables virtual alias expansion in the cleanup that runs for mail arriving
+on port 25. The map is still consulted at `smtpd` to decide whether the
+recipient exists, but the envelope keeps the original address through the
+filter.
+
 ```
 inbound SMTP (port 25) ──► hermes_postfix_dkim
                                   │
                                   │  smtpd checks: helo, sender, recipient
-                                  │  relay_recipient_maps / recipient_canonical_maps
-                                  │  virtual_alias_maps  ◄── mysql:/etc/postfix/mysql-virtual.cf
-                                  │                          │
-                                  │                          ▼
-                                  │      ┌────────────────────────────────────┐
-                                  │      │ hermes_db_server                    │
-                                  │      │  SELECT maps FROM virtual_recipients│
-                                  │      │   UNION                             │
-                                  │      │  SELECT delivers_to FROM            │
-                                  │      │   mailbox_aliases                   │
-                                  │      └────────────────────────────────────┘
+                                  │  recipient VALIDATED against
+                                  │  relay_recipient_maps / virtual_alias_maps
+                                  │       ◄── mysql:/etc/postfix/mysql-virtual.cf
+                                  │            │
+                                  │            ▼
+                                  │  ┌────────────────────────────────────┐
+                                  │  │ hermes_db_server                   │
+                                  │  │  SELECT maps FROM virtual_recipients│
+                                  │  │   UNION                            │
+                                  │  │  SELECT delivers_to FROM           │
+                                  │  │   mailbox_aliases                  │
+                                  │  └────────────────────────────────────┘
                                   │
-                                  v
-                          rewritten recipient(s)
+                                  │  cleanup runs with no_address_mappings,
+                                  │  so the recipient is NOT rewritten yet
+                                  ▼
+              content filter (amavis on 10021)
+              policy keyed on the ORIGINAL virtual address
                                   │
                                   ▼
-                       content filter (amavis on 10024)
+                         hermes_ciphermail
+                                  │
+                                  ▼
+              reinjection on :10026, which overrides
+              receive_override_options and therefore DOES
+              expand virtual_alias_maps
+                                  │
+                                  ▼
+                          rewritten recipient(s)
                                   │
                                   ▼
                        outbound or local delivery
@@ -85,16 +107,21 @@ rather than a hash file.
 |---|---|---|
 | `id` | INT PK | Surrogate key for the row |
 | `virtual_address` | VARCHAR(255) | The address being rewritten. Full email (`info@example.com`) **or** a catch-all token (`@example.com`). |
-| `maps` | VARCHAR(255) | Destination address. Single recipient per row in the current schema. |
+| `maps` | VARCHAR(255) | Destination address. One per row; an address delivering to several destinations has one row each, and Postfix concatenates them. |
 | `alias_type` | VARCHAR(20) | Defaults to `forward`. Reserved for future per-alias behavior flags; not surfaced in the UI today. |
 | `send_as` | TINYINT(3) | Reserved for outbound "send-as" support (allow the destination to send mail as the virtual address). Not wired through Postfix yet. |
 | `policy_id` | INT | Reserved for per-alias Amavis policy attachment. Not surfaced today. |
 | `system` | INT | Provenance marker — `1` = seeded by the install/system-addresses flow (postmaster/abuse/root), `2` = admin-created via this page. The system rows are managed by `update_system_email_addresses.cfm` and recreated when the admin email or postmaster changes. |
 
-There is no UNIQUE constraint on `virtual_address` because a single
-inbound address can fan out to multiple destinations — each destination
-gets its own row. The add handler dedupes on the `(virtual_address,
-maps)` pair so the same forward isn't inserted twice.
+There is no UNIQUE constraint on `virtual_address`, because a single
+inbound address fans out to several destinations by holding one row each.
+
+There is deliberately no unique key on the `(virtual_address, maps)` pair
+either, even though `mailbox_aliases` gained one in v260815. Existing
+installs may already hold exact duplicates, and `ADD UNIQUE` would abort
+the whole schema upgrade on the first one it met. The console is the guard
+instead: **Add refuses an address that already exists**, so a duplicate
+pair cannot be created through the UI.
 
 ## Two address shapes — specific and catch-all
 
@@ -108,9 +135,10 @@ sales@company.com      →   sales-team@externalcrm.example
 legal@company.com      →   external-counsel@lawfirm.example
 ```
 
-The local-part is rewritten by Postfix before content filtering. The
-recipient never sees the original `info@`/`sales@`/`legal@` address
-unless the destination mail system surfaces the original envelope.
+The local-part is rewritten by Postfix **after** content filtering, at the
+`:10026` reinjection listener. The recipient never sees the original
+`info@`/`sales@`/`legal@` address unless the destination mail system
+surfaces the original envelope.
 
 ### Catch-alls
 
@@ -148,66 +176,124 @@ aliases and wants the same widened visibility.
 
 ## Fields on the page
 
-### Add Virtual Recipients card
+### Add Virtual Recipient modal
+
+Opened by the **Add Virtual Recipient** button above the table. One
+address per submission, matching
+[Email Server > Aliases](../03-email-server/aliases.md).
 
 | Field | Notes |
 |---|---|
-| **Virtual Address(es)** | Newline-delimited textarea. Each line is one full email address or a `@domain.com` catch-all. Lowercased, trimmed, deduped against `virtual_recipients` AND `mailbox_aliases` before insert. |
-| **Delivers To** | Single destination address for the whole batch. Validated as an email. Autocomplete sourced from `inc/getintrecipients.cfm` (existing relay recipients and mailbox addresses) so you can typeahead-pick a known recipient. |
+| **Virtual Address** | One full email address or a `@domain.com` catch-all. Lowercased and trimmed. |
+| **Delivers To** | One or more destinations, entered as removable chips. Typing searches existing relay recipients through `inc/getintrecipients.cfm`; any other address can be typed in and accepted on Enter. One row is written per chip. |
 
-The handler iterates the textarea line-by-line and accumulates per-line
-results. The success banner reports the count and addresses that landed,
-and separate error banners surface invalid-format lines, lines whose
-domain isn't configured as a relay domain, lines whose domain is a
-mailbox domain (with the "use Email Server > Aliases" pointer), and
-duplicate lines. **No transaction wraps the batch** — partial success is
-the expected behavior.
+Because a submission carries exactly one address, it produces exactly one
+verdict, reported as a single message rather than a tally:
+
+| Condition | Message |
+|---|---|
+| Virtual Address blank | 1 |
+| Delivers To empty | 2 |
+| A destination is not a valid email | 3 |
+| Address is neither a valid email nor a `@domain` catch-all | 4 |
+| Domain not configured in the system | 5 |
+| Domain is a mailbox domain (use Email Server > Aliases) | 6 |
+| Address already exists as a mailbox alias | 7 |
+| Address already exists as a virtual recipient (use Edit) | 8 |
+
+Until v260815 this was a newline-delimited textarea creating many
+addresses at once. That shape forced every outcome to be an accumulating
+per-row tally across four separate callouts, and it meant an address that
+already existed could only be reported rather than refused, because other
+rows in the same batch still had to process. The trade for the simpler
+model is that creating several addresses now takes several submissions.
 
 ### Virtual Recipients table
 
-Standard DataTables surface — searchable, sortable, exportable
+Standard DataTables surface: searchable, sortable, exportable
 (copy / CSV / Excel / PDF / print), `stateSave: true` so column order
-and page size persist across reloads. Columns:
+and page size persist across reloads. Rows are **grouped by address**, so
+an entry with twenty destinations is one row with twenty chips.
 
-| Column | Source |
-|---|---|
-| Checkbox | Bulk-select for delete |
-| Recipient | `virtual_recipients.virtual_address` |
-| Delivers To | `virtual_recipients.maps` |
-| Actions | Edit (opens modal) |
+| Index | Column | Source |
+|---|---|---|
+| 0 | Actions | Edit and Delete. Not sortable or searchable |
+| 1 | Recipient | `virtual_recipients.virtual_address` |
+| 2 | Delivers To | Display-only chips, one per destination, external ones badged |
+
+Actions sits on the left to match Aliases. Note for anyone changing this
+table: `order` and `columnDefs` are index-based and `stateSave` persists
+the sort by index, so inserting or removing a column requires updating
+both plus the `stateLoadParams` guard.
 
 ### Edit modal
 
-Inline edit of `virtual_address` and `maps`. Re-runs the same domain
-validation, catch-all detection, and dedupe check as Add — including
-the rejection of mailbox-domain rows.
+Edits the whole entry, keyed on the address rather than a row id. The
+destination set opens as removable chips and the save is a **diff**:
+insert what is new, delete what was taken off, leave the rest untouched.
+Diffing rather than delete-then-reinsert means there is never a moment
+when the address has no destinations. Re-runs the same domain validation
+and catch-all detection as Add, including the rejection of mailbox-domain
+rows.
+
+Adding and removing destinations happens here and only here. Add creates.
 
 ### Delete
 
-Checkbox-driven bulk delete from the table card. The handler
-(`delete_virtual_recipients.cfm`) just runs `DELETE FROM virtual_recipients
-WHERE id = ?` per selected row — there is no dependency check, because
-nothing else in the schema points back at a virtual recipient row.
+One Delete button per row, confirmed in a modal that names the address and
+its destination count. The row carries `dest_ids`, every underlying row id
+for that address comma-joined by the grouped query, and the handler
+(`delete_virtual_recipients.cfm`) runs `DELETE FROM virtual_recipients
+WHERE id = ?` per id, so one click removes the address and all of its
+destinations together. There is no dependency check, because nothing else
+in the schema points back at a virtual recipient row.
 
-## Content filter bypass — by design, loud
+The select-all checkbox column and its bulk **Delete Selected** button were
+removed in v260815. They existed because the pre-grouping table rendered
+one row per destination, so an address with a large destination set filled
+the screen and needed bulk selection to clear.
 
-The yellow callout on the page exists for a reason. Postfix rewrites
-the recipient **before** the message reaches Amavis content filtering,
-but Amavis policy lookups key on the **post-rewrite** recipient. If the
-destination address is an external Internet address (Gmail, Outlook.com,
-a personal mailbox, etc.), Amavis applies the default outbound policy
-to it — which typically means lighter spam/banned-files enforcement than
-a domain-scoped inbound policy would.
+## Virtual recipients are content filtered
 
-The net effect: mail aliased through a virtual recipient to an external
-address is generally **less aggressively filtered** than the same mail
-delivered to a local mailbox or relayed to a known partner domain.
-This is fine for legitimate forwards, but admins who use virtual
-recipients to bridge a sunset domain to a personal Gmail should expect
-Amavis to be permissive about it. Tighten the policy by editing the
-destination recipient's `recipients` row directly under
-[Relay Recipients](relay-recipients.md) if the destination is itself a
-known Hermes recipient.
+They are filtered exactly like any other inbound mail. This section
+previously claimed the opposite, and the page carried a callout saying
+mail through a virtual recipient was delivered "while bypassing ALL
+content checking (spam, virus, banned files)". Both were wrong. The
+wording traced back to `build-220203` and described no part of this
+pipeline. Removed in v260815.
+
+Three independent reasons it was never true:
+
+1. **`content_filter` is global.** `main.cf` sets
+   `content_filter = amavis:[hermes_mail_filter]:10021` with no
+   per-recipient exception. The only bypass lane in the system is
+   `:10030`, the `BYPASSALLCHECKS` policy bank, and it is reachable only
+   through a `FILTER` action set by
+   [Global Sender Block/Allow](../04-content-checks/global-sender-rules.md),
+   which is keyed on the **sender**.
+2. **Amavis sees the original address.** Because
+   `receive_override_options = no_address_mappings` defers expansion past
+   the filter, the envelope recipient reaching Amavis is the virtual
+   address itself, not the destination. There is no "post-rewrite
+   recipient" for policy to key on at that point.
+3. **A domain-scoped policy always matches.** Adding a domain inserts an
+   `@domain` row into `recipients` carrying the default policy, and
+   Amavis's recipient lookup falls back from `user@domain` to `@domain`.
+   The code that does it says so: "ensures Amavis applies SVF filtering to
+   all mail for this domain."
+
+Amavis also classifies the mail correctly as inbound, because
+`@local_domains_maps` reads `/etc/postfix/relay_domains` and the virtual
+address is on one by definition, since the Add handler refuses any domain
+that is not configured.
+
+The real caveat with virtual recipients is not filtering, it is
+**forwarding**. Mail leaves with the original sender's address, so SPF
+fails at the receiving end, and if the message was modified on the way
+through, by an External Banner or LinkGuard, the original DKIM signature
+no longer validates either. Senders publishing a strict DMARC policy can
+therefore have mail to external destinations rejected. That warning lives
+in the Add modal, beside the field it applies to.
 
 ## Domain-delete dependency
 
@@ -249,21 +335,27 @@ reserved local-parts; do not maintain them by hand here.
 | Delivers To blank or invalid email in Add | error 2/3 banner, no DB write |
 | Edit virtual address fails email or catch-all format | `session.m = 10`, redirect, no DB write |
 | Edit Delivers To blank or invalid | `session.m = 11`/`12`, redirect, no DB write |
-| Domain not in `domains` table | `session.m = 13` on edit; per-line invalid-domain banner on add — line skipped, others continue |
-| Domain is a mailbox domain | Per-line invalid-domain banner with the "use Email Server > Aliases" hint; line skipped |
-| Duplicate `(virtual_address, maps)` pair in `virtual_recipients` or `mailbox_aliases` | Per-line duplicate banner on add; `session.m = 14` on edit |
-| Delete with no rows selected | `session.m = 1` banner, no DB write |
+| Domain not in `domains` table | `session.m = 13` on edit; `errormessage = 5` on add, nothing written |
+| Domain is a mailbox domain | `errormessage = 6` on add, with the "use Email Server > Aliases" hint |
+| Address already exists in `mailbox_aliases` | `errormessage = 7` on add |
+| Address already exists in `virtual_recipients` | `errormessage = 8` on add, pointing at Edit; `session.m = 14` on edit |
+| Delete request carries no id | `session.m = 1` banner, no DB write |
 | MySQL `hermes_db_server` down | Postfix `virtual_alias_maps` lookups fail. By default Postfix defers mail to the affected recipients with a temporary error and retries on the next queue run; legitimate mail is held, not bounced. |
 
 ## Bulk import
 
-The current page supports newline-delimited paste into the Add textarea,
-which is the practical bulk path: paste hundreds of `alias@domain.com`
-lines (all forwarding to one destination) at once, click Add, get a
-per-line outcome report. A separate CSV import is not provided because
-the table is intentionally one-destination-per-row — fan-out is
-expressed by adding the same `virtual_address` multiple times with
-different `maps`, which is easier to do in the textarea than in a CSV.
+There is no bulk path. Add creates one address per submission.
+
+Until v260815 the Add card was a newline-delimited textarea and pasting
+many addresses at once was the practical bulk route. It was removed
+because a submission carrying many addresses can only report a per-row
+tally, which is what forced the page's four accumulating callouts and
+made it impossible to simply refuse an address that already existed.
+Fan-out in the other direction, one address to many destinations, is
+unaffected and is entered as chips.
+
+If a bulk path is wanted again it should be a real import with its own
+report, not a shared text field whose failure mode is a tally.
 
 ## Files and containers touched
 

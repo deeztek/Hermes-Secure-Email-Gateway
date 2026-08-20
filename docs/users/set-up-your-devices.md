@@ -98,6 +98,52 @@ The wizard's Linux page is a settings reference card — server name, ports, enc
 
 If you don't want to set up any apps at all, pick **Web only** on the device picker. The wizard gives you a single button that opens webmail in your browser. **No app password is needed for webmail** — it uses your normal login. Webmail is fully responsive and works on phones and tablets too, so you can use it from anywhere with a browser.
 
+## Sending from an alias
+
+If your administrator has given you permission to send from another address, a
+team address like `sales@yourdomain.tld` for example, that permission is set on
+the server. Your mail app still has to be told the address exists before it will
+offer it to you.
+
+This catches nearly everybody out: the permission is granted, nothing appears to
+change, and it looks like it did not work. It did. The app simply does not know
+about it yet, because there is no way for the server to tell it.
+
+**In webmail (Nextcloud Mail)**
+
+1. Open **Mail**, then the **settings gear** beside your account, or go to
+   **Account settings**.
+2. Find **Aliases** and click **Add alias**.
+3. Enter the address, and the name you want on messages sent from it.
+4. Compose a new message. The **From** field is now a dropdown.
+
+**In Thunderbird**
+
+1. **Account Settings**, select your account, then **Manage Identities** and **Add**.
+2. Enter the alias address and the display name. Leave the outgoing server as it is.
+3. The **From** dropdown appears in the compose window once there is more than one
+   identity.
+
+**In Apple Mail, Outlook and others**
+
+Same idea, different menu. Look for a second email address, an alternate identity,
+or an alias in the account's settings.
+
+### If it is refused when you send
+
+You will get a message like:
+
+```
+Sender address rejected: not owned by user you@yourdomain.tld
+```
+
+That means the address was added in your app but the permission has not been
+granted on the server, or has been removed. Nothing you can change in the app will
+fix it. Ask your administrator to grant Send As for that address.
+
+The check is deliberate. It is what stops anyone sending mail as one of your
+colleagues.
+
 ## What gets created behind the scenes
 
 For the Apple path, the wizard mints a brand-new app password for that device and embeds it in the downloadable profile. You never see the password — it lives inside the profile, which iOS or macOS hands directly to the Mail, Calendar, and Contacts apps. The new app password also shows up as a row in *My App Passwords* under the label you chose.
