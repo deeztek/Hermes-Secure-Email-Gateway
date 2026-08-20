@@ -404,7 +404,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="col-md-6">
         <div class="mb-3">
           <label class="form-label"><strong>Mail Server Certificate</strong></label>
-          <input type="text" name="dovecot_cert_name" class="certificate form-control" id="dovecot_cert_name" placeholder="Start typing to search..." value="#encodeForHTMLAttribute(dovecotCertName)#" autocomplete="off">
+          <!--- No name attribute: the server reads the hidden dovecot_cert_id
+               and ignores this field. No data-target-type either, because this
+               picker has no certificate type field to fill. --->
+          <select class="certificate remote-picker form-control" id="dovecot_cert_name"
+                  data-endpoint="./inc/getcertificates.cfm"
+                  data-target-id="dovecot_cert_id"
+                  data-target-subject="dovecot_cert_subject"
+                  data-target-issuer="dovecot_cert_issuer"
+                  data-target-serial="dovecot_cert_serial"
+                  placeholder="Click to choose a certificate, or type to search...">
+            <cfif Trim(dovecotCertId) is not "" AND Trim(dovecotCertName) is not "">
+              <option value="#encodeForHTMLAttribute(dovecotCertId)#" selected>#encodeForHTML(dovecotCertName)#</option>
+            </cfif>
+          </select>
         </div>
         <div class="mb-3">
           <label class="form-label"><strong>Certificate Subject</strong></label>
@@ -789,40 +802,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
   // Certificate autocomplete for the Mail Server TLS Certificate field
-  $(document).on('keydown', '.certificate', function() {
-    var $input = $(this);
-    $input.autocomplete({
-      source: function(request, response) {
-        $.ajax({
-          url: "./inc/getcertificates.cfm",
-          type: 'post',
-          dataType: "json",
-          data: { search: request.term, request: 1 },
-          success: function(data) { response(data); }
-        });
-      },
-      select: function(event, ui) {
-        $input.val(ui.item.label);
-        var certId = ui.item.value;
-
-        $.ajax({
-          url: './inc/getcertificates.cfm',
-          type: 'post',
-          data: { id: certId, request: 2 },
-          dataType: 'json',
-          success: function(response) {
-            if (response.length > 0) {
-              $('#dovecot_cert_id').val(response[0]['id']);
-              $('#dovecot_cert_subject').val(response[0]['subject']);
-              $('#dovecot_cert_issuer').val(response[0]['issuer']);
-              $('#dovecot_cert_serial').val(response[0]['serial']);
-            }
-          }
-        });
-        return false;
-      }
-    });
-  });
+  // The certificate picker's jQuery UI autocomplete lived here. It is now a
+  // TomSelect driven by inc/remote_picker_js.cfm.
 
   // Compression level visibility — hide for LZ4 (no configurable level)
   function updateCompressionUI() {
@@ -915,6 +896,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     });
   });
 </script>
+
+<cfinclude template="./inc/remote_picker_js.cfm">
 
 </body>
 </html>

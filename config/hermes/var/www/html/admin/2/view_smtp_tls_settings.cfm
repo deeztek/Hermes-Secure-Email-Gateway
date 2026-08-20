@@ -219,7 +219,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="mb-3">
               <label class="form-label"><strong>SMTP TLS Certificate</strong></label>
               <cfoutput>
-              <input type="text" name="certificate_1" class="certificate form-control" id="certificate_1" placeholder="Start typing to search..." value="#getcertdetails.friendly_name#" autocomplete="off">
+              <!--- No name attribute: the server reads the hidden
+                   certificateno_1 id and ignores this field. --->
+              <select class="certificate remote-picker form-control" id="certificate_1"
+                      data-endpoint="./inc/getcertificates.cfm"
+                      data-target-id="certificateno_1"
+                      data-target-type="type_1"
+                      data-target-subject="subject_1"
+                      data-target-issuer="issuer_1"
+                      data-target-serial="serial_1"
+                      placeholder="Click to choose a certificate, or type to search...">
+                <cfif Trim(smtpCertificate) is not "" AND Trim(getcertdetails.friendly_name) is not "">
+                  <option value="#encodeForHTMLAttribute(smtpCertificate)#" selected>#encodeForHTML(getcertdetails.friendly_name)#</option>
+                </cfif>
+              </select>
               </cfoutput>
             </div>
             <div class="mb-3">
@@ -462,45 +475,8 @@ $(document).ready(function() {
     $('#deleteForm').submit();
   });
 
-  // Certificate autocomplete
-  $(document).on('keydown', '.certificate', function() {
-    var id = this.id;
-    var splitid = id.split('_');
-    var index = splitid[1];
-
-    $('#'+id).autocomplete({
-      source: function(request, response) {
-        $.ajax({
-          url: "./inc/getcertificates.cfm",
-          type: 'post',
-          dataType: "json",
-          data: { search: request.term, request: 1 },
-          success: function(data) { response(data); }
-        });
-      },
-      select: function(event, ui) {
-        $(this).val(ui.item.label);
-        var certId = ui.item.value;
-
-        $.ajax({
-          url: './inc/getcertificates.cfm',
-          type: 'post',
-          data: { id: certId, request: 2 },
-          dataType: 'json',
-          success: function(response) {
-            if (response.length > 0) {
-              document.getElementById('certificateno_'+index).value = response[0]['id'];
-              document.getElementById('type_'+index).value = response[0]['type'];
-              document.getElementById('subject_'+index).value = response[0]['subject'];
-              document.getElementById('issuer_'+index).value = response[0]['issuer'];
-              document.getElementById('serial_'+index).value = response[0]['serial'];
-            }
-          }
-        });
-        return false;
-      }
-    });
-  });
+  // The certificate picker's jQuery UI autocomplete lived here. It is now a
+  // TomSelect driven by inc/remote_picker_js.cfm.
 });
 
 function openEditModal(id, domain, note) {
@@ -510,6 +486,8 @@ function openEditModal(id, domain, note) {
   new bootstrap.Modal(document.getElementById('editModal')).show();
 }
 </script>
+
+<cfinclude template="./inc/remote_picker_js.cfm">
 
 </body>
 </html>

@@ -730,7 +730,27 @@ a, a:hover{
             <div class="mb-3">
                 <label class="form-label"><strong>TimeZone</strong></label>
                 <cfoutput>
-                <input type="text" name="timezone" class="timezone form-control" id="timezone" placeholder="Start typing to search..." value="#get_timezone.value#" autocomplete="off">
+                <!--- data-value-field="label" because edit_system_settings.cfm
+                     validates form.timezone against the timezones table by
+                     NAME. The certificate pickers are the opposite: they submit
+                     a row id into a hidden field. Submitting an id here would
+                     fail that lookup and reject every save.
+
+                     No data-target-* attributes: the old handler wrote into
+                     `timezoneid_<index>`, an element that has never existed on
+                     this page, and derived <index> from an id with no
+                     underscore in it, so it was always `timezoneid_undefined`.
+                     Every timezone selection threw a TypeError there. It only
+                     appeared to work because the visible field had already been
+                     set on the line before the throw. --->
+                <select name="timezone" class="timezone remote-picker form-control" id="timezone"
+                        data-endpoint="./inc/gettimezones.cfm"
+                        data-value-field="label"
+                        placeholder="Click to choose a timezone, or type to search...">
+                  <cfif Trim(get_timezone.value) is not "">
+                    <option value="#encodeForHTMLAttribute(get_timezone.value)#" selected>#encodeForHTML(get_timezone.value)#</option>
+                  </cfif>
+                </select>
                 </cfoutput>
             </div>
 
@@ -927,65 +947,15 @@ a, a:hover{
   </script>
    <!--- SCRIPT TO SHOW/HIDE SET CONSOLE HOST SCRIPT ENDS HERE  --->
 
- <!--- SCRIPT TO GET CERTIFICATES BELOW --->
+ <!--- TIMEZONE PICKER
+
+      The jQuery UI autocomplete that used to live here is gone. The field is a
+      TomSelect driven by inc/remote_picker_js.cfm, included at the foot of this
+      page. Its select handler also wrote into `timezoneid_undefined`, an
+      element that does not exist, throwing on every selection. --->
 
 <script type="text/javascript">
   $(document).ready(function(){
-
-      $(document).on('keydown', '.timezone', function() {
-          
-          var id = this.id;
-          var splitid = id.split('_');
-          var index = splitid[1];
-
-          $( '#'+id ).autocomplete({
-              source: function( request, response ) {
-                  $.ajax({
-                      url: "./inc/gettimezones.cfm",
-                      type: 'post',
-                      dataType: "json",
-                      data: {
-                          search: request.term,request:1
-                      },
-                      success: function( data ) {
-                          response( data );
-                      }
-                  });
-              },
-              select: function (event, ui) {
-                  $(this).val(ui.item.label); // display the selected text
-                  var id = ui.item.value; // selected id to input
-
-                  // AJAX
-                  $.ajax({
-                      url: './inc/gettimezones.cfm',
-                      type: 'post',
-                      data: {id:id,request:2},
-                      dataType: 'json',
-                      success:function(response){
-                          
-                          var len = response.length;
-
-                          if(len > 0){
-                              var timezone_id = response[0]['id'];
-                              var timezone = response[0]['timezone'];
-                                       
-                              document.getElementById('timezoneid_'+index).value = timezone_id;
-                              document.getElementById('timezone_'+index).value = timezone;
-                                                
-                        
-                              
-                          }
-                          
-                      }
-                  });
-
-                  return false;
-              }
-          });
-      });
-      
-      
 
   });
 
@@ -1009,5 +979,7 @@ $('#captcha_provider').on('change', function(){
     // 'builtin' doesn't need any fields
 });
 </script>
+
+<cfinclude template="./inc/remote_picker_js.cfm">
 
 </html>
