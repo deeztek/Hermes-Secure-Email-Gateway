@@ -279,7 +279,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            IF(us.download_msg = 1, 'YES', 'NO') AS download_msg,
            COALESCE(us.ldap_username, '') AS ldap_username,
            IF(rc.user_id IS NULL, 'NO', 'YES') AS cert,
-           IF(rk.user_id IS NULL, 'NO', 'YES') AS keystore
+           IF(rk.user_id IS NULL, 'NO', 'YES') AS keystore,
+           <!--- Every alias this mailbox may send as, comma joined.
+                A correlated subquery rather than another LEFT JOIN: joining
+                sender_login_maps would multiply this row once per grant, and
+                the GROUP BY would hide the fan-out rather than prevent it. --->
+           (SELECT GROUP_CONCAT(slm.sender ORDER BY slm.sender ASC SEPARATOR ',')
+              FROM sender_login_maps slm
+             WHERE slm.login_user = m.username
+               AND slm.sender    <> m.username) AS send_as_list
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id AND d.type = 'mailbox'
     LEFT JOIN recipients r ON r.recipient = m.username
@@ -369,6 +377,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>S/MIME</th>
           <th>PGP</th>
           <th>Email</th>
+          <th>Send As</th>
           <th>Display Name</th>
           <th>Domain</th>
           <th>Quota</th>
@@ -418,6 +427,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button" title="Manage S/MIME Certificates"><i class="fas fa-user-shield"></i></a></td>
           <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button" title="Manage PGP Keyrings"><i class="fas fa-user-lock"></i></a></td>
           <td>#HTMLEditFormat(username)#</td>
+          <!--- Send As grants as chips. Read-only here; the grant is made in
+               Actions > Send As. Capped width with wrapping so a mailbox with
+               many grants grows the row downwards rather than pushing every
+               later column further right on a table that is already wide.
+
+               The query excludes the self-row. Every mailbox has one, so
+               including it would put a chip for the mailbox's own address on
+               every single row, which says nothing: this column is for
+               ALTERNATE identities. --->
+          <td>
+            <cfif Trim(send_as_list) is "">
+              <span class="text-muted">None</span>
+            <cfelse>
+              <div class="d-flex flex-wrap gap-1" style="max-width: 22rem;">
+                <cfloop from="1" to="#ListLen(send_as_list)#" index="saIdx">
+                  <span class="badge bg-light text-dark border">#HTMLEditFormat(Trim(ListGetAt(send_as_list, saIdx)))#</span>
+                </cfloop>
+              </div>
+            </cfif>
+          </td>
           <td>#HTMLEditFormat(name)#</td>
           <td>#HTMLEditFormat(domain)#</td>
           <td>
@@ -468,6 +497,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>S/MIME</th>
           <th>PGP</th>
           <th>Email</th>
+          <th>Send As</th>
           <th>Display Name</th>
           <th>Domain</th>
           <th>Quota</th>
@@ -1007,18 +1037,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   // Initialize DataTable
   $(document).ready(function() {
     var table = $('#mailboxesTable').DataTable({
+      // 0 Actions, 1 S/MIME, 2 PGP, 3 Email, 4 Send As, 5 Display Name,
+      // 6 Domain, then the rest. Send As was inserted after Email, which
+      // shifted every index from 4 onwards; the Domain filter below moved
+      // with it. stateSave persists the sort by index, but DataTables
+      // discards a saved state whose column COUNT differs and this table
+      // went from 21 columns to 22, so old state is dropped on its own.
       "order": [[3, "asc"]],
       "pageLength": 25,
       "stateSave": true,
       "columnDefs": [
-        { "orderable": false, "targets": [0, 1, 2] }
+        // Send As holds chips, not a sortable scalar.
+        { "orderable": false, "targets": [0, 1, 2, 4] }
       ]
     });
 
-    // Domain filter dropdown (column 5 = Domain)
+    // Domain filter dropdown (column 6 = Domain)
     $('#domainFilter').on('change', function() {
       var val = $(this).val();
-      table.column(5).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
+      table.column(6).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
     });
 
     // Initialize Tom Select for the edit-mailbox timezone dropdown

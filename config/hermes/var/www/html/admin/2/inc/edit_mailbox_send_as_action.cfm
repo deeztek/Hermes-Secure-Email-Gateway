@@ -105,11 +105,35 @@ everything, which is how an admin removes the last grant.
 </cfloop>
 
 <!--- REPLACE the stored set. Delete-then-insert rather than diffing:
-     the set is small, and this cannot leave a stale grant behind. --->
+     the set is small, and this cannot leave a stale grant behind.
+
+     `sender <> login_user` is LOAD-BEARING. Every mailbox owns a self-row,
+     (alice@d, alice@d), written by add_mailbox_action.cfm when the mailbox is
+     created. That row is what lets the user send as their OWN address:
+     Postfix's smtpd_sender_login_maps feeds reject_sender_login_mismatch on
+     the submission port, and without it the mailbox can receive mail but
+     cannot send any.
+
+     Deleting by login_user alone took the self-row with it, and nothing put
+     it back, because the picker only ever offers aliases. Opening this modal
+     and saving, even with nothing selected and nothing changed, was enough to
+     stop that mailbox sending. --->
 <cftry>
     <cfquery datasource="hermes">
         DELETE FROM sender_login_maps
         WHERE login_user = <cfqueryparam value="#sendAsLoginUser#" cfsqltype="cf_sql_varchar">
+          AND sender    <> <cfqueryparam value="#sendAsLoginUser#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+
+    <!--- Re-assert the self-row. Normally already present, so this is a no-op;
+         it repairs a mailbox whose row was removed by the delete above before
+         it was scoped. Idempotent via INSERT IGNORE. --->
+    <cfquery datasource="hermes">
+        INSERT IGNORE INTO sender_login_maps (sender, login_user)
+        VALUES (
+          <cfqueryparam value="#sendAsLoginUser#" cfsqltype="cf_sql_varchar">,
+          <cfqueryparam value="#sendAsLoginUser#" cfsqltype="cf_sql_varchar">
+        )
     </cfquery>
 
     <cfloop index="granted" list="#acceptedList#" delimiters=",">
