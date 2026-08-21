@@ -264,15 +264,23 @@ select acme_hash from system_certificates where id = '#certificate#'
 <cfset oldHash = #getprevioushash.acme_hash#>
 <cfoutput>Old Hash: #oldHash#</cfoutput><br>
 
+<!--- The hash is banked ONLY after a request succeeds, further down, next to
+     the "Congratulations" check.
+
+     It used to be written here, before the request was attempted. A request
+     that then failed, or that was never going to succeed because the
+     certificate is an Imported one rather than an Acme one, left the hash on
+     the record anyway. Every later run read it back, found it matched, and
+     took the "already covered" branch below. One failed attempt therefore
+     convinced the system the work was done, permanently: the certificate
+     stayed Pending and its SANs stayed marked validated, with no retry ever
+     attempted. Seen in the field on a certificate stuck for six days.
+
+     Writing it only on success makes a failure retryable, which is what the
+     30 minute schedule is for. --->
 <cfif #oldHash# is "">
 
-<cfoutput>No SAN Domains Hash found. Creating new one and will attempt new certificate request..</cfoutput><br>
-
-<cfquery name="updatehash" datasource="hermes">
-update system_certificates set acme_hash = '#newHash#' where id = '#certificate#'
-</cfquery>
-
-<!--- Since no old hash exists set requestacme=1 so that it will request new Acme cert --->
+<cfoutput>No SAN Domains Hash found. Will attempt new certificate request..</cfoutput><br>
 <cfset requestacme=1>
 
 <cfelse>
@@ -280,12 +288,6 @@ update system_certificates set acme_hash = '#newHash#' where id = '#certificate#
 <!--- If Old hash does not equal new hash then set requestacme=1 so that it will request new Acme cert --->
 <cfif #oldHash# NEQ #newHash#>
 <cfset requestacme=1>
-
-<!--- Update new hash --->
-<cfquery name="updatehash" datasource="hermes">
-update system_certificates set acme_hash = '#newHash#' where id = '#certificate#'
-</cfquery>
-
 <cfoutput>SAN Domains Hash changed. Will attempt new certificate request...</cfoutput><br>
 
 <!--- /CFIF #oldHash# NEQ #newHash# --->
@@ -362,6 +364,12 @@ update system_certificates set acme_hash = '#newHash#' where id = '#certificate#
 update mailbox_sans set dns = 'YES', dns_result_msg = 'SUCCESS: Successfully Received SAN Certificate', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#' and ip = 'YES'
 </cfquery>
 
+<!--- Bank the hash HERE, and only here. Writing it before the request meant a
+     failure was recorded as success for every run that followed. --->
+<cfquery name="updatehash" datasource="hermes">
+update system_certificates set acme_hash = '#newHash#' where id = '#certificate#'
+</cfquery>
+
 <cfoutput>Successfully obtained certificate for #theCertname#...</cfoutput><br>
 
 <!--- GENERATE NGINX CONFIGURATION (includes SNI configs) --->
@@ -402,12 +410,29 @@ update mailbox_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_
 
 <cfelse>
 
-<!--- Hash unchanged = cert already covers these SANs. But some SANs may
-     have dns='NO' (e.g. after a delete/re-add cycle recreated the rows).
-     If ip='YES' and hash matches the last successful cert request, then
-     dns='YES' is provably correct -- set it. --->
+<!--- Hash unchanged. That used to be treated as proof the certificate already
+     covers these SANs, and it is not: the hash is computed over the SAN NAMES
+     alone and stored per certificate, so it says the requested set has not
+     changed and nothing whatever about what the certificate contains.
+
+     The consequence was rows marked 'verified against existing certificate'
+     against a certificate that did not contain them. Observed on a mailbox
+     domain whose mailbox_certificate was the bootstrap certificate, whose
+     SANs are localhost and hermes-bootstrap.local: two domain.tld names
+     were marked validated against it, which then stopped any new certificate
+     ever being requested and switched on tls_server_sni_maps pointing at a
+     certificate covering none of those names.
+
+     So ask the certificate. A matching hash now only earns the chance to
+     check, and every name is verified against the SAN list before its row is
+     marked validated.
+
+     Deliberately FAILS OPEN: if the certificate cannot be read or parsed, the
+     previous behaviour is kept. Being wrong in the strict direction would
+     re-request certificates unnecessarily and could reach a rate limit, which
+     is worse than leaving a row as it was. --->
 <cfquery name="checkStuckDns" datasource="hermes">
-  SELECT id FROM mailbox_sans
+  SELECT id, subdomain FROM mailbox_sans
   WHERE certificate = '#certificate#'
   AND ip = 'YES'
   AND dns = 'NO'
@@ -415,17 +440,79 @@ update mailbox_sans set dns_result_msg = 'ERROR: SAN limit reached', dns_result_
 
 <cfif checkStuckDns.recordcount GT 0>
 
+<!--- Read the SAN list once for this certificate. --->
+<cfset certSanNames = "">
+<cfset certSanReadable = false>
+<cftry>
+    <!--- Fetched here rather than reused: getcertname is only defined in the
+         request branch above, which did not run on this path. --->
+    <cfquery name="sanCertDetails" datasource="hermes">
+        SELECT type, file_name FROM system_certificates
+        WHERE id = <cfqueryparam value="#certificate#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfset sanCertPath = "">
+    <cfif sanCertDetails.recordcount GTE 1 AND sanCertDetails.type IS "Acme">
+        <cfset sanCertPath = "/etc/letsencrypt/live/" & sanCertDetails.file_name & "/fullchain.pem">
+    <cfelseif sanCertDetails.recordcount GTE 1 AND sanCertDetails.type IS "Imported">
+        <cfset sanCertPath = "/opt/hermes/ssl/" & sanCertDetails.file_name & "_hermes.bundle.pem">
+    </cfif>
+    <cfif Len(sanCertPath) AND FileExists(sanCertPath)>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_postfix_dkim openssl x509 -noout -ext subjectAltName -in #sanCertPath#"
+            variable="sanOut" timeout="20"/>
+        <cfif Len(Trim(sanOut))>
+            <cfloop index="sanTok" list="#Trim(sanOut)#" delimiters=",#chr(10)##chr(13)#">
+                <cfset sanTok = Trim(sanTok)>
+                <cfif Left(sanTok, 4) IS "DNS:">
+                    <cfset certSanNames = ListAppend(certSanNames, LCase(Trim(Mid(sanTok, 5, Len(sanTok)))))>
+                </cfif>
+            </cfloop>
+            <cfif ListLen(certSanNames)>
+                <cfset certSanReadable = true>
+            </cfif>
+        </cfif>
+    </cfif>
+<cfcatch type="any">
+    <cfset certSanReadable = false>
+</cfcatch>
+</cftry>
+
+<cfif NOT certSanReadable>
+    <cfoutput>Could not read the SAN list for certificate ###certificate#; leaving #checkStuckDns.recordcount# row(s) unchanged rather than guessing.</cfoutput><br>
+<cfelse>
+<cfset sanVerified = "">
+<cfset sanRejected = "">
+<cfloop query="checkStuckDns">
+    <cfset thisFqdn = LCase(Trim(checkStuckDns.subdomain))>
+    <cfset thisParent = ListRest(thisFqdn, ".")>
+    <cfif ListFindNoCase(certSanNames, thisFqdn) GT 0
+          OR (Len(thisParent) AND ListFindNoCase(certSanNames, "*." & thisParent) GT 0)>
+        <cfset sanVerified = ListAppend(sanVerified, checkStuckDns.id)>
+    <cfelse>
+        <cfset sanRejected = ListAppend(sanRejected, thisFqdn)>
+    </cfif>
+</cfloop>
+
+<cfif ListLen(sanRejected)>
+    <cfoutput>Certificate ###certificate# does not cover: #encodeForHTML(sanRejected)#. Left unvalidated so a certificate can be requested for them.</cfoutput><br>
+</cfif>
+
+<cfif ListLen(sanVerified)>
 <cfquery datasource="hermes">
   UPDATE mailbox_sans
   SET dns = 'YES',
-      dns_result_msg = 'SUCCESS: SAN verified against existing certificate',
+      dns_result_msg = 'SUCCESS: SAN present in the existing certificate',
       dns_result_datetime = '#datenow# #timenow#'
-  WHERE certificate = '#certificate#'
-  AND ip = 'YES'
-  AND dns = 'NO'
+  WHERE id IN (<cfqueryparam value="#sanVerified#" list="true" cfsqltype="cf_sql_integer">)
 </cfquery>
 
-<cfoutput>No changes to SAN Domains found but corrected #checkStuckDns.recordcount# SAN(s) with dns='NO' that are already covered by existing certificate. Regenerating Nginx...</cfoutput><br>
+<cfoutput>Verified #ListLen(sanVerified)# SAN(s) against the existing certificate. Regenerating Nginx...</cfoutput><br>
+
+<!--- /CFIF ListLen(sanVerified) --->
+</cfif>
+
+<!--- /CFIF NOT certSanReadable --->
+</cfif>
 
 <!--- GENERATE NGINX CONFIGURATION --->
 <cfinclude template="../admin/2/inc/generate_nginx_configuration.cfm">

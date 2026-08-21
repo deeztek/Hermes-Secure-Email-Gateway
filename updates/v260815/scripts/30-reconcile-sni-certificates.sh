@@ -40,9 +40,20 @@
 #
 # WHAT THIS DOES
 #
-# For every certificate with SAN rows marked validated, derives the path the
-# console itself would use, checks it inside the Postfix container, and
-# DELETES the rows of any whose files are missing.
+# For every SAN row marked validated, opens the certificate it names and checks
+# the name is actually in that certificate's SAN list, accepting a wildcard one
+# label up. Rows whose certificate provably does not contain them are DELETED,
+# and that certificate's stored SAN hash is cleared so issuance is retried.
+#
+# Coverage, not file existence. A row marked validated asserts "certificate N
+# contains this FQDN", so that is the thing to verify. Checking only that N's
+# file exists passes a bootstrap certificate covering localhost and
+# hermes-bootstrap.local while it claims to validate two domain.tld names,
+# which is the exact case this was written for.
+#
+# FAILS OPEN. If the certificate cannot be read or parsed, its rows are left
+# alone and the reason is logged. A row wrongly deleted breaks a working SNI
+# setup; a row wrongly kept is untidy. Only positively disproved coverage acts.
 #
 # Delete rather than clear, because mailbox_sans is derived state, not
 # configuration. sync_mailbox_sans.cfm rebuilds it from additional_sans x
@@ -97,46 +108,100 @@ for c in hermes_db_server hermes_postfix_dkim; do
     fi
 done
 
-# Every certificate currently claiming validated SANs, with the fields
-# needed to rebuild its path. -N -B gives tab-separated rows with no header.
+# Every SAN row currently claiming to be validated, with the fields needed to
+# rebuild its certificate's path. -N -B gives tab-separated rows, no header.
 rows="$(printf '%s\n' "
-SELECT DISTINCT ms.certificate, sc.type, sc.file_name
+SELECT ms.id, ms.subdomain, ms.certificate, sc.type, sc.file_name
 FROM mailbox_sans ms
 JOIN system_certificates sc ON sc.id = ms.certificate
-WHERE ms.dns = 'YES';" | db || true)"
+WHERE ms.dns = 'YES'
+ORDER BY ms.certificate, ms.id;" | db || true)"
+
+# Read a certificate's SAN list once per certificate. Prints one lowercase
+# name per line. Empty output means "could not determine", which callers MUST
+# treat as unknown rather than as "covers nothing".
+san_names_for() {
+    local ctype="$1" fname="$2" path=""
+    case "$ctype" in
+        Acme)     path="/etc/letsencrypt/live/${fname}/fullchain.pem" ;;
+        Imported) path="/opt/hermes/ssl/${fname}_hermes.bundle.pem" ;;
+        *)        return 0 ;;
+    esac
+    docker exec hermes_postfix_dkim test -f "$path" 2>/dev/null || return 0
+    docker exec hermes_postfix_dkim openssl x509 -noout -ext subjectAltName \
+        -in "$path" 2>/dev/null \
+        | tr ',' '\n' \
+        | sed -n 's/.*DNS:[[:space:]]*\([^,[:space:]]*\).*/\1/p' \
+        | tr '[:upper:]' '[:lower:]'
+}
 
 if [[ -z "$rows" ]]; then
-    log "No certificates have validated SANs; nothing to reconcile."
+    log "No SAN rows are marked validated; nothing to reconcile."
 else
-    stale_ids=()
-    while IFS=$'\t' read -r cert_id cert_type file_name; do
-        [[ -z "${cert_id:-}" ]] && continue
+    stale_row_ids=()
+    stale_cert_ids=()
+    cur_cert=""
+    cur_names=""
+    cur_readable=0
 
-        case "$cert_type" in
-            Acme)     path="/etc/letsencrypt/live/${file_name}/fullchain.pem" ;;
-            Imported) path="/opt/hermes/ssl/${file_name}_hermes.bundle.pem" ;;
-            *)        warn "Certificate ${cert_id} has unknown type '${cert_type}'; treating as missing."
-                      path="" ;;
-        esac
+    while IFS=$'\t' read -r row_id subdomain cert_id cert_type file_name; do
+        [[ -z "${row_id:-}" ]] && continue
 
-        if [[ -n "$path" ]] && docker exec hermes_postfix_dkim test -f "$path" 2>/dev/null; then
+        # Rows arrive grouped by certificate, so read each one once.
+        if [[ "$cert_id" != "$cur_cert" ]]; then
+            cur_cert="$cert_id"
+            cur_names="$(san_names_for "$cert_type" "$file_name")"
+            if [[ -n "$cur_names" ]]; then cur_readable=1; else cur_readable=0; fi
+            if (( ! cur_readable )); then
+                warn "Could not read the SAN list for certificate ${cert_id} (${file_name})."
+                warn "    Its rows are left exactly as they are. A row wrongly deleted breaks a"
+                warn "    working setup; a row wrongly kept is only untidy."
+            fi
+        fi
+
+        # FAIL OPEN. Only act where coverage was positively disproved.
+        (( cur_readable )) || continue
+
+        subdomain="$(printf '%s' "$subdomain" | tr '[:upper:]' '[:lower:]')"
+        parent="${subdomain#*.}"
+
+        if printf '%s\n' "$cur_names" | grep -qxF "$subdomain"; then
+            continue
+        fi
+        # A wildcard one label up genuinely covers this name.
+        if [[ "$parent" != "$subdomain" ]] \
+           && printf '%s\n' "$cur_names" | grep -qxF "*.${parent}"; then
             continue
         fi
 
-        log "Certificate ${cert_id} (${file_name}) is marked validated but its file is absent:"
-        log "    ${path:-<no path for type ${cert_type}>}"
-        stale_ids+=("$cert_id")
+        log "${subdomain} is marked validated against certificate ${cert_id} (${file_name}),"
+        log "    which does not contain it."
+        stale_row_ids+=("$row_id")
+        case " ${stale_cert_ids[*]-} " in
+            *" ${cert_id} "*) ;;
+            *) stale_cert_ids+=("$cert_id") ;;
+        esac
     done <<< "$rows"
 
-    if (( ${#stale_ids[@]} == 0 )); then
-        log "All validated SAN certificates are present on disk."
+    if (( ${#stale_row_ids[@]} == 0 )); then
+        log "Every validated SAN is present in the certificate it names."
     else
-        ids="$(IFS=,; echo "${stale_ids[*]}")"
-        printf '%s\n' "DELETE FROM mailbox_sans WHERE certificate IN (${ids});" | db
-        log "Removed SAN rows for certificate(s): ${ids}"
-        log "These are rebuilt from additional_sans by the next SAN sync, so nothing"
-        log "an operator configured is lost. Re-run SAN validation once a certificate"
-        log "has actually been issued."
+        rids="$(IFS=,; echo "${stale_row_ids[*]}")"
+        cids="$(IFS=,; echo "${stale_cert_ids[*]}")"
+
+        printf '%s\n' "DELETE FROM mailbox_sans WHERE id IN (${rids});" | db
+        log "Removed ${#stale_row_ids[@]} SAN row(s) that named a certificate not containing them."
+
+        # Clearing the hash is what makes this stick. acme_validate_ip.cfm
+        # compares a hash of the SAN names against system_certificates.acme_hash
+        # and, on a match, concludes the certificate already covers them. Delete
+        # the rows and leave the hash, and the next scheduled run recreates the
+        # same wrong state within half an hour. With the hash gone it takes the
+        # "no hash, request a certificate" branch instead, which is what should
+        # happen for names no certificate covers.
+        printf '%s\n' "UPDATE system_certificates SET acme_hash = NULL WHERE id IN (${cids});" | db
+        log "Cleared the SAN hash on certificate(s) ${cids} so issuance is attempted again."
+        log "Rows are rebuilt from additional_sans by the next SAN sync, unvalidated."
     fi
 fi
 

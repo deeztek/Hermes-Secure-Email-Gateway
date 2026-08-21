@@ -227,6 +227,22 @@ beside each release below is the **actual release date**.
   unvalidated, because `mailbox_sans` is derived state: `sync_mailbox_sans.cfm` rebuilds it from
   `additional_sans`, which is where the operator's intent actually lives, so a row whose
   certificate is gone has nothing left to say.
+- **A SAN could be marked validated against a certificate that did not contain it**, which then
+  blocked its certificate from ever being requested. `acme_validate_ip.cfm` hashes the SAN
+  *names* and stores that hash per certificate; on a later run, a matching hash was taken as
+  proof the certificate already covered them. It proves only that the requested set has not
+  changed, and says nothing about the certificate's contents. A mailbox domain whose
+  `mailbox_certificate` was the bootstrap certificate, whose SANs are `localhost` and
+  `hermes-bootstrap.local`, ended up with two unrelated names marked "verified against existing
+  certificate" against it. Coverage is now read from the certificate's actual SAN list, accepting
+  a wildcard one label up, and the check fails open so an unreadable certificate changes nothing.
+
+  Compounding it, the hash was written **before** the certificate request was attempted, so a
+  request that failed still left the hash on the record and every later run read it back as
+  proof the work was done. One failed attempt made the failure permanent: the certificate stayed
+  Pending, its SANs stayed marked validated, and nothing ever retried. The hash is now written
+  only on success. The upgrade also clears the stored hash for any certificate found not to
+  cover its SANs, without which the cleanup would be undone by the next scheduled run.
 - **Binding SMTP TLS to a certificate that was never issued stopped mail being accepted.** The
   selection checked that the certificate's database row existed, not that its files did, and a
   record stuck in Pending appears in the picker like any other. Nginx and Dovecot fall back to
