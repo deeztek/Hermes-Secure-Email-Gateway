@@ -162,7 +162,74 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------
--- 6. Version stamp -- MUST be the last statement (advances build_no so
+-- 6. Additional quotes
+--
+-- quotes has no unique key on the text, only PRIMARY KEY (id) over an
+-- auto-increment, so INSERT IGNORE cannot dedupe these: there is no
+-- constraint for a repeat to violate. Each row is guarded by its own
+-- NOT EXISTS instead. The subquery reads quotes through a derived table
+-- because MySQL refuses to reference the insert target directly (1093),
+-- the same shape used in section 5 above.
+--
+-- These are also seeded into config/database/hermes_install.sql as ids
+-- 38-46, so a fresh install gets them too. This block only runs on upgrade.
+-- ---------------------------------------------------------------------
+INSERT INTO quotes (quote, source)
+SELECT 'We must learn to suffer what we cannot evade.', 'Michel de Montaigne'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'We must learn to suffer what we cannot evade.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'Start where you are. Use what you have. Do what you can.', 'Arthur Ashe'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'Start where you are. Use what you have. Do what you can.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'When you realize there is nothing lacking, the whole world belongs to you.', 'Lao Tzu'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'When you realize there is nothing lacking, the whole world belongs to you.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'Change your leaves, keep intact your roots.', 'Victor Hugo'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'Change your leaves, keep intact your roots.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'I am life that wants to live, in the midst of life that wants to live.', 'Albert Schweitzer'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'I am life that wants to live, in the midst of life that wants to live.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'He who rejects change is the architect of decay.', 'Harold Wilson'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'He who rejects change is the architect of decay.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'I find that opportunities actually present themselves in unexpected ways, and that is what I want to be open to.', 'PJ Hirabayashi'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'I find that opportunities actually present themselves in unexpected ways, and that is what I want to be open to.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'Notice that the stiffest tree is most easily cracked, while the bamboo or willow survives by bending with the wind.', 'Bruce Lee'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'Notice that the stiffest tree is most easily cracked, while the bamboo or willow survives by bending with the wind.'
+);
+
+INSERT INTO quotes (quote, source)
+SELECT 'Bravado may stir the crowd, but courage needs no audience.', 'T.F. Hodge'
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM quotes) AS q WHERE q.quote = 'Bravado may stir the crowd, but courage needs no audience.'
+);
+
+-- ---------------------------------------------------------------------
+-- 7. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260815' WHERE parameter = 'build_no';

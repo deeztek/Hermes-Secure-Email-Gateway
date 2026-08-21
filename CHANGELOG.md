@@ -45,6 +45,10 @@ beside each release below is the **actual release date**.
   authenticated senders short-circuit before it and anything reaching the map came from
   outside.
 
+- **Nine more quotes** in the console's rotation, bringing it to 46. Seeded in both places, so
+  a fresh install and an upgraded one end up with the same set: `hermes_install.sql` as ids 38 to
+  46, and the release's schema step guarded row by row with `NOT EXISTS`, since `quotes` has no
+  unique key on the text for `INSERT IGNORE` to work against.
 ### Changed
 
 - **External destinations are permitted on mailbox domains**, and flagged wherever they appear

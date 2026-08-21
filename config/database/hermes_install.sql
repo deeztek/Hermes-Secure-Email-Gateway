@@ -1627,7 +1627,7 @@ CREATE TABLE IF NOT EXISTS `quotes` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 37 row(s) for `quotes`
+-- 46 row(s) for `quotes`
 INSERT IGNORE INTO `quotes` VALUES (1,'Just because you\'re paranoid doesn\'t mean they aren\'t after you.','Joseph Heller, Catch-22');
 INSERT IGNORE INTO `quotes` VALUES (2,'The two most important days in your life are the day you are born and the day you find out why','Mark Twain');
 INSERT IGNORE INTO `quotes` VALUES (3,'What stands in the way become the way','Marcus Aurelius');
@@ -1665,6 +1665,15 @@ INSERT IGNORE INTO `quotes` VALUES (34,'What on earth would a man do with himsel
 INSERT IGNORE INTO `quotes` VALUES (35,'The best bridge between despair and hope is a good night’s sleep','Harry Ruby');
 INSERT IGNORE INTO `quotes` VALUES (36,'A person with a new idea is a crank until the idea succeeds','Mark Twain');
 INSERT IGNORE INTO `quotes` VALUES (37,'All generalizations are false, including this one','Mark Twain');
+INSERT IGNORE INTO `quotes` VALUES (38,'We must learn to suffer what we cannot evade.','Michel de Montaigne');
+INSERT IGNORE INTO `quotes` VALUES (39,'Start where you are. Use what you have. Do what you can.','Arthur Ashe');
+INSERT IGNORE INTO `quotes` VALUES (40,'When you realize there is nothing lacking, the whole world belongs to you.','Lao Tzu');
+INSERT IGNORE INTO `quotes` VALUES (41,'Change your leaves, keep intact your roots.','Victor Hugo');
+INSERT IGNORE INTO `quotes` VALUES (42,'I am life that wants to live, in the midst of life that wants to live.','Albert Schweitzer');
+INSERT IGNORE INTO `quotes` VALUES (43,'He who rejects change is the architect of decay.','Harold Wilson');
+INSERT IGNORE INTO `quotes` VALUES (44,'I find that opportunities actually present themselves in unexpected ways, and that is what I want to be open to.','PJ Hirabayashi');
+INSERT IGNORE INTO `quotes` VALUES (45,'Notice that the stiffest tree is most easily cracked, while the bamboo or willow survives by bending with the wind.','Bruce Lee');
+INSERT IGNORE INTO `quotes` VALUES (46,'Bravado may stir the crowd, but courage needs no audience.','T.F. Hodge');
 
 -- -------- random_words                         [seed] --------
 CREATE TABLE IF NOT EXISTS `random_words` (
