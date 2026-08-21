@@ -15,6 +15,22 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfset datenow=#DateFormat(Now(),"yyyy-mm-dd")#>
 <cfset timenow="#TimeFormat(now(), "HH:mm:ss")#">
 
+<cfscript>
+    // Normalise a raw error string for the varchar(255) *_result_msg columns:
+    // collapse whitespace so the Certificates table stays on one line,
+    // guarantee an ERROR: prefix, and cap the length. Storing raw output
+    // unbounded and unbound was how an apostrophe in "Let's Encrypt" could
+    // take down the whole job.
+    function sanErrMsg(required string raw) {
+        var msg = trim(reReplace(arguments.raw, "[[:space:]]+", " ", "all"));
+        if (!len(msg)) { msg = "unknown error"; }
+        if (ucase(left(msg, 6)) != "ERROR:") { msg = "ERROR: " & msg; }
+        if (len(msg) > 255) { msg = left(msg, 252) & "..."; }
+        return msg;
+    }
+</cfscript>
+
+
   <cfquery name="getsubdomains" datasource="hermes">
 select id, certificate, mailbox_domain, subdomain, ip from mailbox_sans
   </cfquery>
@@ -23,6 +39,13 @@ select id, certificate, mailbox_domain, subdomain, ip from mailbox_sans
 <cfif #getsubdomains.recordcount# GTE 1>
 
 <cfloop query="getsubdomains">
+
+<!--- Reset per row. step was never cleared between iterations, so a value left
+     over from a previous name could be read by the branches below. --->
+<cfset step = "0">
+<cfset sanRowFailed = false>
+<cfset sanFailReason = "">
+
 
 <!--- GENERATE CUSTOMTRANS --->
 <cfinclude template="../admin/2/inc/generate_customtrans.cfm">
@@ -42,13 +65,50 @@ output = "#subdomain#" addnewline="no">
     
     <cfcatch type="any">
  
-        <cfset m="/inc/acme_validate_ip.cfm: Error running /usr/bin/openssl">
-        <cfinclude template="../admin/2/inc/error.cfm">
-        <cfabort>
+        <cfset sanRowFailed = true>
+        <cfset sanFailReason = "could not encrypt the verification payload. " & cfcatch.message>
 
 
     </cfcatch>
     </cftry>
+
+<!--- Row-level bail out. Clean up this row's temp files, record why it could
+     not be verified where the Certificates page will show it, and move to the
+     next name.
+
+     Every one of these paths used to <cfabort>. The abort killed the whole
+     request, and the issuance loop further down never ran, so one name that
+     could not be verified silently blocked certificate issuance for every
+     certificate on the box, with no message anywhere because Ofelia discards
+     stdout.
+
+     'ip' is deliberately left as it was. A transient network failure must not
+     un-validate a name that verified previously, because that would force an
+     unnecessary re-request and can reach a rate limit. --->
+<cfif sanRowFailed>
+
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip">
+  </cfif>
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip.ssl")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip.ssl">
+  </cfif>
+
+  <cfset sanFailReason = sanErrMsg(sanFailReason)>
+
+  <cfquery datasource="hermes">
+    UPDATE mailbox_sans
+    SET ip_result_msg = <cfqueryparam value="#sanFailReason#" cfsqltype="cf_sql_varchar">,
+        ip_result_datetime = <cfqueryparam value="#datenow# #timenow#" cfsqltype="cf_sql_timestamp">
+    WHERE id = <cfqueryparam value="#getsubdomains.id#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <cfoutput>#encodeForHTML(getsubdomains.subdomain)#: #encodeForHTML(sanFailReason)#</cfoutput><br>
+
+  <cfcontinue>
+
+</cfif>
+
     
  <!--- GENERATE/ENCRYPT ACTIVATEFILE WITH PUBLIC KEY ENDS HERE --->
   
@@ -71,13 +131,38 @@ output = "#subdomain#" addnewline="no">
 
     <cfcatch type="any">
  
-        <cfset m="/inc/acme_validate_ip.cfm: Error connecting to https://verify.hermesseg.io">
-        <cfinclude template="../admin/2/inc/error.cfm">
-        <cfabort>
+        <cfset sanRowFailed = true>
+        <cfset sanFailReason = "could not reach https://verify.hermesseg.io. " & cfcatch.message>
 
 
     </cfcatch>
     </cftry>
+
+<!--- Row-level bail out. See the note on the first one above. --->
+<cfif sanRowFailed>
+
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip">
+  </cfif>
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip.ssl")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip.ssl">
+  </cfif>
+
+  <cfset sanFailReason = sanErrMsg(sanFailReason)>
+
+  <cfquery datasource="hermes">
+    UPDATE mailbox_sans
+    SET ip_result_msg = <cfqueryparam value="#sanFailReason#" cfsqltype="cf_sql_varchar">,
+        ip_result_datetime = <cfqueryparam value="#datenow# #timenow#" cfsqltype="cf_sql_timestamp">
+    WHERE id = <cfqueryparam value="#getsubdomains.id#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <cfoutput>#encodeForHTML(getsubdomains.subdomain)#: #encodeForHTML(sanFailReason)#</cfoutput><br>
+
+  <cfcontinue>
+
+</cfif>
+
     
  <!--- GENERATE/ENCRYPT ACTIVATEFILE WITH PUBLIC KEY ENDS HERE --->
   
@@ -113,29 +198,34 @@ output = "#subdomain#" addnewline="no">
 
     <cfelse>
 
-<!---  Delete Temp Files --->   
+<!--- Verification service did not answer 200. --->
+<cfset sanRowFailed = true>
+<cfset sanFailReason = "verification service returned HTTP " & cfhttp.status_code>
 
-     <cfset verifyipfile="/opt/hermes/tmp/#customtrans3#_verifyip">
-      <cfif fileExists(verifyipfile)>
-      
-      <cffile action = "delete" file = "#verifyipfile#">
-      
-      <!--- /CFIF fileExists(verifyipfile)> --->
-      </cfif>
-      
-      <cfset verifyipfile_ssl="/opt/hermes/tmp/#customtrans3#_verifyip.ssl">
-      <cfif fileExists(verifyipfile_ssl)>
-      
-      <cffile action = "delete" file = "#verifyipfile_ssl#">
-      
-      <!--- /CFIF fileExists(verifyipfile_ssl)> --->
-      </cfif>
-   
-<!---
-    <cfoutput>status not 200</cfoutput>
---->
+<!--- Row-level bail out. See the note on the first one above. --->
+<cfif sanRowFailed>
 
-<cfabort>
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip">
+  </cfif>
+  <cfif fileExists("/opt/hermes/tmp/#customtrans3#_verifyip.ssl")>
+    <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_verifyip.ssl">
+  </cfif>
+
+  <cfset sanFailReason = sanErrMsg(sanFailReason)>
+
+  <cfquery datasource="hermes">
+    UPDATE mailbox_sans
+    SET ip_result_msg = <cfqueryparam value="#sanFailReason#" cfsqltype="cf_sql_varchar">,
+        ip_result_datetime = <cfqueryparam value="#datenow# #timenow#" cfsqltype="cf_sql_timestamp">
+    WHERE id = <cfqueryparam value="#getsubdomains.id#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <cfoutput>#encodeForHTML(getsubdomains.subdomain)#: #encodeForHTML(sanFailReason)#</cfoutput><br>
+
+  <cfcontinue>
+
+</cfif>
 
 <!--- /CFIF  #cfhttp.status_code# EQ "200" --->
   </cfif>
@@ -152,9 +242,7 @@ output = "#subdomain#" addnewline="no">
     <cfif #cfcatch.message# contains "invalid call of the function listGetAt">
     
     
-        <cfset m="/inc/acme_validate_ip.cfm: Error reading server response">
-        <cfinclude template="../admin/2/inc/error.cfm">
-        <cfabort>
+        <cfoutput>#encodeForHTML(getsubdomains.subdomain)#: could not read the verification response.</cfoutput><br>
     
     <!-- /CFIF cfcatch.message -->
     </cfif>
@@ -386,8 +474,26 @@ update system_certificates set acme_hash = '#newHash#' where id = '#certificate#
 
 <cfelse>
 
+<!--- Record why it failed, on the rows the Certificates page shows.
+
+     This used to interpolate the raw certbot output straight into the SQL.
+     Two ways that broke: certbot output routinely contains an apostrophe
+     ("Let's Encrypt" alone is enough), which is a syntax error that killed
+     the whole scheduled job; and dns_result_msg is varchar(255) while certbot
+     output runs to many lines. Collapse the whitespace so the table stays
+     readable, cap it, and bind it. --->
+<cfif Len(Trim(acmeOutput))>
+  <cfset acmeErrMsg = sanErrMsg(acmeOutput)>
+<cfelse>
+  <cfset acmeErrMsg = sanErrMsg("certbot produced no output")>
+</cfif>
+
 <cfquery name="insertfailure" datasource="hermes">
-update mailbox_sans set dns_result_msg = 'ERROR: #acmeOutput#', dns_result_datetime = '#datenow# #timenow#' where certificate = '#certificate#' and ip = 'YES' and dns = 'NO'
+update mailbox_sans
+set dns_result_msg = <cfqueryparam value="#acmeErrMsg#" cfsqltype="cf_sql_varchar">,
+    dns_result_datetime = <cfqueryparam value="#datenow# #timenow#" cfsqltype="cf_sql_timestamp">
+where certificate = <cfqueryparam value="#certificate#" cfsqltype="cf_sql_integer">
+and ip = 'YES' and dns = 'NO'
 </cfquery>
 
 <cfoutput>Could not obtain certificate for #theCertname#. Error reported was: #acmeOutput#</cfoutput><br>
