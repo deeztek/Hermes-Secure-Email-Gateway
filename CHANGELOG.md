@@ -267,6 +267,15 @@ beside each release below is the **actual release date**.
   Both branches now point at the chain-bearing file, `_hermes.bundle.pem` and `fullchain.pem`,
   matching Nginx and Dovecot. `smtpd_tls_CAfile` is unchanged and still correct for its actual
   purpose.
+
+  The three services differ in a way that decides who needs repairing. Nginx and Dovecot
+  recompute their certificate path on every config generation, so both correct themselves as the
+  upgrade runs. Postfix stores its path in the `parameters` table and `generate_postfix_configuration.cfm`
+  only emits what is stored, so the stale leaf path would have survived every regeneration until
+  somebody happened to re-save that page. A phase script rewrites it instead, and only where the
+  chain file is genuinely present: a leaf without its chain is degraded, whereas naming a file
+  that does not exist stops Postfix serving TLS altogether, and the repair must not turn one into
+  the other.
 - **Binding SMTP TLS to a certificate that was never issued stopped mail being accepted.** The
   selection checked that the certificate's database row existed, not that its files did, and a
   record stuck in Pending appears in the picker like any other. Nginx and Dovecot fall back to
