@@ -1,11 +1,11 @@
 {
-  "version": "260628",
-  "generated": "2026-06-28T12:06:28Z",
+  "version": "260815",
+  "generated": "2026-08-21T16:01:15Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
     "schedule/get_retention_status.cfm": "23e803627582603b8852f43bcc8ac52f629dc92a073f8ac8d3d9720c22dcaf2f",
-    "schedule/acme_validate_ip.cfm": "cdf730ee9c228fef7bdc5cefee4eb83aaf4f2a21a04161e6e32c14500b92cfe9",
+    "schedule/acme_validate_ip.cfm": "8db14ffe64f678c69170ff974f6a1ac6be0f2310fe46e9a02929cccafb7ef478",
     "schedule/message_cleanup.cfm": "6e0639d411aee275956b96e9174dcdeea38842155a3a6383c5164460951c414c",
     "schedule/generate_smtp_sni.cfm": "07cb8658dbc06250764386333696bc7c7df63279c0eb85b5abce3a58f966252d",
     "admin/2/inc/license_check.cfm": "07585ba63546e088a1c9b96ba09ad07910f2f5320abc0d13563ca2be7afcdc49",
@@ -33,5 +33,5 @@
     "admin/2/view_linkguard.cfm": "d8d8910d1595fd86c3e668745d032f39691f0fa01fc6a4225903b54e1c0520bb",
     "admin/2/inc/linkguard_write_and_reload.cfm": "4a6028464a7cc1e278b2b453da12b2b9b2cc22160eb9bbdd0a753415c3a12cc4"
   },
-  "fingerprint": "4109d0f5b2d18ffa77d422639688de20a94a9a661e98fd3f33486f7c8b970be9"
+  "fingerprint": "0402e0fdf9445590be3de256462f65cb95c71c19700c88d6aa8f15191c762780"
 }
