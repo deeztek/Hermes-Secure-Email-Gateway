@@ -106,6 +106,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     The SMTP TLS Certificate you entered is not valid.
   </div>
 </cfif>
+<cfif m is "63">
+  <cfset badCertFile = StructKeyExists(session, "smtpTlsBadCertFile") ? session.smtpTlsBadCertFile : "">
+  <cfset session.smtpTlsBadCertFile = "">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Certificate files are missing</h4>
+    <p>Nothing was saved and the previous certificate is still in use.</p>
+    <cfif Len(Trim(badCertFile))>
+      <p class="mb-1">Postfix would have been pointed at a file that does not exist:</p>
+      <p class="mb-2"><code><cfoutput>#encodeForHTML(badCertFile)#</cfoutput></code></p>
+    </cfif>
+    <p class="mb-0"><small>A certificate can appear in this list before it has actually been
+    issued, and its record survives if its files are later removed. Postfix has no fallback for
+    the SMTP TLS certificate, so binding one that is not on disk would stop mail being accepted
+    over TLS. Check the certificate has completed issuing under
+    <a href="view_system_certificates.cfm">System Certificates</a>, then try again.</small></p>
+  </div>
+</cfif>
 <cfif m is "3">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

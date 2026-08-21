@@ -41,13 +41,24 @@
 # WHAT THIS DOES
 #
 # For every certificate with SAN rows marked validated, derives the path the
-# console itself would use, checks it inside the Postfix container, and for
-# any whose files are missing sets DNS back to 'NO'.
+# console itself would use, checks it inside the Postfix container, and
+# DELETES the rows of any whose files are missing.
 #
-# It clears the flag rather than deleting the rows. That is what disables
-# SNI for the certificate, it is reversible, and it keeps the operator's SAN
-# configuration so a later successful issuance simply re-validates. Deleting
-# would throw away work someone would have to redo by hand.
+# Delete rather than clear, because mailbox_sans is derived state, not
+# configuration. sync_mailbox_sans.cfm rebuilds it from additional_sans x
+# mailbox-hosting domains, which is where the operator's intent actually
+# lives. A row means "this FQDN was validated against certificate N", so
+# once N's files are gone the row has nothing left to say, and merely
+# clearing dns would leave it still claiming an association with a dead
+# certificate. That half-state is what caused this in the first place.
+# Anything legitimate comes back on the next sync.
+#
+# It also REPORTS, without changing, any of the three console/smtp/mail
+# certificate bindings that point at a certificate whose files are missing.
+# Those are operator choices rather than derived state, so this says so and
+# leaves them alone. Nginx and Dovecot both fall back to the bootstrap
+# certificate when their files are absent; Postfix SMTP TLS does not, which
+# is guarded at the point of selection instead.
 #
 # It then removes a dangling tls_server_sni_maps from the LIVE Postfix
 # config, but only when the map file is genuinely absent. That is a single
@@ -121,15 +132,45 @@ else
         log "All validated SAN certificates are present on disk."
     else
         ids="$(IFS=,; echo "${stale_ids[*]}")"
-        printf '%s\n' "
-UPDATE mailbox_sans
-   SET dns = 'NO',
-       dns_result_msg = 'Reset by v260815: the certificate this SAN was validated against is not present on disk',
-       dns_result_datetime = NOW()
- WHERE dns = 'YES' AND certificate IN (${ids});" | db
-        log "Cleared the validated flag for certificate(s): ${ids}"
-        log "Re-run SAN validation once a certificate has actually been issued."
+        printf '%s\n' "DELETE FROM mailbox_sans WHERE certificate IN (${ids});" | db
+        log "Removed SAN rows for certificate(s): ${ids}"
+        log "These are rebuilt from additional_sans by the next SAN sync, so nothing"
+        log "an operator configured is lost. Re-run SAN validation once a certificate"
+        log "has actually been issued."
     fi
+fi
+
+# The three single-certificate bindings are operator choices, not derived
+# state, so report and do not touch. Nginx and Dovecot fall back to the
+# bootstrap certificate when files are missing; Postfix SMTP TLS does not,
+# and is guarded at selection time from this release on. An install that
+# already has a bad binding needs a human to pick a different certificate.
+bindings="$(printf '%s\n' "
+SELECT p.parameter, p.value2, sc.type, sc.file_name
+FROM parameters2 p
+JOIN system_certificates sc ON sc.id = p.value2
+WHERE p.parameter IN ('console.certificate','smtp.certificate','mail.certificate');" | db || true)"
+
+if [[ -n "$bindings" ]]; then
+    while IFS=$'\t' read -r pname cert_id cert_type file_name; do
+        [[ -z "${pname:-}" ]] && continue
+        case "$cert_type" in
+            Acme)     bpath="/etc/letsencrypt/live/${file_name}/fullchain.pem" ;;
+            Imported) bpath="/opt/hermes/ssl/${file_name}_hermes.pem" ;;
+            *)        bpath="" ;;
+        esac
+        if [[ -n "$bpath" ]] && docker exec hermes_postfix_dkim test -f "$bpath" 2>/dev/null; then
+            continue
+        fi
+        warn "${pname} points at certificate ${cert_id} (${file_name}) whose files are missing:"
+        warn "    ${bpath:-<no path for type ${cert_type}>}"
+        case "$pname" in
+            console.certificate) warn "    Nginx falls back to the bootstrap certificate, so the console still serves." ;;
+            mail.certificate)    warn "    Dovecot falls back to the bootstrap certificate, so IMAP still serves." ;;
+            smtp.certificate)    warn "    Postfix does NOT fall back. Pick a different certificate under SMTP TLS Settings." ;;
+        esac
+        warn "    Not changed automatically: which certificate to use is your decision."
+    done <<< "$bindings"
 fi
 
 # A live main.cf pointing at a map that is not there refuses TLS on every

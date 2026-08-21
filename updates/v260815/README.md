@@ -250,11 +250,23 @@ was deleted, one still Pending because it was requested but never issued, and on
 imported without its chain so no bundle file was ever created. The first of those
 is the certificate-delete bug fixed in this same release.
 
-**This upgrade repairs it.** Any certificate whose SANs are marked validated but
-whose files are absent has that flag cleared, and a dangling directive is removed
-from the live Postfix config. Validation flags are reset rather than deleted, so
-your SAN configuration survives and simply re-validates once a certificate is
-genuinely issued. A healthy install is left untouched.
+**This upgrade repairs it.** SAN rows for a certificate whose files are absent are
+removed, and a dangling directive is taken out of the live Postfix config. Nothing
+you configured is lost: those rows are rebuilt from your SAN prefixes on the next
+sync, and they re-validate once a certificate is genuinely issued. A healthy
+install is left untouched.
+
+It also reports, without changing, any of the console, SMTP or mail certificate
+bindings pointing at files that are not there. Which certificate to use is your
+decision, so the upgrade names the problem rather than reassigning it.
+
+Related, and the same failure in a different place: **selecting an SMTP TLS
+certificate whose files are missing is now refused** rather than accepted. A
+certificate can appear in that picker before it has finished issuing. Nginx and
+Dovecot fall back to the bootstrap certificate in that situation; Postfix does
+not, and binding one that is not on disk stops mail being accepted over TLS. The
+save is declined, the missing path is named, and the certificate already in use
+stays in use.
 
 ## What to do
 

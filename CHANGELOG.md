@@ -222,8 +222,22 @@ beside each release below is the **actual release date**.
   one had. The stale rows then point at a valid id again, which is why the SQL cleanup cannot
   reach them: they are stale by history, not by foreign key. A phase script reconciles them
   against the filesystem instead, clearing the validated flag rather than deleting the rows so
-  the operator's SAN configuration survives, and removing a dangling directive from the live
-  Postfix config with a single `postconf -X` rather than regenerating `main.cf` unattended.
+  removing a dangling directive from the live Postfix config with a single `postconf -X` rather
+  than regenerating `main.cf` unattended. The stale rows are deleted rather than merely marked
+  unvalidated, because `mailbox_sans` is derived state: `sync_mailbox_sans.cfm` rebuilds it from
+  `additional_sans`, which is where the operator's intent actually lives, so a row whose
+  certificate is gone has nothing left to say.
+- **Binding SMTP TLS to a certificate that was never issued stopped mail being accepted.** The
+  selection checked that the certificate's database row existed, not that its files did, and a
+  record stuck in Pending appears in the picker like any other. Nginx and Dovecot fall back to
+  the bootstrap certificate when their files are missing; Postfix has no fallback for
+  `smtpd_tls_cert_file` and simply fails TLS, which on port 25 means inbound delivery stops. The
+  save is now refused with the missing path named, before anything is written, so the previously
+  bound certificate stays in use. Failing by declining to save is recoverable; failing by
+  pointing Postfix at a file that is not there is silent until mail stops. The upgrade also
+  reports, without changing, any of the console, SMTP or mail certificate bindings already
+  pointing at absent files: which certificate to use is an operator decision, not something to
+  reassign automatically.
 
 ### Removed
 

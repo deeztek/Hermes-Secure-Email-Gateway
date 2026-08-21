@@ -116,12 +116,6 @@ select type, file_name from system_certificates where id=<cfqueryparam value = #
 
 <cfelse>
 
-<!--- UPDATE SMTP CERTIFICATE IN PARAMETERS2 --->
-<cfquery name="update" datasource="hermes">
-update parameters2 set value2='#form.certificateno_1#', applied='2' where parameter='smtp.certificate'
-</cfquery>  
-
-
   <cfif #checkcertificate.type# is "Imported">
   
   <cfset certpath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.pem">
@@ -136,6 +130,38 @@ update parameters2 set value2='#form.certificateno_1#', applied='2' where parame
       
   <!--- /CFIF #checkcertificate.type# is --->
   </cfif>
+
+<!--- REFUSE A CERTIFICATE WHOSE FILES ARE NOT THERE.
+
+     The row existing is not the same as the certificate existing. A record
+     stuck in Pending has never been issued, and one whose files were removed
+     leaves the row behind, yet both appear in the picker like any other.
+
+     Unlike Nginx and Dovecot, which fall back to the bootstrap certificate
+     when their files are missing, Postfix has no fallback here: it is handed
+     smtpd_tls_cert_file and fails TLS if the path is not readable. On port 25
+     that means inbound mail stops.
+
+     So this refuses the save instead. Nothing is written, the previous
+     certificate stays bound, and the admin is told which file is missing.
+     Failing by declining to save is recoverable; failing by pointing Postfix
+     at a file that does not exist is not, and it is silent until mail stops.
+
+     Deliberately BEFORE the parameters2 update below, so a refusal cannot
+     leave the database naming a certificate the config never adopted. --->
+<cfif certpath is "" OR NOT FileExists(certpath) OR NOT FileExists(keypath)>
+    <cfset session.m = 63>
+    <cfset session.smtpTlsBadCertFile = (certpath is "" ? "unknown certificate type '#checkcertificate.type#'" : certpath)>
+    <cfset step = 0>
+    <cfoutput>
+    <cflocation url="view_smtp_tls_settings.cfm" addtoken="no">
+    </cfoutput>
+</cfif>
+
+<!--- UPDATE SMTP CERTIFICATE IN PARAMETERS2 --->
+<cfquery name="update" datasource="hermes">
+update parameters2 set value2='#form.certificateno_1#', applied='2' where parameter='smtp.certificate'
+</cfquery>  
   
 <cfset step=3>
 
