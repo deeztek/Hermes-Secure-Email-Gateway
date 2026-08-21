@@ -85,7 +85,17 @@ Called from: email_server_settings_action.cfm (after saving form values)
     <!--- Look up the certificate type and file_name to build the correct path.
          Path patterns match generate_nginx_configuration.cfm:
            Acme:     /etc/letsencrypt/live/<file_name>/fullchain.pem + privkey.pem
-           Imported: /opt/hermes/ssl/<file_name>_hermes.pem + _hermes.key
+           Imported: /opt/hermes/ssl/<file_name>_hermes.bundle.pem + _hermes.key
+
+         The BUNDLE, not _hermes.pem. The import writes both: _hermes.pem is
+         the leaf on its own, _hermes.bundle.pem is the leaf followed by the
+         CA chain the admin pasted in. Dovecot was pointed at the leaf, so it
+         served a certificate with no path to a trust anchor. Browsers hide
+         that by fetching the missing intermediate over AIA; mail clients
+         generally do not, so IMAP and POP on 993/995/143 failed to verify
+         while the console on 443 looked perfectly fine, because Nginx has
+         always read the bundle. The Acme branch never had the problem, since
+         fullchain.pem already contains the intermediates.
          Bootstrap cert (id=1, file_name='bootstrap') goes through the Imported
          branch -- the legacy `EQ "1"` special case that pointed at the
          non-existent /etc/ssl/certs/ssl-cert-snakeoil.pem was removed in #251 --->
@@ -98,7 +108,13 @@ Called from: email_server_settings_action.cfm (after saving form values)
             <cfset sslCertPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/fullchain.pem">
             <cfset sslKeyPath = "/etc/letsencrypt/live/" & getCertInfo.file_name & "/privkey.pem">
         <cfelseif getCertInfo.type EQ "Imported">
-            <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.pem">
+            <!--- Bundle, so the chain is served. Falls back to the bare leaf
+                 only if no bundle exists, which would mean a certificate
+                 imported before this was fixed or an incomplete import. --->
+            <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.bundle.pem">
+            <cfif NOT FileExists(sslCertPath)>
+                <cfset sslCertPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.pem">
+            </cfif>
             <cfset sslKeyPath = "/opt/hermes/ssl/" & getCertInfo.file_name & "_hermes.key">
         </cfif>
     </cfif>
@@ -129,7 +145,10 @@ Called from: email_server_settings_action.cfm (after saving form values)
      /etc/letsencrypt/live/localhost/fullchain.pem was bogus -- that
      LE folder never existed on a fresh install. --->
 <cfif sslCertPath EQ "">
-    <cfset sslCertPath = "/opt/hermes/ssl/bootstrap_hermes.pem">
+    <cfset sslCertPath = "/opt/hermes/ssl/bootstrap_hermes.bundle.pem">
+    <cfif NOT FileExists(sslCertPath)>
+        <cfset sslCertPath = "/opt/hermes/ssl/bootstrap_hermes.pem">
+    </cfif>
     <cfset sslKeyPath = "/opt/hermes/ssl/bootstrap_hermes.key">
 </cfif>
 

@@ -246,6 +246,16 @@ beside each release below is the **actual release date**.
   Pending, its SANs stayed marked validated, and nothing ever retried. The hash is now written
   only on success. The upgrade also clears the stored hash for any certificate found not to
   cover its SANs, without which the cleanup would be undone by the next scheduled run.
+- **Dovecot served an imported certificate without its chain**, so IMAP and POP clients could not
+  verify it while the console looked perfectly fine. Importing a third-party certificate writes
+  four files: the leaf as `_hermes.pem`, the CA chain as `_hermes.chain.pem`, the two
+  concatenated as `_hermes.bundle.pem`, and the key. Nginx has always read the bundle; Dovecot
+  read the bare leaf. A client then had no path from the leaf to a trust anchor and refused the
+  connection, which browsers hide by fetching the missing intermediate over AIA and mail clients
+  generally do not. Nothing was wrong with the import: it verifies the leaf against the supplied
+  chain before accepting it, so a bad chain would have been rejected outright. Dovecot now reads
+  the bundle, falling back to the leaf only when no bundle exists. Certificates issued through
+  ACME were never affected, since `fullchain.pem` already contains the intermediates.
 - **Binding SMTP TLS to a certificate that was never issued stopped mail being accepted.** The
   selection checked that the certificate's database row existed, not that its files did, and a
   record stuck in Pending appears in the picker like any other. Nginx and Dovecot fall back to
