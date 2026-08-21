@@ -288,6 +288,30 @@ beside each release below is the **actual release date**.
   reports, without changing, any of the console, SMTP or mail certificate bindings already
   pointing at absent files: which certificate to use is an operator decision, not something to
   reassign automatically.
+- **Mailbox certificates could never be issued on a fresh install.** The automated SAN request
+  omitted certbot's `--agree-tos`, `--non-interactive` and contact-address flags, which the manual
+  single-domain path has always passed. certbot registers an ACME account on its first run against
+  an endpoint; without those flags it stopped to ask whether you accept the Terms of Service, found
+  no terminal to ask through, and exited on `EOFError` before attempting a challenge. The automated
+  path could therefore only ever succeed on a gateway where someone had already requested a
+  certificate by hand. Adding a mailbox domain is normally the first ACME action a new install
+  performs, so on a fresh install it failed every time. `admin_email` ships as a placeholder and
+  only the console ever writes it, so the address is passed only when it is a real one; otherwise
+  the account is registered without a contact address rather than bound to one that does not exist,
+  since an ACME account's address is awkward to correct afterwards.
+- **Every ACME failure was invisible, and one unverifiable name blocked issuance for the whole
+  gateway.** Two faults compounding. certbot writes its failures to stderr, and the request ran the
+  container directly with nowhere for stderr to go, so any failure surfaced as a Lucee exception
+  rather than as output: the handler mailed the administrator and aborted, leaving nothing on the
+  record and nothing on the page. A certbot success was the only outcome the code could observe.
+  Separately, all three failure paths in the SAN verification loop aborted the entire request
+  instead of the single row, and the issuance loop runs after that loop, so one name that could not
+  be verified stopped certificate issuance for every certificate on the gateway, silently, because
+  the scheduler discards output. Failures now run through a temporary script with stderr folded in,
+  are recorded against the SAN row, and appear on the Certificates page; a verification failure
+  skips its row and lets the run continue, without clearing a validation that previously succeeded.
+  Recording them also required binding the message rather than interpolating it, since certbot
+  output routinely contains an apostrophe and the column holds 255 characters.
 
 ### Removed
 

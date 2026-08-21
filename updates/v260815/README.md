@@ -303,6 +303,37 @@ not, and binding one that is not on disk stops mail being accepted over TLS. The
 save is declined, the missing path is named, and the certificate already in use
 stays in use.
 
+### Mailbox certificates could not be issued on a new gateway
+
+Adding a mailbox domain asks Let's Encrypt for a certificate covering that
+domain's `autoconfig` and `autodiscover` names. On a gateway that had never
+requested a certificate by hand, that request could not succeed.
+
+certbot registers an account the first time it talks to Let's Encrypt, and the
+automated request never passed the flags that accept the Terms of Service
+without asking. certbot stopped to ask, found no terminal to ask through, and
+gave up before it attempted anything. Because it reports that kind of failure on
+its error stream, and the request had nowhere to put an error stream, the whole
+thing surfaced as an internal error: the scheduled job stopped where it stood,
+wrote nothing to the certificate's SAN rows, and left the page showing the names
+as merely pending. The job runs every thirty minutes, so it failed on that
+schedule, indefinitely, without saying so anywhere you would look.
+
+Gateways that had previously requested a certificate through **System →
+Certificates → Request ACME Certificate** were unaffected, because that path has
+always passed the right flags and the account it registered was then reused.
+
+Two things follow from the fix. Failures are now written to the SAN row and shown
+in the certificate's **Mailbox SAN Validation** table, so a certificate that will
+not issue tells you why. And a single name that cannot be verified no longer
+stops the run: previously the job abandoned everything at the first such name,
+and since certificates are requested after all names are checked, one bad name
+prevented every certificate on the gateway from being issued.
+
+If your **Admin E-mail** under System Settings is still the shipped placeholder,
+the account is registered without a contact address rather than against a made-up
+one. Set a real address there if you want Let's Encrypt's expiry warnings.
+
 ## What to do
 
 Run the standard upgrade:
@@ -387,6 +418,8 @@ reaches it.
 | SMTP TLS | A missing per-domain certificate map no longer stops inbound mail; stale validation flags reset on upgrade | |
 | TLS, all services | Imported certificates now serve their full chain on IMAP, POP and SMTP, not just the leaf | |
 | Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed; orphaned `mailbox_sans` rows removed | |
+| Certificates | ACME requests for mailbox domains now register an account non-interactively, so a new gateway can issue at all | |
+| Certificates | ACME failures are recorded and shown per SAN instead of aborting the job silently; one unverifiable name no longer blocks every certificate | |
 | Cleanup | Four unreachable files removed: two duplicate Virtual Recipient pages, two dead scheduler scripts | |
 
 ## Known follow-up
