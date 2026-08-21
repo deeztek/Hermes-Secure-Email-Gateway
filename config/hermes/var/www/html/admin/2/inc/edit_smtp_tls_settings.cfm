@@ -116,15 +116,34 @@ select type, file_name from system_certificates where id=<cfqueryparam value = #
 
 <cfelse>
 
+<!--- smtpd_tls_cert_file must hold the FULL CHAIN, not the leaf.
+
+     Postfix sends the peer whatever is in smtpd_tls_cert_file. smtpd_tls_CAfile
+     is for verifying remote CLIENT certificates and is not a dependable way to
+     get the server's own intermediates onto the wire; with the leaf alone here,
+     `openssl s_client -showcerts` against 465 returned exactly one certificate
+     and any peer without the intermediate cached could not build a path to a
+     trust anchor.
+
+     So both branches point at the chain-bearing file, matching what Nginx has
+     always used and what Dovecot now uses:
+       Imported -> _hermes.bundle.pem  (leaf + the CA chain pasted at import)
+       Acme     -> fullchain.pem       (cert.pem is the leaf on its own)
+
+     capath is still set for smtpd_tls_CAfile, which remains correct for its
+     actual purpose of validating client certificates. --->
   <cfif #checkcertificate.type# is "Imported">
   
-  <cfset certpath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.pem">
+  <cfset certpath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.bundle.pem">
+  <cfif NOT FileExists(certpath)>
+    <cfset certpath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.pem">
+  </cfif>
   <cfset keypath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.key">
   <cfset capath = "/opt/hermes/ssl/#checkcertificate.file_name#_hermes.chain.pem">
 
   <cfelseif #checkcertificate.type# is "Acme">
       
-  <cfset certpath = "/etc/letsencrypt/live/#checkcertificate.file_name#/cert.pem">
+  <cfset certpath = "/etc/letsencrypt/live/#checkcertificate.file_name#/fullchain.pem">
   <cfset keypath = "/etc/letsencrypt/live/#checkcertificate.file_name#/privkey.pem">
   <cfset capath = "/etc/letsencrypt/live/#checkcertificate.file_name#/chain.pem">
       

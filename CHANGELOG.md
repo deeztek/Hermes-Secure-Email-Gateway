@@ -256,6 +256,17 @@ beside each release below is the **actual release date**.
   chain before accepting it, so a bad chain would have been rejected outright. Dovecot now reads
   the bundle, falling back to the leaf only when no bundle exists. Certificates issued through
   ACME were never affected, since `fullchain.pem` already contains the intermediates.
+- **SMTP TLS served the leaf without its chain**, on 25, 465 and 587. The same defect as the
+  Dovecot one above and found the same way: `openssl s_client -showcerts` against 465 returned
+  exactly one certificate. `smtpd_tls_cert_file` was pointed at the bare leaf, `_hermes.pem` for
+  an imported certificate and `cert.pem` for an ACME one, with the intermediates passed
+  separately as `smtpd_tls_CAfile`. That setting exists to verify remote **client** certificates
+  and is not a dependable route for the server's own chain; Postfix sends what is in
+  `smtpd_tls_cert_file`. Any peer without the intermediate already cached could not build a path
+  to a trust anchor, which for a sending MTA can mean refusing TLS or falling back to plaintext.
+  Both branches now point at the chain-bearing file, `_hermes.bundle.pem` and `fullchain.pem`,
+  matching Nginx and Dovecot. `smtpd_tls_CAfile` is unchanged and still correct for its actual
+  purpose.
 - **Binding SMTP TLS to a certificate that was never issued stopped mail being accepted.** The
   selection checked that the certificate's database row existed, not that its files did, and a
   record stuck in Pending appears in the picker like any other. Nginx and Dovecot fall back to
