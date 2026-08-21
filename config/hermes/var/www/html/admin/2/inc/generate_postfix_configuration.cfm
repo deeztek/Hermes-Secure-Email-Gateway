@@ -57,9 +57,22 @@ timeout="10" />
 
 <!--- Try to build the map whenever the database thinks there is something to
      build. The count alone is NOT the decision: it only decides whether it is
-     worth attempting. --->
+     worth attempting.
+
+     With nothing to build, any map still on disk is a leftover from a previous
+     run and must go BEFORE the existence test below, or that test reads the
+     leftover and re-enables the directive for names nothing validates. That is
+     reachable whenever the last validated SAN goes away, which is exactly what
+     the v260815 reconciliation does. --->
 <cfif getValidatedCertCount.cnt GT 0>
     <cfinclude template="smtp_sni_generate_config.cfm">
+<cfelse>
+    <cfif FileExists("/etc/postfix/sni_maps")>
+        <cffile action="delete" file="/etc/postfix/sni_maps">
+    </cfif>
+    <cfif FileExists("/etc/postfix/sni_maps.db")>
+        <cffile action="delete" file="/etc/postfix/sni_maps.db">
+    </cfif>
 </cfif>
 
 <!--- The directive is decided by the ARTIFACT, not by the row count.

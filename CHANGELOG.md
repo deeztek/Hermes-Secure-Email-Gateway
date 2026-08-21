@@ -211,7 +211,10 @@ beside each release below is the **actual release date**.
   failed with `SSL_accept error`, and inbound delivery stopped. It failed closed and announced
   itself only as a log warning. The directive is now decided by whether `sni_maps.db` exists,
   which is the file Postfix actually opens, so the two cannot diverge; being wrong now leaves
-  SNI disabled and mail flowing on the default certificate instead of refusing mail. The reason
+  SNI disabled and mail flowing on the default certificate instead of refusing mail. A map left
+  on disk from an earlier run is deleted before that test rather than after, so the last
+  validated SAN going away cannot leave a leftover file re-enabling the directive for names
+  nothing validates. The reason
   a certificate was skipped is logged rather than discarded, which it had been.
 
   Three situations produced the mismatch, all observed: a deleted certificate, one still Pending
