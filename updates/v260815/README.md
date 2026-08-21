@@ -204,6 +204,41 @@ One further fix found on the way: selecting a timezone had always thrown a
 JavaScript error, because the handler looked for a field that has never existed
 on that page. Saving worked regardless, which is why it went unnoticed.
 
+### If you imported your own certificate, its chain was not being served
+
+Importing a third-party certificate writes the leaf, the CA chain you pasted,
+and the two concatenated as a bundle. Nginx read the bundle. **Dovecot and
+Postfix read the leaf on its own**, so IMAP, POP and SMTP presented a
+certificate with no path back to a trust anchor.
+
+Browsers hide this by fetching the missing intermediate themselves, which is why
+a console that looked perfectly healthy on 443 sat alongside mail clients
+refusing to connect and sending servers declining TLS. Nothing was wrong with
+the import: it verifies the leaf against the chain you supply before accepting
+it, so an incomplete chain is rejected at that point.
+
+You can see it in one command. One certificate means the chain is missing:
+
+```bash
+echo | openssl s_client -connect <your-host>:465 -showcerts 2>/dev/null \
+  | grep -c "BEGIN CERTIFICATE"
+```
+
+**The upgrade repairs all three services and needs nothing from you.** Nginx and
+Dovecot recompute their certificate path whenever their config is generated, so
+both correct themselves as this upgrade runs. Postfix stores its path instead,
+so a phase script rewrites it, but only where the chain file is genuinely
+present: serving a leaf without its chain is degraded, while naming a file that
+does not exist would stop Postfix serving TLS at all, and the repair must not
+turn the first into the second.
+
+Certificates issued through ACME were never affected on Nginx or Dovecot, and
+are corrected on Postfix by the same script.
+
+After upgrading, that same command should return 2 or more on ports 25, 465, 587
+and 993. If any still returns 1, re-import the certificate with its CA chain and
+save SMTP TLS Settings.
+
 ### Deleting a certificate always failed, after deleting it
 
 Deleting any certificate ended on a Lucee error page rather than a success
@@ -343,6 +378,7 @@ the interface and has no effect.
 | Console | Certificate and timezone fields are real dropdowns that open on click | `#310` |
 | Certificates | Deleting one no longer fails after having deleted it; stranded SAN rows cleaned up | |
 | SMTP TLS | A missing per-domain certificate map no longer stops inbound mail; stale validation flags reset on upgrade | |
+| TLS, all services | Imported certificates now serve their full chain on IMAP, POP and SMTP, not just the leaf | |
 | Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed; orphaned `mailbox_sans` rows removed | |
 | Cleanup | Four unreachable files removed: two duplicate Virtual Recipient pages, two dead scheduler scripts | |
 
