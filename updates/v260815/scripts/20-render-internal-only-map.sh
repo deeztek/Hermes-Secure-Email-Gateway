@@ -7,13 +7,14 @@
 # so a release that introduces a new lookup table has to place the file
 # itself. That is all this does.
 #
-# It deliberately does NOT touch main.cf. The new
-# check_recipient_access is in main.cf.HERMES, and main.cf is regenerated
-# from that template by the console whenever Postfix settings are saved.
-# Rewriting a live main.cf from an unattended upgrade script is a good way
-# to stop a gateway accepting mail, and there is no need: the flag defaults
-# to 0 on every existing address, so until an admin turns it on there is
-# nothing for the map to reject.
+# It deliberately does NOT touch main.cf. Rewriting a live main.cf from an
+# unattended upgrade script is a good way to stop a gateway accepting mail,
+# and there is no need: the restriction reaches main.cf on its own later in
+# this upgrade, because the schema step seeds it into the parameters table
+# and the post-upgrade phase runs generate_postfix_configuration.cfm, which
+# rebuilds smtpd_recipient_restrictions from those rows. The flag also
+# defaults to 0 on every existing address, so until an admin turns it on
+# there is nothing for the map to reject either way.
 #
 # ORDER MATTERS, and this is why the file is written now rather than later:
 # main.cf must never reference a lookup file that does not exist. Placing
@@ -71,8 +72,8 @@ sed -e "s|HERMES-USERNAME|${db_user}|g" \
 chmod 644 "$target"
 
 log "Rendered mysql-internal-only-recipients.cf"
-log "The Reachable By control is stored now, but Postfix only consults it once"
-log "main.cf picks up the new restriction. That happens the next time Postfix"
-log "settings are saved in the console, which regenerates main.cf from its template."
+log "Reachable By is armed later in this same upgrade: the schema step seeds the"
+log "restriction into the parameters table, and the post-upgrade phase regenerates"
+log "main.cf from it. Nothing further is required from you."
 
 exit 0

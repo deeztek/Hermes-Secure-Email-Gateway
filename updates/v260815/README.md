@@ -312,15 +312,14 @@ cd /opt/hermes-seg-docker-gl
 sudo ./scripts/system_update_docker.sh
 ```
 
-**Then, if you intend to use Reachable By, save Postfix settings once.** Open any
-page under **System** that writes Postfix configuration and save it. That
-regenerates `main.cf` from its template and picks up the new recipient
-restriction.
+**Reachable By is armed by the upgrade itself.** The schema step seeds the new
+recipient restriction into the configuration table, and the post-upgrade phase
+rebuilds `main.cf` from those rows, so the map is in
+`smtpd_recipient_restrictions` by the time the run finishes. Nothing further is
+required from you.
 
-Until you do, the setting is recorded but not enforced. This is deliberate: an
-unattended upgrade that rewrites a live `main.cf` is a good way to stop a gateway
-accepting mail, and there is nothing to enforce anyway until you turn the setting
-on somewhere.
+Every existing alias defaults to `Anyone`, so nothing changes for any address
+until you deliberately set one to internal-only.
 
 Nothing else is required. Everything else applies automatically.
 
@@ -358,10 +357,18 @@ Then in the console:
 - Open **System, Console Settings** and click the Certificate field without
   typing. It should drop down a list.
 
-**Reachable By needs one extra step on an upgraded install.** The recipient
-restriction that enforces it is written into `main.cf` from a template, so it
-stays inert until you save Postfix settings once. Until then the setting shows in
-the interface and has no effect.
+**Confirm Reachable By is armed.** The upgrade does this for you, so this is a
+check rather than a step:
+
+```bash
+docker exec hermes_postfix_dkim postconf -n | grep smtpd_recipient_restrictions
+```
+
+You want `check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf`
+in that list, sitting after `permit_sasl_authenticated` and before
+`reject_unauth_destination`. Senders on your own networks and authenticated
+submission users pass before the check, so only mail arriving from outside ever
+reaches it.
 
 ## What changed
 

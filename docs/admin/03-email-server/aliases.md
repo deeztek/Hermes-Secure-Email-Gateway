@@ -121,11 +121,15 @@ The MySQL lookup is live: adding a row in this page takes effect on
 the next inbound message, with no Postfix reload, no `postmap`, and
 no template regeneration.
 
-**Reachable By is the exception.** The `check_recipient_access` map that
-enforces it is referenced from `smtpd_recipient_restrictions` in
-`main.cf`, so on an install upgraded from an earlier release the setting
-is inert until Postfix settings are saved once, which regenerates
-`main.cf` from its template.
+**Reachable By reaches `main.cf` differently.** The `check_recipient_access`
+map that enforces it is named in `smtpd_recipient_restrictions`, and that
+directive is not copied from `main.cf.HERMES` on a running system:
+`generate_postfix_configuration.cfm` rebuilds it from the `parameters`
+table, concatenating every `child = '1'` row whose `parent_name` is
+`smtpd_recipient_restrictions`, ordered by `order1`. The map is a seeded
+row there at `order1` 1.150, so it appears whenever that directive is
+regenerated, which the upgrade does for you and any Postfix settings save
+does thereafter.
 
 ## The `mailbox_aliases` table
 

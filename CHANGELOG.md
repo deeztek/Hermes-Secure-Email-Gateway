@@ -37,7 +37,8 @@ beside each release below is the **actual release date**.
   `generate_postfix_configuration.cfm` rebuilds `smtpd_recipient_restrictions` from the
   `parameters` table, so the directive is assembled purely from `child = '1'` rows ordered by
   `order1`. Adding the map to the template alone would have been silently undone by the first
-  Postfix settings save, which is exactly the save the release notes tell operators to perform.
+  Postfix settings save. The release notes previously told operators to perform that save; the
+  upgrade's own post-upgrade phase regenerates the directive, so it is armed without them.
   Caught on the test box, where the map was rendered with real credentials and the console
   stored the setting while `postconf -n` showed no sign of it. The row sits at `order1` 1.150,
   after `permit_mynetworks`, the discard map and `permit_sasl_authenticated`, so internal and
