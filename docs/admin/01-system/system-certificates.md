@@ -135,6 +135,47 @@ prefixes) use a separate code path
 [SAN Management](../03-email-server/san-management.md). Both paths land
 rows in the same `system_certificates` table.
 
+#### The ACME account
+
+certbot registers an account the first time it talks to a given ACME
+endpoint, and registering means accepting the Terms of Service. Both
+request paths pass `--agree-tos --non-interactive --no-eff-email` so
+that happens without a prompt, because neither runs on a terminal that
+could answer one.
+
+The automated SAN path did not always pass them. Without `--agree-tos`
+certbot stops to ask, finds no terminal, and exits on `EOFError` before
+it attempts a challenge, so the path only ever worked on a gateway
+where somebody had already requested a certificate by hand from this
+page. Adding a mailbox domain is normally the first ACME action a new
+install performs, so on a fresh install it failed every time.
+
+The contact address comes from **Admin E-mail** in
+[System Settings](system-settings.md), and is passed only when it is a
+real address. It ships as a placeholder and nothing outside the console
+ever writes it, so if it has not been changed the account is registered
+with `--register-unsafely-without-email` instead. That is supported by
+Let's Encrypt, and it beats binding the account to an address that does
+not exist, because an ACME account's contact address is awkward to
+correct afterwards. **Set a real Admin E-mail if you want Let's
+Encrypt's expiry warnings.**
+
+#### Failures are recorded, not swallowed
+
+certbot writes its failures to stderr. Both request paths capture stdout
+and stderr together, so a failure comes back as a value rather than an
+exception.
+
+For the SAN path the reason is written to `mailbox_sans.dns_result_msg`
+and shown in the **Mailbox SAN Validation** sub-table below, so a
+certificate that will not issue tells you why on this page. The
+scheduled validator then retries on its next run.
+
+Previously stderr had nowhere to go, so any certbot failure surfaced as
+an internal error: the scheduled job stopped where it stood, wrote
+nothing to the SAN rows, and mailed the administrator. A certbot
+success was the only outcome the code could observe.
+
 ### 2. Import Certificate
 
 For certs issued by any CA other than Let's Encrypt (commercial CA,
@@ -229,13 +270,34 @@ a delete:
 7.    plus filesystem cleanup:
         Imported: rm /opt/hermes/ssl/<file_name>_hermes.{pem,key,chain.pem,bundle.pem}
         Acme:     docker run --rm certbot/certbot:latest delete --cert-name <file_name>
-                  + DELETE FROM mailbox_domains_sans WHERE acme_certificate = ?
+                  + DELETE FROM mailbox_sans WHERE certificate = ?
 ```
 
 The guard is **stop-on-first-match** with a specific error message per
 case so the admin knows which binding is blocking the delete and where
 to go to unbind. There is no "force delete" — the only way past the
 guard is to unbind on the consuming page first.
+
+### Deleting used to fail after having deleted
+
+Step 7's SAN cleanup named `mailbox_domains_sans`, a table that has
+never existed in this schema. The real table is `mailbox_sans` and the
+column is `certificate`.
+
+Because the cleanup ran **after** the row had already been removed, the
+delete appeared to fail while having actually happened: the admin saw
+an error, the certificate was gone from the table, and the SAN rows
+that referenced it were left behind pointing at an id that no longer
+resolved. Those stranded rows are what the reconciliation described in
+[SAN Management](../03-email-server/san-management.md#upgrades-reconcile-stale-rows-and-leave-you-one-step)
+now cleans up on upgrade.
+
+Worth knowing why an FK-based cleanup could not find them all.
+`system_certificates` is InnoDB, so its auto-increment is recalculated
+as `MAX(id) + 1` after a restart, which means a deleted id gets reused.
+A stranded row then resolves to a perfectly valid but wrong certificate,
+and no orphan query can see it. Catching that class needed a filesystem
+check rather than a SQL one.
 
 ## Certificate downloads (gated)
 

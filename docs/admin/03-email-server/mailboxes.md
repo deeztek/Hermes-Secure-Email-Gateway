@@ -191,11 +191,12 @@ columns:
 
 | Column | Source | Notes |
 |---|---|---|
-| Actions | — | Dropdown: Edit Options, Edit Encryption, Reset 2FA Devices, Manage App Passwords (→ `view_mailbox_app_passwords.cfm`), Send Mobile Setup Profile, Rotate NC Internal Password (only if NC enabled), Delete |
+| Actions | — | Dropdown: Edit Options, Edit Encryption, **Send As**, Reset 2FA Devices, Manage App Passwords (→ `view_mailbox_app_passwords.cfm`), Send Mobile Setup Profile, Rotate NC Internal Password (only if NC enabled), Delete |
 | S/MIME | link to `view_recipient_certificates.cfm?type=1&id=...` | Per-mailbox cert manager |
 | PGP | link to `view_recipient_keyrings.cfm?type=1&id=...` | Per-mailbox keyring manager |
 | Email | `mailboxes.username` | Full address |
 | Display Name | `mailboxes.name` | |
+| Send As | correlated subquery on `sender_login_maps` | One chip per granted address. Self-rows are excluded, since every mailbox has one and it is not an alternate identity. See [Send As modal](#send-as-modal) |
 | Domain | join on `domains.domain` | |
 | Quota | `mailboxes.quota / 1024 / 1024 / 1024` | Rendered in GB |
 | Auth | `recipients.auth_type` | `LOCAL` badge or `REMOTE` badge (tooltip shows `remoteauth_domain`) |
@@ -260,6 +261,71 @@ Submit queues async cert + keyring generation into
 `cert_generation_queue` if a flag flips on and no existing
 cert/keyring is present — same lazy-queue pattern as
 [Relay Recipients](../02-email-relay/relay-recipients.md#edit-encryption-modal).
+
+## Send As modal
+
+Grants a mailbox permission to put another address in the `From` field.
+Reached from **Actions > Send As**.
+
+The grant lives in the `sender_login_maps` table as a
+`(sender, login_user)` pair: `sender` is the address being used,
+`login_user` is the mailbox allowed to use it. Postfix reads the table
+through `smtpd_sender_login_maps`, and `reject_sender_login_mismatch`
+on the submission port refuses any message whose `From` is not paired
+with the authenticated user.
+
+**This moved here from the alias.** It used to be a Yes/No on each
+alias, which worked while an alias had one destination and stopped
+making sense once it could have twenty: a single toggle would have
+granted send-as to every member of a list at once. Membership and
+send-as are now independent. Adding somebody to a list grants them
+nothing, and granting send-as does not require them to be a member.
+Editing an alias's destination no longer carries the grant with it,
+because the grant means "this mailbox may send from this address" and
+says nothing about where that address delivers.
+
+### The self-row
+
+Every mailbox owns a row where `sender` and `login_user` are both its
+own address, written by `add_mailbox_action.cfm` at creation. That row
+is what lets the user send as themselves. Without it the mailbox
+receives normally and cannot send at all.
+
+The save handler deletes the existing grant set before writing the new
+one, and that delete is scoped `sender <> login_user` so it can never
+reach the self-row. A re-assert follows, normally a no-op.
+
+Before that scoping existed, saving this modal took the self-row with
+it, and the picker only ever offers aliases so nothing put it back.
+Opening the modal and saving with nothing selected and nothing changed
+was enough to stop the mailbox sending. **A mailbox left in that state
+repairs itself the next time this modal is saved**, changes or not.
+
+### The grant alone is not enough
+
+No mail protocol exposes send-as permissions to a client, so the user
+must also add the address as an identity in whatever they read mail
+with:
+
+| Client | Where |
+| --- | --- |
+| Webmail (Nextcloud Mail) | Mail, Account settings, Aliases, Add alias |
+| Thunderbird | Account Settings, Manage Identities, Add |
+| Outlook | Account Settings, additional email addresses |
+| Apple Mail | Account settings, Edit Email Addresses |
+
+Until they do, the `From` field stays a plain label and the address is
+nowhere to be found, which looks exactly like the grant not working. In
+every client `From` only becomes a dropdown once the account has more
+than one identity.
+
+The reverse is a useful check that the grant is real: a client will
+happily let a user add an identity they have **not** been granted, and
+the message is refused at submission with
+`Sender address rejected: not owned by user ...`.
+
+Documented for end users in
+[Set up your devices](../../users/set-up-your-devices.md).
 
 ## Reset 2FA Devices modal
 

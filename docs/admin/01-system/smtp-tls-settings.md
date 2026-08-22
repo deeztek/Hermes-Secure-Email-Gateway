@@ -81,6 +81,64 @@ system row, but if you migrate from a legacy install with a non-`id=1`
 system row, the SMTP page won't refuse the snakeoil even though the
 System Certificates page will block its deletion.
 
+### The certificate chain, not just the leaf
+
+An imported certificate is written to three files by
+[System Certificates](system-certificates.md):
+
+| File | Contents |
+| --- | --- |
+| `<name>_hermes.pem` | the leaf certificate alone |
+| `<name>_hermes.chain.pem` | the CA chain alone |
+| `<name>_hermes.bundle.pem` | leaf plus chain |
+
+`smtpd_tls_cert_file` must point at the **bundle**. A leaf on its own
+makes the receiving side build the chain itself, which some verifiers
+will not do, and the handshake fails against exactly the strict peers
+TLS was turned on for.
+
+Nginx always read the bundle. Postfix and Dovecot read the leaf, which
+is why a browser could show a clean padlock on `:443` next to a mail
+client failing on `:465` or `:993` with the same certificate. The
+import was never at fault: it verifies the leaf against the chain
+before accepting either, which is what made the symptom so confusing.
+
+Confirm what is actually being served:
+
+```bash
+openssl s_client -connect <host>:465 -showcerts </dev/null 2>/dev/null \
+  | grep -c 'BEGIN CERT'
+```
+
+`s_client` prints the leaf twice, once in the chain listing and again
+under `Server certificate`, so **2 means leaf-only** and 3 or more
+means the chain is being served. Repeat with `-starttls smtp` for `:25`
+and `:587`.
+
+Nginx and Dovecot compute their certificate path fresh on every config
+generation, so they repaired themselves on the first upgrade. SMTP TLS
+**stores** its path in the `parameters` table, so an install with a
+certificate already bound keeps whatever was written when it was bound.
+The v260815 upgrade rewrites that stored value in place; nothing is
+needed from the admin.
+
+### A certificate that is not on disk is refused
+
+Selecting a certificate whose files are missing is refused at save,
+naming the path it looked for, and the certificate already in use stays
+in use.
+
+A certificate can appear in the picker before it has finished issuing.
+Nginx and Dovecot fall back to the bootstrap certificate in that
+situation; **Postfix does not**, and binding a path that is not there
+stops mail being accepted over TLS. Declining the save is recoverable;
+pointing Postfix at a missing file is silent until mail stops.
+
+An upgrade reports, without changing, any console, SMTP or mail
+certificate binding already pointing at an absent file. Which
+certificate to use is an operator decision, not something to reassign
+unattended.
+
 ## How directive values are stored
 
 This page is the canonical example of the dual-row `parameters` table

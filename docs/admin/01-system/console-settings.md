@@ -145,9 +145,75 @@ Three boolean (`enable` / `disable`) selects. Each is substituted into
 | OCSP Stapling | `ssl_stapling on;` (enabled) vs. `#ssl_stapling on;` (disabled) |
 | OCSP Stapling Verify | `ssl_stapling_verify on;` (enabled) vs. `#ssl_stapling_verify on;` (disabled) |
 
-Defaults are all `enable` and should stay that way for any
-publicly-reachable console. Disable only if you have a specific reason
-(e.g., HSTS preload conflict during a hostname migration window).
+All three are seeded **`disable`**, and enabling them is an opt-in.
+For any publicly-reachable console with a trusted certificate bound,
+turning all three on is the right end state.
+
+#### HSTS is guarded, because it can lock you out
+
+HSTS tells a browser to require HTTPS for a hostname for a year, with
+no click-through. Chromium will not honour the usual bypass phrase
+under it. If the certificate for that hostname is not trusted, recovery
+means clearing the entry from every browser that has touched the
+address.
+
+Two guards:
+
+| Bound certificate | Behaviour |
+| --- | --- |
+| The bootstrap certificate | Enabling HSTS is **refused** at save, with alert 28 naming the order to work in |
+| Any other self-signed certificate | Allowed, with an in-place warning at the control and no "(Recommended)" label |
+| A trusted certificate | Allowed, no warning |
+
+The refusal is scoped to the bootstrap certificate rather than to
+self-signed certificates generally. The bootstrap cert is self-signed
+with `CN=localhost`, so it can never be valid for a real console
+address even for an operator who has manually trusted it, and enabling
+HSTS against it always ends in a lockout. An operator running their own
+self-signed certificate distributed to their own trust stores has a
+working setup, so they get the warning rather than a refusal. A
+private-CA certificate is not self-signed and never trips either.
+
+Two details worth knowing:
+
+- The guard checks the certificate **being saved**, not the one
+  currently bound, so binding a trusted certificate and enabling HSTS
+  in the same save still works. Refusing that would be a worse trap
+  than the one being fixed.
+- It runs before anything is written, so a refused save applies
+  nothing rather than leaving the console half-configured with a new
+  address and no certificate change.
+
+The order to work in is: bind a trusted certificate, confirm the
+console loads clean, then enable HSTS.
+
+#### Why the seed changed
+
+The baseline used to seed all three `enable` while the installer
+rendered them commented out in nginx, and said so:
+
+```
+#   hermes_hsts    -> empty (admin enables via UI)
+#   hermes_ocsp    -> empty (admin enables via UI)
+```
+
+So on a fresh install the database and the live config disagreed: the
+page showed HSTS on, nginx was not sending the header, and the **first
+Console Settings save of any kind** regenerated nginx from the database
+and made all three real.
+
+The admin never opted in. Changing the console address from the
+install-time IP to an FQDN is the documented next step after
+installing, and it is exactly such a save. At that moment the bootstrap
+certificate is still bound, so the browser received HSTS for a hostname
+whose certificate it did not trust, and the operator lost the console
+they were in the middle of configuring.
+
+**Existing installs are deliberately not flipped by the upgrade.** A
+gateway using HSTS correctly with a real certificate would otherwise be
+silently downgraded. The affected population is anyone whose console
+certificate is still self-signed, and they see the warning the moment
+this page opens, which is also the only moment it can hurt them.
 
 ## Save flow — the cascade
 

@@ -218,7 +218,83 @@ challenge — it confirms that the SAN's DNS A record points at this
 gateway's expected IP (which is what `https://verify.hermesseg.io`
 returns when probed). It exists to catch broken DNS before burning a
 Let's Encrypt rate-limit slot, not to perform the ACME challenge
-itself.
+itself. It says nothing about whether inbound port 80 is reachable,
+which the ACME challenge still has to establish separately.
+
+### `dns = YES` is proven against the certificate, not inferred
+
+A SAN is marked `dns = YES` in one of two ways: the certificate was
+just issued and certbot reported success, or the validator read the
+existing certificate's own SAN list and found the name in it.
+
+It used to be inferred instead. The validator hashes the set of
+`ip = YES` names per certificate and compares it with the hash stored
+on `system_certificates.acme_hash`. An unchanged hash was treated as
+proof the certificate already covered those names, and it is nothing
+of the kind: the hash is computed over the requested names alone and
+says only that the request set has not changed.
+
+The consequence was rows marked validated against a certificate that
+did not contain them. Seen in the field on a mailbox domain whose
+bound certificate was the bootstrap one, whose SANs are `localhost`
+and `hermes-bootstrap.local`: two unrelated names were marked
+validated against it, which stopped any new certificate ever being
+requested and switched on `tls_server_sni_maps` pointing at a
+certificate covering none of them.
+
+Now a matching hash only earns the chance to check. The validator
+reads the SAN list off the certificate on disk with
+`openssl x509 -noout -ext subjectAltName` and marks a row validated
+only if the name is present, or is covered by a matching wildcard.
+
+The check **fails open**: if the certificate cannot be read or parsed,
+rows are left exactly as they were. Being strict in the other
+direction would re-request certificates unnecessarily and could reach
+a rate limit, which is worse than leaving a row alone.
+
+### The hash is banked only after a successful request
+
+`acme_hash` is written when certbot reports success, and at no other
+time.
+
+It used to be written before the request was attempted. A request that
+then failed, or that was never going to succeed because the bound
+certificate is an Imported one rather than an Acme one, left the hash
+on the record anyway. Every later run read it back, found it matched,
+and took the already-covered branch. **One failed attempt convinced
+the system the work was done, permanently**, with the certificate
+staying Pending and its SANs staying marked validated, and no retry
+ever attempted. Observed in the field on a certificate stuck for six
+days.
+
+Writing it only on success is what makes a failure retryable, which is
+the point of running the validator on a schedule.
+
+### Upgrades reconcile stale rows, and leave you one step
+
+An upgrade that finds SAN rows marked validated against a certificate
+which does not contain them removes those rows and clears the hash, so
+issuance is attempted again. It reports what it did:
+
+```
+Removed 2 SAN row(s) that named a certificate not containing them.
+Cleared the SAN hash on certificate(s) 1 so issuance is attempted again.
+```
+
+**If you see that, open each mailbox domain under
+[Domains](domains.md) and save it once the upgrade finishes.**
+
+The rows are rebuilt from `additional_sans` by `sync_mailbox_sans.cfm`,
+and that sync runs on exactly three operator actions: adding or
+deleting a prefix on this page, adding a mailbox domain, or editing
+one. Nothing runs it on a schedule. Until you save, `mailbox_sans` is
+empty for that certificate and the scheduled validator reports
+`No SAN Domains found` and does nothing, so the replacement
+certificate is never requested. There is no error, because from the
+validator's point of view there is genuinely nothing to do.
+
+Tracked as
+[#319](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/319).
 
 ## How SAN status surfaces elsewhere
 
@@ -244,7 +320,7 @@ the per-cert SAN sub-table show up on other pages:
 | Delete with non-numeric `delete_san_id` | `session.m = 20`, redirect |
 | `sync_mailbox_sans.cfm` fails mid-cross-join | Partial `mailbox_sans` state possible; re-saving any mailbox domain or re-adding the same prefix triggers another sync that converges |
 | Validator can't reach `verify.hermesseg.io` | `mailbox_sans.ip` stays at the previous value; cert request gated until next successful probe. Validator runs hourly. |
-| `acme_request_san_certificate.cfm` fails (DNS, port 80, rate limit) | Postmaster email sent with certbot stderr; SAN rows retain validation state; admin can re-trigger by toggling the cert binding on Domains |
+| `acme_request_san_certificate.cfm` fails (DNS, port 80, rate limit, no ACME account) | certbot's own output is written to `mailbox_sans.dns_result_msg` and shown in the Mailbox SAN Validation sub-table on [System Certificates](../01-system/system-certificates.md). `ip` is left as it was. The scheduled validator retries on its next run; no operator action needed. No email is sent, because the validator runs every 30 minutes and mailing each attempt would flood |
 | `smtp_sni_generate_config.cfm` finds zero validated SANs | Deletes `/etc/postfix/sni_maps` and `.db` — Postfix falls back to its default cert on every connection. Non-fatal but clients lose per-domain SNI. |
 
 ## Files and containers touched
