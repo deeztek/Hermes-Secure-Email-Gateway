@@ -97,6 +97,17 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **Saving Send As destroyed the mailbox's ability to send as itself** (#311). Every mailbox owns
+  a self-row in `sender_login_maps`, written when the mailbox is created, and it is what
+  `reject_sender_login_mismatch` consults on the submission port to let a user send as their own
+  address. The handler replaced the grant set with a delete keyed on `login_user` alone, which took
+  the self-row with it, and nothing put it back because the picker only ever offers aliases.
+  Opening the modal and saving, with nothing selected and nothing changed, was enough. Receiving
+  kept working, so it surfaced as an unexplained client-side send failure with nothing pointing at
+  the page that caused it. The delete is now scoped `sender <> login_user`, and a self-row
+  re-assert follows it, normally a no-op, so a mailbox already damaged by this repairs itself on
+  the next save rather than needing an operator who knows what to look for.
+
 
 - **Nextcloud sharing now stays inside your own domain by default** (#316). Two things at once.
   First, isolation: a gateway can host unrelated organisations side by side, and Nextcloud groups

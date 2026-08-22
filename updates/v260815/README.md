@@ -77,6 +77,29 @@ nothing had changed, which reads as a failure for what was arguably a no-op.
 Everything about an existing entry, including adding and removing destinations,
 happens in Edit, where the whole set is shown as chips and the save is a diff.
 
+### Switching an alias to Discard deletes its destinations
+
+Now that an alias can hold twenty members, this needed saying out loud.
+Switching Type to Discard removes every destination it has, and switching back
+afterwards leaves an empty alias rather than the list you started with. The old
+Discard Mode notice said mail would be dropped, which was true and missed the
+point entirely.
+
+A warning now appears on that transition, naming how many destinations are about
+to go and listing them. It appears only when there is something to lose, so an
+alias that already discards raises no alarm about nothing.
+
+Three related repairs on the same page:
+
+- Discard aliases had lost their Edit control when the grouped display arrived,
+  because editing lives on the destination chips and a discard alias renders
+  "Silently dropped" instead of chips. They have Edit back.
+- The Add modal kept whatever Type was last used, so opening it on an existing
+  alias could submit the wrong kind. It now resets to Forward.
+- One address can no longer hold both forwarding and discard rows. Postfix
+  cannot express that, and the grouped view could only render it as one or the
+  other.
+
 ### Virtual Recipients now takes one address at a time
 
 The Add form was a box you could paste many addresses into at once. It is now a
@@ -137,6 +160,24 @@ user ...`.
 
 Documented for users in `docs/users/set-up-your-devices.md`.
 
+### Saving Send As stopped that mailbox sending
+
+Worth reading even if you never used the feature deliberately, because it may
+already have happened to you.
+
+Every mailbox owns a record saying it may send as its own address. Saving Send
+As deleted that record along with the grants it was replacing. Opening the modal
+and saving, with nothing selected and nothing changed, was enough to do it. The
+mailbox carried on receiving normally and could no longer send anything, so it
+presented as a mail client problem rather than as anything to do with that page.
+
+The delete is now scoped so it cannot reach that record, and the record is
+re-asserted on every save.
+
+**A mailbox already broken by this repairs itself the next time you save its
+Send As**, even with nothing changed. If anyone has reported unexplained send
+failures while receiving worked fine, open Send As on that mailbox and save.
+
 ### Nextcloud sharing now stays inside your own domain by default
 
 Two things, and the second is the one that prompted it.
@@ -184,6 +225,40 @@ that key was doing double duty as the lookup index. Replaced rather than simply
 removed, so alias lookups do not degrade.
 
 Tracked in `#311` and `#316`.
+
+### HSTS could switch itself on, against a certificate no browser trusts
+
+On a fresh install the database said HSTS was enabled while the installer had
+rendered it commented out in Nginx. The page showed it on, the header was never
+sent, and the first Console Settings save of any kind regenerated Nginx from the
+database and made it real.
+
+Changing the console address from the install-time IP to a proper hostname is
+the documented next step after installing, and it is exactly such a save. At
+that moment the self-signed bootstrap certificate is still bound, so the browser
+is told to require HTTPS for a hostname whose certificate it does not trust, for
+a year, with no click-through. Chromium will not honour the usual bypass phrase
+under HSTS, so recovery means clearing the entry from every browser that touched
+the address, in the middle of setting the gateway up.
+
+Three changes. The setting is seeded off, so the database matches what the
+installer actually writes and nothing turns itself on. Enabling it is refused
+outright while the bootstrap certificate is bound, with the refusal naming the
+order to work in: bind a trusted certificate, confirm the console loads clean,
+then enable HSTS. And where the bound certificate is merely self-signed rather
+than the bootstrap one, which can be a perfectly good setup if you have
+distributed it to your own trust stores, the page warns in place instead of
+refusing.
+
+The guard checks the certificate being saved rather than the one currently
+bound, so binding a real certificate and enabling HSTS in the same save still
+works. It also runs before anything is written, so a refused save applies
+nothing rather than leaving the console half configured.
+
+**Existing installs are deliberately not flipped.** A gateway using HSTS
+correctly with a real certificate would otherwise be silently downgraded by an
+upgrade. If your console certificate is still self-signed, you will see the new
+warning the moment the page opens, which is also the only moment it can hurt.
 
 ### Dropdowns that looked like text boxes
 
@@ -352,6 +427,34 @@ required from you.
 Every existing alias defaults to `Anyone`, so nothing changes for any address
 until you deliberately set one to internal-only.
 
+### One manual step, if the upgrade reported removing SAN rows
+
+Watch the upgrade output for a line like this from the certificate
+reconciliation step:
+
+```
+Removed 2 SAN row(s) that named a certificate not containing them.
+```
+
+If you see it, **open each mailbox domain under Email Server, Domains and save
+it** once the upgrade finishes. Saving is what rebuilds those rows.
+
+The reconciliation removes SAN rows that were marked validated against a
+certificate which does not actually contain them, which is the stale state
+described further up. The rows are rebuilt from your SAN settings by the same
+sync that runs when you add or edit a mailbox domain, and that sync has no
+scheduled trigger of its own. Until you save, the thirty-minute certificate job
+finds nothing to work with and reports `No SAN Domains found`, so the
+replacement certificate is never requested. There is no error, because from the
+job's point of view there is genuinely nothing to do.
+
+After saving, the certificate is requested on the next run of that job, within
+thirty minutes. Confirm on the Certificates page: the Mailbox SAN Validation
+table should show your names, moving to validated once issued.
+
+If the upgrade did not report removing any rows, this does not apply to you and
+nothing is needed.
+
 Nothing else is required. Everything else applies automatically.
 
 ## How to confirm it worked
@@ -420,10 +523,24 @@ reaches it.
 | Schema | Unique key traded for a lookup index and a pair-unique; `virtual_recipients` indexed; orphaned `mailbox_sans` rows removed | |
 | Certificates | ACME requests for mailbox domains now register an account non-interactively, so a new gateway can issue at all | |
 | Certificates | ACME failures are recorded and shown per SAN instead of aborting the job silently; one unverifiable name no longer blocks every certificate | |
+| Mailboxes | Saving Send As no longer deletes the mailbox's own identity; a mailbox already broken by it repairs on the next save | |
+| Console | HSTS seeded off, refused while the bootstrap certificate is bound, and warned about when the bound certificate is self-signed | |
+| Aliases | Warning before converting a list to Discard; Edit restored on discard rows; forward and discard can no longer be mixed on one address | `#311` |
+| Certificates | SAN validation reads the certificate's own SAN list instead of trusting an unchanged hash as proof of coverage | |
+| Install | `hermes.key` generated during installation, so no admin page depends on being visited in a particular order | |
+| Console | Nine more quotes in the rotation, seeded for fresh installs and upgrades alike | |
 | Cleanup | Four unreachable files removed: two duplicate Virtual Recipient pages, two dead scheduler scripts | |
 
 ## Known follow-up
 
+- Certificate reconciliation removes stale SAN rows but nothing rebuilds them
+  automatically, so an affected gateway needs a mailbox domain re-saved by hand.
+  The manual step is described under What to do. Making the scheduled job run
+  the sync itself is [#319](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/319).
+- Postfix logs a `smtpd_relay_before_recipient_restrictions` compatibility notice
+  beside every Reachable By rejection. The rejection is correct and the notice is
+  cosmetic, but it is new because nothing in that chain rejected before.
+  [#318](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/318).
 - Catch-all entries cannot be set to internal-only, because of how Postfix probes
   an access map by bare domain.
 - Per-destination Send-As granularity. The grant is per mailbox and per address;
