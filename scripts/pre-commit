@@ -261,7 +261,48 @@ fi
 # ===========================================
 # LAYER 6: Content scanning with gitleaks
 # ===========================================
-echo "[6/7] Scanning file contents for secrets..."
+# ---------------------------------------------------------------------------
+# Layer 6: fresh-install parity
+#
+# Per-release artifacts under updates/ run on UPGRADE ONLY. A fresh install
+# never executes them, so anything that lands there and not in
+# hermes_install.sql / install_hermes_docker.sh makes an upgraded gateway and
+# a newly installed one diverge on the same tag. v260815 shipped exactly that
+# in its SMTP TLS chain-path repair before it was caught by hand.
+#
+# Only fires when updates/ files are staged, and only checks the newest
+# release, so it never demands a cleanup of history.
+# ---------------------------------------------------------------------------
+echo "[6/7] Checking fresh-install parity for staged release artifacts..."
+
+if echo "$STAGED_FILES" | grep -qE '^updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)$'; then
+    if [ -x "$(dirname "$0")/check_fresh_install_parity.sh" ]; then
+        if ! "$(dirname "$0")/check_fresh_install_parity.sh" >/tmp/hermes_parity.$$ 2>&1; then
+            cat /tmp/hermes_parity.$$
+            rm -f /tmp/hermes_parity.$$
+            echo ""
+            echo "=============================================="
+            echo "  FRESH-INSTALL PARITY UNDECLARED - COMMIT BLOCKED"
+            echo "=============================================="
+            echo ""
+            echo "Every phase script and schema_updates.sql section must declare"
+            echo "how a FRESH install gets the same outcome, because updates/ runs"
+            echo "on upgrade only."
+            echo ""
+            echo "If this is a genuine false positive: git commit --no-verify"
+            echo ""
+            exit 1
+        fi
+        rm -f /tmp/hermes_parity.$$
+        echo "      Fresh-install parity declared."
+    else
+        echo "      WARNING: check_fresh_install_parity.sh missing or not executable - skipped."
+    fi
+else
+    echo "      No release artifacts staged - skipped."
+fi
+
+echo "[7/7] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then
@@ -300,45 +341,4 @@ else
     echo "  git commit --no-verify"
     echo ""
     exit 1
-fi
-
-# ---------------------------------------------------------------------------
-# Layer 7: fresh-install parity
-#
-# Per-release artifacts under updates/ run on UPGRADE ONLY. A fresh install
-# never executes them, so anything that lands there and not in
-# hermes_install.sql / install_hermes_docker.sh makes an upgraded gateway and
-# a newly installed one diverge on the same tag. v260815 shipped exactly that
-# in its SMTP TLS chain-path repair before it was caught by hand.
-#
-# Only fires when updates/ files are staged, and only checks the newest
-# release, so it never demands a cleanup of history.
-# ---------------------------------------------------------------------------
-echo "[7/7] Checking fresh-install parity for staged release artifacts..."
-
-if echo "$STAGED_FILES" | grep -qE '^updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)$'; then
-    if [ -x "$(dirname "$0")/check_fresh_install_parity.sh" ]; then
-        if ! "$(dirname "$0")/check_fresh_install_parity.sh" >/tmp/hermes_parity.$$ 2>&1; then
-            cat /tmp/hermes_parity.$$
-            rm -f /tmp/hermes_parity.$$
-            echo ""
-            echo "=============================================="
-            echo "  FRESH-INSTALL PARITY UNDECLARED - COMMIT BLOCKED"
-            echo "=============================================="
-            echo ""
-            echo "Every phase script and schema_updates.sql section must declare"
-            echo "how a FRESH install gets the same outcome, because updates/ runs"
-            echo "on upgrade only."
-            echo ""
-            echo "If this is a genuine false positive: git commit --no-verify"
-            echo ""
-            exit 1
-        fi
-        rm -f /tmp/hermes_parity.$$
-        echo "      Fresh-install parity declared."
-    else
-        echo "      WARNING: check_fresh_install_parity.sh missing or not executable - skipped."
-    fi
-else
-    echo "      No release artifacts staged - skipped."
 fi
