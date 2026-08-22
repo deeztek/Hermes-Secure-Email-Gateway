@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# FRESH-INSTALL: covered-by scripts/install_hermes_docker.sh  sets shareapi_only_share_with_group_members at ~4558
 #
 # v260815 -- keep Nextcloud sharing inside the tenant by default (#316)
 #

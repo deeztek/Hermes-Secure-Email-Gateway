@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# FRESH-INSTALL: n/a  repairs SAN rows validated against a certificate not containing them, which only a pre-existing install can have
 #
 # v260815 -- reconcile SAN validation state against the certificates on disk
 #

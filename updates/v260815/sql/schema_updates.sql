@@ -9,6 +9,7 @@
 
 -- ---------------------------------------------------------------------
 -- 1. Let an alias deliver to more than one destination
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  mailbox_aliases DDL carries the same key layout
 --
 -- A distribution list is an alias with several destinations. Relay
 -- domains could already express that, because virtual_recipients has no
@@ -38,6 +39,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_alias_dest
 
 -- ---------------------------------------------------------------------
 -- 2. Index virtual_recipients.virtual_address
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  virtual_recipients DDL carries the index
 --
 -- Unrelated to the constraint change above, and a pre-existing problem:
 -- this table has only a PRIMARY KEY on id, so the per-message lookup
@@ -57,6 +59,7 @@ CREATE INDEX IF NOT EXISTS idx_virtual_address
 
 -- ---------------------------------------------------------------------
 -- 3. Internal-only flag
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  mailbox_aliases.internal_only is in the DDL
 --
 -- Controls who may SEND TO an address, which is a different question from
 -- where that address delivers. An internal alias accepts mail only from
@@ -83,6 +86,7 @@ ALTER TABLE mailbox_aliases
 
 -- ---------------------------------------------------------------------
 -- 4. Clean up SAN rows orphaned by the certificate-delete bug
+-- FRESH-INSTALL: n/a  cleans rows stranded by a bug that only a pre-existing install can have hit
 --
 -- delete_system_certificate.cfm removed the row from system_certificates
 -- and then tried to remove the matching SAN rows from a table called
@@ -113,6 +117,7 @@ WHERE ms.certificate IS NOT NULL
 
 -- ---------------------------------------------------------------------
 -- 5. Register the internal-only map as a recipient restriction
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  the same parameters seed row is at ~1341
 --
 -- Reachable By is enforced by a check_recipient_access map named in
 -- smtpd_recipient_restrictions. That directive is NOT copied from
@@ -163,6 +168,7 @@ WHERE NOT EXISTS (
 
 -- ---------------------------------------------------------------------
 -- 6. Additional quotes
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  seeded as quotes ids 38-46
 --
 -- quotes has no unique key on the text, only PRIMARY KEY (id) over an
 -- auto-increment, so INSERT IGNORE cannot dedupe these: there is no
@@ -230,6 +236,7 @@ WHERE NOT EXISTS (
 
 -- ---------------------------------------------------------------------
 -- 7. Version stamp -- MUST be the last statement (advances build_no so
+-- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260815' WHERE parameter = 'build_no';

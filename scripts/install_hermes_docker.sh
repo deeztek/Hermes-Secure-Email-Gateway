@@ -2359,7 +2359,7 @@ generate_postfix_configs() {
             -e "s|^myhostname = .*|myhostname = ${postfix_hostname}|" \
             -e "s|^myorigin = .*|myorigin = ${postfix_origin}|" \
             -e "s|^mynetworks = .*|mynetworks = 127.0.0.1, ${ipv4_subnet}.0/24|" \
-            -e "s|^smtpd_tls_cert_file = .*|smtpd_tls_cert_file = /opt/hermes/ssl/bootstrap_hermes.pem|" \
+            -e "s|^smtpd_tls_cert_file = .*|smtpd_tls_cert_file = /opt/hermes/ssl/bootstrap_hermes.bundle.pem|" \
             -e "s|^smtpd_tls_key_file = .*|smtpd_tls_key_file = /opt/hermes/ssl/bootstrap_hermes.key|" \
             -e "s|^smtpd_tls_CAfile = .*|smtpd_tls_CAfile = /opt/hermes/ssl/bootstrap_hermes.chain.pem|" \
             "$main_template" > "$main_target"

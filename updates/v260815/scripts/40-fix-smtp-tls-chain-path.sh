@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# FRESH-INSTALL: covered-by config/database/hermes_install.sql  rows 213/215/217 seed the bundle path, matching the installer sed at ~2362
 #
 # v260815 -- point smtpd_tls_cert_file at the chain, on installs that already
 # had a certificate bound

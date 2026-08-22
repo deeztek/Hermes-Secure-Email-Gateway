@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# FRESH-INSTALL: covered-by scripts/install_hermes_docker.sh  the mysql-*.HERMES glob at ~2376 renders this map automatically
 #
 # v260815 -- render the internal-only recipient map for existing installs
 #

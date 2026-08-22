@@ -1301,12 +1301,21 @@ INSERT IGNORE INTO `parameters` VALUES (206, 'smtp_sasl_password_maps', NULL, NU
 INSERT IGNORE INTO `parameters` VALUES (207, 'hash:/etc/postfix/sasl_passwd', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '206', 'smtp_sasl_password_maps', 1, 1.000, 0, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (210, 'smtpd_tls_security_level', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (211, 'may', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '210', 'smtpd_tls_security_level', 1, 1.000, 1, 1, NULL, NULL, NULL);
+-- SMTP TLS paths. These MUST match what install_hermes_docker.sh seds into
+-- main.cf and what updates/v260815/scripts/40-fix-smtp-tls-chain-path.sh
+-- produces on upgrade, because generate_postfix_configuration.cfm rebuilds
+-- main.cf from these rows. They used to seed the Debian snakeoil paths, which
+-- disagreed with both, so the first Postfix settings save of any kind swapped
+-- a fresh install off the bootstrap certificate onto a path Hermes does not
+-- manage. Same failure shape as #251, which was the nginx version of it.
+-- cert_file is the BUNDLE, not the leaf: a leaf alone makes the peer build the
+-- chain itself and strict verifiers refuse the handshake.
 INSERT IGNORE INTO `parameters` VALUES (212, 'smtpd_tls_cert_file', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (213, '/etc/ssl/certs/ssl-cert-snakeoil.pem', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '212', 'smtpd_tls_cert_file', 1, 1.000, 1, 1, NULL, NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (213, '/opt/hermes/ssl/bootstrap_hermes.bundle.pem', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '212', 'smtpd_tls_cert_file', 1, 1.000, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (214, 'smtpd_tls_key_file', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (215, '/etc/ssl/private/ssl-cert-snakeoil.key', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '214', 'smtpd_tls_key_file', 1, 1.000, 1, 1, NULL, NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (215, '/opt/hermes/ssl/bootstrap_hermes.key', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '214', 'smtpd_tls_key_file', 1, 1.000, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (216, 'smtpd_tls_CAfile', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, NULL, NULL, 2, NULL, 1, 1, NULL, NULL, NULL);
-INSERT IGNORE INTO `parameters` VALUES (217, NULL, NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '216', 'smtpd_tls_CAfile', 1, 1.000, 1, 1, NULL, NULL, NULL);
+INSERT IGNORE INTO `parameters` VALUES (217, '/opt/hermes/ssl/bootstrap_hermes.chain.pem', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '216', 'smtpd_tls_CAfile', 1, 1.000, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (414, 'hostkarma.junkemailfilter.com=127.0.1.2*1', NULL, NULL, 1, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 12.000, 1, 1, 'insert', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (243, 'yes', NULL, NULL, NULL, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '242', 'smtp_tls_note_starttls_offer', 1, 1.000, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (411, 'bl.suomispam.net=127.0.0.[2..11]*2', NULL, NULL, 2, NULL, NULL, 'postfix', NULL, NULL, 1, 'main.cf', NULL, '79', 'postscreen_dnsbl_sites', 1, 9.000, 1, 1, 'insert', NULL, NULL);

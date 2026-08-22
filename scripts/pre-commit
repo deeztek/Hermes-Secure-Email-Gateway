@@ -13,7 +13,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # ===========================================
 # LAYER 1: Block sensitive paths (catches what gitleaks misses)
 # ===========================================
-echo "[1/6] Checking for sensitive file paths..."
+echo "[1/7] Checking for sensitive file paths..."
 
 # Define sensitive path patterns (files that should NEVER be committed)
 SENSITIVE_PATHS=(
@@ -91,7 +91,7 @@ echo "      No sensitive paths detected."
 # Catches the dev-dump leak class (real customer domains/emails/IPs, dev hosts)
 # that gitleaks does NOT flag because it isn't a "secret" by shape.
 # ===========================================
-echo "[2/6] Scanning staged content for DEV/customer data..."
+echo "[2/7] Scanning staged content for DEV/customer data..."
 
 # High-confidence signatures only (keep false positives near zero).
 # NOTE: deeztek.com is legitimate (docs/support/license); only .net/.org are dev.
@@ -135,7 +135,7 @@ echo "      No DEV/customer data signatures detected."
 # .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 5.
 # This is exactly how a real DB password once shipped to the public repo.
 # ===========================================
-echo "[3/6] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
+echo "[3/7] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
 
 if echo "$STAGED_FILES" | grep -qx ".gitleaks.toml"; then
     # Flag 12+ char alphanumeric tokens that mix UPPER, lower AND digit -- the
@@ -181,7 +181,7 @@ echo "      No real secrets in .gitleaks.toml."
 #
 # Comments are allowed (prose/examples); only live code is blocked.
 # ===========================================
-echo "[4/6] Checking for hardcoded install roots..."
+echo "[4/7] Checking for hardcoded install roots..."
 
 ROOT_PAT='/opt/(hermes-seg|hermes-seg-docker-gl|hermes-seg-container-gl|Hermes-Secure-Email-Gateway)'
 ROOT_HITS=""
@@ -240,7 +240,7 @@ echo "      No hardcoded install roots detected."
 # check kept calling a script removed at #218. See #288.
 #
 # Only runs when one of the two files is actually staged.
-echo "[5/6] Checking generated artifacts against their seed..."
+echo "[5/7] Checking generated artifacts against their seed..."
 
 if echo "$STAGED_FILES" | grep -qxE "config/ofelia/config\.ini|config/database/hermes_install\.sql"; then
     DRIFT_CHECK="$(git rev-parse --show-toplevel)/scripts/check_ofelia_seed_drift.sh"
@@ -261,7 +261,7 @@ fi
 # ===========================================
 # LAYER 6: Content scanning with gitleaks
 # ===========================================
-echo "[6/6] Scanning file contents for secrets..."
+echo "[6/7] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then
@@ -300,4 +300,45 @@ else
     echo "  git commit --no-verify"
     echo ""
     exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Layer 7: fresh-install parity
+#
+# Per-release artifacts under updates/ run on UPGRADE ONLY. A fresh install
+# never executes them, so anything that lands there and not in
+# hermes_install.sql / install_hermes_docker.sh makes an upgraded gateway and
+# a newly installed one diverge on the same tag. v260815 shipped exactly that
+# in its SMTP TLS chain-path repair before it was caught by hand.
+#
+# Only fires when updates/ files are staged, and only checks the newest
+# release, so it never demands a cleanup of history.
+# ---------------------------------------------------------------------------
+echo "[7/7] Checking fresh-install parity for staged release artifacts..."
+
+if echo "$STAGED_FILES" | grep -qE '^updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)$'; then
+    if [ -x "$(dirname "$0")/check_fresh_install_parity.sh" ]; then
+        if ! "$(dirname "$0")/check_fresh_install_parity.sh" >/tmp/hermes_parity.$$ 2>&1; then
+            cat /tmp/hermes_parity.$$
+            rm -f /tmp/hermes_parity.$$
+            echo ""
+            echo "=============================================="
+            echo "  FRESH-INSTALL PARITY UNDECLARED - COMMIT BLOCKED"
+            echo "=============================================="
+            echo ""
+            echo "Every phase script and schema_updates.sql section must declare"
+            echo "how a FRESH install gets the same outcome, because updates/ runs"
+            echo "on upgrade only."
+            echo ""
+            echo "If this is a genuine false positive: git commit --no-verify"
+            echo ""
+            exit 1
+        fi
+        rm -f /tmp/hermes_parity.$$
+        echo "      Fresh-install parity declared."
+    else
+        echo "      WARNING: check_fresh_install_parity.sh missing or not executable - skipped."
+    fi
+else
+    echo "      No release artifacts staged - skipped."
 fi
