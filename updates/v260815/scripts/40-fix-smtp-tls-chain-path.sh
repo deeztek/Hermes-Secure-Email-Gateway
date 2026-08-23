@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# FRESH-INSTALL: covered-by config/database/hermes_install.sql  rows 213/215/217 seed the bundle path, matching the installer sed at ~2362
+# FRESH-INSTALL: covered-by scripts/install_hermes_docker.sh  the #254 block at ~3480 reconciles the parameters rows to the bootstrap cert, and a fresh install's bound cert is the self-signed bootstrap whose .pem/.chain.pem/.bundle.pem are cp copies of one file, so there is no chain to omit. Real certificates get the bundle from edit_smtp_tls_settings.cfm at bind time.
 #
 # v260815 -- point smtpd_tls_cert_file at the chain, on installs that already
 # had a certificate bound
