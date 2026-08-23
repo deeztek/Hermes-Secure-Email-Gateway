@@ -8,18 +8,21 @@
 # updates/. Anything that lands in one and not the other makes an upgraded
 # gateway and a newly installed one diverge, on the same release tag.
 #
-# Nothing enforced that pairing. It held release after release purely because
-# whoever wrote the phase script happened to remember. On v260815 it did not
-# hold: 40-fix-smtp-tls-chain-path.sh moved the SMTP TLS path from the leaf to
-# the bundle for every upgraded install, while the installer kept writing the
-# leaf and the baseline seeded a third value again (the Debian snakeoil path).
-# Because generate_postfix_configuration.cfm rebuilds main.cf from those rows,
-# the first Postfix settings save of any kind swapped a fresh install onto a
-# certificate Hermes does not manage. Same failure shape as #251.
+# Nothing enforces that pairing. It holds release after release because whoever
+# writes the phase script happens to remember, which is not a mechanism.
 #
-# This script does not try to work out coverage on its own -- that is not
-# mechanically decidable. It forces the AUTHOR to answer the question, at
-# authoring time, in a form a machine can check is present.
+# This script does not try to work out coverage on its own. That is not
+# mechanically decidable, and an attempt to infer it produces confident wrong
+# answers: the SMTP TLS path was investigated exactly that way on 2026-08-22 and
+# the conclusion was wrong in both directions, because the reasoning ran on a
+# truncated grep and missed the installer block that already handled it (#254).
+#
+# So it forces the AUTHOR to answer the question, at authoring time, in a form a
+# machine can check is present. A declaration someone wrote deliberately beats an
+# inference nobody checked.
+#
+# It catches OMISSION only. It cannot catch the case where both paths exist and
+# produce different answers. That needs comparing end states; see #321.
 #
 # Every phase script and every numbered section of schema_updates.sql must
 # carry one declaration:

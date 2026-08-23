@@ -267,8 +267,11 @@ fi
 # Per-release artifacts under updates/ run on UPGRADE ONLY. A fresh install
 # never executes them, so anything that lands there and not in
 # hermes_install.sql / install_hermes_docker.sh makes an upgraded gateway and
-# a newly installed one diverge on the same tag. v260815 shipped exactly that
-# in its SMTP TLS chain-path repair before it was caught by hand.
+# a newly installed one diverge on the same tag.
+#
+# This catches OMISSION only: a phase script with no fresh-install counterpart
+# declared. It cannot catch two paths that both exist and disagree. That needs
+# comparing end states, tracked in #321.
 #
 # Only fires when updates/ files are staged, and only checks the newest
 # release, so it never demands a cleanup of history.
