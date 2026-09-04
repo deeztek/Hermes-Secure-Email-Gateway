@@ -9,6 +9,38 @@ beside each release below is the **actual release date**.
 
 ## Unreleased
 
+### Fixed
+
+- **Legacy-to-Docker migration no longer lands on a stale release stamp or a known
+  postscreen defect** (#322). `migrate_legacy_to_docker.sh` brings a build 240815 backup
+  forward by diffing structure against the shipped baseline and merging absent
+  `parameters` rows. That is additive by design, which is right for operator settings and
+  wrong for a release that corrected a value the legacy build already seeded: the merge
+  sees no gap, so the defect survives the migration that every upgraded install had it
+  removed by. Two such cases had accumulated over four releases.
+
+  `system_settings.build_no` was one. The installer stamps the current release, then the
+  legacy `system_settings` restore overwrites it with `240815` and nothing put it back.
+  The console reported a legacy build indefinitely, backup and restore version checks read
+  it, and `find_pending_releases()` compares `v260731` as greater than `240815`, so the
+  operator's first update run replayed every `updates/` directory. Now stamped as step 8
+  of the schema bridge, derived from the newest `updates/v<YYMMDD>/` directory, the same
+  source the installer uses, so it stays correct per release with nothing to remember.
+
+  The other was the v260807 DNSBL return-code fix (#293). Legacy seeds four postscreen
+  entries with no `=returncode` filter, so postscreen counts any answer in 127.0.0.0/8 as
+  a hit, including the 127.255.255.0/24 codes lists use for refused and over quota. Two of
+  the four reach `postscreen_dnsbl_threshold = 3` by themselves and reject legitimate mail.
+  The four `UPDATE` statements now run as step 7 of the bridge, carried verbatim from that
+  release so they stay idempotent and preserve a retuned weight. `b.barracudacentral.org`
+  is still not removed, matching what the upgrade path does for a list an operator may have
+  registered for, but the script now says so when the row is enabled.
+
+  Step 7 is the one part of the bridge that is not self-maintaining. A future release that
+  corrects a seeded value has to add its own statement there.
+
+## [v260815] — 2026-08-22
+
 ### Added
 
 - **Distribution lists, as aliases with more than one destination** (#311). An alias can now

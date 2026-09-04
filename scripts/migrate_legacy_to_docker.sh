@@ -521,6 +521,146 @@ GEN_NULL_SQL
     else
         warn "Schema-forward incomplete: ${remaining} baseline column(s) still missing (see ${LOG_FILE})."
     fi
+
+    # 7) Per-release VALUE corrections to rows the legacy DB already has (#322).
+    #    Steps 1-6 reconcile structure and add absent rows. Neither touches a
+    #    row that exists, which is right for operator settings but wrong for a
+    #    release that shipped a correctness fix to a SEEDED value: the legacy
+    #    row carries the defect, the baseline carries the fix, and an additive
+    #    merge sees no gap. A migrated box therefore lands with a bug that
+    #    every upgraded box had removed.
+    #
+    #    This is not self-maintaining the way the rest of the function is.
+    #    Each entry here is a deliberate copy of one release's reconciliation
+    #    SQL, and a release that corrects a seeded value has to add its own.
+    #    Keep every statement idempotent so re-running the migration is safe.
+    reconcile_seeded_values
+
+    # 8) Release stamp (#322). The installer wrote the current build_no, then the
+    #    legacy system_settings restore overwrote it with the source build
+    #    (240815). Nothing else puts it back, so without this the console
+    #    reports a legacy build forever and system_update_docker.sh sees every
+    #    updates/v<DATE>/ directory as still pending.
+    stamp_build_no
+}
+
+# ----------------------------------------------------------------------------
+# reconcile_seeded_values
+# ----------------------------------------------------------------------------
+# Value corrections carried forward from per-release schema_updates.sql for
+# rows that build 240815 already had. Called from apply_schema_forward step 7.
+# See #322 for the audit that found this class.
+reconcile_seeded_values() {
+    log "Applying per-release value corrections to legacy seed rows..."
+
+    # --- v260807 / #293: DNSBL return-code filters -------------------------
+    # Four seeded postscreen entries shipped with no =returncode filter, so
+    # postscreen counts ANY answer in 127.0.0.0/8 as a hit. That range includes
+    # the 127.255.255.0/24 codes lists use for "refused" and "over quota", so a
+    # gateway whose resolver is being refused scores those refusals as
+    # listings. Two of the four reach postscreen_dnsbl_threshold = 3 by
+    # themselves and reject legitimate mail.
+    #
+    # Verbatim from updates/v260807/sql/schema_updates.sql. The weight is
+    # carried over from whatever the row already had, so an operator who
+    # retuned one keeps their value. Idempotent: after the update the row
+    # contains '=', which the NOT LIKE '%=%' guard excludes on any re-run.
+    #
+    # b.barracudacentral.org is deliberately NOT removed here, matching the
+    # upgrade path: an operator may have registered their querying IP. The
+    # post-migration checklist tells them how to remove it if they have not.
+    local before_dnsbl after_dnsbl
+    before_dnsbl=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters WHERE parent_name='postscreen_dnsbl_sites' AND child=1 AND parameter NOT LIKE '%=%';" 2>/dev/null)
+
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'DNSBL_SQL'
+UPDATE parameters
+   SET parameter = CONCAT('bl.spamcop.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.spamcop.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.spamcop.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('bl.suomispam.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.suomispam.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.suomispam.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('bl.spameatingmonkey.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('bl.spameatingmonkey.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'bl.spameatingmonkey.net*%' AND parameter NOT LIKE '%=%';
+
+UPDATE parameters
+   SET parameter = CONCAT('backscatter.spameatingmonkey.net=127.0.0.[2..11]',
+                          SUBSTRING(parameter, LENGTH('backscatter.spameatingmonkey.net') + 1))
+ WHERE parent_name = 'postscreen_dnsbl_sites' AND child = 1
+   AND parameter LIKE 'backscatter.spameatingmonkey.net*%' AND parameter NOT LIKE '%=%';
+DNSBL_SQL
+
+    after_dnsbl=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters WHERE parent_name='postscreen_dnsbl_sites' AND child=1 AND parameter NOT LIKE '%=%';" 2>/dev/null)
+    if [[ "${before_dnsbl:-0}" -gt "${after_dnsbl:-0}" ]]; then
+        log "  + v260807/#293: added return-code filters to $(( before_dnsbl - after_dnsbl )) postscreen DNSBL entr(ies)"
+    else
+        log "  + v260807/#293: postscreen DNSBL return-code filters already correct"
+    fi
+
+    # These UPDATEs change the database only. main.cf still holds the old
+    # directive until generate_postfix_configuration.cfm re-renders it, which
+    # the post-migration checklist already triggers via the SPF/DKIM/DMARC
+    # Save & Apply steps.
+
+    # Legacy seeds b.barracudacentral.org at weight 7 against a threshold of 3,
+    # and it answers only for registered querying IPs. Surface it rather than
+    # remove it: removing a block list from a live gateway is the operator's
+    # call, not the migration's.
+    local barracuda
+    barracuda=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT COUNT(*) FROM hermes.parameters WHERE parent_name='postscreen_dnsbl_sites' AND child=1 AND parameter LIKE 'b.barracudacentral.org%' AND enabled=1;" 2>/dev/null)
+    if [[ "${barracuda:-0}" -gt 0 ]]; then
+        warn "  b.barracudacentral.org is enabled and carries weight 7 (threshold is 3)."
+        warn "    It answers only for registered querying IPs. If this host's IP is not"
+        warn "    registered, disable it under System / RBL Configuration before Resume."
+    fi
+}
+
+# ----------------------------------------------------------------------------
+# stamp_build_no
+# ----------------------------------------------------------------------------
+# Write system_settings.build_no to the release this checkout actually is.
+# Called from apply_schema_forward step 8. See #322.
+#
+# The version is derived from the newest updates/v<YYMMDD>/ directory, the same
+# source install_hermes_docker.sh's derive_install_version() uses, so it stays
+# correct per release with no checklist step to forget.
+stamp_build_no() {
+    local install_version legacy_build
+    install_version=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
+        | grep -oE '^v[0-9]{6}$' \
+        | sort \
+        | tail -1)
+
+    legacy_build=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT value FROM hermes.system_settings WHERE parameter='build_no';" 2>/dev/null | tr -d '[:space:]')
+
+    if [[ -z "$install_version" ]]; then
+        warn "Could not derive release version from ${HERMES_ROOT}/updates/."
+        warn "  build_no left at the restored legacy value '${legacy_build:-unknown}'. The console"
+        warn "  will report a legacy build and system_update_docker.sh will treat every"
+        warn "  updates/v<DATE>/ directory as pending. Set it by hand before updating."
+        return 0
+    fi
+
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<STAMP_SQL
+INSERT INTO system_settings (parameter, value)
+SELECT 'build_no', '${install_version}'
+WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'build_no');
+UPDATE system_settings SET value = '${install_version}' WHERE parameter = 'build_no';
+STAMP_SQL
+
+    log "  + build_no stamped ${legacy_build:-unset} -> ${install_version} (was the legacy source build)"
 }
 
 # ============================================================================
