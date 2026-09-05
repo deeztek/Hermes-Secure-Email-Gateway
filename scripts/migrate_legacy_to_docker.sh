@@ -431,74 +431,31 @@ UPDATE parameters SET enabled = 1 WHERE parent_name = 'defer_transports' AND chi
 HOLD_SQL
     log "  + outbound delivery set to PAUSED in config (survives config re-renders; admin resumes from Web UI)"
 
-    # Other seeded tables are REPORTED, not merged. Their natural keys differ
-    # per table and a wrong guess would duplicate operator-edited rows, so this
-    # surfaces the delta for a human instead of silently writing.
+    # Every other seeded table is MERGED on its natural key, the same way the
+    # parameters merge above works (#322).
     #
-    # The table list is DERIVED from the shipped baseline -- every target of an
-    # INSERT in hermes_install.sql -- rather than hand-maintained (#322). It was
-    # a literal naming eleven tables, which said nothing at all about the
-    # fourteen others the legacy dump also overwrites, among them `files`,
-    # `malware_databases`, `captcha_list`, `subnet` and `timezones`. A table
-    # nobody thought to add reported no shortfall because it was never looked
-    # at, which reads exactly like having no shortfall. Deriving the list means
-    # a table seeded by a future release is covered the day it is added.
+    # This used to print row-count deltas and stop there, on the reasoning that
+    # natural keys differ per table and a wrong guess duplicates operator-edited
+    # rows. Half of that was true and the conclusion did not follow. These
+    # tables do have natural keys -- `files` is keyed by `file` ('exe', 'vbs'),
+    # which is even part of its PRIMARY KEY -- so the merge is no more of a
+    # guess here than it is for parameters. And a count delta is not something
+    # an operator can act on: it names no missing row, no affected feature and
+    # no remedy, and it scrolls past mid-run. Telling someone a number they can
+    # do nothing with is not a safeguard.
     #
-    # `parameters` is excluded: it is merged above, so it can only be at or
-    # above the baseline count and would be noise here.
+    # The id column is deliberately never carried over. Baseline ids and legacy
+    # ids are unrelated numbering, so an id-matched merge would both collide and
+    # miss; identity lives in the natural key and the id is re-assigned.
     #
-    # Exact COUNT(*) per table -- information_schema.table_rows is only an
-    # estimate for InnoDB and would give misleading numbers here. Generated as
-    # one probe per table and run in a single round trip: the derived list is
-    # three times longer than the literal it replaced, and two docker execs per
-    # table is a visible stall at that size.
-    local seeded_tables table_in_list
-    seeded_tables=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
-        | sed 's/.*`\(.*\)`/\1/' | sort -u)
-    table_in_list=$(printf "'%s'," $seeded_tables | sed 's/,$//')
-
-    log "  Seed-row delta in other config tables (informational -- NOT modified):"
-    local seed_delta_found=0
-    if [[ -n "$table_in_list" ]]; then
-        local count_probes seed_hits
-        # Pass 1: one probe per seeded table present in BOTH schemas, so a table
-        # missing from either is skipped rather than erroring the whole batch.
-        count_probes=$(docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null <<GEN_COUNT_SQL
-SELECT CONCAT(
-  'SELECT CONCAT(''      ', t.TABLE_NAME, ': baseline has '', ',
-  '(SELECT COUNT(*) FROM \`hermes_ref\`.\`', t.TABLE_NAME, '\`), '' row(s), restored DB has '', ',
-  '(SELECT COUNT(*) FROM \`hermes\`.\`', t.TABLE_NAME, '\`))',
-  ' FROM DUAL WHERE (SELECT COUNT(*) FROM \`hermes\`.\`', t.TABLE_NAME, '\`)',
-  ' < (SELECT COUNT(*) FROM \`hermes_ref\`.\`', t.TABLE_NAME, '\`);')
-FROM information_schema.TABLES t
-WHERE t.TABLE_SCHEMA = 'hermes_ref'
-  AND t.TABLE_NAME IN (${table_in_list})
-  AND t.TABLE_NAME <> 'parameters'
-  AND EXISTS (SELECT 1 FROM information_schema.TABLES h
-              WHERE h.TABLE_SCHEMA='hermes' AND h.TABLE_NAME=t.TABLE_NAME)
-ORDER BY t.TABLE_NAME;
-GEN_COUNT_SQL
-        )
-        # Pass 2: run them. A probe returns a row only on a shortfall.
-        if [[ -n "$count_probes" ]]; then
-            seed_hits=$(printf '%s\n' "$count_probes" \
-                | docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null | grep -v '^$' || true)
-            if [[ -n "$seed_hits" ]]; then
-                seed_delta_found=1
-                printf '%s\n' "$seed_hits" | tee -a "$LOG_FILE"
-            fi
-        fi
-    fi
-    if [[ "$seed_delta_found" == "0" ]]; then
-        log "      no shortfall detected in any table the baseline seeds"
-    else
-        warn "  ^ these tables have fewer rows than the current baseline. Features"
-        warn "    relying on the missing rows will be unconfigured until added by hand."
-        warn "    Content tables (file types, malware databases, word lists) are the"
-        warn "    common case and are capability-only. A shortfall in system_settings"
-        warn "    or parameters2 means a feature added since the legacy build has no"
-        warn "    configuration row at all."
-    fi
+    # Strictly additive, like the parameters merge: an existing row is left
+    # exactly as it is, so operator customisation survives. The one behaviour
+    # worth naming is that a baseline default the operator DELETED comes back.
+    # That is the same trade the parameters merge already makes, and it is the
+    # right side of it: the console disables rows rather than deleting them, so
+    # a row absent from a legacy DB is almost always a row that build 240815
+    # never shipped.
+    merge_seed_rows
 
     # 5) Generic unpopulated-column check.
     #    Adding a column creates it NULL. If its correct value must be DERIVED
@@ -511,11 +468,16 @@ GEN_COUNT_SQL
     #    ones someone thought of -- flag the whole CLASS: any column that the
     #    baseline populates but which is 100% NULL in the restored DB.
     #
-    #    Scoped to the same $table_in_list built for the seed-row report above
-    #    (every table the shipped SQL seeds), so this never runs COUNT(*) over
-    #    huge runtime tables like msgs.
+    #    Scoped to tables the baseline actually seeds (read from the shipped
+    #    SQL), so this never runs COUNT(*) over huge runtime tables like msgs.
     #    Report only -- backfilling requires knowing each column's derivation,
-    #    which is a per-column judgement call, not something to guess at.
+    #    which is a per-column judgement call, not something to guess at. Unlike
+    #    the seed-row shortfall above, this one has no mechanical fix, so it
+    #    stays a warning.
+    local seeded_tables table_in_list
+    seeded_tables=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+    table_in_list=$(printf "'%s'," $seeded_tables | sed 's/,$//')
 
     if [[ -n "$table_in_list" ]]; then
         local null_checks null_hits
@@ -585,6 +547,229 @@ GEN_NULL_SQL
     stamp_build_no
 }
 
+# ----------------------------------------------------------------------------
+# merge_seed_rows
+# ----------------------------------------------------------------------------
+# Insert baseline seed rows the legacy DB never had, into every seeded table
+# except `parameters` (merged separately above, its identity rules are
+# genuinely special) . Called from apply_schema_forward step 4. See #322.
+#
+# Each table is matched on its NATURAL key -- the field that names the thing,
+# not the id. `files` is keyed by `file` ('exe', 'vbs'), `policy` by
+# `policy_name`, `spam_settings` by `parameter`. The id is never carried over:
+# baseline and legacy id sequences are unrelated, so an id-matched merge would
+# collide on rows that exist and miss rows that do not.
+#
+# Adding a table: put it in SEED_MERGE_KEYS below, one line per key column. A
+# table the baseline seeds but this map does not name is reported at the end as
+# a gap in the MAP, which is a developer-facing message and actionable, unlike
+# the row-count warning this replaced.
+#
+# The two join tables are handled after the loop, because their identity is a
+# foreign id that has to be resolved through the parent's natural key first,
+# and the parent has to be merged before that resolution is complete.
+merge_seed_rows() {
+    log "Merging baseline seed rows absent from the legacy DB..."
+
+    # table:key_column, one line per key column (a composite key repeats the
+    # table). Derived by inspecting the shipped baseline; see #322.
+    local SEED_MERGE_KEYS="
+additional_sans:san
+aliases:alias
+captcha_list:random_letter
+crontab_entries:value
+dns_forwarders:server
+dns_forwarders:port
+encryption_settings:alias
+encryption_settings:property
+file_rules:rule_id
+file_rules:rule_name
+file_types:name
+files:file
+intrusion_prevention_jails:jail_name
+intrusion_prevention_settings:setting_name
+intrusion_prevention_whitelist:ip_cidr
+linkguard_abused_hosts:host
+malware_databases:name
+malware_feeds:name
+malware_feeds_config:section_name
+message_rules:rule_name
+migrations:name
+msg_content_type:content_type
+ofelia_jobs:job_name
+parameters2:parameter
+parameters2:module
+pgp_keyservers:keyserver
+policy:policy_name
+pushover_notifications:name
+quotes:quote
+random_words:word
+remoteauth_settings:setting_name
+sieve_rules:scope
+sieve_rules:username
+sieve_rules:rule_name
+spam_policies:policy_name
+spam_settings:parameter
+subnet:value3
+system_settings:parameter
+system_updates:version
+system_updates:build
+timezones:timezone
+user_destinations:destination
+"
+
+    # Load the map into a scratch table so the statement generator can build the
+    # match predicate with GROUP_CONCAT instead of the shell splitting strings.
+    local key_values
+    key_values=$(printf '%s\n' "$SEED_MERGE_KEYS" | grep -vE '^[[:space:]]*$' \
+        | awk -F: '{printf "(\047%s\047,\047%s\047),", $1, $2}' | sed 's/,$//')
+
+    docker exec -i hermes_db_server mariadb -u root >> "$LOG_FILE" 2>&1 <<MAP_SQL
+DROP TABLE IF EXISTS hermes_ref.__merge_keys;
+CREATE TABLE hermes_ref.__merge_keys (t VARCHAR(64), k VARCHAR(64)) ENGINE=InnoDB;
+INSERT INTO hermes_ref.__merge_keys (t, k) VALUES ${key_values};
+MAP_SQL
+
+    # Row counts before, so the log can say what actually changed.
+    local counts_before counts_after
+    counts_before=$(_seed_table_counts)
+
+    # Pass 1: generate one INSERT ... SELECT ... WHERE NOT EXISTS per mapped
+    # table. Columns come from information_schema, so a column added by a future
+    # release is carried without touching this function. AUTO_INCREMENT columns
+    # are excluded, which is what re-assigns the id.
+    local merge_sql
+    merge_sql=$(docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null <<'GEN_MERGE_SQL'
+SET SESSION group_concat_max_len = 1000000;
+SELECT CONCAT(
+  'INSERT INTO `hermes`.`', m.t, '` (',
+  (SELECT GROUP_CONCAT(CONCAT('`', c.COLUMN_NAME, '`') ORDER BY c.ORDINAL_POSITION)
+     FROM information_schema.COLUMNS c
+    WHERE c.TABLE_SCHEMA='hermes_ref' AND c.TABLE_NAME=m.t AND COALESCE(c.EXTRA,'') <> 'auto_increment'),
+  ') SELECT ',
+  (SELECT GROUP_CONCAT(CONCAT('r.`', c.COLUMN_NAME, '`') ORDER BY c.ORDINAL_POSITION)
+     FROM information_schema.COLUMNS c
+    WHERE c.TABLE_SCHEMA='hermes_ref' AND c.TABLE_NAME=m.t AND COALESCE(c.EXTRA,'') <> 'auto_increment'),
+  ' FROM `hermes_ref`.`', m.t, '` r WHERE NOT EXISTS (SELECT 1 FROM `hermes`.`', m.t,
+  '` h WHERE ',
+  (SELECT GROUP_CONCAT(CONCAT('h.`', k.k, '` <=> r.`', k.k, '`') SEPARATOR ' AND ')
+     FROM hermes_ref.__merge_keys k WHERE k.t = m.t),
+  ');')
+FROM (SELECT DISTINCT t FROM hermes_ref.__merge_keys) m
+WHERE EXISTS (SELECT 1 FROM information_schema.TABLES t1
+              WHERE t1.TABLE_SCHEMA='hermes_ref' AND t1.TABLE_NAME=m.t)
+  AND EXISTS (SELECT 1 FROM information_schema.TABLES t2
+              WHERE t2.TABLE_SCHEMA='hermes' AND t2.TABLE_NAME=m.t)
+ORDER BY m.t;
+GEN_MERGE_SQL
+    )
+
+    # Pass 2: run them.
+    if [[ -n "$merge_sql" ]]; then
+        printf '%s\n' "$merge_sql" \
+            | docker exec -i hermes_db_server mariadb -u root >> "$LOG_FILE" 2>&1 \
+            || warn "  One or more seed merges reported an error (see ${LOG_FILE})."
+    else
+        warn "  Could not generate seed-merge statements (see ${LOG_FILE})."
+    fi
+
+    merge_join_table_rows
+    counts_after=$(_seed_table_counts)
+    _report_merge_delta "$counts_before" "$counts_after"
+
+    # A table the baseline seeds but SEED_MERGE_KEYS does not name is skipped
+    # silently otherwise. Unlike a row count, this one has an owner and a fix:
+    # add the table and its natural key to the map.
+    local unmapped seeded_in_baseline
+    seeded_in_baseline=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+    unmapped=$(comm -23 \
+        <(printf '%s\n' "$seeded_in_baseline" | sort -u) \
+        <({ printf '%s\n' "$SEED_MERGE_KEYS" | grep -vE '^[[:space:]]*$' | cut -d: -f1; echo parameters; } | sort -u))
+    if [[ -n "$unmapped" ]]; then
+        warn "  Seeded tables with no natural key in SEED_MERGE_KEYS (NOT merged):"
+        printf '      %s\n' $unmapped | tee -a "$LOG_FILE"
+        warn "  ^ developer action: add each table and its natural key to"
+        warn "    merge_seed_rows() in this script. Until then their baseline"
+        warn "    rows are not carried onto migrated installs."
+    fi
+
+    docker exec hermes_db_server mariadb -u root \
+        -e "DROP TABLE IF EXISTS hermes_ref.__merge_keys;" >> "$LOG_FILE" 2>&1
+}
+
+# ----------------------------------------------------------------------------
+# merge_join_table_rows
+# ----------------------------------------------------------------------------
+# The two seeded tables whose identity is a foreign id rather than a name.
+# An id means nothing across two unrelated sequences, so each is resolved
+# through its parent's natural key. Runs AFTER the generic merge, so the parent
+# rows it resolves against are already present.
+merge_join_table_rows() {
+    # file_rule_components.file_id -> files.id, whose natural key is `file`.
+    # rule_id is not a foreign key despite the name: the seed carries a single
+    # rule-set number, so it is matched as a plain value alongside rule_name.
+    docker exec -i hermes_db_server mariadb -u root >> "$LOG_FILE" 2>&1 <<'FRC_SQL'
+INSERT INTO `hermes`.`file_rule_components`
+  (file_id, rule_id, rule_name, description, action, type, priority, system)
+SELECT hf.id, r.rule_id, r.rule_name, r.description, r.action, r.type, r.priority, r.system
+FROM `hermes_ref`.`file_rule_components` r
+JOIN `hermes_ref`.`files` rf ON rf.id = r.file_id
+JOIN `hermes`.`files`      hf ON hf.file <=> rf.file
+WHERE NOT EXISTS (
+  SELECT 1 FROM `hermes`.`file_rule_components` h
+  WHERE h.file_id = hf.id AND h.rule_id <=> r.rule_id AND h.rule_name <=> r.rule_name);
+FRC_SQL
+
+    # malware_feed_urls.feed_id -> malware_feeds_config.id, natural key
+    # `section_name`. url_key names the entry within a feed.
+    docker exec -i hermes_db_server mariadb -u root >> "$LOG_FILE" 2>&1 <<'MFU_SQL'
+INSERT INTO `hermes`.`malware_feed_urls`
+  (feed_id, url_key, url_value, enabled, filename_override, sort_order)
+SELECT hc.id, r.url_key, r.url_value, r.enabled, r.filename_override, r.sort_order
+FROM `hermes_ref`.`malware_feed_urls` r
+JOIN `hermes_ref`.`malware_feeds_config` rc ON rc.id = r.feed_id
+JOIN `hermes`.`malware_feeds_config`      hc ON hc.section_name <=> rc.section_name
+WHERE NOT EXISTS (
+  SELECT 1 FROM `hermes`.`malware_feed_urls` h
+  WHERE h.feed_id = hc.id AND h.url_key <=> r.url_key);
+MFU_SQL
+}
+
+# ----------------------------------------------------------------------------
+# _seed_table_counts / _report_merge_delta
+# ----------------------------------------------------------------------------
+# One round trip for every mapped table's row count, so the merge can report
+# what it actually inserted rather than what was missing.
+_seed_table_counts() {
+    local probes
+    probes=$(docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null <<'GEN_COUNT_SQL'
+SELECT CONCAT('SELECT CONCAT(''', m.t, ' '', (SELECT COUNT(*) FROM `hermes`.`', m.t, '`));')
+FROM (SELECT DISTINCT t FROM hermes_ref.__merge_keys) m
+WHERE EXISTS (SELECT 1 FROM information_schema.TABLES t2
+              WHERE t2.TABLE_SCHEMA='hermes' AND t2.TABLE_NAME=m.t)
+ORDER BY m.t;
+GEN_COUNT_SQL
+    )
+    [[ -z "$probes" ]] && return 0
+    printf '%s\n' "$probes" \
+        | docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null | grep -v '^$' || true
+}
+
+_report_merge_delta() {  # <before> <after>
+    local before="$1" after="$2" any=0 t b a
+    while read -r t a; do
+        [[ -z "$t" ]] && continue
+        b=$(printf '%s\n' "$before" | awk -v k="$t" '$1==k {print $2}')
+        [[ -z "$b" ]] && b=0
+        if [[ "$a" -gt "$b" ]]; then
+            log "      + ${t}: merged $(( a - b )) row(s)"
+            any=1
+        fi
+    done <<< "$after"
+    [[ "$any" == "0" ]] && log "      all baseline seed rows already present (nothing to merge)"
+    return 0
+}
 # ----------------------------------------------------------------------------
 # reconcile_seeded_values
 # ----------------------------------------------------------------------------

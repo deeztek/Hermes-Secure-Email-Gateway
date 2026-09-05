@@ -39,23 +39,38 @@ beside each release below is the **actual release date**.
   Step 7 is the one part of the bridge that is not self-maintaining. A future release that
   corrects a seeded value has to add its own statement there.
 
-- **The migration's seed-row report now covers every table the baseline seeds, not eleven of
-  them** (#322). Tables that exist in both the legacy build and the current baseline are
-  replaced wholesale by the legacy dump, and only `parameters` is merged back. The rest are
-  reported rather than merged, deliberately: their natural keys differ per table and a wrong
-  guess duplicates operator-edited rows. But the report iterated a hand-written list of eleven
-  tables, so the fourteen others the dump also overwrites produced no output at all, which on
-  screen is indistinguishable from having no shortfall. Among the silent ones were `files`,
-  `malware_databases`, `captcha_list`, `file_rules`, `spam_policies`, `subnet`, `timezones` and
-  `system_updates`.
+- **The migration now carries every baseline seed row onto a migrated install, instead of
+  printing a count and leaving it** (#322). Tables that exist in both build 240815 and the
+  current baseline are replaced wholesale by the legacy dump, so every row a release added
+  since that build is gone. Only `parameters` was merged back. The other thirty-seven printed
+  a row-count delta and stopped, on the reasoning that their natural keys differ per table and
+  a wrong guess duplicates operator-edited rows.
 
-  The list is now derived from the shipped baseline itself, every target of an `INSERT` in
-  `hermes_install.sql`, which the same function already computed one step later for its
-  unpopulated-column probe and now shares. Coverage goes from 11 tables to 37, a table seeded
-  by a future release is covered the day it is added, and there is no list left to maintain.
-  The probes are generated as one statement per table and run in a single round trip, since
-  the derived list is three times longer and two round trips per table would be a visible
-  stall. Still report-only, and still nothing is written.
+  Half of that was true and the conclusion did not follow. These tables do have natural keys:
+  `files` is keyed by `file` (`exe`, `vbs`), which is even part of its primary key, `policy` by
+  `policy_name`, `spam_settings` and `system_settings` by `parameter`. Matching on the name of
+  the thing rather than on an id is exactly what the `parameters` merge already did. And a
+  count delta is not something an operator can act on: it names no missing row, no affected
+  feature and no remedy, and it scrolls past mid-run, ahead of an archive restore that can take
+  hours. Telling someone a number they can do nothing with is not a safeguard.
+
+  All thirty-seven are now merged on their natural key, additively, so an existing row is left
+  exactly as it is and operator customisation survives. The `id` is never carried over, since
+  baseline and legacy id sequences are unrelated and an id-matched merge would both collide and
+  miss. `file_rule_components` and `malware_feed_urls` are join tables whose identity is a
+  foreign id, so each is resolved through its parent's natural key (`files.file` and
+  `malware_feeds_config.section_name`) after the parent has been merged. Column lists come from
+  `information_schema`, so a column added by a future release is carried without touching the
+  code.
+
+  What remains is a table the baseline seeds that the key map does not name. That is now
+  reported, and unlike a row count it has an owner and a fix: add the table and its natural key
+  to `merge_seed_rows()`.
+
+  One behaviour worth naming: a baseline default the operator deliberately deleted comes back.
+  That is the same trade the `parameters` merge already makes, and it is the right side of it,
+  because the console disables rows rather than deleting them, so a row absent from a legacy DB
+  is almost always one that build 240815 never shipped.
 
 ## [v260815] — 2026-08-22
 
