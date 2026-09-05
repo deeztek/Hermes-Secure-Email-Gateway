@@ -39,6 +39,24 @@ beside each release below is the **actual release date**.
   Step 7 is the one part of the bridge that is not self-maintaining. A future release that
   corrects a seeded value has to add its own statement there.
 
+- **The migration's seed-row report now covers every table the baseline seeds, not eleven of
+  them** (#322). Tables that exist in both the legacy build and the current baseline are
+  replaced wholesale by the legacy dump, and only `parameters` is merged back. The rest are
+  reported rather than merged, deliberately: their natural keys differ per table and a wrong
+  guess duplicates operator-edited rows. But the report iterated a hand-written list of eleven
+  tables, so the fourteen others the dump also overwrites produced no output at all, which on
+  screen is indistinguishable from having no shortfall. Among the silent ones were `files`,
+  `malware_databases`, `captcha_list`, `file_rules`, `spam_policies`, `subnet`, `timezones` and
+  `system_updates`.
+
+  The list is now derived from the shipped baseline itself, every target of an `INSERT` in
+  `hermes_install.sql`, which the same function already computed one step later for its
+  unpopulated-column probe and now shares. Coverage goes from 11 tables to 37, a table seeded
+  by a future release is covered the day it is added, and there is no list left to maintain.
+  The probes are generated as one statement per table and run in a single round trip, since
+  the derived list is three times longer and two round trips per table would be a visible
+  stall. Still report-only, and still nothing is written.
+
 ## [v260815] — 2026-08-22
 
 ### Added

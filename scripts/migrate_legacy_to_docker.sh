@@ -434,26 +434,70 @@ HOLD_SQL
     # Other seeded tables are REPORTED, not merged. Their natural keys differ
     # per table and a wrong guess would duplicate operator-edited rows, so this
     # surfaces the delta for a human instead of silently writing.
+    #
+    # The table list is DERIVED from the shipped baseline -- every target of an
+    # INSERT in hermes_install.sql -- rather than hand-maintained (#322). It was
+    # a literal naming eleven tables, which said nothing at all about the
+    # fourteen others the legacy dump also overwrites, among them `files`,
+    # `malware_databases`, `captcha_list`, `subnet` and `timezones`. A table
+    # nobody thought to add reported no shortfall because it was never looked
+    # at, which reads exactly like having no shortfall. Deriving the list means
+    # a table seeded by a future release is covered the day it is added.
+    #
+    # `parameters` is excluded: it is merged above, so it can only be at or
+    # above the baseline count and would be noise here.
+    #
     # Exact COUNT(*) per table -- information_schema.table_rows is only an
-    # estimate for InnoDB and would give misleading numbers here.
+    # estimate for InnoDB and would give misleading numbers here. Generated as
+    # one probe per table and run in a single round trip: the derived list is
+    # three times longer than the literal it replaced, and two docker execs per
+    # table is a visible stall at that size.
+    local seeded_tables table_in_list
+    seeded_tables=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+    table_in_list=$(printf "'%s'," $seeded_tables | sed 's/,$//')
+
     log "  Seed-row delta in other config tables (informational -- NOT modified):"
     local seed_delta_found=0
-    for t in parameters2 system_settings spam_settings ofelia_jobs encryption_settings \
-             remoteauth_settings policy file_types malware_feeds dns_forwarders message_rules; do
-        local ref_n cur_n
-        ref_n=$(docker exec hermes_db_server mariadb -u root -N -e "SELECT COUNT(*) FROM hermes_ref.\`${t}\`;" 2>/dev/null || echo "")
-        cur_n=$(docker exec hermes_db_server mariadb -u root -N -e "SELECT COUNT(*) FROM hermes.\`${t}\`;" 2>/dev/null || echo "")
-        [[ -z "$ref_n" || -z "$cur_n" ]] && continue
-        if [[ "$cur_n" -lt "$ref_n" ]]; then
-            warn "      ${t}: baseline has ${ref_n} row(s), restored DB has ${cur_n}"
-            seed_delta_found=1
+    if [[ -n "$table_in_list" ]]; then
+        local count_probes seed_hits
+        # Pass 1: one probe per seeded table present in BOTH schemas, so a table
+        # missing from either is skipped rather than erroring the whole batch.
+        count_probes=$(docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null <<GEN_COUNT_SQL
+SELECT CONCAT(
+  'SELECT CONCAT(''      ', t.TABLE_NAME, ': baseline has '', ',
+  '(SELECT COUNT(*) FROM \`hermes_ref\`.\`', t.TABLE_NAME, '\`), '' row(s), restored DB has '', ',
+  '(SELECT COUNT(*) FROM \`hermes\`.\`', t.TABLE_NAME, '\`))',
+  ' FROM DUAL WHERE (SELECT COUNT(*) FROM \`hermes\`.\`', t.TABLE_NAME, '\`)',
+  ' < (SELECT COUNT(*) FROM \`hermes_ref\`.\`', t.TABLE_NAME, '\`);')
+FROM information_schema.TABLES t
+WHERE t.TABLE_SCHEMA = 'hermes_ref'
+  AND t.TABLE_NAME IN (${table_in_list})
+  AND t.TABLE_NAME <> 'parameters'
+  AND EXISTS (SELECT 1 FROM information_schema.TABLES h
+              WHERE h.TABLE_SCHEMA='hermes' AND h.TABLE_NAME=t.TABLE_NAME)
+ORDER BY t.TABLE_NAME;
+GEN_COUNT_SQL
+        )
+        # Pass 2: run them. A probe returns a row only on a shortfall.
+        if [[ -n "$count_probes" ]]; then
+            seed_hits=$(printf '%s\n' "$count_probes" \
+                | docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null | grep -v '^$' || true)
+            if [[ -n "$seed_hits" ]]; then
+                seed_delta_found=1
+                printf '%s\n' "$seed_hits" | tee -a "$LOG_FILE"
+            fi
         fi
-    done
+    fi
     if [[ "$seed_delta_found" == "0" ]]; then
-        log "      no shortfall detected in the reported tables"
+        log "      no shortfall detected in any table the baseline seeds"
     else
         warn "  ^ these tables have fewer rows than the current baseline. Features"
         warn "    relying on the missing rows will be unconfigured until added by hand."
+        warn "    Content tables (file types, malware databases, word lists) are the"
+        warn "    common case and are capability-only. A shortfall in system_settings"
+        warn "    or parameters2 means a feature added since the legacy build has no"
+        warn "    configuration row at all."
     fi
 
     # 5) Generic unpopulated-column check.
@@ -467,14 +511,11 @@ HOLD_SQL
     #    ones someone thought of -- flag the whole CLASS: any column that the
     #    baseline populates but which is 100% NULL in the restored DB.
     #
-    #    Scoped to tables the baseline actually seeds (read from the shipped
-    #    SQL), so this never runs COUNT(*) over huge runtime tables like msgs.
+    #    Scoped to the same $table_in_list built for the seed-row report above
+    #    (every table the shipped SQL seeds), so this never runs COUNT(*) over
+    #    huge runtime tables like msgs.
     #    Report only -- backfilling requires knowing each column's derivation,
     #    which is a per-column judgement call, not something to guess at.
-    local seeded_tables table_in_list
-    seeded_tables=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
-        | sed 's/.*`\(.*\)`/\1/' | sort -u)
-    table_in_list=$(printf "'%s'," $seeded_tables | sed 's/,$//')
 
     if [[ -n "$table_in_list" ]]; then
         local null_checks null_hits
