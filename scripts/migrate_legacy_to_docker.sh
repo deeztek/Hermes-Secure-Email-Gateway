@@ -882,7 +882,7 @@ DNSBL_SQL
 # backup this was verified against), and the seed merge cannot correct it,
 # because the merge is additive and the row already exists.
 stamp_build_no() {
-    local install_version legacy_build
+    local install_version legacy_build legacy_version
     install_version=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
         | grep -oE '^v[0-9]{6}$' \
         | sort \
@@ -890,6 +890,19 @@ stamp_build_no() {
 
     legacy_build=$(docker exec hermes_db_server mariadb -u root -N \
         -e "SELECT value FROM hermes.system_settings WHERE parameter='build_no';" 2>/dev/null | tr -d '[:space:]')
+    legacy_version=$(docker exec hermes_db_server mariadb -u root -N \
+        -e "SELECT value FROM hermes.system_settings WHERE parameter='version_no';" 2>/dev/null | tr -d '[:space:]')
+
+    # version_no first, and unconditionally. It is the literal the baseline
+    # seeds, so unlike build_no it does not depend on reading updates/ and must
+    # not be skipped when that read fails.
+    docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<'VERSION_SQL'
+INSERT INTO system_settings (parameter, value)
+SELECT 'version_no', 'Docker'
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM system_settings) s WHERE s.parameter = 'version_no');
+UPDATE system_settings SET value = 'Docker' WHERE parameter = 'version_no';
+VERSION_SQL
+    log "  + version_no stamped ${legacy_version:-unset} -> Docker"
 
     if [[ -z "$install_version" ]]; then
         warn "Could not derive release version from ${HERMES_ROOT}/updates/."
@@ -904,12 +917,7 @@ INSERT INTO system_settings (parameter, value)
 SELECT 'build_no', '${install_version}'
 WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM system_settings) s WHERE s.parameter = 'build_no');
 UPDATE system_settings SET value = '${install_version}' WHERE parameter = 'build_no';
-INSERT INTO system_settings (parameter, value)
-SELECT 'version_no', 'Docker'
-WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM system_settings) s WHERE s.parameter = 'version_no');
-UPDATE system_settings SET value = 'Docker' WHERE parameter = 'version_no';
 STAMP_SQL
-
     log "  + build_no stamped ${legacy_build:-unset} -> ${install_version} (was the legacy source build)"
 }
 
