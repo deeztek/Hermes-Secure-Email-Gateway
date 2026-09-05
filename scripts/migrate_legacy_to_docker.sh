@@ -374,7 +374,7 @@ WHERE
   (
     r.child = 2
     AND NOT EXISTS (
-      SELECT 1 FROM hermes.parameters h
+      SELECT 1 FROM (SELECT * FROM hermes.parameters) h
       WHERE h.module <=> r.module AND h.child = 2 AND h.parameter <=> r.parameter)
   )
   -- (b) child=1 under a SINGLE-valued directive: `parameter` holds the VALUE,
@@ -388,7 +388,7 @@ WHERE
          WHERE r2.child = 1 AND r2.module <=> r.module
            AND r2.parent_name <=> r.parent_name) = 1
     AND NOT EXISTS (
-      SELECT 1 FROM hermes.parameters h
+      SELECT 1 FROM (SELECT * FROM hermes.parameters) h
       WHERE h.module <=> r.module AND h.child = 1
         AND h.parent_name <=> r.parent_name)
   )
@@ -401,7 +401,7 @@ WHERE
          WHERE r2.child = 1 AND r2.module <=> r.module
            AND r2.parent_name <=> r.parent_name) > 1
     AND NOT EXISTS (
-      SELECT 1 FROM hermes.parameters h
+      SELECT 1 FROM (SELECT * FROM hermes.parameters) h
       WHERE h.module <=> r.module AND h.child = 1
         AND h.parent_name <=> r.parent_name
         AND h.parameter <=> r.parameter)
@@ -543,7 +543,10 @@ GEN_NULL_SQL
     #    legacy system_settings restore overwrote it with the source build
     #    (240815). Nothing else puts it back, so without this the console
     #    reports a legacy build forever and system_update_docker.sh sees every
-    #    updates/v<DATE>/ directory as still pending.
+    #    updates/v<DATE>/ directory as still pending. version_no is stamped for
+    #    the same reason: legacy carries the Ubuntu release there ('20.04')
+    #    where the Docker baseline carries 'Docker', and the seed merge cannot
+    #    correct it, because the merge is additive and the row already exists.
     stamp_build_no
 }
 
@@ -568,6 +571,17 @@ GEN_NULL_SQL
 # The two join tables are handled after the loop, because their identity is a
 # foreign id that has to be resolved through the parent's natural key first,
 # and the parent has to be merged before that resolution is complete.
+#
+# Every NOT EXISTS reads the insert target through a derived table
+# (SELECT * FROM `hermes`.`t`) rather than naming it directly. MySQL refuses
+# the direct form with error 1093, which updates/v260815 hit and worked around
+# the same way. It also fixes the semantics: the derived table is a snapshot
+# taken before the insert, so where the baseline legitimately holds two rows
+# sharing a natural key -- `captcha_list`, `timezones` and `malware_databases`
+# all do -- both are inserted, matching a fresh install, instead of the second
+# being suppressed by the first. The reverse case, legacy holding one of a
+# baseline pair, inserts neither. That under-inserts by one rather than
+# duplicating, which is the safe direction.
 merge_seed_rows() {
     log "Merging baseline seed rows absent from the legacy DB..."
 
@@ -650,8 +664,8 @@ SELECT CONCAT(
   (SELECT GROUP_CONCAT(CONCAT('r.`', c.COLUMN_NAME, '`') ORDER BY c.ORDINAL_POSITION)
      FROM information_schema.COLUMNS c
     WHERE c.TABLE_SCHEMA='hermes_ref' AND c.TABLE_NAME=m.t AND COALESCE(c.EXTRA,'') <> 'auto_increment'),
-  ' FROM `hermes_ref`.`', m.t, '` r WHERE NOT EXISTS (SELECT 1 FROM `hermes`.`', m.t,
-  '` h WHERE ',
+  ' FROM `hermes_ref`.`', m.t, '` r WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM `hermes`.`', m.t,
+  '`) h WHERE ',
   (SELECT GROUP_CONCAT(CONCAT('h.`', k.k, '` <=> r.`', k.k, '`') SEPARATOR ' AND ')
      FROM hermes_ref.__merge_keys k WHERE k.t = m.t),
   ');')
@@ -717,7 +731,7 @@ FROM `hermes_ref`.`file_rule_components` r
 JOIN `hermes_ref`.`files` rf ON rf.id = r.file_id
 JOIN `hermes`.`files`      hf ON hf.file <=> rf.file
 WHERE NOT EXISTS (
-  SELECT 1 FROM `hermes`.`file_rule_components` h
+  SELECT 1 FROM (SELECT * FROM `hermes`.`file_rule_components`) h
   WHERE h.file_id = hf.id AND h.rule_id <=> r.rule_id AND h.rule_name <=> r.rule_name);
 FRC_SQL
 
@@ -731,7 +745,7 @@ FROM `hermes_ref`.`malware_feed_urls` r
 JOIN `hermes_ref`.`malware_feeds_config` rc ON rc.id = r.feed_id
 JOIN `hermes`.`malware_feeds_config`      hc ON hc.section_name <=> rc.section_name
 WHERE NOT EXISTS (
-  SELECT 1 FROM `hermes`.`malware_feed_urls` h
+  SELECT 1 FROM (SELECT * FROM `hermes`.`malware_feed_urls`) h
   WHERE h.feed_id = hc.id AND h.url_key <=> r.url_key);
 MFU_SQL
 }
@@ -855,12 +869,18 @@ DNSBL_SQL
 # ----------------------------------------------------------------------------
 # stamp_build_no
 # ----------------------------------------------------------------------------
-# Write system_settings.build_no to the release this checkout actually is.
-# Called from apply_schema_forward step 8. See #322.
+# Write system_settings.build_no and version_no to what this checkout actually
+# is. Called from apply_schema_forward step 8. See #322.
 #
-# The version is derived from the newest updates/v<YYMMDD>/ directory, the same
+# build_no is derived from the newest updates/v<YYMMDD>/ directory, the same
 # source install_hermes_docker.sh's derive_install_version() uses, so it stays
 # correct per release with no checklist step to forget.
+#
+# version_no is the literal 'Docker', matching what the baseline seeds. It names
+# the platform rather than a release, so there is nothing to derive it from. A
+# legacy DB carries the Ubuntu release there instead ('20.04' on the 240815
+# backup this was verified against), and the seed merge cannot correct it,
+# because the merge is additive and the row already exists.
 stamp_build_no() {
     local install_version legacy_build
     install_version=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null \
@@ -882,8 +902,12 @@ stamp_build_no() {
     docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1 <<STAMP_SQL
 INSERT INTO system_settings (parameter, value)
 SELECT 'build_no', '${install_version}'
-WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = 'build_no');
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM system_settings) s WHERE s.parameter = 'build_no');
 UPDATE system_settings SET value = '${install_version}' WHERE parameter = 'build_no';
+INSERT INTO system_settings (parameter, value)
+SELECT 'version_no', 'Docker'
+WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM system_settings) s WHERE s.parameter = 'version_no');
+UPDATE system_settings SET value = 'Docker' WHERE parameter = 'version_no';
 STAMP_SQL
 
     log "  + build_no stamped ${legacy_build:-unset} -> ${install_version} (was the legacy source build)"

@@ -72,6 +72,26 @@ beside each release below is the **actual release date**.
   because the console disables rows rather than deleting them, so a row absent from a legacy DB
   is almost always one that build 240815 never shipped.
 
+  Verified against a real build 240815 backup, offline: the merge inserts 377 rows, including
+  16 `system_settings` keys, 29 `parameters2`, 11 `malware_databases` and all 10 `ofelia_jobs`.
+  Rows the operator had customised are left alone, most visibly the 103 `message_rules` on that
+  gateway against 5 in the baseline, and its 96 `files` rows against 94.
+
+- **The migration also stamps `version_no`, not just `build_no`** (#322). A legacy database
+  carries the Ubuntu release there, `20.04` on the backup this was checked against, where the
+  Docker baseline carries `Docker`. The seed merge cannot correct it, because the merge is
+  additive and the row already exists, so a migrated console reported the Ubuntu version
+  indefinitely.
+
+- **Fixed MySQL error 1093 in the migration's seed merges** (#322). Every `NOT EXISTS` guard
+  named the insert target directly, which MySQL rejects. `updates/v260815` had already hit this
+  and worked around it with a derived table; the same workaround is now applied to the generic
+  merge, both join-table merges, the release stamp, and the pre-existing `parameters` merge,
+  which carried the same shape. It also settles the semantics where the baseline legitimately
+  holds two rows sharing a natural key, as `captcha_list`, `timezones` and `malware_databases`
+  all do: the derived table is a snapshot taken before the insert, so both rows land, matching
+  a fresh install.
+
 ## [v260815] — 2026-08-22
 
 ### Added
