@@ -82,7 +82,7 @@
 
 Hermes Secure Email Gateway is a Free Open Source Secure Email Gateway **and** Email Server.
 
-It provides spam, virus, and malware protection through Apache SpamAssassin, ClamAV, and Amavisd-new; full in-transit and at-rest email encryption via SMTP TLS, S/MIME, PGP, encrypted PDF (powered by CipherMail), and Dovecot mail-crypt; email archiving; integrated mailbox hosting on Dovecot with per-user quotas, aliases, shared folders, Sieve rules, vacation auto-reply, and mobile-device autoconfiguration; file sync, webmail, calendars (CalDAV), and contacts (CardDAV) through Nextcloud; a local user directory and single sign-on via OpenLDAP and Authelia, with multi-factor authentication via TOTP, WebAuthn, and Duo Push; and modern email authentication standards including SPF, DKIM signing and verification, DMARC, and ARC through OpenDKIM, OpenDMARC, and OpenARC.
+It provides spam, virus, and malware protection through Apache SpamAssassin, ClamAV, and Amavisd-new; full in-transit and at-rest email encryption via SMTP TLS, S/MIME, PGP, encrypted PDF (powered by CipherMail), and Dovecot mail-crypt; full email archiving of every processed message, with self-service recovery for users and administrators; integrated mailbox hosting on Dovecot with per-user quotas, aliases, shared folders, Sieve rules, vacation auto-reply, and mobile-device autoconfiguration; file sync, webmail, calendars (CalDAV), and contacts (CardDAV) through Nextcloud; a local user directory and single sign-on via OpenLDAP and Authelia, with multi-factor authentication via TOTP, WebAuthn, and Duo Push; and modern email authentication standards including SPF, DKIM signing and verification, DMARC, and ARC through OpenDKIM, OpenDMARC, and OpenARC.
 
 Hermes combines these Open Source technologies under one unified web-based administration console for easy management of your organization's inbound and outbound email, mailbox users, encryption keys, and authentication policies. End users get a self-service portal for managing their own signatures, sieve rules, vacation messages, app passwords, and mobile-device profiles.
 
@@ -120,7 +120,9 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Malware feeds management (managed via Fangfrisch): configure additional 3rd-party signature feeds including SaneSecurity, MalwarePatrol, SecuriteInfo, TwinWave, ClamPunch, RFXN, InterServer, Ditekshen, and more
 - Per-recipient spam/virus/file policies
 - Custom message rules, score overrides, custom file expressions/extensions/rules
-- Quarantine, message-history search, queue management, train as spam/ham, release to recipient, download messages
+- Quarantine, queue management, train as spam/ham, download messages
+- **Full email archiving**: every processed message is archived, not only blocked mail. Clean deliveries, spam, banned attachments, and infected mail are each written to their own store. Searchable by date range, sender, recipient, subject, score, and verdict
+- **Self-service recovery**: recipients search Message History and release messages back to their own mailbox from the per-mailbox portal, without administrator involvement. Administrators see the whole system record and can release on any user's behalf; release always delivers to the original recipient, so it cannot be used to redirect another user's mail. Retention is set by policy, not by a fixed window
 
 ### Encryption and authentication (Community)
 
@@ -220,7 +222,7 @@ Hermes splits storage across **five independent tiers** so each can live on the 
 |---|---|---|---|
 | **Config** | install root (implicit) | Repo working tree, generated config, secrets, `.env` | Fast SSD; sized by repo location |
 | **Data** | `/mnt/data` | Databases, service logs, mail-filter state, Postfix queue | Fast SSD; sized for DB growth and log retention. **High write rate, backup-critical.** |
-| **Archive** | `/mnt/archive` | Amavis quarantine archive | Cheap bulk; sized for retention policy &times; quarantine inflow. Grows unboundedly, cold access. |
+| **Archive** | `/mnt/archive` | Email archive: every processed message (clean, spam, banned, infected) | Cheap bulk; sized for retention policy &times; total mail volume. Grows unboundedly, cold access. |
 | **Vmail** | `/mnt/vmail` | Dovecot mailboxes | Cheap bulk; sized for users &times; quota |
 | **Nextcloud** | `/mnt/files` | Nextcloud app + user files + Redis cache | Cheap bulk; sized for user file storage |
 
@@ -249,11 +251,11 @@ For a production install, give **each storage tier its own physical or virtual d
 | Tier | Disk it wants | Why a dedicated disk |
 | --- | --- | --- |
 | **Data** | Fast SSD | High write rate (databases, logs, Postfix queue) and backup-critical; isolating it from the OS disk is the single biggest performance win |
-| **Archive** | Commodity bulk | Quarantine archive grows unboundedly with retention; keep that growth off the DB/OS disk |
+| **Archive** | Commodity bulk | The email archive holds every processed message and grows unboundedly with retention; keep that growth off the DB/OS disk |
 | **Vmail** | Commodity bulk | Dovecot mailboxes scale with users &times; quota; size and grow independently |
 | **Nextcloud** | Commodity bulk | User files + Redis cache; size for file-storage growth independently |
 
-None of this is *strictly required*; small or test deployments can collapse the tiers onto one disk (point Archive, Vmail, and Nextcloud at the same path as Data; see [Storage topology](#storage-topology) above). But for any install carrying real mail volume, a dedicated disk per tier is the recommended layout: it keeps the latency-sensitive Data tier fast, and prevents unbounded quarantine / mailbox / file growth from ever filling the database disk.
+None of this is *strictly required*; small or test deployments can collapse the tiers onto one disk (point Archive, Vmail, and Nextcloud at the same path as Data; see [Storage topology](#storage-topology) above). But for any install carrying real mail volume, a dedicated disk per tier is the recommended layout: it keeps the latency-sensitive Data tier fast, and prevents unbounded archive / mailbox / file growth from ever filling the database disk.
 
 If you don't want a secondary drive for a given tier, simply create the directory on your primary disk (e.g., `mkdir /mnt/data /mnt/archive /mnt/vmail /mnt/files`) and point the installer at it.
 
