@@ -102,6 +102,68 @@ validate_decl() {
 }
 
 MIGRATION_FAILED=0
+SEEDID_FAILED=0
+
+# ---------------------------------------------------------------------------
+# Seed id collisions in the baseline
+# ---------------------------------------------------------------------------
+# A column-list INSERT (no id) takes the next AUTO_INCREMENT value. If a later
+# line in the same table's seed inserts that same id explicitly, INSERT IGNORE
+# discards it WITHOUT ERROR and the import still reports success.
+#
+# That is not hypothetical. It shipped in v260815: the auto-id
+# check_recipient_access row landed on id 474, the next line's explicit
+# VALUES (474, 'inet:hermes_body_milter:8893', ...) collided, and the body
+# milter was absent from smtpd_milters on every fresh install of that release.
+# Disclaimers, signatures, external banners and Link Guard were all silently
+# dead, and milter_default_action = accept meant Postfix never complained
+# either. A customer lost days to it.
+#
+# `parameters` has only PRIMARY KEY (id) and no unique key on anything else, so
+# there was nothing to dedupe on and nothing to fail loudly.
+#
+# The rule is simple and mechanically checkable: within one table's seed, an
+# auto-id INSERT must not be followed by an explicit-id INSERT. Put the auto-id
+# rows last and a collision cannot be constructed.
+# ---------------------------------------------------------------------------
+check_seed_id_collisions() {
+    local baseline="config/database/hermes_install.sql"
+    if [[ ! -f "$baseline" ]]; then
+        echo "${YELLOW}  skipped${NC}  baseline not found"
+        return 0
+    fi
+
+    local offenders
+    offenders=$(awk '
+        # Column-list form: INSERT [IGNORE] INTO `t` (`col`, ...) VALUES
+        match($0, /^INSERT (IGNORE )?INTO `[a-z_0-9]+` \(/) {
+            t = $0; sub(/^INSERT (IGNORE )?INTO `/, "", t); sub(/`.*/, "", t)
+            if (!(t in autoline)) { autoline[t] = NR }
+            next
+        }
+        # Positional form: INSERT [IGNORE] INTO `t` VALUES (<id>,
+        match($0, /^INSERT (IGNORE )?INTO `[a-z_0-9]+` VALUES \([0-9]+,/) {
+            t = $0; sub(/^INSERT (IGNORE )?INTO `/, "", t); sub(/`.*/, "", t)
+            if (t in autoline) {
+                id = $0; sub(/^.*VALUES \(/, "", id); sub(/,.*/, "", id)
+                printf "%s|%d|%d|%s\n", t, autoline[t], NR, id
+            }
+            next
+        }
+    ' "$baseline")
+
+    if [[ -n "$offenders" ]]; then
+        while IFS='|' read -r t aline eline id; do
+            [[ -z "$t" ]] && continue
+            note_fail "${baseline}: table '${t}' has an auto-id INSERT at line ${aline}, then an explicit id ${id} at line ${eline}"
+            CHECKED=$((CHECKED + 1))
+        done <<< "$offenders"
+        SEEDID_FAILED=1
+    else
+        CHECKED=$((CHECKED + 1))
+        echo "${GREEN}  ok${NC}       no auto-id seed row precedes an explicit id"
+    fi
+}
 
 # ---------------------------------------------------------------------------
 # Migration seed coverage (the THIRD install path)
@@ -213,6 +275,9 @@ done
 echo "${CYAN}Migration seed coverage${NC}"
 check_migration_seed_coverage
 echo
+echo "${CYAN}Seed id collisions${NC}"
+check_seed_id_collisions
+echo
 
 if [[ $FAILED -gt 0 ]]; then
     echo "${RED}FAILED${NC}: ${FAILED} artifact(s) undeclared out of ${CHECKED} checked."
@@ -224,6 +289,14 @@ if [[ $FAILED -gt 0 ]]; then
     echo "  ${YELLOW}# FRESH-INSTALL: covered-by scripts/install_hermes_docker.sh  <function or line>${NC}"
     echo "  ${YELLOW}# FRESH-INSTALL: n/a  repairs data only a pre-existing install can have${NC}"
     echo
+    if [[ $SEEDID_FAILED -eq 1 ]]; then
+        echo "Move the auto-id INSERT below every explicit-id INSERT for that table."
+        echo "An auto-id row takes the next AUTO_INCREMENT value; a later explicit id"
+        echo "that matches is discarded by INSERT IGNORE without an error, and the"
+        echo "import still reports success. That is how the body milter went missing"
+        echo "from smtpd_milters on every fresh install of v260815."
+        echo
+    fi
     if [[ $MIGRATION_FAILED -eq 1 ]]; then
         echo "For a table the baseline seeds but the migration does not carry, add"
         echo "its natural key to SEED_MERGE_KEYS in merge_seed_rows(), or if it"

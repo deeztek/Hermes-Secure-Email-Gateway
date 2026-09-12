@@ -112,7 +112,65 @@ INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `sou
 INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-refresh-network-aliases\"]',' 0 30 03 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/refresh_network_aliases.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 
 -- ---------------------------------------------------------------------
--- 3. Version stamp -- MUST be the last statement (advances build_no so
+-- 3. Restore the body milter in smtpd_milters on fresh v260815 installs
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  the auto-id row was moved below every explicit id, so the collision cannot recur
+--
+-- v260815's baseline inserted the #311 internal-only recipients row with a
+-- column-list INSERT and no id, positioned ABOVE ids 474-477. The
+-- AUTO_INCREMENT counter was at 474, that row took 474, and the next line's
+-- explicit VALUES (474, 'inet:hermes_body_milter:8893', ...) then collided on
+-- the primary key. INSERT IGNORE discards a duplicate without erroring, so the
+-- import reported success and nothing was logged.
+--
+-- Result on EVERY fresh install of v260815: hermes_body_milter is absent from
+-- smtpd_milters. Postfix never calls the body milter for inbound mail, so Link
+-- Guard, disclaimers, organizational signatures and external banners are all
+-- silently inert. milter_default_action = accept means Postfix does not
+-- complain either. The row survived in non_smtpd_milters (id 475), which is
+-- locally submitted mail only, so the feature looks half-present if anyone
+-- checks the wrong directive.
+--
+-- Upgraded installs are NOT affected: they receive that row from
+-- updates/v260815/sql/schema_updates.sql and never re-run the baseline.
+--
+-- The id is auto-assigned deliberately. 474 is legitimately occupied by the
+-- internal-only recipients row on an affected gateway, and forcing it would
+-- collide all over again. Identity here is (parent_name, parameter), not the id.
+--
+-- The NOT EXISTS reads the target through a derived table because MySQL
+-- rejects naming the insert target directly (error 1093).
+--
+-- Idempotent: a gateway that already has the row, whether from a repair by hand
+-- or from having been upgraded rather than freshly installed, is left alone.
+-- ---------------------------------------------------------------------
+INSERT INTO parameters
+  (parameter, name, module, editable, conf_file,
+   parent, parent_name, child, order1, enabled, applied, action)
+SELECT 'inet:hermes_body_milter:8893', 'Hermes Body Milter', 'postfix', 1, 'main.cf',
+       (SELECT id FROM (SELECT id FROM parameters
+          WHERE parameter='smtpd_milters' AND child=2 AND module='postfix') p),
+       'smtpd_milters', 1, 3.100, 1, 1, NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM (SELECT * FROM parameters) x
+  WHERE x.parent_name='smtpd_milters'
+    AND x.parameter='inet:hermes_body_milter:8893');
+
+-- The same row under non_smtpd_milters, for completeness. It normally survives
+-- (id 475 did not collide), so this is a no-op on every gateway seen so far.
+INSERT INTO parameters
+  (parameter, name, module, editable, conf_file,
+   parent, parent_name, child, order1, enabled, applied, action)
+SELECT 'inet:hermes_body_milter:8893', 'Hermes Body Milter', 'postfix', 1, 'main.cf',
+       (SELECT id FROM (SELECT id FROM parameters
+          WHERE parameter='non_smtpd_milters' AND child=2 AND module='postfix') p),
+       'non_smtpd_milters', 1, 3.100, 1, 1, NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM (SELECT * FROM parameters) x
+  WHERE x.parent_name='non_smtpd_milters'
+    AND x.parameter='inet:hermes_body_milter:8893');
+
+-- ---------------------------------------------------------------------
+-- 4. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

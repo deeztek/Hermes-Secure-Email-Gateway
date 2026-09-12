@@ -1379,11 +1379,20 @@ INSERT IGNORE INTO `parameters` VALUES (447, 'permit_sasl_authenticated', NULL, 
 INSERT IGNORE INTO `parameters` VALUES (448, 'tls_server_sni_maps', NULL, NULL, NULL, NULL, 'TLS Server SNI Maps', 'postfix', NULL, NULL, 0, 'main.cf', 'Server Name Indication certificate mappings', NULL, NULL, 2, NULL, 1, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (449, 'hash:/etc/postfix/sni_maps', NULL, NULL, NULL, NULL, 'SNI Maps File', 'postfix', NULL, NULL, 0, 'main.cf', NULL, NULL, 'tls_server_sni_maps', 1, 1.000, 1, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (473, 'check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf', NULL, NULL, NULL, NULL, 'Discard Recipients Access Check', 'postfix', NULL, NULL, 0, 'main.cf', 'Silent discard for mailbox aliases configured to silently drop messages', NULL, 'smtpd_recipient_restrictions', 1, 1.050, 1, 1, 'NONE', NULL, NULL);
-INSERT IGNORE INTO `parameters` (`parameter`, `name`, `module`, `editable`, `conf_file`, `description`, `parent`, `parent_name`, `child`, `order1`, `enabled`, `applied`, `action`) VALUES ('check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf', 'Internal Only Recipients Access Check', 'postfix', 0, 'main.cf', 'Rejects mail from outside your own domains to aliases marked Reachable By: internal only', NULL, 'smtpd_recipient_restrictions', 1, 1.150, 1, 1, 'NONE');
 INSERT IGNORE INTO `parameters` VALUES (474, 'inet:hermes_body_milter:8893', NULL, NULL, NULL, NULL, 'Hermes Body Milter', 'postfix', NULL, NULL, 1, 'main.cf', NULL, '351', 'smtpd_milters', 1, 3.100, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (475, 'inet:hermes_body_milter:8893', NULL, NULL, NULL, NULL, 'Hermes Body Milter', 'postfix', NULL, NULL, 1, 'main.cf', NULL, '352', 'non_smtpd_milters', 1, 3.100, 1, 1, NULL, NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (476, 'defer_transports', NULL, NULL, NULL, NULL, 'Pause Outbound Delivery', 'postfix', NULL, NULL, 0, 'main.cf', 'When enabled, holds all outbound mail in the queue (renders defer_transports = smtp relay). Toggled by the Mail Queue Pause/Resume control; set to paused automatically during legacy-to-Docker migration. enabled=0 = normal delivery.', NULL, NULL, 2, NULL, 0, 1, 'NONE', NULL, NULL);
 INSERT IGNORE INTO `parameters` VALUES (477, 'smtp relay', NULL, NULL, NULL, NULL, 'Deferred Transports', 'postfix', NULL, NULL, 0, 'main.cf', NULL, NULL, 'defer_transports', 1, 1.000, 0, 1, 'NONE', NULL, NULL);
+
+-- Auto-id row, so it MUST stay below every explicit id in this table.
+-- It previously sat above ids 474-477. The AUTO_INCREMENT counter was at 474,
+-- this row took 474, and the next line's explicit VALUES (474, ...) then hit a
+-- duplicate primary key. INSERT IGNORE discards that silently, so the import
+-- reported success and the body milter was simply absent from smtpd_milters on
+-- every fresh install of v260815. `parameters` has only PRIMARY KEY (id) and no
+-- unique key on anything else, so nothing dedupes and nothing fails loudly.
+-- scripts/check_fresh_install_parity.sh now fails the commit if this moves back up.
+INSERT IGNORE INTO `parameters` (`parameter`, `name`, `module`, `editable`, `conf_file`, `description`, `parent`, `parent_name`, `child`, `order1`, `enabled`, `applied`, `action`) VALUES ('check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf', 'Internal Only Recipients Access Check', 'postfix', 0, 'main.cf', 'Rejects mail from outside your own domains to aliases marked Reachable By: internal only', NULL, 'smtpd_recipient_restrictions', 1, 1.150, 1, 1, 'NONE');
 
 -- -------- parameters2                          [scrub] --------
 CREATE TABLE IF NOT EXISTS `parameters2` (
