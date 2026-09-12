@@ -232,6 +232,48 @@ Usage: <cfinclude template="system_alerts.cfm">
 </cfif>
 
 <!--- ============================================================================
+     NETWORK ALIAS RANGES CHANGED, OR STOPPED RESOLVING (#324)
+
+     Aliases are advisory: nothing applies itself, so an operator has to act for
+     anything to happen. That makes the notification the mechanism rather than a
+     courtesy. The resolver also emails on change, but an email is a one-shot and
+     admin_email goes stale when people leave. This persists until the condition
+     clears, which is the property that matters here.
+
+     Two separate conditions, deliberately. A resolve that has been failing for a
+     week must not first become visible at the moment the ranges finally matter.
+     ============================================================================ --->
+<cfquery name="_alertAliasFailed" datasource="hermes">
+    SELECT COUNT(*) AS c FROM network_aliases
+    WHERE enabled = 1 AND last_status IN ('failed', 'empty', 'no_resolver')
+</cfquery>
+<cfif _alertAliasFailed.c GT 0>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "warning",
+        icon: "fas fa-network-wired",
+        label: "Alias resolve",
+        title: "#_alertAliasFailed.c# network alias(es) could not be resolved. Existing ranges were left in place. <a href='view_network_aliases.cfm' class='alert-link'>Review</a>",
+        priority: 6
+    })>
+</cfif>
+
+<cfquery name="_alertAliasStale" datasource="hermes">
+    SELECT COUNT(*) AS c FROM network_aliases
+    WHERE enabled = 1
+      AND source_type = 'spf'
+      AND (last_resolved IS NULL OR last_resolved < DATE_SUB(NOW(), INTERVAL 3 DAY))
+</cfquery>
+<cfif _alertAliasStale.c GT 0>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "info",
+        icon: "fas fa-clock",
+        label: "Alias stale",
+        title: "#_alertAliasStale.c# enabled network alias(es) have not resolved in the last three days. The scheduled job runs daily. <a href='view_network_aliases.cfm' class='alert-link'>Review</a>",
+        priority: 8
+    })>
+</cfif>
+
+<!--- ============================================================================
      RENDER ALERTS
      Display all alerts sorted by priority (lower = higher priority)
      ============================================================================ --->

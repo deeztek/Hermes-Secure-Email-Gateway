@@ -47,6 +47,24 @@ beside each release below is the **actual release date**.
   it cannot currently refuse, but the path is written now so that adopting the first consumer is
   a change in one place and nowhere else.
 
+- **A scheduled resolver for SPF-backed aliases** (#324). Runs daily at 03:30 via Ofelia,
+  expands the record including `include:` and `redirect=` at the SPF specification's ten-lookup
+  limit, and records what changed. Advisory only: it writes alias ranges and nothing else,
+  renders no config file and reloads no service, so it cannot affect mail flow.
+
+  Three rules it exists to honour. A failed or empty resolve **never empties the list**, because
+  losing ranges to a resolver hiccup is worse than stale ranges. Stderr is never treated as data,
+  which `inc/rbl_test_entry.cfm` learned expensively when a missing binary's error text was
+  folded into the output variable and every block list read as healthy. And ranges an operator
+  typed by hand are never discarded by a resolve; only resolved rows are reconciled.
+
+  Notification is on change only, never on a clean resolve, or it becomes noise and gets
+  filtered. The email names the ranges that were added or withdrawn rather than reporting a
+  count, and two persistent dashboard alerts cover what an email cannot: one for aliases that
+  failed to resolve, and a separate lower-priority one for aliases that have not resolved in
+  three days, so a resolve that has been quietly failing does not first become visible at the
+  moment the ranges finally matter.
+
 ### Changed
 
 - **The sidebar keeps the current page's section open and marks the page active** (#309). The

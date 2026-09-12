@@ -1239,6 +1239,7 @@ INSERT IGNORE INTO `ofelia_jobs` VALUES (11,'[job-exec \"hermes-authelia-log-rot
 INSERT IGNORE INTO `ofelia_jobs` VALUES (12,'[job-exec \"hermes-quarantine-notify\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_notify.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (13,'[job-exec \"hermes-process-cert-queue\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (14,'[job-exec \"hermes-fangfrisch-refresh\"]','@every 10m','/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh','hermes_mail_filter',NULL,NULL,NULL,NULL,'malware_feeds',1,0);
+INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-refresh-network-aliases\"]',' 0 30 03 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/refresh_network_aliases.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 
 -- -------- org_signatures                       [truncate] --------
 CREATE TABLE IF NOT EXISTS `org_signatures` (

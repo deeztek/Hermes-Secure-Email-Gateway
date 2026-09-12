@@ -92,7 +92,27 @@ INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `sou
   ('Microsoft 365', 'Microsoft 365 outbound mail servers, resolved from the Exchange Online SPF record', 'spf', 'spf.protection.outlook.com', 0);
 
 -- ---------------------------------------------------------------------
--- 2. Version stamp -- MUST be the last statement (advances build_no so
+-- 2. Scheduled resolver job (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same seed row, id 15
+--
+-- Runs schedule/refresh_network_aliases.cfm daily at 03:30. Advisory only: it
+-- writes network_alias_entries and nothing else, renders no config file and
+-- reloads no service, so it cannot affect mail flow.
+--
+-- Seeded active with both shipped aliases disabled, so it runs and finds nothing
+-- to do until an operator enables one. That is deliberate: the job being ready
+-- means enabling an alias is a single action rather than two.
+--
+-- The explicit id is required rather than preferred. scripts/check_ofelia_seed_drift.sh
+-- parses these rows positionally, expecting twelve fields starting with the id,
+-- and diffs the result against the shipped config/ofelia/config.ini. A
+-- column-list INSERT would not parse. config/ofelia/config.ini carries the
+-- matching block, in the same order, or that check fails the commit.
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-refresh-network-aliases\"]',' 0 30 03 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/refresh_network_aliases.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
+
+-- ---------------------------------------------------------------------
+-- 3. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------
