@@ -1,0 +1,36 @@
+-- =====================================================================
+-- Hermes SEG schema updates -- v260912
+--
+-- Idempotent (safe to re-run). Applied by apply_schema_updates() /
+-- system_update_docker.sh for installs upgrading from an earlier build;
+-- NOT run on fresh installs (those get the current schema from
+-- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
+--
+-- This release carries no schema changes so far. Its content is the
+-- legacy-to-Docker migration work on #322, which lives entirely in
+-- scripts/migrate_legacy_to_docker.sh and ships with the tag rather than
+-- as a per-release artifact, plus the sidebar fix on #309, which is a
+-- CFML change needing no schema support.
+--
+-- So this file currently exists to advance build_no. That is not
+-- ceremony: the update orchestrator reads build_no to decide which
+-- release directories are still pending, and warns if a release finishes
+-- without stamping. A release with no schema work still has to stamp.
+-- Without this directory, find_pending_releases() would find nothing
+-- newer than v260815, report "nothing to apply", and leave build_no
+-- stale, which is the exact defect #322 was opened to fix on the
+-- migration path.
+--
+-- DELIBERATELY ABSENT:
+--
+--   Anything for #323 or #324. Those are being built on top of the
+--   network alias facility rather than ahead of it, so neither has
+--   landed. When they do, their sections go above the version stamp.
+-- =====================================================================
+
+-- ---------------------------------------------------------------------
+-- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
+-- the update orchestrator records this release as applied).
+-- ---------------------------------------------------------------------
+UPDATE system_settings SET value = 'v260912' WHERE parameter = 'build_no';
