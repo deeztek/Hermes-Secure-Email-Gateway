@@ -29,6 +29,24 @@ beside each release below is the **actual release date**.
   ones so a re-resolve never discards what an operator typed, and `first_seen` / `last_seen`
   give change detection without a second table.
 
+- **A console page for managing network aliases**, under System (#324). Create an alias, give it
+  a source, and for a hand-entered one add and remove ranges. The page says plainly, in a callout
+  at the top, that nothing consumes aliases yet and that nothing is regenerated automatically
+  when one changes, because an operator who assumes otherwise would be wrong in a way that is
+  hard to notice.
+
+  Ranges are validated before they are stored rather than after. A malformed CIDR in a Postfix
+  lookup file is not rejected loudly, it silently never matches, so anything that is not a valid
+  range is skipped and the operator is told how many.
+
+  IPv6 entries are shown, badged, and labelled as unused while IPv6 is disabled in the mail
+  containers, rather than being hidden. A range that is stored but not applied should be visible
+  as exactly that.
+
+  Delete is guarded rather than cascading, matching the shape of #320. No consumer exists yet so
+  it cannot currently refuse, but the path is written now so that adopting the first consumer is
+  a change in one place and nowhere else.
+
 ### Changed
 
 - **The sidebar keeps the current page's section open and marks the page active** (#309). The

@@ -168,6 +168,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_network_aliases.cfm" class="nav-link">
+                <i class="nav-icon fas fa-network-wired"></i>
+                <p>Network Aliases</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_scheduled_tasks.cfm" class="nav-link">
                 <i class="nav-icon fas fa-clock"></i>
                 <p>Scheduled Tasks</p>
