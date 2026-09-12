@@ -537,4 +537,68 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--end::Sidebar Wrapper-->
 </aside>
 <!--end::Sidebar-->
+
+<!---
+  Issue 309 -- keep the section containing the current page expanded, and mark
+  the page itself active.
+
+  The tree is static markup with no awareness of the requested template, so
+  every navigation collapsed it and the operator had to re-open the section
+  they were working in. Worst in Content Checks and System, which have the
+  longest child lists. Reported by a user via discussion 307.
+
+  Done in JS rather than CFML on purpose. There are 66 nav-links across 6
+  treeview sections; a <cfif> on each would be 66 edits now and another one
+  every time the menu grows. This stays correct on its own.
+
+  Runs INLINE at parse time, not on DOMContentLoaded. adminlte.min.js is loaded
+  by html_head.cfm, which is included before this file, so its script tag is
+  parsed before the sidebar markup exists and it can only initialise on
+  DOMContentLoaded. Setting the classes here means they are already present when
+  it does, which is the same state a static AdminLTE template ships with.
+
+  Note for anyone extending this: the whole file is inside a cfoutput block,
+  where a
+  literal hash is an expression delimiter and has to be doubled. There is no
+  precedent in this codebase for one appearing inside a CFML comment, so this
+  block avoids them entirely rather than relying on the parser stripping
+  comments first. The parent-toggle test below keys off '.cfm' for the same
+  reason, instead of testing whether the href is a bare hash.
+--->
+<script>
+(function () {
+  var links = document.querySelectorAll('.app-sidebar a.nav-link[href]');
+  if (!links.length) { return; }
+
+  // Requested template name, lowercased, query string discarded.
+  var here = (window.location.pathname.split('/').pop() || 'index.cfm').toLowerCase();
+
+  var match = null;
+  for (var i = 0; i < links.length; i++) {
+    var href = links[i].getAttribute('href') || '';
+    // Parent toggles have no .cfm target; only real pages can match.
+    if (href.toLowerCase().indexOf('.cfm') === -1) { continue; }
+    if (href.split('?')[0].split('/').pop().toLowerCase() === here) {
+      match = links[i];
+      break;
+    }
+  }
+
+  // No match is normal: the dashboard is reached from the brand link, and some
+  // pages are not in the menu at all. Leave the sidebar as AdminLTE renders it.
+  if (!match) { return; }
+
+  match.classList.add('active');
+
+  // Open every ancestor section. A loop rather than one step, so a future
+  // nested submenu opens all the way down without this needing to change.
+  var node = match.closest('li.nav-item');
+  while (node && node.parentElement) {
+    var ancestor = node.parentElement.closest('li.nav-item');
+    if (!ancestor) { break; }
+    ancestor.classList.add('menu-open');
+    node = ancestor;
+  }
+})();
+</script>
 </cfoutput>
