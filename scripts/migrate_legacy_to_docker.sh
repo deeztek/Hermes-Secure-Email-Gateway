@@ -618,6 +618,7 @@ malware_feeds_config:section_name
 message_rules:rule_name
 migrations:name
 msg_content_type:content_type
+network_aliases:name
 ofelia_jobs:job_name
 parameters2:parameter
 parameters2:module

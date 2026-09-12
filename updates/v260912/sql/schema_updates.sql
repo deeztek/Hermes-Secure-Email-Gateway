@@ -6,13 +6,13 @@
 -- NOT run on fresh installs (those get the current schema from
 -- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
 --
--- This release carries no schema changes so far. Its content is the
--- legacy-to-Docker migration work on #322, which lives entirely in
--- scripts/migrate_legacy_to_docker.sh and ships with the tag rather than
--- as a per-release artifact, plus the sidebar fix on #309, which is a
--- CFML change needing no schema support.
+-- Contents: the network alias tables from #324. The rest of the release
+-- needs no schema support -- the legacy-to-Docker migration work on #322
+-- lives entirely in scripts/migrate_legacy_to_docker.sh and ships with the
+-- tag rather than as a per-release artifact, and the sidebar fix on #309 is
+-- a CFML change.
 --
--- So this file currently exists to advance build_no. That is not
+-- The version stamp is here regardless. That is not
 -- ceremony: the update orchestrator reads build_no to decide which
 -- release directories are still pending, and warns if a release finishes
 -- without stamping. A release with no schema work still has to stamp.
@@ -23,13 +23,76 @@
 --
 -- DELIBERATELY ABSENT:
 --
---   Anything for #323 or #324. Those are being built on top of the
---   network alias facility rather than ahead of it, so neither has
---   landed. When they do, their sections go above the version stamp.
+--   Anything that reads the alias tables. The resolver, the console page
+--   and the first consumer (#323) all land later. Shipping the tables and
+--   seeds first means none of those is also a migration.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
--- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- 1. Network aliases (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same two tables and the same two disabled seed rows
+--
+-- A named set of CIDR ranges with a source. `static` is a hand-entered list;
+-- `spf` is resolved from a DNS TXT record. Consumers reference the alias
+-- instead of pasting ranges into their own list.
+--
+-- Nothing reads these yet. The tables and the seeds land first so the resolver
+-- and the first consumer (#323) are not also a migration.
+--
+-- Seeded DISABLED, so a gateway gains two discoverable examples and no
+-- behaviour until an operator turns one on.
+--
+-- network_alias_entries stores IPv6 ranges as well as IPv4 and marks them with
+-- `family`. The mail containers set net.ipv6.conf.all.disable_ipv6=1 so v6 is
+-- unusable today and gets filtered at render, but storing it keeps the data
+-- correct if that ever changes.
+--
+-- `origin` separates hand-entered rows from resolved ones, so a re-resolve
+-- never discards what an operator typed. first_seen/last_seen give change
+-- detection: an entry whose last_seen predates the alias's last_resolved has
+-- dropped out of the published record.
+--
+-- It has no seed rows, so scripts/check_fresh_install_parity.sh does not
+-- require it in SEED_MERGE_KEYS. If it ever gains any, it is a join table
+-- keyed on alias_id and belongs in merge_join_table_rows(), resolved through
+-- network_aliases.name, not carried by id.
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `network_alias_entries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `alias_id` int(11) NOT NULL,
+  `cidr` varchar(64) NOT NULL,
+  `family` varchar(4) NOT NULL DEFAULT 'ip4',
+  `origin` varchar(16) NOT NULL DEFAULT 'manual',
+  `first_seen` datetime DEFAULT current_timestamp(),
+  `last_seen` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_alias_cidr` (`alias_id`,`cidr`),
+  KEY `idx_alias_id` (`alias_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `network_aliases` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `source_type` varchar(16) NOT NULL DEFAULT 'static',
+  `source_value` varchar(255) DEFAULT NULL,
+  `enabled` tinyint(3) NOT NULL DEFAULT 1,
+  `last_resolved` datetime DEFAULT NULL,
+  `last_status` varchar(32) DEFAULT NULL,
+  `last_message` varchar(512) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_alias_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `source_value`, `enabled`) VALUES
+  ('Google Workspace', 'Google outbound mail servers, resolved from Google published SPF record', 'spf', '_spf.google.com', 0);
+INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `source_value`, `enabled`) VALUES
+  ('Microsoft 365', 'Microsoft 365 outbound mail servers, resolved from the Exchange Online SPF record', 'spf', 'spf.protection.outlook.com', 0);
+
+-- ---------------------------------------------------------------------
+-- 2. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

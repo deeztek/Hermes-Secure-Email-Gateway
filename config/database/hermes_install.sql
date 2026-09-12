@@ -1166,6 +1166,46 @@ INSERT IGNORE INTO `msg_content_type` VALUES (10,'C','Clean',1,1);
 INSERT IGNORE INTO `msg_content_type` VALUES (11,'s','Spam Tagged(OLD)',1,1);
 INSERT IGNORE INTO `msg_content_type` VALUES (12,'Y','Spam Tagged',1,1);
 
+-- -------- network_alias_entries                [truncate] --------
+CREATE TABLE IF NOT EXISTS `network_alias_entries` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `alias_id` int(11) NOT NULL,
+  `cidr` varchar(64) NOT NULL,
+  `family` varchar(4) NOT NULL DEFAULT 'ip4',
+  `origin` varchar(16) NOT NULL DEFAULT 'manual',
+  `first_seen` datetime DEFAULT current_timestamp(),
+  `last_seen` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_alias_cidr` (`alias_id`,`cidr`),
+  KEY `idx_alias_id` (`alias_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- -------- network_aliases                      [seed] --------
+CREATE TABLE IF NOT EXISTS `network_aliases` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(128) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `source_type` varchar(16) NOT NULL DEFAULT 'static',
+  `source_value` varchar(255) DEFAULT NULL,
+  `enabled` tinyint(3) NOT NULL DEFAULT 1,
+  `last_resolved` datetime DEFAULT NULL,
+  `last_status` varchar(32) DEFAULT NULL,
+  `last_message` varchar(512) DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_alias_name` (`name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- 2 row(s) for `network_aliases`
+-- Seeded DISABLED. Nothing resolves and nothing consumes them until an operator
+-- turns one on, so a fresh gateway gains two discoverable examples and no
+-- behaviour. Ids are omitted; the UNIQUE KEY on name handles dedup.
+INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `source_value`, `enabled`) VALUES
+  ('Google Workspace', 'Google outbound mail servers, resolved from Google published SPF record', 'spf', '_spf.google.com', 0);
+INSERT IGNORE INTO `network_aliases` (`name`, `description`, `source_type`, `source_value`, `enabled`) VALUES
+  ('Microsoft 365', 'Microsoft 365 outbound mail servers, resolved from the Exchange Online SPF record', 'spf', 'spf.protection.outlook.com', 0);
+
 -- -------- numbers                              [truncate] --------
 CREATE TABLE IF NOT EXISTS `numbers` (
   `number` int(11) DEFAULT NULL

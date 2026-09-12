@@ -9,6 +9,45 @@ beside each release below is the **actual release date**.
 
 ## Unreleased
 
+### Added
+
+- **Network aliases: named sets of IP ranges, resolvable from a DNS record** (#324). Two tables
+  and two disabled seed rows. A `static` alias is a hand-entered list given a name; an `spf`
+  alias carries a hostname such as `_spf.google.com` that a resolver will expand. Nothing reads
+  them yet: the tables land first so the resolver, the console page and the first consumer are
+  not each also a migration.
+
+  The case for a shared facility rather than another per-feature list is already in the tree.
+  `postscreen_access.cidr` ships with 129 hand-pasted Microsoft ranges and nothing keeps them
+  current, and #323 was about to add a second list with the same defect for Google. Four
+  consumers want the same thing: that postscreen list, Relay Networks, the domain-restricted
+  relay sources of #323, and the fail2ban whitelist.
+
+  IPv6 ranges are stored and marked by `family` rather than discarded. The mail containers set
+  `net.ipv6.conf.all.disable_ipv6=1`, so they are filtered at render today, but storing them
+  keeps the data correct if that changes. `origin` separates hand-entered rows from resolved
+  ones so a re-resolve never discards what an operator typed, and `first_seen` / `last_seen`
+  give change detection without a second table.
+
+### Changed
+
+- **The sidebar keeps the current page's section open and marks the page active** (#309). The
+  menu tree was static markup with no awareness of the requested template, so every navigation
+  collapsed it and the operator had to remember and re-open the section they were working in.
+  Worst in Content Checks and System, which have the longest child lists. Reported by a user.
+
+- **The install-path parity check now guards three paths, not two.** A change has to land on a
+  new install, an existing install, and a legacy build 240815 gateway brought across by
+  `migrate_legacy_to_docker.sh`. Only the first two had a guard, which is how the defects behind
+  #322 reached shipped code. A table added to the baseline but not to the migration's merge map
+  produces a migrated gateway whose new feature has no configuration rows at all, and nobody
+  finds out until a migration runs on a customer's box.
+
+  Unlike fresh-versus-upgrade, this one is mechanically decidable, so it needs no declaration:
+  every table with an `INSERT` in the baseline must be carried by the merge map, by the
+  join-table handler, or by a written exemption. `parameters` is the one current exemption, and
+  the reason is recorded where the exemption is declared.
+
 ### Fixed
 
 - **Legacy-to-Docker migration no longer lands on a stale release stamp or a known
