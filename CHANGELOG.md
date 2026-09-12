@@ -86,6 +86,33 @@ beside each release below is the **actual release date**.
 
 ### Fixed
 
+- **The body milter was missing from `smtpd_milters` on every fresh install of v260815**, which
+  silently disabled Link Guard, disclaimers, organizational signatures and external banners.
+
+  v260815's baseline inserted the internal-only recipients row (#311) with a column-list
+  `INSERT` carrying no id, positioned above ids 474 to 477. The `AUTO_INCREMENT` counter was at
+  474, that row took it, and the next line's explicit
+  `VALUES (474, 'inet:hermes_body_milter:8893', ...)` collided on the primary key.
+  `INSERT IGNORE` discards a duplicate without erroring, so the import reported success and
+  nothing appeared in any log. `parameters` has only `PRIMARY KEY (id)` and no unique key on
+  anything else, so there was nothing to dedupe on and nothing to fail loudly.
+
+  Postfix therefore never called the body milter for inbound mail, and
+  `milter_default_action = accept` meant it never complained. The row survived under
+  `non_smtpd_milters`, which is locally submitted mail only, so the feature looked half-present
+  to anyone checking the wrong directive. Upgraded installs were unaffected: they receive that
+  row from `updates/v260815/sql/schema_updates.sql` and never re-run the baseline.
+
+  Three changes. The auto-id row moves below every explicit id in the baseline, so the collision
+  cannot recur. A repair in the v260912 schema update restores the row on affected gateways, and
+  a phase script pushes the corrected chain into `main.cf`, because the orchestrator restarts
+  Postfix but never re-renders its configuration, so the database fix alone would have sat unused
+  until somebody happened to save a settings page.
+
+  `scripts/check_fresh_install_parity.sh` now fails the commit when an auto-id `INSERT` precedes
+  an explicit id in the same table's seed. Run against the v260815 baseline it names line 1341
+  and id 474, so it would have blocked the original commit.
+
 - **Legacy-to-Docker migration no longer lands on a stale release stamp or a known
   postscreen defect** (#322). `migrate_legacy_to_docker.sh` brings a build 240815 backup
   forward by diffing structure against the shipped baseline and merging absent

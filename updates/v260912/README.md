@@ -22,6 +22,30 @@ mail-rejecting configuration.
 
 ## What changed
 
+### Link Guard, disclaimers, signatures and banners were dead on fresh v260815 installs
+
+If this gateway was **freshly installed** at v260815, the body milter was never in Postfix's
+inbound milter chain, so none of those features did anything at all. There were no errors,
+because Postfix is configured to accept mail when a milter is unreachable, and the failure was
+silent at every other layer too.
+
+A single line in the v260815 database seed caused it. One row was inserted without an id, took
+the id the next row expected, and that next row was discarded without complaint. The discarded
+row was the one that puts the body milter in the chain.
+
+This release restores the row and pushes the corrected chain into the live Postfix
+configuration. No action is needed.
+
+Gateways that **upgraded** to v260815, rather than installing fresh, were never affected.
+
+To confirm afterwards:
+
+```bash
+docker exec hermes_postfix_dkim postconf -n smtpd_milters
+```
+
+Three entries are expected, the last being `inet:hermes_body_milter:8893`.
+
 ### A migrated gateway reported the wrong version, indefinitely
 
 The installer stamps the current release into `system_settings`, and then the
