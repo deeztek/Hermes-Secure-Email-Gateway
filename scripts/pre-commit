@@ -273,31 +273,39 @@ fi
 # declared. It cannot catch two paths that both exist and disagree. That needs
 # comparing end states, tracked in #321.
 #
-# Only fires when updates/ files are staged, and only checks the newest
-# release, so it never demands a cleanup of history.
+# It also checks the THIRD install path. A legacy 240815 box brought across by
+# migrate_legacy_to_docker.sh is neither a fresh install nor an upgrade, and a
+# table the baseline seeds that the migration does not carry gives that gateway
+# a feature with no configuration rows. Unlike fresh-vs-upgrade, that one is
+# mechanically decidable, so it is computed rather than declared.
+#
+# Fires when updates/ artifacts, the baseline, or the migration script are
+# staged, and only checks the newest release, so it never demands a cleanup of
+# history.
 # ---------------------------------------------------------------------------
-echo "[6/7] Checking fresh-install parity for staged release artifacts..."
+echo "[6/7] Checking install-path parity for staged artifacts..."
 
-if echo "$STAGED_FILES" | grep -qE '^updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)$'; then
+if echo "$STAGED_FILES" | grep -qE '^(updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)|config/database/hermes_install\.sql|scripts/migrate_legacy_to_docker\.sh)$'; then
     if [ -x "$(dirname "$0")/check_fresh_install_parity.sh" ]; then
         if ! "$(dirname "$0")/check_fresh_install_parity.sh" >/tmp/hermes_parity.$$ 2>&1; then
             cat /tmp/hermes_parity.$$
             rm -f /tmp/hermes_parity.$$
             echo ""
             echo "=============================================="
-            echo "  FRESH-INSTALL PARITY UNDECLARED - COMMIT BLOCKED"
+            echo "  INSTALL-PATH PARITY UNDECLARED - COMMIT BLOCKED"
             echo "=============================================="
             echo ""
             echo "Every phase script and schema_updates.sql section must declare"
             echo "how a FRESH install gets the same outcome, because updates/ runs"
-            echo "on upgrade only."
+            echo "on upgrade only. Every table the baseline seeds must also be"
+            echo "carried onto a MIGRATED install by merge_seed_rows()."
             echo ""
             echo "If this is a genuine false positive: git commit --no-verify"
             echo ""
             exit 1
         fi
         rm -f /tmp/hermes_parity.$$
-        echo "      Fresh-install parity declared."
+        echo "      Install-path parity declared (fresh, upgrade, migration)."
     else
         echo "      WARNING: check_fresh_install_parity.sh missing or not executable - skipped."
     fi

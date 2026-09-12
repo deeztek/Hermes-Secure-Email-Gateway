@@ -2,6 +2,11 @@
 #
 # check_fresh_install_parity.sh
 #
+# Two guards, both about a change landing on every install path rather than
+# just the one the author was thinking about. Fresh-vs-upgrade is declared,
+# because it is not mechanically decidable. Migration seed coverage is computed,
+# because it is.
+#
 # Per-release artifacts under updates/<version>/ run on UPGRADE ONLY. A fresh
 # install builds from config/database/hermes_install.sql plus
 # scripts/install_hermes_docker.sh, and never executes a single line of
@@ -96,6 +101,69 @@ validate_decl() {
     return 0
 }
 
+MIGRATION_FAILED=0
+
+# ---------------------------------------------------------------------------
+# Migration seed coverage (the THIRD install path)
+# ---------------------------------------------------------------------------
+# A feature has to land on three paths, not two: new install, existing install,
+# and a legacy 240815 box brought across by migrate_legacy_to_docker.sh.
+#
+# The fresh-vs-upgrade question above is not mechanically decidable, so it is
+# answered by a declaration. This one IS decidable, so it needs no declaration
+# at all: every table the baseline seeds must be carried onto a migrated install
+# by merge_seed_rows(), either through SEED_MERGE_KEYS, through the join-table
+# handler, or by a deliberate written exemption.
+#
+# Without this, adding a seeded table silently produces a migrated gateway whose
+# new feature has no configuration rows, and nobody finds out until a migration
+# runs on a customer's box. That is exactly the class #322 was opened for.
+# ---------------------------------------------------------------------------
+check_migration_seed_coverage() {
+    local baseline="config/database/hermes_install.sql"
+    local migrate="scripts/migrate_legacy_to_docker.sh"
+
+    if [[ ! -f "$baseline" || ! -f "$migrate" ]]; then
+        echo "${YELLOW}  skipped${NC}  baseline or migration script not found"
+        return 0
+    fi
+
+    local seeded mapped joined exempt covered uncovered n_seeded
+    seeded=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$baseline" \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+
+    # Tables merged on a declared natural key.
+    mapped=$(sed -n '/SEED_MERGE_KEYS="/,/^"$/p' "$migrate" \
+        | grep -E '^[a-z_0-9]+:[a-z_0-9]+$' | cut -d: -f1 | sort -u)
+
+    # Tables whose identity is a foreign id, resolved in the join-table handler.
+    joined=$(sed -n '/^merge_join_table_rows()/,/^}/p' "$migrate" \
+        | grep -oE 'INSERT INTO `hermes`\.`[a-z_0-9]+`' \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
+
+    # Deliberate exemptions, written in the migration script as:
+    #   # MIGRATION-SEED-EXEMPT: <table>  <reason>
+    exempt=$(grep -oE '^#[[:space:]]*MIGRATION-SEED-EXEMPT:[[:space:]]*[a-z_0-9]+' "$migrate" \
+        | sed -E 's/.*:[[:space:]]*//' | sort -u)
+
+    covered=$(printf '%s\n%s\n%s\n' "$mapped" "$joined" "$exempt" | grep -v '^$' | sort -u)
+    uncovered=$(comm -23 <(printf '%s\n' "$seeded" | grep -v '^$') <(printf '%s\n' "$covered"))
+
+    n_seeded=$(printf '%s\n' "$seeded" | grep -c . )
+
+    if [[ -n "$uncovered" ]]; then
+        while read -r t; do
+            [[ -z "$t" ]] && continue
+            note_fail "config/database/hermes_install.sql seeds '${t}', which merge_seed_rows() does not carry"
+            CHECKED=$((CHECKED + 1))
+        done <<< "$uncovered"
+        MIGRATION_FAILED=1
+    else
+        CHECKED=$((CHECKED + 1))
+        echo "${GREEN}  ok${NC}       all ${n_seeded} seeded table(s) carried by merge_seed_rows()"
+    fi
+}
+
 echo "${CYAN}Fresh-install parity check${NC}"
 echo
 
@@ -142,6 +210,10 @@ for d in $DIRS; do
     echo
 done
 
+echo "${CYAN}Migration seed coverage${NC}"
+check_migration_seed_coverage
+echo
+
 if [[ $FAILED -gt 0 ]]; then
     echo "${RED}FAILED${NC}: ${FAILED} artifact(s) undeclared out of ${CHECKED} checked."
     echo
@@ -152,6 +224,17 @@ if [[ $FAILED -gt 0 ]]; then
     echo "  ${YELLOW}# FRESH-INSTALL: covered-by scripts/install_hermes_docker.sh  <function or line>${NC}"
     echo "  ${YELLOW}# FRESH-INSTALL: n/a  repairs data only a pre-existing install can have${NC}"
     echo
+    if [[ $MIGRATION_FAILED -eq 1 ]]; then
+        echo "For a table the baseline seeds but the migration does not carry, add"
+        echo "its natural key to SEED_MERGE_KEYS in merge_seed_rows(), or if it"
+        echo "genuinely should not be carried, declare that deliberately:"
+        echo
+        echo "  ${YELLOW}# MIGRATION-SEED-EXEMPT: <table>  <reason>${NC}"
+        echo
+        echo "A migrated gateway is the third install path. A seeded table nobody"
+        echo "carried across is a feature with no configuration rows on it."
+        echo
+    fi
     echo "If you cannot honestly write one, the fresh-install path is missing and"
     echo "that is the bug this check exists to catch."
     exit 1

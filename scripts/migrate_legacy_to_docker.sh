@@ -554,8 +554,16 @@ GEN_NULL_SQL
 # merge_seed_rows
 # ----------------------------------------------------------------------------
 # Insert baseline seed rows the legacy DB never had, into every seeded table
-# except `parameters` (merged separately above, its identity rules are
-# genuinely special) . Called from apply_schema_forward step 4. See #322.
+# except `parameters`. Called from apply_schema_forward step 4. See #322.
+#
+# MIGRATION-SEED-EXEMPT: parameters  merged by its own bespoke logic in apply_schema_forward
+#   step 4, whose identity rules are genuinely special: a directive row (child=2) is keyed by
+#   name, a single-valued child by its parent link alone because the operator may have edited
+#   the value, and a multi-valued child by parent plus value. No single natural key expresses
+#   that, which is why it cannot live in SEED_MERGE_KEYS.
+#
+# That declaration is read by scripts/check_fresh_install_parity.sh, which fails the commit if
+# the baseline seeds a table this function does not carry and nobody wrote down why.
 #
 # Each table is matched on its NATURAL key -- the field that names the thing,
 # not the id. `files` is keyed by `file` ('exe', 'vbs'), `policy` by
