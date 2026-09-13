@@ -559,7 +559,7 @@ select id, domain, transport_id, senders_id, action_taken, recipients_id from do
   </cfquery>
 
 <cfquery name="relayhostenabled" datasource="hermes">
-select parameter, parent, child from parameters where parent='#getrelayhostid.id#' and child='1'
+select parameter, parent, child from parameters where parent_name='relayhost' and child='1'
 </cfquery>
 
 <cfif #relayhostenabled.parameter# is "">

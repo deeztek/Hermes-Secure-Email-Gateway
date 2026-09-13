@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent_name='smtpd_milters'
   </cfquery>
   
   <cfquery name="dkimnonsmtpd" datasource="hermes">
@@ -35,7 +35,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='1',
   applied='1'
   where
-  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent_name='non_smtpd_milters'
   </cfquery>
 
 
@@ -129,7 +129,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='2',
   applied='1'
   where
-  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent_name='smtpd_milters'
   </cfquery>
   
   <cfquery name="dkimnonsmtpd" datasource="hermes">
@@ -137,7 +137,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   enabled='2',
   applied='1'
   where
-  parameter LIKE 'inet:%:8891' and child = '1' and parent='#get_non_smtpd_milters_id.id#'
+  parameter LIKE 'inet:%:8891' and child = '1' and parent_name='non_smtpd_milters'
   </cfquery>
 
 <!--- SET PARAMETERS IN ORDER TO DISABLE DMARC --->

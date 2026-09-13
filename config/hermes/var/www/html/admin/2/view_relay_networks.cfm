@@ -183,7 +183,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="checkexists_entry" datasource="hermes">
       SELECT id FROM parameters
       WHERE parameter = <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">
-      AND parent = '#mynetworks_parent_id#'
+      AND parent_name = 'mynetworks'
       AND child = '1'
     </cfquery>
 
@@ -195,16 +195,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <!--- Get max order --->
     <cfquery name="getmaxorder_entry" datasource="hermes">
-      SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent='#mynetworks_parent_id#' AND child='1'
+      SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent_name='mynetworks' AND child='1'
     </cfquery>
     <cfset nextorder_entry = getmaxorder_entry.maximum + 1>
 
     <!--- Insert the entry --->
     <cfquery name="add_entry" datasource="hermes">
-      INSERT INTO parameters (parameter, module, editable, conf_file, parent, parent_name, child, order1, enabled, applied, action, network_entry, note)
+      INSERT INTO parameters (parameter, module, editable, conf_file, parent_name, child, order1, enabled, applied, action, network_entry, note)
       VALUES (
         <cfqueryparam value="#theEntry#" cfsqltype="cf_sql_varchar">,
-        'postfix', '1', 'main.cf', '#mynetworks_parent_id#', 'mynetworks', '1', '#nextorder_entry#', '1', '2', 'insert', '#isNetworkEntry#',
+        'postfix', '1', 'main.cf', 'mynetworks', '1', '#nextorder_entry#', '1', '2', 'insert', '#isNetworkEntry#',
         <cfqueryparam value="#entryNote#" cfsqltype="cf_sql_varchar">
       )
     </cfquery>
@@ -244,7 +244,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     UPDATE parameters
     SET action = 'delete', applied = '2'
     WHERE id = <cfqueryparam value="#form.network_id#" cfsqltype="cf_sql_integer">
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <cfset session.m = 13>
@@ -272,7 +272,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         UPDATE parameters
         SET action = 'delete', applied = '2'
         WHERE id = <cfqueryparam value="#networkId#" cfsqltype="cf_sql_integer">
-        AND parent = '#mynetworks_parent_id#'
+        AND parent_name = 'mynetworks'
       </cfquery>
       <cfset deleteCount = deleteCount + 1>
     </cfif>
@@ -343,7 +343,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfquery name="getOriginal" datasource="hermes">
     SELECT parameter FROM parameters
     WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <cfif getOriginal.recordcount LT 1>
@@ -358,7 +358,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="checkDuplicate" datasource="hermes">
       SELECT id FROM parameters
       WHERE parameter = <cfqueryparam value="#editAddress#" cfsqltype="cf_sql_varchar">
-      AND parent = '#mynetworks_parent_id#'
+      AND parent_name = 'mynetworks'
       AND child = '1'
       AND id <> <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
     </cfquery>
@@ -381,7 +381,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           applied = '2',
           action = 'APPLY'
       WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-      AND parent = '#mynetworks_parent_id#'
+      AND parent_name = 'mynetworks'
     </cfquery>
     <cfset session.m = 24>
   <cfelse>
@@ -390,7 +390,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       UPDATE parameters
       SET note = <cfqueryparam value="#editNote#" cfsqltype="cf_sql_varchar">
       WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-      AND parent = '#mynetworks_parent_id#'
+      AND parent_name = 'mynetworks'
     </cfquery>
     <cfset session.m = 19>
   </cfif>
@@ -407,7 +407,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     DELETE FROM parameters
     WHERE action = 'insert'
     AND applied = '2'
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <cfset session.m = 14>
@@ -424,7 +424,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     SET action = 'NONE', applied = '1'
     WHERE action = 'delete'
     AND applied = '2'
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <cfset session.m = 15>
@@ -442,7 +442,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     DELETE FROM parameters
     WHERE action = 'delete'
     AND applied = '2'
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <!--- Mark pending inserts as applied --->
@@ -451,7 +451,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     SET applied = '1', action = 'NONE'
     WHERE action = 'insert'
     AND applied = '2'
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <!--- Mark edited entries as applied --->
@@ -460,7 +460,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     SET applied = '1', action = 'NONE'
     WHERE action = 'APPLY'
     AND applied = '2'
-    AND parent = '#mynetworks_parent_id#'
+    AND parent_name = 'mynetworks'
   </cfquery>
 
   <!--- Generate Postfix configuration and reload services --->

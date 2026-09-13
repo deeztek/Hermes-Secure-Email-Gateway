@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     enabled='1',
     applied='1'
     where
-    parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent='#get_smtpd_recipient_restrictions_id.id#'
+    parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent_name='smtpd_recipient_restrictions'
     </cfquery>
 
 
@@ -96,7 +96,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     enabled='2',
     applied='1'
     where
-    parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent='#get_smtpd_recipient_restrictions_id.id#'
+    parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent_name='smtpd_recipient_restrictions'
     </cfquery>
 
 <!--- SET PARAMETERS IN ORDER TO DISABLE DMARC --->

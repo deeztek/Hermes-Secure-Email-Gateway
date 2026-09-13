@@ -29,7 +29,7 @@ SELECT id FROM parameters WHERE parameter='mynetworks' AND child = '2'
 <cfquery name="get_active_networks" datasource="hermes">
 SELECT id, parameter, note, network_entry
 FROM parameters
-WHERE parent='#mynetworks_parent_id#'
+WHERE parent_name='mynetworks'
 AND child = '1'
 AND enabled='1'
 AND applied='1'
@@ -42,7 +42,7 @@ ORDER BY order1 ASC
 <cfquery name="get_pending_adds" datasource="hermes">
 SELECT id, parameter, note, network_entry
 FROM parameters
-WHERE parent='#mynetworks_parent_id#'
+WHERE parent_name='mynetworks'
 AND child = '1'
 AND action='insert'
 AND applied='2'
@@ -53,7 +53,7 @@ ORDER BY parameter ASC
 <cfquery name="get_pending_deletes" datasource="hermes">
 SELECT id, parameter, note, network_entry
 FROM parameters
-WHERE parent='#mynetworks_parent_id#'
+WHERE parent_name='mynetworks'
 AND child = '1'
 AND action='delete'
 AND applied='2'
@@ -64,7 +64,7 @@ ORDER BY parameter ASC
 <cfquery name="get_pending_edits" datasource="hermes">
 SELECT id, parameter, note, network_entry
 FROM parameters
-WHERE parent='#mynetworks_parent_id#'
+WHERE parent_name='mynetworks'
 AND child = '1'
 AND action='APPLY'
 AND applied='2'
@@ -75,7 +75,7 @@ ORDER BY parameter ASC
 <cfquery name="get_pending_changes" datasource="hermes">
 SELECT COUNT(*) as cnt
 FROM parameters
-WHERE parent='#mynetworks_parent_id#'
+WHERE parent_name='mynetworks'
 AND applied='2'
 </cfquery>
 

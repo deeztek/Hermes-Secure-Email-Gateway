@@ -35,7 +35,7 @@ Then postmaps the file via docker exec.
 </cfquery>
 
 <cfquery name="getRelayHost" datasource="hermes">
-  SELECT parameter FROM parameters WHERE parent = '#getRelayHostId.id#' AND child = '1' AND enabled = '1'
+  SELECT parameter FROM parameters WHERE parent_name = 'relayhost' AND child = '1' AND enabled = '1'
 </cfquery>
 
 <cfquery name="getRelayAuthEnabled" datasource="hermes">

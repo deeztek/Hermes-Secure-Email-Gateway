@@ -14,7 +14,7 @@ select id from parameters where parameter='smtpd_tls_security_level' and enabled
 </cfquery>
       
 <cfquery name="smtpd_tls_security_level" datasource="hermes">
-select parameter from parameters where parent='#smtpd_tls_security_level_id.id#' and child='1' and enabled='1' order by order1 asc
+select parameter from parameters where parent_name='smtpd_tls_security_level' and child='1' and enabled='1' order by order1 asc
 </cfquery>
 
 <cfquery name="smtpd_tls_certificate" datasource="hermes">

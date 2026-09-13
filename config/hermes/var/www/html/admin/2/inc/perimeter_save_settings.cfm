@@ -20,14 +20,14 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
 <!--- Update DNSBL Threshold --->
 <cfquery datasource="hermes">
   UPDATE parameters SET parameter = <cfqueryparam value="#form.dnsbl_threshold#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_dnsbl_threshold_id.id#" cfsqltype="cf_sql_integer"> AND child = '1' AND enabled = '1'
+  WHERE parent_name = <cfqueryparam value="postscreen_dnsbl_threshold" cfsqltype="cf_sql_varchar"> AND child = '1' AND enabled = '1'
 </cfquery>
 
 <!--- Update Message Size Limit (convert MB to bytes) --->
 <cfset messageSizeBytes = form.message_size_limit * 1024 * 1024>
 <cfquery datasource="hermes">
   UPDATE parameters SET parameter = <cfqueryparam value="#Int(messageSizeBytes)#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_message_size_id.id#" cfsqltype="cf_sql_integer"> AND child = '1' AND enabled = '1'
+  WHERE parent_name = <cfqueryparam value="message_size_limit" cfsqltype="cf_sql_varchar"> AND child = '1' AND enabled = '1'
 </cfquery>
 
 <!--- Update Postscreen Pipelining Enable --->
@@ -35,7 +35,7 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
 <cfif StructKeyExists(form, "postscreen_pipelining") AND form.postscreen_pipelining is "yes"><cfset pipeVal = "yes"></cfif>
 <cfquery datasource="hermes">
   UPDATE parameters SET parameter = <cfqueryparam value="#pipeVal#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_postscreen_pipelining_id.id#" cfsqltype="cf_sql_integer"> AND child = '1'
+  WHERE parent_name = <cfqueryparam value="postscreen_pipelining_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
 </cfquery>
 
 <!--- Update Postscreen Non-SMTP Command Enable --->
@@ -43,7 +43,7 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
 <cfif StructKeyExists(form, "postscreen_non_smtp") AND form.postscreen_non_smtp is "yes"><cfset nonSmtpVal = "yes"></cfif>
 <cfquery datasource="hermes">
   UPDATE parameters SET parameter = <cfqueryparam value="#nonSmtpVal#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_postscreen_non_smtp_id.id#" cfsqltype="cf_sql_integer"> AND child = '1'
+  WHERE parent_name = <cfqueryparam value="postscreen_non_smtp_command_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
 </cfquery>
 
 <!--- Update Postscreen Bare Newline Enable --->
@@ -51,7 +51,7 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
 <cfif StructKeyExists(form, "postscreen_bare_newline") AND form.postscreen_bare_newline is "yes"><cfset bareVal = "yes"></cfif>
 <cfquery datasource="hermes">
   UPDATE parameters SET parameter = <cfqueryparam value="#bareVal#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_postscreen_bare_newline_id.id#" cfsqltype="cf_sql_integer"> AND child = '1'
+  WHERE parent_name = <cfqueryparam value="postscreen_bare_newline_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
 </cfquery>
 
 <!--- Update HELO Required --->
@@ -59,7 +59,7 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
 <cfif StructKeyExists(form, "helo_required") AND form.helo_required is "1"><cfset heloVal = "1"></cfif>
 <cfquery datasource="hermes">
   UPDATE parameters SET enabled = <cfqueryparam value="#heloVal#" cfsqltype="cf_sql_varchar">, applied = '2'
-  WHERE parent = <cfqueryparam value="#get_helo_required_id.id#" cfsqltype="cf_sql_integer"> AND child = '1'
+  WHERE parent_name = <cfqueryparam value="smtpd_helo_required" cfsqltype="cf_sql_varchar"> AND child = '1'
 </cfquery>
 
 <!--- Update Recipient Restrictions --->
@@ -70,7 +70,7 @@ Requires: get_perimeter_checks.cfm (provides parent IDs)
   <cfquery datasource="hermes">
     UPDATE parameters SET enabled = <cfqueryparam value="#restrictVal#" cfsqltype="cf_sql_varchar">, applied = '2'
     WHERE parameter = <cfqueryparam value="#restriction#" cfsqltype="cf_sql_varchar">
-      AND child = '1' AND parent = <cfqueryparam value="#get_recipient_restrictions_id.id#" cfsqltype="cf_sql_integer">
+      AND child = '1' AND parent_name = <cfqueryparam value="smtpd_recipient_restrictions" cfsqltype="cf_sql_varchar">
   </cfquery>
 </cfloop>
 

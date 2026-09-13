@@ -23,7 +23,7 @@ select id from parameters where parameter='bounce_queue_lifetime' and child = '2
   </cfquery>
   
   <cfquery name="get_bounce_queue_lifetime_children" datasource="hermes">
-  select parent, child from parameters where parent='#get_bounce_queue_lifetime.id#' and child = '1' order by order1 asc
+  select parent, child from parameters where parent_name='bounce_queue_lifetime' and child = '1' order by order1 asc
   </cfquery>
   
   <cfquery name="update_bounce_queue_lifetime_children" datasource="hermes">
@@ -31,7 +31,7 @@ select id from parameters where parameter='bounce_queue_lifetime' and child = '2
   parameter='#form.bouncequeue#d',
   applied='2'
   where
-  parent='#get_bounce_queue_lifetime.id#' and child = '1'
+  parent_name='bounce_queue_lifetime' and child = '1'
   </cfquery>
   
   <cfquery name="get_maximal_queue_lifetime" datasource="hermes">
@@ -39,7 +39,7 @@ select id from parameters where parameter='bounce_queue_lifetime' and child = '2
   </cfquery>
   
   <cfquery name="get_maximal_queue_lifetime_children" datasource="hermes">
-  select parent, child from parameters where parent='#get_maximal_queue_lifetime.id#' and child = '1' order by order1 asc
+  select parent, child from parameters where parent_name='maximal_queue_lifetime' and child = '1' order by order1 asc
   </cfquery>
   
   <cfquery name="update_maximal_queue_lifetime_children" datasource="hermes">
@@ -47,6 +47,6 @@ select id from parameters where parameter='bounce_queue_lifetime' and child = '2
   parameter='#form.maxqueue#d',
   applied='2'
   where
-  parent='#get_maximal_queue_lifetime.id#' and child = '1'
+  parent_name='maximal_queue_lifetime' and child = '1'
   </cfquery>
   

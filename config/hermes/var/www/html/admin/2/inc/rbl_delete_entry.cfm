@@ -12,7 +12,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
     <cfquery datasource="hermes">
       DELETE FROM parameters
       WHERE id = <cfqueryparam value="#form.delete_id#" cfsqltype="cf_sql_integer">
-        AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+        AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
     </cfquery>
   </cfif>
 </cfif>
@@ -25,7 +25,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
         <cfquery datasource="hermes">
           DELETE FROM parameters
           WHERE id = <cfqueryparam value="#delId#" cfsqltype="cf_sql_integer">
-            AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+            AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
         </cfquery>
       </cfif>
     </cfloop>

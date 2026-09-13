@@ -8,11 +8,11 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <!--- Commit pending changes --->
 <cfquery datasource="hermes">
   DELETE FROM parameters WHERE action = 'delete' AND applied = '2'
-    AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+    AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
 </cfquery>
 <cfquery datasource="hermes">
   UPDATE parameters SET action = 'NONE', applied = '1'
-  WHERE applied = '2' AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+  WHERE applied = '2' AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <!--- Generate and apply postfix configuration --->

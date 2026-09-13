@@ -25,7 +25,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cfquery>
       
       <cfquery name="get_bounce_queue_lifetime_children" datasource="hermes">
-      select * from parameters where parent='#get_bounce_queue_lifetime.id#' and child = '1' order by order1 asc
+      select * from parameters where parent_name='bounce_queue_lifetime' and child = '1' order by order1 asc
       </cfquery>
       
       <cfquery name="get_maximal_queue_lifetime" datasource="hermes">
@@ -33,7 +33,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       </cfquery>
       
       <cfquery name="get_maximal_queue_lifetime_children" datasource="hermes">
-      select * from parameters where parent='#get_maximal_queue_lifetime.id#' and child = '1' order by order1 asc
+      select * from parameters where parent_name='maximal_queue_lifetime' and child = '1' order by order1 asc
       </cfquery>
       
       <cfparam name = "bouncequeue" default = "#get_bounce_queue_lifetime_children.parameter#"> 

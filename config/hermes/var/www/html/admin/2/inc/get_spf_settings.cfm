@@ -23,7 +23,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfquery>
 
 <cfquery name="get_spf" datasource="hermes">
-  select enabled from parameters where parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent='#get_smtpd_recipient_restrictions_id.id#'
+  select enabled from parameters where parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent_name='smtpd_recipient_restrictions'
   </cfquery>
 
 <cfquery name="get_debugLevel" datasource="hermes">

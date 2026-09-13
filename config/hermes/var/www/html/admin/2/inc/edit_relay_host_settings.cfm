@@ -61,7 +61,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         enabled='1',
         applied='2',
         action='APPLY'
-    WHERE parent='#get_relayhost_id.id#'
+    WHERE parent_name='relayhost'
     AND child='1'
     </cfquery>
 
@@ -133,7 +133,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
             enabled='1',
             applied='2',
             action='APPLY'
-        WHERE parent='#get_smtp_sasl_auth_enable_id.id#'
+        WHERE parent_name='smtp_sasl_auth_enable'
         AND child='1'
         </cfquery>
 
@@ -178,7 +178,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
             enabled='1',
             applied='2',
             action='APPLY'
-        WHERE parent='#get_smtp_sasl_password_maps_id.id#'
+        WHERE parent_name='smtp_sasl_password_maps'
         AND child='1'
         </cfquery>
 
@@ -206,7 +206,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
             enabled='0',
             applied='2',
             action='APPLY'
-        WHERE parent='#get_smtp_sasl_auth_enable_id.id#'
+        WHERE parent_name='smtp_sasl_auth_enable'
         AND child='1'
         </cfquery>
 
@@ -245,7 +245,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
             enabled='0',
             applied='2',
             action='APPLY'
-        WHERE parent='#get_smtp_sasl_password_maps_id.id#'
+        WHERE parent_name='smtp_sasl_password_maps'
         AND child='1'
         </cfquery>
 
@@ -277,7 +277,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         enabled='0',
         applied='2',
         action='APPLY'
-    WHERE parent='#get_relayhost_id.id#'
+    WHERE parent_name='relayhost'
     AND child='1'
     </cfquery>
 
@@ -299,7 +299,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         enabled='0',
         applied='2',
         action='APPLY'
-    WHERE parent='#get_smtp_sasl_auth_enable_id.id#'
+    WHERE parent_name='smtp_sasl_auth_enable'
     AND child='1'
     </cfquery>
 
@@ -339,7 +339,7 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         enabled='0',
         applied='2',
         action='APPLY'
-    WHERE parent='#get_smtp_sasl_password_maps_id.id#'
+    WHERE parent_name='smtp_sasl_password_maps'
     AND child='1'
     </cfquery>
 

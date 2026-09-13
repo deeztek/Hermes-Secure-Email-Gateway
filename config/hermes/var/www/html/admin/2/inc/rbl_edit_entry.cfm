@@ -40,7 +40,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
         weight = <cfqueryparam value="#actualWeight#" cfsqltype="cf_sql_integer">,
         action = 'NONE', applied = '1'
     WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
-      AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+      AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
   </cfquery>
 
   <!--- Immediately generate and apply Postfix configuration --->

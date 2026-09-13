@@ -27,7 +27,7 @@ Expects: form.spfenabled, and when enabled: form.debuglevel, form.testonly,
   <cfquery datasource="hermes">
     UPDATE parameters SET enabled = '1', applied = '1'
     WHERE parameter = 'check_policy_service unix:private/policy-spf'
-      AND child = '1' AND parent = <cfqueryparam value="#get_smtpd_recipient_restrictions_id.id#" cfsqltype="cf_sql_integer">
+      AND child = '1' AND parent_name = <cfqueryparam value="smtpd_recipient_restrictions" cfsqltype="cf_sql_varchar">
   </cfquery>
 
   <!--- Update SPF policy settings --->
@@ -71,7 +71,7 @@ Expects: form.spfenabled, and when enabled: form.debuglevel, form.testonly,
   <cfquery datasource="hermes">
     UPDATE parameters SET enabled = '2', applied = '1'
     WHERE parameter = 'check_policy_service unix:private/policy-spf'
-      AND child = '1' AND parent = <cfqueryparam value="#get_smtpd_recipient_restrictions_id.id#" cfsqltype="cf_sql_integer">
+      AND child = '1' AND parent_name = <cfqueryparam value="smtpd_recipient_restrictions" cfsqltype="cf_sql_varchar">
   </cfquery>
 
   <!--- Also disable DMARC (DMARC requires SPF) --->
@@ -81,12 +81,12 @@ Expects: form.spfenabled, and when enabled: form.debuglevel, form.testonly,
   <cfquery datasource="hermes">
     UPDATE parameters SET enabled = '2', applied = '1'
     WHERE parameter LIKE 'inet:%:54321' AND child = '1'
-      AND parent = <cfqueryparam value="#get_smtpd_milters_id.id#" cfsqltype="cf_sql_integer">
+      AND parent_name = <cfqueryparam value="smtpd_milters" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfquery datasource="hermes">
     UPDATE parameters SET enabled = '2', applied = '1'
     WHERE parameter LIKE 'inet:%:54321' AND child = '1'
-      AND parent = <cfqueryparam value="#get_non_smtpd_milters_id.id#" cfsqltype="cf_sql_integer">
+      AND parent_name = <cfqueryparam value="non_smtpd_milters" cfsqltype="cf_sql_varchar">
   </cfquery>
 
   <!--- Disable DMARC failure reports --->

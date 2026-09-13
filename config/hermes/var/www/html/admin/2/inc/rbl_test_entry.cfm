@@ -19,7 +19,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <cfquery name="getEntry" datasource="hermes">
   SELECT parameter FROM parameters
   WHERE id = <cfqueryparam value="#url.id#" cfsqltype="cf_sql_integer">
-    AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+    AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
     AND child = '1'
 </cfquery>
 

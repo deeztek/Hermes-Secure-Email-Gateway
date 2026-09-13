@@ -35,7 +35,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <cfquery name="checkDup" datasource="hermes">
   SELECT COUNT(*) as cnt FROM parameters
   WHERE parameter LIKE <cfqueryparam value="%#rblHost#%" cfsqltype="cf_sql_varchar">
-    AND child = '1' AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+    AND child = '1' AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
 </cfquery>
 <cfif checkDup.cnt GT 0>
   <cfset session.m = 12>
@@ -45,7 +45,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <!--- Get next order --->
 <cfquery name="getMaxOrder" datasource="hermes">
   SELECT COALESCE(MAX(order1), 0) as maxOrder FROM parameters
-  WHERE parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer"> AND child = '1'
+  WHERE parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar"> AND child = '1'
 </cfquery>
 <cfset nextOrder = getMaxOrder.maxOrder + 1>
 
@@ -59,12 +59,11 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 </cfif>
 
 <cfquery datasource="hermes">
-  INSERT INTO parameters (parameter, parent_name, module, editable, conf_file, parent, child, order1, enabled, weight, applied, action)
+  INSERT INTO parameters (parameter, parent_name, module, editable, conf_file, child, order1, enabled, weight, applied, action)
   VALUES (
     <cfqueryparam value="#paramValue#" cfsqltype="cf_sql_varchar">,
     'postscreen_dnsbl_sites',
     'postfix', '1', 'main.cf',
-    <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">,
     '1',
     <cfqueryparam value="#nextOrder#" cfsqltype="cf_sql_integer">,
     '1',

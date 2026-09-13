@@ -9,7 +9,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
 <cfif action is "cancel_add">
   <cfquery datasource="hermes">
     DELETE FROM parameters WHERE action = 'insert' AND applied = '2'
-      AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+      AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfset session.m = 6>
   <cflocation url="view_rbl_configuration.cfm" addtoken="no">
@@ -20,7 +20,7 @@ Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
   <cfquery datasource="hermes">
     UPDATE parameters SET action = 'NONE', applied = '1'
     WHERE action = 'delete' AND applied = '2'
-      AND parent = <cfqueryparam value="#get_dnsbl_sites_id.id#" cfsqltype="cf_sql_integer">
+      AND parent_name = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfset session.m = 7>
   <cflocation url="view_rbl_configuration.cfm" addtoken="no">

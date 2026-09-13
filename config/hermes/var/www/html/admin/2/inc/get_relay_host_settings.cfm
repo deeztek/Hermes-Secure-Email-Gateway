@@ -25,7 +25,7 @@ SELECT id, enabled FROM parameters WHERE parameter='relayhost' AND child = '2'
 
 <!--- Get relay host child parameter (contains hostname and port) --->
 <cfquery name="get_relayhost" datasource="hermes">
-SELECT name, parameter FROM parameters WHERE parent='#get_relayhost_parent.id#' AND child = '1'
+SELECT name, parameter FROM parameters WHERE parent_name='relayhost' AND child = '1'
 </cfquery>
 
 <!--- Determine if relay host is enabled (check parent enabled status) --->
@@ -52,7 +52,7 @@ SELECT id, enabled FROM parameters WHERE parameter='smtp_sasl_auth_enable' AND c
 
 <!--- Get smtp_sasl_auth_enable value --->
 <cfquery name="get_smtp_sasl_auth_enable_parameter" datasource="hermes">
-SELECT parameter FROM parameters WHERE parent='#get_smtp_sasl_auth_enable.id#' AND child = '1'
+SELECT parameter FROM parameters WHERE parent_name='smtp_sasl_auth_enable' AND child = '1'
 </cfquery>
 
 <!--- Determine if authentication is required (check parent enabled AND value is yes) --->
