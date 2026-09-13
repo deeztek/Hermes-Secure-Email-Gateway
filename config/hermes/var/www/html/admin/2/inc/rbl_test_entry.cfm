@@ -5,7 +5,7 @@ Performs a live DNS probe against an RBL entry to verify it is responding.
 Two-point probe: 2.0.0.127.<hostname> must answer, 1.0.0.127.<hostname> must not.
 Returns JSON: {"status":"ok|warn|error|timeout","message":"..."}
 Expects: url.id
-Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
+Scopes by parent_name = postscreen_dnsbl_sites; no id lookup needed.
 --->
 
 <cfcontent type="application/json">

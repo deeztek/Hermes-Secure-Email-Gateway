@@ -18,9 +18,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="get_smtpd_recipient_restrictions_id" datasource="hermes">
-  select id from parameters where parameter='smtpd_recipient_restrictions' and child = '2'
-  </cfquery>
 
 <cfquery name="get_spf" datasource="hermes">
   select enabled from parameters where parameter='check_policy_service unix:private/policy-spf' and child = '1' and parent_name='smtpd_recipient_restrictions'

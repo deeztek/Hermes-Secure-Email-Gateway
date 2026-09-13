@@ -4,36 +4,24 @@ Queries the parameters table for all perimeter check settings.
 --->
 
 <!--- Postscreen Settings --->
-<cfquery name="get_postscreen_pipelining_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="postscreen_pipelining_enable" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_postscreen_pipelining" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="postscreen_pipelining_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
   ORDER BY order1 ASC
 </cfquery>
 
-<cfquery name="get_postscreen_non_smtp_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="postscreen_non_smtp_command_enable" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_postscreen_non_smtp" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="postscreen_non_smtp_command_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
   ORDER BY order1 ASC
 </cfquery>
 
-<cfquery name="get_postscreen_bare_newline_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="postscreen_bare_newline_enable" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_postscreen_bare_newline" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="postscreen_bare_newline_enable" cfsqltype="cf_sql_varchar"> AND child = '1'
   ORDER BY order1 ASC
 </cfquery>
 
-<cfquery name="get_dnsbl_threshold_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="postscreen_dnsbl_threshold" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_dnsbl_threshold" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="postscreen_dnsbl_threshold" cfsqltype="cf_sql_varchar"> AND child = '1' AND enabled = '1'
@@ -41,9 +29,6 @@ Queries the parameters table for all perimeter check settings.
 </cfquery>
 
 <!--- Message Settings --->
-<cfquery name="get_message_size_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="message_size_limit" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_message_size" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="message_size_limit" cfsqltype="cf_sql_varchar"> AND child = '1' AND enabled = '1'
@@ -51,9 +36,6 @@ Queries the parameters table for all perimeter check settings.
 </cfquery>
 
 <!--- HELO Required --->
-<cfquery name="get_helo_required_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="smtpd_helo_required" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 <cfquery name="get_helo_required" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
   WHERE parent_name = <cfqueryparam value="smtpd_helo_required" cfsqltype="cf_sql_varchar"> AND child = '1'
@@ -61,9 +43,6 @@ Queries the parameters table for all perimeter check settings.
 </cfquery>
 
 <!--- Recipient Restrictions --->
-<cfquery name="get_recipient_restrictions_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="smtpd_recipient_restrictions" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 
 <cfquery name="get_reject_unauth_destination" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters
@@ -102,12 +81,6 @@ Queries the parameters table for all perimeter check settings.
 </cfquery>
 
 <!--- SPF/DKIM/DMARC Milters --->
-<cfquery name="get_smtpd_milters_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="smtpd_milters" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
-<cfquery name="get_non_smtpd_milters_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="non_smtpd_milters" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 
 <cfquery name="get_spf" datasource="hermes">
   SELECT id, parameter, enabled FROM parameters

@@ -3,7 +3,7 @@
 Hermes Secure Email Gateway - RBL Add Entry Action Handler
 Adds a new RBL block/allow list entry to the parameters table.
 Expects: form.rbl_host, form.rbl_weight, form.rbl_type
-Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
+Scopes by parent_name = postscreen_dnsbl_sites; no id lookup needed.
 --->
 
 <cfif NOT StructKeyExists(form, "rbl_host") OR trim(form.rbl_host) is "">

@@ -3,7 +3,7 @@
 Hermes Secure Email Gateway - RBL Delete Entry Action Handler
 Handles single delete and bulk delete, immediately applies Postfix configuration.
 Expects: form.delete_id (single) or form.selected_ids (bulk)
-Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
+Scopes by parent_name = postscreen_dnsbl_sites; no id lookup needed.
 --->
 
 <!--- Single delete --->

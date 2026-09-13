@@ -3,7 +3,7 @@
 Hermes Secure Email Gateway - RBL Edit Entry Action Handler
 Updates an existing RBL entry's hostname and weight.
 Expects: form.edit_id, form.edit_host, form.edit_weight (positive integer), form.edit_type (block/allow)
-Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
+Scopes by parent_name = postscreen_dnsbl_sites; no id lookup needed.
 --->
 
 <cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)

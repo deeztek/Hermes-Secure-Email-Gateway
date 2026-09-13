@@ -9,9 +9,6 @@ Hermes Secure Email Gateway Pro Edition is NOT free software. It is covered unde
 You should have received a copy of the Hermes Secure Email Gateway Pro Edition License along with Hermes Secure Email Gateway Pro Edition Software.  If not, see https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula.
   --->
 
-<cfquery name="smtpd_tls_security_level_id" datasource="hermes">
-select id from parameters where parameter='smtpd_tls_security_level' and enabled='1'
-</cfquery>
       
 <cfquery name="smtpd_tls_security_level" datasource="hermes">
 select parameter from parameters where parent_name='smtpd_tls_security_level' and child='1' and enabled='1' order by order1 asc

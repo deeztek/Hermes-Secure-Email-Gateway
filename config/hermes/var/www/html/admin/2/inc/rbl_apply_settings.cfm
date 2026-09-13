@@ -2,7 +2,7 @@
 <!---
 Hermes Secure Email Gateway - RBL Apply Settings Action Handler
 Commits all pending RBL changes and regenerates Postfix configuration.
-Requires: get_rbl_configuration.cfm (provides get_dnsbl_sites_id)
+Scopes by parent_name = postscreen_dnsbl_sites; no id lookup needed.
 --->
 
 <!--- Commit pending changes --->

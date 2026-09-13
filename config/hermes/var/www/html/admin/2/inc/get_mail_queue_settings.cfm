@@ -20,17 +20,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <!--- GET MAIL QUEUE SETTINGS STARTS HERE --->
 
-    <cfquery name="get_bounce_queue_lifetime" datasource="hermes">
-      select id from parameters where parameter='bounce_queue_lifetime' and child = '2'
-      </cfquery>
       
       <cfquery name="get_bounce_queue_lifetime_children" datasource="hermes">
       select * from parameters where parent_name='bounce_queue_lifetime' and child = '1' order by order1 asc
       </cfquery>
       
-      <cfquery name="get_maximal_queue_lifetime" datasource="hermes">
-      select id from parameters where parameter='maximal_queue_lifetime' and child = '2'
-      </cfquery>
       
       <cfquery name="get_maximal_queue_lifetime_children" datasource="hermes">
       select * from parameters where parent_name='maximal_queue_lifetime' and child = '1' order by order1 asc

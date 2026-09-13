@@ -23,9 +23,6 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <cfif #form.tlsmode# is "" OR #form.tlsmode# is "may" OR #form.tlsmode# is "encrypt">
 
 <!--- PARENT ID NO LONGER USED
-<cfquery name="smtpd_tls_security_level_id" datasource="hermes">
-select id from parameters where parameter='smtpd_tls_security_level' and enabled='1'
-</cfquery>
 --->
 
 <cfquery name="update" datasource="hermes">

@@ -18,9 +18,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="get_bounce_queue_lifetime" datasource="hermes">
-select id from parameters where parameter='bounce_queue_lifetime' and child = '2'
-  </cfquery>
   
   <cfquery name="get_bounce_queue_lifetime_children" datasource="hermes">
   select parent, child from parameters where parent_name='bounce_queue_lifetime' and child = '1' order by order1 asc
@@ -34,9 +31,6 @@ select id from parameters where parameter='bounce_queue_lifetime' and child = '2
   parent_name='bounce_queue_lifetime' and child = '1'
   </cfquery>
   
-  <cfquery name="get_maximal_queue_lifetime" datasource="hermes">
-  select id from parameters where parameter='maximal_queue_lifetime' and child = '2'
-  </cfquery>
   
   <cfquery name="get_maximal_queue_lifetime_children" datasource="hermes">
   select parent, child from parameters where parent_name='maximal_queue_lifetime' and child = '1' order by order1 asc

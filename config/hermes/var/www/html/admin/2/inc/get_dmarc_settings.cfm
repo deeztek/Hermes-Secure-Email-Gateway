@@ -47,13 +47,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   select value2 from parameters2 where parameter='starttime' and module = 'dmarc'
   </cfquery>
 
-<cfquery name="get_smtpd_milters_id" datasource="hermes">
-  select id from parameters where parameter='smtpd_milters' and child = '2'
-  </cfquery>
 
-<cfquery name="get_non_smtpd_milters_id" datasource="hermes">
-  select id from parameters where parameter='non_smtpd_milters' and child = '2'
-  </cfquery>
   
   
   <cfquery name="get_dmarc" datasource="hermes">

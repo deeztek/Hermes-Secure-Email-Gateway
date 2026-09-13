@@ -18,13 +18,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<cfquery name="get_smtpd_milters_id" datasource="hermes">
-select id from parameters where parameter='smtpd_milters' and child = '2'
-</cfquery>
 
-<cfquery name="get_non_smtpd_milters_id" datasource="hermes">
-select id from parameters where parameter='non_smtpd_milters' and child = '2'
-</cfquery>
 
 <cfquery name="get_dkim" datasource="hermes">
 select enabled from parameters where parameter LIKE 'inet:%:8891' and child = '1' and parent_name='smtpd_milters'

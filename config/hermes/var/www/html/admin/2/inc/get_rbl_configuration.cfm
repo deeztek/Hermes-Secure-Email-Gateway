@@ -6,9 +6,6 @@ Block entries have positive weight, Allow entries have negative weight.
 --->
 
 <!--- Get parent ID --->
-<cfquery name="get_dnsbl_sites_id" datasource="hermes">
-  SELECT id FROM parameters WHERE parameter = <cfqueryparam value="postscreen_dnsbl_sites" cfsqltype="cf_sql_varchar"> AND child = '2'
-</cfquery>
 
 <!--- All active entries --->
 <cfquery name="get_active_all" datasource="hermes">
