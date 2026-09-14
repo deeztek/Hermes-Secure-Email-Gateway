@@ -290,6 +290,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cflocation url="view_network_aliases.cfm" addtoken="no">
 </cfif>
 
+<!--- ---- resolve every enabled SPF alias now ----
+      The scheduled job runs nightly. Without this an admin who enables an alias sees
+      an empty list and has nothing to click, on a page whose whole point is that it
+      maintains itself. Same pattern as inc/run_update_check.cfm: call the schedule
+      page over localhost and let it do the work, so there is one implementation. --->
+<cfif action is "resolve_now">
+  <cftry>
+    <cfhttp method="GET"
+            url="http://localhost:8888/schedule/refresh_network_aliases.cfm"
+            timeout="180"
+            result="resolveResult">
+    </cfhttp>
+    <cfif resolveResult.status_code NEQ 200>
+      <cflog file="hermes" type="error"
+        text="view_network_aliases.cfm: resolver returned status #resolveResult.status_code#">
+      <cfset session.m = 70>
+    <cfelse>
+      <cfset session.m = 71>
+    </cfif>
+    <cfcatch type="any">
+      <cflog file="hermes" type="error" text="view_network_aliases.cfm: resolver failed: #cfcatch.message#">
+      <cfset session.m = 70>
+    </cfcatch>
+  </cftry>
+  <cflocation url="view_network_aliases.cfm" addtoken="no">
+</cfif>
+
 <!--- ---- add ranges to a static alias ---- --->
 <cfif action is "add_entries">
   <cfset theId = form.alias_id>
@@ -441,6 +468,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset session.m = 0>
 </cfif>
 
+<cfif m is "70">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Resolve failed</h4>
+    <cfoutput>The resolver could not be reached. Existing ranges were left untouched. Check the per-alias status below.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "71">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-check"></i> Done</h4>
+    <cfoutput>Every enabled alias was re-resolved. Per-alias results are shown below.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
 <!--- ==================================================================
       WHAT THIS PAGE IS, STATED ON THE PAGE
       ================================================================== --->
@@ -471,6 +516,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-network-wired"></i> Aliases</h3>
     <div class="card-tools">
+      <form method="post" class="d-inline">
+        <input type="hidden" name="action" value="resolve_now">
+        <button type="submit" class="btn btn-secondary btn-sm"
+                onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Resolving...';this.form.submit();">
+          <i class="fas fa-sync"></i> Resolve Now
+        </button>
+      </form>
       <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAliasModal">
         <i class="fas fa-plus"></i> Add Alias
       </button>
