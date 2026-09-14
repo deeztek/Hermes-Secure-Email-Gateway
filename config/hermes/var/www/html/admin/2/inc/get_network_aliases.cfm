@@ -49,8 +49,12 @@ ORDER BY a.name ASC
 
 <!---
   Consumer references per alias, so the page can say where an alias is used and the
-  admin knows which page to apply after a change. Each consumer adds a clause as it
-  is adopted; Relay Networks is the first.
+  admin knows which page to apply after a change. One clause per consumer: Relay
+  Networks, Network Block-Allow, and the Intrusion Prevention whitelist. A new
+  consumer adds a clause here, a branch in aliasReferenceCount() on
+  view_network_aliases.cfm, and a branch in aliasConsumers() on
+  schedule/refresh_network_aliases.cfm, or it is invisible to the delete guard and
+  to the change email.
 --->
 <cfquery name="get_alias_consumers" datasource="hermes">
 SELECT a.name AS alias_name, 'Relay Networks' AS consumer, 'view_relay_networks.cfm' AS page

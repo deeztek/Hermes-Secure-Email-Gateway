@@ -140,10 +140,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     Guarded rather than cascading, matching #320: an alias in use cannot be
     deleted until the references are gone.
 
-    Relay Networks is the first consumer. A relay-network row referencing an
-    alias holds its NAME with network_entry = '2', so the count matches on name
-    rather than id. Further consumers (the postscreen access list, the
-    intrusion-prevention whitelist) add their own clause here.
+    One clause per consumer, and every consumer stores the alias NAME rather
+    than its id, so each clause joins on name: Relay Networks (parameters,
+    network_entry = '2'), Network Block-Allow (postscreen_access,
+    entry_type = 'alias'), and the Intrusion Prevention whitelist
+    (intrusion_prevention_whitelist, entry_type = 'alias').
+
+    A new consumer that does not add its clause here leaves the guard blind to
+    it, and deleting the alias silently empties that consumer's list on the
+    next render. Add it in three places: here, get_alias_consumers in
+    inc/get_network_aliases.cfm, and aliasConsumers() in
+    schedule/refresh_network_aliases.cfm.
   --->
   <cfset var refs = "">
   <cfquery name="refs" datasource="hermes">
@@ -558,12 +565,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     move. <strong>Google Workspace</strong> and <strong>Microsoft 365</strong> are
     pre-loaded and switched off; enable one and its ranges are fetched straight away.
   </p>
+  <p>
+    Three pages can use an alias instead of pasted ranges. Add it once on the page that
+    needs it and there is nothing to retype when the provider changes:
+  </p>
+  <ul>
+    <li>
+      <strong><a href="view_relay_networks.cfm">Email Relay / Relay Networks</a></strong>
+      for which networks may relay through this gateway.
+    </li>
+    <li>
+      <strong><a href="view_network_block_allow.cfm">System / Network Block-Allow</a></strong>
+      to allow a provider past the RBL checks, or to block one outright.
+    </li>
+    <li>
+      <strong><a href="view_intrusion_prevention.cfm">System / Intrusion Prevention</a></strong>
+      to keep fail2ban from ever banning a provider's sending ranges.
+    </li>
+  </ul>
   <p class="mb-0">
-    <strong>Relay Networks</strong> can use an alias instead of pasted ranges &mdash; add
-    it there once and there is nothing to retype when the provider changes. Nothing is
-    applied on its own: when an alias moves you apply it on Relay Networks, so mail flow
-    never changes without you. Other places that take IP ranges, such as the Network
-    Block/Allow list, still need the ranges copied in for now.
+    The <strong>Used by</strong> column shows where each alias is referenced. Nothing is
+    applied on its own: when an alias moves, you apply it on the pages listed there, so
+    mail flow never changes without you. The alias name is never written to a
+    configuration file. It is replaced with the alias's current ranges each time the file
+    is generated, so the ranges in use are always the ones shown here.
   </p>
 </div>
 
