@@ -566,8 +566,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-network-wired"></i> Aliases</h3>
-    <div class="card-tools">
-      <form method="post" class="d-inline">
+    <div class="card-tools d-flex align-items-center gap-1">
+      <form method="post" class="m-0">
         <input type="hidden" name="action" value="resolve_now">
         <button type="submit" class="btn btn-secondary btn-sm"
                 onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Resolving...';this.form.submit();">
@@ -641,8 +641,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td>
             <!--- d-flex so the <form> wrapping Resolve becomes a flex item rather than a
                  block that pushes the later buttons onto a second line. flex-nowrap keeps
-                 the row intact when the column is narrow. --->
-            <div class="d-flex flex-nowrap gap-1">
+                 the row intact when the column is narrow. align-items-center because the
+                 default is stretch, which makes the form (and so its button) taller than
+                 the plain sibling buttons. --->
+            <div class="d-flex flex-nowrap align-items-center gap-1">
               <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
                 <i class="fas fa-list"></i>
               </a>
