@@ -48,6 +48,29 @@ ORDER BY a.name ASC
 </cfquery>
 
 <!---
+  Consumer references per alias, so the page can say where an alias is used and the
+  admin knows which page to apply after a change. Each consumer adds a clause as it
+  is adopted; Relay Networks is the first.
+--->
+<cfquery name="get_alias_consumers" datasource="hermes">
+SELECT a.name AS alias_name,
+       'Relay Networks' AS consumer,
+       'view_relay_networks.cfm' AS page,
+       COUNT(*) AS uses
+FROM parameters p
+JOIN network_aliases a ON a.name = p.parameter
+WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
+GROUP BY a.name
+</cfquery>
+
+<cfset aliasConsumerText = StructNew()>
+<cfset aliasConsumerPage = StructNew()>
+<cfloop query="get_alias_consumers">
+  <cfset aliasConsumerText[get_alias_consumers.alias_name] = get_alias_consumers.consumer>
+  <cfset aliasConsumerPage[get_alias_consumers.alias_name] = get_alias_consumers.page>
+</cfloop>
+
+<!---
   Entries for the alias the operator opened, if any. Ordered by family then the
   text of the range, which is not numeric ordering but is stable and readable;
   these lists are tens of rows, not thousands.

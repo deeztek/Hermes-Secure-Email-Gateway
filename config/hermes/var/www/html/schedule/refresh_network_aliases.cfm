@@ -227,6 +227,32 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfreturn res>
 </cffunction>
 
+<!--- ------------------------------------------------------------------
+      aliasConsumers: where an alias is referenced, in words.
+
+      A notification that says "the ranges changed" and stops is a notice, not an
+      instruction. Nothing applies itself, so the mail has to name the pages the
+      admin must go and apply, or they are left to work it out.
+
+      Each consumer adds a clause here as it is adopted.
+      ------------------------------------------------------------------ --->
+<cffunction name="aliasConsumers" returntype="string" output="false">
+  <cfargument name="aliasName" type="string" required="true">
+  <cfset var out = []>
+  <cfset var relay = "">
+
+  <cfquery name="relay" datasource="hermes">
+    SELECT COUNT(*) AS c FROM parameters
+    WHERE parent_name = 'mynetworks' AND child = '1' AND network_entry = '2'
+      AND parameter = <cfqueryparam value="#arguments.aliasName#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif relay.c GT 0>
+    <cfset ArrayAppend(out, "Email Relay / Relay Networks")>
+  </cfif>
+
+  <cfreturn ArrayToList(out, ", ")>
+</cffunction>
+
 <!--- ==================================================================
       MAIN
       ================================================================== --->
@@ -358,9 +384,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfif ArrayLen(addedRanges) OR ArrayLen(removedRanges)>
     <cfset ArrayAppend(changedAliases, {
-      name    = thisName,
-      added   = addedRanges,
-      removed = removedRanges
+      name      = thisName,
+      added     = addedRanges,
+      removed   = removedRanges,
+      consumers = aliasConsumers(thisName)
     })>
     <cflog file="hermes" type="information"
            text="refresh_network_aliases: #thisName# changed -- #ArrayLen(addedRanges)# added, #ArrayLen(removedRanges)# removed">
@@ -395,9 +422,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               type="html">
         <h3>Network alias ranges changed</h3>
         <p>
-          These aliases are advisory. <strong>Nothing has been applied</strong> and no
-          configuration was regenerated. Review them in the admin console under
-          System / Network Aliases.
+          <strong>Nothing has been applied.</strong> No configuration was regenerated and
+          mail flow is unchanged. Each alias below lists the pages that use it: open each
+          one and click its Apply button to put the new ranges into effect.
         </p>
         <cfif ArrayLen(changedAliases)>
           <cfloop array="#changedAliases#" index="oneChange">
@@ -409,6 +436,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfif ArrayLen(oneChange.removed)>
               <p>No longer published:</p>
               <ul><cfloop array="#oneChange.removed#" index="r"><li><cfoutput>#EncodeForHTML(r)#</cfoutput></li></cfloop></ul>
+            </cfif>
+            <cfif Len(Trim(oneChange.consumers))>
+              <p><strong>Apply on:</strong> <cfoutput>#EncodeForHTML(oneChange.consumers)#</cfoutput></p>
+            <cfelse>
+              <p><em>Nothing uses this alias yet, so there is nothing to apply.</em></p>
             </cfif>
           </cfloop>
         </cfif>

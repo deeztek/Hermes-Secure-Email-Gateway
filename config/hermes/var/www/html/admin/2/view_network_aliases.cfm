@@ -589,6 +589,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>Ranges</th>
           <th>Last resolved</th>
           <th>Status</th>
+          <th>Used by</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -636,6 +637,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <span class="badge bg-danger" title="#EncodeForHTMLAttribute(last_message)#">#EncodeForHTML(last_status)#</span>
             <cfelse>
               <span class="text-muted">-</span>
+            </cfif>
+          </td>
+          <td>
+            <cfif StructKeyExists(aliasConsumerText, name)>
+              <a href="#aliasConsumerPage[name]#" class="badge bg-dark text-decoration-none"
+                 title="Apply here after the ranges change">#EncodeForHTML(aliasConsumerText[name])#</a>
+            <cfelse>
+              <span class="text-muted">not used</span>
             </cfif>
           </td>
           <td>
@@ -943,8 +952,8 @@ $(document).ready(function () {
     lengthMenu: [[25, 50, 100, -1], ['25 rows', '50 rows', '100 rows', 'Show all']],
     order: [[0, 'asc']],
     columnDefs: [
-      { orderable: false, targets: [6] },
-      { searchable: false, targets: [6] }
+      { orderable: false, targets: [7] },
+      { searchable: false, targets: [7] }
     ]
   });
   toggleSource('add');
