@@ -648,17 +648,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <!--- d-flex so the <form> wrapping Resolve becomes a flex item rather than a
-                 block that pushes the later buttons onto a second line. flex-nowrap keeps
-                 the row intact when the column is narrow. align-items-center because the
-                 default is stretch, which makes the form (and so its button) taller than
-                 the plain sibling buttons. --->
-            <div class="d-flex flex-nowrap align-items-center gap-1">
+            <!--- Inline-block, not flex. A table actions cell wants buttons at their
+                 natural size on one line; flex in a narrow column shrinks them instead.
+                 text-nowrap keeps the line intact, d-inline-block stops the <form>
+                 wrapping Resolve behaving as a block, and the whitespace between
+                 elements supplies the gap, matching the other list pages. --->
+            <span class="text-nowrap">
               <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
                 <i class="fas fa-list"></i>
               </a>
               <cfif source_type is "spf" AND enabled>
-                <form method="post" class="m-0">
+                <form method="post" class="d-inline-block m-0 align-top">
                   <input type="hidden" name="action" value="resolve_one">
                   <input type="hidden" name="alias_id" value="#id#">
                   <button type="submit" class="btn btn-secondary btn-sm" title="Resolve this alias now"
@@ -677,7 +677,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                       title="Delete">
                 <i class="fas fa-trash"></i>
               </button>
-            </div>
+            </span>
           </td>
         </tr>
       </cfoutput>
