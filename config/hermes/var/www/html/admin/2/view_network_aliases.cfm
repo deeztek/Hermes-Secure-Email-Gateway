@@ -640,29 +640,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
-              <i class="fas fa-list"></i>
-            </a>
-            <cfif source_type is "spf" AND enabled>
-              <form method="post" class="d-inline">
-                <input type="hidden" name="action" value="resolve_one">
-                <input type="hidden" name="alias_id" value="#id#">
-                <button type="submit" class="btn btn-secondary btn-sm" title="Resolve this alias now"
-                        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>';this.form.submit();">
-                  <i class="fas fa-sync"></i>
-                </button>
-              </form>
-            </cfif>
-            <button type="button" class="btn btn-warning btn-sm"
-                    onclick="openEditAlias(#id#, '#JSStringFormat(name)#', '#JSStringFormat(description)#', '#JSStringFormat(source_type)#', '#JSStringFormat(source_value)#', #enabled#)"
-                    title="Edit">
-              <i class="fas fa-edit"></i>
-            </button>
-            <button type="button" class="btn btn-danger btn-sm"
-                    onclick="openDeleteAlias(#id#, '#JSStringFormat(name)#')"
-                    title="Delete">
-              <i class="fas fa-trash"></i>
-            </button>
+            <!--- d-flex so the <form> wrapping Resolve becomes a flex item rather than a
+                 block that pushes the later buttons onto a second line. flex-nowrap keeps
+                 the row intact when the column is narrow. --->
+            <div class="d-flex flex-nowrap gap-1">
+              <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
+                <i class="fas fa-list"></i>
+              </a>
+              <cfif source_type is "spf" AND enabled>
+                <form method="post" class="m-0">
+                  <input type="hidden" name="action" value="resolve_one">
+                  <input type="hidden" name="alias_id" value="#id#">
+                  <button type="submit" class="btn btn-secondary btn-sm" title="Resolve this alias now"
+                          onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>';this.form.submit();">
+                    <i class="fas fa-sync"></i>
+                  </button>
+                </form>
+              </cfif>
+              <button type="button" class="btn btn-warning btn-sm"
+                      onclick="openEditAlias(#id#, '#JSStringFormat(name)#', '#JSStringFormat(description)#', '#JSStringFormat(source_type)#', '#JSStringFormat(source_value)#', #enabled#)"
+                      title="Edit">
+                <i class="fas fa-edit"></i>
+              </button>
+              <button type="button" class="btn btn-danger btn-sm"
+                      onclick="openDeleteAlias(#id#, '#JSStringFormat(name)#')"
+                      title="Delete">
+                <i class="fas fa-trash"></i>
+              </button>
+            </div>
           </td>
         </tr>
       </cfoutput>
