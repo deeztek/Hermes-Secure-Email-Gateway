@@ -154,8 +154,39 @@ timeout="10" />
 
 <cfloop query="getparents">
 
+  <!---
+    Network alias expansion (#324).
+
+    A child row with network_entry = '2' is not a literal address: its `parameter`
+    holds the NAME of a network alias, and it renders as that alias's current IPv4
+    ranges. Postfix never sees an alias -- the indirection is resolved here, so
+    main.cf gets the same literal CIDRs it always did.
+
+    IPv6 is excluded because the mail containers set
+    net.ipv6.conf.all.disable_ipv6=1. The ranges are stored either way; this is
+    where they get filtered.
+
+    An alias that is disabled, or has not resolved yet, contributes NOTHING rather
+    than injecting an empty element into the directive. That is deliberate: a
+    half-rendered mynetworks is worse than a short one. The console flags an alias
+    in that state so it is visible rather than silent.
+  --->
   <cfquery name="getchildren" datasource="hermes">
-  select parameter from parameters where child='1' and parent_name = '#getparents.parameter#' and enabled = '1' order by order1 asc
+  SELECT rendered AS parameter FROM (
+    SELECT c.order1,
+           CASE WHEN c.network_entry = '2'
+                THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ')
+                        FROM network_alias_entries e
+                        JOIN network_aliases a ON a.id = e.alias_id
+                       WHERE a.name = c.parameter AND a.enabled = 1 AND e.family = 'ip4')
+                ELSE c.parameter END AS rendered
+      FROM parameters c
+     WHERE c.child = '1'
+       AND c.parent_name = <cfqueryparam value="#getparents.parameter#" cfsqltype="cf_sql_varchar">
+       AND c.enabled = '1'
+  ) x
+  WHERE rendered IS NOT NULL AND rendered <> ''
+  ORDER BY order1 ASC
   </cfquery>
 
 
@@ -303,8 +334,22 @@ select parameter, parent_name, description, child, editable, enabled, conf_file 
 </cfquery>
 
 <!--- Get mynetworks child entries (networks and IPs) --->
+<!--- Same alias expansion as the postconf path above (#324). Amavis reads one
+     network per line, so an alias contributing several ranges is split below. --->
 <cfquery name="getintnetworks" datasource="hermes">
-select parameter from parameters where child='1' and parent_name = 'mynetworks' and enabled = '1' order by order1 asc
+  SELECT rendered AS parameter FROM (
+    SELECT c.order1,
+           CASE WHEN c.network_entry = '2'
+                THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ')
+                        FROM network_alias_entries e
+                        JOIN network_aliases a ON a.id = e.alias_id
+                       WHERE a.name = c.parameter AND a.enabled = 1 AND e.family = 'ip4')
+                ELSE c.parameter END AS rendered
+      FROM parameters c
+     WHERE c.child = '1' AND c.parent_name = 'mynetworks' AND c.enabled = '1'
+  ) x
+  WHERE rendered IS NOT NULL AND rendered <> ''
+  ORDER BY order1 ASC
 </cfquery>
 
 <!--- Write new mynetworks file --->
@@ -313,13 +358,18 @@ file = "/etc/amavis/mynetworks"
 output = ""
 addnewline="no">
 
+<!--- One network per line. A literal row contributes one entry; an expanded alias
+     contributes several as a comma list, so split rather than writing a comma-joined
+     line that amavis would not parse. --->
 <cfloop query="getintnetworks">
+<cfloop list="#getintnetworks.parameter#" index="oneNetwork" delimiters=",">
 <cfoutput>
 <cffile action = "append"
 file = "/etc/amavis/mynetworks"
-output = "#parameter#"
+output = "#Trim(oneNetwork)#"
 addnewline="yes">
 </cfoutput>
+</cfloop>
 </cfloop>
 
 <!--- Reload amavis in hermes_mail_filter container --->

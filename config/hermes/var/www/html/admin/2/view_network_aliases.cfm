@@ -137,13 +137,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cffunction name="aliasReferenceCount" returntype="numeric" output="false">
   <cfargument name="aliasId" type="numeric" required="true">
   <!---
-    Consumers register here as they are adopted: #323 relay sources first, then
-    the postscreen access list, Relay Networks, then the fail2ban whitelist.
-    Nothing references an alias yet, so this cannot currently refuse a delete.
-    It exists now so adopting the first consumer is a change here and nowhere
-    else. Guarded rather than cascading, matching #320.
+    Guarded rather than cascading, matching #320: an alias in use cannot be
+    deleted until the references are gone.
+
+    Relay Networks is the first consumer. A relay-network row referencing an
+    alias holds its NAME with network_entry = '2', so the count matches on name
+    rather than id. Further consumers (the postscreen access list, the
+    intrusion-prevention whitelist) add their own clause here.
   --->
-  <cfreturn 0>
+  <cfset var refs = "">
+  <cfquery name="refs" datasource="hermes">
+    SELECT COUNT(*) AS c
+    FROM parameters p
+    JOIN network_aliases a ON a.name = p.parameter
+    WHERE p.parent_name = 'mynetworks'
+      AND p.child = '1'
+      AND p.network_entry = '2'
+      AND a.id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfreturn refs.c>
 </cffunction>
 
 <!--- ==================================================================
@@ -433,15 +445,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       WHAT THIS PAGE IS, STATED ON THE PAGE
       ================================================================== --->
 <div class="callout callout-info">
-  <h5><i class="fas fa-info-circle"></i> Aliases do not change anything on their own</h5>
-  <p class="mb-0">
-    An alias is a named set of IP ranges. Other parts of the system will be able to
-    reference an alias instead of repeating the same ranges in several places, so a
-    cloud provider's ranges are maintained once.
+  <h5><i class="fas fa-info-circle"></i> What this page is for</h5>
+  <p>
+    Cloud mail providers publish the IP ranges their servers send from, and those ranges
+    change. Today you paste them by hand wherever they are needed &mdash; Relay Networks,
+    the Network Block/Allow list &mdash; and there is nothing to tell you when the
+    provider has changed them. Mail starts failing and the cause is not obvious.
   </p>
-  <p class="mb-0 mt-2">
-    Nothing consumes aliases yet, and nothing is regenerated automatically when an
-    alias changes. Adding or editing one here has no effect on mail flow.
+  <p>
+    An alias is a named set of ranges that keeps itself current. Point it at a provider's
+    published SPF record and it re-resolves on a schedule, shows you what changed, and
+    emails you. <strong>Google Workspace</strong> and <strong>Microsoft 365</strong> are
+    pre-loaded and switched off; enable one to see its current ranges.
+  </p>
+  <p class="mb-0">
+    <strong>Relay Networks can reference an alias directly</strong> &mdash; add it there
+    once and it relays for the alias's current ranges, with nothing to retype when they
+    change. Changes are never applied on their own: when an alias moves, you apply it on
+    the consuming page, so nothing alters mail flow without you. Pointing the Network
+    Block/Allow list and the intrusion-prevention whitelist at an alias is coming next.
   </p>
 </div>
 
@@ -549,13 +571,43 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <div class="card-body">
     <cfif source_type is "spf">
-      <div class="callout callout-warning">
-        <p class="mb-0">
-          This alias resolves from <code>#EncodeForHTML(source_value)#</code>. The scheduled
-          resolver has not been built yet, so these ranges are whatever has been entered by
-          hand so far.
-        </p>
-      </div>
+      <cfif NOT enabled>
+        <div class="callout callout-warning">
+          <p class="mb-0">
+            This alias is <strong>disabled</strong>, so it is not being resolved. Edit it and
+            tick Enabled to have <code>#EncodeForHTML(source_value)#</code> re-resolved on
+            schedule.
+          </p>
+        </div>
+      <cfelseif NOT IsDate(last_resolved)>
+        <div class="callout callout-warning">
+          <p class="mb-0">
+            Resolves from <code>#EncodeForHTML(source_value)#</code>, but has not run yet.
+            The scheduled job runs nightly at 03:30. Any ranges listed below were entered
+            by hand.
+          </p>
+        </div>
+      <cfelseif last_status is "ok">
+        <div class="callout callout-success">
+          <p class="mb-0">
+            Resolved from <code>#EncodeForHTML(source_value)#</code> on
+            <strong>#DateFormat(last_resolved, "yyyy-mm-dd")# #TimeFormat(last_resolved, "HH:mm")#</strong>.
+            Re-resolves nightly at 03:30; you are emailed if the ranges change.
+          </p>
+        </div>
+      <cfelse>
+        <div class="callout callout-danger">
+          <p class="mb-0">
+            <strong>Last resolve failed</strong>
+            (#DateFormat(last_resolved, "yyyy-mm-dd")# #TimeFormat(last_resolved, "HH:mm")#):
+            #EncodeForHTML(last_message)#
+          </p>
+          <p class="mb-0 mt-2">
+            The ranges below are the ones from the last successful resolve and were left in
+            place deliberately. A failed lookup never empties the list.
+          </p>
+        </div>
+      </cfif>
     </cfif>
 
     <form action="view_network_aliases.cfm" method="post" class="mb-3">

@@ -400,6 +400,56 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <!--- ===================== --->
+<!--- ACTION: ADD ALIAS REFERENCE (#324) --->
+<!--- =====================
+     Stores the alias NAME, not its ranges, with network_entry = '2'. The ranges are
+     expanded when Postfix config is generated, so they stay current without anyone
+     retyping them here. Goes in as a pending addition like any other entry, so the
+     admin still applies it deliberately.
+--->
+<cfif action is "add_alias_ref">
+  <cfset theAlias = Trim(form.alias_name)>
+
+  <cfquery name="check_alias_valid" datasource="hermes">
+    SELECT name FROM network_aliases
+    WHERE name = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">
+    AND enabled = 1
+  </cfquery>
+  <cfif check_alias_valid.recordcount LT 1>
+    <cfset session.m = 32>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
+  <cfquery name="check_alias_dupe" datasource="hermes">
+    SELECT id FROM parameters
+    WHERE parent_name = 'mynetworks' AND child = '1'
+    AND network_entry = '2'
+    AND parameter = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif check_alias_dupe.recordcount GTE 1>
+    <cfset session.m = 33>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
+  <cfquery name="getmaxorder_alias" datasource="hermes">
+    SELECT COALESCE(MAX(order1), 0) as maximum FROM parameters WHERE parent_name='mynetworks' AND child='1'
+  </cfquery>
+  <cfset nextorder_alias = getmaxorder_alias.maximum + 1>
+
+  <cfquery name="add_alias_row" datasource="hermes">
+    INSERT INTO parameters (parameter, module, editable, conf_file, parent_name, child, order1, enabled, applied, action, network_entry, note)
+    VALUES (
+      <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">,
+      'postfix', '1', 'main.cf', 'mynetworks', '1', '#nextorder_alias#', '1', '2', 'insert', '2',
+      <cfqueryparam value="Network alias" cfsqltype="cf_sql_varchar">
+    )
+  </cfquery>
+
+  <cfset session.m = 34>
+  <cflocation url="view_relay_networks.cfm" addtoken="no">
+</cfif>
+
+<!--- ===================== --->
 <!--- ACTION: CANCEL ADD --->
 <!--- ===================== --->
 <cfif action is "cancel_add">
@@ -478,6 +528,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <!--- ERROR MESSAGES START HERE --->
+
+<cfif m is "32">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>That alias does not exist or is disabled. Enable it on the Network Aliases page first.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "33">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Already added</h4>
+    <cfoutput>That alias is already in this list.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "34">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>Alias added. You must click <strong>Apply Settings</strong> below for it to take effect.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
 
 <cfif m is "12">
   <div class="alert alert-danger alert-dismissible">
@@ -734,6 +811,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- ADD NETWORK ALIAS CARD (#324) --->
+<cfif get_available_aliases.recordcount GTE 1>
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-network-wired"></i> Add Network Alias</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-muted">
+      A network alias is a named set of ranges maintained on the
+      <a href="view_network_aliases.cfm">Network Aliases</a> page. Adding one here relays
+      for its current ranges without pasting them in, and it stays correct when the
+      provider changes them.
+    </p>
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="add_alias_ref">
+      <div class="row">
+        <div class="col-md-8">
+          <label for="alias_name" class="form-label"><strong>Alias</strong></label>
+          <select class="form-select" id="alias_name" name="alias_name" required>
+            <cfoutput query="get_available_aliases">
+              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif ip4_count GT 0>(#ip4_count# IPv4 range<cfif ip4_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
+            </cfoutput>
+          </select>
+          <small class="text-muted">
+            Only enabled aliases are listed. The ranges are expanded when you apply, not stored here.
+          </small>
+        </div>
+        <div class="col-md-4 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Alias</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+</cfif>
+
 
 <!--- PENDING ADDITIONS CARD --->
 <cfif get_pending_adds.recordcount GTE 1>
@@ -808,9 +921,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <cfoutput query="get_active_networks">
               <tr>
                 <td><input type="checkbox" class="network-checkbox" value="#id#"></td>
-                <td>#parameter#</td>
+                <td>
+                  <cfif network_entry is "2">
+                    <strong>#encodeForHTML(parameter)#</strong><br>
+                    <cfif StructKeyExists(aliasExpansion, parameter) AND Len(Trim(aliasExpansion[parameter]))>
+                      <small class="text-muted">#encodeForHTML(aliasExpansion[parameter])#</small>
+                    <cfelse>
+                      <small class="text-danger">This alias has no IPv4 ranges yet, so it contributes nothing. Resolve it on the Network Aliases page.</small>
+                    </cfif>
+                  <cfelse>
+                    #parameter#
+                  </cfif>
+                </td>
                 <td>#encodeForHTML(note)#</td>
-                <td><cfif network_entry is "1"><span class="badge bg-info">Network</span><cfelse><span class="badge bg-secondary">IP</span></cfif></td>
+                <td><cfif network_entry is "2"><span class="badge bg-primary">Alias</span><cfelseif network_entry is "1"><span class="badge bg-info">Network</span><cfelse><span class="badge bg-secondary">IP</span></cfif></td>
                 <td>
                   <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#JSStringFormat(parameter)#', '#JSStringFormat(note)#');" title="Edit">
                     <i class="fas fa-edit"></i>
