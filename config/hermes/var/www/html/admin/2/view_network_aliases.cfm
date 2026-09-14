@@ -566,14 +566,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-network-wired"></i> Aliases</h3>
-    <div class="card-tools d-flex align-items-center gap-1">
-      <form method="post" class="m-0">
-        <input type="hidden" name="action" value="resolve_now">
-        <button type="submit" class="btn btn-secondary btn-sm"
-                onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Resolving...';this.form.submit();">
-          <i class="fas fa-sync"></i> Resolve All
-        </button>
-      </form>
+    <div class="card-tools">
+      <button type="button" class="btn btn-secondary btn-sm" onclick="resolveAll(this)">
+        <i class="fas fa-sync"></i> Resolve All
+      </button>
       <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAliasModal">
         <i class="fas fa-plus"></i> Add Alias
       </button>
@@ -648,24 +644,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <!--- Inline-block, not flex. A table actions cell wants buttons at their
-                 natural size on one line; flex in a narrow column shrinks them instead.
-                 text-nowrap keeps the line intact, d-inline-block stops the <form>
-                 wrapping Resolve behaving as a block, and the whitespace between
-                 elements supplies the gap, matching the other list pages. --->
+            <!--- No <form> in this cell. A form carries its own line-height, so its box
+                 is taller than the button inside it and that button sits proud of its
+                 siblings however the cell is laid out. Every button here is a plain
+                 sibling calling JS, which posts a single hidden form below the table.
+                 Same pattern as deleteSingle() on Relay Networks. --->
             <span class="text-nowrap">
               <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
                 <i class="fas fa-list"></i>
               </a>
               <cfif source_type is "spf" AND enabled>
-                <form method="post" class="d-inline-block m-0 align-top">
-                  <input type="hidden" name="action" value="resolve_one">
-                  <input type="hidden" name="alias_id" value="#id#">
-                  <button type="submit" class="btn btn-secondary btn-sm" title="Resolve this alias now"
-                          onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>';this.form.submit();">
-                    <i class="fas fa-sync"></i>
-                  </button>
-                </form>
+                <button type="button" class="btn btn-secondary btn-sm" title="Resolve this alias now"
+                        onclick="resolveOne(#id#)">
+                  <i class="fas fa-sync"></i>
+                </button>
               </cfif>
               <button type="button" class="btn btn-warning btn-sm"
                       onclick="openEditAlias(#id#, '#JSStringFormat(name)#', '#JSStringFormat(description)#', '#JSStringFormat(source_type)#', '#JSStringFormat(source_value)#', #enabled#)"
@@ -778,12 +770,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <form action="view_network_aliases.cfm" method="post" class="d-inline">
-              <input type="hidden" name="action" value="delete_entry">
-              <input type="hidden" name="entry_id" value="#get_alias_entries.id#">
-              <input type="hidden" name="alias_id" value="#id#">
-              <button type="submit" class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
-            </form>
+            <button type="button" class="btn btn-danger btn-sm" title="Remove this range"
+                    onclick="deleteEntry(#get_alias_entries.id#, #id#)">
+              <i class="fas fa-trash"></i>
+            </button>
           </td>
         </tr>
       </cfloop>
@@ -807,6 +797,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ==================================================================
       MODALS
       ================================================================== --->
+<!--- Hidden forms for the Resolve buttons, so neither the actions cell nor the card
+     header holds a form. A form carries its own line-height and would render taller
+     than the buttons beside it. --->
+<form id="resolveOneForm" method="post" class="d-none">
+  <input type="hidden" name="action" value="resolve_one">
+  <input type="hidden" name="alias_id" id="resolveOneId">
+</form>
+<form id="resolveAllForm" method="post" class="d-none">
+  <input type="hidden" name="action" value="resolve_now">
+</form>
+<form id="deleteEntryForm" action="view_network_aliases.cfm" method="post" class="d-none">
+  <input type="hidden" name="action" value="delete_entry">
+  <input type="hidden" name="entry_id" id="deleteEntryId">
+  <input type="hidden" name="alias_id" id="deleteEntryAliasId">
+</form>
+
 <div class="modal fade" id="addAliasModal" tabindex="-1">
   <div class="modal-dialog">
     <form action="view_network_aliases.cfm" method="post">
@@ -925,6 +931,23 @@ function toggleSource(which) {
   var type = document.getElementById(which + '_source_type').value;
   var wrap = document.getElementById(which + '_source_wrap');
   wrap.hidden = (type !== 'spf');
+}
+
+function resolveOne(id) {
+  document.getElementById('resolveOneId').value = id;
+  document.getElementById('resolveOneForm').submit();
+}
+
+function deleteEntry(entryId, aliasId) {
+  document.getElementById('deleteEntryId').value = entryId;
+  document.getElementById('deleteEntryAliasId').value = aliasId;
+  document.getElementById('deleteEntryForm').submit();
+}
+
+function resolveAll(btn) {
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Resolving...';
+  document.getElementById('resolveAllForm').submit();
 }
 
 function openEditAlias(id, name, description, sourceType, sourceValue, enabled) {
