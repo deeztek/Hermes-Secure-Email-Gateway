@@ -545,22 +545,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <h5><i class="fas fa-info-circle"></i> What this page is for</h5>
   <p>
     Cloud mail providers publish the IP ranges their servers send from, and those ranges
-    change. Today you paste them by hand wherever they are needed &mdash; Relay Networks,
-    the Network Block/Allow list &mdash; and there is nothing to tell you when the
-    provider has changed them. Mail starts failing and the cause is not obvious.
+    change. A range pasted in by hand goes stale silently: mail starts failing and the
+    cause is not obvious.
   </p>
   <p>
     An alias is a named set of ranges that keeps itself current. Point it at a provider's
-    published SPF record and it re-resolves on a schedule, shows you what changed, and
-    emails you. <strong>Google Workspace</strong> and <strong>Microsoft 365</strong> are
-    pre-loaded and switched off; enable one to see its current ranges.
+    published SPF record and it re-resolves on a schedule and emails you when the ranges
+    move. <strong>Google Workspace</strong> and <strong>Microsoft 365</strong> are
+    pre-loaded and switched off; enable one and its ranges are fetched straight away.
   </p>
   <p class="mb-0">
-    <strong>Relay Networks can reference an alias directly</strong> &mdash; add it there
-    once and it relays for the alias's current ranges, with nothing to retype when they
-    change. Changes are never applied on their own: when an alias moves, you apply it on
-    the consuming page, so nothing alters mail flow without you. Pointing the Network
-    Block/Allow list and the intrusion-prevention whitelist at an alias is coming next.
+    <strong>Relay Networks</strong> can use an alias instead of pasted ranges &mdash; add
+    it there once and there is nothing to retype when the provider changes. Nothing is
+    applied on its own: when an alias moves you apply it on Relay Networks, so mail flow
+    never changes without you. Other places that take IP ranges, such as the Network
+    Block/Allow list, still need the ranges copied in for now.
   </p>
 </div>
 
