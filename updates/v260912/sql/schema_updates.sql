@@ -6,11 +6,12 @@
 -- NOT run on fresh installs (those get the current schema from
 -- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
 --
--- Contents: the network alias tables from #324. The rest of the release
--- needs no schema support -- the legacy-to-Docker migration work on #322
--- lives entirely in scripts/migrate_legacy_to_docker.sh and ships with the
--- tag rather than as a per-release artifact, and the sidebar fix on #309 is
--- a CFML change.
+-- Contents: the network alias tables from #324, an entry_type column on each
+-- of the two consumers that needed one, and the fresh-install milter repair.
+-- The rest of the release needs no schema support -- the legacy-to-Docker
+-- migration work on #322 lives entirely in
+-- scripts/migrate_legacy_to_docker.sh and ships with the tag rather than as a
+-- per-release artifact, and the sidebar fix on #309 is a CFML change.
 --
 -- The version stamp is here regardless. That is not
 -- ceremony: the update orchestrator reads build_no to decide which
@@ -21,11 +22,17 @@
 -- stale, which is the exact defect #322 was opened to fix on the
 -- migration path.
 --
+-- The alias feature ships whole in this release: the tables and seeds here,
+-- the console page (view_network_aliases.cfm), the SPF resolver
+-- (schedule/refresh_network_aliases.cfm) on the Ofelia job seeded in section
+-- 2, and three consumers that expand an alias at render time -- Relay
+-- Networks, Network Block/Allow, and the fail2ban whitelist. An alias is
+-- never seen by Postfix, Amavis or fail2ban as a name; it is expanded to its
+-- current ranges when the config file is written.
+--
 -- DELIBERATELY ABSENT:
 --
---   Anything that reads the alias tables. The resolver, the console page
---   and the first consumer (#323) all land later. Shipping the tables and
---   seeds first means none of those is also a migration.
+--   #323. It gets its own release.
 -- =====================================================================
 
 -- ---------------------------------------------------------------------
@@ -35,9 +42,6 @@
 -- A named set of CIDR ranges with a source. `static` is a hand-entered list;
 -- `spf` is resolved from a DNS TXT record. Consumers reference the alias
 -- instead of pasting ranges into their own list.
---
--- Nothing reads these yet. The tables and the seeds land first so the resolver
--- and the first consumer (#323) are not also a migration.
 --
 -- Seeded DISABLED, so a gateway gains two discoverable examples and no
 -- behaviour until an operator turns one on.
@@ -170,7 +174,51 @@ WHERE NOT EXISTS (
     AND x.parameter='inet:hermes_body_milter:8893');
 
 -- ---------------------------------------------------------------------
--- 4. Version stamp -- MUST be the last statement (advances build_no so
+-- 4. Network aliases in the postscreen access list (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same column on the postscreen_access DDL
+--
+-- A postscreen_access row with entry_type = 'alias' holds a network alias NAME in
+-- `sender` instead of a literal address, and renders as that alias's current IPv4
+-- ranges when the .cidr file is written.
+--
+-- This is the consumer with the clearest case. config/postfix-dkim/etc/postfix/
+-- postscreen_access.cidr ships with 129 hand-pasted Microsoft ranges and nothing
+-- keeps them current, and Microsoft moves theirs far more often than Google does.
+--
+-- NULL means a literal address, which is every existing row, so nothing changes for
+-- an install that never adds an alias.
+-- ---------------------------------------------------------------------
+ALTER TABLE `postscreen_access`
+  ADD COLUMN IF NOT EXISTS `entry_type` varchar(16) DEFAULT NULL;
+
+-- ---------------------------------------------------------------------
+-- 5. Network aliases in the intrusion-prevention whitelist (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same column on the intrusion_prevention_whitelist DDL
+--
+-- A whitelist row with entry_type = 'alias' holds a network alias NAME in
+-- `ip_cidr` and renders as that alias's current IPv4 ranges in fail2ban's
+-- ignoreip.
+--
+-- The case: a gateway relaying for a cloud provider has that provider's ranges in
+-- mynetworks. If fail2ban bans one of them for any reason, legitimate mail stops
+-- arriving and the cause is not obvious. ignoreip is space separated, so an
+-- expanded alias needs no splitting.
+--
+-- NULL means a literal address, which is every existing row.
+-- ---------------------------------------------------------------------
+ALTER TABLE `intrusion_prevention_whitelist`
+  ADD COLUMN IF NOT EXISTS `entry_type` varchar(16) DEFAULT NULL;
+
+-- ip_cidr holds an alias NAME on an alias row, and network_aliases.name is
+-- varchar(128) while this column was varchar(50). sql_mode includes
+-- STRICT_TRANS_TABLES, so a longer name would be rejected outright rather than
+-- truncated. Widening is unconditional and safe to re-run: MODIFY to the size it
+-- already is, is a no-op, and no existing literal address is anywhere near 50.
+ALTER TABLE `intrusion_prevention_whitelist`
+  MODIFY `ip_cidr` varchar(128) NOT NULL;
+
+-- ---------------------------------------------------------------------
+-- 6. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

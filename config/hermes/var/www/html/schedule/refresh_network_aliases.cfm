@@ -240,6 +240,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfargument name="aliasName" type="string" required="true">
   <cfset var out = []>
   <cfset var relay = "">
+  <cfset var pscreen = "">
+  <cfset var f2b = "">
 
   <cfquery name="relay" datasource="hermes">
     SELECT COUNT(*) AS c FROM parameters
@@ -248,6 +250,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfquery>
   <cfif relay.c GT 0>
     <cfset ArrayAppend(out, "Email Relay / Relay Networks")>
+  </cfif>
+
+  <cfquery name="pscreen" datasource="hermes">
+    SELECT COUNT(*) AS c FROM postscreen_access
+    WHERE entry_type = 'alias'
+      AND sender = <cfqueryparam value="#arguments.aliasName#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif pscreen.c GT 0>
+    <cfset ArrayAppend(out, "System / Network Block-Allow")>
+  </cfif>
+
+  <cfquery name="f2b" datasource="hermes">
+    SELECT COUNT(*) AS c FROM intrusion_prevention_whitelist
+    WHERE entry_type = 'alias'
+      AND ip_cidr = <cfqueryparam value="#arguments.aliasName#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+  <cfif f2b.c GT 0>
+    <cfset ArrayAppend(out, "System / Intrusion Prevention")>
   </cfif>
 
   <cfreturn ArrayToList(out, ", ")>

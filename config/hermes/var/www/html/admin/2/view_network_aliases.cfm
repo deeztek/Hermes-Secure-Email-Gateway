@@ -147,13 +147,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   --->
   <cfset var refs = "">
   <cfquery name="refs" datasource="hermes">
-    SELECT COUNT(*) AS c
-    FROM parameters p
-    JOIN network_aliases a ON a.name = p.parameter
-    WHERE p.parent_name = 'mynetworks'
-      AND p.child = '1'
-      AND p.network_entry = '2'
-      AND a.id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
+    SELECT
+      (SELECT COUNT(*) FROM parameters p JOIN network_aliases a ON a.name = p.parameter
+        WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
+          AND a.id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">)
+    + (SELECT COUNT(*) FROM postscreen_access s JOIN network_aliases a ON a.name = s.sender
+        WHERE s.entry_type = 'alias'
+          AND a.id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">)
+    + (SELECT COUNT(*) FROM intrusion_prevention_whitelist w JOIN network_aliases a ON a.name = w.ip_cidr
+        WHERE w.entry_type = 'alias'
+          AND a.id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">)
+      AS c
   </cfquery>
   <cfreturn refs.c>
 </cffunction>
@@ -636,9 +640,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <cfif StructKeyExists(aliasConsumerText, name)>
-              <a href="#aliasConsumerPage[name]#" class="badge bg-dark text-decoration-none"
-                 title="Apply here after the ranges change">#EncodeForHTML(aliasConsumerText[name])#</a>
+            <cfif StructKeyExists(aliasConsumerList, name)>
+              <cfloop array="#aliasConsumerList[name]#" index="oneConsumer">
+                <a href="#oneConsumer.page#" class="badge bg-dark text-decoration-none me-1"
+                   title="Apply here after the ranges change">#EncodeForHTML(oneConsumer.text)#</a>
+              </cfloop>
             <cfelse>
               <span class="text-muted">not used</span>
             </cfif>

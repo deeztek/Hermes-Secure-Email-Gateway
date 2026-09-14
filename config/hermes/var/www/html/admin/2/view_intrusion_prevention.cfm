@@ -419,6 +419,47 @@ $(document).ready(function() {
     <cflocation url="view_intrusion_prevention.cfm" addtoken="no">
 </cfif>
 
+<!--- Add a network alias to the whitelist (#324): stores the alias NAME with
+     entry_type = 'alias'. intrusion_prevention_generate_config.cfm expands it to
+     the alias's current IPv4 ranges every time jail.local is written, so the
+     whitelist follows the alias instead of a hand-pasted copy of it. --->
+<cfif action EQ "add_whitelist_alias">
+    <cfif StructKeyExists(form, "alias_name") AND len(trim(form.alias_name))>
+        <cfset theAlias = trim(form.alias_name)>
+
+        <cfquery name="chkAlias" datasource="hermes">
+            SELECT name FROM network_aliases
+            WHERE name = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar"> AND enabled = 1
+        </cfquery>
+        <cfquery name="chkAliasDupe" datasource="hermes">
+            SELECT id FROM intrusion_prevention_whitelist
+            WHERE entry_type = 'alias' AND ip_cidr = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+
+        <cfif chkAlias.recordcount IS 0>
+            <cfset session.m = "ip_whitelist_alias_missing">
+        <cfelseif chkAliasDupe.recordcount GTE 1>
+            <cfset session.m = "ip_whitelist_duplicate">
+        <cfelse>
+            <cfquery datasource="hermes">
+                INSERT INTO intrusion_prevention_whitelist (ip_cidr, description, entry_type)
+                VALUES (
+                    <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">,
+                    <cfqueryparam value="#trim(form.alias_description)#" cfsqltype="cf_sql_varchar">,
+                    'alias'
+                )
+            </cfquery>
+            <cfquery name="markUnsyncedAlias" datasource="hermes">
+                UPDATE intrusion_prevention_settings SET setting_value = '0' WHERE setting_name = 'config_synced'
+            </cfquery>
+            <cfset session.m = "ip_whitelist_add">
+        </cfif>
+    <cfelse>
+        <cfset session.m = "ip_error">
+    </cfif>
+    <cflocation url="view_intrusion_prevention.cfm" addtoken="no">
+</cfif>
+
 <!--- Delete Whitelist Entries --->
 <cfif action EQ "delete_whitelist">
     <cfif IsDefined("form.delete_whitelist_ids") AND form.delete_whitelist_ids NEQ "">
@@ -581,6 +622,16 @@ $(document).ready(function() {
     <cfset session.m = 0>
 </cfif>
 
+<cfif m EQ "ip_whitelist_alias_missing">
+    <div class="alert alert-warning alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h4><i class="icon fa fa-exclamation-triangle"></i> Warning!</h4>
+        That network alias no longer exists or is disabled. Check it on the
+        <a href="view_network_aliases.cfm">Network Aliases</a> page.
+    </div>
+    <cfset session.m = 0>
+</cfif>
+
 <cfif m EQ "ip_whitelist_invalid">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -672,6 +723,29 @@ $(document).ready(function() {
 <cfquery name="getWhitelist" datasource="hermes">
     SELECT * FROM intrusion_prevention_whitelist ORDER BY ip_cidr
 </cfquery>
+
+<!--- Enabled aliases offered in the Add Network Alias modal, plus the ranges each
+     one currently expands to so a row can show what it means (#324). --->
+<cfquery name="getAvailableAliases" datasource="hermes">
+    SELECT a.name,
+           (SELECT COUNT(*) FROM network_alias_entries e
+             WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count
+    FROM network_aliases a
+    WHERE a.enabled = 1
+    ORDER BY a.name ASC
+</cfquery>
+
+<cfquery name="getAliasRanges" datasource="hermes">
+    SELECT a.name, GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ') AS ranges
+    FROM network_aliases a
+    JOIN network_alias_entries e ON e.alias_id = a.id
+    WHERE e.family = 'ip4'
+    GROUP BY a.name
+</cfquery>
+<cfset aliasExpansion = StructNew()>
+<cfloop query="getAliasRanges">
+    <cfset aliasExpansion[getAliasRanges.name] = getAliasRanges.ranges>
+</cfloop>
 
 <cfquery name="getBannedIPs" datasource="hermes">
     SELECT f.*, j.bantime, j.display_name as jail_display_name
@@ -926,6 +1000,9 @@ $(document).ready(function() {
         <h3 class="card-title"><i class="fas fa-list-alt"></i> IP Whitelist (Never Ban)</h3>
         <div class="card-tools">
             <a href="#add_whitelist_modal" class="btn btn-sm btn-primary" data-bs-toggle="modal"><i class="fas fa-plus"></i> Add IP/CIDR</a>
+            <cfif getAvailableAliases.recordcount GTE 1>
+                <a href="#add_whitelist_alias_modal" class="btn btn-sm btn-secondary" data-bs-toggle="modal"><i class="fas fa-network-wired"></i> Add Network Alias</a>
+            </cfif>
         </div>
     </div>
     <div class="card-body">
@@ -946,6 +1023,7 @@ $(document).ready(function() {
                 <tbody>
                     <cfoutput query="getWhitelist">
                         <cfset isProtected = (CompareNoCase(ip_cidr, "127.0.0.1/8") EQ 0 OR CompareNoCase(ip_cidr, "::1") EQ 0 OR CompareNoCase(ip_cidr, "172.16.0.0/12") EQ 0)>
+                        <cfset isAlias = (ListFindNoCase(getWhitelist.columnList, "entry_type") AND CompareNoCase(entry_type, "alias") EQ 0)>
                         <tr>
                             <td>
                                 <cfif isProtected>
@@ -954,7 +1032,17 @@ $(document).ready(function() {
                                     <input type="checkbox" class="whitelist-checkbox" name="whitelist_id" value="#id#">
                                 </cfif>
                             </td>
-                            <td><code>#ip_cidr#</code><cfif isProtected> <span class="badge bg-secondary">Protected</span></cfif></td>
+                            <td>
+                                <code>#encodeForHTML(ip_cidr)#</code><cfif isProtected> <span class="badge bg-secondary">Protected</span></cfif>
+                                <cfif isAlias>
+                                    <span class="badge bg-primary">Alias</span>
+                                    <cfif StructKeyExists(aliasExpansion, ip_cidr) AND Len(Trim(aliasExpansion[ip_cidr]))>
+                                        <br><small class="text-muted">#encodeForHTML(aliasExpansion[ip_cidr])#</small>
+                                    <cfelse>
+                                        <br><small class="text-warning">Not resolved yet. Resolve it on the Network Aliases page.</small>
+                                    </cfif>
+                                </cfif>
+                            </td>
                             <td>#description#</td>
                             <td><cfif isProtected><span class="text-muted">N/A</span><cfelse>#DateFormat(created_at, "mm/dd/yyyy")# #TimeFormat(created_at, "HH:mm")#</cfif></td>
                         </tr>
@@ -1151,6 +1239,47 @@ $(document).ready(function() {
 </div>
 
 <!-- Delete Whitelist Confirmation Modal -->
+<!-- Add Network Alias to Whitelist Modal (#324) -->
+<cfif getAvailableAliases.recordcount GTE 1>
+<div class="modal fade" id="add_whitelist_alias_modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h4 class="modal-title"><i class="fas fa-network-wired"></i> Add Network Alias to Whitelist</h4>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="post" action="">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add_whitelist_alias">
+                    <p class="text-muted">
+                        A network alias is a named set of ranges maintained on the
+                        <a href="view_network_aliases.cfm">Network Aliases</a> page. Whitelisting one here
+                        stores the name, not a copy of the ranges, so fail2ban picks up the current
+                        ranges every time you click Apply Settings.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label">Alias <span class="text-danger">*</span></label>
+                        <select name="alias_name" class="form-select" required>
+                            <cfoutput query="getAvailableAliases">
+                                <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# (#ip4_count# IPv4 range<cfif ip4_count NEQ 1>s</cfif>)</option>
+                            </cfoutput>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <input type="text" name="alias_description" class="form-control" value="Network alias" placeholder="e.g., Office egress">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Add to Whitelist</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+</cfif>
+
 <div class="modal fade" id="delete_whitelist_modal" tabindex="-1" role="dialog">
     <div class="modal-dialog">
         <div class="modal-content">

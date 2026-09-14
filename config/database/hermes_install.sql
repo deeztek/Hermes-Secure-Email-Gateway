@@ -817,17 +817,23 @@ INSERT IGNORE INTO `intrusion_prevention_settings` VALUES (2,'config_synced','1'
 -- -------- intrusion_prevention_whitelist       [seed] --------
 CREATE TABLE IF NOT EXISTS `intrusion_prevention_whitelist` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
-  `ip_cidr` varchar(50) NOT NULL,
+  -- 128, not 50: with entry_type = 'alias' this column holds a network alias
+  -- NAME, and network_aliases.name is varchar(128).
+  `ip_cidr` varchar(128) NOT NULL,
   `description` varchar(500) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `entry_type` varchar(16) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `ip_cidr` (`ip_cidr`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- 4 row(s) for `intrusion_prevention_whitelist`
-INSERT IGNORE INTO `intrusion_prevention_whitelist` VALUES (2,'::1','Localhost IPv6','2026-01-23 12:22:58');
-INSERT IGNORE INTO `intrusion_prevention_whitelist` VALUES (3,'172.16.0.0/12','Docker internal network','2026-01-23 12:22:58');
-INSERT IGNORE INTO `intrusion_prevention_whitelist` VALUES (4,'127.0.0.1/8','Localhost IPv4','2026-01-23 12:36:54');
+-- Column-list form, not positional. `entry_type` was added to this table in
+-- v260912 (#324) and a positional VALUES list would then be one short of the
+-- column count, which is error 1136 and aborts the whole baseline import.
+INSERT IGNORE INTO `intrusion_prevention_whitelist` (`id`, `ip_cidr`, `description`, `created_at`) VALUES (2,'::1','Localhost IPv6','2026-01-23 12:22:58');
+INSERT IGNORE INTO `intrusion_prevention_whitelist` (`id`, `ip_cidr`, `description`, `created_at`) VALUES (3,'172.16.0.0/12','Docker internal network','2026-01-23 12:22:58');
+INSERT IGNORE INTO `intrusion_prevention_whitelist` (`id`, `ip_cidr`, `description`, `created_at`) VALUES (4,'127.0.0.1/8','Localhost IPv4','2026-01-23 12:36:54');
 
 -- keywords: classified `drop` (omitted entirely; schema_updates.sql may also DROP IF EXISTS)
 -- -------- mailbox_aliases                      [truncate] --------
@@ -1639,6 +1645,7 @@ CREATE TABLE IF NOT EXISTS `postscreen_access` (
   `action2` varchar(255) DEFAULT NULL,
   `applied` int(11) DEFAULT NULL,
   `note` varchar(255) DEFAULT NULL,
+  `entry_type` varchar(16) DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 

@@ -53,21 +53,32 @@ ORDER BY a.name ASC
   is adopted; Relay Networks is the first.
 --->
 <cfquery name="get_alias_consumers" datasource="hermes">
-SELECT a.name AS alias_name,
-       'Relay Networks' AS consumer,
-       'view_relay_networks.cfm' AS page,
-       COUNT(*) AS uses
-FROM parameters p
-JOIN network_aliases a ON a.name = p.parameter
+SELECT a.name AS alias_name, 'Relay Networks' AS consumer, 'view_relay_networks.cfm' AS page
+FROM parameters p JOIN network_aliases a ON a.name = p.parameter
 WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
+GROUP BY a.name
+UNION ALL
+SELECT a.name, 'Network Block-Allow', 'view_network_block_allow.cfm'
+FROM postscreen_access s JOIN network_aliases a ON a.name = s.sender
+WHERE s.entry_type = 'alias'
+GROUP BY a.name
+UNION ALL
+SELECT a.name, 'Intrusion Prevention', 'view_intrusion_prevention.cfm'
+FROM intrusion_prevention_whitelist w JOIN network_aliases a ON a.name = w.ip_cidr
+WHERE w.entry_type = 'alias'
 GROUP BY a.name
 </cfquery>
 
-<cfset aliasConsumerText = StructNew()>
-<cfset aliasConsumerPage = StructNew()>
+<!--- An alias can be used by several consumers, so collect a list per alias. --->
+<cfset aliasConsumerList = StructNew()>
 <cfloop query="get_alias_consumers">
-  <cfset aliasConsumerText[get_alias_consumers.alias_name] = get_alias_consumers.consumer>
-  <cfset aliasConsumerPage[get_alias_consumers.alias_name] = get_alias_consumers.page>
+  <cfif NOT StructKeyExists(aliasConsumerList, get_alias_consumers.alias_name)>
+    <cfset aliasConsumerList[get_alias_consumers.alias_name] = []>
+  </cfif>
+  <cfset ArrayAppend(aliasConsumerList[get_alias_consumers.alias_name], {
+    text = get_alias_consumers.consumer,
+    page = get_alias_consumers.page
+  })>
 </cfloop>
 
 <!---

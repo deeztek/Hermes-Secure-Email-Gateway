@@ -86,6 +86,61 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===================== --->
 <!--- ACTION HANDLERS --->
 <!--- ===================== --->
+<cfquery name="get_available_aliases" datasource="hermes">
+SELECT a.name,
+       (SELECT COUNT(*) FROM network_alias_entries e
+         WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count
+FROM network_aliases a
+WHERE a.enabled = 1
+ORDER BY a.name ASC
+</cfquery>
+
+<cfset aliasExpansion = StructNew()>
+<cfloop query="get_available_aliases">
+  <cfquery name="get_one_exp" datasource="hermes">
+  SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ') AS ranges
+  FROM network_alias_entries e JOIN network_aliases a ON a.id = e.alias_id
+  WHERE a.name = <cfqueryparam value="#get_available_aliases.name#" cfsqltype="cf_sql_varchar">
+    AND e.family = 'ip4'
+  </cfquery>
+  <cfset aliasExpansion[get_available_aliases.name] = get_one_exp.ranges>
+</cfloop>
+
+<!--- Add a network alias (#324): stores the alias NAME with entry_type = 'alias';
+     generate_postscreen_access.cfm expands it to current ranges when the .cidr
+     file is written. --->
+<cfif action is "add_alias_ref">
+  <cfset theAlias = Trim(form.alias_name)>
+  <cfset theAct   = Trim(form.entry_action)>
+  <cfif theAct is not "permit" AND theAct is not "reject">
+    <cfset theAct = "permit">
+  </cfif>
+
+  <cfquery name="chk_alias" datasource="hermes">
+    SELECT name FROM network_aliases
+    WHERE name = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar"> AND enabled = 1
+  </cfquery>
+  <cfquery name="chk_dupe" datasource="hermes">
+    SELECT id FROM postscreen_access
+    WHERE entry_type = 'alias' AND sender = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">
+  </cfquery>
+
+  <cfif chk_alias.recordcount GTE 1 AND chk_dupe.recordcount IS 0>
+    <cfquery datasource="hermes">
+      INSERT INTO postscreen_access (sender, action, action2, applied, note, entry_type)
+      VALUES (
+        <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">,
+        <cfqueryparam value="#theAct#" cfsqltype="cf_sql_varchar">,
+        'NONE', '1',
+        <cfqueryparam value="Network alias" cfsqltype="cf_sql_varchar">,
+        'alias'
+      )
+    </cfquery>
+    <cfinclude template="./inc/generate_postscreen_access.cfm">
+  </cfif>
+  <cflocation url="view_network_block_allow.cfm" addtoken="no">
+</cfif>
+
 <cfif action is "add_entries">
   <cfinclude template="./inc/network_add_entries.cfm">
 <cfelseif action is "delete" OR action is "bulk_delete">
@@ -204,6 +259,52 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!-- ADD NETWORK ALIAS (#324) -->
+<cfif get_available_aliases.recordcount GTE 1>
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-network-wired"></i> Add Network Alias</h3>
+  </div>
+  <div class="card-body">
+    <p class="text-muted">
+      A network alias is a named set of ranges maintained on the
+      <a href="view_network_aliases.cfm">Network Aliases</a> page. Adding one here keeps
+      the list correct when the provider changes their ranges, instead of pasting them in
+      and watching them go stale.
+    </p>
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="add_alias_ref">
+      <div class="row">
+        <div class="col-md-6">
+          <label for="alias_name" class="form-label"><strong>Alias</strong></label>
+          <select class="form-select" id="alias_name" name="alias_name" required>
+            <cfoutput query="get_available_aliases">
+              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif ip4_count GT 0>(#ip4_count# IPv4 range<cfif ip4_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
+            </cfoutput>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <label class="form-label"><strong>Action</strong></label>
+          <div>
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="entry_action" id="alias_permit" value="permit" checked>
+              <label class="form-check-label" for="alias_permit"><i class="fas fa-check text-success"></i> Allow (bypass RBL)</label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="entry_action" id="alias_reject" value="reject">
+              <label class="form-check-label" for="alias_reject"><i class="fas fa-ban text-danger"></i> Block</label>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 d-flex align-items-end pb-4">
+          <button type="submit" class="btn btn-primary"><i class="fas fa-plus"></i> Add Alias</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+</cfif>
+
 <!-- ENTRIES TABLE -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">
@@ -235,7 +336,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfoutput query="get_active_all">
             <tr>
               <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
-              <td>#encodeForHTML(sender)#</td>
+              <td>
+                <cfif StructKeyExists(variables, "aliasExpansion") AND note is "Network alias">
+                  <strong>#encodeForHTML(sender)#</strong>
+                  <span class="badge bg-primary ms-1">Alias</span>
+                  <cfif StructKeyExists(aliasExpansion, sender) AND Len(Trim(aliasExpansion[sender]))>
+                    <br><small class="text-muted">#encodeForHTML(aliasExpansion[sender])#</small>
+                  <cfelse>
+                    <br><small class="text-danger">No IPv4 ranges yet, so this contributes nothing.</small>
+                  </cfif>
+                <cfelse>
+                  #encodeForHTML(sender)#
+                </cfif>
+              </td>
               <td>#encodeForHTML(note)#</td>
               <td>
                 <cfif action is "permit">

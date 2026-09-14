@@ -71,6 +71,7 @@ else
 fi
 
 FAILED=0
+COLCOUNT_FAILED=0
 CHECKED=0
 
 note_fail() { echo "${RED}  MISSING${NC}  $1"; FAILED=$((FAILED + 1)); }
@@ -162,6 +163,51 @@ check_seed_id_collisions() {
     else
         CHECKED=$((CHECKED + 1))
         echo "${GREEN}  ok${NC}       no auto-id seed row precedes an explicit id"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Positional seed rows vs their table's column count
+# ---------------------------------------------------------------------------
+# A positional `INSERT INTO t VALUES (...)` is silently bound to the column
+# count of the CREATE TABLE above it. Add a column to a seeded table and every
+# positional seed for it is one value short. That is MySQL error 1136, which
+# INSERT IGNORE does NOT downgrade, so the whole baseline import aborts at that
+# line and a fresh install gets a half-created schema.
+#
+# Found the hard way in v260912: adding `entry_type` to
+# intrusion_prevention_whitelist broke its three protected localhost/Docker
+# seed rows, which would have aborted every fresh install of the release.
+#
+# Column-list INSERTs are immune, which is the fix as well as the reason this
+# check only looks at positional ones.
+# ---------------------------------------------------------------------------
+check_seed_column_count() {
+    local baseline="config/database/hermes_install.sql"
+    local helper="scripts/check_seed_column_count.py"
+
+    if [[ ! -f "$baseline" ]]; then
+        echo "${YELLOW}  skipped${NC}  baseline not found"
+        return 0
+    fi
+    if [[ ! -f "$helper" ]]; then
+        echo "${YELLOW}  skipped${NC}  ${helper} not found"
+        return 0
+    fi
+
+    local offenders
+    offenders=$(python3 "$helper" "$baseline")
+
+    if [[ -n "$offenders" ]]; then
+        while IFS='|' read -r t line n ncol; do
+            [[ -z "$t" ]] && continue
+            note_fail "${baseline}: table '${t}' positional INSERT at line ${line} has ${n} values, table has ${ncol} columns"
+            CHECKED=$((CHECKED + 1))
+        done <<< "$offenders"
+        COLCOUNT_FAILED=1
+    else
+        CHECKED=$((CHECKED + 1))
+        echo "${GREEN}  ok${NC}       every positional seed matches its column count"
     fi
 }
 
@@ -278,6 +324,9 @@ echo
 echo "${CYAN}Seed id collisions${NC}"
 check_seed_id_collisions
 echo
+echo "${CYAN}Seed column counts${NC}"
+check_seed_column_count
+echo
 
 if [[ $FAILED -gt 0 ]]; then
     echo "${RED}FAILED${NC}: ${FAILED} artifact(s) undeclared out of ${CHECKED} checked."
@@ -295,6 +344,17 @@ if [[ $FAILED -gt 0 ]]; then
         echo "that matches is discarded by INSERT IGNORE without an error, and the"
         echo "import still reports success. That is how the body milter went missing"
         echo "from smtpd_milters on every fresh install of v260815."
+        echo
+    fi
+    if [[ $COLCOUNT_FAILED -eq 1 ]]; then
+        echo "Convert that table's seed rows to column-list form:"
+        echo
+        echo "  ${YELLOW}INSERT IGNORE INTO \`t\` (\`id\`, \`col\`, ...) VALUES (...);${NC}"
+        echo
+        echo "A positional VALUES list is bound to the column count of the CREATE"
+        echo "TABLE above it. One extra column makes it error 1136, which INSERT"
+        echo "IGNORE does not swallow, so the baseline import aborts mid-file and"
+        echo "the fresh install gets a half-created schema."
         echo
     fi
     if [[ $MIGRATION_FAILED -eq 1 ]]; then
