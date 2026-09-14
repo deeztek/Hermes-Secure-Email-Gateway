@@ -209,6 +209,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     )
   </cfquery>
 
+  <!--- Enabling an SPF alias should make it work, not leave it empty until 03:30. --->
+  <cfif theEnabled EQ 1 AND theType is "spf">
+    <cfquery name="get_new_alias_id" datasource="hermes">
+      SELECT id FROM network_aliases
+      WHERE name = <cfqueryparam value="#theName#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfif get_new_alias_id.recordcount GTE 1>
+      <cfset resolveOneAlias(get_new_alias_id.id)>
+    </cfif>
+  </cfif>
+
   <cfset session.m = 63>
   <cflocation url="view_network_aliases.cfm" addtoken="no">
 </cfif>
@@ -255,6 +266,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     WHERE id = <cfqueryparam value="#theId#" cfsqltype="cf_sql_integer">
   </cfquery>
 
+  <cfif theEnabled EQ 1 AND theType is "spf">
+    <cfset resolveOneAlias(theId)>
+  </cfif>
+
   <cfset session.m = 64>
   <cflocation url="view_network_aliases.cfm" addtoken="no">
 </cfif>
@@ -288,6 +303,43 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfset session.m = 66>
   <cflocation url="view_network_aliases.cfm" addtoken="no">
+</cfif>
+
+<!---
+  resolveOneAlias: trigger the scheduled resolver for a single alias.
+
+  Used by the per-alias Resolve button and, more importantly, straight after an
+  alias is enabled. Enabling something should make it work; nobody wants to enable
+  an alias and then hunt for a second button to make it do anything.
+
+  Best-effort by design. A failed resolve is recorded against the alias itself by
+  the schedule page (last_status / last_message), which the row already displays,
+  so swallowing the error here loses nothing.
+--->
+<cffunction name="resolveOneAlias" returntype="void" output="false">
+  <cfargument name="aliasId" type="numeric" required="true">
+  <cftry>
+    <cfhttp method="GET"
+            url="http://localhost:8888/schedule/refresh_network_aliases.cfm?alias=#arguments.aliasId#"
+            timeout="120"
+            result="oneResult">
+    </cfhttp>
+    <cfcatch type="any">
+      <cflog file="hermes" type="error"
+        text="view_network_aliases.cfm: resolve of alias #arguments.aliasId# failed: #cfcatch.message#">
+    </cfcatch>
+  </cftry>
+</cffunction>
+
+<!--- ---- resolve ONE alias on demand ---- --->
+<cfif action is "resolve_one">
+  <cfif IsNumeric(form.alias_id)>
+    <cfset resolveOneAlias(form.alias_id)>
+    <cfset session.m = 71>
+  <cfelse>
+    <cfset session.m = 60>
+  </cfif>
+  <cflocation url="view_network_aliases.cfm?alias=#form.alias_id#" addtoken="no">
 </cfif>
 
 <!--- ---- resolve every enabled SPF alias now ----
@@ -481,7 +533,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Done</h4>
-    <cfoutput>Every enabled alias was re-resolved. Per-alias results are shown below.</cfoutput>
+    <cfoutput>Resolve finished. The status column below shows the result for each alias.</cfoutput>
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -520,7 +572,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <input type="hidden" name="action" value="resolve_now">
         <button type="submit" class="btn btn-secondary btn-sm"
                 onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Resolving...';this.form.submit();">
-          <i class="fas fa-sync"></i> Resolve Now
+          <i class="fas fa-sync"></i> Resolve All
         </button>
       </form>
       <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addAliasModal">
@@ -591,6 +643,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <a href="view_network_aliases.cfm?alias=#id#" class="btn btn-info btn-sm" title="View ranges">
               <i class="fas fa-list"></i>
             </a>
+            <cfif source_type is "spf" AND enabled>
+              <form method="post" class="d-inline">
+                <input type="hidden" name="action" value="resolve_one">
+                <input type="hidden" name="alias_id" value="#id#">
+                <button type="submit" class="btn btn-secondary btn-sm" title="Resolve this alias now"
+                        onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i>';this.form.submit();">
+                  <i class="fas fa-sync"></i>
+                </button>
+              </form>
+            </cfif>
             <button type="button" class="btn btn-warning btn-sm"
                     onclick="openEditAlias(#id#, '#JSStringFormat(name)#', '#JSStringFormat(description)#', '#JSStringFormat(source_type)#', '#JSStringFormat(source_value)#', #enabled#)"
                     title="Edit">

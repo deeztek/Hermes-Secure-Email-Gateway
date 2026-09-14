@@ -230,6 +230,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ==================================================================
       MAIN
       ================================================================== --->
+<!---
+  Optional ?alias=<id> resolves ONE alias instead of every enabled one. The console
+  uses it for the per-alias Resolve button and to resolve immediately when an alias
+  is enabled, so an admin never has to wait for the nightly run to see it work.
+  Ofelia calls this page with no parameter and gets all of them.
+--->
+<cfparam name="url.alias" default="0">
+
 <cfquery name="getAliases" datasource="hermes">
   SELECT id, name, source_value
   FROM network_aliases
@@ -237,6 +245,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     AND source_type = 'spf'
     AND source_value IS NOT NULL
     AND source_value <> ''
+    <cfif IsNumeric(url.alias) AND url.alias GT 0>
+      AND id = <cfqueryparam value="#url.alias#" cfsqltype="cf_sql_integer">
+    </cfif>
   ORDER BY name ASC
 </cfquery>
 
