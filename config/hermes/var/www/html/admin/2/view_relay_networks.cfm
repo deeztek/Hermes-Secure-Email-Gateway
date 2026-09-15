@@ -551,7 +551,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-success alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
-    <cfoutput>Alias added. You must click <strong>Apply Settings</strong> below for it to take effect.</cfoutput>
+    <cfoutput>Alias added. You must click <strong>Apply Settings</strong> below for it to take effect.</cfoutput><br><br>
+    <form action="" method="post">
+      <input type="hidden" name="action" value="apply">
+      <div class="text-center">
+        <button type="submit" class="btn btn-danger" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">Apply Settings</button>
+      </div>
+    </form>
   </div>
   <cfset session.m = 0>
 </cfif>
