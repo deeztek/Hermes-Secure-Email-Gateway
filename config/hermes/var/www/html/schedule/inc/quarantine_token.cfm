@@ -127,6 +127,8 @@ function validateQuarantineActionToken(required string token, string expectedAct
 
         result.valid = true;
         result.mailId = toString(mailId);
+        result.secretId = toString(result.secretId);
+        result.recipientEmail = toString(result.recipientEmail);
         result.action = action;
         return result;
     } catch (any e) {

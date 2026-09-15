@@ -134,6 +134,7 @@ for (var defaultRow in settingDefaults) {
     <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
     <cfset session.m = 1>
     <cflocation url="view_quarantine_digest.cfm" addtoken="no">
+    <cfabort>
 </cfif>
 
 <cfquery name="getDigestSettings" datasource="hermes">
