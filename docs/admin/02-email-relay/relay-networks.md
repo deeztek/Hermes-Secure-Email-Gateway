@@ -18,6 +18,13 @@ Pairs with [Relay Recipients](relay-recipients.md) (the trusted-target
 list) and [Relay Host](relay-host.md) / [Domains](domains.md) (the
 outbound/forwarding configuration).
 
+The page also includes an **optional SPF synchronization** section. When
+enabled, Hermes periodically resolves the configured SPF root (for
+example `_spf.google.com`), follows `include:` chains, and syncs the
+discovered IPv4 networks into `mynetworks`. Only rows tagged
+`SPF Sync (Auto)` are managed by that task; manually added relay
+networks are left untouched.
+
 ## When you add entries to this page
 
 | Scenario | What to add |
@@ -32,6 +39,30 @@ outbound/forwarding configuration).
 If the source authenticates via SMTP AUTH (a Relay Recipient with a
 password), it does **not** need to be listed here — `permit_sasl_authenticated`
 covers it via the credential path.
+
+## Optional SPF synchronization
+
+Use **Allow syncing of SPF records** when a sender publishes its relay
+ranges in SPF and you want Hermes to track that list automatically.
+
+| Setting | Stored in | Default | Behavior |
+|---|---|---|---|
+| Allow syncing of SPF records | `parameters2.value2` (`spf_sync_enabled`, module `relay_networks`) | `0` | Enables/disables the scheduled synchronization task |
+| SPF Server to Scan | `parameters2.value2` (`spf_sync_server`, module `relay_networks`) | `_spf.google.com` | SPF root queried by the scheduled task |
+
+When enabled, the Ofelia job `google-relay-networks` runs every 30
+minutes and curls `schedule/update_google_relay_networks.cfm`. The task:
+
+1. Resolves TXT records for the configured SPF root
+2. Follows `include:` chains recursively
+3. Collects IPv4 `ip4:` values only
+4. Leaves manually maintained relay networks unchanged
+5. Replaces only relay-network rows tagged `SPF Sync (Auto)`
+6. Regenerates Postfix/Amavis trust configuration only when the managed
+   set changed
+
+If syncing is disabled, the scheduled task exits without changing the
+database or Postfix configuration.
 
 ## What `mynetworks` controls — the open-relay risk
 

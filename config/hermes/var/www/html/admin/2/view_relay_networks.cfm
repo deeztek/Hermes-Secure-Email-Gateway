@@ -98,6 +98,59 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- GET RELAY NETWORKS DATA --->
 <cfinclude template="./inc/get_relay_networks.cfm">
 
+<!--- Get SPF sync settings --->
+<cfquery name="get_spf_sync_settings" datasource="hermes">
+  SELECT parameter, value2
+  FROM parameters2
+  WHERE module = 'relay_networks'
+    AND active = '1'
+    AND parameter IN ('spf_sync_enabled', 'spf_sync_server')
+</cfquery>
+
+<cfset relaySyncSettings = {}>
+<cfloop query="get_spf_sync_settings">
+  <cfset relaySyncSettings[get_spf_sync_settings.parameter] = get_spf_sync_settings.value2>
+</cfloop>
+
+<cfparam name="relaySyncSettings.spf_sync_enabled" default="0">
+<cfparam name="relaySyncSettings.spf_sync_server" default="_spf.google.com">
+
+
+<!--- ===================== --->
+<!--- ACTION: SAVE SPF SYNC SETTINGS --->
+<!--- ===================== --->
+<cfif action is "save_spf_sync_settings">
+  <cfset spf_sync_enabled = StructKeyExists(form, "spf_sync_enabled") ? "1" : "0">
+  <cfset spf_sync_server = StructKeyExists(form, "spf_sync_server") ? trim(form.spf_sync_server) : "">
+
+  <cfif spf_sync_enabled is "1" AND spf_sync_server is "">
+    <cfset session.m = 33>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
+  <cfif spf_sync_server is not "" AND NOT REFind("^[A-Za-z0-9._-]+$", spf_sync_server)>
+    <cfset session.m = 34>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
+  <cfquery datasource="hermes">
+    UPDATE parameters2
+    SET value2 = <cfqueryparam value="#spf_sync_enabled#" cfsqltype="cf_sql_varchar">
+    WHERE parameter = 'spf_sync_enabled'
+      AND module = 'relay_networks'
+  </cfquery>
+
+  <cfquery datasource="hermes">
+    UPDATE parameters2
+    SET value2 = <cfqueryparam value="#spf_sync_server#" cfsqltype="cf_sql_varchar">
+    WHERE parameter = 'spf_sync_server'
+      AND module = 'relay_networks'
+  </cfquery>
+
+  <cfset session.m = 35>
+  <cflocation url="view_relay_networks.cfm" addtoken="no">
+</cfif>
+
 
 <!--- ===================== --->
 <!--- ACTION: ADD ENTRIES --->
@@ -669,6 +722,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset session.entry_errors = "">
 </cfif>
 
+<cfif m is "33">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>Enter the SPF server to scan before enabling automatic SPF sync.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "34">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>The SPF server may contain only letters, numbers, periods, dashes, and underscores.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "35">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-check"></i> Success!</h4>
+    <cfoutput>Automatic SPF relay-network sync settings saved successfully.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
 <!--- ERROR MESSAGES END HERE --->
 
 
@@ -701,6 +781,44 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <li>Other trusted network devices</li>
     </ul>
     <p class="mb-0"><strong>Note:</strong> Changes are staged until you click <strong>Apply Settings</strong>. This allows you to batch multiple changes before reloading services.</p>
+  </div>
+</div>
+
+
+<!--- SPF SYNC SETTINGS CARD --->
+<div class="card card-primary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-sync-alt"></i> SPF Synchronization</h3>
+  </div>
+  <div class="card-body">
+    <form method="post" autocomplete="off">
+      <input type="hidden" name="action" value="save_spf_sync_settings">
+      <div class="row">
+        <div class="col-lg-4">
+          <div class="form-check form-switch mb-3 mt-1">
+            <cfoutput>
+            <input class="form-check-input" type="checkbox" role="switch" id="spf_sync_enabled" name="spf_sync_enabled" value="1" <cfif relaySyncSettings.spf_sync_enabled is "1">checked</cfif> onchange="toggleSpfSyncServer();">
+            </cfoutput>
+            <label class="form-check-label" for="spf_sync_enabled"><strong>Allow syncing of SPF records</strong></label>
+          </div>
+          <div class="form-text">When enabled, Hermes scans the configured SPF record every 30 minutes and updates only auto-managed relay-network rows.</div>
+        </div>
+        <div class="col-lg-5">
+          <div class="mb-3">
+            <label for="spf_sync_server" class="form-label"><strong>SPF Server to Scan</strong></label>
+            <cfoutput>
+            <input type="text" class="form-control" id="spf_sync_server" name="spf_sync_server" value="#encodeForHTMLAttribute(relaySyncSettings.spf_sync_server)#" maxlength="255" placeholder="_spf.google.com">
+            </cfoutput>
+            <div class="form-text">Example: <code>_spf.google.com</code></div>
+          </div>
+        </div>
+        <div class="col-lg-3 d-flex align-items-end pb-3">
+          <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Saving...';this.form.submit();">
+            <i class="fas fa-save"></i> Save Sync Settings
+          </button>
+        </div>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -958,6 +1076,8 @@ var relayTable;
 var selectedIds = new Set();
 
 $(document).ready(function() {
+  toggleSpfSyncServer();
+
   // Initialize DataTable
   relayTable = $('#relayNetworksTable').DataTable({
     dom: 'Blfrtip',
@@ -1016,6 +1136,17 @@ $(document).ready(function() {
     updateSelectAllState();
   });
 });
+
+function toggleSpfSyncServer() {
+  var enabledField = document.getElementById('spf_sync_enabled');
+  var serverField = document.getElementById('spf_sync_server');
+
+  if (!enabledField || !serverField) {
+    return;
+  }
+
+  serverField.readOnly = !enabledField.checked;
+}
 
 // Update select all checkbox state based on current page
 function updateSelectAllState() {
