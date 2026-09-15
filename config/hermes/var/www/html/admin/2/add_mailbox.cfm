@@ -406,7 +406,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- QUARANTINE NOTIFICATIONS --->
       <div class="form-group mb-3">
         <label><strong>Quarantine Notifications</strong></label>
-        <p class="help-block">When enabled, users receive an email notification each time a message is quarantined, with a one-click release button.</p>
+        <p class="help-block">When enabled, recipients receive quarantine mail based on the current system policy. Hermes can send either individual notices or scheduled digest emails with secure view, release, and block actions.</p>
         <select class="form-control" name="reports" style="width: 100%">
           <option value="YES" selected="selected">Enabled</option>
           <option value="NO">Disabled</option>

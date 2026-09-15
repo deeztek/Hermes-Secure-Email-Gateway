@@ -45,7 +45,7 @@ See GitHub issue #180
 <cfinclude template="/schedule/inc/quarantine_token.cfm">
 
 <!--- Validate the token --->
-<cfset tokenResult = validateQuarantineReleaseToken(url.token)>
+<cfset tokenResult = validateQuarantineActionToken(url.token, "release")>
 
 <cfif NOT tokenResult.valid>
     <div class="card">
@@ -66,8 +66,8 @@ See GitHub issue #180
 <!--- Token is valid — look up the quarantine details --->
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject,
-           ma_rcpt.email AS recipient_email,
-           ma_from.email AS from_email
+           CAST(ma_rcpt.email AS CHAR(255)) AS recipient_email,
+           COALESCE(CAST(ma_from.email AS CHAR(255)), CAST(m.from_addr AS CHAR(255)), 'unknown sender') AS from_email
     FROM msgs m
     INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
     INNER JOIN maddr ma_rcpt ON mr.rid = ma_rcpt.id
@@ -120,7 +120,7 @@ See GitHub issue #180
         <div class="card">
             <div class="card-header success"><div class="icon">&#9989;</div><h2>Message Released</h2></div>
             <div class="card-body">
-                <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(getmsg.from_email EQ "" ? "unknown sender" : getmsg.from_email)#</cfoutput></strong> has been released to your mailbox.</p>
+                <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(getmsg.from_email)#</cfoutput></strong> has been released to your mailbox.</p>
                 <p>It should arrive within a few minutes.</p>
             </div>
         </div>

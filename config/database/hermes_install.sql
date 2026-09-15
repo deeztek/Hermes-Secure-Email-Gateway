@@ -1200,6 +1200,7 @@ INSERT IGNORE INTO `ofelia_jobs` VALUES (12,'[job-exec \"hermes-quarantine-notif
 INSERT IGNORE INTO `ofelia_jobs` VALUES (13,'[job-exec \"hermes-process-cert-queue\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (14,'[job-exec \"hermes-fangfrisch-refresh\"]','@every 10m','/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh','hermes_mail_filter',NULL,NULL,NULL,NULL,'malware_feeds',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"google-relay-networks\"]','@every 30m','/usr/bin/curl --silent http://localhost:8888/schedule/update_google_relay_networks.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
+INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-quarantine-digest\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/digestQuarantine.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 
 -- -------- org_signatures                       [truncate] --------
 CREATE TABLE IF NOT EXISTS `org_signatures` (
@@ -1468,6 +1469,13 @@ INSERT IGNORE INTO `parameters2` VALUES (184, 'hide.login.form', 'true', 'nextcl
 INSERT IGNORE INTO `parameters2` VALUES (185, 'sharing.enabled', 'yes', 'dovecot', NULL, 1);
 INSERT IGNORE INTO `parameters2` VALUES (186, 'spf_sync_enabled', '0', 'relay_networks', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (187, 'spf_sync_server', '_spf.google.com', 'relay_networks', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (186, 'enabled', '0', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (187, 'frequency', 'daily', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (188, 'template', 'modern', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (189, 'subject', '[Hermes SEG] Quarantine Digest', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (190, 'intro', 'Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in.', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (191, 'disable_individual', '1', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (192, 'last_run', NULL, 'quarantine_digest', 1, 1);
 
 -- Link Guard (#186) global settings live in parameters2 under module='linkguard'
 -- (the module-namespaced settings store, like clamav/firewall/authelia/console).
@@ -2331,7 +2339,7 @@ INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 
 -- Keep this value in step with the baseline's actual content anyway, so a
 -- hand-run `mysql < hermes_install.sql` (no install script) is not misleading.
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
-INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260723');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260816');
 
 -- -------- system_updates                       [seed] --------
 CREATE TABLE IF NOT EXISTS `system_updates` (
@@ -3071,6 +3079,16 @@ CREATE TABLE IF NOT EXISTS `msgrcpt` (
   KEY `mail_id` (`mail_id`) USING BTREE,
   KEY `rid` (`rid`) USING BTREE,
   KEY `idx_msgrcpt_notify` (`ds`,`notification_sent`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+-- -------- quarantine_digest_deliveries --------
+CREATE TABLE IF NOT EXISTS `quarantine_digest_deliveries` (
+  `rid` bigint(20) unsigned NOT NULL,
+  `mail_id` varchar(255) NOT NULL,
+  `status` char(1) NOT NULL DEFAULT 'P',
+  `last_attempt_at` datetime DEFAULT current_timestamp(),
+  `delivered_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`rid`,`mail_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- ============================================================================

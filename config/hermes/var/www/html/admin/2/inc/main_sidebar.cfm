@@ -420,6 +420,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_quarantine_digest.cfm" class="nav-link">
+                <i class="nav-icon fas fa-envelope-open"></i>
+                <p>Quarantine Digest</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_message_history.cfm" class="nav-link">
                 <i class="nav-icon fas fa-history"></i>
                 <p>Message History</p>

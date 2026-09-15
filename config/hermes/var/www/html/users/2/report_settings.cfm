@@ -207,7 +207,7 @@ select report_enabled from user_settings where email = '#session.email#'
                 <h3 class="card-title"><i class="fas fa-bell me-2"></i>Quarantine Notifications</h3>
             </div>
             <div class="card-body">
-                <p>When enabled, you will receive an email notification each time a message to your address is quarantined. Each notification includes a one-click <strong>Release Message</strong> button that does not require logging in.</p>
+                <p>When enabled, you will receive quarantine mail based on your administrator's policy. This may be an individual notice or a scheduled digest email with secure <strong>View</strong>, <strong>Release Message</strong>, and <strong>Block Sender</strong> links that do not require logging in.</p>
                 <form action="" method="post">
                     <input type="hidden" name="action" value="setreports">
 
