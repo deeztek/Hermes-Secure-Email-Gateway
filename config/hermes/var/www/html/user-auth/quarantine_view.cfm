@@ -111,8 +111,7 @@ Public endpoint (no Authelia login required).
         </div>
         <h3>Message Body</h3>
         <pre><cfoutput>#encodeForHTML(safeBody)#</cfoutput></pre>
-        <h3>Headers</h3>
-        <pre><cfoutput>#encodeForHTML(message.header)#</cfoutput></pre>
+        <p style="margin-top:20px; color:#6b7280;">For privacy, this public view shows the message body and key envelope details only. Full raw headers remain available from the authenticated user portal.</p>
     </div>
 </div>
 </div>

@@ -210,9 +210,9 @@ for (var defaultRow in settingDefaults) {
           </div>
 
           <div class="mb-3">
-            <label class="form-label"><strong>Email Intro Text</strong></label>
+            <label class="form-label"><strong>Short Email Intro Text</strong></label>
             <textarea class="form-control" name="digest_intro" rows="3" maxlength="255"><cfoutput>#encodeForHTML(digestIntro)#</cfoutput></textarea>
-            <small class="text-muted">Short message shown above the quarantined-message table in the digest email.</small>
+            <small class="text-muted">Short message shown above the quarantined-message table in the digest email. Stored in the compact parameters2 settings store, so it is limited to 255 characters.</small>
           </div>
 
           <div class="mb-3">

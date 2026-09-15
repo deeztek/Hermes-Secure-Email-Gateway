@@ -98,6 +98,7 @@ function getTemplateConfig(required string templateName) {
 <cfset digestTemplate = lCase(getDigestSetting(getDigestSettings, "template", "modern"))>
 <cfset digestSubject = getDigestSetting(getDigestSettings, "subject", "[Hermes SEG] Quarantine Digest")>
 <cfset digestIntro = getDigestSetting(getDigestSettings, "intro", "Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in.")>
+<cfset digestDisableIndividual = getDigestSetting(getDigestSettings, "disable_individual", "1")>
 <cfset digestLastRunRaw = getDigestSetting(getDigestSettings, "last_run", "")>
 <cfset digestLastRun = "">
 <cfif digestLastRunRaw NEQ "" AND isDate(digestLastRunRaw)>
@@ -143,22 +144,23 @@ function getTemplateConfig(required string templateName) {
 <cfset skippedCount = 0>
 <cfset errorCount = 0>
 
-<cfquery name="getRecipients" datasource="hermes">
+<cfquery name="getRecipientMessages" datasource="hermes">
     SELECT r.recipient AS recipient_email,
-           ma.id AS rid,
-           COALESCE(us.report_enabled, 'YES') AS report_enabled
+           ma_rcpt.id AS rid,
+           COALESCE(us.report_enabled, 'YES') AS report_enabled,
+           digest_rows.mail_id,
+           digest_rows.secret_id,
+           digest_rows.spam_level,
+           digest_rows.time_iso,
+           digest_rows.subject,
+           digest_rows.content,
+           digest_rows.from_email
     FROM recipients r
-    INNER JOIN maddr ma ON ma.email = r.recipient
+    INNER JOIN maddr ma_rcpt ON ma_rcpt.email = r.recipient
     LEFT JOIN user_settings us ON us.email = r.recipient
-    WHERE COALESCE(us.report_enabled, 'YES') <> 'NO'
-    ORDER BY r.recipient
-</cfquery>
-
-<cfoutput>digestQuarantine: evaluating #getRecipients.recordcount# recipients from #DateFormat(windowStart, "yyyy-mm-dd")# #TimeFormat(windowStart, "HH:mm:ss")# through #DateFormat(windowEnd, "yyyy-mm-dd")# #TimeFormat(windowEnd, "HH:mm:ss")#<br></cfoutput>
-
-<cfloop query="getRecipients">
-    <cfquery name="getMessages" datasource="hermes">
-        SELECT m.mail_id,
+    LEFT JOIN (
+        SELECT mr.rid,
+               m.mail_id,
                m.secret_id,
                m.spam_level,
                m.time_iso,
@@ -168,18 +170,57 @@ function getTemplateConfig(required string templateName) {
         FROM msgrcpt mr
         INNER JOIN msgs m ON m.mail_id = mr.mail_id
         LEFT JOIN maddr ma_from ON ma_from.id = m.sid
-        WHERE mr.rid = <cfqueryparam value="#rid#" cfsqltype="cf_sql_integer">
-          AND mr.ds IN ('B', 'D')
+        WHERE mr.ds IN ('B', 'D')
           AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">
           AND m.time_iso <= <cfqueryparam value="#windowEnd#" cfsqltype="cf_sql_timestamp">
-        GROUP BY m.mail_id
-        ORDER BY m.time_iso DESC
-    </cfquery>
+        GROUP BY mr.rid, m.mail_id
+    ) digest_rows ON digest_rows.rid = ma_rcpt.id
+    WHERE COALESCE(us.report_enabled, 'YES') <> 'NO'
+    ORDER BY r.recipient, digest_rows.time_iso DESC
+</cfquery>
 
-    <cfif getMessages.recordcount EQ 0 AND report_enabled NEQ "ALL">
+<cfscript>
+recipientMap = structNew("ordered");
+for (var row in getRecipientMessages) {
+    var recipientKey = toString(row.recipient_email);
+    if (!structKeyExists(recipientMap, recipientKey)) {
+        recipientMap[recipientKey] = {
+            recipientEmail: recipientKey,
+            rid: row.rid,
+            reportEnabled: toString(row.report_enabled),
+            messages: []
+        };
+    }
+    if (structKeyExists(row, "mail_id") && !isNull(row.mail_id) && len(trim(toString(row.mail_id)))) {
+        arrayAppend(recipientMap[recipientKey].messages, {
+            mail_id: toString(row.mail_id),
+            secret_id: toString(row.secret_id),
+            spam_level: row.spam_level,
+            time_iso: row.time_iso,
+            subject: toString(row.subject),
+            content: toString(row.content),
+            from_email: toString(row.from_email)
+        });
+    }
+}
+recipientKeys = structKeyArray(recipientMap);
+arraySort(recipientKeys, "textnocase");
+</cfscript>
+
+<cfoutput>digestQuarantine: evaluating #arrayLen(recipientKeys)# recipients from #DateFormat(windowStart, "yyyy-mm-dd")# #TimeFormat(windowStart, "HH:mm:ss")# through #DateFormat(windowEnd, "yyyy-mm-dd")# #TimeFormat(windowEnd, "HH:mm:ss")#<br></cfoutput>
+
+<cfloop array="#recipientKeys#" index="recipientKey">
+    <cfset recipientData = recipientMap[recipientKey]>
+    <cfset recipientEmail = recipientData.recipientEmail>
+    <cfset reportEnabled = recipientData.reportEnabled>
+    <cfset recipientRid = recipientData.rid>
+    <cfset messageList = recipientData.messages>
+    <cfset messageCount = arrayLen(messageList)>
+
+    <cfif messageCount EQ 0 AND reportEnabled NEQ "ALL">
         <cfset skippedCount = skippedCount + 1>
         <cfif verbose>
-            <cfoutput>#encodeForHTML(recipient_email)#: skipped (no quarantined messages)<br></cfoutput>
+            <cfoutput>#encodeForHTML(recipientEmail)#: skipped (no quarantined messages)<br></cfoutput>
         </cfif>
         <cfcontinue>
     </cfif>
@@ -195,7 +236,7 @@ function getTemplateConfig(required string templateName) {
                 <td style="background:#templateConfig.headerBg#; padding:24px; text-align:center; color:##ffffff;">
                     <img src="cid:hermeslogo" alt="Hermes Secure Email Gateway" style="max-height:64px; width:auto; display:block; margin:0 auto 16px;">
                     <h1 style="margin:0; font-size:24px;">#encodeForHTML(templateConfig.heading)#</h1>
-                    <p style="margin:12px 0 0; font-size:14px; opacity:0.95;">#encodeForHTML(recipient_email)#</p>
+                    <p style="margin:12px 0 0; font-size:14px; opacity:0.95;">#encodeForHTML(recipientEmail)#</p>
                 </td>
             </tr>
             <tr>
@@ -207,10 +248,10 @@ function getTemplateConfig(required string templateName) {
                     </div>
 
                     <p style="margin:0 0 16px; font-size:15px;">
-                        <strong>#getMessages.recordcount#</strong> quarantined message<cfif getMessages.recordcount NEQ 1>s</cfif> found for this digest period.
+                        <strong>#messageCount#</strong> quarantined message<cfif messageCount NEQ 1>s</cfif> found for this digest period.
                     </p>
 
-                    <cfif getMessages.recordcount EQ 0>
+                    <cfif messageCount EQ 0>
                         <div style="padding:18px; background:##f9fafb; border:1px dashed ##d1d5db; border-radius:#templateConfig.cardRadius#; color:##4b5563;">
                             No quarantined messages were found during this digest period.
                         </div>
@@ -222,14 +263,14 @@ function getTemplateConfig(required string templateName) {
                                 <th align="left" style="padding:12px; border:1px solid ##e5e7eb;">Subject</th>
                                 <th align="left" style="padding:12px; border:1px solid ##e5e7eb;">Actions</th>
                             </tr>
-                            <cfloop query="getMessages">
-                                <cfset viewUrl = generateQuarantineActionUrl(mail_id, secret_id, recipient_email, consoleHost, "view")>
-                                <cfset releaseUrl = generateQuarantineActionUrl(mail_id, secret_id, recipient_email, consoleHost, "release")>
-                                <cfset blockUrl = generateQuarantineActionUrl(mail_id, secret_id, recipient_email, consoleHost, "block")>
+                            <cfloop array="#messageList#" index="messageItem">
+                                <cfset viewUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "view")>
+                                <cfset releaseUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "release")>
+                                <cfset blockUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "block")>
                                 <tr>
-                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; white-space:nowrap;">#DateFormat(time_iso, "mm/dd/yyyy")#<br>#TimeFormat(time_iso, "hh:mm:ss tt")#</td>
-                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; word-break:break-word;">#encodeForHTML(from_email)#</td>
-                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; word-break:break-word;">#encodeForHTML(subject)#</td>
+                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; white-space:nowrap;">#DateFormat(messageItem.time_iso, "mm/dd/yyyy")#<br>#TimeFormat(messageItem.time_iso, "hh:mm:ss tt")#</td>
+                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; word-break:break-word;">#encodeForHTML(messageItem.from_email)#</td>
+                                    <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; word-break:break-word;">#encodeForHTML(messageItem.subject)#</td>
                                     <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; min-width:240px;">
                                         <a href="#viewUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##ffffff; border:1px solid #templateConfig.buttonBg#; color:#templateConfig.buttonBg#; text-decoration:none; border-radius:6px; font-weight:bold;">View</a>
                                         <a href="#releaseUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:#templateConfig.buttonBg#; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Release</a>
@@ -253,30 +294,47 @@ function getTemplateConfig(required string templateName) {
 
     <cftry>
         <cfmail from="#postmasterEmail#"
-                to="#trim(recipient_email)#"
+                to="#trim(recipientEmail)#"
                 subject="#digestSubject#"
                 type="HTML"
                 server="hermes_postfix_dkim"
                 port="10026">#digestBodyHtml#
             <cfmailparam file="/var/www/html/dist/img/hermes_logo_new_orange2.png" contentid="hermeslogo" disposition="inline">
         </cfmail>
+
+        <cfif messageCount GT 0 AND digestDisableIndividual EQ "1">
+            <cfset deliveredMailIds = []>
+            <cfloop array="#messageList#" index="messageItem">
+                <cfset arrayAppend(deliveredMailIds, messageItem.mail_id)>
+            </cfloop>
+            <cfquery datasource="hermes">
+                UPDATE msgrcpt
+                SET notification_sent = 2
+                WHERE rid = <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">
+                  AND mail_id IN (<cfqueryparam value="#arrayToList(deliveredMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
+            </cfquery>
+        </cfif>
+
         <cfset sentCount = sentCount + 1>
         <cfif verbose>
-            <cfoutput>#encodeForHTML(recipient_email)#: digest sent (#getMessages.recordcount# messages)<br></cfoutput>
+            <cfoutput>#encodeForHTML(recipientEmail)#: digest sent (#messageCount# messages)<br></cfoutput>
         </cfif>
     <cfcatch type="any">
         <cfset errorCount = errorCount + 1>
-        <cfoutput>#encodeForHTML(recipient_email)#: ERROR sending digest - #encodeForHTML(cfcatch.message)#<br></cfoutput>
+        <cfoutput>#encodeForHTML(recipientEmail)#: ERROR sending digest - #encodeForHTML(cfcatch.message)#<br></cfoutput>
     </cfcatch>
     </cftry>
 </cfloop>
 
-<cfquery datasource="hermes">
-    UPDATE parameters2
-    SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
-        applied = 2
-    WHERE module = 'quarantine_digest'
-      AND parameter = 'last_run'
-</cfquery>
-
-<cfoutput>digestQuarantine: complete (sent=#sentCount# skipped=#skippedCount# errors=#errorCount#)<br></cfoutput>
+<cfif errorCount EQ 0>
+    <cfquery datasource="hermes">
+        UPDATE parameters2
+        SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
+            applied = 2
+        WHERE module = 'quarantine_digest'
+          AND parameter = 'last_run'
+    </cfquery>
+    <cfoutput>digestQuarantine: complete (sent=#sentCount# skipped=#skippedCount# errors=#errorCount#)<br></cfoutput>
+<cfelse>
+    <cfoutput>digestQuarantine: complete with errors (sent=#sentCount# skipped=#skippedCount# errors=#errorCount# last_run not advanced)<br></cfoutput>
+</cfif>
