@@ -125,7 +125,10 @@ function normalizeGoogleDomains(rawValue) {
 <cfset flowMessage = "Please contact your system administrator.">
 <cfset flowEmail = "">
 
-<cfif googleSettings.enabled EQ "1" AND Len(Trim(googleSettings.client_id)) GT 0 AND Len(Trim(googleClientSecret)) GT 0 AND ArrayLen(allowedDomains) GT 0 AND StructKeyExists(url, "code") AND StructKeyExists(url, "state")>
+<cfif StructKeyExists(url, "error") AND Len(Trim(url.error)) GT 0>
+    <cfset flowTitle = "Organization Login Failed">
+    <cfset flowMessage = "Organization sign-in was denied or canceled. Please try again or contact your system administrator.">
+<cfelseif googleSettings.enabled EQ "1" AND Len(Trim(googleSettings.client_id)) GT 0 AND Len(Trim(googleClientSecret)) GT 0 AND ArrayLen(allowedDomains) GT 0 AND StructKeyExists(url, "code") AND StructKeyExists(url, "state")>
     <cfif NOT StructKeyExists(session, "googleProvisionState") OR session.googleProvisionState NEQ url.state>
         <cfset flowTitle = "Organization Login Failed">
         <cfset flowMessage = "We could not validate your sign-in request. Please contact your system administrator.">
@@ -204,10 +207,18 @@ function normalizeGoogleDomains(rawValue) {
                             <cfset flowStatus = "success">
                             <cfset flowTitle = "Organization Account Verified">
                             <cfset flowMessage = "A new Hermes SEG account has been created for #HTMLEditFormat(flowEmail)#. Please check your email for the welcome message, then use Reset password? to finish setup.">
+                        <cfelseif googleProvisionStatus EQ "created_email_failed">
+                            <cfset flowStatus = "success">
+                            <cfset flowTitle = "Organization Account Verified">
+                            <cfset flowMessage = googleProvisionMessage>
                         <cfelseif googleProvisionStatus EQ "exists">
                             <cfset flowStatus = "success">
                             <cfset flowTitle = "Account Already Available">
-                            <cfset flowMessage = "A Hermes SEG account already exists for #HTMLEditFormat(flowEmail)#. Open the User Console and use Reset password? if you need to set or change your password.">
+                            <cfif IsDefined("googleProvisionExistingAuthType") AND googleProvisionExistingAuthType EQ "remote">
+                                <cfset flowMessage = "A Hermes SEG account already exists for #HTMLEditFormat(flowEmail)#. Use your organization credentials to sign in. Contact your system administrator if you need help accessing the account.">
+                            <cfelse>
+                                <cfset flowMessage = "A Hermes SEG account already exists for #HTMLEditFormat(flowEmail)#. Open the User Console and use Reset password? if you need to set or change your password.">
+                            </cfif>
                         <cfelse>
                             <cfset flowTitle = "Organization Login Failed">
                             <cfset flowMessage = googleProvisionMessage>

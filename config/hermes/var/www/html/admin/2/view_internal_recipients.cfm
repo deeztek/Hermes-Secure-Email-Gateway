@@ -427,6 +427,8 @@ a, a:hover{
         <cfset googleProvisionError = "Google name claim must contain only lowercase letters, numbers, or underscores.">
       <cfelseif googleEnabled EQ "1" AND ArrayLen(googleAllowedDomainsArray) EQ 0>
         <cfset googleProvisionError = "Enter at least one allowed login domain.">
+      <cfelseif Len(googleAllowedDomains) GT 255>
+        <cfset googleProvisionError = "Allowed login domains are too long to save. Remove some domains and try again.">
       <cfelseif NOT ListFindNoCase("YES,NO", googleReports)>
         <cfset googleProvisionError = "Invalid Quarantine Notifications value.">
       <cfelseif NOT ListFindNoCase("0,1", googleTrainBayes)>
@@ -680,7 +682,7 @@ a, a:hover{
     <div class="alert alert-<cfoutput>#session.googleProvisioningMessageType#</cfoutput> alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         <h5><i class="icon <cfoutput><cfif session.googleProvisioningMessageType EQ 'success'>fa fa-check<cfelse>fa fa-ban</cfif></cfoutput>"></i> <cfoutput><cfif session.googleProvisioningMessageType EQ "success">Success<cfelse>Error</cfif></cfoutput></h5>
-        <cfoutput>#session.googleProvisioningMessage#</cfoutput>
+        <cfoutput>#HTMLEditFormat(session.googleProvisioningMessage)#</cfoutput>
     </div>
     <cfset StructDelete(session, "googleProvisioningMessage")>
     <cfset StructDelete(session, "googleProvisioningMessageType")>
@@ -759,7 +761,7 @@ a, a:hover{
 
                             <div class="form-group mb-3">
                                 <label><strong>Google Client Secret</strong></label>
-                                <cfoutput><input type="text" class="form-control" name="google_client_secret" value="#googleClientSecretMasked#" autocomplete="off"></cfoutput>
+                                <cfoutput><input type="password" class="form-control" name="google_client_secret" value="#googleClientSecretMasked#" autocomplete="off"></cfoutput>
                                 <small class="text-muted">Leave <code>********</code> unchanged to keep the stored secret.</small>
                             </div>
 
