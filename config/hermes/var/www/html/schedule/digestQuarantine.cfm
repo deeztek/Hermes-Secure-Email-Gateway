@@ -87,6 +87,9 @@ function getTemplateConfig(required string templateName) {
 }
 </cfscript>
 
+<cftry>
+<cflock name="digestQuarantineSchedulerLock" type="exclusive" timeout="1" throwOnTimeout="true">
+
 <cfquery name="getDigestSettings" datasource="hermes">
     SELECT parameter, value2
     FROM parameters2
@@ -153,7 +156,6 @@ function getTemplateConfig(required string templateName) {
            digest_rows.spam_level,
            digest_rows.time_iso,
            digest_rows.subject,
-           digest_rows.content,
            digest_rows.from_email
     FROM recipients r
     INNER JOIN maddr ma_rcpt ON ma_rcpt.email = r.recipient
@@ -165,14 +167,20 @@ function getTemplateConfig(required string templateName) {
                m.spam_level,
                m.time_iso,
                m.subject,
-               m.content,
                COALESCE(ma_from.email, m.from_addr, 'unknown sender') AS from_email
         FROM msgrcpt mr
         INNER JOIN msgs m ON m.mail_id = mr.mail_id
         LEFT JOIN maddr ma_from ON ma_from.id = m.sid
+        LEFT JOIN quarantine_digest_deliveries qdd
+               ON qdd.rid = mr.rid
+              AND qdd.mail_id = CAST(m.mail_id AS CHAR(255))
         WHERE mr.ds IN ('B', 'D')
-          AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">
           AND m.time_iso <= <cfqueryparam value="#windowEnd#" cfsqltype="cf_sql_timestamp">
+          AND (
+                (qdd.mail_id IS NULL AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">)
+             OR COALESCE(qdd.status, 'P') = 'F'
+          )
+          AND COALESCE(qdd.status, 'P') <> 'S'
         GROUP BY mr.rid, m.mail_id
     ) digest_rows ON digest_rows.rid = ma_rcpt.id
     WHERE COALESCE(us.report_enabled, 'YES') <> 'NO'
@@ -198,7 +206,6 @@ for (var row in getRecipientMessages) {
             spam_level: row.spam_level,
             time_iso: row.time_iso,
             subject: toString(row.subject),
-            content: toString(row.content),
             from_email: toString(row.from_email)
         });
     }
@@ -217,7 +224,8 @@ arraySort(recipientKeys, "textnocase");
     <cfset messageList = recipientData.messages>
     <cfset messageCount = arrayLen(messageList)>
 
-    <cfif messageCount EQ 0 AND reportEnabled NEQ "ALL">
+    <cfset sendEmptyDigest = (reportEnabled EQ "ALL")>
+    <cfif messageCount EQ 0 AND NOT sendEmptyDigest>
         <cfset skippedCount = skippedCount + 1>
         <cfif verbose>
             <cfoutput>#encodeForHTML(recipientEmail)#: skipped (no quarantined messages)<br></cfoutput>
@@ -302,17 +310,36 @@ arraySort(recipientKeys, "textnocase");
             <cfmailparam file="/var/www/html/dist/img/hermes_logo_new_orange2.png" contentid="hermeslogo" disposition="inline">
         </cfmail>
 
-        <cfif messageCount GT 0 AND digestDisableIndividual EQ "1">
-            <cfset deliveredMailIds = []>
+        <cfif messageCount GT 0>
             <cfloop array="#messageList#" index="messageItem">
-                <cfset arrayAppend(deliveredMailIds, messageItem.mail_id)>
+                <cfquery datasource="hermes">
+                    INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
+                    VALUES (
+                        <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
+                        <cfqueryparam value="#messageItem.mail_id#" cfsqltype="cf_sql_varchar">,
+                        'S',
+                        NOW(),
+                        NOW()
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        status = 'S',
+                        last_attempt_at = NOW(),
+                        delivered_at = NOW()
+                </cfquery>
             </cfloop>
-            <cfquery datasource="hermes">
-                UPDATE msgrcpt
-                SET notification_sent = 2
-                WHERE rid = <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">
-                  AND mail_id IN (<cfqueryparam value="#arrayToList(deliveredMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
-            </cfquery>
+
+            <cfif digestDisableIndividual EQ "1">
+                <cfset deliveredMailIds = []>
+                <cfloop array="#messageList#" index="messageItem">
+                    <cfset arrayAppend(deliveredMailIds, messageItem.mail_id)>
+                </cfloop>
+                <cfquery datasource="hermes">
+                    UPDATE msgrcpt
+                    SET notification_sent = 2
+                    WHERE rid = <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">
+                      AND mail_id IN (<cfqueryparam value="#arrayToList(deliveredMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
+                </cfquery>
+            </cfif>
         </cfif>
 
         <cfset sentCount = sentCount + 1>
@@ -321,20 +348,45 @@ arraySort(recipientKeys, "textnocase");
         </cfif>
     <cfcatch type="any">
         <cfset errorCount = errorCount + 1>
+        <cfif messageCount GT 0>
+            <cfloop array="#messageList#" index="messageItem">
+                <cfquery datasource="hermes">
+                    INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
+                    VALUES (
+                        <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
+                        <cfqueryparam value="#messageItem.mail_id#" cfsqltype="cf_sql_varchar">,
+                        'F',
+                        NOW(),
+                        NULL
+                    )
+                    ON DUPLICATE KEY UPDATE
+                        status = 'F',
+                        last_attempt_at = NOW(),
+                        delivered_at = NULL
+                </cfquery>
+            </cfloop>
+        </cfif>
         <cfoutput>#encodeForHTML(recipientEmail)#: ERROR sending digest - #encodeForHTML(cfcatch.message)#<br></cfoutput>
     </cfcatch>
     </cftry>
 </cfloop>
 
+<cfquery datasource="hermes">
+    UPDATE parameters2
+    SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
+        applied = 2
+    WHERE module = 'quarantine_digest'
+      AND parameter = 'last_run'
+</cfquery>
+
 <cfif errorCount EQ 0>
-    <cfquery datasource="hermes">
-        UPDATE parameters2
-        SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
-            applied = 2
-        WHERE module = 'quarantine_digest'
-          AND parameter = 'last_run'
-    </cfquery>
     <cfoutput>digestQuarantine: complete (sent=#sentCount# skipped=#skippedCount# errors=#errorCount#)<br></cfoutput>
 <cfelse>
-    <cfoutput>digestQuarantine: complete with errors (sent=#sentCount# skipped=#skippedCount# errors=#errorCount# last_run not advanced)<br></cfoutput>
+    <cfoutput>digestQuarantine: complete with errors (sent=#sentCount# skipped=#skippedCount# errors=#errorCount# failed recipient deliveries remain queued for retry)<br></cfoutput>
 </cfif>
+
+</cflock>
+<cfcatch type="lock">
+    <cfoutput>digestQuarantine: another run is already in progress<br></cfoutput>
+</cfcatch>
+</cftry>

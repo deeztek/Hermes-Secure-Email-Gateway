@@ -43,6 +43,10 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
   <cfset m = session.m>
 </cfif>
 
+<cfif NOT StructKeyExists(session, "quarantineDigestCsrf") OR session.quarantineDigestCsrf EQ "">
+  <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
+</cfif>
+
 <cfscript>
 settingDefaults = [
     {parameter="enabled", value2="0"},
@@ -68,6 +72,11 @@ for (var defaultRow in settingDefaults) {
 </cfscript>
 
 <cfif StructKeyExists(form, "action") AND form.action EQ "save_digest_settings">
+    <cfif NOT StructKeyExists(form, "csrf_token") OR form.csrf_token NEQ session.quarantineDigestCsrf>
+        <cfset m = "Quarantine Digest: invalid CSRF token">
+        <cfinclude template="./inc/error.cfm">
+        <cfabort>
+    </cfif>
     <cfparam name="form.digest_enabled" default="0">
     <cfparam name="form.digest_frequency" default="daily">
     <cfparam name="form.digest_template" default="modern">
@@ -122,6 +131,7 @@ for (var defaultRow in settingDefaults) {
         WHERE module = 'quarantine_digest' AND parameter = 'disable_individual'
     </cfquery>
 
+    <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
     <cfset session.m = 1>
     <cflocation url="view_quarantine_digest.cfm" addtoken="no">
 </cfif>
@@ -175,6 +185,7 @@ for (var defaultRow in settingDefaults) {
       <div class="card-body">
         <form method="post" action="view_quarantine_digest.cfm">
           <input type="hidden" name="action" value="save_digest_settings">
+          <cfoutput><input type="hidden" name="csrf_token" value="#encodeForHTMLAttribute(session.quarantineDigestCsrf)#"></cfoutput>
 
           <div class="mb-3">
             <label class="form-label"><strong>Enable Quarantine Digest</strong></label>

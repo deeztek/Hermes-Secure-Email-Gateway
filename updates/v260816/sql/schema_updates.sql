@@ -60,7 +60,23 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------
--- 2. Seed the Ofelia quarantine digest job
+-- 2. Track digest deliveries per recipient/message
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `quarantine_digest_deliveries` (
+  `rid` bigint(20) unsigned NOT NULL,
+  `mail_id` varchar(255) NOT NULL,
+  `status` char(1) NOT NULL DEFAULT 'P',
+  `last_attempt_at` datetime DEFAULT current_timestamp(),
+  `delivered_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`rid`,`mail_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
+ALTER TABLE `quarantine_digest_deliveries`
+  ADD COLUMN IF NOT EXISTS `status` char(1) NOT NULL DEFAULT 'P' AFTER `mail_id`,
+  ADD COLUMN IF NOT EXISTS `last_attempt_at` datetime DEFAULT current_timestamp() AFTER `status`;
+
+-- ---------------------------------------------------------------------
+-- 3. Seed the Ofelia quarantine digest job
 -- ---------------------------------------------------------------------
 INSERT INTO `ofelia_jobs` (job_name, schedule, command, container, type, active, no_overlap)
 SELECT '[job-exec "hermes-quarantine-digest"]', '@every 60s',
@@ -71,6 +87,6 @@ WHERE NOT EXISTS (
 );
 
 -- ---------------------------------------------------------------------
--- 3. Version stamp -- MUST be the last statement.
+-- 4. Version stamp -- MUST be the last statement.
 -- ---------------------------------------------------------------------
 UPDATE system_settings SET value = 'v260816' WHERE parameter = 'build_no';

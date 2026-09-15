@@ -67,18 +67,17 @@ Public endpoint (no Authelia login required).
     <cfabort>
 </cfif>
 
+<cfquery datasource="hermes">
+    INSERT INTO mailaddr (email)
+    VALUES (<cfqueryparam value="#getmsg.from_email#" cfsqltype="cf_sql_varchar">)
+    ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+</cfquery>
+
 <cfquery name="getMailaddr" datasource="hermes">
     SELECT id FROM mailaddr WHERE email = <cfqueryparam value="#getmsg.from_email#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
-<cfif getMailaddr.recordcount LT 1>
-    <cfquery name="insertMailaddr" datasource="hermes" result="stSender">
-        INSERT INTO mailaddr (email) VALUES (<cfqueryparam value="#getmsg.from_email#" cfsqltype="cf_sql_varchar">)
-    </cfquery>
-    <cfset senderMailaddrId = stSender.GENERATED_KEY>
-<cfelse>
-    <cfset senderMailaddrId = getMailaddr.id>
-</cfif>
+<cfset senderMailaddrId = getMailaddr.id>
 
 <cfquery name="getExisting" datasource="hermes">
     SELECT wb FROM wblist
@@ -86,25 +85,21 @@ Public endpoint (no Authelia login required).
       AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
 </cfquery>
 
+<cfquery datasource="hermes">
+    INSERT INTO wblist (rid, sid, wb)
+    VALUES (
+        <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">,
+        <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
+        'B'
+    )
+    ON DUPLICATE KEY UPDATE wb = 'B'
+</cfquery>
+
 <cfif getExisting.recordcount LT 1>
-    <cfquery datasource="hermes">
-        INSERT INTO wblist (rid, sid, wb)
-        VALUES (
-            <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">,
-            <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
-            'B'
-        )
-    </cfquery>
     <cfset blockMessage = "The sender has been added to the recipient block list.">
 <cfelseif getExisting.wb EQ "B">
     <cfset blockMessage = "This sender is already blocked for the recipient.">
 <cfelse>
-    <cfquery datasource="hermes">
-        UPDATE wblist
-        SET wb = 'B'
-        WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
-          AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
-    </cfquery>
     <cfset blockMessage = "The existing sender rule has been updated to block this sender.">
 </cfif>
 

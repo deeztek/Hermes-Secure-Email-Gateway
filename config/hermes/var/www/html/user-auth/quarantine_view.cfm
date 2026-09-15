@@ -80,13 +80,13 @@ Public endpoint (no Authelia login required).
 <cfset popAccount = createObject("component", "cfc.pop4.pop").init()>
 <cfset message = popAccount.loadFromFile(quarFile)>
 <cfset safeBody = Trim(message.textbody)>
-<cfif safeBody EQ "">
-    <cfset safeBody = REReplace(toString(message.htmlbody), "<[^>]+>", " ", "ALL")>
+<cfset renderedHtmlBody = "">
+<cfif safeBody EQ "" AND Len(Trim(message.htmlbody))>
+    <cfset renderedHtmlBody = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src ''none''; img-src data: cid:; style-src ''unsafe-inline''; font-src data:; frame-ancestors ''none''; form-action ''none''; base-uri ''none'';"><style>body{font-family:Arial,Helvetica,sans-serif;color:#333;padding:16px;word-break:break-word;} table{max-width:100%;} img{max-width:100%;height:auto;} a{pointer-events:none;color:inherit;text-decoration:none;}</style></head><body>' & message.htmlbody & '</body></html>'>
+<cfelseif safeBody EQ "">
+    <cfset safeBody = "This quarantined message does not contain a displayable message body.">
 </cfif>
 <cfset safeBody = Trim(safeBody)>
-<cfif safeBody EQ "">
-    <cfset safeBody = "This message did not contain a readable body." >
-</cfif>
 <cfset releaseUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, getportal.value2, "release")>
 <cfset blockUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, getportal.value2, "block")>
 
@@ -110,7 +110,11 @@ Public endpoint (no Authelia login required).
             </cfoutput>
         </div>
         <h3>Message Body</h3>
-        <pre><cfoutput>#encodeForHTML(safeBody)#</cfoutput></pre>
+        <cfif renderedHtmlBody NEQ "">
+            <cfoutput><iframe title="Quarantined message HTML body" sandbox="" style="width:100%; min-height:480px; border:1px solid ##e5e7eb; border-radius:8px; background:##fff;" srcdoc="#encodeForHTMLAttribute(renderedHtmlBody)#"></iframe></cfoutput>
+        <cfelse>
+            <pre><cfoutput>#encodeForHTML(safeBody)#</cfoutput></pre>
+        </cfif>
         <p style="margin-top:20px; color:#6b7280;">For privacy, this public view shows the message body and key envelope details only. Full raw headers remain available from the authenticated user portal.</p>
     </div>
 </div>

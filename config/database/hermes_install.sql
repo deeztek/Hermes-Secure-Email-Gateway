@@ -3078,6 +3078,16 @@ CREATE TABLE IF NOT EXISTS `msgrcpt` (
   KEY `idx_msgrcpt_notify` (`ds`,`notification_sent`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
+-- -------- quarantine_digest_deliveries --------
+CREATE TABLE IF NOT EXISTS `quarantine_digest_deliveries` (
+  `rid` bigint(20) unsigned NOT NULL,
+  `mail_id` varchar(255) NOT NULL,
+  `status` char(1) NOT NULL DEFAULT 'P',
+  `last_attempt_at` datetime DEFAULT current_timestamp(),
+  `delivered_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`rid`,`mail_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
+
 -- ============================================================================
 -- OPERATIONAL SUPPORT TABLES
 -- Pre-created so first-touch CFML pages don't error on fresh installs.
