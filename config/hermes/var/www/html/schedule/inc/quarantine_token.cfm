@@ -23,7 +23,7 @@ function getQuarantineReleaseKey() {
  */
 function generateQuarantineActionUrl(required string mailId, required string secretId, required string recipientEmail, required string consoleHost, string action = "release", numeric expiryHours = 72) {
     var normalizedAction = lCase(trim(arguments.action));
-    if (!listFindNoCase("release,view,block", normalizedAction)) {
+    if (!listFindNoCase("release,view,block,whitelist", normalizedAction)) {
         normalizedAction = "release";
     }
 
@@ -73,7 +73,7 @@ function validateQuarantineActionToken(required string token, string expectedAct
             return result;
         }
 
-        if (!listFindNoCase("release,view,block", action)) {
+        if (!listFindNoCase("release,view,block,whitelist", action)) {
             result.error = "Invalid token";
             return result;
         }

@@ -67,7 +67,7 @@ See GitHub issue #180
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject,
            ma_rcpt.email AS recipient_email,
-           ma_from.email AS from_email
+           COALESCE(ma_from.email, m.from_addr, 'unknown sender') AS from_email
     FROM msgs m
     INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
     INNER JOIN maddr ma_rcpt ON mr.rid = ma_rcpt.id
@@ -120,7 +120,7 @@ See GitHub issue #180
         <div class="card">
             <div class="card-header success"><div class="icon">&#9989;</div><h2>Message Released</h2></div>
             <div class="card-body">
-                <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(getmsg.from_email EQ "" ? "unknown sender" : getmsg.from_email)#</cfoutput></strong> has been released to your mailbox.</p>
+                <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(getmsg.from_email)#</cfoutput></strong> has been released to your mailbox.</p>
                 <p>It should arrive within a few minutes.</p>
             </div>
         </div>

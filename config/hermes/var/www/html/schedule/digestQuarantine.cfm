@@ -330,6 +330,7 @@ arraySort(recipientKeys, "textnocase");
                             <cfloop array="#messageList#" index="messageItem">
                                 <cfset viewUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "view")>
                                 <cfset releaseUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "release")>
+                                <cfset whitelistUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "whitelist")>
                                 <cfset blockUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "block")>
                                 <tr>
                                     <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; white-space:nowrap;">#DateFormat(messageItem.time_iso, "mm/dd/yyyy")#<br>#TimeFormat(messageItem.time_iso, "hh:mm:ss tt")#</td>
@@ -338,6 +339,7 @@ arraySort(recipientKeys, "textnocase");
                                     <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; min-width:240px;">
                                         <a href="#viewUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##ffffff; border:1px solid #templateConfig.buttonBg#; color:#templateConfig.buttonBg#; text-decoration:none; border-radius:6px; font-weight:bold;">View</a>
                                         <a href="#releaseUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:#templateConfig.buttonBg#; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Release</a>
+                                        <a href="#whitelistUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##16a34a; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Whitelist Sender</a>
                                         <a href="#blockUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##dc2626; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Block Sender</a>
                                     </td>
                                 </tr>
