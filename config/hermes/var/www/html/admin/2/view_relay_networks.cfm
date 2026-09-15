@@ -416,7 +416,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     AND enabled = 1
   </cfquery>
   <cfif check_alias_valid.recordcount LT 1>
-    <cfset session.m = 32>
+    <cfset session.m = 35>
     <cflocation url="view_relay_networks.cfm" addtoken="no">
   </cfif>
 
@@ -529,7 +529,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- ERROR MESSAGES START HERE --->
 
-<cfif m is "32">
+<cfif m is "35">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-ban"></i> Oops!</h4>
