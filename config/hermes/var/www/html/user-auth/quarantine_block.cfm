@@ -46,9 +46,9 @@ Public endpoint (no Authelia login required).
 
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id,
-           ma_rcpt.email AS recipient_email,
-           COALESCE(ma_from.email, m.from_addr, '') AS from_email,
-           m.subject
+           CAST(ma_rcpt.email AS CHAR(255)) AS recipient_email,
+           COALESCE(CAST(ma_from.email AS CHAR(255)), CAST(m.from_addr AS CHAR(255)), '') AS from_email,
+           CAST(m.subject AS CHAR(255)) AS subject
     FROM msgs m
     INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
     INNER JOIN maddr ma_rcpt ON mr.rid = ma_rcpt.id
@@ -64,7 +64,7 @@ Public endpoint (no Authelia login required).
 </cfif>
 
 <cfquery name="getRecipient" datasource="hermes">
-    SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#getmsg.recipient_email#" cfsqltype="cf_sql_varchar">
+    SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#tokenResult.recipientEmail#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <cfif getRecipient.recordcount LT 1>

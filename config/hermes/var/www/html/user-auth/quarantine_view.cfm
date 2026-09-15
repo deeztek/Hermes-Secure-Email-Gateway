@@ -20,6 +20,7 @@ Public endpoint (no Authelia login required).
         .actions a { display: inline-block; margin: 0 10px 10px 0; padding: 10px 16px; border-radius: 6px; text-decoration: none; font-weight: bold; }
         .btn-view { border: 1px solid #f97316; color: #f97316; }
         .btn-release { background: #f97316; color: #fff; }
+        .btn-whitelist { background: #16a34a; color: #fff; }
         .btn-block { background: #dc3545; color: #fff; }
         pre { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; white-space: pre-wrap; word-break: break-word; }
     </style>
@@ -55,8 +56,8 @@ Public endpoint (no Authelia login required).
 
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject, m.time_iso, m.archive,
-           ma_rcpt.email AS recipient_email,
-           COALESCE(ma_from.email, m.from_addr, 'unknown sender') AS from_email
+           CAST(ma_rcpt.email AS CHAR(255)) AS recipient_email,
+           COALESCE(CAST(ma_from.email AS CHAR(255)), CAST(m.from_addr AS CHAR(255)), 'unknown sender') AS from_email
     FROM msgs m
     INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
     INNER JOIN maddr ma_rcpt ON mr.rid = ma_rcpt.id
@@ -93,6 +94,7 @@ Public endpoint (no Authelia login required).
 </cfif>
 <cfset safeBody = Trim(safeBody)>
 <cfset releaseUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, Trim(getportal.value2), "release")>
+<cfset whitelistUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, Trim(getportal.value2), "whitelist")>
 <cfset blockUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, Trim(getportal.value2), "block")>
 
 <div class="card">
@@ -111,6 +113,7 @@ Public endpoint (no Authelia login required).
         <div class="actions">
             <cfoutput>
             <a class="btn-release" href="#releaseUrl#">Release Message</a>
+            <a class="btn-whitelist" href="#whitelistUrl#">Whitelist Sender</a>
             <a class="btn-block" href="#blockUrl#">Block Sender</a>
             </cfoutput>
         </div>

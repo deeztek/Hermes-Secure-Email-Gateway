@@ -90,7 +90,9 @@ function validateQuarantineActionToken(required string token, string expectedAct
         }
 
         var q = queryExecute(
-            "SELECT m.mail_id, m.secret_id, ma.email AS recipient_email
+            "SELECT CAST(m.mail_id AS CHAR(255)) AS mail_id,
+                    CAST(m.secret_id AS CHAR(255)) AS secret_id,
+                    CAST(ma.email AS CHAR(255)) AS recipient_email
              FROM msgs m
              INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
              INNER JOIN maddr ma ON mr.rid = ma.id

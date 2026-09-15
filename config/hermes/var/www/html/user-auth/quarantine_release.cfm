@@ -66,8 +66,8 @@ See GitHub issue #180
 <!--- Token is valid — look up the quarantine details --->
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject,
-           ma_rcpt.email AS recipient_email,
-           COALESCE(ma_from.email, m.from_addr, 'unknown sender') AS from_email
+           CAST(ma_rcpt.email AS CHAR(255)) AS recipient_email,
+           COALESCE(CAST(ma_from.email AS CHAR(255)), CAST(m.from_addr AS CHAR(255)), 'unknown sender') AS from_email
     FROM msgs m
     INNER JOIN msgrcpt mr ON m.mail_id = mr.mail_id
     INNER JOIN maddr ma_rcpt ON mr.rid = ma_rcpt.id
