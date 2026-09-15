@@ -87,6 +87,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       where a malformed line is not rejected loudly, it just quietly fails to
       match. cfqueryparam covers injection; this covers correctness.
 --->
+<cffunction name="stampRangesChanged" returntype="void" output="false">
+  <cfargument name="aliasId" type="numeric" required="true">
+  <!--- The range set moved. Every consumer's rendered file is now stale until
+       someone applies on that page, and network_alias_applied says which ones.
+       Stamped by every path that changes ranges, by hand or by resolver, because
+       the consequence does not depend on who did it. --->
+  <cfquery datasource="hermes">
+    UPDATE network_aliases SET ranges_changed_at = NOW(6)
+    WHERE id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+</cffunction>
+
 <cffunction name="aliasNameOf" returntype="string" output="false">
   <cfargument name="aliasId" type="numeric" required="true">
   <cfset var q = "">
@@ -481,6 +493,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
   </cfloop>
 
+  <cfif addedCount GT 0>
+    <cfset stampRangesChanged(theId)>
+  </cfif>
   <cfset session.alias_touched = aliasNameOf(theId)>
   <cfif badCount GT 0>
     <cfset session.m = 67>
@@ -502,6 +517,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     DELETE FROM network_alias_entries
     WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
   </cfquery>
+  <cfset stampRangesChanged(theId)>
   <cfset session.alias_touched = aliasNameOf(theId)>
   <cfset session.m = 69>
   <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
@@ -686,6 +702,48 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     is generated, so the ranges in use are always the ones shown here.
   </p>
 </div>
+
+<!--- ==================================================================
+      NOT APPLIED YET
+
+      The persistent half of the change signal. The resolver's email is a
+      one-shot and the inline message after a hand edit is gone on the next page
+      load; this stays up until every consumer has actually rendered the current
+      ranges, which is the property that matters when nothing applies itself.
+
+      Per consumer, so applying on one page clears that page and leaves the
+      others standing rather than clearing all three at once.
+      ================================================================== --->
+<cfif StructCount(aliasPending) GT 0>
+  <div class="callout callout-warning">
+    <h5><i class="fas fa-exclamation-triangle"></i> Ranges changed and have not been applied</h5>
+    <p>
+      These aliases mean something different from what the pages below currently
+      have. Nothing changes on those pages until you apply on each one.
+    </p>
+    <cfoutput>
+      <cfloop collection="#aliasPending#" item="onePendingName">
+        <p class="mb-1">
+          <strong>#EncodeForHTML(onePendingName)#</strong>
+          <cfif IsDate(aliasPending[onePendingName].changed)>
+            <small class="text-muted">changed #DateFormat(aliasPending[onePendingName].changed, "yyyy-mm-dd")# #TimeFormat(aliasPending[onePendingName].changed, "HH:mm")#</small>
+          </cfif>
+        </p>
+        <ul class="mb-2">
+          <cfloop array="#aliasPending[onePendingName].pages#" index="onePendingPage">
+            <li><a href="#onePendingPage.page#">#EncodeForHTML(onePendingPage.text)#</a></li>
+          </cfloop>
+        </ul>
+      </cfloop>
+    </cfoutput>
+    <p class="mb-0">
+      <small class="text-muted">
+        A page drops off this list once its configuration has been regenerated with
+        the current ranges.
+      </small>
+    </p>
+  </div>
+</cfif>
 
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">

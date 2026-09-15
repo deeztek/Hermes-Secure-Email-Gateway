@@ -218,7 +218,41 @@ ALTER TABLE `intrusion_prevention_whitelist`
   MODIFY `ip_cidr` varchar(128) NOT NULL;
 
 -- ---------------------------------------------------------------------
--- 6. Version stamp -- MUST be the last statement (advances build_no so
+-- 6. Un-applied alias changes (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same column and same table on the DDL
+--
+-- Nothing applies an alias by itself. When its ranges move, every consumer's
+-- rendered file is stale until an operator applies on that page. Until now the
+-- only signals were a one-shot email from the resolver and an inline message on
+-- the alias page, both of which are gone by the next page load. These two
+-- pieces let the console say, persistently, that an alias changed and has not
+-- been applied yet, and name the pages that still need it.
+--
+-- ranges_changed_at is stamped whenever the range set changes, by the resolver
+-- or by hand. network_alias_applied records when each CONSUMER last rendered
+-- that alias. Pending is simply applied_at missing or older than
+-- ranges_changed_at.
+--
+-- Per consumer rather than per alias: an alias can be referenced by all three,
+-- each applied separately, so a single stamp on the alias would clear the
+-- warning for pages that are still stale.
+--
+-- Both are runtime state, not configuration. Nothing seeds the table, and a
+-- missing row means never applied, which is the correct reading on an install
+-- that has just gained the feature.
+-- ---------------------------------------------------------------------
+ALTER TABLE `network_aliases`
+  ADD COLUMN IF NOT EXISTS `ranges_changed_at` datetime(6) DEFAULT NULL;
+
+CREATE TABLE IF NOT EXISTS `network_alias_applied` (
+  `alias_id` int(11) NOT NULL,
+  `consumer` varchar(32) NOT NULL,
+  `applied_at` datetime(6) NOT NULL DEFAULT current_timestamp(6),
+  PRIMARY KEY (`alias_id`,`consumer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ---------------------------------------------------------------------
+-- 7. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

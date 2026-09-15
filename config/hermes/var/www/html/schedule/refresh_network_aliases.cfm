@@ -403,6 +403,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfloop>
 
   <cfif ArrayLen(addedRanges) OR ArrayLen(removedRanges)>
+    <!--- Stamp the change so the console can keep saying "not applied yet" long
+         after this mail has been read and forgotten. The mail is a one-shot;
+         network_alias_applied is the thing that persists. --->
+    <cfquery name="stampChanged" datasource="hermes">
+      UPDATE network_aliases SET ranges_changed_at = NOW(6)
+      WHERE id = <cfqueryparam value="#thisId#" cfsqltype="cf_sql_integer">
+    </cfquery>
     <cfset ArrayAppend(changedAliases, {
       name      = thisName,
       added     = addedRanges,

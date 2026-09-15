@@ -243,6 +243,45 @@ Usage: <cfinclude template="system_alerts.cfm">
      Two separate conditions, deliberately. A resolve that has been failing for a
      week must not first become visible at the moment the ranges finally matter.
      ============================================================================ --->
+<!--- Alias ranges that changed and have not been applied on every page that
+     references them. This is the load-bearing signal: nothing applies itself,
+     the resolver's email is a one-shot, and the alias page's own callout is only
+     seen by someone already on that page. Counted per alias rather than per
+     consumer, because the operator thinks in aliases and the page lists the
+     specific pages still to apply. --->
+<cfquery name="_alertAliasPending" datasource="hermes">
+    SELECT COUNT(DISTINCT a.id) AS c
+    FROM network_aliases a
+    JOIN (
+      SELECT a1.name AS alias_name, 'Relay Networks' AS consumer
+        FROM parameters p JOIN network_aliases a1 ON a1.name = p.parameter
+       WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
+       GROUP BY a1.name
+      UNION ALL
+      SELECT a2.name, 'Network Block-Allow'
+        FROM postscreen_access s JOIN network_aliases a2 ON a2.name = s.sender
+       WHERE s.entry_type = 'alias'
+       GROUP BY a2.name
+      UNION ALL
+      SELECT a3.name, 'Intrusion Prevention'
+        FROM intrusion_prevention_whitelist w JOIN network_aliases a3 ON a3.name = w.ip_cidr
+       WHERE w.entry_type = 'alias'
+       GROUP BY a3.name
+    ) c ON c.alias_name = a.name
+    LEFT JOIN network_alias_applied ap ON ap.alias_id = a.id AND ap.consumer = c.consumer
+    WHERE a.ranges_changed_at IS NOT NULL
+      AND (ap.applied_at IS NULL OR ap.applied_at < a.ranges_changed_at)
+</cfquery>
+<cfif _alertAliasPending.c GT 0>
+    <cfset ArrayAppend(systemAlerts, {
+        type: "warning",
+        icon: "fas fa-triangle-exclamation",
+        label: "Alias not applied",
+        title: "#_alertAliasPending.c# network alias(es) changed and have not been applied everywhere they are used. <a href='view_network_aliases.cfm' class='alert-link'>Review</a>",
+        priority: 5
+    })>
+</cfif>
+
 <cfquery name="_alertAliasFailed" datasource="hermes">
     SELECT COUNT(*) AS c FROM network_aliases
     WHERE enabled = 1 AND last_status IN ('failed', 'empty', 'no_resolver')

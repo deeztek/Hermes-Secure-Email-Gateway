@@ -1172,6 +1172,24 @@ INSERT IGNORE INTO `msg_content_type` VALUES (10,'C','Clean',1,1);
 INSERT IGNORE INTO `msg_content_type` VALUES (11,'s','Spam Tagged(OLD)',1,1);
 INSERT IGNORE INTO `msg_content_type` VALUES (12,'Y','Spam Tagged',1,1);
 
+-- -------- network_alias_applied               [truncate] --------
+-- When each consumer last rendered a given alias, so the console can say an
+-- alias changed and has not been applied yet.
+--
+-- Per consumer, not per alias: an alias can be referenced by all three, each of
+-- which is applied separately, so "applied" is only ever true of one consumer at
+-- a time. A single stamp on the alias would clear the warning for pages that
+-- are still stale.
+--
+-- Runtime state, not configuration. Nothing seeds it and a missing row simply
+-- means never applied, which is the correct reading on a fresh install.
+CREATE TABLE IF NOT EXISTS `network_alias_applied` (
+  `alias_id` int(11) NOT NULL,
+  `consumer` varchar(32) NOT NULL,
+  `applied_at` datetime(6) NOT NULL DEFAULT current_timestamp(6),
+  PRIMARY KEY (`alias_id`,`consumer`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- network_alias_entries                [truncate] --------
 CREATE TABLE IF NOT EXISTS `network_alias_entries` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1194,6 +1212,9 @@ CREATE TABLE IF NOT EXISTS `network_aliases` (
   `source_type` varchar(16) NOT NULL DEFAULT 'static',
   `source_value` varchar(255) DEFAULT NULL,
   `enabled` tinyint(3) NOT NULL DEFAULT 1,
+  -- Stamped whenever the range set changes, by the resolver or by hand. Compared
+  -- against network_alias_applied to find work the operator still has to apply.
+  `ranges_changed_at` datetime(6) DEFAULT NULL,
   `last_resolved` datetime DEFAULT NULL,
   `last_status` varchar(32) DEFAULT NULL,
   `last_message` varchar(512) DEFAULT NULL,

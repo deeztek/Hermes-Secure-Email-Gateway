@@ -84,6 +84,12 @@ bantime = #getJails.bantime#
 
     <cfset ipSyncSuccess = true>
 
+    <!--- jail.local now reflects whatever the aliases currently mean, so this
+         page is caught up. Success path only: stamping after a failed write
+         would clear a warning while the file on disk is still stale. --->
+    <cfset aliasStampConsumer = "Intrusion Prevention">
+    <cfinclude template="alias_stamp_applied.cfm">
+
 <cfcatch type="any">
     <cfset ipSyncError = cfcatch.message & " | Detail: " & cfcatch.detail & " | Type: " & cfcatch.type>
     <!--- Log the error --->

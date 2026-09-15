@@ -106,3 +106,54 @@ GROUP BY a.name
   </cfquery>
 </cfif>
 
+<!---
+  Alias changes that have not been applied yet.
+
+  An alias is pending on a consumer when its ranges moved after that consumer
+  last rendered it. ranges_changed_at is stamped by every path that changes
+  ranges; network_alias_applied is stamped by each generator when it writes its
+  file. A missing applied row means never applied, which is why the join is a
+  LEFT JOIN.
+
+  Scoped to consumers that actually reference the alias, so an alias nobody uses
+  never nags. Nothing here applies anything: this is the persistent version of
+  what the resolver says once by email.
+--->
+<cfquery name="get_alias_pending" datasource="hermes">
+SELECT a.name AS alias_name, a.ranges_changed_at, c.consumer, c.page
+FROM network_aliases a
+JOIN (
+  SELECT a1.name AS alias_name, 'Relay Networks' AS consumer, 'view_relay_networks.cfm' AS page
+    FROM parameters p JOIN network_aliases a1 ON a1.name = p.parameter
+   WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
+   GROUP BY a1.name
+  UNION ALL
+  SELECT a2.name, 'Network Block-Allow', 'view_network_block_allow.cfm'
+    FROM postscreen_access s JOIN network_aliases a2 ON a2.name = s.sender
+   WHERE s.entry_type = 'alias'
+   GROUP BY a2.name
+  UNION ALL
+  SELECT a3.name, 'Intrusion Prevention', 'view_intrusion_prevention.cfm'
+    FROM intrusion_prevention_whitelist w JOIN network_aliases a3 ON a3.name = w.ip_cidr
+   WHERE w.entry_type = 'alias'
+   GROUP BY a3.name
+) c ON c.alias_name = a.name
+LEFT JOIN network_alias_applied ap ON ap.alias_id = a.id AND ap.consumer = c.consumer
+WHERE a.ranges_changed_at IS NOT NULL
+  AND (ap.applied_at IS NULL OR ap.applied_at < a.ranges_changed_at)
+ORDER BY a.name ASC, c.consumer ASC
+</cfquery>
+
+<cfset aliasPending = StructNew()>
+<cfloop query="get_alias_pending">
+  <cfif NOT StructKeyExists(aliasPending, get_alias_pending.alias_name)>
+    <cfset aliasPending[get_alias_pending.alias_name] = {
+      changed = get_alias_pending.ranges_changed_at,
+      pages   = []
+    }>
+  </cfif>
+  <cfset ArrayAppend(aliasPending[get_alias_pending.alias_name].pages, {
+    text = get_alias_pending.consumer,
+    page = get_alias_pending.page
+  })>
+</cfloop>

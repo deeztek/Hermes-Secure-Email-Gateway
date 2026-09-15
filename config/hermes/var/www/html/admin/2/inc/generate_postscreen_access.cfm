@@ -54,3 +54,8 @@ and reloads Postfix so the new CIDR table takes effect immediately.
 <cfexecute name="/usr/local/bin/docker"
   arguments="exec hermes_postfix_dkim /usr/sbin/postfix reload"
   timeout="30" />
+
+<!--- The .cidr now reflects whatever the aliases currently mean, so this page is
+     caught up. See inc/alias_stamp_applied.cfm. --->
+<cfset aliasStampConsumer = "Network Block-Allow">
+<cfinclude template="alias_stamp_applied.cfm">

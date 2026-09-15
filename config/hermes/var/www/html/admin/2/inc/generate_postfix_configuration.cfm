@@ -385,3 +385,7 @@ timeout = "240">
 </cfcatch>
 </cftry>
 
+<!--- main.cf and /etc/amavis/mynetworks now reflect whatever the aliases
+     currently mean, so Relay Networks is caught up. --->
+<cfset aliasStampConsumer = "Relay Networks">
+<cfinclude template="alias_stamp_applied.cfm">
