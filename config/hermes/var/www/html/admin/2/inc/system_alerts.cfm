@@ -277,7 +277,7 @@ Usage: <cfinclude template="system_alerts.cfm">
         type: "warning",
         icon: "fas fa-triangle-exclamation",
         label: "Alias not applied",
-        title: "#_alertAliasPending.c# network alias(es) changed and have not been applied everywhere they are used. <a href='view_network_aliases.cfm' class='alert-link'>Review</a>",
+        title: "#_alertAliasPending.c# network alias(es) changed but one or more pages that use them failed to regenerate. <a href='view_network_aliases.cfm' class='alert-link'>Review</a>",
         priority: 5
     })>
 </cfif>

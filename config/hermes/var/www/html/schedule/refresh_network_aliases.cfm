@@ -410,11 +410,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       UPDATE network_aliases SET ranges_changed_at = NOW(6)
       WHERE id = <cfqueryparam value="#thisId#" cfsqltype="cf_sql_integer">
     </cfquery>
+    <!--- Apply the consumers that reference this alias, each independently.
+         Scoped to the alias that actually changed, so a run where one of
+         several aliases moved does not regenerate the others' files. --->
+    <cfset aliasApplyId = thisId>
+    <cfinclude template="../admin/2/inc/alias_apply_consumers.cfm">
+
     <cfset ArrayAppend(changedAliases, {
       name      = thisName,
       added     = addedRanges,
       removed   = removedRanges,
-      consumers = aliasConsumers(thisName)
+      consumers = aliasConsumers(thisName),
+      applied   = aliasApplyResults
     })>
     <cflog file="hermes" type="information"
            text="refresh_network_aliases: #thisName# changed -- #ArrayLen(addedRanges)# added, #ArrayLen(removedRanges)# removed">
@@ -449,9 +456,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               type="html">
         <h3>Network alias ranges changed</h3>
         <p>
-          <strong>Nothing has been applied.</strong> No configuration was regenerated and
-          mail flow is unchanged. Each alias below lists the pages that use it: open each
-          one and click its Apply button to put the new ranges into effect.
+          The pages that use each alias were regenerated automatically, so the new
+          ranges are already in effect. This is a record of what changed, not a
+          list of work for you.
+        </p>
+        <p>
+          Anything that failed to apply is marked below and stays flagged on the
+          Network Aliases page and the dashboard until it has been applied.
         </p>
         <cfif ArrayLen(changedAliases)>
           <cfloop array="#changedAliases#" index="oneChange">
@@ -464,10 +475,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <p>No longer published:</p>
               <ul><cfloop array="#oneChange.removed#" index="r"><li><cfoutput>#EncodeForHTML(r)#</cfoutput></li></cfloop></ul>
             </cfif>
-            <cfif Len(Trim(oneChange.consumers))>
-              <p><strong>Apply on:</strong> <cfoutput>#EncodeForHTML(oneChange.consumers)#</cfoutput></p>
+            <cfif ArrayLen(oneChange.applied)>
+              <p><strong>Applied:</strong></p>
+              <ul>
+                <cfloop array="#oneChange.applied#" index="oneApply">
+                  <li>
+                    <cfoutput>#EncodeForHTML(oneApply.consumer)#</cfoutput>
+                    <cfif oneApply.ok>
+                      &mdash; ok
+                    <cfelse>
+                      &mdash; <strong>FAILED</strong><cfif Len(Trim(oneApply.error))>: <cfoutput>#EncodeForHTML(oneApply.error)#</cfoutput></cfif>
+                    </cfif>
+                  </li>
+                </cfloop>
+              </ul>
             <cfelse>
-              <p><em>Nothing uses this alias yet, so there is nothing to apply.</em></p>
+              <p><em>Nothing uses this alias yet, so there was nothing to apply.</em></p>
             </cfif>
           </cfloop>
         </cfif>

@@ -99,19 +99,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfquery>
 </cffunction>
 
-<cffunction name="aliasNameOf" returntype="string" output="false">
-  <cfargument name="aliasId" type="numeric" required="true">
-  <cfset var q = "">
-  <cfquery name="q" datasource="hermes">
-    SELECT name FROM network_aliases
-    WHERE id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
-  </cfquery>
-  <cfif q.recordcount GTE 1>
-    <cfreturn q.name>
-  </cfif>
-  <cfreturn "">
-</cffunction>
-
 <cffunction name="normalizeCidr" returntype="string" output="false">
   <cfargument name="value" type="string" required="true">
   <cfset var v = Trim(arguments.value)>
@@ -495,8 +482,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfif addedCount GT 0>
     <cfset stampRangesChanged(theId)>
+    <cfset aliasApplyId = theId>
+    <cfinclude template="./inc/alias_apply_consumers.cfm">
+    <cfset session.alias_apply_results = aliasApplyResults>
   </cfif>
-  <cfset session.alias_touched = aliasNameOf(theId)>
   <cfif badCount GT 0>
     <cfset session.m = 67>
   <cfelse>
@@ -518,7 +507,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
   </cfquery>
   <cfset stampRangesChanged(theId)>
-  <cfset session.alias_touched = aliasNameOf(theId)>
+  <cfset aliasApplyId = theId>
+  <cfinclude template="./inc/alias_apply_consumers.cfm">
+  <cfset session.alias_apply_results = aliasApplyResults>
   <cfset session.m = 69>
   <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
 </cfif>
@@ -695,11 +686,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </li>
   </ul>
   <p class="mb-0">
-    The <strong>Used by</strong> column shows where each alias is referenced. Nothing is
-    applied on its own: when an alias moves, you apply it on the pages listed there, so
-    mail flow never changes without you. The alias name is never written to a
-    configuration file. It is replaced with the alias's current ranges each time the file
-    is generated, so the ranges in use are always the ones shown here.
+    The <strong>Used by</strong> column shows where each alias is referenced. When an
+    alias's ranges change, those pages are regenerated for you, so the ranges in use stay
+    the ones shown here without anyone retyping them. If one of them fails to regenerate
+    it is listed below as not applied, and stays listed until it succeeds. The alias name
+    itself is never written to a configuration file; it is replaced with the current
+    ranges each time the file is generated.
   </p>
 </div>
 
@@ -718,8 +710,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="callout callout-warning">
     <h5><i class="fas fa-exclamation-triangle"></i> Ranges changed and have not been applied</h5>
     <p>
-      These aliases mean something different from what the pages below currently
-      have. Nothing changes on those pages until you apply on each one.
+      These pages should have been regenerated automatically when the ranges changed
+      and were not, so what they have is out of date. Open each one and use its own
+      Apply. Check the system log if it keeps coming back.
     </p>
     <cfoutput>
       <cfloop collection="#aliasPending#" item="onePendingName">
