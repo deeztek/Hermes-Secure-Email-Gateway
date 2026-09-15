@@ -39,6 +39,11 @@ Public endpoint (no Authelia login required).
     SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'
 </cfquery>
 
+<cfif getportal.recordcount LT 1 OR Trim(getportal.value2) EQ "">
+    <div class="card"><div class="card-header"><h2>Block Unavailable</h2></div><div class="card-body"><p>The quarantine portal host is not configured.</p></div></div>
+    <cfabort>
+</cfif>
+
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id,
            ma_rcpt.email AS recipient_email,
@@ -128,7 +133,7 @@ Public endpoint (no Authelia login required).
     <div class="card-body">
         <p><cfoutput>#encodeForHTML(blockMessage)#</cfoutput></p>
         <p><cfoutput><strong>Recipient:</strong> #encodeForHTML(getmsg.recipient_email)#<br><strong>Sender:</strong> #encodeForHTML(getmsg.from_email)#<br><strong>Subject:</strong> #encodeForHTML(getmsg.subject)#</cfoutput></p>
-        <div class="actions"><cfoutput><a href="https://#encodeForHTMLAttribute(getportal.value2)#/users/2/view_sender_filters.cfm">Manage Sender Filters</a></cfoutput></div>
+        <div class="actions"><cfoutput><a href="https://#encodeForHTMLAttribute(Trim(getportal.value2))#/users/2/view_sender_filters.cfm">Manage Sender Filters</a></cfoutput></div>
     </div>
 </div>
 </body>
