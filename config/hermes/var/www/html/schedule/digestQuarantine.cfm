@@ -229,6 +229,7 @@ arraySort(recipientKeys, "textnocase");
     <cfset recipientRid = recipientData.rid>
     <cfset messageList = recipientData.messages>
     <cfset messageCount = arrayLen(messageList)>
+    <cfset recipientMailIds = []>
 
     <cfset sendEmptyDigest = (reportEnabled EQ "ALL")>
     <cfif messageCount EQ 0 AND NOT sendEmptyDigest>
@@ -237,6 +238,12 @@ arraySort(recipientKeys, "textnocase");
             <cfoutput>#encodeForHTML(recipientEmail)#: skipped (no quarantined messages)<br></cfoutput>
         </cfif>
         <cfcontinue>
+    </cfif>
+
+    <cfif messageCount GT 0>
+        <cfloop array="#messageList#" index="messageItem">
+            <cfset arrayAppend(recipientMailIds, messageItem.mail_id)>
+        </cfloop>
     </cfif>
 
     <cfsavecontent variable="digestBodyHtml"><cfoutput>
@@ -317,33 +324,27 @@ arraySort(recipientKeys, "textnocase");
         </cfmail>
 
         <cfif messageCount GT 0>
-            <cfloop array="#messageList#" index="messageItem">
-                <cfquery datasource="hermes">
-                    INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
-                    VALUES (
-                        <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
-                        <cfqueryparam value="#messageItem.mail_id#" cfsqltype="cf_sql_varchar">,
-                        'S',
-                        NOW(),
-                        NOW()
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        status = 'S',
-                        last_attempt_at = NOW(),
-                        delivered_at = NOW()
-                </cfquery>
-            </cfloop>
+            <cfquery datasource="hermes">
+                INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
+                SELECT <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
+                       CAST(mail_id AS CHAR(255)),
+                       'S',
+                       NOW(),
+                       NOW()
+                FROM msgs
+                WHERE mail_id IN (<cfqueryparam value="#arrayToList(recipientMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
+                ON DUPLICATE KEY UPDATE
+                    status = 'S',
+                    last_attempt_at = NOW(),
+                    delivered_at = NOW()
+            </cfquery>
 
             <cfif digestDisableIndividual EQ "1">
-                <cfset deliveredMailIds = []>
-                <cfloop array="#messageList#" index="messageItem">
-                    <cfset arrayAppend(deliveredMailIds, messageItem.mail_id)>
-                </cfloop>
                 <cfquery datasource="hermes">
                     UPDATE msgrcpt
                     SET notification_sent = 2
                     WHERE rid = <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">
-                      AND mail_id IN (<cfqueryparam value="#arrayToList(deliveredMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
+                      AND mail_id IN (<cfqueryparam value="#arrayToList(recipientMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
                 </cfquery>
             </cfif>
         </cfif>
@@ -355,22 +356,20 @@ arraySort(recipientKeys, "textnocase");
     <cfcatch type="any">
         <cfset errorCount = errorCount + 1>
         <cfif messageCount GT 0>
-            <cfloop array="#messageList#" index="messageItem">
-                <cfquery datasource="hermes">
-                    INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
-                    VALUES (
-                        <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
-                        <cfqueryparam value="#messageItem.mail_id#" cfsqltype="cf_sql_varchar">,
-                        'F',
-                        NOW(),
-                        NULL
-                    )
-                    ON DUPLICATE KEY UPDATE
-                        status = 'F',
-                        last_attempt_at = NOW(),
-                        delivered_at = NULL
-                </cfquery>
-            </cfloop>
+            <cfquery datasource="hermes">
+                INSERT INTO quarantine_digest_deliveries (rid, mail_id, status, last_attempt_at, delivered_at)
+                SELECT <cfqueryparam value="#recipientRid#" cfsqltype="cf_sql_integer">,
+                       CAST(mail_id AS CHAR(255)),
+                       'F',
+                       NOW(),
+                       NULL
+                FROM msgs
+                WHERE mail_id IN (<cfqueryparam value="#arrayToList(recipientMailIds)#" cfsqltype="cf_sql_varchar" list="true">)
+                ON DUPLICATE KEY UPDATE
+                    status = 'F',
+                    last_attempt_at = NOW(),
+                    delivered_at = NULL
+            </cfquery>
         </cfif>
         <cfoutput>#encodeForHTML(recipientEmail)#: ERROR sending digest - #encodeForHTML(cfcatch.message)#<br></cfoutput>
     </cfcatch>

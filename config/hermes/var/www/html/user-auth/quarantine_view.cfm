@@ -80,14 +80,9 @@ Public endpoint (no Authelia login required).
 <cfset popAccount = createObject("component", "cfc.pop4.pop").init()>
 <cfset message = popAccount.loadFromFile(quarFile)>
 <cfset safeBody = Trim(message.textbody)>
-<cfset renderedHtmlBody = "">
+<cfset htmlOnlyBody = "">
 <cfif safeBody EQ "" AND Len(Trim(message.htmlbody))>
-    <cfset sanitizedHtmlBody = Trim(message.htmlbody)>
-    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<!--.*?-->", "", "all")>
-    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<\\s*(script|iframe|object|embed|form|input|button|select|option|textarea|svg|math|meta|base|link|img)\\b[^>]*>(.*?)<\\s*/\\s*\\1\\s*>", "", "all")>
-    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<\\s*(script|iframe|object|embed|form|input|button|select|option|textarea|svg|math|meta|base|link|img)\\b[^>]*\\/?>", "", "all")>
-    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "\\s(on\\w+|href|src|srcset|action|formaction|target)\\s*=\\s*(""[^""]*""|'[^']*'|[^\\s>]+)", "", "all")>
-    <cfset renderedHtmlBody = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src ''none''; style-src ''unsafe-inline''; font-src data:; frame-ancestors ''none''; form-action ''none''; base-uri ''none'';"><style>body{font-family:Arial,Helvetica,sans-serif;color:#333;padding:16px;word-break:break-word;} table{max-width:100%;} a{pointer-events:none;color:inherit;text-decoration:none;}</style></head><body>' & sanitizedHtmlBody & '</body></html>'>
+    <cfset htmlOnlyBody = Trim(message.htmlbody)>
 <cfelseif safeBody EQ "">
     <cfset safeBody = "This quarantined message does not contain a displayable message body.">
 </cfif>
@@ -115,8 +110,9 @@ Public endpoint (no Authelia login required).
             </cfoutput>
         </div>
         <h3>Message Body</h3>
-        <cfif renderedHtmlBody NEQ "">
-            <cfoutput><iframe title="Quarantined message HTML body" sandbox="" style="width:100%; min-height:480px; border:1px solid ##e5e7eb; border-radius:8px; background:##fff;" srcdoc="#encodeForHTMLAttribute(renderedHtmlBody)#"></iframe></cfoutput>
+        <cfif htmlOnlyBody NEQ "">
+            <p style="color:#6b7280;">This message only contains HTML. The HTML source is shown below for safety.</p>
+            <pre><cfoutput>#encodeForHTML(htmlOnlyBody)#</cfoutput></pre>
         <cfelse>
             <pre><cfoutput>#encodeForHTML(safeBody)#</cfoutput></pre>
         </cfif>

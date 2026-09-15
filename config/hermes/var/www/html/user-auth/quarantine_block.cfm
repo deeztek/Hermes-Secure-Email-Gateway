@@ -67,14 +67,31 @@ Public endpoint (no Authelia login required).
     <cfabort>
 </cfif>
 
-<cfquery datasource="hermes">
-    INSERT INTO mailaddr (email)
-    VALUES (<cfqueryparam value="#getmsg.from_email#" cfsqltype="cf_sql_varchar">)
-    ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+<cfquery name="getSenderAddress" datasource="hermes">
+    SELECT CAST(ma.email AS CHAR(255)) AS sender_email,
+           wa.id AS mailaddr_id
+    FROM msgs m
+    INNER JOIN maddr ma ON ma.id = m.sid
+    LEFT JOIN mailaddr wa ON wa.email = CAST(ma.email AS CHAR(255))
+    WHERE m.mail_id = <cfqueryparam value="#tokenResult.mailId#" cfsqltype="cf_sql_varchar">
+      AND m.secret_id = <cfqueryparam value="#tokenResult.secretId#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
+<cfif getSenderAddress.recordcount LT 1 OR Trim(getSenderAddress.sender_email) EQ "">
+    <div class="card"><div class="card-header"><h2>Block Failed</h2></div><div class="card-body"><p>The message sender could not be resolved.</p></div></div>
+    <cfabort>
+</cfif>
+
+<cfif NOT Len(Trim(getSenderAddress.mailaddr_id))>
+<cfquery datasource="hermes">
+    INSERT INTO mailaddr (email)
+    VALUES (<cfqueryparam value="#getSenderAddress.sender_email#" cfsqltype="cf_sql_varchar">)
+    ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)
+</cfquery>
+</cfif>
+
 <cfquery name="getMailaddr" datasource="hermes">
-    SELECT id FROM mailaddr WHERE email = <cfqueryparam value="#getmsg.from_email#" cfsqltype="cf_sql_varchar">
+    SELECT id FROM mailaddr WHERE email = <cfqueryparam value="#getSenderAddress.sender_email#" cfsqltype="cf_sql_varchar">
 </cfquery>
 
 <cfset senderMailaddrId = getMailaddr.id>
