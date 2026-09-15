@@ -51,35 +51,35 @@ function shouldRunDigest(required string frequency, any lastRunValue, boolean fo
 function getTemplateConfig(required string templateName) {
     var templateKey = lCase(trim(arguments.templateName));
     var cfg = {
-        bodyBg: "#f4f6f9",
-        headerBg: "#f97316",
-        accentBg: "#fff7ed",
-        accentBorder: "#fdba74",
-        buttonBg: "#f97316",
+        bodyBg: "##f4f6f9",
+        headerBg: "##f97316",
+        accentBg: "##fff7ed",
+        accentBorder: "##fdba74",
+        buttonBg: "##f97316",
         cardRadius: "12px",
-        tableHeaderBg: "#fff7ed",
+        tableHeaderBg: "##fff7ed",
         heading: "Quarantine Digest"
     };
 
     switch (templateKey) {
         case "classic":
-            cfg.bodyBg = "#f8fafc";
-            cfg.headerBg = "#1d4ed8";
-            cfg.accentBg = "#eff6ff";
-            cfg.accentBorder = "#93c5fd";
-            cfg.buttonBg = "#2563eb";
+            cfg.bodyBg = "##f8fafc";
+            cfg.headerBg = "##1d4ed8";
+            cfg.accentBg = "##eff6ff";
+            cfg.accentBorder = "##93c5fd";
+            cfg.buttonBg = "##2563eb";
             cfg.cardRadius = "6px";
-            cfg.tableHeaderBg = "#dbeafe";
+            cfg.tableHeaderBg = "##dbeafe";
             cfg.heading = "Classic Quarantine Digest";
             break;
         case "compact":
-            cfg.bodyBg = "#f3f4f6";
-            cfg.headerBg = "#111827";
-            cfg.accentBg = "#f9fafb";
-            cfg.accentBorder = "#d1d5db";
-            cfg.buttonBg = "#374151";
+            cfg.bodyBg = "##f3f4f6";
+            cfg.headerBg = "##111827";
+            cfg.accentBg = "##f9fafb";
+            cfg.accentBorder = "##d1d5db";
+            cfg.buttonBg = "##374151";
             cfg.cardRadius = "10px";
-            cfg.tableHeaderBg = "#e5e7eb";
+            cfg.tableHeaderBg = "##e5e7eb";
             cfg.heading = "Compact Quarantine Digest";
             break;
     }
