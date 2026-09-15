@@ -193,6 +193,13 @@ ORDER BY a.name ASC
     <p>Entry updated and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
+<cfif m is 31>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    <p>A network alias cannot be edited here. Change its ranges on the Network Aliases page, or delete the reference.</p>
+  </div>
+</cfif>
 <cfif m is 30>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -337,7 +344,10 @@ ORDER BY a.name ASC
             <tr>
               <td><input type="checkbox" class="row-checkbox" value="#id#"></td>
               <td>
-                <cfif StructKeyExists(variables, "aliasExpansion") AND note is "Network alias">
+                <!--- entry_type is the marker the generator keys on. The note is
+                     user-editable, so keying the display off it would make a row stop
+                     rendering as an alias the moment someone retyped the note. --->
+                <cfif entry_type is "alias">
                   <strong>#encodeForHTML(sender)#</strong>
                   <span class="badge bg-primary ms-1">Alias</span>
                   <cfif StructKeyExists(aliasExpansion, sender) AND Len(Trim(aliasExpansion[sender]))>
@@ -358,9 +368,14 @@ ORDER BY a.name ASC
                 </cfif>
               </td>
               <td>
-                <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(sender)#', '#encodeForJavaScript(action)#', '#encodeForJavaScript(note)#');" title="Edit">
-                  <i class="fas fa-edit"></i>
-                </button>
+                <!--- No Edit on an alias row: the cell holds the alias NAME, so editing
+                     it could only break the reference or turn it into a literal that no
+                     longer tracks the alias. Ranges change on the Network Aliases page. --->
+                <cfif entry_type is not "alias">
+                  <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#encodeForJavaScript(sender)#', '#encodeForJavaScript(action)#', '#encodeForJavaScript(note)#');" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                </cfif>
                 <button type="button" class="btn btn-sm btn-danger" onclick="deleteSingle('#id#', '#encodeForJavaScript(sender)#');" title="Delete">
                   <i class="fas fa-trash"></i>
                 </button>

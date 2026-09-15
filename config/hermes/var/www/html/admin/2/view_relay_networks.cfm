@@ -298,6 +298,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cflocation url="view_relay_networks.cfm" addtoken="no">
   </cfif>
 
+  <!--- Alias rows are not editable. The button is hidden on them, so reaching
+       here means a hand-made POST. Refuse rather than let the alias name be
+       overwritten. --->
+  <cfquery name="check_edit_is_alias" datasource="hermes">
+    SELECT id FROM parameters
+    WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+      AND parent_name = 'mynetworks'
+      AND network_entry = '2'
+  </cfquery>
+  <cfif check_edit_is_alias.recordcount GTE 1>
+    <cfset session.m = 36>
+    <cflocation url="view_relay_networks.cfm" addtoken="no">
+  </cfif>
+
   <cfset editAddress = trim(form.edit_parameter)>
   <cfset editNote = StructKeyExists(form, "edit_note") ? trim(form.edit_note) : editAddress>
 
@@ -528,6 +542,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <!--- ERROR MESSAGES START HERE --->
+
+<cfif m is "36">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> Oops!</h4>
+    <cfoutput>A network alias cannot be edited here. Change its ranges on the Network Aliases page, or delete the reference.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
 
 <cfif m is "35">
   <div class="alert alert-danger alert-dismissible">
@@ -942,9 +965,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <td>#encodeForHTML(note)#</td>
                 <td><cfif network_entry is "2"><span class="badge bg-primary">Alias</span><cfelseif network_entry is "1"><span class="badge bg-info">Network</span><cfelse><span class="badge bg-secondary">IP</span></cfif></td>
                 <td>
-                  <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#JSStringFormat(parameter)#', '#JSStringFormat(note)#');" title="Edit">
-                    <i class="fas fa-edit"></i>
-                  </button>
+                  <!--- No Edit on an alias row. The cell holds the alias NAME, and
+                       editing it could only rename the reference into something that
+                       resolves to nothing, or turn it into a literal address that no
+                       longer tracks the alias. Ranges are changed on the Network
+                       Aliases page; here you either reference the alias or you do
+                       not, so Delete is the only action that makes sense. --->
+                  <cfif network_entry is not "2">
+                    <button type="button" class="btn btn-sm btn-primary" onclick="openEditModal('#id#', '#JSStringFormat(parameter)#', '#JSStringFormat(note)#');" title="Edit">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                  </cfif>
                   <button type="button" class="btn btn-sm btn-danger" onclick="deleteSingle('#id#', '#JSStringFormat(parameter)#');" title="Delete">
                     <i class="fas fa-trash"></i>
                   </button>

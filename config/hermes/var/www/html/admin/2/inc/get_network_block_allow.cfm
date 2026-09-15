@@ -4,7 +4,7 @@ Queries the postscreen_access table for active IP/network overrides.
 --->
 
 <cfquery name="get_active_all" datasource="hermes">
-  SELECT id, sender, action, note
+  SELECT id, sender, action, note, entry_type
   FROM postscreen_access
   WHERE applied = '1' AND action2 = 'NONE'
   ORDER BY sender ASC
