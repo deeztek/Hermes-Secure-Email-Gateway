@@ -125,19 +125,29 @@ ORDER BY a.name ASC
     WHERE entry_type = 'alias' AND sender = <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">
   </cfquery>
 
-  <cfif chk_alias.recordcount GTE 1 AND chk_dupe.recordcount IS 0>
-    <cfquery datasource="hermes">
-      INSERT INTO postscreen_access (sender, action, action2, applied, note, entry_type)
-      VALUES (
-        <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">,
-        <cfqueryparam value="#theAct#" cfsqltype="cf_sql_varchar">,
-        'NONE', '1',
-        <cfqueryparam value="Network alias" cfsqltype="cf_sql_varchar">,
-        'alias'
-      )
-    </cfquery>
-    <cfinclude template="./inc/generate_postscreen_access.cfm">
+  <!--- Say why nothing happened. Redirecting with no message reads as a page
+       that ignored the click. --->
+  <cfif chk_alias.recordcount IS 0>
+    <cfset session.m = 32>
+    <cflocation url="view_network_block_allow.cfm" addtoken="no">
   </cfif>
+  <cfif chk_dupe.recordcount GTE 1>
+    <cfset session.m = 33>
+    <cflocation url="view_network_block_allow.cfm" addtoken="no">
+  </cfif>
+
+  <cfquery datasource="hermes">
+    INSERT INTO postscreen_access (sender, action, action2, applied, note, entry_type)
+    VALUES (
+      <cfqueryparam value="#theAlias#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#theAct#" cfsqltype="cf_sql_varchar">,
+      'NONE', '1',
+      <cfqueryparam value="Network alias" cfsqltype="cf_sql_varchar">,
+      'alias'
+    )
+  </cfquery>
+  <cfinclude template="./inc/generate_postscreen_access.cfm">
+  <cfset session.m = 34>
   <cflocation url="view_network_block_allow.cfm" addtoken="no">
 </cfif>
 
@@ -191,6 +201,27 @@ ORDER BY a.name ASC
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Entry Updated</h4>
     <p>Entry updated and Postfix configuration applied successfully.</p>
+  </div>
+</cfif>
+<cfif m is 32>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Error</h4>
+    <p>That network alias does not exist or is disabled. Enable it on the Network Aliases page first.</p>
+  </div>
+</cfif>
+<cfif m is 33>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Already Added</h4>
+    <p>That network alias is already in this list. An alias can only be referenced once here.</p>
+  </div>
+</cfif>
+<cfif m is 34>
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Alias Added</h4>
+    <p>Network alias added and Postfix configuration applied.</p>
   </div>
 </cfif>
 <cfif m is 31>

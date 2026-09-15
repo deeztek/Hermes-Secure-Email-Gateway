@@ -87,6 +87,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       where a malformed line is not rejected loudly, it just quietly fails to
       match. cfqueryparam covers injection; this covers correctness.
 --->
+<cffunction name="normalizeCidr" returntype="string" output="false">
+  <cfargument name="value" type="string" required="true">
+  <cfset var v = Trim(arguments.value)>
+  <cfif Find("/", v)>
+    <cfreturn v>
+  </cfif>
+  <cfif REFind("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$", v)>
+    <cfreturn v & "/32">
+  </cfif>
+  <cfif REFindNoCase("^[0-9a-f:]+$", v) AND Find(":", v)>
+    <cfreturn v & "/128">
+  </cfif>
+  <cfreturn v>
+</cffunction>
+
 <cffunction name="cidrFamily" returntype="string" output="false">
   <cfargument name="value" type="string" required="true">
   <cfset var v = Trim(arguments.value)>
@@ -96,8 +111,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset var octets = "">
   <cfset var i = 0>
 
+  <!--- A bare address is a host route, so supply the prefix rather than
+       rejecting it. Typing 8.8.8.8 and getting silence is not useful; /32 is
+       the only thing it could have meant. normalizeCidr() returns the value
+       that gets stored, so the table shows what Postfix will see. --->
   <cfif NOT Find("/", v)>
-    <cfreturn "">
+    <cfif REFind("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$", v)>
+      <cfset v = v & "/32">
+    <cfelseif REFindNoCase("^[0-9a-f:]+$", v) AND Find(":", v)>
+      <cfset v = v & "/128">
+    <cfelse>
+      <cfreturn "">
+    </cfif>
   </cfif>
   <cfset parts = ListToArray(v, "/")>
   <cfif ArrayLen(parts) NEQ 2>
@@ -266,6 +291,36 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cflocation url="view_network_aliases.cfm" addtoken="no">
   </cfif>
 
+  <!---
+    An alias in use can be neither disabled nor renamed, for the same reason it
+    cannot be deleted.
+
+    DISABLE: every consumer expands only `enabled = 1`, so disabling empties the
+    alias out of Relay Networks, the postscreen access list and fail2ban's
+    ignoreip the next time each of those files is written. Nothing warns anyone,
+    and the files do not change at the moment you disable, so the effect lands
+    later, at whatever unrelated save happens to regenerate them.
+
+    RENAME: consumers store the NAME, not the id. Renaming leaves three rows
+    pointing at a name that no longer exists, each of which expands to nothing.
+
+    Remove the references first. The Used by column says where they are.
+  --->
+  <cfquery name="current_alias" datasource="hermes">
+    SELECT name, enabled FROM network_aliases
+    WHERE id = <cfqueryparam value="#theId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfif current_alias.recordcount GTE 1 AND aliasReferenceCount(theId) GT 0>
+    <cfif theEnabled EQ 0 AND current_alias.enabled EQ 1>
+      <cfset session.m = 72>
+      <cflocation url="view_network_aliases.cfm" addtoken="no">
+    </cfif>
+    <cfif Compare(theName, current_alias.name) NEQ 0>
+      <cfset session.m = 73>
+      <cflocation url="view_network_aliases.cfm" addtoken="no">
+    </cfif>
+  </cfif>
+
   <cfquery name="update_alias" datasource="hermes">
     UPDATE network_aliases
     SET name = <cfqueryparam value="#theName#" cfsqltype="cf_sql_varchar">,
@@ -294,9 +349,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
   <!---
-    Guarded, not cascading. No consumer exists yet so this cannot currently
-    refuse, but the path is written now so adopting the first consumer does not
-    also mean revisiting delete. See #320 for the same shape on domain delete.
+    Guarded, not cascading: an alias with references cannot be deleted. Three
+    consumers count toward that, and edit_alias applies the same guard to
+    disabling and renaming. See #320 for the same shape on domain delete.
   --->
   <cfif aliasReferenceCount(theId) GT 0>
     <cfset session.m = 65>
@@ -394,6 +449,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfloop list="#rawEntries#" index="oneEntry" delimiters="#Chr(10)##Chr(13)#,">
     <cfset oneEntry = Trim(oneEntry)>
     <cfif oneEntry is not "">
+      <cfset oneEntry = normalizeCidr(oneEntry)>
       <cfset theFamily = cidrFamily(oneEntry)>
       <cfif theFamily is "">
         <cfset badCount = badCount + 1>
@@ -482,6 +538,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Alias updated.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "72">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> In use</h4>
+    <cfoutput>That alias cannot be disabled while it is referenced. Disabling it would quietly drop its ranges from every page that uses it, the next time each of those configuration files is written. Remove the references first; the <strong>Used by</strong> column shows where they are.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "73">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-ban"></i> In use</h4>
+    <cfoutput>That alias cannot be renamed while it is referenced. References are stored by name, so renaming would leave them pointing at an alias that no longer exists. Remove the references, rename, then add them back; the <strong>Used by</strong> column shows where they are.</cfoutput>
   </div>
   <cfset session.m = 0>
 </cfif>
