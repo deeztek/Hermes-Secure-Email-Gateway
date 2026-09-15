@@ -82,7 +82,12 @@ Public endpoint (no Authelia login required).
 <cfset safeBody = Trim(message.textbody)>
 <cfset renderedHtmlBody = "">
 <cfif safeBody EQ "" AND Len(Trim(message.htmlbody))>
-    <cfset renderedHtmlBody = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src ''none''; img-src data: cid:; style-src ''unsafe-inline''; font-src data:; frame-ancestors ''none''; form-action ''none''; base-uri ''none'';"><style>body{font-family:Arial,Helvetica,sans-serif;color:#333;padding:16px;word-break:break-word;} table{max-width:100%;} img{max-width:100%;height:auto;} a{pointer-events:none;color:inherit;text-decoration:none;}</style></head><body>' & message.htmlbody & '</body></html>'>
+    <cfset sanitizedHtmlBody = Trim(message.htmlbody)>
+    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<!--.*?-->", "", "all")>
+    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<\\s*(script|iframe|object|embed|form|input|button|select|option|textarea|svg|math|meta|base|link|img)\\b[^>]*>(.*?)<\\s*/\\s*\\1\\s*>", "", "all")>
+    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "<\\s*(script|iframe|object|embed|form|input|button|select|option|textarea|svg|math|meta|base|link|img)\\b[^>]*\\/?>", "", "all")>
+    <cfset sanitizedHtmlBody = reReplaceNoCase(sanitizedHtmlBody, "\\s(on\\w+|href|src|srcset|action|formaction|target)\\s*=\\s*(""[^""]*""|'[^']*'|[^\\s>]+)", "", "all")>
+    <cfset renderedHtmlBody = '<!DOCTYPE html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src ''none''; style-src ''unsafe-inline''; font-src data:; frame-ancestors ''none''; form-action ''none''; base-uri ''none'';"><style>body{font-family:Arial,Helvetica,sans-serif;color:#333;padding:16px;word-break:break-word;} table{max-width:100%;} a{pointer-events:none;color:inherit;text-decoration:none;}</style></head><body>' & sanitizedHtmlBody & '</body></html>'>
 <cfelseif safeBody EQ "">
     <cfset safeBody = "This quarantined message does not contain a displayable message body.">
 </cfif>

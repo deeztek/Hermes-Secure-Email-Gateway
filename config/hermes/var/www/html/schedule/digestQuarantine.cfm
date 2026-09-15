@@ -141,7 +141,8 @@ function getTemplateConfig(required string templateName) {
 <cfset postmasterEmail = Trim(getpostmaster.value)>
 <cfset consoleHost = Trim(getportal.value2)>
 <cfset windowStart = getDigestWindowStart(digestFrequency, digestLastRun, forceRun)>
-<cfset windowEnd = now()>
+<cfset selectionCutoff = now()>
+<cfset windowEnd = selectionCutoff>
 <cfset templateConfig = getTemplateConfig(digestTemplate)>
 <cfset sentCount = 0>
 <cfset skippedCount = 0>
@@ -175,12 +176,17 @@ function getTemplateConfig(required string templateName) {
                ON qdd.rid = mr.rid
               AND qdd.mail_id = CAST(m.mail_id AS CHAR(255))
         WHERE mr.ds IN ('B', 'D')
-          AND m.time_iso <= <cfqueryparam value="#windowEnd#" cfsqltype="cf_sql_timestamp">
           AND (
-                (qdd.mail_id IS NULL AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">)
-             OR COALESCE(qdd.status, 'P') = 'F'
+                (
+                    qdd.mail_id IS NULL
+                    AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">
+                    AND m.time_iso <= <cfqueryparam value="#selectionCutoff#" cfsqltype="cf_sql_timestamp">
+                )
+             OR (
+                    qdd.status = 'F'
+                    AND m.time_iso <= <cfqueryparam value="#selectionCutoff#" cfsqltype="cf_sql_timestamp">
+                )
           )
-          AND COALESCE(qdd.status, 'P') <> 'S'
         GROUP BY mr.rid, m.mail_id
     ) digest_rows ON digest_rows.rid = ma_rcpt.id
     WHERE COALESCE(us.report_enabled, 'YES') <> 'NO'
@@ -373,7 +379,7 @@ arraySort(recipientKeys, "textnocase");
 
 <cfquery datasource="hermes">
     UPDATE parameters2
-    SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
+    SET value2 = <cfqueryparam value="#DateFormat(selectionCutoff, 'yyyy-mm-dd')# #TimeFormat(selectionCutoff, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
         applied = 2
     WHERE module = 'quarantine_digest'
       AND parameter = 'last_run'

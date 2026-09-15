@@ -97,14 +97,17 @@ Public endpoint (no Authelia login required).
 
 <cfif getExisting.recordcount LT 1>
     <cfset blockMessage = "The sender has been added to the recipient block list.">
+    <cfset blockHeading = "Sender Blocked">
 <cfelseif getExisting.wb EQ "B">
     <cfset blockMessage = "This sender is already blocked for the recipient.">
+    <cfset blockHeading = "Sender Already Blocked">
 <cfelse>
     <cfset blockMessage = "The existing sender rule has been updated to block this sender.">
+    <cfset blockHeading = "Sender Rule Updated">
 </cfif>
 
 <div class="card">
-    <div class="card-header"><h2 style="margin:0;">Sender Blocked</h2></div>
+    <div class="card-header"><h2 style="margin:0;"><cfoutput>#encodeForHTML(blockHeading)#</cfoutput></h2></div>
     <div class="card-body">
         <p><cfoutput>#encodeForHTML(blockMessage)#</cfoutput></p>
         <p><cfoutput><strong>Recipient:</strong> #encodeForHTML(getmsg.recipient_email)#<br><strong>Sender:</strong> #encodeForHTML(getmsg.from_email)#<br><strong>Subject:</strong> #encodeForHTML(getmsg.subject)#</cfoutput></p>
