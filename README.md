@@ -4,10 +4,6 @@
   </a>
 </p>
 
-<p>
-  This fork includes Google Provisioning, SPF syncing with _spf.google.com or any other, and quarantine digests.
-</p>
-
 <h1 align="center">Hermes Secure Email Gateway and Email Server</h1>
 
 <p align="center">
