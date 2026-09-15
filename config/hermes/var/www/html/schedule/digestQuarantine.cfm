@@ -20,31 +20,57 @@ function getDigestSetting(required query q, required string name, string default
     return arguments.defaultValue;
 }
 
-function getDigestWindowStart(required string frequency, any lastRunValue, boolean forceRun = false) {
-    if (!arguments.forceRun AND isDate(arguments.lastRunValue)) {
+function getDigestScheduledRunTime(required string frequency, date referenceNow = now()) {
+    var runTime = createDateTime(year(arguments.referenceNow), month(arguments.referenceNow), day(arguments.referenceNow), 19, 0, 0);
+    return runTime;
+}
+
+function getDigestWindowStart(required string frequency, any lastRunValue, required date scheduledRunTime, boolean forceRun = false) {
+    if (isDate(arguments.lastRunValue)) {
         return arguments.lastRunValue;
     }
+
+    if (arguments.forceRun) {
+        switch (lCase(arguments.frequency)) {
+            case "weekly":
+                return dateAdd("ww", -1, now());
+            case "monthly":
+                return dateAdd("m", -1, now());
+            default:
+                return dateAdd("d", -1, now());
+        }
+    }
+
     switch (lCase(arguments.frequency)) {
         case "weekly":
-            return dateAdd("ww", -1, now());
+            return dateAdd("ww", -1, arguments.scheduledRunTime);
         case "monthly":
-            return dateAdd("m", -1, now());
+            return dateAdd("m", -1, arguments.scheduledRunTime);
         default:
-            return dateAdd("d", -1, now());
+            return dateAdd("d", -1, arguments.scheduledRunTime);
     }
 }
 
-function shouldRunDigest(required string frequency, any lastRunValue, boolean forceRun = false) {
-    if (arguments.forceRun OR !isDate(arguments.lastRunValue)) {
+function shouldRunDigest(required string frequency, required date scheduledRunTime, any lastRunValue, boolean forceRun = false) {
+    if (arguments.forceRun) {
         return true;
     }
+
+    if (now() LT arguments.scheduledRunTime) {
+        return false;
+    }
+
+    if (isDate(arguments.lastRunValue) AND arguments.lastRunValue GTE arguments.scheduledRunTime) {
+        return false;
+    }
+
     switch (lCase(arguments.frequency)) {
         case "weekly":
-            return now() GTE dateAdd("ww", 1, arguments.lastRunValue);
+            return dayOfWeek(arguments.scheduledRunTime) EQ 6;
         case "monthly":
-            return now() GTE dateAdd("m", 1, arguments.lastRunValue);
+            return day(arguments.scheduledRunTime) EQ daysInMonth(arguments.scheduledRunTime);
         default:
-            return now() GTE dateAdd("d", 1, arguments.lastRunValue);
+            return true;
     }
 }
 
@@ -119,9 +145,10 @@ function getTemplateConfig(required string templateName) {
 <cfif NOT ListFindNoCase("modern,classic,compact", digestTemplate)>
     <cfset digestTemplate = "modern">
 </cfif>
+<cfset scheduledRunTime = getDigestScheduledRunTime(digestFrequency, now())>
 
-<cfif NOT shouldRunDigest(digestFrequency, digestLastRun, forceRun)>
-    <cfoutput>digestQuarantine: not due yet (frequency=#digestFrequency# last_run=#encodeForHTML(digestLastRunRaw)#)<br></cfoutput>
+<cfif NOT shouldRunDigest(digestFrequency, scheduledRunTime, digestLastRun, forceRun)>
+    <cfoutput>digestQuarantine: not due yet (frequency=#digestFrequency# scheduled_run=#DateFormat(scheduledRunTime, "yyyy-mm-dd")# #TimeFormat(scheduledRunTime, "HH:mm:ss")# last_run=#encodeForHTML(digestLastRunRaw)#)<br></cfoutput>
     <cfabort>
 </cfif>
 
@@ -140,8 +167,8 @@ function getTemplateConfig(required string templateName) {
 
 <cfset postmasterEmail = Trim(getpostmaster.value)>
 <cfset consoleHost = Trim(getportal.value2)>
-<cfset windowStart = getDigestWindowStart(digestFrequency, digestLastRun, forceRun)>
-<cfset selectionCutoff = now()>
+<cfset windowStart = getDigestWindowStart(digestFrequency, digestLastRun, scheduledRunTime, forceRun)>
+<cfset selectionCutoff = forceRun ? now() : scheduledRunTime>
 <cfset windowEnd = selectionCutoff>
 <cfset templateConfig = getTemplateConfig(digestTemplate)>
 <cfset sentCount = 0>
@@ -330,6 +357,7 @@ arraySort(recipientKeys, "textnocase");
                             <cfloop array="#messageList#" index="messageItem">
                                 <cfset viewUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "view")>
                                 <cfset releaseUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "release")>
+                                <cfset whitelistUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "whitelist")>
                                 <cfset blockUrl = generateQuarantineActionUrl(messageItem.mail_id, messageItem.secret_id, recipientEmail, consoleHost, "block")>
                                 <tr>
                                     <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; white-space:nowrap;">#DateFormat(messageItem.time_iso, "mm/dd/yyyy")#<br>#TimeFormat(messageItem.time_iso, "hh:mm:ss tt")#</td>
@@ -338,6 +366,7 @@ arraySort(recipientKeys, "textnocase");
                                     <td valign="top" style="padding:12px; border:1px solid ##e5e7eb; min-width:240px;">
                                         <a href="#viewUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##ffffff; border:1px solid #templateConfig.buttonBg#; color:#templateConfig.buttonBg#; text-decoration:none; border-radius:6px; font-weight:bold;">View</a>
                                         <a href="#releaseUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:#templateConfig.buttonBg#; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Release</a>
+                                        <a href="#whitelistUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##16a34a; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Whitelist Sender</a>
                                         <a href="#blockUrl#" style="display:inline-block; margin:0 8px 8px 0; padding:9px 14px; background:##dc2626; color:##ffffff; text-decoration:none; border-radius:6px; font-weight:bold;">Block Sender</a>
                                     </td>
                                 </tr>
@@ -422,7 +451,7 @@ arraySort(recipientKeys, "textnocase");
 <cfif errorCount EQ 0>
     <cfquery datasource="hermes">
         UPDATE parameters2
-        SET value2 = <cfqueryparam value="#DateFormat(selectionCutoff, 'yyyy-mm-dd')# #TimeFormat(selectionCutoff, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
+        SET value2 = <cfqueryparam value="#DateFormat(windowEnd, 'yyyy-mm-dd')# #TimeFormat(windowEnd, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
             applied = 2
         WHERE module = 'quarantine_digest'
           AND parameter = 'last_run'
