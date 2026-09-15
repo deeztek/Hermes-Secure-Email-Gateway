@@ -45,7 +45,7 @@ See GitHub issue #180
 <cfinclude template="/schedule/inc/quarantine_token.cfm">
 
 <!--- Validate the token --->
-<cfset tokenResult = validateQuarantineReleaseToken(url.token)>
+<cfset tokenResult = validateQuarantineActionToken(url.token, "release")>
 
 <cfif NOT tokenResult.valid>
     <div class="card">

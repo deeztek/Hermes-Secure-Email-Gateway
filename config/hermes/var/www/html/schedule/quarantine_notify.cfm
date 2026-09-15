@@ -25,6 +25,28 @@ See GitHub issue #180
 <cfset postmasterEmail = getpostmaster.value>
 <cfset consoleHost = getportal.value2>
 
+<cfquery name="getDigestSettings" datasource="hermes">
+    SELECT parameter, value2
+    FROM parameters2
+    WHERE module = 'quarantine_digest'
+      AND parameter IN ('enabled', 'disable_individual')
+</cfquery>
+
+<cfset digestEnabled = "0">
+<cfset digestDisableIndividual = "0">
+<cfloop query="getDigestSettings">
+    <cfif parameter EQ "enabled">
+        <cfset digestEnabled = Trim(value2)>
+    <cfelseif parameter EQ "disable_individual">
+        <cfset digestDisableIndividual = Trim(value2)>
+    </cfif>
+</cfloop>
+
+<cfif digestEnabled EQ "1" AND digestDisableIndividual EQ "1">
+    quarantine_notify: digest mode active, individual notices disabled<br>
+    <cfabort>
+</cfif>
+
 <!--- Recency backstop (days). The notifier gates ONLY on notification_sent = 0,
       so ANY event that introduces old quarantine rows at 0 -- a legacy->Docker
       migration, a cross-host restore/DR rehost, a manual DB import -- otherwise
