@@ -47,30 +47,6 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
   <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
 </cfif>
 
-<cfscript>
-settingDefaults = [
-    {parameter="enabled", value2="0"},
-    {parameter="frequency", value2="daily"},
-    {parameter="template", value2="modern"},
-    {parameter="subject", value2="[Hermes SEG] Quarantine Digest"},
-    {parameter="intro", value2="Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in."},
-    {parameter="disable_individual", value2="1"},
-    {parameter="last_run", value2=""}
-];
-for (var defaultRow in settingDefaults) {
-    queryExecute(
-        "INSERT INTO parameters2 (parameter, value2, module, active, applied) " &
-        "SELECT :parameter, :value2, 'quarantine_digest', 1, 1 " &
-        "WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM parameters2) p WHERE p.parameter = :parameter AND p.module = 'quarantine_digest')",
-        {
-            parameter: {value: defaultRow.parameter, cfsqltype: "cf_sql_varchar"},
-            value2: {value: defaultRow.value2, cfsqltype: "cf_sql_varchar", null: (defaultRow.value2 EQ "")}
-        },
-        {datasource: "hermes"}
-    );
-}
-</cfscript>
-
 <cfif StructKeyExists(form, "action") AND form.action EQ "save_digest_settings">
     <cfif NOT StructKeyExists(form, "csrf_token") OR form.csrf_token NEQ session.quarantineDigestCsrf>
         <cfset m = "Quarantine Digest: invalid CSRF token">
@@ -105,6 +81,30 @@ for (var defaultRow in settingDefaults) {
     <cfif digestIntro EQ "">
         <cfset digestIntro = "Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in.">
     </cfif>
+
+    <cfscript>
+    settingDefaults = [
+        {parameter="enabled", value2="0"},
+        {parameter="frequency", value2="daily"},
+        {parameter="template", value2="modern"},
+        {parameter="subject", value2="[Hermes SEG] Quarantine Digest"},
+        {parameter="intro", value2="Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in."},
+        {parameter="disable_individual", value2="1"},
+        {parameter="last_run", value2=""}
+    ];
+    for (var defaultRow in settingDefaults) {
+        queryExecute(
+            "INSERT INTO parameters2 (parameter, value2, module, active, applied) " &
+            "SELECT :parameter, :value2, 'quarantine_digest', 1, 1 " &
+            "WHERE NOT EXISTS (SELECT 1 FROM (SELECT * FROM parameters2) p WHERE p.parameter = :parameter AND p.module = 'quarantine_digest')",
+            {
+                parameter: {value: defaultRow.parameter, cfsqltype: "cf_sql_varchar"},
+                value2: {value: defaultRow.value2, cfsqltype: "cf_sql_varchar", null: (defaultRow.value2 EQ "")}
+            },
+            {datasource: "hermes"}
+        );
+    }
+    </cfscript>
 
     <cfquery datasource="hermes">
         UPDATE parameters2 SET value2 = <cfqueryparam value="#form.digest_enabled#" cfsqltype="cf_sql_varchar">, applied = 2

@@ -96,27 +96,29 @@ Public endpoint (no Authelia login required).
 
 <cfset senderMailaddrId = getMailaddr.id>
 
-<cfquery name="getExisting" datasource="hermes">
-    SELECT wb FROM wblist
-    WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
-      AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
-</cfquery>
+<cftransaction>
+    <cfquery name="getExisting" datasource="hermes">
+        SELECT wb FROM wblist
+        WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
+          AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
+    </cfquery>
 
-<cfquery datasource="hermes">
-    INSERT INTO wblist (rid, sid, wb)
-    VALUES (
-        <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">,
-        <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
-        'B'
-    )
-    ON DUPLICATE KEY UPDATE wb = 'B'
-</cfquery>
+    <cfquery datasource="hermes">
+        INSERT INTO wblist (rid, sid, wb)
+        VALUES (
+            <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">,
+            <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">,
+            'B'
+        )
+        ON DUPLICATE KEY UPDATE wb = 'B'
+    </cfquery>
 
-<cfquery name="getCurrent" datasource="hermes">
-    SELECT wb FROM wblist
-    WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
-      AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
-</cfquery>
+    <cfquery name="getCurrent" datasource="hermes">
+        SELECT wb FROM wblist
+        WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
+          AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
+    </cfquery>
+</cftransaction>
 
 <cfif getExisting.recordcount LT 1 AND getCurrent.recordcount GTE 1 AND getCurrent.wb EQ "B">
     <cfset blockMessage = "The sender has been added to the recipient block list.">

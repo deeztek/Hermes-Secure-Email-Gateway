@@ -161,7 +161,7 @@ function getTemplateConfig(required string templateName) {
     FROM recipients r
     INNER JOIN maddr ma_rcpt ON ma_rcpt.email = r.recipient
     LEFT JOIN user_settings us ON us.email = r.recipient
-    LEFT JOIN (
+    INNER JOIN (
         SELECT mr.rid,
                m.mail_id,
                m.secret_id,
@@ -193,6 +193,38 @@ function getTemplateConfig(required string templateName) {
     ORDER BY r.recipient, digest_rows.time_iso DESC
 </cfquery>
 
+<cfquery name="getEmptyDigestRecipients" datasource="hermes">
+    SELECT r.recipient AS recipient_email,
+           ma_rcpt.id AS rid,
+           COALESCE(us.report_enabled, 'YES') AS report_enabled
+    FROM recipients r
+    INNER JOIN maddr ma_rcpt ON ma_rcpt.email = r.recipient
+    LEFT JOIN user_settings us ON us.email = r.recipient
+    WHERE COALESCE(us.report_enabled, 'YES') = 'ALL'
+      AND NOT EXISTS (
+            SELECT 1
+            FROM msgrcpt mr
+            INNER JOIN msgs m ON m.mail_id = mr.mail_id
+            LEFT JOIN quarantine_digest_deliveries qdd
+                   ON qdd.rid = mr.rid
+                  AND qdd.mail_id = CAST(m.mail_id AS CHAR(255))
+            WHERE mr.rid = ma_rcpt.id
+              AND mr.ds IN ('B', 'D')
+              AND (
+                    (
+                        qdd.mail_id IS NULL
+                        AND m.time_iso >= <cfqueryparam value="#windowStart#" cfsqltype="cf_sql_timestamp">
+                        AND m.time_iso <= <cfqueryparam value="#selectionCutoff#" cfsqltype="cf_sql_timestamp">
+                    )
+                 OR (
+                        qdd.status = 'F'
+                        AND m.time_iso <= <cfqueryparam value="#selectionCutoff#" cfsqltype="cf_sql_timestamp">
+                    )
+              )
+      )
+    ORDER BY r.recipient
+</cfquery>
+
 <cfscript>
 recipientMap = structNew("ordered");
 for (var row in getRecipientMessages) {
@@ -214,6 +246,17 @@ for (var row in getRecipientMessages) {
             subject: toString(row.subject),
             from_email: toString(row.from_email)
         });
+    }
+}
+for (var emptyRow in getEmptyDigestRecipients) {
+    var emptyRecipientKey = toString(emptyRow.recipient_email);
+    if (!structKeyExists(recipientMap, emptyRecipientKey)) {
+        recipientMap[emptyRecipientKey] = {
+            recipientEmail: emptyRecipientKey,
+            rid: emptyRow.rid,
+            reportEnabled: toString(emptyRow.report_enabled),
+            messages: []
+        };
     }
 }
 recipientKeys = structKeyArray(recipientMap);
