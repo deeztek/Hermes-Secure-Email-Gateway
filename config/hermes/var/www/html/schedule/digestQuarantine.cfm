@@ -419,18 +419,17 @@ arraySort(recipientKeys, "textnocase");
     </cftry>
 </cfloop>
 
-<cfquery datasource="hermes">
-    UPDATE parameters2
-    SET value2 = <cfqueryparam value="#DateFormat(selectionCutoff, 'yyyy-mm-dd')# #TimeFormat(selectionCutoff, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
-        applied = 2
-    WHERE module = 'quarantine_digest'
-      AND parameter = 'last_run'
-</cfquery>
-
 <cfif errorCount EQ 0>
+    <cfquery datasource="hermes">
+        UPDATE parameters2
+        SET value2 = <cfqueryparam value="#DateFormat(selectionCutoff, 'yyyy-mm-dd')# #TimeFormat(selectionCutoff, 'HH:mm:ss')#" cfsqltype="cf_sql_varchar">,
+            applied = 2
+        WHERE module = 'quarantine_digest'
+          AND parameter = 'last_run'
+    </cfquery>
     <cfoutput>digestQuarantine: complete (sent=#sentCount# skipped=#skippedCount# errors=#errorCount#)<br></cfoutput>
 <cfelse>
-    <cfoutput>digestQuarantine: complete with errors (sent=#sentCount# skipped=#skippedCount# errors=#errorCount# failed recipient deliveries remain queued for retry)<br></cfoutput>
+    <cfoutput>digestQuarantine: complete with errors (sent=#sentCount# skipped=#skippedCount# errors=#errorCount# failed recipient deliveries remain queued for retry and last_run was not advanced)<br></cfoutput>
 </cfif>
 
 </cflock>

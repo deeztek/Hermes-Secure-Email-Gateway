@@ -38,9 +38,9 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
     <div class="app-content">
       <div class="container-fluid">
 
-<cfparam name="m" default="0">
-<cfif StructKeyExists(session, "m") AND session.m NEQ "">
-  <cfset m = session.m>
+<cfparam name="digestFlash" default="0">
+<cfif StructKeyExists(session, "quarantineDigestFlash") AND session.quarantineDigestFlash NEQ "">
+  <cfset digestFlash = session.quarantineDigestFlash>
 </cfif>
 
 <cfif NOT StructKeyExists(session, "quarantineDigestCsrf") OR session.quarantineDigestCsrf EQ "">
@@ -132,7 +132,7 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
     </cfquery>
 
     <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
-    <cfset session.m = 1>
+    <cfset session.quarantineDigestFlash = 1>
     <cflocation url="view_quarantine_digest.cfm" addtoken="no">
     <cfabort>
 </cfif>
@@ -162,13 +162,13 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
 <cfset disableIndividual = StructKeyExists(digestSettings, 'disable_individual') ? digestSettings['disable_individual'] : '1'>
 <cfset digestLastRun = StructKeyExists(digestSettings, 'last_run') ? digestSettings['last_run'] : ''>
 
-<cfif m EQ "1">
+<cfif digestFlash EQ "1">
 <div class="alert alert-success alert-dismissible">
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   <h5><i class="icon fas fa-check"></i> Success</h5>
   Quarantine digest settings were saved successfully.
 </div>
-<cfset session.m = "">
+<cfset session.quarantineDigestFlash = "">
 </cfif>
 
 <div class="alert alert-info">

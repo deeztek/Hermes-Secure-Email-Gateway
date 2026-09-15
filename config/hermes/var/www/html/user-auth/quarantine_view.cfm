@@ -48,6 +48,11 @@ Public endpoint (no Authelia login required).
     SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'
 </cfquery>
 
+<cfif getportal.recordcount LT 1 OR Trim(getportal.value2) EQ "">
+    <div class="card"><div class="card-header"><h2>View Unavailable</h2></div><div class="card-body"><p>The quarantine portal host is not configured.</p></div></div>
+    <cfabort>
+</cfif>
+
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject, m.time_iso, m.archive,
            ma_rcpt.email AS recipient_email,
@@ -87,8 +92,8 @@ Public endpoint (no Authelia login required).
     <cfset safeBody = "This quarantined message does not contain a displayable message body.">
 </cfif>
 <cfset safeBody = Trim(safeBody)>
-<cfset releaseUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, getportal.value2, "release")>
-<cfset blockUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, getportal.value2, "block")>
+<cfset releaseUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, Trim(getportal.value2), "release")>
+<cfset blockUrl = generateQuarantineActionUrl(getmsg.mail_id, getmsg.secret_id, getmsg.recipient_email, Trim(getportal.value2), "block")>
 
 <div class="card">
     <div class="card-header">
