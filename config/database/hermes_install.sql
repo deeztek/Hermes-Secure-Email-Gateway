@@ -1199,6 +1199,7 @@ INSERT IGNORE INTO `ofelia_jobs` VALUES (11,'[job-exec \"hermes-authelia-log-rot
 INSERT IGNORE INTO `ofelia_jobs` VALUES (12,'[job-exec \"hermes-quarantine-notify\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_notify.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (13,'[job-exec \"hermes-process-cert-queue\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (14,'[job-exec \"hermes-fangfrisch-refresh\"]','@every 10m','/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh','hermes_mail_filter',NULL,NULL,NULL,NULL,'malware_feeds',1,0);
+INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-quarantine-digest\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/digestQuarantine.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 
 -- -------- org_signatures                       [truncate] --------
 CREATE TABLE IF NOT EXISTS `org_signatures` (
@@ -1465,6 +1466,13 @@ INSERT IGNORE INTO `parameters2` VALUES (180, 'logging.debug', 'no', 'dovecot', 
 INSERT IGNORE INTO `parameters2` VALUES (183, 'forwarding.enabled', 'no', 'unbound', NULL, 1);
 INSERT IGNORE INTO `parameters2` VALUES (184, 'hide.login.form', 'true', 'nextcloud', NULL, 1);
 INSERT IGNORE INTO `parameters2` VALUES (185, 'sharing.enabled', 'yes', 'dovecot', NULL, 1);
+INSERT IGNORE INTO `parameters2` VALUES (186, 'enabled', '0', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (187, 'frequency', 'daily', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (188, 'template', 'modern', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (189, 'subject', '[Hermes SEG] Quarantine Digest', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (190, 'intro', 'Review quarantined messages below. Secure links let recipients view, release, or block senders without signing in.', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (191, 'disable_individual', '1', 'quarantine_digest', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (192, 'last_run', NULL, 'quarantine_digest', 1, 1);
 
 -- Link Guard (#186) global settings live in parameters2 under module='linkguard'
 -- (the module-namespaced settings store, like clamav/firewall/authelia/console).
@@ -2328,7 +2336,7 @@ INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 
 -- Keep this value in step with the baseline's actual content anyway, so a
 -- hand-run `mysql < hermes_install.sql` (no install script) is not misleading.
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
-INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260723');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260816');
 
 -- -------- system_updates                       [seed] --------
 CREATE TABLE IF NOT EXISTS `system_updates` (

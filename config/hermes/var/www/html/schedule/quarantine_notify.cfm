@@ -25,6 +25,23 @@ See GitHub issue #180
 <cfset postmasterEmail = getpostmaster.value>
 <cfset consoleHost = getportal.value2>
 
+<cfquery name="getDigestSettings" datasource="hermes">
+    SELECT parameter, value2
+    FROM parameters2
+    WHERE module = 'quarantine_digest'
+      AND parameter IN ('enabled', 'disable_individual')
+</cfquery>
+
+<cfset digestEnabled = "0">
+<cfset digestDisableIndividual = "0">
+<cfloop query="getDigestSettings">
+    <cfif parameter EQ "enabled">
+        <cfset digestEnabled = Trim(value2)>
+    <cfelseif parameter EQ "disable_individual">
+        <cfset digestDisableIndividual = Trim(value2)>
+    </cfif>
+</cfloop>
+
 <!--- Recency backstop (days). The notifier gates ONLY on notification_sent = 0,
       so ANY event that introduces old quarantine rows at 0 -- a legacy->Docker
       migration, a cross-host restore/DR rehost, a manual DB import -- otherwise
@@ -101,6 +118,16 @@ See GitHub issue #180
     <cfset thisContent = toString(row.content)>
     <cfset thisSpamLevel = row.spam_level>
     <cfset thisTimeIso = row.time_iso>
+
+    <cfif digestEnabled EQ "1" AND digestDisableIndividual EQ "1">
+        <cfquery datasource="hermes">
+            UPDATE msgrcpt SET notification_sent = 2
+            WHERE mail_id = <cfqueryparam value="#thisMailId#" cfsqltype="cf_sql_varchar">
+              AND rid = <cfqueryparam value="#thisRid#" cfsqltype="cf_sql_integer">
+        </cfquery>
+        <cfoutput>#thisRecipientEmail#: skipped (digest enabled, individual notices disabled)<br></cfoutput>
+        <cfcontinue>
+    </cfif>
 
     <!--- Check if this recipient has notifications enabled --->
     <cfquery name="getUserSettings" datasource="hermes">
