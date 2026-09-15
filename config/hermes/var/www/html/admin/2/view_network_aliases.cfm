@@ -87,6 +87,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       where a malformed line is not rejected loudly, it just quietly fails to
       match. cfqueryparam covers injection; this covers correctness.
 --->
+<cffunction name="aliasNameOf" returntype="string" output="false">
+  <cfargument name="aliasId" type="numeric" required="true">
+  <cfset var q = "">
+  <cfquery name="q" datasource="hermes">
+    SELECT name FROM network_aliases
+    WHERE id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfif q.recordcount GTE 1>
+    <cfreturn q.name>
+  </cfif>
+  <cfreturn "">
+</cffunction>
+
 <cffunction name="normalizeCidr" returntype="string" output="false">
   <cfargument name="value" type="string" required="true">
   <cfset var v = Trim(arguments.value)>
@@ -468,6 +481,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
   </cfloop>
 
+  <cfset session.alias_touched = aliasNameOf(theId)>
   <cfif badCount GT 0>
     <cfset session.m = 67>
   <cfelse>
@@ -488,6 +502,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     DELETE FROM network_alias_entries
     WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
   </cfquery>
+  <cfset session.alias_touched = aliasNameOf(theId)>
   <cfset session.m = 69>
   <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
 </cfif>
@@ -583,6 +598,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-exclamation-triangle"></i> Some entries were skipped</h4>
     <cfoutput>Valid ranges were added. Anything that was not a valid CIDR was skipped, because a malformed range does not fail loudly in a Postfix lookup file, it just silently never matches.</cfoutput>
+
+  <cfinclude template="./inc/alias_apply_nudge.cfm">
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -592,6 +609,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Ranges added.</cfoutput>
+
+  <cfinclude template="./inc/alias_apply_nudge.cfm">
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -601,6 +620,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Range removed.</cfoutput>
+
+  <cfinclude template="./inc/alias_apply_nudge.cfm">
   </div>
   <cfset session.m = 0>
 </cfif>
