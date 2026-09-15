@@ -13,7 +13,7 @@ function getQuarantineReleaseKey() {
     if (fileExists(keyFile)) {
         return trim(fileRead(keyFile));
     }
-    var newKey = hash(createUUID() & now() & randRange(100000, 999999), "SHA-256");
+    var newKey = generateSecretKey("AES");
     fileWrite(keyFile, newKey);
     return newKey;
 }
@@ -55,6 +55,8 @@ function validateQuarantineActionToken(required string token, string expectedAct
         var expiry = 0;
         var providedSignature = "";
         var isLegacyToken = false;
+        var matchedSecretId = "";
+        var matchedRecipientEmail = "";
 
         if (arrayLen(parts) EQ 4) {
             action = lCase(toString(toBinary(parts[1])));
@@ -114,8 +116,8 @@ function validateQuarantineActionToken(required string token, string expectedAct
             var expectedSignature = hmac(payload, key, "HmacSHA256");
             if (compareNoCase(providedSignature, expectedSignature) EQ 0) {
                 validForRecipient = true;
-                result.recipientEmail = toString(row.recipient_email);
-                result.secretId = toString(row.secret_id);
+                matchedRecipientEmail = toString(row.recipient_email);
+                matchedSecretId = toString(row.secret_id);
                 break;
             }
         }
@@ -127,8 +129,8 @@ function validateQuarantineActionToken(required string token, string expectedAct
 
         result.valid = true;
         result.mailId = toString(mailId);
-        result.secretId = toString(result.secretId);
-        result.recipientEmail = toString(result.recipientEmail);
+        result.secretId = matchedSecretId;
+        result.recipientEmail = matchedRecipientEmail;
         result.action = action;
         return result;
     } catch (any e) {

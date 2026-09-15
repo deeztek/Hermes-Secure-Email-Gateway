@@ -101,13 +101,7 @@ Public endpoint (no Authelia login required).
 
 <cfset senderMailaddrId = getMailaddr.id>
 
-<cfquery name="getExisting" datasource="hermes">
-    SELECT wb FROM wblist
-    WHERE rid = <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">
-      AND sid = <cfqueryparam value="#senderMailaddrId#" cfsqltype="cf_sql_integer">
-</cfquery>
-
-<cfquery datasource="hermes">
+<cfquery datasource="hermes" result="stBlock">
     INSERT INTO wblist (rid, sid, wb)
     VALUES (
         <cfqueryparam value="#getRecipient.id#" cfsqltype="cf_sql_integer">,
@@ -117,10 +111,10 @@ Public endpoint (no Authelia login required).
     ON DUPLICATE KEY UPDATE wb = 'B'
 </cfquery>
 
-<cfif getExisting.recordcount LT 1>
+<cfif stBlock.recordcount EQ 1>
     <cfset blockMessage = "The sender has been added to the recipient block list.">
     <cfset blockHeading = "Sender Blocked">
-<cfelseif getExisting.wb EQ "B">
+<cfelseif stBlock.recordcount EQ 0>
     <cfset blockMessage = "This sender is already blocked for the recipient.">
     <cfset blockHeading = "Sender Already Blocked">
 <cfelse>
