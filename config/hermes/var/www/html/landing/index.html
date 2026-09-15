@@ -57,6 +57,25 @@
         }
         a.hero:hover .cta { background: var(--orange-dark); }
 
+        .secondary-cta {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--ink);
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 6px 24px rgba(45, 55, 72, 0.08);
+            transition: transform .1s ease, box-shadow .2s ease, border-color .2s ease;
+        }
+        .secondary-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(45, 55, 72, 0.12);
+            border-color: var(--orange);
+        }
+
         /* Secondary: Admin */
         .admin { margin-top: 26px; font-size: 0.9rem; }
         .admin a { color: var(--muted); text-decoration: none; border-bottom: 1px solid var(--line); padding-bottom: 1px; }
@@ -76,6 +95,8 @@
             <p>For mailbox and relay users &mdash; review quarantined mail, manage your account &amp; security, and access webmail (mailbox users).</p>
             <span class="cta">Open User Console &rarr;</span>
         </a>
+
+        <a class="secondary-cta" href="/user-auth/google_login.cfm">Don't have an account here? Log in with your organization account</a>
 
         <p class="admin">Administrator? <a href="/admin/">Sign in to the Admin Console &rarr;</a></p>
 

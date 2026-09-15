@@ -292,7 +292,7 @@ a, a:hover{
     <cfset action = form.action>
     </cfif></cfif>
 
-    <!--- RESET FAILED CERT QUEUE JOBS --->
+        <!--- RESET FAILED CERT QUEUE JOBS --->
     <cfif action EQ "reset_failed_queue">
         <cftry>
             <cfquery datasource="hermes">
@@ -408,49 +408,7 @@ a, a:hover{
     <cfset StructDelete(session, "queueMessage")>
 </cfif>
 
-        <!--- CERT/KEYRING QUEUE STATUS BANNER --->
-        <cfquery name="getPendingQueue" datasource="hermes">
-            SELECT
-                SUM(CASE WHEN status='pending' THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN status='processing' THEN 1 ELSE 0 END) as processing,
-                SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) as failed
-            FROM cert_generation_queue
-            WHERE status IN ('pending', 'processing', 'failed')
-        </cfquery>
-
-        <cfif getPendingQueue.pending GT 0 OR getPendingQueue.processing GT 0>
-          <div class="alert alert-info alert-dismissible">
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true">&times;</button>
-            <h5><i class="icon fas fa-spinner fa-spin"></i> Background Generation in Progress</h5>
-            <cfoutput>
-            <cfif getPendingQueue.pending GT 0>#getPendingQueue.pending# certificate(s)/keyring(s) pending generation</cfif>
-            <cfif getPendingQueue.pending GT 0 AND getPendingQueue.processing GT 0>, </cfif>
-            <cfif getPendingQueue.processing GT 0>#getPendingQueue.processing# currently processing</cfif>
-            </cfoutput>
-          </div>
-        </cfif>
-
-        <cfif getPendingQueue.failed GT 0>
-          <div class="alert alert-warning">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <h5><i class="icon fas fa-exclamation-triangle"></i> Generation Failures</h5>
-                <cfoutput>#getPendingQueue.failed# certificate(s)/keyring(s) failed to generate.</cfoutput>
-              </div>
-              <form method="post" action="" class="ms-3">
-                <input type="hidden" name="action" value="reset_failed_queue">
-                <button type="submit" class="btn btn-sm btn-outline-dark" onclick="return confirm('Reset all failed jobs to pending? They will be retried on the next processing cycle.')">
-                  <i class="fas fa-redo me-1"></i>Retry Failed Jobs
-                </button>
-              </form>
-            </div>
-          </div>
-        </cfif>
-
-        <!--- ERROR MESSAGES END HERE --->
-
-
-  <!--- DELETE RECIPIENT MODAL HTML STARTS HERE --->
+          <!--- DELETE RECIPIENT MODAL HTML STARTS HERE --->
  
 
 <div class="modal fade" id="delete_modal" tabindex="-1" role="dialog" aria-labelledby="deleteRecipientModalLabel" aria-hidden="true">
@@ -1530,6 +1488,7 @@ modal markup don't need a rename cascade.)
         <form>
         <div class="mb-3">
             <a href="add_internal_recipients.cfm" class="btn btn-primary" role="button"><i class="fa fa-plus-square fa-lg me-1"></i>Create Recipient(s)</a>
+            <a href="google_internal_recipients.cfm" class="btn btn-secondary" role="button"><i class="fab fa-google me-1"></i>Manage Google Provisioning</a>
             <button type="button" id="editoptions" class="btn btn-primary"><i class="fa fa-edit me-1"></i>Edit Options</button>
             <button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock me-1"></i>Edit Encryption</button>
             <button type="button" id="editbackend" class="btn btn-primary"><i class="fas fa-server me-1"></i>Edit Backend</button>
