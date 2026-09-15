@@ -1188,7 +1188,7 @@ CREATE TABLE IF NOT EXISTS `ofelia_jobs` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 10 row(s) for `ofelia_jobs`
+-- 11 row(s) for `ofelia_jobs`
 INSERT IGNORE INTO `ofelia_jobs` VALUES (1,'[job-exec \"renew-acme-certificate\"]',' 0 05 12 * * *','/opt/hermes/schedule/renew_acme_certificate.sh','hermes_commandbox',NULL,NULL,NULL,NULL,'certbot',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (2,'[job-exec \"hermes-message-cleanup\"]',' 0 30 01 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/message_cleanup.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (3,'[job-exec \"hermes-update-check\"]',' 0 30 04 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/check_for_update.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
@@ -1199,6 +1199,7 @@ INSERT IGNORE INTO `ofelia_jobs` VALUES (11,'[job-exec \"hermes-authelia-log-rot
 INSERT IGNORE INTO `ofelia_jobs` VALUES (12,'[job-exec \"hermes-quarantine-notify\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/quarantine_notify.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (13,'[job-exec \"hermes-process-cert-queue\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/process_cert_queue.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (14,'[job-exec \"hermes-fangfrisch-refresh\"]','@every 10m','/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh','hermes_mail_filter',NULL,NULL,NULL,NULL,'malware_feeds',1,0);
+INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"google-relay-networks\"]','@every 30m','/usr/bin/curl --silent http://localhost:8888/schedule/update_google_relay_networks.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-quarantine-digest\"]','@every 60s','/usr/bin/curl --silent http://localhost:8888/schedule/digestQuarantine.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'system',1,1);
 
 -- -------- org_signatures                       [truncate] --------
@@ -1356,7 +1357,7 @@ CREATE TABLE IF NOT EXISTS `parameters2` (
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_swedish_ci;
 
--- 97 row(s) for `parameters2` (scrubbed)
+-- 99 row(s) for `parameters2` (scrubbed)
 INSERT IGNORE INTO `parameters2` VALUES (181, 'files_app_visible', 'no', 'nextcloud', NULL, 2);
 INSERT IGNORE INTO `parameters2` VALUES (36, 'firewall_status', 'disabled', 'firewall', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (140, 'duo.hostname', '', 'authelia', 1, 1);
@@ -1466,6 +1467,8 @@ INSERT IGNORE INTO `parameters2` VALUES (180, 'logging.debug', 'no', 'dovecot', 
 INSERT IGNORE INTO `parameters2` VALUES (183, 'forwarding.enabled', 'no', 'unbound', NULL, 1);
 INSERT IGNORE INTO `parameters2` VALUES (184, 'hide.login.form', 'true', 'nextcloud', NULL, 1);
 INSERT IGNORE INTO `parameters2` VALUES (185, 'sharing.enabled', 'yes', 'dovecot', NULL, 1);
+INSERT IGNORE INTO `parameters2` VALUES (186, 'spf_sync_enabled', '0', 'relay_networks', 1, 1);
+INSERT IGNORE INTO `parameters2` VALUES (187, 'spf_sync_server', '_spf.google.com', 'relay_networks', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (186, 'enabled', '0', 'quarantine_digest', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (187, 'frequency', 'daily', 'quarantine_digest', 1, 1);
 INSERT IGNORE INTO `parameters2` VALUES (188, 'template', 'modern', 'quarantine_digest', 1, 1);
