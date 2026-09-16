@@ -1013,7 +1013,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                      title="Include this range in the configuration files"
                      onchange="toggleEntry(#get_alias_entries.id#, #detail_alias_id#)">
             <cfelse>
-              <span class="text-muted">-</span>
+              <span class="text-muted">N/A</span>
             </cfif>
           </td>
           <td><code>#EncodeForHTML(get_alias_entries.cidr)#</code></td>
