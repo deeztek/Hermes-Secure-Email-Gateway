@@ -270,16 +270,47 @@ timeout = "60">
 
 
 <!--- RUN POSTFIX CONFIG SCRIPT IN DOCKER CONTAINER --->
-<cfexecute name="/usr/local/bin/docker"
-  arguments="exec hermes_postfix_dkim /bin/bash /opt/hermes/tmp/#customtrans3#_postconf.sh"
-  timeout="240"
-  variable="postconfOutput"
-  errorVariable="postconfError" />
+<!--- The step that actually applies the config, and the only one in this file
+     that had no error handling. A failure here threw a raw Lucee stack trace at
+     the operator, left the temp script behind, and skipped the applied='1'
+     commit below, so the rows stayed staged with no indication why.
 
-<!--- Delete postconf script --->
+     The common cause is the last line of the generated script: `postfix reload`
+     exits non-zero when the Postfix daemon is not running, which the container
+     can be while every postconf read still works. So nothing else in this file,
+     and nothing in the verification commands an operator would reach for, shows
+     the daemon is down. Only this does. --->
+<cfset postconfFailed = false>
+<cfset postconfFailMsg = "">
+<cftry>
+  <cfexecute name="/usr/local/bin/docker"
+    arguments="exec hermes_postfix_dkim /bin/bash /opt/hermes/tmp/#customtrans3#_postconf.sh"
+    timeout="240"
+    variable="postconfOutput"
+    errorVariable="postconfError" />
+  <cfcatch type="any">
+    <cfset postconfFailed = true>
+    <cfset postconfFailMsg = cfcatch.message & " | " & cfcatch.detail>
+  </cfcatch>
+</cftry>
+
+<!--- Delete postconf script. Outside the try so it happens either way; before
+     this it was skipped on failure and the file accumulated in /opt/hermes/tmp. --->
 <cfif FileExists("/opt/hermes/tmp/#customtrans3#_postconf.sh")>
 <cffile action = "delete"
 file = "/opt/hermes/tmp/#customtrans3#_postconf.sh">
+</cfif>
+
+<cfif postconfFailed>
+  <cflog file="hermes" type="error"
+         text="generate_postfix_configuration: applying main.cf failed: #postconfFailMsg#">
+  <cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+    <cfthrow message="generate_postfix_configuration: applying main.cf failed: #postconfFailMsg#">
+  <cfelse>
+    <cfset m="Generate Postfix Configuration: main.cf could not be applied. Check that Postfix is running in hermes_postfix_dkim. Error was #postconfFailMsg#">
+    <cfinclude template="error.cfm">
+    <cfabort>
+  </cfif>
 </cfif>
 
 <!--- UPDATE PARAMETERS TABLE --->
