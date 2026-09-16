@@ -361,6 +361,151 @@ select property, value from encryption_settings where property='user.systemMailS
   <!--- /DIV class="card" --->
 </div>
 
+<!-- Mail Traffic Insights -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fas fa-exchange-alt"></i>
+      Mail Traffic Insights
+    </h3>
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="small-box text-bg-primary mb-3">
+          <div class="inner">
+            <h3 id="traffic-incoming">0</h3>
+            <p>Incoming Mail</p>
+          </div>
+          <div class="icon"><i class="fas fa-inbox"></i></div>
+        </div>
+        <div class="small-box text-bg-success mb-3">
+          <div class="inner">
+            <h3 id="traffic-outgoing">0</h3>
+            <p>Outgoing Mail</p>
+          </div>
+          <div class="icon"><i class="fas fa-paper-plane"></i></div>
+        </div>
+        <div class="alert alert-secondary mb-0">
+          <strong>Average processing time:</strong>
+          <span id="avg-processing-time">Not available</span>
+          <br>
+          <small id="avg-processing-note" class="text-muted">Not available</small>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <h6 class="mb-2">Top 10 Senders</h6>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Sender</th>
+                <th class="text-end">Messages</th>
+              </tr>
+            </thead>
+            <tbody id="top-senders-body">
+              <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <h6 class="mb-2">Top 10 Recipients</h6>
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Recipient</th>
+                <th class="text-end">Messages</th>
+              </tr>
+            </thead>
+            <tbody id="top-recipients-body">
+              <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Health and Quick Access -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h3 class="card-title">
+      <i class="fas fa-heartbeat"></i>
+      Health Checks & Quick Access
+    </h3>
+  </div>
+  <div class="card-body">
+    <div class="row g-4">
+      <div class="col-lg-8">
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <div class="info-box mb-3 bg-light">
+              <span class="info-box-icon text-bg-success"><i class="fas fa-shield-alt"></i></span>
+              <div class="info-box-content">
+                <span class="info-box-text">Security Checks</span>
+                <span class="info-box-number"><span id="health-check-pass">0</span>/<span id="health-check-total">0</span> passing</span>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="info-box mb-3 bg-light">
+              <span class="info-box-icon text-bg-primary"><i class="fas fa-cogs"></i></span>
+              <div class="info-box-content">
+                <span class="info-box-text">Services Running</span>
+                <span class="info-box-number"><span id="services-running">0</span>/<span id="services-total">0</span> running</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>Check</th>
+                <th>Category</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="health-checks-body">
+              <tr><td colspan="3" class="text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="service-status-body">
+              <tr><td colspan="2" class="text-muted">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="col-lg-4">
+        <h6>Quick Access</h6>
+        <div class="d-grid gap-2">
+          <a href="view_message_history.cfm" class="btn btn-outline-primary"><i class="fas fa-history me-1"></i> Message History</a>
+          <a href="view_mail_queue.cfm" class="btn btn-outline-primary"><i class="fas fa-stream me-1"></i> Mail Queue</a>
+          <a href="view_perimeter_checks.cfm" class="btn btn-outline-primary"><i class="fas fa-shield-alt me-1"></i> Perimeter Checks</a>
+          <a href="view_relay_networks.cfm" class="btn btn-outline-primary"><i class="fas fa-network-wired me-1"></i> Relay Networks</a>
+          <a href="view_system_logs.cfm" class="btn btn-outline-primary"><i class="fas fa-file-alt me-1"></i> System Logs</a>
+          <a href="view_system_updates.cfm" class="btn btn-outline-primary"><i class="fas fa-download me-1"></i> System Updates</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
         <!-- System Resources Card -->
         <div class="card mb-4">
 
@@ -717,11 +862,48 @@ document.addEventListener('DOMContentLoaded', function() {
           document.getElementById('stat-banned').textContent = data.banned.toLocaleString();
           document.getElementById('stat-badheader').textContent = data.badHeader.toLocaleString();
           document.getElementById('stat-other').textContent = data.other.toLocaleString();
+          document.getElementById('traffic-incoming').textContent = (data.incoming || 0).toLocaleString();
+          document.getElementById('traffic-outgoing').textContent = (data.outgoing || 0).toLocaleString();
+
+          var avgProcessing = document.getElementById('avg-processing-time');
+          var avgProcessingNote = document.getElementById('avg-processing-note');
+          if (avgProcessing) {
+            if (data.processingTimeAvailable && data.averageProcessingTimeMs !== undefined) {
+              avgProcessing.textContent = data.averageProcessingTimeMs.toLocaleString() + ' ms';
+            } else {
+              avgProcessing.textContent = 'Not available';
+            }
+          }
+          if (avgProcessingNote) {
+            avgProcessingNote.textContent = data.processingTimeNote || '';
+          }
+
+          renderTopTrafficTable('top-senders-body', data.topSenders || []);
+          renderTopTrafficTable('top-recipients-body', data.topRecipients || []);
 
           // Show/hide limited note
           var limitNote = document.getElementById('stat-limit-note');
           if (limitNote) {
             limitNote.style.display = data.limited ? 'block' : 'none';
+          }
+
+          function renderTopTrafficTable(bodyId, rows) {
+            var body = document.getElementById(bodyId);
+            if (!body) return;
+
+            if (!rows.length) {
+              body.innerHTML = '<tr><td colspan="2" class="text-muted">No data in selected period</td></tr>';
+              return;
+            }
+
+            body.innerHTML = rows.map(function(item) {
+              var email = (item.email || '(unknown)').toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+              var count = Number(item.count || 0).toLocaleString();
+              return '<tr><td style="word-break: break-all;">' + email + '</td><td class="text-end">' + count + '</td></tr>';
+            }).join('');
           }
 
           // Update chart
@@ -820,6 +1002,84 @@ document.addEventListener('DOMContentLoaded', function() {
   } else {
     initMessageStats();
   }
+})();
+</script>
+
+<!-- Dashboard Health Script (Vanilla JS) -->
+<script>
+(function() {
+  function statusBadge(statusText, successValues) {
+    var normalized = (statusText || '').toString().toLowerCase();
+    var ok = successValues.indexOf(normalized) !== -1;
+    return ok
+      ? '<span class="badge text-bg-success">OK</span>'
+      : '<span class="badge text-bg-danger">Needs Attention</span>';
+  }
+
+  function serviceBadge(statusText) {
+    var normalized = (statusText || '').toString().toLowerCase();
+    if (normalized === 'running') {
+      return '<span class="badge text-bg-success">Running</span>';
+    }
+    if (normalized === 'stopped') {
+      return '<span class="badge text-bg-danger">Stopped</span>';
+    }
+    return '<span class="badge text-bg-secondary">Unknown</span>';
+  }
+
+  function refreshDashboardHealth() {
+    fetch('/admin/2/api/get_dashboard_health.cfm?_=' + Date.now())
+      .then(function(response) { return response.json(); })
+      .then(function(data) {
+        if (!data.success) return;
+
+        document.getElementById('health-check-pass').textContent = data.summary.checkPass || 0;
+        document.getElementById('health-check-total').textContent = data.summary.checkTotal || 0;
+        document.getElementById('services-running').textContent = data.summary.serviceRunning || 0;
+        document.getElementById('services-total').textContent = data.summary.serviceTotal || 0;
+
+        var checksBody = document.getElementById('health-checks-body');
+        if (checksBody) {
+          var checks = data.checks || [];
+          if (!checks.length) {
+            checksBody.innerHTML = '<tr><td colspan="3" class="text-muted">No checks available</td></tr>';
+          } else {
+            checksBody.innerHTML = checks.map(function(item) {
+              var checkName = (item.name || '').toString()
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              var category = (item.category || '').toString()
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              return '<tr><td>' + checkName + '</td><td>' + category + '</td><td>' + statusBadge(item.status ? 'ok' : 'bad', ['ok']) + '</td></tr>';
+            }).join('');
+          }
+        }
+
+        var servicesBody = document.getElementById('service-status-body');
+        if (servicesBody) {
+          var services = data.services || [];
+          if (!services.length) {
+            servicesBody.innerHTML = '<tr><td colspan="2" class="text-muted">No services available</td></tr>';
+          } else {
+            servicesBody.innerHTML = services.map(function(item) {
+              var serviceName = (item.name || item.service || '').toString()
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+              return '<tr><td>' + serviceName + '</td><td>' + serviceBadge(item.status) + '</td></tr>';
+            }).join('');
+          }
+        }
+      })
+      .catch(function(error) {
+        console.log('Error fetching dashboard health:', error);
+      });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', refreshDashboardHealth);
+  } else {
+    refreshDashboardHealth();
+  }
+
+  setInterval(refreshDashboardHealth, 60000);
 })();
 </script>
 
