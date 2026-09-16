@@ -20,11 +20,12 @@ does when an operator presses Apply on any Postfix settings page, and staged
 rows are rendered by any regeneration regardless of their applied flag, so this
 does not make anything live that was not already going to be.
 
-It also carries four cfabort paths, guarding chown, dos2unix, chmod and the
-amavis reload. On the scheduled path an abort ends the resolver run early, so
-later aliases go unresolved and no mail is sent. All four mean the host cannot
-write mail config at all, and the alias will still show as not applied
-afterwards, so it surfaces rather than passing silently.
+Its four fatal paths, guarding chown, dos2unix, chmod and the amavis reload,
+used to draw an error box and cfabort, which on a scheduled run would emit HTML
+into a JSON response and end the run early so later aliases never resolved.
+They now log unconditionally and, when request.generateQuiet is set, throw
+instead. The throw is caught here, the consumer is recorded as failed and left
+unstamped, and the run continues.
 
 EACH CONSUMER IS INDEPENDENT AND FAILURE IS PER CONSUMER
 
@@ -40,6 +41,13 @@ listed as not applied, which is the whole point of tracking it per consumer.
 Expects: aliasApplyId (numeric alias id).
 Sets:    aliasApplyResults, an array of {consumer, ok, error}.
 --->
+<!--- Nobody is looking at a page here, whether this came from the scheduler or
+     from a hand edit on the aliases page: in both cases the outcome is reported
+     as a structured result, not as an error box drawn mid-template. generateQuiet
+     tells the generators to log and throw rather than render error.cfm and
+     cfabort the request. Each consumer's cftry below then records the failure and
+     the run continues to the next one. --->
+<cfset request.generateQuiet = true>
 <cfset aliasApplyResults = []>
 
 <cfquery name="aliasApplyWho" datasource="hermes">
@@ -103,3 +111,5 @@ Sets:    aliasApplyResults, an array of {consumer, ok, error}.
     error    = oneErr
   })>
 </cfloop>
+
+<cfset request.generateQuiet = false>

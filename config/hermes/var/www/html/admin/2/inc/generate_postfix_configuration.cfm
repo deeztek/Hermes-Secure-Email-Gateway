@@ -36,9 +36,20 @@ arguments="exec hermes_postfix_dkim chown root:root /etc/postfix/main.cf"
 timeout="10" />
 
 <cfcatch type="any">
+<!--- Always logged, whoever called. error.cfm only draws a box on a page;
+     before this, a failure during a scheduled run left no trace at all. --->
+<cflog file="hermes" type="error"
+       text="generate_postfix_configuration: chown /etc/postfix/main.cf failed: #cfcatch.message#">
+<cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+  <!--- Unattended caller: error.cfm would emit HTML into a JSON response and
+       cfabort would end the whole run, not just this generator. Throw instead,
+       so the caller's cftry records the failure and carries on. --->
+  <cfthrow message="generate_postfix_configuration: chown /etc/postfix/main.cf failed: #cfcatch.message#">
+<cfelse>
 <cfset m="Generate Postfix Configuration: There was an error changing ownership of /etc/postfix/main.cf. Error was #cfcatch.message#">
 <cfinclude template="error.cfm">
 <cfabort>
+</cfif>
 </cfcatch>
 </cftry>
 
@@ -212,9 +223,20 @@ timeout="10" />
 
 <cfcatch type="any">
 
+<!--- Always logged, whoever called. error.cfm only draws a box on a page;
+     before this, a failure during a scheduled run left no trace at all. --->
+<cflog file="hermes" type="error"
+       text="generate_postfix_configuration: dos2unix failed: #cfcatch.message#">
+<cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+  <!--- Unattended caller: error.cfm would emit HTML into a JSON response and
+       cfabort would end the whole run, not just this generator. Throw instead,
+       so the caller's cftry records the failure and carries on. --->
+  <cfthrow message="generate_postfix_configuration: dos2unix failed: #cfcatch.message#">
+<cfelse>
 <cfset m="Generate Postfix Configuration: There was an error executing /usr/bin/dos2unix. Error was #cfcatch.message#">
 <cfinclude template="error.cfm">
 <cfabort>
+</cfif>
 
 </cfcatch>
 </cftry>
@@ -229,9 +251,20 @@ timeout = "60">
 
 <cfcatch type="any">
 
+<!--- Always logged, whoever called. error.cfm only draws a box on a page;
+     before this, a failure during a scheduled run left no trace at all. --->
+<cflog file="hermes" type="error"
+       text="generate_postfix_configuration: chmod of the postconf script failed: #cfcatch.message#">
+<cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+  <!--- Unattended caller: error.cfm would emit HTML into a JSON response and
+       cfabort would end the whole run, not just this generator. Throw instead,
+       so the caller's cftry records the failure and carries on. --->
+  <cfthrow message="generate_postfix_configuration: chmod of the postconf script failed: #cfcatch.message#">
+<cfelse>
 <cfset m="Generate Postfix Configuration: There was an error making /opt/hermes/tmp/#customtrans3#_postconf.sh executable. Error was #cfcatch.message#">
 <cfinclude template="error.cfm">
 <cfabort>
+</cfif>
 
 </cfcatch>
 </cftry>
@@ -379,9 +412,20 @@ arguments="exec hermes_mail_filter /etc/init.d/amavis force-reload"
 timeout = "240">
 </cfexecute>
 <cfcatch type="any">
+<!--- Always logged, whoever called. error.cfm only draws a box on a page;
+     before this, a failure during a scheduled run left no trace at all. --->
+<cflog file="hermes" type="error"
+       text="generate_postfix_configuration: amavis force-reload failed: #cfcatch.message#">
+<cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+  <!--- Unattended caller: error.cfm would emit HTML into a JSON response and
+       cfabort would end the whole run, not just this generator. Throw instead,
+       so the caller's cftry records the failure and carries on. --->
+  <cfthrow message="generate_postfix_configuration: amavis force-reload failed: #cfcatch.message#">
+<cfelse>
 <cfset m="Generate Postfix Configuration: There was an error reloading amavis in hermes_mail_filter container. Error was #cfcatch.message#">
 <cfinclude template="error.cfm">
 <cfabort>
+</cfif>
 </cfcatch>
 </cftry>
 

@@ -92,8 +92,15 @@ bantime = #getJails.bantime#
 
 <cfcatch type="any">
     <cfset ipSyncError = cfcatch.message & " | Detail: " & cfcatch.detail & " | Type: " & cfcatch.type>
-    <!--- Log the error --->
-    <cfset m = "intrusion_prevention_generate_config.cfm: Error - #cfcatch.message# | Detail: #cfcatch.detail# | Type: #cfcatch.type#">
-    <cfinclude template="error.cfm">
+    <!--- The comment below used to say "log the error" while error.cfm only drew
+         a box on the page and logged nothing. Now it actually logs, whoever
+         called, and the box is drawn only when someone is looking at a page.
+         ipSyncSuccess stays false either way, so the caller still sees it. --->
+    <cflog file="hermes" type="error"
+           text="intrusion_prevention_generate_config: #cfcatch.message# | #cfcatch.detail#">
+    <cfif NOT (StructKeyExists(request, "generateQuiet") AND request.generateQuiet)>
+      <cfset m = "intrusion_prevention_generate_config.cfm: Error - #cfcatch.message# | Detail: #cfcatch.detail# | Type: #cfcatch.type#">
+      <cfinclude template="error.cfm">
+    </cfif>
 </cfcatch>
 </cftry>
