@@ -463,6 +463,7 @@ select property, value from encryption_settings where property='user.systemMailS
 
         <div class="table-responsive">
           <table class="table table-sm">
+            <caption class="visually-hidden">Mail security and relay configuration health checks</caption>
             <thead>
               <tr>
                 <th>Check</th>
@@ -478,6 +479,7 @@ select property, value from encryption_settings where property='user.systemMailS
 
         <div class="table-responsive">
           <table class="table table-sm mb-0">
+            <caption class="visually-hidden">Core mail service runtime status</caption>
             <thead>
               <tr>
                 <th>Service</th>
