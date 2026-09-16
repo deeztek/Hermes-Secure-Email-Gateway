@@ -735,6 +735,9 @@ $(document).ready(function() {
     ORDER BY a.name ASC
 </cfquery>
 
+<cfset aliasCoverConsumer = "Intrusion Prevention">
+<cfinclude template="./inc/alias_covered_cidrs.cfm">
+
 <cfquery name="getAliasRanges" datasource="hermes">
     SELECT a.name, GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ') AS ranges
     FROM network_aliases a
@@ -1034,6 +1037,10 @@ $(document).ready(function() {
                             </td>
                             <td>
                                 <code>#encodeForHTML(ip_cidr)#</code><cfif isProtected> <span class="badge bg-secondary">Protected</span></cfif>
+                                <cfif NOT isAlias AND NOT isProtected AND StructKeyExists(aliasCoveredBy, ip_cidr)>
+                                    <br><span class="badge bg-warning text-dark">Also in alias</span>
+                                    <small class="text-muted">#EncodeForHTML(aliasCoveredBy[ip_cidr])# already supplies this range</small>
+                                </cfif>
                                 <cfif isAlias>
                                     <span class="badge bg-primary">Alias</span>
                                     <cfif StructKeyExists(aliasExpansion, ip_cidr) AND Len(Trim(aliasExpansion[ip_cidr]))>

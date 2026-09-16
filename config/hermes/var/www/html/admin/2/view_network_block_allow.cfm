@@ -95,6 +95,9 @@ WHERE a.enabled = 1
 ORDER BY a.name ASC
 </cfquery>
 
+<cfset aliasCoverConsumer = "Network Block-Allow">
+<cfinclude template="./inc/alias_covered_cidrs.cfm">
+
 <cfset aliasExpansion = StructNew()>
 <cfloop query="get_available_aliases">
   <cfquery name="get_one_exp" datasource="hermes">
@@ -388,6 +391,10 @@ ORDER BY a.name ASC
                   </cfif>
                 <cfelse>
                   #encodeForHTML(sender)#
+                  <cfif StructKeyExists(aliasCoveredBy, sender)>
+                    <br><span class="badge bg-warning text-dark">Also in alias</span>
+                    <small class="text-muted">#EncodeForHTML(aliasCoveredBy[sender])# already supplies this range</small>
+                  </cfif>
                 </cfif>
               </td>
               <td>#encodeForHTML(note)#</td>

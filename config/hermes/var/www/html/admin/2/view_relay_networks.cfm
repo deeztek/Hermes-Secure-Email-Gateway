@@ -97,6 +97,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- GET RELAY NETWORKS DATA --->
 <cfinclude template="./inc/get_relay_networks.cfm">
+<cfset aliasCoverConsumer = "Relay Networks">
+<cfinclude template="./inc/alias_covered_cidrs.cfm">
 
 
 <!--- ===================== --->
@@ -960,6 +962,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     </cfif>
                   <cfelse>
                     #parameter#
+                    <!--- A literal row an alias already supplies. Left in the
+                         rendered config as configured, flagged here so the
+                         operator can see the row is doing nothing. --->
+                    <cfif StructKeyExists(aliasCoveredBy, parameter)>
+                      <br><span class="badge bg-warning text-dark">Also in alias</span>
+                      <small class="text-muted">#EncodeForHTML(aliasCoveredBy[parameter])# already supplies this range</small>
+                    </cfif>
                   </cfif>
                 </td>
                 <td>#encodeForHTML(note)#</td>
