@@ -116,7 +116,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfquery name="getTopRecipients" datasource="hermes">
         SELECT
             maddr.email as email,
-            COUNT(*) as total
+            COUNT(DISTINCT msgrcpt.mail_id) as total
         FROM msgrcpt
         INNER JOIN maddr ON msgrcpt.rid = maddr.id
         INNER JOIN (

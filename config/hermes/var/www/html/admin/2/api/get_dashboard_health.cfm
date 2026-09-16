@@ -230,10 +230,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfif NOT StructKeyExists(application, "dashboardHealthCacheByUser") OR NOT IsStruct(application.dashboardHealthCacheByUser)>
             <cfset application.dashboardHealthCacheByUser = {}>
         </cfif>
-        <cfset application.dashboardHealthCacheByUser[cacheKey] = {
-            "generatedAt": now(),
-            "responseJson": serializeJSON(response)
-        }>
+        <cfif NOT StructKeyExists(application.dashboardHealthCacheByUser, cacheKey) OR NOT IsStruct(application.dashboardHealthCacheByUser[cacheKey])>
+            <cfset application.dashboardHealthCacheByUser[cacheKey] = {}>
+        </cfif>
+        <cfset application.dashboardHealthCacheByUser[cacheKey].generatedAt = now()>
+        <cfset application.dashboardHealthCacheByUser[cacheKey].responseJson = serializeJSON(response)>
     </cflock>
 
     <cfcatch type="any">
