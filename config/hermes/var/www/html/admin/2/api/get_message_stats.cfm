@@ -104,7 +104,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             ORDER BY time_num DESC
             LIMIT #maxMessages#
         ) as recent_msgs
-        LEFT JOIN maddr ON recent_msgs.sid = maddr.id
+        INNER JOIN maddr ON recent_msgs.sid = maddr.id
+        WHERE maddr.email IS NOT NULL
+          AND maddr.email <> ''
         GROUP BY maddr.email
         ORDER BY total DESC
         LIMIT 10

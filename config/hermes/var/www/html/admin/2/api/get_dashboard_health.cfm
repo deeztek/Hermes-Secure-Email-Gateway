@@ -88,23 +88,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset smtpdMiltersParentId = getSmtpdMiltersId.id>
     </cfif>
 
-    <cfquery name="getDkimEnabled" datasource="hermes">
-        SELECT enabled
-        FROM parameters
-        WHERE parameter LIKE <cfqueryparam value="inet:%:8891" cfsqltype="cf_sql_varchar">
-          AND child = '1'
-          AND parent = <cfqueryparam value="#smtpdMiltersParentId#" cfsqltype="cf_sql_integer">
-        LIMIT 1
-    </cfquery>
+    <cfset dkimEnabled = false>
+    <cfset dmarcEnabled = false>
+    <cfif smtpdMiltersParentId GT 0>
+        <cfquery name="getDkimEnabled" datasource="hermes">
+            SELECT enabled
+            FROM parameters
+            WHERE parameter LIKE <cfqueryparam value="inet:%:8891" cfsqltype="cf_sql_varchar">
+              AND child = '1'
+              AND parent = <cfqueryparam value="#smtpdMiltersParentId#" cfsqltype="cf_sql_integer">
+            LIMIT 1
+        </cfquery>
 
-    <cfquery name="getDmarcEnabled" datasource="hermes">
-        SELECT enabled
-        FROM parameters
-        WHERE parameter LIKE <cfqueryparam value="inet:%:54321" cfsqltype="cf_sql_varchar">
-          AND child = '1'
-          AND parent = <cfqueryparam value="#smtpdMiltersParentId#" cfsqltype="cf_sql_integer">
-        LIMIT 1
-    </cfquery>
+        <cfquery name="getDmarcEnabled" datasource="hermes">
+            SELECT enabled
+            FROM parameters
+            WHERE parameter LIKE <cfqueryparam value="inet:%:54321" cfsqltype="cf_sql_varchar">
+              AND child = '1'
+              AND parent = <cfqueryparam value="#smtpdMiltersParentId#" cfsqltype="cf_sql_integer">
+            LIMIT 1
+        </cfquery>
+
+        <cfset dkimEnabled = (getDkimEnabled.recordCount EQ 1 AND getDkimEnabled.enabled EQ "1")>
+        <cfset dmarcEnabled = (getDmarcEnabled.recordCount EQ 1 AND getDmarcEnabled.enabled EQ "1")>
+    </cfif>
 
     <cfset checks = []>
     <cfset arrayAppend(checks, {
@@ -125,12 +132,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset arrayAppend(checks, {
         "name": "DKIM milter enabled",
         "category": "Mail security",
-        "status": (getDkimEnabled.recordCount EQ 1 AND getDkimEnabled.enabled EQ "1")
+        "status": dkimEnabled
     })>
     <cfset arrayAppend(checks, {
         "name": "DMARC milter enabled",
         "category": "Mail security",
-        "status": (getDmarcEnabled.recordCount EQ 1 AND getDmarcEnabled.enabled EQ "1")
+        "status": dmarcEnabled
     })>
 
     <cfset serviceDefs = [
@@ -140,31 +147,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         {"name":"spamassassin","label":"SpamAssassin"}
     ]>
     <cfset services = []>
-    <cfloop array="#serviceDefs#" index="svc">
+    <cfset allServiceOutput = "">
+    <cfset serviceDelimiter = "__HERMES_SERVICE_SPLIT__">
+    <cfset serviceCommand = "/usr/sbin/service postfix status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service amavis status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service clamav-daemon status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service spamassassin status 2>&1">
+    <cftry>
+        <cfexecute name="/bin/sh" arguments='-c "#serviceCommand#"' variable="allServiceOutput" timeout="12" />
+        <cfcatch type="any">
+            <cfset allServiceOutput = cfcatch.message & " " & cfcatch.detail>
+        </cfcatch>
+    </cftry>
+
+    <cfset allServiceOutput = replace(allServiceOutput, serviceDelimiter, chr(7), "all")>
+    <cfset serviceChunks = listToArray(allServiceOutput, chr(7), true)>
+
+    <cfloop from="1" to="#arrayLen(serviceDefs)#" index="serviceIndex">
+        <cfset svc = serviceDefs[serviceIndex]>
         <cfset serviceState = "unknown">
-        <cfset rawOutput = "">
-        <cfset rawErrorOutput = "">
-        <cfset outputNormalized = "">
-        <cftry>
-            <cfexecute
-                name="/usr/sbin/service"
-                arguments="#svc.name# status"
-                variable="rawOutput"
-                errorVariable="rawErrorOutput"
-                timeout="10" />
-            <cfset outputNormalized = lCase(trim(rawOutput & " " & rawErrorOutput))>
-            <cfif findNoCase("active (running)", outputNormalized) OR findNoCase("is running", outputNormalized) OR findNoCase("start/running", outputNormalized)>
-                <cfset serviceState = "running">
-            <cfelseif findNoCase("inactive", outputNormalized) OR findNoCase("stopped", outputNormalized) OR findNoCase("not running", outputNormalized) OR findNoCase("unrecognized service", outputNormalized)>
-                <cfset serviceState = "stopped">
-            </cfif>
-            <cfcatch type="any">
-                <cfset outputNormalized = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
-                <cfif findNoCase("inactive", outputNormalized) OR findNoCase("stopped", outputNormalized) OR findNoCase("not running", outputNormalized) OR findNoCase("unrecognized service", outputNormalized)>
-                    <cfset serviceState = "stopped">
-                </cfif>
-            </cfcatch>
-        </cftry>
+        <cfset serviceOutput = "">
+        <cfif serviceIndex LTE arrayLen(serviceChunks)>
+            <cfset serviceOutput = lCase(trim(serviceChunks[serviceIndex]))>
+        </cfif>
+
+        <cfif findNoCase("active (running)", serviceOutput) OR findNoCase("is running", serviceOutput) OR findNoCase("start/running", serviceOutput)>
+            <cfset serviceState = "running">
+        <cfelseif findNoCase("inactive", serviceOutput) OR findNoCase("stopped", serviceOutput) OR findNoCase("not running", serviceOutput) OR findNoCase("unrecognized service", serviceOutput)>
+            <cfset serviceState = "stopped">
+        </cfif>
+
         <cfset arrayAppend(services, {
             "name": svc.label,
             "service": svc.name,

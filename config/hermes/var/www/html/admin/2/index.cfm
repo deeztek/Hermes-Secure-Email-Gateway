@@ -1039,7 +1039,19 @@ document.addEventListener('DOMContentLoaded', function() {
     fetch('/admin/2/api/get_dashboard_health.cfm')
       .then(function(response) { return response.json(); })
       .then(function(data) {
-        if (!data.success) return;
+        if (!data.success) {
+          var errorMessage = (data.error || 'Unable to load health status').toString()
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          var checksBodyOnError = document.getElementById('health-checks-body');
+          var servicesBodyOnError = document.getElementById('service-status-body');
+          if (checksBodyOnError) {
+            checksBodyOnError.innerHTML = '<tr><td colspan="3" class="text-danger">' + errorMessage + '</td></tr>';
+          }
+          if (servicesBodyOnError) {
+            servicesBodyOnError.innerHTML = '<tr><td colspan="2" class="text-danger">' + errorMessage + '</td></tr>';
+          }
+          return;
+        }
 
         document.getElementById('health-check-pass').textContent = data.summary.checkPass || 0;
         document.getElementById('health-check-total').textContent = data.summary.checkTotal || 0;
