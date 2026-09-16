@@ -874,31 +874,35 @@ $(document).ready(function() {
             <cfelse>
                 <span class="badge badge-synced"><i class="fas fa-check-circle"></i> Synced</span>
             </cfif>
-            <!--- Always rendered, not gated on hasPendingChanges.
-
-                 The badge reports state; this performs an action, and the two
-                 should not share a condition. Gating the button on the flag
-                 hides it in exactly the case where it is most needed: the flag
-                 being wrong. That is not hypothetical, it is the defect this
-                 was added for.
-
-                 Safe to press at any time. It regenerates jail.local from the
-                 database and reloads, which produces the same file when nothing
-                 has changed, and fail2ban restores active bans from its own
-                 persistent database across a reload.
-
-                 Styled by state so it does not read as urgent when it is not. --->
-            <form action="" method="post" class="d-inline ms-2">
-                <input type="hidden" name="action" value="apply_changes">
-                <button type="submit" class="btn btn-sm <cfif hasPendingChanges>btn-danger<cfelse>btn-outline-secondary</cfif>"
-                        title="Rewrite jail.local from the database and reload fail2ban. Safe to run at any time."
-                        onclick="this.disabled=true;this.innerHTML='Applying...';this.form.submit();">Apply Settings</button>
-            </form>
         </div>
     </div>
     <div class="card-body">
         <div class="row">
             <div class="col-md-6">
+                <!--- Always rendered, not gated on hasPendingChanges.
+
+                     The badge in the header reports state; this performs an
+                     action, and the two should not share a condition. Gating the
+                     button on the flag hides it in exactly the case where it is
+                     most needed: the flag being wrong. That is not hypothetical,
+                     it is the defect this was added for.
+
+                     Safe to press at any time. It rewrites jail.local from the
+                     database and reloads, which produces the same file when
+                     nothing has changed, and fail2ban restores active bans from
+                     its own persistent database across a reload. --->
+                <form action="" method="post" class="mb-3">
+                    <input type="hidden" name="action" value="apply_changes">
+                    <button type="submit" class="btn btn-primary"
+                            title="Rewrite jail.local from the database and reload fail2ban. Safe to run at any time."
+                            onclick="this.disabled=true;this.innerHTML='<i class=\'fas fa-spinner fa-spin\'></i> Applying...';this.form.submit();">
+                        <i class="fas fa-save"></i> Apply Settings
+                    </button>
+                    <cfif hasPendingChanges>
+                        <span class="ms-2 text-danger"><i class="fas fa-exclamation-circle"></i> Changes are waiting to be applied</span>
+                    </cfif>
+                </form>
+
                 <form name="SetIPStatus" method="post">
                     <input type="hidden" name="action" value="set_ip_status">
                     <div class="form-group">
