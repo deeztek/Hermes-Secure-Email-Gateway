@@ -166,35 +166,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         {"name":"spamassassin","label":"SpamAssassin"}
     ]>
     <cfset services = []>
-    <cfset serviceStates = {}>
-    <cfset systemctlOutput = "">
-    <cfset systemctlError = "">
-    <cftry>
-        <cfexecute
-            name="/usr/bin/systemctl"
-            arguments="is-active postfix amavis clamav-daemon spamassassin"
-            variable="systemctlOutput"
-            errorVariable="systemctlError"
-            timeout="5" />
-    <cfcatch type="any">
-        <cfset systemctlError = cfcatch.message & " " & cfcatch.detail>
-    </cfcatch>
-    </cftry>
-
-    <cfset statusLines = listToArray(trim(systemctlOutput), chr(10), true)>
-    <cfloop from="1" to="#arrayLen(serviceDefs)#" index="serviceIndex">
-        <cfset svc = serviceDefs[serviceIndex]>
+    <cfloop array="#serviceDefs#" index="svc">
         <cfset serviceState = "unknown">
         <cfset rawStatus = "">
-        <cfif serviceIndex LTE arrayLen(statusLines)>
-            <cfset rawStatus = lCase(trim(statusLines[serviceIndex]))>
-        <cfelseif Len(trim(systemctlError))>
-            <cfset rawStatus = lCase(trim(systemctlError))>
-        </cfif>
+        <cfset serviceOutput = "">
+        <cfset serviceErrorOutput = "">
+        <cftry>
+            <cfexecute
+                name="/usr/sbin/service"
+                arguments="#svc.name# status"
+                variable="serviceOutput"
+                errorVariable="serviceErrorOutput"
+                timeout="3" />
+            <cfset rawStatus = lCase(trim(serviceOutput & " " & serviceErrorOutput))>
+            <cfcatch type="any">
+                <cfset rawStatus = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
+            </cfcatch>
+        </cftry>
 
         <cfif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
             <cfset serviceState = "running">
-        <cfelseif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus)>
+        <cfelseif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus) OR findNoCase("stopped", rawStatus)>
             <cfset serviceState = "stopped">
         </cfif>
 

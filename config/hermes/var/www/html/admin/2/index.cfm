@@ -1045,7 +1045,7 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function refreshDashboardHealth() {
-    fetch('/admin/2/api/get_dashboard_health.cfm')
+    fetch('/admin/2/api/get_dashboard_health.cfm', { cache: 'no-store' })
       .then(function(response) {
         return response.json()
           .catch(function() { return { success: false, error: 'Unable to load health status' }; })
