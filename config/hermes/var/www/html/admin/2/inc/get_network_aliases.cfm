@@ -24,11 +24,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   `spf` carries a hostname that the scheduled resolver expands.
 
   usable_count is what consumers would actually write: v_alias_ranges applies
-  enabled, included and the address-family policy in one place. stored_count is
-  every row. The difference is ranges that exist but are not being rendered,
-  because they were unchecked or because their family is not enabled on this
-  deployment. The page shows both rather than a total that will not match what
-  lands on disk.
+  enabled, included and the address-family policy in one place.
+
+  A range that is stored but not rendered is one of two things, and they are not
+  interchangeable: the operator unchecked it, or its address family is not
+  enabled on this deployment. One is a decision someone made and can undo; the
+  other is a property of the box. Reporting a single "not rendered" total tells
+  the reader neither, so the counts are separated and the page names the reason.
+
+  excluded_count is the first. The second is stored - usable - excluded, since
+  the only other thing the view filters on is family.
 --->
 
 <cfquery name="get_aliases" datasource="hermes">
@@ -44,7 +49,9 @@ SELECT a.id,
        (SELECT COUNT(*) FROM v_alias_ranges v
          WHERE v.alias_id = a.id) AS usable_count,
        (SELECT COUNT(*) FROM network_alias_entries e
-         WHERE e.alias_id = a.id) AS stored_count
+         WHERE e.alias_id = a.id) AS stored_count,
+       (SELECT COUNT(*) FROM network_alias_entries e
+         WHERE e.alias_id = a.id AND e.included = 0) AS excluded_count
 FROM network_aliases a
 ORDER BY a.name ASC
 </cfquery>

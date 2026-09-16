@@ -852,8 +852,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </td>
           <td>
             #usable_count# in use
-            <cfif stored_count GT usable_count>
-              <br><small class="text-muted">#stored_count - usable_count# stored but not rendered</small>
+            <cfif excluded_count GT 0>
+              <br><small class="text-muted">#excluded_count# excluded</small>
+            </cfif>
+            <!--- Whatever is left over is filtered by the address-family policy,
+                 since that is the only other thing v_alias_ranges filters on. --->
+            <cfset familyFiltered = stored_count - usable_count - excluded_count>
+            <cfif familyFiltered GT 0>
+              <br><small class="text-muted">#familyFiltered# IPv6, not rendered while IPv6 is disabled</small>
             </cfif>
           </td>
           <td>
