@@ -182,6 +182,10 @@ $(document).ready(function() {
 
 <!--- Generate container IPs file for fail2ban API notify script --->
 <!--- This file is read by hermes-api-notify.sh which can't use Docker DNS in host network mode --->
+<!--- Above the action handlers: they call cidrCheck(), so the function has to
+     exist before any of them runs. --->
+<cfinclude template="./inc/cidr_validate.cfm">
+
 <cfinclude template="./inc/generate_container_ips.cfm">
 
 <!--- Initialize variables --->
@@ -758,7 +762,6 @@ $(document).ready(function() {
     ORDER BY a.name ASC
 </cfquery>
 
-<cfinclude template="./inc/cidr_validate.cfm">
 <cfset aliasCoverConsumer = "Intrusion Prevention">
 <cfinclude template="./inc/alias_covered_cidrs.cfm">
 
