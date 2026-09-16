@@ -32,6 +32,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfabort>
 </cfif>
 
+<cfquery name="getAuthorizedAdmin" datasource="hermes">
+    SELECT id
+    FROM system_users
+    WHERE id = <cfqueryparam value="#session.userid#" cfsqltype="cf_sql_integer">
+      AND username = <cfqueryparam value="#session.theUser#" cfsqltype="cf_sql_varchar">
+      AND system = <cfqueryparam value="2" cfsqltype="cf_sql_integer">
+      AND applied = <cfqueryparam value="1" cfsqltype="cf_sql_integer">
+    LIMIT 1
+</cfquery>
+<cfif getAuthorizedAdmin.recordCount NEQ 1>
+    <cfheader statuscode="403" statustext="Forbidden">
+    <cfoutput>{"success":false,"error":"Forbidden"}</cfoutput>
+    <cfabort>
+</cfif>
+
 <cfset response = {
     "success": true,
     "checks": [],
