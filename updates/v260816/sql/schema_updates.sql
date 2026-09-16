@@ -79,7 +79,7 @@ ALTER TABLE `quarantine_digest_deliveries`
 -- 3. Seed the Ofelia quarantine digest job
 -- ---------------------------------------------------------------------
 INSERT INTO `ofelia_jobs` (job_name, schedule, command, container, type, active, no_overlap)
-SELECT '[job-exec "hermes-quarantine-digest"]', '@every 60s',
+SELECT '[job-exec "hermes-quarantine-digest"]', '0 0 19 * * *',
        '/usr/bin/curl --silent http://localhost:8888/schedule/digestQuarantine.cfm',
        'hermes_commandbox', 'system', 1, 1
 WHERE NOT EXISTS (
