@@ -33,20 +33,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 }>
 
 <cfset cacheTtlSeconds = 30>
-<cfset cachedResponse = "">
+<cfset cachedResponseJson = "">
 <cfset cacheIsValid = false>
 <cflock scope="application" type="readonly" timeout="5">
     <cfif StructKeyExists(application, "dashboardHealthCache")>
         <cfset cacheAgeSeconds = DateDiff("s", application.dashboardHealthCache.generatedAt, now())>
         <cfif cacheAgeSeconds GTE 0 AND cacheAgeSeconds LTE cacheTtlSeconds>
-            <cfset cachedResponse = application.dashboardHealthCache.response>
+            <cfset cachedResponseJson = application.dashboardHealthCache.responseJson>
             <cfset cacheIsValid = true>
         </cfif>
     </cfif>
 </cflock>
 
 <cfif cacheIsValid>
-    <cfoutput>#serializeJSON(cachedResponse)#</cfoutput>
+    <cfoutput>#cachedResponseJson#</cfoutput>
     <cfabort>
 </cfif>
 
@@ -186,7 +186,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cflock scope="application" type="exclusive" timeout="5">
         <cfset application.dashboardHealthCache = {
             "generatedAt": now(),
-            "response": response
+            "responseJson": serializeJSON(response)
         }>
     </cflock>
 
