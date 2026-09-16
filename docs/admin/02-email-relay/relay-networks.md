@@ -258,6 +258,16 @@ SMTP-time checks also bypasses content-filter network checks.
 Every shell-out uses `docker exec hermes_postfix_dkim …` /
 `docker exec hermes_mail_filter …` per the standard Hermes pattern.
 
+## Referencing a network alias
+
+Instead of pasting a provider's ranges here, add a [network alias](../01-system/network-aliases.md) and the current ranges are expanded into `mynetworks` whenever the file is written. When the provider's ranges change, this page is regenerated for you.
+
+An alias row shows the name, an **Alias** badge, and the ranges it currently supplies. It has a delete button and no edit button: the cell holds the alias name, not an address, so editing it could only break the reference. Ranges are changed on the Network Aliases page.
+
+A hand-typed row whose range an alias also supplies is marked **Also in alias**. The duplicate is harmless and the row can be removed.
+
+**This does not change what adding a range here means.** Everything in `mynetworks` is trusted unconditionally, alias or not, and a cloud provider's outbound ranges are shared with every other customer of that provider. An alias makes the configuration easier to maintain, not safer.
+
 ## Related
 
 - [Relay Recipients](relay-recipients.md) — the recipient-validation

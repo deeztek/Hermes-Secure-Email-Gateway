@@ -101,6 +101,7 @@ enabled.
 | `hermes-quarantine-notify` | Every 60s, `no-overlap` | `hermes_commandbox` | Issues quarantine-release emails to recipients with pending messages |
 | `hermes-process-cert-queue` | Every 60s, `no-overlap` | `hermes_commandbox` | Drains the encryption cert lookup queue for outbound S/MIME / PGP recipients |
 | `hermes-fangfrisch-refresh` | Every 10 min | `hermes_mail_filter` | Refreshes third-party ClamAV signature feeds (SecuriteInfo, Sanesecurity, etc.) |
+| `hermes-refresh-network-aliases` | Daily 03:30 | `hermes_commandbox` | Re-resolves enabled SPF-backed [network aliases](network-aliases.md), applies the pages that reference any alias whose ranges moved, and emails a record of what changed. Added v260912 |
 
 New jobs added by later features (signature-map regen for the body
 milter, the post-upgrade hook caller, etc.) appear here automatically as

@@ -214,6 +214,14 @@ permanently.
 | `/etc/postfix/postscreen_access.cidr` (volume mount) | `hermes_postfix_dkim` | Live CIDR file consumed by postscreen |
 | `hermes_postfix_dkim` container | — | Where `postfix reload` runs |
 
+## Referencing a network alias
+
+A [network alias](../01-system/network-aliases.md) can be added here instead of a literal address, as either Allow or Block. Its current ranges are expanded into `postscreen_access.cidr`, one network per line, whenever the file is written, and this page is regenerated automatically when those ranges change.
+
+This is the list with the strongest case for an alias: the shipped `postscreen_access.cidr` carries well over a hundred hand-pasted cloud provider ranges, and nothing keeps them current.
+
+An alias row has a delete button and no edit button, since the cell holds a name rather than an address.
+
 ## Related
 
 - [Perimeter Checks](perimeter-checks.md) — postscreen toggles and the

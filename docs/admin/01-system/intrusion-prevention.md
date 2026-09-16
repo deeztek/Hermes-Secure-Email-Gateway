@@ -182,6 +182,18 @@ Community installs see the gating panel and cannot reach the UI. The `hermes_fai
 | `/opt/hermes/tmp/jail.local.tmp` | both | Ephemeral rendered config; `docker exec cp`-ed into the fail2ban mount |
 | `/opt/hermes/tmp/container_ips.env` | both | DB and Commandbox IPs for the API notify script (host networking has no DNS) |
 
+## Referencing a network alias
+
+A [network alias](network-aliases.md) can be added to the whitelist instead of a literal address. Its current ranges are expanded into `ignoreip` whenever `jail.local` is written.
+
+The case for it: a gateway relaying for a cloud provider has that provider's ranges in `mynetworks`. If fail2ban bans one of them, legitimate mail stops arriving and the cause is not obvious.
+
+Note that `ignoreip` is written as indented continuation lines, so `grep ignoreip` shows only the first. Read the block with `sed -n '1,8p'` or ask fail2ban what it parsed:
+
+```bash
+docker exec hermes_fail2ban fail2ban-client get authelia ignoreip
+```
+
 ## Related
 
 - [Admin Console Firewall](admin-console-firewall.md) — the complementary static-allowlist layer; IPS is reactive, Console Firewall is preventative
