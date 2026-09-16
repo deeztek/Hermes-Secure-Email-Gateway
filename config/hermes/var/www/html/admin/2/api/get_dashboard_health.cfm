@@ -147,26 +147,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         {"name":"spamassassin","label":"SpamAssassin"}
     ]>
     <cfset services = []>
-    <cfset allServiceOutput = "">
-    <cfset serviceDelimiter = "__HERMES_SERVICE_SPLIT__">
-    <cfset serviceCommand = "/usr/sbin/service postfix status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service amavis status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service clamav-daemon status 2>&1; echo " & serviceDelimiter & "; /usr/sbin/service spamassassin status 2>&1">
-    <cftry>
-        <cfexecute name="/bin/sh" arguments='-c "#serviceCommand#"' variable="allServiceOutput" timeout="12" />
-        <cfcatch type="any">
-            <cfset allServiceOutput = cfcatch.message & " " & cfcatch.detail>
-        </cfcatch>
-    </cftry>
-
-    <cfset allServiceOutput = replace(allServiceOutput, serviceDelimiter, chr(7), "all")>
-    <cfset serviceChunks = listToArray(allServiceOutput, chr(7), true)>
-
-    <cfloop from="1" to="#arrayLen(serviceDefs)#" index="serviceIndex">
-        <cfset svc = serviceDefs[serviceIndex]>
+    <cfloop array="#serviceDefs#" index="svc">
         <cfset serviceState = "unknown">
         <cfset serviceOutput = "">
-        <cfif serviceIndex LTE arrayLen(serviceChunks)>
-            <cfset serviceOutput = lCase(trim(serviceChunks[serviceIndex]))>
-        </cfif>
+        <cfset serviceErrorOutput = "">
+        <cftry>
+            <cfexecute
+                name="/usr/sbin/service"
+                arguments="#svc.name# status"
+                variable="serviceOutput"
+                errorVariable="serviceErrorOutput"
+                timeout="3" />
+            <cfset serviceOutput = lCase(trim(serviceOutput & " " & serviceErrorOutput))>
+            <cfcatch type="any">
+                <cfset serviceOutput = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
+            </cfcatch>
+        </cftry>
 
         <cfif findNoCase("active (running)", serviceOutput) OR findNoCase("is running", serviceOutput) OR findNoCase("start/running", serviceOutput)>
             <cfset serviceState = "running">

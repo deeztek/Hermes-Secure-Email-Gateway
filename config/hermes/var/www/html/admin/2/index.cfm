@@ -1020,19 +1020,19 @@ document.addEventListener('DOMContentLoaded', function() {
     var normalized = (statusText || '').toString().toLowerCase();
     var ok = successValues.indexOf(normalized) !== -1;
     return ok
-      ? '<span class="badge text-bg-success">OK</span>'
-      : '<span class="badge text-bg-danger">Needs Attention</span>';
+      ? '<span class="fw-semibold">Pass</span> <span class="badge text-bg-success">OK</span>'
+      : '<span class="fw-semibold">Fail</span> <span class="badge text-bg-danger">Needs Attention</span>';
   }
 
   function serviceBadge(statusText) {
     var normalized = (statusText || '').toString().toLowerCase();
     if (normalized === 'running') {
-      return '<span class="badge text-bg-success">Running</span>';
+      return '<span class="fw-semibold">Running</span> <span class="badge text-bg-success">Running</span>';
     }
     if (normalized === 'stopped') {
-      return '<span class="badge text-bg-danger">Stopped</span>';
+      return '<span class="fw-semibold">Stopped</span> <span class="badge text-bg-danger">Stopped</span>';
     }
-    return '<span class="badge text-bg-secondary">Unknown</span>';
+    return '<span class="fw-semibold">Unknown</span> <span class="badge text-bg-secondary">Unknown</span>';
   }
 
   function refreshDashboardHealth() {
@@ -1089,6 +1089,15 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       })
       .catch(function(error) {
+        var checksBodyOnCatch = document.getElementById('health-checks-body');
+        var servicesBodyOnCatch = document.getElementById('service-status-body');
+        var errorMessage = 'Unable to load health status';
+        if (checksBodyOnCatch) {
+          checksBodyOnCatch.innerHTML = '<tr><td colspan="3" class="text-danger">' + errorMessage + '</td></tr>';
+        }
+        if (servicesBodyOnCatch) {
+          servicesBodyOnCatch.innerHTML = '<tr><td colspan="2" class="text-danger">' + errorMessage + '</td></tr>';
+        }
         console.log('Error fetching dashboard health:', error);
       });
   }
