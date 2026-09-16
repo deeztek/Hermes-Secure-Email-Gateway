@@ -87,6 +87,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       where a malformed line is not rejected loudly, it just quietly fails to
       match. cfqueryparam covers injection; this covers correctness.
 --->
+<cfinclude template="./inc/cidr_validate.cfm">
+
 <cffunction name="stampRangesChanged" returntype="void" output="false">
   <cfargument name="aliasId" type="numeric" required="true">
   <!--- The range set moved. Every consumer's rendered file is now stale until
@@ -97,78 +99,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     UPDATE network_aliases SET ranges_changed_at = NOW(6)
     WHERE id = <cfqueryparam value="#arguments.aliasId#" cfsqltype="cf_sql_integer">
   </cfquery>
-</cffunction>
-
-<cffunction name="normalizeCidr" returntype="string" output="false">
-  <cfargument name="value" type="string" required="true">
-  <cfset var v = Trim(arguments.value)>
-  <cfif Find("/", v)>
-    <cfreturn v>
-  </cfif>
-  <cfif REFind("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$", v)>
-    <cfreturn v & "/32">
-  </cfif>
-  <cfif REFindNoCase("^[0-9a-f:]+$", v) AND Find(":", v)>
-    <cfreturn v & "/128">
-  </cfif>
-  <cfreturn v>
-</cffunction>
-
-<cffunction name="cidrFamily" returntype="string" output="false">
-  <cfargument name="value" type="string" required="true">
-  <cfset var v = Trim(arguments.value)>
-  <cfset var parts = "">
-  <cfset var addr = "">
-  <cfset var prefix = "">
-  <cfset var octets = "">
-  <cfset var i = 0>
-
-  <!--- A bare address is a host route, so supply the prefix rather than
-       rejecting it. Typing 8.8.8.8 and getting silence is not useful; /32 is
-       the only thing it could have meant. normalizeCidr() returns the value
-       that gets stored, so the table shows what Postfix will see. --->
-  <cfif NOT Find("/", v)>
-    <cfif REFind("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$", v)>
-      <cfset v = v & "/32">
-    <cfelseif REFindNoCase("^[0-9a-f:]+$", v) AND Find(":", v)>
-      <cfset v = v & "/128">
-    <cfelse>
-      <cfreturn "">
-    </cfif>
-  </cfif>
-  <cfset parts = ListToArray(v, "/")>
-  <cfif ArrayLen(parts) NEQ 2>
-    <cfreturn "">
-  </cfif>
-  <cfset addr = parts[1]>
-  <cfset prefix = parts[2]>
-  <cfif NOT IsNumeric(prefix)>
-    <cfreturn "">
-  </cfif>
-
-  <!--- IPv4 --->
-  <cfif REFind("^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$", addr)>
-    <cfif prefix LT 0 OR prefix GT 32>
-      <cfreturn "">
-    </cfif>
-    <cfset octets = ListToArray(addr, ".")>
-    <cfloop index="i" from="1" to="4">
-      <cfif octets[i] LT 0 OR octets[i] GT 255>
-        <cfreturn "">
-      </cfif>
-    </cfloop>
-    <cfreturn "ip4">
-  </cfif>
-
-  <!--- IPv6: hex groups and colons, optional :: compression --->
-  <cfif REFindNoCase("^[0-9a-f:]+$", addr) AND Find(":", addr)>
-    <cfif prefix LT 0 OR prefix GT 128>
-      <cfreturn "">
-    </cfif>
-    <cfreturn "ip6">
-  </cfif>
-
-  <cfreturn "">
 </cffunction>
 
 <cffunction name="aliasReferenceCount" returntype="numeric" output="false">
@@ -458,14 +388,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <cfset addedCount = 0>
   <cfset badCount = 0>
+  <cfset badDetail = "">
   <cfloop list="#rawEntries#" index="oneEntry" delimiters="#Chr(10)##Chr(13)#,">
     <cfset oneEntry = Trim(oneEntry)>
     <cfif oneEntry is not "">
-      <cfset oneEntry = normalizeCidr(oneEntry)>
-      <cfset theFamily = cidrFamily(oneEntry)>
-      <cfif theFamily is "">
+      <cfset oneCheck = cidrCheck(oneEntry)>
+      <cfif NOT oneCheck.ok>
         <cfset badCount = badCount + 1>
+        <cfset badDetail = badDetail & EncodeForHTML(oneEntry) & ": " & EncodeForHTML(oneCheck.error)>
+        <cfif Len(oneCheck.suggest)>
+          <cfset badDetail = badDetail & ". Did you mean " & EncodeForHTML(oneCheck.suggest) & "?">
+        </cfif>
+        <cfset badDetail = badDetail & "<br>">
       <cfelse>
+        <cfset oneEntry = oneCheck.cidr>
+        <cfset theFamily = oneCheck.family>
         <cfquery name="insert_entry" datasource="hermes">
           INSERT IGNORE INTO network_alias_entries (alias_id, cidr, family, origin)
           VALUES (
@@ -486,6 +423,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfinclude template="./inc/alias_apply_consumers.cfm">
     <cfset session.alias_apply_results = aliasApplyResults>
   </cfif>
+  <cfset session.alias_bad_detail = badDetail>
   <cfif badCount GT 0>
     <cfset session.m = 67>
   <cfelse>
@@ -666,7 +604,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-exclamation-triangle"></i> Some entries were skipped</h4>
-    <cfoutput>Valid ranges were added. Anything that was not a valid CIDR was skipped, because a malformed range does not fail loudly in a Postfix lookup file, it just silently never matches.</cfoutput>
+    <cfoutput>Valid ranges were added. These were skipped:</cfoutput>
+    <div class="mt-2 small"><cfoutput>#session.alias_bad_detail#</cfoutput></div>
+    <p class="mb-0 mt-2"><small class="text-muted">
+      A range with host bits set, such as a /23 starting on an odd third octet, makes
+      Postfix reject the whole lookup table rather than just that line, so these are
+      refused rather than stored.
+    </small></p>
+    <cfset session.alias_bad_detail = "">
 
   <cfinclude template="./inc/alias_apply_nudge.cfm">
   </div>

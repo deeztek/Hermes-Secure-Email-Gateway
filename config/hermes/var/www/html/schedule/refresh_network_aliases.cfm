@@ -1,3 +1,4 @@
+<cfinclude template="../admin/2/inc/cidr_validate.cfm">
 <!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2025. All Rights Reserved.
 
@@ -341,7 +342,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset beforeList = ValueList(beforeRows.cidr)>
 
   <cfset nowList = "">
+  <!--- A published record can carry a CIDR with host bits set. Storing one puts
+       it into mynetworks, where Postfix errors the whole lookup and discards the
+       rest of the access list, so it is dropped here rather than applied. --->
   <cfloop array="#expansion.ip4#" index="oneRange">
+    <cfset oneCheck = cidrCheck(oneRange)>
+    <cfif NOT oneCheck.ok>
+      <cflog file="hermes" type="warning"
+             text="refresh_network_aliases: #thisName#: dropping #oneRange# from the source record: #oneCheck.error#">
+      <cfcontinue>
+    </cfif>
+    <cfset oneRange = oneCheck.cidr>
     <cfquery name="upsert4" datasource="hermes">
       INSERT INTO network_alias_entries (alias_id, cidr, family, origin, first_seen, last_seen)
       VALUES (
