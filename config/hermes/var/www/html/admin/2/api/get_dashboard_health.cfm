@@ -83,6 +83,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfabort>
 </cfif>
 
+<cfset enabledValues = "1,yes,true,on">
+
 <cftry>
     <cfquery name="getHeloRequiredId" datasource="hermes">
         SELECT id
@@ -167,17 +169,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset arrayAppend(checks, {
         "name": "HELO/EHLO required",
         "category": "Mail security",
-        "status": (getHeloRequired.recordCount EQ 1 AND getHeloRequired.enabled EQ "1")
+        "status": (getHeloRequired.recordCount EQ 1 AND ListFindNoCase(enabledValues, Trim(getHeloRequired.enabled)))
     })>
     <cfset arrayAppend(checks, {
         "name": "Reject unauthorized destination (relay protection)",
         "category": "Relay configuration",
-        "status": (getRejectUnauthDestination.recordCount EQ 1 AND getRejectUnauthDestination.enabled EQ "1")
+        "status": (getRejectUnauthDestination.recordCount EQ 1 AND ListFindNoCase(enabledValues, Trim(getRejectUnauthDestination.enabled)))
     })>
     <cfset arrayAppend(checks, {
         "name": "SPF policy service enabled",
         "category": "Mail security",
-        "status": (getSpfEnabled.recordCount EQ 1 AND getSpfEnabled.enabled EQ "1")
+        "status": (getSpfEnabled.recordCount EQ 1 AND ListFindNoCase(enabledValues, Trim(getSpfEnabled.enabled)))
     })>
     <cfset arrayAppend(checks, {
         "name": "DKIM milter enabled",
@@ -191,56 +193,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     })>
 
     <cfset serviceDefs = [
-        {"name":"postfix","label":"Postfix","processPattern":"master"},
-        {"name":"amavis","label":"Amavis","processPattern":"amavisd"},
-        {"name":"clamav-daemon","label":"ClamAV","processPattern":"clamd"},
-        {"name":"spamassassin","label":"SpamAssassin","processPattern":"spamd"}
+        {"name":"postfix","label":"Postfix","container":"hermes_postfix_dkim"},
+        {"name":"amavis","label":"Amavis","container":"hermes_mail_filter"},
+        {"name":"clamav-daemon","label":"ClamAV","container":"hermes_mail_filter"},
+        {"name":"spamassassin","label":"SpamAssassin","container":"hermes_mail_filter"}
     ]>
+    <cfset dockerBinary = "/usr/local/bin/docker">
+    <cfif NOT FileExists(dockerBinary)>
+        <cfset dockerBinary = "/usr/bin/docker">
+    </cfif>
     <cfset services = []>
     <cfloop array="#serviceDefs#" index="svc">
         <cfset serviceState = "unknown">
         <cfset rawStatus = "">
-        <cfset serviceOutput = "">
-        <cfset serviceErrorOutput = "">
+        <cfset dockerOutput = "">
+        <cfset dockerErrorOutput = "">
         <cftry>
             <cfexecute
-                name="/usr/sbin/service"
-                arguments="#svc.name# status"
-                variable="serviceOutput"
-                errorVariable="serviceErrorOutput"
+                name="#dockerBinary#"
+                arguments='inspect --format="{{.State.Running}}" #svc.container#'
+                variable="dockerOutput"
+                errorVariable="dockerErrorOutput"
                 timeout="3" />
-            <cfset rawStatus = lCase(trim(serviceOutput & " " & serviceErrorOutput))>
+            <cfset rawStatus = lCase(trim(dockerOutput & " " & dockerErrorOutput))>
             <cfcatch type="any">
-                <cfset rawStatus = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
+                <cfset rawStatus = lCase(trim(cfcatch.message & " " & cfcatch.detail & " " & dockerErrorOutput))>
             </cfcatch>
         </cftry>
 
-        <cfif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("inactive (dead)", rawStatus) OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus) OR findNoCase("stopped", rawStatus)>
-            <cfset serviceState = "stopped">
-        <cfelseif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
+        <cfif rawStatus EQ "true">
             <cfset serviceState = "running">
-        </cfif>
-
-        <cfif serviceState EQ "unknown">
-            <cfset processOutput = "">
-            <cfset processErrorOutput = "">
-            <cftry>
-                <cfexecute
-                    name="/usr/bin/pgrep"
-                    arguments='-f "#svc.processPattern#"'
-                    variable="processOutput"
-                    errorVariable="processErrorOutput"
-                    timeout="2" />
-                <cfif Len(Trim(processOutput))>
-                    <cfset serviceState = "running">
-                </cfif>
-                <cfcatch type="any">
-                    <cfset processErrorText = lCase(trim(cfcatch.message & " " & cfcatch.detail & " " & processErrorOutput))>
-                    <cfif findNoCase("exit value of 1", processErrorText) OR findNoCase("no process found", processErrorText)>
-                        <cfset serviceState = "stopped">
-                    </cfif>
-                </cfcatch>
-            </cftry>
+        <cfelseif rawStatus EQ "false" OR findNoCase("no such object", rawStatus) OR findNoCase("not found", rawStatus)>
+            <cfset serviceState = "stopped">
         </cfif>
 
         <cfset arrayAppend(services, {
