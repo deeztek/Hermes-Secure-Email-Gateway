@@ -96,6 +96,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cffunction>
 
 <!--- GET RELAY NETWORKS DATA --->
+<cfinclude template="./inc/cidr_validate.cfm">
 <cfinclude template="./inc/get_relay_networks.cfm">
 <cfset aliasCoverConsumer = "Relay Networks">
 <cfinclude template="./inc/alias_covered_cidrs.cfm">
@@ -161,6 +162,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
         <cfset entries_skipped = entries_skipped + 1>
         <cfset entry_errors = entry_errors & "Invalid CIDR mask: " & encodeForHTML(entryAddress) & "<br>">
+        <cfcontinue>
+      </cfif>
+
+      <!--- Host bits. A range like a /23 starting on an odd third octet passes
+           every check above, then makes Postfix error the whole mynetworks
+           lookup, which drops the rest of the postscreen access list and starts
+           returning 451 on legitimate mail. See inc/cidr_validate.cfm. --->
+      <cfset relayCheck = cidrCheck(entryAddress)>
+      <cfif NOT relayCheck.ok>
+        <cfset entries_skipped = entries_skipped + 1>
+        <cfset entry_errors = entry_errors & encodeForHTML(entryAddress) & ": " & encodeForHTML(relayCheck.error)>
+        <cfif Len(relayCheck.suggest)>
+          <cfset entry_errors = entry_errors & ". Did you mean " & encodeForHTML(relayCheck.suggest) & "?">
+        </cfif>
+        <cfset entry_errors = entry_errors & "<br>">
         <cfcontinue>
       </cfif>
 
@@ -336,6 +352,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
       <cfset session.m = 22>
       <cfset session.edit_error = "Invalid CIDR mask (must be 1-32): " & encodeForHTML(editAddress)>
+      <cflocation url="view_relay_networks.cfm" addtoken="no">
+    </cfif>
+
+    <!--- Host bits, same reason as the add path above. --->
+    <cfset relayCheck = cidrCheck(editAddress)>
+    <cfif NOT relayCheck.ok>
+      <cfset session.m = 22>
+      <cfset session.edit_error = encodeForHTML(editAddress) & ": " & encodeForHTML(relayCheck.error)>
+      <cfif Len(relayCheck.suggest)>
+        <cfset session.edit_error = session.edit_error & ". Did you mean " & encodeForHTML(relayCheck.suggest) & "?">
+      </cfif>
       <cflocation url="view_relay_networks.cfm" addtoken="no">
     </cfif>
 

@@ -389,6 +389,19 @@ $(document).ready(function() {
             </cfif>
         </cfif>
 
+        <!--- Host bits. fail2ban is more forgiving than Postfix here, but the
+             entry is still not what the operator meant, and the same range often
+             gets pasted into the other lists too. See inc/cidr_validate.cfm. --->
+        <cfif isValidIP AND Find("/", ipInput)>
+            <cfset ipsCheck = cidrCheck(ipInput)>
+            <cfif NOT ipsCheck.ok>
+                <cfset session.m = "ip_whitelist_hostbits">
+                <cfset session.whitelist_hostbits = ipsCheck.error
+                       & (Len(ipsCheck.suggest) ? ". Did you mean " & ipsCheck.suggest & "?" : "")>
+                <cflocation url="view_intrusion_prevention.cfm" addtoken="no">
+            </cfif>
+        </cfif>
+
         <cfif isValidIP>
             <cftry>
                 <cfquery name="insertWhitelist" datasource="hermes">
@@ -632,6 +645,16 @@ $(document).ready(function() {
     <cfset session.m = 0>
 </cfif>
 
+<cfif m EQ "ip_whitelist_hostbits">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h4><i class="icon fa fa-ban"></i> Invalid range</h4>
+        <cfoutput>#EncodeForHTML(session.whitelist_hostbits)#</cfoutput>
+    </div>
+    <cfset session.m = 0>
+    <cfset session.whitelist_hostbits = "">
+</cfif>
+
 <cfif m EQ "ip_whitelist_invalid">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -735,6 +758,7 @@ $(document).ready(function() {
     ORDER BY a.name ASC
 </cfquery>
 
+<cfinclude template="./inc/cidr_validate.cfm">
 <cfset aliasCoverConsumer = "Intrusion Prevention">
 <cfinclude template="./inc/alias_covered_cidrs.cfm">
 

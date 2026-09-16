@@ -1,3 +1,4 @@
+<cfinclude template="cidr_validate.cfm">
 
 <!---
 Hermes Secure Email Gateway - Network Block/Allow Add Entries Action Handler
@@ -50,6 +51,19 @@ Requires: get_network_block_allow.cfm, normalizeIP function, ipv4_pattern
     <cfif NOT IsNumeric(cidrPart) OR cidrPart LT 1 OR cidrPart GT 32>
       <cfset entries_skipped = entries_skipped + 1>
       <cfset entry_errors = entry_errors & "Invalid CIDR: " & encodeForHTML(entryAddress) & "<br>">
+      <cfcontinue>
+    </cfif>
+
+    <!--- Host bits. A skipped rule here is less severe than in mynetworks, but
+         it is the same mistake and the same fix. See inc/cidr_validate.cfm. --->
+    <cfset netCheck = cidrCheck(entryAddress)>
+    <cfif NOT netCheck.ok>
+      <cfset entries_skipped = entries_skipped + 1>
+      <cfset entry_errors = entry_errors & encodeForHTML(entryAddress) & ": " & encodeForHTML(netCheck.error)>
+      <cfif Len(netCheck.suggest)>
+        <cfset entry_errors = entry_errors & ". Did you mean " & encodeForHTML(netCheck.suggest) & "?">
+      </cfif>
+      <cfset entry_errors = entry_errors & "<br>">
       <cfcontinue>
     </cfif>
     <cfset theEntry = normalizeIP(networkPart) & "/" & Int(cidrPart)>
