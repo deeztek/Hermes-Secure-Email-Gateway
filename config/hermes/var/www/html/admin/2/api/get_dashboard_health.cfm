@@ -225,11 +225,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfif NOT StructKeyExists(application, "dashboardHealthCacheByUser") OR NOT IsStruct(application.dashboardHealthCacheByUser)>
                 <cfset application.dashboardHealthCacheByUser = {}>
             </cfif>
-            <cfif NOT StructKeyExists(application.dashboardHealthCacheByUser, cacheKey) OR NOT IsStruct(application.dashboardHealthCacheByUser[cacheKey])>
-                <cfset application.dashboardHealthCacheByUser[cacheKey] = {}>
+            <cfset cacheEntry = {}>
+            <cfif StructKeyExists(application.dashboardHealthCacheByUser, cacheKey) AND IsStruct(application.dashboardHealthCacheByUser[cacheKey])>
+                <cfset cacheEntry = duplicate(application.dashboardHealthCacheByUser[cacheKey])>
             </cfif>
-            <cfset application.dashboardHealthCacheByUser[cacheKey].generatedAt = now()>
-            <cfset application.dashboardHealthCacheByUser[cacheKey].responseJson = responseJson>
+            <cfset cacheEntry.generatedAt = now()>
+            <cfset cacheEntry.responseJson = responseJson>
+            <cfset application.dashboardHealthCacheByUser[cacheKey] = cacheEntry>
         </cflock>
         <cfcatch type="any">
             <cflog file="application" type="warning" text="Dashboard health cache write warning: #cfcatch.message# #cfcatch.detail#">
