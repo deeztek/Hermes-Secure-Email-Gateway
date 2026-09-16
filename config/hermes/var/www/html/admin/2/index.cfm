@@ -164,8 +164,8 @@ select property, value from encryption_settings where property='user.systemMailS
 </div>
 
  <!-- System Info Card -->
- <div class="card mb-4">
-  <div class="card-header">
+ <div class="card card-outline card-primary shadow-sm mb-4">
+   <div class="card-header bg-body-secondary">
     <h3 class="card-title">
       <i class="fas fa-info"></i>
      System Info
@@ -362,41 +362,51 @@ select property, value from encryption_settings where property='user.systemMailS
 </div>
 
 <!-- Mail Traffic Insights -->
-<div class="card mb-4">
-  <div class="card-header">
+<div class="card card-outline card-primary shadow-sm mb-4">
+  <div class="card-header bg-body-secondary">
     <h3 class="card-title">
       <i class="fas fa-exchange-alt"></i>
       Mail Traffic Insights
     </h3>
   </div>
   <div class="card-body">
-    <div class="row g-4">
+    <div class="row g-3">
       <div class="col-lg-4">
-        <div class="small-box text-bg-primary mb-3">
+        <div class="row g-3">
+          <div class="col-12">
+        <div class="small-box text-bg-primary mb-0 shadow-sm">
           <div class="inner">
             <h3 id="traffic-incoming">0</h3>
             <p>Incoming Mail</p>
           </div>
           <div class="icon"><i class="fas fa-inbox"></i></div>
         </div>
-        <div class="small-box text-bg-success mb-3">
+          </div>
+          <div class="col-12">
+        <div class="small-box text-bg-success mb-0 shadow-sm">
           <div class="inner">
             <h3 id="traffic-outgoing">0</h3>
             <p>Outgoing Mail</p>
           </div>
           <div class="icon"><i class="fas fa-paper-plane"></i></div>
         </div>
-        <div class="alert alert-secondary mb-0">
+          </div>
+          <div class="col-12">
+        <div class="alert alert-secondary mb-0 h-100">
           <strong>Average processing time:</strong>
           <span id="avg-processing-time">Not available</span>
           <br>
           <small id="avg-processing-note" class="text-muted">Not available</small>
         </div>
+          </div>
+        </div>
       </div>
       <div class="col-lg-4">
-        <h6 class="mb-2">Top 10 Senders</h6>
+        <div class="card h-100 shadow-sm">
+          <div class="card-header py-2"><h6 class="mb-0">Top 10 Senders</h6></div>
+          <div class="card-body p-2">
         <div class="table-responsive">
-          <table class="table table-sm">
+          <table class="table table-sm mb-0">
             <thead>
               <tr>
                 <th>Sender</th>
@@ -408,11 +418,15 @@ select property, value from encryption_settings where property='user.systemMailS
             </tbody>
           </table>
         </div>
+          </div>
+        </div>
       </div>
       <div class="col-lg-4">
-        <h6 class="mb-2">Top 10 Recipients</h6>
+        <div class="card h-100 shadow-sm">
+          <div class="card-header py-2"><h6 class="mb-0">Top 10 Recipients</h6></div>
+          <div class="card-body p-2">
         <div class="table-responsive">
-          <table class="table table-sm">
+          <table class="table table-sm mb-0">
             <thead>
               <tr>
                 <th>Recipient</th>
@@ -424,25 +438,27 @@ select property, value from encryption_settings where property='user.systemMailS
             </tbody>
           </table>
         </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </div>
 
 <!-- Health and Quick Access -->
-<div class="card mb-4">
-  <div class="card-header">
+<div class="card card-outline card-success shadow-sm mb-4">
+  <div class="card-header bg-body-secondary">
     <h3 class="card-title">
       <i class="fas fa-heartbeat"></i>
       Health Checks & Quick Access
     </h3>
   </div>
   <div class="card-body">
-    <div class="row g-4">
+    <div class="row g-3">
       <div class="col-lg-8">
-        <div class="row mb-3">
+        <div class="row g-3 mb-1">
           <div class="col-md-6">
-            <div class="info-box mb-3 bg-light">
+            <div class="info-box mb-2 bg-light shadow-sm">
               <span class="info-box-icon text-bg-success"><i class="fas fa-shield-alt"></i></span>
               <div class="info-box-content">
                 <span class="info-box-text">Security Checks</span>
@@ -451,7 +467,7 @@ select property, value from encryption_settings where property='user.systemMailS
             </div>
           </div>
           <div class="col-md-6">
-            <div class="info-box mb-3 bg-light">
+            <div class="info-box mb-2 bg-light shadow-sm">
               <span class="info-box-icon text-bg-primary"><i class="fas fa-cogs"></i></span>
               <div class="info-box-content">
                 <span class="info-box-text">Services Running</span>
@@ -461,7 +477,7 @@ select property, value from encryption_settings where property='user.systemMailS
           </div>
         </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive border rounded p-2 bg-body-tertiary mb-3">
           <table class="table table-sm">
             <caption class="visually-hidden">Mail security and relay configuration health checks</caption>
             <thead>
@@ -477,7 +493,7 @@ select property, value from encryption_settings where property='user.systemMailS
           </table>
         </div>
 
-        <div class="table-responsive">
+        <div class="table-responsive border rounded p-2 bg-body-tertiary">
           <table class="table table-sm mb-0">
             <caption class="visually-hidden">Core mail service runtime status</caption>
             <thead>
@@ -494,14 +510,18 @@ select property, value from encryption_settings where property='user.systemMailS
       </div>
 
       <div class="col-lg-4">
-        <h6>Quick Access</h6>
+        <div class="card h-100 shadow-sm">
+          <div class="card-header py-2"><h6 class="mb-0">Quick Access</h6></div>
+          <div class="card-body">
         <div class="d-grid gap-2">
-          <a href="view_message_history.cfm" class="btn btn-outline-primary"><i class="fas fa-history me-1"></i> Message History</a>
-          <a href="view_mail_queue.cfm" class="btn btn-outline-primary"><i class="fas fa-stream me-1"></i> Mail Queue</a>
-          <a href="view_perimeter_checks.cfm" class="btn btn-outline-primary"><i class="fas fa-shield-alt me-1"></i> Perimeter Checks</a>
-          <a href="view_relay_networks.cfm" class="btn btn-outline-primary"><i class="fas fa-network-wired me-1"></i> Relay Networks</a>
-          <a href="view_system_logs.cfm" class="btn btn-outline-primary"><i class="fas fa-file-alt me-1"></i> System Logs</a>
-          <a href="view_system_updates.cfm" class="btn btn-outline-primary"><i class="fas fa-download me-1"></i> System Updates</a>
+          <a href="view_message_history.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-history me-1"></i> Message History</a>
+          <a href="view_mail_queue.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-stream me-1"></i> Mail Queue</a>
+          <a href="view_perimeter_checks.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-shield-alt me-1"></i> Perimeter Checks</a>
+          <a href="view_relay_networks.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-network-wired me-1"></i> Relay Networks</a>
+          <a href="view_system_logs.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-file-alt me-1"></i> System Logs</a>
+          <a href="view_system_updates.cfm" class="btn btn-outline-primary btn-sm text-start"><i class="fas fa-download me-1"></i> System Updates</a>
+        </div>
+          </div>
         </div>
       </div>
     </div>
