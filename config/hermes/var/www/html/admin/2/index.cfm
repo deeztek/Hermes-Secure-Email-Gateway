@@ -1047,6 +1047,11 @@ document.addEventListener('DOMContentLoaded', function() {
   function refreshDashboardHealth() {
     fetch('/admin/2/api/get_dashboard_health.cfm', { cache: 'no-store' })
       .then(function(response) {
+        var contentType = (response.headers.get('content-type') || '').toLowerCase();
+        if (contentType.indexOf('application/json') === -1) {
+          return { success: false, error: 'Session expired or unauthorized' };
+        }
+
         return response.json()
           .catch(function() { return { success: false, error: 'Unable to load health status' }; })
           .then(function(data) {

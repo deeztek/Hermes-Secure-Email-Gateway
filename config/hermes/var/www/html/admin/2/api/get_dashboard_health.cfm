@@ -60,7 +60,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 }>
 
 <cfset cacheTtlSeconds = 30>
-<cfset cacheKey = "user-" & trim(session.userid)>
+<cfset cacheKey = "global">
 <cfset cachedResponseJson = "">
 <cfset cacheIsValid = false>
 <cfset responseJson = "">
