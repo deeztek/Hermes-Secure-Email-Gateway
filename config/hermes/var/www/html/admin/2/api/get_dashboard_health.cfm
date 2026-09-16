@@ -28,6 +28,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfabort>
 </cfif>
 
+<cfquery name="getAdminUser" datasource="hermes">
+    SELECT id
+    FROM system_users
+    WHERE username = <cfqueryparam value="#session.theUser#" cfsqltype="cf_sql_varchar">
+      AND system = <cfqueryparam value="2" cfsqltype="cf_sql_integer">
+      AND applied = <cfqueryparam value="1" cfsqltype="cf_sql_integer">
+    LIMIT 1
+</cfquery>
+<cfif getAdminUser.recordCount NEQ 1>
+    <cfheader statuscode="403" statustext="Forbidden">
+    <cfoutput>{"success":false,"error":"Forbidden"}</cfoutput>
+    <cfabort>
+</cfif>
+
 <cfset response = {
     "success": true,
     "checks": [],
@@ -41,16 +55,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 }>
 
 <cfset cacheTtlSeconds = 30>
+<cfset cacheKey = lCase(trim(session.theUser))>
 <cfset cachedResponseJson = "">
 <cfset cacheIsValid = false>
 <cflock scope="application" type="readonly" timeout="5">
-    <cfif StructKeyExists(application, "dashboardHealthCache")
-        AND IsStruct(application.dashboardHealthCache)
-        AND StructKeyExists(application.dashboardHealthCache, "generatedAt")
-        AND StructKeyExists(application.dashboardHealthCache, "responseJson")>
-        <cfset cacheAgeSeconds = DateDiff("s", application.dashboardHealthCache.generatedAt, now())>
+    <cfif StructKeyExists(application, "dashboardHealthCacheByUser")
+        AND IsStruct(application.dashboardHealthCacheByUser)
+        AND StructKeyExists(application.dashboardHealthCacheByUser, cacheKey)
+        AND IsStruct(application.dashboardHealthCacheByUser[cacheKey])
+        AND StructKeyExists(application.dashboardHealthCacheByUser[cacheKey], "generatedAt")
+        AND StructKeyExists(application.dashboardHealthCacheByUser[cacheKey], "responseJson")>
+        <cfset cacheAgeSeconds = DateDiff("s", application.dashboardHealthCacheByUser[cacheKey].generatedAt, now())>
         <cfif cacheAgeSeconds GTE 0 AND cacheAgeSeconds LTE cacheTtlSeconds>
-            <cfset cachedResponseJson = application.dashboardHealthCache.responseJson>
+            <cfset cachedResponseJson = application.dashboardHealthCacheByUser[cacheKey].responseJson>
             <cfset cacheIsValid = true>
         </cfif>
     </cfif>
@@ -210,7 +227,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset response.summary.serviceTotal = arrayLen(services)>
 
     <cflock scope="application" type="exclusive" timeout="5">
-        <cfset application.dashboardHealthCache = {
+        <cfif NOT StructKeyExists(application, "dashboardHealthCacheByUser") OR NOT IsStruct(application.dashboardHealthCacheByUser)>
+            <cfset application.dashboardHealthCacheByUser = {}>
+        </cfif>
+        <cfset application.dashboardHealthCacheByUser[cacheKey] = {
             "generatedAt": now(),
             "responseJson": serializeJSON(response)
         }>
