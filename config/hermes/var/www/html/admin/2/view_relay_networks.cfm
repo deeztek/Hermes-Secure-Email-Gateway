@@ -862,7 +862,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <label for="alias_name" class="form-label"><strong>Alias</strong></label>
           <select class="form-select" id="alias_name" name="alias_name" required>
             <cfoutput query="get_available_aliases">
-              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif ip4_count GT 0>(#ip4_count# IPv4 range<cfif ip4_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
+              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif usable_count GT 0>(#usable_count# range<cfif usable_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
             </cfoutput>
           </select>
           <small class="text-muted">
@@ -958,7 +958,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <cfif StructKeyExists(aliasExpansion, parameter) AND Len(Trim(aliasExpansion[parameter]))>
                       <small class="text-muted">#encodeForHTML(aliasExpansion[parameter])#</small>
                     <cfelse>
-                      <small class="text-danger">This alias has no IPv4 ranges yet, so it contributes nothing. Resolve it on the Network Aliases page.</small>
+                      <small class="text-danger">This alias has no ranges yet, so it contributes nothing. Resolve it on the Network Aliases page.</small>
                     </cfif>
                   <cfelse>
                     #parameter#

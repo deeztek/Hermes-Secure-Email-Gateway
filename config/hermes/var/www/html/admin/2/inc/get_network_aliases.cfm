@@ -23,10 +23,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   An alias is a named set of CIDR ranges. `static` is a hand-entered list;
   `spf` carries a hostname that the scheduled resolver expands.
 
-  ip4_count / ip6_count are split because the mail containers set
-  net.ipv6.conf.all.disable_ipv6=1, so v6 ranges are stored but filtered when a
-  consumer renders its file. The page says so rather than quietly showing a
-  total that will not match what lands on disk.
+  usable_count is what consumers would actually write: v_alias_ranges applies
+  enabled, included and the address-family policy in one place. stored_count is
+  every row. The difference is ranges that exist but are not being rendered,
+  because they were unchecked or because their family is not enabled on this
+  deployment. The page shows both rather than a total that will not match what
+  lands on disk.
 --->
 
 <cfquery name="get_aliases" datasource="hermes">
@@ -39,10 +41,10 @@ SELECT a.id,
        a.last_resolved,
        a.last_status,
        a.last_message,
+       (SELECT COUNT(*) FROM v_alias_ranges v
+         WHERE v.alias_id = a.id) AS usable_count,
        (SELECT COUNT(*) FROM network_alias_entries e
-         WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count,
-       (SELECT COUNT(*) FROM network_alias_entries e
-         WHERE e.alias_id = a.id AND e.family = 'ip6') AS ip6_count
+         WHERE e.alias_id = a.id) AS stored_count
 FROM network_aliases a
 ORDER BY a.name ASC
 </cfquery>
@@ -93,7 +95,7 @@ GROUP BY a.name
 <cfparam name="detail_alias_id" default="0">
 <cfif IsNumeric(detail_alias_id) AND detail_alias_id GT 0>
   <cfquery name="get_alias_entries" datasource="hermes">
-  SELECT id, alias_id, cidr, family, origin, first_seen, last_seen
+  SELECT id, alias_id, cidr, family, origin, included, first_seen, last_seen
   FROM network_alias_entries
   WHERE alias_id = <cfqueryparam value="#detail_alias_id#" cfsqltype="cf_sql_integer">
   ORDER BY family ASC, cidr ASC

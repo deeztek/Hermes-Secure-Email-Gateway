@@ -252,7 +252,47 @@ CREATE TABLE IF NOT EXISTS `network_alias_applied` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ---------------------------------------------------------------------
--- 7. Version stamp -- MUST be the last statement (advances build_no so
+-- 7. One definition of what an alias means (#324)
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  same column, same setting row, same view
+--
+-- Three policies decide whether a stored range reaches a config file: the alias
+-- is enabled, the range is included, and the address family is usable here.
+-- Every consumer needs all three, and they were inline in twelve queries. Miss
+-- one at a render site and an excluded range silently lands in a config file;
+-- for mynetworks that is a relay-trust hole.
+--
+-- `included` lets a range be switched off without deleting it. Deleting a
+-- resolved range never worked: the resolver re-inserts everything the source
+-- publishes, so it came back on the next run. The row stays visible and
+-- unchecked instead, and survives re-resolve for free because the resolver's
+-- upsert only touches last_seen.
+--
+-- alias_ipv6_enabled replaces `AND e.family = 'ip4'` hardcoded in every query.
+-- ip4-only is a property of THIS deployment, since docker-compose.yml sets
+-- net.ipv6.conf.all.disable_ipv6=1 on the mail containers, not a property of
+-- aliases. Enabling IPv6 becomes one row rather than twelve edits. The setting
+-- can drift from the sysctl; both directions are mild, either ranges that never
+-- match or ranges left out, and neither breaks mail.
+--
+-- CREATE OR REPLACE is idempotent for a view, so no IF NOT EXISTS is needed.
+-- ---------------------------------------------------------------------
+ALTER TABLE `network_alias_entries`
+  ADD COLUMN IF NOT EXISTS `included` tinyint(3) NOT NULL DEFAULT 1;
+
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('alias_ipv6_enabled', '0');
+
+CREATE OR REPLACE VIEW `v_alias_ranges` AS
+SELECT a.id AS alias_id, a.name AS alias_name, e.cidr, e.family, e.origin
+  FROM network_alias_entries e
+  JOIN network_aliases a ON a.id = e.alias_id
+ WHERE a.enabled = 1
+   AND e.included = 1
+   AND (e.family = 'ip4'
+        OR COALESCE((SELECT value FROM system_settings
+                      WHERE parameter = 'alias_ipv6_enabled'), '0') = '1');
+
+-- ---------------------------------------------------------------------
+-- 8. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

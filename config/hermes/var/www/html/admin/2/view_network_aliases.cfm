@@ -494,6 +494,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
 </cfif>
 
+<!--- ---- include or exclude one range ---- --->
+<cfif action is "toggle_entry">
+  <cfset theEntryId = form.entry_id>
+  <cfset theId = form.alias_id>
+  <cfif NOT IsNumeric(theEntryId) OR NOT IsNumeric(theId)>
+    <cfset session.m = 60>
+    <cflocation url="view_network_aliases.cfm" addtoken="no">
+  </cfif>
+
+  <!--- Flip it, scoped to the alias so an id from another alias cannot be
+       toggled by a hand-made POST. --->
+  <cfquery name="toggle_one_entry" datasource="hermes">
+    UPDATE network_alias_entries
+       SET included = CASE WHEN included = 1 THEN 0 ELSE 1 END
+     WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
+       AND alias_id = <cfqueryparam value="#theId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+
+  <!--- Same consequence as adding or removing a range: what the alias means
+       changed, so the consumers that reference it are regenerated. --->
+  <cfset stampRangesChanged(theId)>
+  <cfset aliasApplyId = theId>
+  <cfinclude template="./inc/alias_apply_consumers.cfm">
+  <cfset session.alias_apply_results = aliasApplyResults>
+  <cfset session.m = 75>
+  <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
+</cfif>
+
 <!--- ---- remove one range ---- --->
 <cfif action is "delete_entry">
   <cfset theEntryId = form.entry_id>
@@ -572,6 +600,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Alias updated.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "75">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-check"></i> Range updated</h4>
+    <cfoutput>An excluded range stays listed here and is left out of the configuration files. A resolve will not switch it back on.</cfoutput>
+    <cfinclude template="./inc/alias_apply_nudge.cfm">
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -810,9 +848,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            #ip4_count# IPv4
-            <cfif ip6_count GT 0>
-              <br><small class="text-muted">#ip6_count# IPv6, not used while IPv6 is disabled</small>
+            #usable_count# in use
+            <cfif stored_count GT usable_count>
+              <br><small class="text-muted">#stored_count - usable_count# stored but not rendered</small>
             </cfif>
           </td>
           <td>
@@ -1016,6 +1054,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <form id="resolveAllForm" method="post" class="d-none">
   <input type="hidden" name="action" value="resolve_now">
 </form>
+<form id="toggleEntryForm" action="view_network_aliases.cfm" method="post" class="d-none">
+  <input type="hidden" name="action" value="toggle_entry">
+  <input type="hidden" name="entry_id" id="toggleEntryId">
+  <input type="hidden" name="alias_id" id="toggleEntryAliasId">
+</form>
+
 <form id="deleteEntryForm" action="view_network_aliases.cfm" method="post" class="d-none">
   <input type="hidden" name="action" value="delete_entry">
   <input type="hidden" name="entry_id" id="deleteEntryId">

@@ -10,16 +10,16 @@
 <cftry>
     <!--- 1. Get whitelist (user-added entries only) --->
     <!--- entry_type = 'alias' means ip_cidr holds a network alias NAME (#324); it
-         renders as that alias's current IPv4 ranges. ignoreip is space separated,
+         renders as whatever ranges v_alias_ranges says that alias supplies.
+         ignoreip is space separated,
          so the expansion is joined with spaces and needs no further splitting.
          An alias that is disabled or unresolved contributes nothing. --->
     <cfquery name="getWhitelist" datasource="hermes">
         SELECT rendered AS ip_cidr FROM (
           SELECT CASE WHEN w.entry_type = 'alias'
-                      THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ' ')
-                              FROM network_alias_entries e
-                              JOIN network_aliases a ON a.id = e.alias_id
-                             WHERE a.name = w.ip_cidr AND a.enabled = 1 AND e.family = 'ip4')
+                      THEN (SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ' ')
+                              FROM v_alias_ranges v
+                             WHERE v.alias_name = w.ip_cidr)
                       ELSE w.ip_cidr END AS rendered,
                  w.id AS sort_key
             FROM intrusion_prevention_whitelist w

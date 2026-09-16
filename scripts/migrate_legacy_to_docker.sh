@@ -215,12 +215,24 @@ apply_schema_forward() {
     # 1) Create tables present in the baseline but missing from the restored DB.
     local missing_tables t
     missing_tables=$(docker exec hermes_db_server mariadb -u root -N \
-        -e "SELECT table_name FROM information_schema.tables WHERE table_schema='hermes_ref' AND table_name NOT IN (SELECT table_name FROM information_schema.tables WHERE table_schema='hermes');" 2>/dev/null)
+        -e "SELECT table_name FROM information_schema.tables WHERE table_schema='hermes_ref' AND table_type='BASE TABLE' AND table_name NOT IN (SELECT table_name FROM information_schema.tables WHERE table_schema='hermes' AND table_type='BASE TABLE');" 2>/dev/null)
     for t in $missing_tables; do
         log "  + creating missing table: ${t}"
         docker exec hermes_db_server mariadb -u root \
             -e "CREATE TABLE hermes.\`${t}\` LIKE hermes_ref.\`${t}\`;" >> "$LOG_FILE" 2>&1
     done
+
+    # 1b) Views, separately. information_schema.tables lists views alongside
+    #     tables, and CREATE TABLE ... LIKE a view fails, so table_type filters
+    #     them out above. A view is also not something to copy structurally: it
+    #     is a definition, and the baseline is the only correct source for it.
+    #     CREATE OR REPLACE makes this safe to re-run, and applying it after the
+    #     tables above means everything it references exists.
+    if grep -q '^CREATE OR REPLACE VIEW' "$install_sql"; then
+        log "  + applying view definitions from the baseline"
+        awk '/^CREATE OR REPLACE VIEW/,0' "$install_sql" \
+            | docker exec -i hermes_db_server mariadb -u root hermes >> "$LOG_FILE" 2>&1
+    fi
 
     # 2) Add columns present in the baseline but missing from the restored tables.
     #    Single-quoted heredoc so bash leaves the SQL backticks/quotes untouched.
@@ -234,6 +246,9 @@ SELECT CONCAT(
   IF(r.extra<>'' AND r.extra NOT LIKE '%VIRTUAL%' AND r.extra NOT LIKE '%STORED%', CONCAT(' ', r.extra), ''),
   ';')
 FROM information_schema.columns r
+JOIN information_schema.tables t
+  ON t.table_schema = r.table_schema AND t.table_name = r.table_name
+ AND t.table_type = 'BASE TABLE'
 WHERE r.table_schema='hermes_ref'
 AND NOT EXISTS (
   SELECT 1 FROM information_schema.columns h

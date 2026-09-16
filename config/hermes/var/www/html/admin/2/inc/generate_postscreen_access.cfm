@@ -8,7 +8,8 @@ and reloads Postfix so the new CIDR table takes effect immediately.
   Network alias expansion (#324).
 
   A row with entry_type = 'alias' holds an alias NAME in `sender` rather than a
-  literal address, and renders as that alias's current IPv4 ranges. Postfix never
+  literal address, and renders as whatever ranges that alias currently supplies.
+  v_alias_ranges decides which those are. Postfix never
   sees an alias: the indirection is resolved here, so the .cidr file contains the
   same literal networks it always did.
 
@@ -22,10 +23,9 @@ and reloads Postfix so the new CIDR table takes effect immediately.
 <cfquery name="getAllPostscreenAccess" datasource="hermes">
   SELECT rendered AS sender, act AS action FROM (
     SELECT CASE WHEN p.entry_type = 'alias'
-                THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ',')
-                        FROM network_alias_entries e
-                        JOIN network_aliases a ON a.id = e.alias_id
-                       WHERE a.name = p.sender AND a.enabled = 1 AND e.family = 'ip4')
+                THEN (SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ',')
+                        FROM v_alias_ranges v
+                       WHERE v.alias_name = p.sender)
                 ELSE p.sender END AS rendered,
            p.action AS act,
            p.sender AS sort_key

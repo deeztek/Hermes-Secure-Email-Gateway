@@ -1197,6 +1197,10 @@ CREATE TABLE IF NOT EXISTS `network_alias_entries` (
   `cidr` varchar(64) NOT NULL,
   `family` varchar(4) NOT NULL DEFAULT 'ip4',
   `origin` varchar(16) NOT NULL DEFAULT 'manual',
+  -- Unchecking a range excludes it without deleting it, so the row stays visible
+  -- and a re-resolve does not silently bring it back. The resolver's upsert only
+  -- touches last_seen, so this survives without the resolver knowing it exists.
+  `included` tinyint(3) NOT NULL DEFAULT 1,
   `first_seen` datetime DEFAULT current_timestamp(),
   `last_seen` datetime DEFAULT current_timestamp(),
   PRIMARY KEY (`id`),
@@ -2405,6 +2409,11 @@ INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 
 -- schema_updates.sql that normally advances build_no runs on UPGRADES only.
 -- Keep this value in step with the baseline's actual content anyway, so a
 -- hand-run `mysql < hermes_install.sql` (no install script) is not misleading.
+-- Whether IPv6 alias ranges may reach a config file. Off, because
+-- docker-compose.yml sets net.ipv6.conf.all.disable_ipv6=1 on the mail
+-- containers. Read by the v_alias_ranges view, so turning IPv6 on is this row
+-- rather than an edit in every consumer query.
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('alias_ipv6_enabled', '0');
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v260723');
 
@@ -3190,6 +3199,46 @@ CREATE TABLE IF NOT EXISTS `recipients_temp` (
   PRIMARY KEY (`id`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+
+-- =====================================================================
+-- VIEWS -- LAST, and they must stay last.
+--
+-- A view is resolved at creation time, so every table it names has to exist
+-- already. v_alias_ranges reads system_settings, which this file creates long
+-- after the network_alias_* tables it otherwise sits beside. Defined in place,
+-- CREATE VIEW fails and mysql stops reading the file, leaving a half-created
+-- schema with no obvious cause.
+-- =====================================================================
+
+-- -------- v_alias_ranges                       [view] --------
+-- What an alias currently means, in one place.
+--
+-- Three policies decide whether a stored range reaches a config file: the alias
+-- is enabled, the range is included, and the address family is usable on this
+-- deployment. Every consumer needs all three and none of them belongs in a
+-- consumer's query. They were inline in twelve places before this view; missing
+-- one at a render site would silently put an excluded range into a config file,
+-- and for mynetworks that is a relay-trust hole.
+--
+-- The family clause is the one that was already wrong. ip4-only is a property of
+-- THIS deployment (docker-compose.yml sets net.ipv6.conf.all.disable_ipv6=1 on
+-- the mail containers), not a property of aliases, and it was hardcoded into
+-- every query. It is a setting now: enabling IPv6 is one row, not twelve edits.
+--
+-- The setting can drift from the sysctl. Both directions are mild: ranges that
+-- never match, or ranges left out. Neither breaks mail.
+--
+-- Consumers select cidr from here and apply their own separator.
+-- ---------------------------------------------------------------------
+CREATE OR REPLACE VIEW `v_alias_ranges` AS
+SELECT a.id AS alias_id, a.name AS alias_name, e.cidr, e.family, e.origin
+  FROM network_alias_entries e
+  JOIN network_aliases a ON a.id = e.alias_id
+ WHERE a.enabled = 1
+   AND e.included = 1
+   AND (e.family = 'ip4'
+        OR COALESCE((SELECT value FROM system_settings
+                      WHERE parameter = 'alias_ipv6_enabled'), '0') = '1');
 
 -- ============================================================================
 -- End of hermes_install.sql

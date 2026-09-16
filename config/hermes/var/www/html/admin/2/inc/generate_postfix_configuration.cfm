@@ -186,10 +186,9 @@ timeout="10" />
   SELECT rendered AS parameter FROM (
     SELECT c.order1,
            CASE WHEN c.network_entry = '2'
-                THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ')
-                        FROM network_alias_entries e
-                        JOIN network_aliases a ON a.id = e.alias_id
-                       WHERE a.name = c.parameter AND a.enabled = 1 AND e.family = 'ip4')
+                THEN (SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ', ')
+                        FROM v_alias_ranges v
+                       WHERE v.alias_name = c.parameter)
                 ELSE c.parameter END AS rendered
       FROM parameters c
      WHERE c.child = '1'
@@ -373,10 +372,9 @@ select parameter, parent_name, description, child, editable, enabled, conf_file 
   SELECT rendered AS parameter FROM (
     SELECT c.order1,
            CASE WHEN c.network_entry = '2'
-                THEN (SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ')
-                        FROM network_alias_entries e
-                        JOIN network_aliases a ON a.id = e.alias_id
-                       WHERE a.name = c.parameter AND a.enabled = 1 AND e.family = 'ip4')
+                THEN (SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ', ')
+                        FROM v_alias_ranges v
+                       WHERE v.alias_name = c.parameter)
                 ELSE c.parameter END AS rendered
       FROM parameters c
      WHERE c.child = '1' AND c.parent_name = 'mynetworks' AND c.enabled = '1'

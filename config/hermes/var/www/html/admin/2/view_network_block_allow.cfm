@@ -88,8 +88,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===================== --->
 <cfquery name="get_available_aliases" datasource="hermes">
 SELECT a.name,
-       (SELECT COUNT(*) FROM network_alias_entries e
-         WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count
+       (SELECT COUNT(*) FROM v_alias_ranges v
+         WHERE v.alias_id = a.id) AS usable_count
 FROM network_aliases a
 WHERE a.enabled = 1
 ORDER BY a.name ASC
@@ -101,10 +101,9 @@ ORDER BY a.name ASC
 <cfset aliasExpansion = StructNew()>
 <cfloop query="get_available_aliases">
   <cfquery name="get_one_exp" datasource="hermes">
-  SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ') AS ranges
-  FROM network_alias_entries e JOIN network_aliases a ON a.id = e.alias_id
-  WHERE a.name = <cfqueryparam value="#get_available_aliases.name#" cfsqltype="cf_sql_varchar">
-    AND e.family = 'ip4'
+  SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ', ') AS ranges
+  FROM v_alias_ranges v
+  WHERE v.alias_name = <cfqueryparam value="#get_available_aliases.name#" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfset aliasExpansion[get_available_aliases.name] = get_one_exp.ranges>
 </cfloop>
@@ -320,7 +319,7 @@ ORDER BY a.name ASC
           <label for="alias_name" class="form-label"><strong>Alias</strong></label>
           <select class="form-select" id="alias_name" name="alias_name" required>
             <cfoutput query="get_available_aliases">
-              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif ip4_count GT 0>(#ip4_count# IPv4 range<cfif ip4_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
+              <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# <cfif usable_count GT 0>(#usable_count# range<cfif usable_count GT 1>s</cfif>)<cfelse>(not resolved yet)</cfif></option>
             </cfoutput>
           </select>
         </div>
@@ -387,7 +386,7 @@ ORDER BY a.name ASC
                   <cfif StructKeyExists(aliasExpansion, sender) AND Len(Trim(aliasExpansion[sender]))>
                     <br><small class="text-muted">#encodeForHTML(aliasExpansion[sender])#</small>
                   <cfelse>
-                    <br><small class="text-danger">No IPv4 ranges yet, so this contributes nothing.</small>
+                    <br><small class="text-danger">No ranges yet, so this contributes nothing.</small>
                   </cfif>
                 <cfelse>
                   #encodeForHTML(sender)#

@@ -421,7 +421,7 @@ $(document).ready(function() {
 
 <!--- Add a network alias to the whitelist (#324): stores the alias NAME with
      entry_type = 'alias'. intrusion_prevention_generate_config.cfm expands it to
-     the alias's current IPv4 ranges every time jail.local is written, so the
+     the alias's current ranges every time jail.local is written, so the
      whitelist follows the alias instead of a hand-pasted copy of it. --->
 <cfif action EQ "add_whitelist_alias">
     <cfif StructKeyExists(form, "alias_name") AND len(trim(form.alias_name))>
@@ -728,8 +728,8 @@ $(document).ready(function() {
      one currently expands to so a row can show what it means (#324). --->
 <cfquery name="getAvailableAliases" datasource="hermes">
     SELECT a.name,
-           (SELECT COUNT(*) FROM network_alias_entries e
-             WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count
+           (SELECT COUNT(*) FROM v_alias_ranges v
+             WHERE v.alias_id = a.id) AS usable_count
     FROM network_aliases a
     WHERE a.enabled = 1
     ORDER BY a.name ASC
@@ -1268,7 +1268,7 @@ $(document).ready(function() {
                         <label class="form-label">Alias <span class="text-danger">*</span></label>
                         <select name="alias_name" class="form-select" required>
                             <cfoutput query="getAvailableAliases">
-                                <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# (#ip4_count# IPv4 range<cfif ip4_count NEQ 1>s</cfif>)</option>
+                                <option value="#encodeForHTMLAttribute(name)#">#encodeForHTML(name)# (#usable_count# range<cfif usable_count NEQ 1>s</cfif>)</option>
                             </cfoutput>
                         </select>
                     </div>

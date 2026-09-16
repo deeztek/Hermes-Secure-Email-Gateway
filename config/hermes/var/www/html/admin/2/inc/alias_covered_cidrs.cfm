@@ -31,12 +31,9 @@ inc/get_network_aliases.cfm.
 
 <cfif Len(Trim(aliasCoverConsumer))>
   <cfquery name="getAliasCovered" datasource="hermes">
-    SELECT e.cidr, a.name
-    FROM network_alias_entries e
-    JOIN network_aliases a ON a.id = e.alias_id
-    WHERE a.enabled = 1
-      AND e.family = 'ip4'
-      AND a.name IN (
+    SELECT v.cidr, v.alias_name AS name
+    FROM v_alias_ranges v
+    WHERE v.alias_name IN (
         SELECT p.parameter FROM parameters p
          WHERE p.parent_name = 'mynetworks' AND p.child = '1' AND p.network_entry = '2'
            AND <cfqueryparam value="#aliasCoverConsumer#" cfsqltype="cf_sql_varchar"> = 'Relay Networks'

@@ -85,7 +85,7 @@ AND applied='2'
   Network aliases available to reference (#324).
 
   A relay-network row with network_entry = '2' holds an alias NAME rather than a
-  literal address, and renders as that alias's current IPv4 ranges when Postfix
+  literal address, and renders as that alias's current ranges when Postfix
   config is generated. Only enabled aliases are offered, because a disabled one
   contributes nothing and would silently do nothing if selected.
 --->
@@ -94,8 +94,8 @@ SELECT a.name,
        a.source_value,
        a.last_resolved,
        a.last_status,
-       (SELECT COUNT(*) FROM network_alias_entries e
-         WHERE e.alias_id = a.id AND e.family = 'ip4') AS ip4_count
+       (SELECT COUNT(*) FROM v_alias_ranges v
+         WHERE v.alias_id = a.id) AS usable_count
 FROM network_aliases a
 WHERE a.enabled = 1
 ORDER BY a.name ASC
@@ -106,14 +106,12 @@ ORDER BY a.name ASC
 <cfset aliasRangeCount = StructNew()>
 <cfloop query="get_available_aliases">
   <cfquery name="get_one_expansion" datasource="hermes">
-  SELECT GROUP_CONCAT(e.cidr ORDER BY e.cidr SEPARATOR ', ') AS ranges
-  FROM network_alias_entries e
-  JOIN network_aliases a ON a.id = e.alias_id
-  WHERE a.name = <cfqueryparam value="#get_available_aliases.name#" cfsqltype="cf_sql_varchar">
-    AND e.family = 'ip4'
+  SELECT GROUP_CONCAT(v.cidr ORDER BY v.cidr SEPARATOR ', ') AS ranges
+  FROM v_alias_ranges v
+  WHERE v.alias_name = <cfqueryparam value="#get_available_aliases.name#" cfsqltype="cf_sql_varchar">
   </cfquery>
   <cfset aliasExpansion[get_available_aliases.name] = get_one_expansion.ranges>
-  <cfset aliasRangeCount[get_available_aliases.name] = get_available_aliases.ip4_count>
+  <cfset aliasRangeCount[get_available_aliases.name] = get_available_aliases.usable_count>
 </cfloop>
 
 <!--- Get subnet list for dropdown --->
