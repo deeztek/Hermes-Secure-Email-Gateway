@@ -84,19 +84,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cftry>
+    <cfquery name="getHeloRequiredId" datasource="hermes">
+        SELECT id
+        FROM parameters
+        WHERE parameter = <cfqueryparam value="smtpd_helo_required" cfsqltype="cf_sql_varchar">
+          AND child = '2'
+        LIMIT 1
+    </cfquery>
     <cfquery name="getHeloRequired" datasource="hermes">
         SELECT enabled
         FROM parameters
-        WHERE parameter = <cfqueryparam value="smtpd_helo_required" cfsqltype="cf_sql_varchar">
+        WHERE parent = <cfqueryparam value="#(getHeloRequiredId.recordCount EQ 1 ? getHeloRequiredId.id : 0)#" cfsqltype="cf_sql_integer">
           AND child = '1'
+        ORDER BY order1 ASC
         LIMIT 1
     </cfquery>
 
+    <cfquery name="getRecipientRestrictionsId" datasource="hermes">
+        SELECT id
+        FROM parameters
+        WHERE parameter = <cfqueryparam value="smtpd_recipient_restrictions" cfsqltype="cf_sql_varchar">
+          AND child = '2'
+        LIMIT 1
+    </cfquery>
     <cfquery name="getRejectUnauthDestination" datasource="hermes">
         SELECT enabled
         FROM parameters
         WHERE parameter = <cfqueryparam value="reject_unauth_destination" cfsqltype="cf_sql_varchar">
           AND child = '1'
+          AND parent = <cfqueryparam value="#(getRecipientRestrictionsId.recordCount EQ 1 ? getRecipientRestrictionsId.id : 0)#" cfsqltype="cf_sql_integer">
         LIMIT 1
     </cfquery>
 
@@ -105,6 +121,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         FROM parameters
         WHERE parameter = <cfqueryparam value="check_policy_service unix:private/policy-spf" cfsqltype="cf_sql_varchar">
           AND child = '1'
+          AND parent = <cfqueryparam value="#(getRecipientRestrictionsId.recordCount EQ 1 ? getRecipientRestrictionsId.id : 0)#" cfsqltype="cf_sql_integer">
         LIMIT 1
     </cfquery>
 
@@ -174,10 +191,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     })>
 
     <cfset serviceDefs = [
-        {"name":"postfix","label":"Postfix"},
-        {"name":"amavis","label":"Amavis"},
-        {"name":"clamav-daemon","label":"ClamAV"},
-        {"name":"spamassassin","label":"SpamAssassin"}
+        {"name":"postfix","label":"Postfix","processPattern":"master"},
+        {"name":"amavis","label":"Amavis","processPattern":"amavisd"},
+        {"name":"clamav-daemon","label":"ClamAV","processPattern":"clamd"},
+        {"name":"spamassassin","label":"SpamAssassin","processPattern":"spamd"}
     ]>
     <cfset services = []>
     <cfloop array="#serviceDefs#" index="svc">
@@ -202,6 +219,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset serviceState = "stopped">
         <cfelseif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
             <cfset serviceState = "running">
+        </cfif>
+
+        <cfif serviceState EQ "unknown">
+            <cfset processOutput = "">
+            <cfset processErrorOutput = "">
+            <cftry>
+                <cfexecute
+                    name="/usr/bin/pgrep"
+                    arguments='-f "#svc.processPattern#"'
+                    variable="processOutput"
+                    errorVariable="processErrorOutput"
+                    timeout="2" />
+                <cfif Len(Trim(processOutput))>
+                    <cfset serviceState = "running">
+                </cfif>
+                <cfcatch type="any">
+                    <cfset processErrorText = lCase(trim(cfcatch.message & " " & cfcatch.detail & " " & processErrorOutput))>
+                    <cfif findNoCase("exit value of 1", processErrorText) OR findNoCase("no process found", processErrorText)>
+                        <cfset serviceState = "stopped">
+                    </cfif>
+                </cfcatch>
+            </cftry>
         </cfif>
 
         <cfset arrayAppend(services, {
