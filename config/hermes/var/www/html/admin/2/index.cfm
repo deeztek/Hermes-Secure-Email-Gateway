@@ -1114,7 +1114,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (servicesBodyOnCatch) {
           servicesBodyOnCatch.innerHTML = '<tr><td colspan="2" class="text-danger">' + errorMessage + '</td></tr>';
         }
-        console.log('Error fetching dashboard health:', error);
+        console.error('Error fetching dashboard health:', error);
       });
   }
 

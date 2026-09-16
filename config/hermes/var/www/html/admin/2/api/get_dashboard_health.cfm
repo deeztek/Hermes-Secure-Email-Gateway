@@ -45,7 +45,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 }>
 
 <cfset cacheTtlSeconds = 30>
-<cfset cacheKey = lCase(trim(session.theUser))>
+<cfset cacheKey = "user-" & trim(session.userid)>
 <cfset cachedResponseJson = "">
 <cfset cacheIsValid = false>
 <cflock scope="application" type="readonly" timeout="5">
@@ -165,26 +165,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         {"name":"spamassassin","label":"SpamAssassin"}
     ]>
     <cfset services = []>
-    <cfloop array="#serviceDefs#" index="svc">
-        <cfset serviceState = "unknown">
-        <cfset serviceOutput = "">
-        <cfset serviceErrorOutput = "">
-        <cftry>
-            <cfexecute
-                name="/usr/sbin/service"
-                arguments="#svc.name# status"
-                variable="serviceOutput"
-                errorVariable="serviceErrorOutput"
-                timeout="3" />
-            <cfset serviceOutput = lCase(trim(serviceOutput & " " & serviceErrorOutput))>
-            <cfcatch type="any">
-                <cfset serviceOutput = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
-            </cfcatch>
-        </cftry>
+    <cfset serviceStates = {}>
+    <cfset systemctlOutput = "">
+    <cfset systemctlError = "">
+    <cftry>
+        <cfexecute
+            name="/usr/bin/systemctl"
+            arguments="is-active postfix amavis clamav-daemon spamassassin"
+            variable="systemctlOutput"
+            errorVariable="systemctlError"
+            timeout="5" />
+    <cfcatch type="any">
+        <cfset systemctlError = cfcatch.message & " " & cfcatch.detail>
+    </cfcatch>
+    </cftry>
 
-        <cfif findNoCase("active (running)", serviceOutput) OR findNoCase("is running", serviceOutput) OR findNoCase("start/running", serviceOutput)>
+    <cfset statusLines = listToArray(trim(systemctlOutput), chr(10), true)>
+    <cfloop from="1" to="#arrayLen(serviceDefs)#" index="serviceIndex">
+        <cfset svc = serviceDefs[serviceIndex]>
+        <cfset serviceState = "unknown">
+        <cfset rawStatus = "">
+        <cfif serviceIndex LTE arrayLen(statusLines)>
+            <cfset rawStatus = lCase(trim(statusLines[serviceIndex]))>
+        <cfelseif Len(trim(systemctlError))>
+            <cfset rawStatus = lCase(trim(systemctlError))>
+        </cfif>
+
+        <cfif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
             <cfset serviceState = "running">
-        <cfelseif findNoCase("inactive", serviceOutput) OR findNoCase("stopped", serviceOutput) OR findNoCase("not running", serviceOutput) OR findNoCase("unrecognized service", serviceOutput)>
+        <cfelseif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus)>
             <cfset serviceState = "stopped">
         </cfif>
 
