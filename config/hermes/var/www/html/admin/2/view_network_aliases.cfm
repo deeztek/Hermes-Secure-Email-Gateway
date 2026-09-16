@@ -502,9 +502,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset session.m = 60>
     <cflocation url="view_network_aliases.cfm" addtoken="no">
   </cfif>
+  <!--- The button is hidden on resolved rows, so reaching here with one means a
+       hand-made POST. Refuse rather than do something that undoes itself. --->
+  <cfquery name="check_entry_origin" datasource="hermes">
+    SELECT origin FROM network_alias_entries
+    WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
+  </cfquery>
+  <cfif check_entry_origin.recordcount IS 0 OR check_entry_origin.origin is not "manual">
+    <cfset session.m = 74>
+    <cflocation url="view_network_aliases.cfm?alias=#theId#" addtoken="no">
+  </cfif>
+
   <cfquery name="delete_one_entry" datasource="hermes">
     DELETE FROM network_alias_entries
     WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
+      AND origin = 'manual'
   </cfquery>
   <cfset stampRangesChanged(theId)>
   <cfset aliasApplyId = theId>
@@ -560,6 +572,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
     <h4><i class="icon fa fa-check"></i> Success!</h4>
     <cfoutput>Alias updated.</cfoutput>
+  </div>
+  <cfset session.m = 0>
+</cfif>
+
+<cfif m is "74">
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-hidden="true"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Cannot remove a resolved range</h4>
+    <cfoutput>That range comes from the alias source, so the next resolve would put it straight back. Change the source record, or disable the alias if you do not want any of its ranges.</cfoutput>
   </div>
   <cfset session.m = 0>
 </cfif>
@@ -947,10 +968,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>
-            <button type="button" class="btn btn-danger btn-sm" title="Remove this range"
-                    onclick="deleteEntry(#get_alias_entries.id#, #id#)">
-              <i class="fas fa-trash"></i>
-            </button>
+            <!--- Only a manual range can be removed. A resolved one is owned by
+                 the source record: deleting it regenerates every consumer, then
+                 the next resolve re-inserts it, regenerates them all again and
+                 mails to say the ranges changed. Two rounds of reloads to end
+                 where it started. Change the source, or disable the alias. --->
+            <cfif get_alias_entries.origin is "manual">
+              <button type="button" class="btn btn-danger btn-sm" title="Remove this range"
+                      onclick="deleteEntry(#get_alias_entries.id#, #id#)">
+                <i class="fas fa-trash"></i>
+              </button>
+            <cfelse>
+              <span class="text-muted" title="Comes from the alias source. Deleting it would only last until the next resolve.">
+                <i class="fas fa-lock"></i>
+              </span>
+            </cfif>
           </td>
         </tr>
       </cfloop>
