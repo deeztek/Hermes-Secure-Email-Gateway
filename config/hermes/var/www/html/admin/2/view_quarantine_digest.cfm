@@ -70,7 +70,7 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
     <cfif form.digest_frequency EQ "weekly">
         <cfset digestOfeliaSchedule = "0 0 19 * * FRI">
     <cfelseif form.digest_frequency EQ "monthly">
-        <cfset digestOfeliaSchedule = "0 0 19 28-31 * *">
+        <cfset digestOfeliaSchedule = "0 0 1 * *">
     </cfif>
     <cfif NOT ListFindNoCase("modern,classic,compact", form.digest_template)>
         <cfset form.digest_template = "modern">
