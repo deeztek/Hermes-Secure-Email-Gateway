@@ -69,8 +69,6 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
     <cfset digestOfeliaSchedule = "0 0 19 * * *">
     <cfif form.digest_frequency EQ "weekly">
         <cfset digestOfeliaSchedule = "0 0 19 * * 5">
-    <cfelseif form.digest_frequency EQ "monthly">
-        <cfset digestOfeliaSchedule = "0 0 19 28-31 * *">
     </cfif>
     <cfif NOT ListFindNoCase("modern,classic,compact", form.digest_template)>
         <cfset form.digest_template = "modern">
@@ -218,6 +216,7 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
               <option value="weekly" <cfif digestFrequency EQ "weekly">selected</cfif>>Weekly</option>
               <option value="monthly" <cfif digestFrequency EQ "monthly">selected</cfif>>Monthly</option>
             </select>
+            <small class="text-muted">Daily/Monthly run at 7:00 PM each day (monthly delivery is still limited to month-end), and Weekly runs Friday at 7:00 PM.</small>
           </div>
 
           <div class="mb-3">
