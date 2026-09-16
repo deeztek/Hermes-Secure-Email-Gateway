@@ -199,10 +199,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfcatch>
         </cftry>
 
-        <cfif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
-            <cfset serviceState = "running">
-        <cfelseif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus) OR findNoCase("stopped", rawStatus)>
+        <cfif rawStatus EQ "inactive" OR rawStatus EQ "failed" OR findNoCase("inactive (dead)", rawStatus) OR findNoCase("not running", rawStatus) OR findNoCase("could not be found", rawStatus) OR findNoCase("stopped", rawStatus)>
             <cfset serviceState = "stopped">
+        <cfelseif rawStatus EQ "active" OR findNoCase("active (running)", rawStatus) OR findNoCase("is running", rawStatus)>
+            <cfset serviceState = "running">
         </cfif>
 
         <cfset arrayAppend(services, {
