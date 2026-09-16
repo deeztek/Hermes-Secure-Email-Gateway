@@ -66,6 +66,12 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
     <cfif NOT ListFindNoCase("daily,weekly,monthly", form.digest_frequency)>
         <cfset form.digest_frequency = "daily">
     </cfif>
+    <cfset digestOfeliaSchedule = "0 0 19 * * *">
+    <cfif form.digest_frequency EQ "weekly">
+        <cfset digestOfeliaSchedule = "0 0 19 * * 5">
+    <cfelseif form.digest_frequency EQ "monthly">
+        <cfset digestOfeliaSchedule = "0 0 19 28-31 * *">
+    </cfif>
     <cfif NOT ListFindNoCase("modern,classic,compact", form.digest_template)>
         <cfset form.digest_template = "modern">
     </cfif>
@@ -130,6 +136,14 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
         UPDATE parameters2 SET value2 = <cfqueryparam value="#form.disable_individual#" cfsqltype="cf_sql_varchar">, applied = 2
         WHERE module = 'quarantine_digest' AND parameter = 'disable_individual'
     </cfquery>
+    <cfquery datasource="hermes">
+        UPDATE ofelia_jobs
+        SET schedule = <cfqueryparam value="#digestOfeliaSchedule#" cfsqltype="cf_sql_varchar">
+        WHERE job_name = '[job-exec "hermes-quarantine-digest"]'
+    </cfquery>
+    <cfsilent>
+        <cfinclude template="./inc/ofelia_generate_config.cfm">
+    </cfsilent>
 
     <cfset session.quarantineDigestCsrf = hash(createUUID() & now())>
     <cfset session.quarantineDigestFlash = 1>
@@ -194,7 +208,7 @@ Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights R
               <option value="1" <cfif digestEnabled EQ "1">selected</cfif>>Enabled</option>
               <option value="0" <cfif digestEnabled NEQ "1">selected</cfif>>Disabled</option>
             </select>
-            <small class="text-muted">When enabled, Hermes checks every minute whether the configured digest window has elapsed.</small>
+            <small class="text-muted">Hermes schedules this job for 7:00 PM based on the selected digest frequency.</small>
           </div>
 
           <div class="mb-3">

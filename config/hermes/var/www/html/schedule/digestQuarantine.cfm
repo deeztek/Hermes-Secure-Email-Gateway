@@ -1,6 +1,6 @@
 <!---
 Hermes SEG - Quarantine Digest Scheduler
-Runs every 60s via Ofelia. Sends daily, weekly or monthly digest emails.
+Runs at 7:00 PM via Ofelia based on configured frequency. Sends daily, weekly or monthly digest emails.
 Use ?force to ignore the schedule window and emit verbose output.
 --->
 
