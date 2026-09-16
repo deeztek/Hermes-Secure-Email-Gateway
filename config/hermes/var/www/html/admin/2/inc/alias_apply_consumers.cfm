@@ -8,6 +8,24 @@ generator, so this only has to decide WHICH generators to run.
 Scoped to the consumers that actually reference this alias. An alias nobody uses
 regenerates nothing.
 
+ONE WRITER PER CONFIG FILE
+
+Each consumer is applied by the generator that already owns that file. Nothing
+here writes Postfix, Amavis or fail2ban config itself. A second writer for the
+same file is a second thing to keep in step, and the two would drift.
+
+Note that generate_postfix_configuration.cfm rebuilds all of main.cf and
+commits every staged parameter, not only mynetworks. That is the same thing it
+does when an operator presses Apply on any Postfix settings page, and staged
+rows are rendered by any regeneration regardless of their applied flag, so this
+does not make anything live that was not already going to be.
+
+It also carries four cfabort paths, guarding chown, dos2unix, chmod and the
+amavis reload. On the scheduled path an abort ends the resolver run early, so
+later aliases go unresolved and no mail is sent. All four mean the host cannot
+write mail config at all, and the alias will still show as not applied
+afterwards, so it surfaces rather than passing silently.
+
 EACH CONSUMER IS INDEPENDENT AND FAILURE IS PER CONSUMER
 
 The three generators write different files and reload different services. One
@@ -51,11 +69,8 @@ Sets:    aliasApplyResults, an array of {consumer, ok, error}.
   <cftry>
     <cfswitch expression="#aliasApplyWho.consumer#">
       <cfcase value="Relay Networks">
-        <!--- Narrow apply: one directive and one file, never the whole main.cf
-             rebuild. See inc/apply_mynetworks.cfm for why. --->
-        <cfinclude template="apply_mynetworks.cfm">
-        <cfset oneOk = applyMynetworksOk>
-        <cfset oneErr = applyMynetworksError>
+        <cfinclude template="generate_postfix_configuration.cfm">
+        <cfset oneOk = true>
       </cfcase>
 
       <cfcase value="Network Block-Allow">
