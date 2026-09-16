@@ -984,11 +984,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <table class="table table-sm table-bordered">
       <thead>
-        <tr><th>Range</th><th>Family</th><th>Origin</th><th>Last seen</th><th></th></tr>
+        <tr><th>Include</th><th>Range</th><th>Family</th><th>Origin</th><th>Last seen</th><th></th></tr>
       </thead>
       <tbody>
       <cfloop query="get_alias_entries">
-        <tr>
+        <tr<cfif NOT get_alias_entries.included> class="table-secondary"</cfif>>
+          <td>
+            <!--- detail_alias_id, not #id#. Inside this cfloop an unqualified id
+                 resolves against get_alias_entries, so #id# is the ENTRY's id,
+                 not the alias's. Both calls here pass it explicitly.
+
+                 Unchecking excludes the range without deleting it. Deleting a
+                 resolved one never worked: the resolver re-inserts everything the
+                 source publishes, so it returned on the next run. The row stays
+                 here, greyed, and can be switched back on. --->
+            <input type="checkbox" class="form-check-input"
+                   <cfif get_alias_entries.included>checked</cfif>
+                   title="Include this range in the configuration files"
+                   onchange="toggleEntry(#get_alias_entries.id#, #detail_alias_id#)">
+          </td>
           <td><code>#EncodeForHTML(get_alias_entries.cidr)#</code></td>
           <td>
             <cfif get_alias_entries.family is "ip6">
@@ -1013,7 +1027,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  where it started. Change the source, or disable the alias. --->
             <cfif get_alias_entries.origin is "manual">
               <button type="button" class="btn btn-danger btn-sm" title="Remove this range"
-                      onclick="deleteEntry(#get_alias_entries.id#, #id#)">
+                      onclick="deleteEntry(#get_alias_entries.id#, #detail_alias_id#)">
                 <i class="fas fa-trash"></i>
               </button>
             <cfelse>
@@ -1025,7 +1039,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </tr>
       </cfloop>
       <cfif get_alias_entries.recordcount is 0>
-        <tr><td colspan="5" class="text-muted text-center">No ranges yet.</td></tr>
+        <tr><td colspan="6" class="text-muted text-center">No ranges yet.</td></tr>
       </cfif>
       </tbody>
     </table>
@@ -1189,6 +1203,12 @@ function toggleSource(which) {
 function resolveOne(id) {
   document.getElementById('resolveOneId').value = id;
   document.getElementById('resolveOneForm').submit();
+}
+
+function toggleEntry(entryId, aliasId) {
+  document.getElementById('toggleEntryId').value = entryId;
+  document.getElementById('toggleEntryAliasId').value = aliasId;
+  document.getElementById('toggleEntryForm').submit();
 }
 
 function deleteEntry(entryId, aliasId) {
