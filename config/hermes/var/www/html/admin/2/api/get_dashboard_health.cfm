@@ -143,16 +143,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfloop array="#serviceDefs#" index="svc">
         <cfset serviceState = "unknown">
         <cfset rawOutput = "">
+        <cfset rawErrorOutput = "">
+        <cfset outputNormalized = "">
         <cftry>
-            <cfexecute name="/bin/sh" arguments='-c "/usr/sbin/service #svc.name# status 2>&1 || true"' variable="rawOutput" timeout="10" />
-            <cfset outputNormalized = lCase(trim(rawOutput))>
+            <cfexecute
+                name="/usr/sbin/service"
+                arguments="#svc.name# status"
+                variable="rawOutput"
+                errorVariable="rawErrorOutput"
+                timeout="10" />
+            <cfset outputNormalized = lCase(trim(rawOutput & " " & rawErrorOutput))>
             <cfif findNoCase("active (running)", outputNormalized) OR findNoCase("is running", outputNormalized) OR findNoCase("start/running", outputNormalized)>
                 <cfset serviceState = "running">
             <cfelseif findNoCase("inactive", outputNormalized) OR findNoCase("stopped", outputNormalized) OR findNoCase("not running", outputNormalized) OR findNoCase("unrecognized service", outputNormalized)>
                 <cfset serviceState = "stopped">
             </cfif>
             <cfcatch type="any">
-                <cfset serviceState = "unknown">
+                <cfset outputNormalized = lCase(trim(cfcatch.message & " " & cfcatch.detail))>
+                <cfif findNoCase("inactive", outputNormalized) OR findNoCase("stopped", outputNormalized) OR findNoCase("not running", outputNormalized) OR findNoCase("unrecognized service", outputNormalized)>
+                    <cfset serviceState = "stopped">
+                </cfif>
             </cfcatch>
         </cftry>
         <cfset arrayAppend(services, {
@@ -191,9 +201,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cflock>
 
     <cfcatch type="any">
+        <cflog file="application" type="error" text="Dashboard health endpoint error: #cfcatch.message# #cfcatch.detail#">
         <cfset response = {
             "success": false,
-            "error": cfcatch.message
+            "error": "Unable to load dashboard health status at this time."
         }>
     </cfcatch>
 </cftry>
