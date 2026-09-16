@@ -841,12 +841,33 @@ document.addEventListener('DOMContentLoaded', function() {
 (function() {
   var messageStatsChart = null;
   var currentPeriod = '24';
+  var topTrafficLoaded = false;
+
+  function renderTopTrafficTable(bodyId, rows) {
+    var body = document.getElementById(bodyId);
+    if (!body) return;
+
+    if (!rows.length) {
+      body.innerHTML = '<tr><td colspan="2" class="text-muted">No data in selected period</td></tr>';
+      return;
+    }
+
+    body.innerHTML = rows.map(function(item) {
+      var email = (item.email || '(unknown)').toString()
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+      var count = Number(item.count || 0).toLocaleString();
+      return '<tr><td style="word-break: break-all;">' + email + '</td><td class="text-end">' + count + '</td></tr>';
+    }).join('');
+  }
 
   // Function to fetch and update message statistics
-  function refreshMessageStats(period) {
+  function refreshMessageStats(period, includeTop) {
     if (period) currentPeriod = period;
+    var shouldIncludeTop = includeTop ? '1' : '0';
 
-    fetch('/admin/2/api/get_message_stats.cfm?period=' + currentPeriod + '&_=' + Date.now())
+    fetch('/admin/2/api/get_message_stats.cfm?period=' + currentPeriod + '&includeTop=' + shouldIncludeTop + '&_=' + Date.now())
       .then(function(response) { return response.json(); })
       .then(function(data) {
         if (data.success) {
@@ -878,32 +899,16 @@ document.addEventListener('DOMContentLoaded', function() {
             avgProcessingNote.textContent = data.processingTimeNote || '';
           }
 
-          renderTopTrafficTable('top-senders-body', data.topSenders || []);
-          renderTopTrafficTable('top-recipients-body', data.topRecipients || []);
+          if (data.includeTop || !topTrafficLoaded) {
+            renderTopTrafficTable('top-senders-body', data.topSenders || []);
+            renderTopTrafficTable('top-recipients-body', data.topRecipients || []);
+            topTrafficLoaded = true;
+          }
 
           // Show/hide limited note
           var limitNote = document.getElementById('stat-limit-note');
           if (limitNote) {
             limitNote.style.display = data.limited ? 'block' : 'none';
-          }
-
-          function renderTopTrafficTable(bodyId, rows) {
-            var body = document.getElementById(bodyId);
-            if (!body) return;
-
-            if (!rows.length) {
-              body.innerHTML = '<tr><td colspan="2" class="text-muted">No data in selected period</td></tr>';
-              return;
-            }
-
-            body.innerHTML = rows.map(function(item) {
-              var email = (item.email || '(unknown)').toString()
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;');
-              var count = Number(item.count || 0).toLocaleString();
-              return '<tr><td style="word-break: break-all;">' + email + '</td><td class="text-end">' + count + '</td></tr>';
-            }).join('');
           }
 
           // Update chart
@@ -985,15 +990,18 @@ document.addEventListener('DOMContentLoaded', function() {
     var periodSelect = document.getElementById('messagePeriodSelect');
     if (periodSelect) {
       periodSelect.addEventListener('change', function() {
-        refreshMessageStats(this.value);
+        refreshMessageStats(this.value, true);
       });
     }
 
     // Initial load of message stats immediately
-    refreshMessageStats();
+    refreshMessageStats(currentPeriod, true);
 
     // Auto-refresh message stats every 60 seconds
-    setInterval(function() { refreshMessageStats(); }, 60000);
+    if (window.messageStatsRefreshInterval) {
+      clearInterval(window.messageStatsRefreshInterval);
+    }
+    window.messageStatsRefreshInterval = setInterval(function() { refreshMessageStats(currentPeriod, false); }, 60000);
   }
 
   // Wait for DOM to be ready before initializing
@@ -1079,7 +1087,10 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshDashboardHealth();
   }
 
-  setInterval(refreshDashboardHealth, 60000);
+  if (window.dashboardHealthInterval) {
+    clearInterval(window.dashboardHealthInterval);
+  }
+  window.dashboardHealthInterval = setInterval(refreshDashboardHealth, 60000);
 })();
 </script>
 
