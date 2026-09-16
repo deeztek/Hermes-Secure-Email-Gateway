@@ -205,6 +205,20 @@ ORDER BY a.name ASC
     <p>Entry updated and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
+<cfif m is 35>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Nothing Added</h4>
+    <cfif StructKeyExists(session, "entries_skipped")>
+      <p><cfoutput>#session.entries_skipped#</cfoutput> entr<cfif session.entries_skipped EQ 1>y was<cfelse>ies were</cfif> rejected, so no configuration was applied.</p>
+      <cfset session.entries_skipped = "">
+    </cfif>
+    <cfif StructKeyExists(session, "entry_errors") AND session.entry_errors is not "">
+      <p><cfoutput>#session.entry_errors#</cfoutput></p>
+      <cfset session.entry_errors = "">
+    </cfif>
+  </div>
+</cfif>
 <cfif m is 32>
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

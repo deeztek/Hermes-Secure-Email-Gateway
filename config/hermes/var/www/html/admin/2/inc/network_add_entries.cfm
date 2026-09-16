@@ -112,8 +112,14 @@ Requires: get_network_block_allow.cfm, normalizeIP function, ipv4_pattern
       <cfset session.m = 4>
     </cfcatch>
   </cftry>
+<cfelseif entries_skipped GT 0>
+  <!--- Nothing was added and the generator was not run, so this must not report
+       success or claim the configuration was applied. It used to set the same
+       code as the success path, which produced a green "0 entries added and
+       Postfix configuration applied" next to the list of what was rejected. --->
+  <cfset session.m = 35>
 <cfelse>
-  <cfset session.m = 1>
+  <cfset session.m = 30>
 </cfif>
 
 <cflocation url="view_network_block_allow.cfm" addtoken="no">
