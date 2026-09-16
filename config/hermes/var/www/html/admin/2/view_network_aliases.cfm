@@ -504,12 +504,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
   <!--- Flip it, scoped to the alias so an id from another alias cannot be
-       toggled by a hand-made POST. --->
+       toggled by a hand-made POST, and to resolved rows because a manual one is
+       deleted rather than excluded. The checkbox is not rendered on manual rows,
+       so reaching here with one means a hand-made POST. --->
   <cfquery name="toggle_one_entry" datasource="hermes">
     UPDATE network_alias_entries
        SET included = CASE WHEN included = 1 THEN 0 ELSE 1 END
      WHERE id = <cfqueryparam value="#theEntryId#" cfsqltype="cf_sql_integer">
        AND alias_id = <cfqueryparam value="#theId#" cfsqltype="cf_sql_integer">
+       AND origin <> 'manual'
   </cfquery>
 
   <!--- Same consequence as adding or removing a range: what the alias means
@@ -990,18 +993,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfloop query="get_alias_entries">
         <tr<cfif NOT get_alias_entries.included> class="table-secondary"</cfif>>
           <td>
-            <!--- detail_alias_id, not #id#. Inside this cfloop an unqualified id
-                 resolves against get_alias_entries, so #id# is the ENTRY's id,
-                 not the alias's. Both calls here pass it explicitly.
+            <!--- One control per row, decided by origin.
 
-                 Unchecking excludes the range without deleting it. Deleting a
-                 resolved one never worked: the resolver re-inserts everything the
-                 source publishes, so it returned on the next run. The row stays
-                 here, greyed, and can be switched back on. --->
-            <input type="checkbox" class="form-check-input"
-                   <cfif get_alias_entries.included>checked</cfif>
-                   title="Include this range in the configuration files"
-                   onchange="toggleEntry(#get_alias_entries.id#, #detail_alias_id#)">
+                 RESOLVED: a checkbox, because delete does not work. The resolver
+                 re-inserts everything the source publishes, so a deleted range
+                 returns on the next run. Unchecking leaves the row visible and
+                 greyed, and survives re-resolve.
+
+                 MANUAL: nothing here, a delete button in the last column. The
+                 operator typed it and no source will bring it back, so excluding
+                 and deleting are the same act and offering both is noise.
+
+                 detail_alias_id, not #id#: inside this cfloop an unqualified id
+                 resolves against get_alias_entries, so #id# would be the ENTRY's
+                 id, not the alias's. --->
+            <cfif get_alias_entries.origin is not "manual">
+              <input type="checkbox" class="form-check-input"
+                     <cfif get_alias_entries.included>checked</cfif>
+                     title="Include this range in the configuration files"
+                     onchange="toggleEntry(#get_alias_entries.id#, #detail_alias_id#)">
+            <cfelse>
+              <span class="text-muted">-</span>
+            </cfif>
           </td>
           <td><code>#EncodeForHTML(get_alias_entries.cidr)#</code></td>
           <td>
