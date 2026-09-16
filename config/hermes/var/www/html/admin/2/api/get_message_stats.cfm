@@ -25,11 +25,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Get time period from URL parameter (default: 24 hours) --->
 <cfparam name="url.period" default="24">
+<cfparam name="url.includeTop" default="1">
 
 <!--- Validate period parameter --->
 <cfset validPeriods = "0.25,1,8,12,24">
 <cfif NOT listFind(validPeriods, url.period)>
     <cfset url.period = 24>
+</cfif>
+<cfif url.includeTop NEQ "0" AND url.includeTop NEQ "1">
+    <cfset url.includeTop = "1">
 </cfif>
 
 <!--- Calculate date range based on period --->
@@ -71,9 +75,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         SUM(CASE WHEN content = 'V' THEN 1 ELSE 0 END) as virus,
         SUM(CASE WHEN content = 'B' THEN 1 ELSE 0 END) as banned,
         SUM(CASE WHEN content = 'H' THEN 1 ELSE 0 END) as badHeader,
-        SUM(CASE WHEN content IS NULL OR content = '' OR content NOT IN ('C','S','V','B','H') THEN 1 ELSE 0 END) as other
+        SUM(CASE WHEN content IS NULL OR content = '' OR content NOT IN ('C','S','V','B','H') THEN 1 ELSE 0 END) as other,
+        SUM(CASE WHEN originating = 'Y' THEN 1 ELSE 0 END) as outgoing,
+        SUM(CASE WHEN originating <> 'Y' OR originating IS NULL OR originating = '' THEN 1 ELSE 0 END) as incoming
     FROM (
-        SELECT content
+        SELECT content, originating
         FROM msgs
         WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#periodStartUnix#">
           AND time_num < <cfqueryparam cfsqltype="cf_sql_integer" value="#periodEndUnix#">
@@ -81,6 +87,75 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         LIMIT #maxMessages#
     ) as recent_msgs
 </cfquery>
+
+<cfset topSenders = []>
+<cfset topRecipients = []>
+<cfif url.includeTop EQ "1">
+    <!--- Top 10 senders in selected period (recent capped data) --->
+    <cfquery name="getTopSenders" datasource="hermes">
+        SELECT
+            maddr.email as email,
+            COUNT(DISTINCT recent_msgs.mail_id) as total
+        FROM (
+            SELECT mail_id, sid
+            FROM msgs
+            WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#periodStartUnix#">
+              AND time_num < <cfqueryparam cfsqltype="cf_sql_integer" value="#periodEndUnix#">
+            ORDER BY time_num DESC
+            LIMIT #maxMessages#
+        ) as recent_msgs
+        INNER JOIN maddr ON recent_msgs.sid = maddr.id
+        WHERE maddr.email IS NOT NULL
+          AND maddr.email <> ''
+        GROUP BY maddr.email
+        ORDER BY total DESC
+        LIMIT 10
+    </cfquery>
+
+    <!--- Top 10 recipients in selected period (recent capped data) --->
+    <cfquery name="getTopRecipients" datasource="hermes">
+        SELECT
+            maddr.email as email,
+            COUNT(DISTINCT msgrcpt.mail_id) as total
+        FROM msgrcpt
+        INNER JOIN maddr ON msgrcpt.rid = maddr.id
+        INNER JOIN (
+            SELECT mail_id
+            FROM msgs
+            WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#periodStartUnix#">
+              AND time_num < <cfqueryparam cfsqltype="cf_sql_integer" value="#periodEndUnix#">
+            ORDER BY time_num DESC
+            LIMIT #maxMessages#
+        ) as recent_msgs ON msgrcpt.mail_id = recent_msgs.mail_id
+        WHERE maddr.email IS NOT NULL
+          AND maddr.email <> ''
+        GROUP BY maddr.email
+        ORDER BY total DESC
+        LIMIT 10
+    </cfquery>
+
+    <cfloop query="getTopSenders">
+        <cfset senderEmail = "(unknown)">
+        <cfif IsDefined("getTopSenders.email") AND Len(Trim(getTopSenders.email))>
+            <cfset senderEmail = Trim(getTopSenders.email)>
+        </cfif>
+        <cfset arrayAppend(topSenders, {
+            "email": senderEmail,
+            "count": getTopSenders.total
+        })>
+    </cfloop>
+
+    <cfloop query="getTopRecipients">
+        <cfset recipientEmail = "(unknown)">
+        <cfif IsDefined("getTopRecipients.email") AND Len(Trim(getTopRecipients.email))>
+            <cfset recipientEmail = Trim(getTopRecipients.email)>
+        </cfif>
+        <cfset arrayAppend(topRecipients, {
+            "email": recipientEmail,
+            "count": getTopRecipients.total
+        })>
+    </cfloop>
+</cfif>
 
 <!--- Build response structure --->
 <cfif getStats.total GTE maxMessages>
@@ -101,6 +176,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     "banned": getStats.banned,
     "badHeader": getStats.badHeader,
     "other": getStats.other,
+    "incoming": getStats.incoming,
+    "outgoing": getStats.outgoing,
+    "includeTop": (url.includeTop EQ "1"),
+    "topSenders": topSenders,
+    "topRecipients": topRecipients,
+    "processingTimeAvailable": false,
+    "processingTimeNote": "Average processing time is not available from the current message log tables.",
     "limited": isLimited,
     "maxMessages": maxMessages
 }>
