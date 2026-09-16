@@ -1039,7 +1039,21 @@ document.addEventListener('DOMContentLoaded', function() {
 
   function refreshDashboardHealth() {
     fetch('/admin/2/api/get_dashboard_health.cfm')
-      .then(function(response) { return response.json(); })
+      .then(function(response) {
+        return response.json()
+          .catch(function() { return { success: false, error: 'Unable to load health status' }; })
+          .then(function(data) {
+            if (!response.ok) {
+              data.success = false;
+              if (response.status === 401 || response.status === 403) {
+                data.error = 'Access denied for health status';
+              } else if (!data.error) {
+                data.error = 'Unable to load health status';
+              }
+            }
+            return data;
+          });
+      })
       .then(function(data) {
         if (!data.success) {
           var errorMessage = (data.error || 'Unable to load health status').toString()
