@@ -205,6 +205,17 @@ ORDER BY a.name ASC
     <p>Entry updated and Postfix configuration applied successfully.</p>
   </div>
 </cfif>
+<cfif m is 36>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Entry Not Updated</h4>
+    <cfif StructKeyExists(session, "entry_errors") AND session.entry_errors is not "">
+      <p><cfoutput>#session.entry_errors#</cfoutput></p>
+      <cfset session.entry_errors = "">
+    </cfif>
+    <p class="mb-0"><small>The existing entry was left unchanged and no configuration was applied.</small></p>
+  </div>
+</cfif>
 <cfif m is 35>
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>

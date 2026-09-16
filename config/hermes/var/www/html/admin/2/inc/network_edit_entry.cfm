@@ -22,9 +22,24 @@ Expects: form.edit_id, form.edit_sender, form.edit_action, form.edit_note
     <cflocation url="view_network_block_allow.cfm" addtoken="no">
   </cfif>
 
+  <!--- Validate the address. This path had none at all: whatever was typed went
+       into the UPDATE and then into postscreen_access.cidr. The add path checks
+       the shape and the host bits, and an edit can write exactly the same value,
+       so it has to check the same things. See inc/cidr_validate.cfm. --->
+  <cfinclude template="cidr_validate.cfm">
+  <cfset editCheck = cidrCheck(trim(form.edit_sender))>
+  <cfif NOT editCheck.ok>
+    <cfset session.entry_errors = EncodeForHTML(trim(form.edit_sender)) & ": " & EncodeForHTML(editCheck.error)>
+    <cfif Len(editCheck.suggest)>
+      <cfset session.entry_errors = session.entry_errors & ". Did you mean " & EncodeForHTML(editCheck.suggest) & "?">
+    </cfif>
+    <cfset session.m = 36>
+    <cflocation url="view_network_block_allow.cfm" addtoken="no">
+  </cfif>
+
   <cfquery datasource="hermes">
     UPDATE postscreen_access
-    SET sender = <cfqueryparam value="#trim(form.edit_sender)#" cfsqltype="cf_sql_varchar">,
+    SET sender = <cfqueryparam value="#editCheck.cidr#" cfsqltype="cf_sql_varchar">,
         action = <cfqueryparam value="#form.edit_action#" cfsqltype="cf_sql_varchar">,
         note = <cfqueryparam value="#trim(form.edit_note)#" cfsqltype="cf_sql_varchar">,
         action2 = 'NONE', applied = '1'
