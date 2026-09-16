@@ -396,7 +396,7 @@ $(document).ready(function() {
         <!--- Host bits. fail2ban is more forgiving than Postfix here, but the
              entry is still not what the operator meant, and the same range often
              gets pasted into the other lists too. See inc/cidr_validate.cfm. --->
-        <cfif isValidIP AND Find("/", ipInput)>
+        <cfif isValidIP>
             <cfset ipsCheck = cidrCheck(ipInput)>
             <cfif NOT ipsCheck.ok>
                 <cfset session.m = "ip_whitelist_hostbits">
