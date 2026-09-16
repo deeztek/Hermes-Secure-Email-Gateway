@@ -48,6 +48,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset cacheKey = "user-" & trim(session.userid)>
 <cfset cachedResponseJson = "">
 <cfset cacheIsValid = false>
+<cfset responseJson = "">
 <cflock scope="application" type="readonly" timeout="5">
     <cfif StructKeyExists(application, "dashboardHealthCacheByUser")
         AND IsStruct(application.dashboardHealthCacheByUser)
@@ -225,16 +226,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset response.summary.serviceRunning = runningCount>
     <cfset response.summary.serviceTotal = arrayLen(services)>
 
-    <cflock scope="application" type="exclusive" timeout="5">
-        <cfif NOT StructKeyExists(application, "dashboardHealthCacheByUser") OR NOT IsStruct(application.dashboardHealthCacheByUser)>
-            <cfset application.dashboardHealthCacheByUser = {}>
-        </cfif>
-        <cfif NOT StructKeyExists(application.dashboardHealthCacheByUser, cacheKey) OR NOT IsStruct(application.dashboardHealthCacheByUser[cacheKey])>
-            <cfset application.dashboardHealthCacheByUser[cacheKey] = {}>
-        </cfif>
-        <cfset application.dashboardHealthCacheByUser[cacheKey].generatedAt = now()>
-        <cfset application.dashboardHealthCacheByUser[cacheKey].responseJson = serializeJSON(response)>
-    </cflock>
+    <cfset responseJson = serializeJSON(response)>
+
+    <cftry>
+        <cflock scope="application" type="exclusive" timeout="5">
+            <cfif NOT StructKeyExists(application, "dashboardHealthCacheByUser") OR NOT IsStruct(application.dashboardHealthCacheByUser)>
+                <cfset application.dashboardHealthCacheByUser = {}>
+            </cfif>
+            <cfif NOT StructKeyExists(application.dashboardHealthCacheByUser, cacheKey) OR NOT IsStruct(application.dashboardHealthCacheByUser[cacheKey])>
+                <cfset application.dashboardHealthCacheByUser[cacheKey] = {}>
+            </cfif>
+            <cfset application.dashboardHealthCacheByUser[cacheKey].generatedAt = now()>
+            <cfset application.dashboardHealthCacheByUser[cacheKey].responseJson = responseJson>
+        </cflock>
+        <cfcatch type="any">
+            <cflog file="application" type="warning" text="Dashboard health cache write warning: #cfcatch.message# #cfcatch.detail#">
+        </cfcatch>
+    </cftry>
 
     <cfcatch type="any">
         <cflog file="application" type="error" text="Dashboard health endpoint error: #cfcatch.message# #cfcatch.detail#">
@@ -242,7 +250,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             "success": false,
             "error": "Unable to load dashboard health status at this time."
         }>
+        <cfset responseJson = serializeJSON(response)>
     </cfcatch>
 </cftry>
 
-<cfoutput>#serializeJSON(response)#</cfoutput>
+<cfif Len(responseJson) EQ 0>
+    <cfset responseJson = serializeJSON(response)>
+</cfif>
+<cfoutput>#responseJson#</cfoutput>

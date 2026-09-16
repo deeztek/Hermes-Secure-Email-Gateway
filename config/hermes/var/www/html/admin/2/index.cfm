@@ -1037,6 +1037,13 @@ document.addEventListener('DOMContentLoaded', function() {
     return '<span class="fw-semibold">Unknown</span> <span class="badge text-bg-secondary">Unknown</span>';
   }
 
+  function setHealthSummaryCounts(checkPass, checkTotal, serviceRunning, serviceTotal) {
+    document.getElementById('health-check-pass').textContent = checkPass;
+    document.getElementById('health-check-total').textContent = checkTotal;
+    document.getElementById('services-running').textContent = serviceRunning;
+    document.getElementById('services-total').textContent = serviceTotal;
+  }
+
   function refreshDashboardHealth() {
     fetch('/admin/2/api/get_dashboard_health.cfm')
       .then(function(response) {
@@ -1066,13 +1073,16 @@ document.addEventListener('DOMContentLoaded', function() {
           if (servicesBodyOnError) {
             servicesBodyOnError.innerHTML = '<tr><td colspan="2" class="text-danger">' + errorMessage + '</td></tr>';
           }
+          setHealthSummaryCounts('0', '0', '0', '0');
           return;
         }
 
-        document.getElementById('health-check-pass').textContent = data.summary.checkPass || 0;
-        document.getElementById('health-check-total').textContent = data.summary.checkTotal || 0;
-        document.getElementById('services-running').textContent = data.summary.serviceRunning || 0;
-        document.getElementById('services-total').textContent = data.summary.serviceTotal || 0;
+        setHealthSummaryCounts(
+          data.summary.checkPass || 0,
+          data.summary.checkTotal || 0,
+          data.summary.serviceRunning || 0,
+          data.summary.serviceTotal || 0
+        );
 
         var checksBody = document.getElementById('health-checks-body');
         if (checksBody) {
@@ -1114,6 +1124,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (servicesBodyOnCatch) {
           servicesBodyOnCatch.innerHTML = '<tr><td colspan="2" class="text-danger">' + errorMessage + '</td></tr>';
         }
+        setHealthSummaryCounts('0', '0', '0', '0');
         console.error('Error fetching dashboard health:', error);
       });
   }
