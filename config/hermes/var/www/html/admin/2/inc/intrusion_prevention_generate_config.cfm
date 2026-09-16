@@ -92,6 +92,18 @@ bantime = #getJails.bantime#
 
 <cfcatch type="any">
     <cfset ipSyncError = cfcatch.message & " | Detail: " & cfcatch.detail & " | Type: " & cfcatch.type>
+
+    <!--- jail.local on disk no longer matches the database, so the page must not
+         go on claiming Synced. Without this a failed write leaves the badge
+         green and the operator with nothing to tell them otherwise. --->
+    <cftry>
+      <cfquery datasource="hermes">
+        UPDATE intrusion_prevention_settings SET setting_value = '0'
+         WHERE setting_name = 'config_synced'
+      </cfquery>
+      <cfcatch type="any"><!--- already failing; do not fail harder ---></cfcatch>
+    </cftry>
+
     <!--- The comment below used to say "log the error" while error.cfm only drew
          a box on the page and logged nothing. Now it actually logs, whoever
          called, and the box is drawn only when someone is looking at a page.

@@ -871,6 +871,16 @@ $(document).ready(function() {
         <div class="card-tools">
             <cfif hasPendingChanges>
                 <span class="badge badge-pending"><i class="fas fa-exclamation-circle"></i> Pending Changes</span>
+                <!--- A standing Apply, not just the one inside each action's alert.
+                     Config can go stale without the operator having just done
+                     something on this page: an alias they changed elsewhere, or an
+                     apply that failed because the container was down. Both leave
+                     them here with nothing to click. --->
+                <form action="" method="post" class="d-inline ms-2">
+                    <input type="hidden" name="action" value="apply_changes">
+                    <button type="submit" class="btn btn-danger btn-sm"
+                            onclick="this.disabled=true;this.innerHTML='Applying...';this.form.submit();">Apply Settings</button>
+                </form>
             <cfelse>
                 <span class="badge badge-synced"><i class="fas fa-check-circle"></i> Synced</span>
             </cfif>
