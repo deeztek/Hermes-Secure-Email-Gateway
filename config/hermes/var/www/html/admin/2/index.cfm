@@ -471,7 +471,7 @@ select property, value from encryption_settings where property='user.systemMailS
                 <th>Status</th>
               </tr>
             </thead>
-            <tbody id="health-checks-body">
+            <tbody id="health-checks-body" role="status" aria-live="polite" aria-atomic="true">
               <tr><td colspan="3" class="text-muted">Loading...</td></tr>
             </tbody>
           </table>
@@ -486,7 +486,7 @@ select property, value from encryption_settings where property='user.systemMailS
                 <th>Status</th>
               </tr>
             </thead>
-            <tbody id="service-status-body">
+            <tbody id="service-status-body" role="status" aria-live="polite" aria-atomic="true">
               <tr><td colspan="2" class="text-muted">Loading...</td></tr>
             </tbody>
           </table>

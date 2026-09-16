@@ -22,23 +22,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfif NOT StructKeyExists(session, "theUser")
     OR NOT StructKeyExists(session, "loggedin")
-    OR session.loggedin NEQ "true">
+    OR session.loggedin NEQ "true"
+    OR NOT StructKeyExists(session, "userid")
+    OR NOT IsNumeric(session.userid)
+    OR NOT StructKeyExists(session, "email")
+    OR Trim(session.email) EQ "">
     <cfheader statuscode="401" statustext="Unauthorized">
     <cfoutput>{"success":false,"error":"Unauthorized"}</cfoutput>
-    <cfabort>
-</cfif>
-
-<cfquery name="getAdminUser" datasource="hermes">
-    SELECT id
-    FROM system_users
-    WHERE username = <cfqueryparam value="#session.theUser#" cfsqltype="cf_sql_varchar">
-      AND system = <cfqueryparam value="2" cfsqltype="cf_sql_integer">
-      AND applied = <cfqueryparam value="1" cfsqltype="cf_sql_integer">
-    LIMIT 1
-</cfquery>
-<cfif getAdminUser.recordCount NEQ 1>
-    <cfheader statuscode="403" statustext="Forbidden">
-    <cfoutput>{"success":false,"error":"Forbidden"}</cfoutput>
     <cfabort>
 </cfif>
 
