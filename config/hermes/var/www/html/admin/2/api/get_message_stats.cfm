@@ -97,7 +97,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             maddr.email as email,
             COUNT(*) as total
         FROM (
-            SELECT mail_id, sid
+            SELECT sid
             FROM msgs
             WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#periodStartUnix#">
               AND time_num < <cfqueryparam cfsqltype="cf_sql_integer" value="#periodEndUnix#">

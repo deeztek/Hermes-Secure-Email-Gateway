@@ -20,6 +20,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfcontent type="application/json">
 <cfheader name="Cache-Control" value="no-cache, no-store, must-revalidate">
 
+<cfif NOT StructKeyExists(session, "theUser")>
+    <cfheader statuscode="401" statustext="Unauthorized">
+    <cfoutput>{"success":false,"error":"Unauthorized"}</cfoutput>
+    <cfabort>
+</cfif>
+
 <cfset response = {
     "success": true,
     "checks": [],
