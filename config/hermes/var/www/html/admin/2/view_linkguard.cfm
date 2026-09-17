@@ -491,7 +491,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset StructDelete(session,"lgCheck")><cfset StructDelete(session,"lgCheckUrl")><cfset StructDelete(session,"lgCheckErr")>
 
 <!--- render helpers for the Check + Activity views --->
-<cfset srcLabel = { "admin":"Admin rule", "local":"Local feed (URLhaus / OpenPhish)", "heuristic":"Structural heuristic", "gsb":"Google Safe Browsing", "vt":"VirusTotal", "none":"Default (no source flagged it)", "scheme":"Unsupported address type" }>
+<cfset srcLabel = { "admin":"Admin rule", "local":"Local feed (URLhaus / OpenPhish)", "heuristic":"Structural heuristic", "gsb":"Google Safe Browsing", "vt":"VirusTotal", "none":"Default (no source flagged it)", "scheme":"Unsupported address type", "redirect":"Redirect destination", "combined":"Combined weak signals" }>
 <cfset srcOf = function(s){ var x = LCase(Trim(arguments.s)); return StructKeyExists(srcLabel, x) ? srcLabel[x] : arguments.s; }>
 <cfset vBadge = function(v){ var x = LCase(Trim(arguments.v)); return (x EQ 'clean') ? 'success' : ((x EQ 'suspicious') ? 'warning text-dark' : ((x EQ 'malicious') ? 'danger' : 'secondary')); }>
 <cfset aBadge = function(a){ var x = LCase(Trim(arguments.a)); return (x EQ 'redirected' OR x EQ 'proceeded') ? 'success' : ((x EQ 'warned') ? 'warning text-dark' : ((x EQ 'blocked') ? 'danger' : 'secondary')); }>
