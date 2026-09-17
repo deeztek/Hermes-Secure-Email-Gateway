@@ -234,18 +234,20 @@ Usage: <cfinclude template="system_alerts.cfm">
 <!--- ============================================================================
      NETWORK ALIAS RANGES CHANGED, OR STOPPED RESOLVING (#324)
 
-     Aliases are advisory: nothing applies itself, so an operator has to act for
-     anything to happen. That makes the notification the mechanism rather than a
-     courtesy. The resolver also emails on change, but an email is a one-shot and
-     admin_email goes stale when people leave. This persists until the condition
-     clears, which is the property that matters here.
+     A range change applies itself to the consumers referencing the alias, each
+     one independently. What reaches this alert is therefore what did NOT land: a
+     consumer whose regeneration failed, leaving its config out of step with the
+     alias and nobody watching. The resolver also emails on change, but an email
+     is a one-shot and admin_email goes stale when people leave. This persists
+     until the condition clears, which is the property that matters here.
 
      Two separate conditions, deliberately. A resolve that has been failing for a
      week must not first become visible at the moment the ranges finally matter.
      ============================================================================ --->
 <!--- Alias ranges that changed and have not been applied on every page that
-     references them. This is the load-bearing signal: nothing applies itself,
-     the resolver's email is a one-shot, and the alias page's own callout is only
+     references them. Auto-apply covers the normal case, so anything counted here
+     is a consumer that failed to regenerate. That is the load-bearing signal: the
+     resolver's email is a one-shot, and the alias page's own callout is only
      seen by someone already on that page. Counted per alias rather than per
      consumer, because the operator thinks in aliases and the page lists the
      specific pages still to apply. --->
