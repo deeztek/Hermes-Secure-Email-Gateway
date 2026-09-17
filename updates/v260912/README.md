@@ -83,6 +83,8 @@ _Pro Edition._ Link Guard is better at catching credential-phishing pages hosted
 
 Reputation checks and the built-in threat feeds were also strengthened against a common evasion technique.
 
+Signals that are individually too weak to act on are now considered together, so a link that no single check would flag on its own can still be caught. These appear in the click log as **Combined weak signals** and show a warning rather than being blocked.
+
 Reputation lookups now record their outcome in the Link Guard container log, so a decision can be explained after the fact.
 
 These changes are in the Link Guard container image and arrive with the upgrade. No configuration change is needed.
