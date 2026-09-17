@@ -111,6 +111,43 @@ queryExecute(
       <cfset session.m = 11>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
     </cfif>
+    <cfif allowedSender NEQ "" AND NOT IsValid("email", allowedSender)>
+      <cfset session.m = 13>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+    <cfif anyIp EQ 0 AND ipAllowlist EQ "">
+      <cfset session.m = 14>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+    <cfif allowedSender NEQ "" AND allowedDomain NEQ "" AND listLast(allowedSender, "@") NEQ allowedDomain>
+      <cfset session.m = 15>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+
+    <cfif allowedSender NEQ "">
+      <cfset senderDomain = listLast(allowedSender, "@")>
+      <cfquery name="getAllowedSenderDomain" datasource="hermes">
+        SELECT id FROM domains
+        WHERE LOWER(domain) = <cfqueryparam value="#senderDomain#" cfsqltype="cf_sql_varchar">
+        LIMIT 1
+      </cfquery>
+      <cfif getAllowedSenderDomain.recordcount EQ 0>
+        <cfset session.m = 16>
+        <cflocation url="view_transactional_emails.cfm" addtoken="no">
+      </cfif>
+    </cfif>
+
+    <cfif allowedDomain NEQ "">
+      <cfquery name="getAllowedTokenDomain" datasource="hermes">
+        SELECT id FROM domains
+        WHERE LOWER(domain) = <cfqueryparam value="#allowedDomain#" cfsqltype="cf_sql_varchar">
+        LIMIT 1
+      </cfquery>
+      <cfif getAllowedTokenDomain.recordcount EQ 0>
+        <cfset session.m = 17>
+        <cflocation url="view_transactional_emails.cfm" addtoken="no">
+      </cfif>
+    </cfif>
 
     <cfset _transLength = 32>
     <cfinclude template="./inc/generate_customtrans.cfm">
@@ -167,6 +204,39 @@ queryExecute(
     <cfif credName EQ "">
       <cfset session.m = 12>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+    <cfif smtpAllowedSender NEQ "" AND NOT IsValid("email", smtpAllowedSender)>
+      <cfset session.m = 18>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+    <cfif smtpAllowedSender NEQ "" AND smtpAllowedDomain NEQ "" AND listLast(smtpAllowedSender, "@") NEQ smtpAllowedDomain>
+      <cfset session.m = 19>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+
+    <cfif smtpAllowedSender NEQ "">
+      <cfset smtpSenderDomain = listLast(smtpAllowedSender, "@")>
+      <cfquery name="getAllowedSmtpSenderDomain" datasource="hermes">
+        SELECT id FROM domains
+        WHERE LOWER(domain) = <cfqueryparam value="#smtpSenderDomain#" cfsqltype="cf_sql_varchar">
+        LIMIT 1
+      </cfquery>
+      <cfif getAllowedSmtpSenderDomain.recordcount EQ 0>
+        <cfset session.m = 20>
+        <cflocation url="view_transactional_emails.cfm" addtoken="no">
+      </cfif>
+    </cfif>
+
+    <cfif smtpAllowedDomain NEQ "">
+      <cfquery name="getAllowedSmtpDomain" datasource="hermes">
+        SELECT id FROM domains
+        WHERE LOWER(domain) = <cfqueryparam value="#smtpAllowedDomain#" cfsqltype="cf_sql_varchar">
+        LIMIT 1
+      </cfquery>
+      <cfif getAllowedSmtpDomain.recordcount EQ 0>
+        <cfset session.m = 21>
+        <cflocation url="view_transactional_emails.cfm" addtoken="no">
+      </cfif>
     </cfif>
 
     <cfset _transLength = 16>
@@ -275,6 +345,15 @@ queryExecute(
 <cfif m EQ 5><div class="alert alert-success"><h5><i class="icon fas fa-check"></i> Success</h5>SMTP credential revoked.</div></cfif>
 <cfif m EQ 11><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>API token name is required.</div></cfif>
 <cfif m EQ 12><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP credential name is required.</div></cfif>
+<cfif m EQ 13><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>API allowed sender must be a valid email address.</div></cfif>
+<cfif m EQ 14><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>Restricted API tokens require at least one IP/CIDR entry.</div></cfif>
+<cfif m EQ 15><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>API sender and domain restrictions must match the same domain.</div></cfif>
+<cfif m EQ 16><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>API sender domain is not configured in Hermes.</div></cfif>
+<cfif m EQ 17><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>API allowed domain is not configured in Hermes.</div></cfif>
+<cfif m EQ 18><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP allowed sender must be a valid email address.</div></cfif>
+<cfif m EQ 19><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP sender and domain restrictions must match the same domain.</div></cfif>
+<cfif m EQ 20><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP sender domain is not configured in Hermes.</div></cfif>
+<cfif m EQ 21><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP allowed domain is not configured in Hermes.</div></cfif>
 <cfif m EQ 30><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>Could not generate SMTP credential hash.</div></cfif>
 
 <cfif StructKeyExists(session, "newTransactionalApiToken") AND session.newTransactionalApiToken NEQ "">
@@ -396,7 +475,8 @@ queryExecute(
   <div class="card-header"><h3 class="card-title"><i class="fas fa-code me-2"></i>REST API</h3></div>
   <div class="card-body">
     <p class="mb-2"><strong>Endpoint:</strong> <code><cfoutput>https://#encodeForHTML(cgi.server_name)#/api/v1/transactional/send</cfoutput></code></p>
-    <p class="mb-3"><strong>Authentication:</strong> <code>Authorization: ****** (query-string tokens are rejected).</p>
+    <p class="mb-1"><strong>Authentication:</strong> <code>Use a ****** in the Authorization header.</code></p>
+    <p class="mb-3"><small class="text-muted">Query-string API tokens are rejected.</small></p>
 
     <form method="post" action="view_transactional_emails.cfm" class="row g-3 mb-3">
       <input type="hidden" name="action" value="create_api_token">

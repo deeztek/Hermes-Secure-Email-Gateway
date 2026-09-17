@@ -113,7 +113,13 @@ function txAudit(required struct row) {
 </cfscript>
 
 <cfif StructKeyExists(url, "token") OR StructKeyExists(url, "api_token")>
+  <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="TOKEN_IN_QUERY_NOT_ALLOWED"})>
   <cfset txRespond(400, false, "TOKEN_IN_QUERY_NOT_ALLOWED", "API tokens must be sent in the Authorization header.")>
+</cfif>
+
+<cfif cgi.request_method NEQ "POST">
+  <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="METHOD_NOT_ALLOWED"})>
+  <cfset txRespond(405, false, "METHOD_NOT_ALLOWED", "Only POST is supported.")>
 </cfif>
 
 <cfset reqData = getHttpRequestData()>
@@ -123,11 +129,13 @@ function txAudit(required struct row) {
 </cfif>
 
 <cfif Left(authHeader, 7) NEQ "Bearer ">
+  <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="AUTHENTICATION_FAILED"})>
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
 
 <cfset bearerToken = trim(Mid(authHeader, 8, Len(authHeader)-7))>
 <cfif bearerToken EQ "">
+  <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="AUTHENTICATION_FAILED"})>
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
 
@@ -155,6 +163,7 @@ function txAudit(required struct row) {
 </cfloop>
 
 <cfif NOT foundToken>
+  <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="AUTHENTICATION_FAILED"})>
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
 
