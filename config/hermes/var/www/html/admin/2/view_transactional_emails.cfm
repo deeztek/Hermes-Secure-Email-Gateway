@@ -248,9 +248,9 @@ queryExecute(
 
     <cftry>
       <cfexecute name="/usr/local/bin/docker"
-        arguments='exec -i hermes_dovecot /bin/sh -lc "pw=$(cat); doveadm pw -s ARGON2ID -p \"$pw\""'
+        arguments="exec hermes_dovecot doveadm pw -s ARGON2ID -p #smtpPasswordPlain#"
         variable="smtpPasswordHash"
-        timeout="60">#smtpPasswordPlain#</cfexecute>
+        timeout="60"></cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
       <cfif smtpPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", smtpPasswordHash)>
         <cfthrow message="Credential hash generation failed">
