@@ -15,9 +15,14 @@
   <main class="app-main">
 
 <cfparam name="m" default="0">
+<cfset smtpCredentialErrorDetail = "">
 <cfif StructKeyExists(session, "m") AND session.m NEQ "">
   <cfset m = session.m>
   <cfset session.m = "">
+</cfif>
+<cfif StructKeyExists(session, "smtpCredentialErrorDetail") AND session.smtpCredentialErrorDetail NEQ "">
+  <cfset smtpCredentialErrorDetail = session.smtpCredentialErrorDetail>
+  <cfset session.smtpCredentialErrorDetail = "">
 </cfif>
 
 <cfif NOT StructKeyExists(session, "transactionalEmailCsrf") OR session.transactionalEmailCsrf EQ "">
@@ -245,17 +250,42 @@ queryExecute(
     <cfset _transLength = 32>
     <cfinclude template="./inc/generate_customtrans.cfm">
     <cfset smtpPasswordPlain = customtrans3>
+    <cfset session.smtpCredentialErrorDetail = "">
 
     <cftry>
       <cfexecute name="/usr/local/bin/docker"
-        arguments='exec -i hermes_dovecot /bin/sh -lc "IFS= read -r smtp_password_plain || [ -n \"$smtp_password_plain\" ]; exec doveadm pw -s ARGON2ID -p \"$smtp_password_plain\""'
+        arguments='exec -i hermes_dovecot /scripts/hermes_smtp_hash.sh'
         variable="smtpPasswordHash"
+        errorVariable="smtpPasswordHashError"
         timeout="60">#smtpPasswordPlain#</cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
       <cfif smtpPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", smtpPasswordHash)>
-        <cfthrow message="Credential hash generation failed">
+        <cfthrow message="Credential hash generation failed" detail="SMTP hash command returned invalid output.">
       </cfif>
     <cfcatch type="any">
+      <cfset _hashErrorStderr = IsDefined("smtpPasswordHashError") ? Trim(smtpPasswordHashError) : "">
+      <cfif IsDefined("smtpPasswordPlain") AND smtpPasswordPlain NEQ "">
+        <cfset _hashErrorStderr = ReplaceNoCase(_hashErrorStderr, smtpPasswordPlain, "[REDACTED]", "all")>
+      </cfif>
+      <cfset _hashErrorRaw = LCase(Trim(cfcatch.message & " " & cfcatch.detail & " " & _hashErrorStderr))>
+      <cfset _hashErrorLog = _hashErrorRaw>
+      <cfset _smtpHashErrorCategory = "unknown_failure">
+      <cfif Find("unknown scheme", _hashErrorRaw) OR Find("invalid scheme", _hashErrorRaw)>
+        <cfset _smtpHashErrorCategory = "unsupported_scheme">
+        <cfset session.smtpCredentialErrorDetail = "Dovecot hash scheme is not available in the container.">
+      <cfelseif Find("script_utility_missing", _hashErrorRaw)>
+        <cfset _smtpHashErrorCategory = "script_utility_missing">
+        <cfset session.smtpCredentialErrorDetail = "Required script utility is missing in the Dovecot container.">
+      <cfelseif Find("not found", _hashErrorRaw) OR Find("command not found", _hashErrorRaw)>
+        <cfset _smtpHashErrorCategory = "command_missing">
+        <cfset session.smtpCredentialErrorDetail = "Dovecot hash command failed in the container.">
+      <cfelseif Find("permission denied", _hashErrorRaw)>
+        <cfset _smtpHashErrorCategory = "permission_denied">
+        <cfset session.smtpCredentialErrorDetail = "Permission was denied while generating the SMTP hash.">
+      <cfelse>
+        <cfset session.smtpCredentialErrorDetail = "Hash generation failed. Check Hermes application logs for details.">
+      </cfif>
+      <cflog file="hermes" type="error" text="Transactional SMTP hash generation failed (category=#_smtpHashErrorCategory#): #Left(_hashErrorLog, 1000)#">
       <cfset session.m = 30>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
     </cfcatch>
@@ -354,7 +384,15 @@ queryExecute(
 <cfif m EQ 19><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP sender and domain restrictions must match the same domain.</div></cfif>
 <cfif m EQ 20><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP sender domain is not configured in Hermes.</div></cfif>
 <cfif m EQ 21><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>SMTP allowed domain is not configured in Hermes.</div></cfif>
-<cfif m EQ 30><div class="alert alert-danger"><h5><i class="icon fas fa-ban"></i> Error</h5>Could not generate SMTP credential hash.</div></cfif>
+<cfif m EQ 30>
+  <div class="alert alert-danger">
+    <h5><i class="icon fas fa-ban"></i> Error</h5>
+    Could not generate SMTP credential hash.
+    <cfif smtpCredentialErrorDetail NEQ "">
+      <br><small><strong>Details:</strong> <cfoutput>#encodeForHTML(smtpCredentialErrorDetail)#</cfoutput></small>
+    </cfif>
+  </div>
+</cfif>
 
 <cfif StructKeyExists(session, "newTransactionalApiToken") AND session.newTransactionalApiToken NEQ "">
   <div class="callout callout-warning">
