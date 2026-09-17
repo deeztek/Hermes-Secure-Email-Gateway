@@ -251,7 +251,8 @@ queryExecute(
       <cffile action="write" file="#smtpPasswordTempFile#" output="#smtpPasswordPlain#" addnewline="no">
       <cfexecute name="/bin/chmod" arguments="600 #smtpPasswordTempFile#" timeout="10"></cfexecute>
       <cfexecute name="/usr/local/bin/docker"
-        arguments='exec hermes_dovecot /bin/sh -lc "pw=$(cat #smtpPasswordTempFile#); doveadm pw -s ARGON2ID -p \"$pw\""'
+        arguments="exec -i hermes_dovecot doveadm pw -s ARGON2ID"
+        inputfile="#smtpPasswordTempFile#"
         variable="smtpPasswordHash"
         timeout="60"></cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>

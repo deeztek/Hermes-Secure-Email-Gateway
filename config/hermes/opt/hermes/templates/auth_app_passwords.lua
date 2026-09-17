@@ -88,25 +88,25 @@ local function tx_auth_rate_limited(conn, auth_identifier)
     if not cur then
         return false, qerr
     end
-
-    local function tx_auth_lock(conn, lock_name)
-        local q = "SELECT GET_LOCK(" .. sql_quote(conn, lock_name) .. ", 5) AS got_lock"
-        local cur, qerr = conn:execute(q)
-        if not cur then
-            return false, qerr
-        end
-        local row = cur:fetch({}, "a")
-        cur:close()
-        return ((tonumber(row and row.got_lock) or 0) == 1), nil
-    end
-
-    local function tx_auth_unlock(conn, lock_name)
-        local q = "SELECT RELEASE_LOCK(" .. sql_quote(conn, lock_name) .. ")"
-        conn:execute(q)
-    end
     local row = cur:fetch({}, "a")
     cur:close()
     return ((tonumber(row and row.cnt) or 0) >= TX_AUTH_FAIL_LIMIT), nil
+end
+
+local function tx_auth_lock(conn, lock_name)
+    local q = "SELECT GET_LOCK(" .. sql_quote(conn, lock_name) .. ", 5) AS got_lock"
+    local cur, qerr = conn:execute(q)
+    if not cur then
+        return false, qerr
+    end
+    local row = cur:fetch({}, "a")
+    cur:close()
+    return ((tonumber(row and row.got_lock) or 0) == 1), nil
+end
+
+local function tx_auth_unlock(conn, lock_name)
+    local q = "SELECT RELEASE_LOCK(" .. sql_quote(conn, lock_name) .. ")"
+    conn:execute(q)
 end
 
 function auth_passdb_lookup(req)
