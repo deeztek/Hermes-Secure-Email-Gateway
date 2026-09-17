@@ -192,12 +192,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         "status": dmarcEnabled
     })>
 
-    <cfset serviceDefs = [
-        {"name":"postfix","label":"Postfix","container":"hermes_postfix_dkim"},
-        {"name":"amavis","label":"Amavis","container":"hermes_mail_filter"},
-        {"name":"clamav-daemon","label":"ClamAV","container":"hermes_mail_filter"},
-        {"name":"spamassassin","label":"SpamAssassin","container":"hermes_mail_filter"}
-    ]>
+   <cfset serviceDefs = [
+    {"name":"postfix","label":"Postfix","container":"hermes_postfix_dkim"},
+    {"name":"amavis","label":"Amavis","container":"hermes_mail_filter"},
+    {"name":"clamav-daemon","label":"ClamAV","container":"hermes_mail_filter"},
+    {"name":"spamassassin","label":"SpamAssassin","container":"hermes_mail_filter"},
+    {"name":"fail2ban","label":"Fail2Ban","container":"hermes_fail2ban"},
+    {"name":"unbound","label":"Unbound DNS","container":"hermes_unbound"},
+    {"name":"nginx","label":"Nginx","container":"hermes_nginx"},
+    {"name":"authelia","label":"Authelia","container":"hermes_authelia"},
+    {"name":"openarc","label":"OpenARC","container":"hermes_openarc"},
+    {"name":"dmarc","label":"DMARC","container":"hermes_dmarc"},
+    {"name":"ciphermail","label":"CipherMail","container":"hermes_ciphermail"},
+    {"name":"dovecot","label":"Dovecot","container":"hermes_dovecot"},
+    {"name":"nextcloud","label":"Nextcloud","container":"hermes_nextcloud"},
+    {"name":"body-milter","label":"Body Milter","container":"hermes_body_milter"},
+    {"name":"linkguard","label":"LinkGuard","container":"hermes_linkguard"},
+    {"name":"commandbox","label":"CommandBox","container":"hermes_commandbox"},
+    {"name":"openldap","label":"OpenLDAP","container":"hermes_ldap"},
+    {"name":"nextcloud-redis","label":"Nextcloud Redis","container":"hermes_nextcloud_redis"},
+    {"name":"authelia-redis","label":"Authelia Redis","container":"hermes_authelia_redis"},
+    {"name":"mariadb","label":"MariaDB","container":"hermes_db_server"},
+    {"name":"ofelia","label":"Ofelia","container":"hermes_ofelia"}
+]>
     <cfset dockerBinary = "/usr/local/bin/docker">
     <cfif NOT FileExists(dockerBinary)>
         <cfset dockerBinary = "/usr/bin/docker">
