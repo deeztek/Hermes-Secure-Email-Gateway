@@ -248,7 +248,7 @@ queryExecute(
 
     <cftry>
       <cfexecute name="/usr/local/bin/docker"
-        arguments="exec -i hermes_dovecot doveadm pw -s ARGON2ID"
+        arguments='exec -i hermes_dovecot /bin/sh -lc "pw=$(cat); doveadm pw -s ARGON2ID -p \"$pw\""'
         variable="smtpPasswordHash"
         timeout="60">#smtpPasswordPlain#</cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
@@ -504,7 +504,7 @@ queryExecute(
             </td>
             <td>
               <cfif Val(any_ip) EQ 1><strong>Any IP</strong><br><small class="text-muted">Requests may originate from any source address.</small>
-              <cfelse><strong>Restricted</strong><br><small class="text-muted">#encodeForHTML(ip_allowlist)#</small></cfif>
+              <cfelse><strong>Restricted</strong><br><small class="text-muted">Allowed ranges: #encodeForHTML(ip_allowlist)#</small></cfif>
             </td>
             <td><cfif IsDate(last_used_at)>#DateFormat(last_used_at,"yyyy-mm-dd")# #TimeFormat(last_used_at,"HH:mm:ss")#<cfelse><span class="text-muted">Never</span></cfif></td>
             <td><cfif Val(active) EQ 1><span class="badge text-bg-success">Active</span><cfelse><span class="badge text-bg-secondary">Revoked</span></cfif></td>

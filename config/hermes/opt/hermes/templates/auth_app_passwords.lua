@@ -203,7 +203,10 @@ function auth_passdb_lookup(req)
 
         local enabled, enabledErr = tx_service_enabled(conn)
         if enabledErr then
-            req:log_warning("transactional_smtp_credentials: enabled check failed: " .. tostring(enabledErr))
+            req:log_error("transactional_smtp_credentials: enabled check failed: " .. tostring(enabledErr))
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "service enabled check failed"
         end
         if not enabled then
             tx_audit(conn, authId, sourceIp, "rejected", "TRANSACTIONAL_DISABLED")
