@@ -304,7 +304,6 @@ function txAudit(required struct row) {
   <cfset tokenAuthIdentifier = "token:" & tokenRow.id>
   <cfset retryAfter = 1>
   <cfif val(getRateUsage.cpm) GTE rateSettings["messages_per_minute"]>
-    <cfset minuteOffset = max(0, rateSettings["messages_per_minute"] - 1)>
     <cfquery name="getMinuteRateBoundary" datasource="hermes">
       SELECT created_at
       FROM transactional_email_audit
@@ -312,15 +311,14 @@ function txAudit(required struct row) {
         AND auth_identifier = <cfqueryparam value="#tokenAuthIdentifier#" cfsqltype="cf_sql_varchar">
         AND result='accepted'
         AND created_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE)
-      ORDER BY created_at DESC
-      LIMIT #minuteOffset#, 1
+      ORDER BY created_at ASC
+      LIMIT 1
     </cfquery>
     <cfif getMinuteRateBoundary.recordcount GT 0 AND IsDate(getMinuteRateBoundary.created_at)>
       <cfset retryAfter = max(retryAfter, 60 - dateDiff("s", getMinuteRateBoundary.created_at, now()))>
     </cfif>
   </cfif>
   <cfif val(getRateUsage.cph) GTE rateSettings["messages_per_hour"]>
-    <cfset hourOffset = max(0, rateSettings["messages_per_hour"] - 1)>
     <cfquery name="getHourRateBoundary" datasource="hermes">
       SELECT created_at
       FROM transactional_email_audit
@@ -328,15 +326,14 @@ function txAudit(required struct row) {
         AND auth_identifier = <cfqueryparam value="#tokenAuthIdentifier#" cfsqltype="cf_sql_varchar">
         AND result='accepted'
         AND created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR)
-      ORDER BY created_at DESC
-      LIMIT #hourOffset#, 1
+      ORDER BY created_at ASC
+      LIMIT 1
     </cfquery>
     <cfif getHourRateBoundary.recordcount GT 0 AND IsDate(getHourRateBoundary.created_at)>
       <cfset retryAfter = max(retryAfter, 3600 - dateDiff("s", getHourRateBoundary.created_at, now()))>
     </cfif>
   </cfif>
   <cfif val(getRateUsage.cpd) GTE rateSettings["messages_per_day"]>
-    <cfset dayOffset = max(0, rateSettings["messages_per_day"] - 1)>
     <cfquery name="getDayRateBoundary" datasource="hermes">
       SELECT created_at
       FROM transactional_email_audit
@@ -344,8 +341,8 @@ function txAudit(required struct row) {
         AND auth_identifier = <cfqueryparam value="#tokenAuthIdentifier#" cfsqltype="cf_sql_varchar">
         AND result='accepted'
         AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
-      ORDER BY created_at DESC
-      LIMIT #dayOffset#, 1
+      ORDER BY created_at ASC
+      LIMIT 1
     </cfquery>
     <cfif getDayRateBoundary.recordcount GT 0 AND IsDate(getDayRateBoundary.created_at)>
       <cfset retryAfter = max(retryAfter, 86400 - dateDiff("s", getDayRateBoundary.created_at, now()))>
