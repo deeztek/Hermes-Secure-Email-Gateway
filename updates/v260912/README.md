@@ -77,6 +77,14 @@ separately and is not in this release.
 
 ## What is fixed
 
+### Scheduled job failures were never reported by email
+
+The scheduler emails the admin address when a scheduled job fails. That mail has never been delivered on any installation: the scheduler connects to Postfix by container name, and no certificate carries a container name, so the TLS check failed and the message was dropped. The failure it was reporting went unnoticed.
+
+The connection stays encrypted; it no longer requires a certificate name that cannot exist. Nothing to configure, and no change to what triggers a notification: a job that succeeds still sends nothing.
+
+Worth checking after upgrading that **System > System Settings** has a correct admin email address, since that is where these go and nothing has been arriving to prove it right.
+
 ### Link Guard detection improvements
 
 _Pro Edition._ Link Guard is better at catching credential-phishing pages hosted on public cloud storage services, a common pattern because the host itself looks trustworthy.
