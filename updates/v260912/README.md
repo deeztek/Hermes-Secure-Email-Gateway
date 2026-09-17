@@ -107,7 +107,7 @@ Reputation lookups now record their outcome in the Link Guard container log, so 
 
 These changes are in the Link Guard container image and arrive with the upgrade. No configuration change is needed.
 
-**Recommended:** if you have not already, add a VirusTotal or Google Safe Browsing API key on **Content Checks > Link Guard**. Both are free for this volume of use, and Link Guard's reputation layer only runs when a key is present.
+**Recommended:** if you have not already, add a VirusTotal or Google Safe Browsing API key on **Content Checks > Link Guard**. The reputation layer only runs when a key is present. Both providers offer a free tier aimed at low volume use, so check their current usage limits against your own mail volume before enabling one. Link Guard caches verdicts, which keeps the number of lookups well below the number of links scanned and helps considerably at the free tier.
 
 ### Ranges that Postfix rejects can no longer be saved
 
@@ -256,4 +256,5 @@ cd /opt/hermes-seg
 sudo ./scripts/system_update_docker.sh v260912
 ```
 
-Take a hypervisor snapshot first, as always.
+Take a backup or a snapshot first, as always. On a hypervisor a VM snapshot is the
+quickest way back. Otherwise run `./scripts/system_backup.sh` from the host.
