@@ -721,9 +721,21 @@ GEN_MERGE_SQL
     local unmapped seeded_in_baseline
     seeded_in_baseline=$(grep -oE '^INSERT (IGNORE )?INTO `[a-z_0-9]+`' "$install_sql" \
         | sed 's/.*`\(.*\)`/\1/' | sort -u)
+    # Subtract the join-table handler too, not just SEED_MERGE_KEYS. Tables whose
+    # identity is a FOREIGN ID rather than a natural key are merged by
+    # merge_join_table_rows(), so listing them here told the operator to add a
+    # natural key for something already carried, and invited a developer to
+    # "fix" a non-problem. check_fresh_install_parity.sh has always counted both
+    # buckets; this warning only knew about one.
+    local _join_handled
+    _join_handled=$(sed -n '/^merge_join_table_rows()/,/^}/p' "${BASH_SOURCE[0]}" \
+        | grep -oE 'INSERT INTO `hermes`\.`[a-z_0-9]+`' \
+        | sed 's/.*`\(.*\)`/\1/' | sort -u)
     unmapped=$(comm -23 \
         <(printf '%s\n' "$seeded_in_baseline" | sort -u) \
-        <({ printf '%s\n' "$SEED_MERGE_KEYS" | grep -vE '^[[:space:]]*$' | cut -d: -f1; echo parameters; } | sort -u))
+        <({ printf '%s\n' "$SEED_MERGE_KEYS" | grep -vE '^[[:space:]]*$' | cut -d: -f1
+            printf '%s\n' "$_join_handled"
+            echo parameters; } | grep -vE '^[[:space:]]*$' | sort -u))
     if [[ -n "$unmapped" ]]; then
         warn "  Seeded tables with no natural key in SEED_MERGE_KEYS (NOT merged):"
         printf '      %s\n' $unmapped | tee -a "$LOG_FILE"

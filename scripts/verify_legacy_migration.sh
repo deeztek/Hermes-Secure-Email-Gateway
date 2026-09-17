@@ -41,7 +41,13 @@ note() { echo -e "  ${YELLOW}NOTE${NC}  $1"; }
 head2() { echo ""; echo -e "${BLUE}=== $1 ===${NC}"; }
 
 q()  { docker exec hermes_db_server mariadb -u root -N -e "$1" 2>/dev/null; }
-qi() { docker exec -i hermes_db_server mariadb -u root -N 2>/dev/null; }
+
+# Pipe SQL into a NAMED database. The database argument is not optional: the
+# baseline has its CREATE DATABASE and USE lines stripped before being piped in,
+# so without it every CREATE TABLE fails with "No database selected". This
+# function used to omit it, and stderr was discarded, so the reference schema
+# silently came out empty and every comparison against it passed vacuously.
+qi() { docker exec -i hermes_db_server mariadb -u root -N "$1" 2>&1; }
 
 docker ps --format '{{.Names}}' | grep -qx hermes_db_server \
     || { echo "hermes_db_server is not running." >&2; exit 2; }
@@ -53,9 +59,19 @@ echo "Hermes root: ${HERMES_ROOT}"
 # ---------------------------------------------------------------------------
 head2 "Building reference schema (hermes_vref) from the baseline"
 q "DROP DATABASE IF EXISTS hermes_vref; CREATE DATABASE hermes_vref;" >/dev/null
-grep -vE '^(CREATE DATABASE|USE `)' "$INSTALL_SQL" | qi >/dev/null
+_ref_err=$(grep -vE '^(CREATE DATABASE|USE `)' "$INSTALL_SQL" | qi hermes_vref)
 REF_TABLES=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='hermes_vref';")
 info "hermes_vref built: ${REF_TABLES} tables"
+
+# An empty or short reference makes checks 3, 5 and 6 compare against nothing
+# and report PASS regardless. A gate that cannot fail is worse than no gate, so
+# stop here rather than produce a reassuring result.
+if [[ -z "$REF_TABLES" || "$REF_TABLES" -lt 50 ]]; then
+    fail "reference schema did not build (${REF_TABLES:-0} tables). Checks 3, 5 and 6 cannot run."
+    [[ -n "$_ref_err" ]] && printf '      %s\n' "$(printf '%s' "$_ref_err" | head -5)"
+    q "DROP DATABASE IF EXISTS hermes_vref;" >/dev/null
+    exit 1
+fi
 
 cleanup() { q "DROP DATABASE IF EXISTS hermes_vref;" >/dev/null; }
 trap cleanup EXIT
