@@ -251,15 +251,35 @@ queryExecute(
     <cfinclude template="./inc/generate_customtrans.cfm">
     <cfset smtpPasswordPlain = customtrans3>
     <cfset session.smtpCredentialErrorDetail = "">
+    <cfif REFind("[\r\n]", smtpPasswordPlain) GT 0>
+      <cfset session.smtpCredentialErrorDetail = "Generated password contained unsupported line breaks.">
+      <cfset session.m = 30>
+      <cflocation url="view_transactional_emails.cfm" addtoken="no">
+    </cfif>
+    <cfset smtpPasswordStdin = smtpPasswordPlain & chr(10) & smtpPasswordPlain & chr(10)>
 
     <cftry>
       <cfexecute name="/usr/local/bin/docker"
-        arguments='exec -i hermes_dovecot /scripts/hermes_smtp_hash.sh'
+        arguments='exec -i hermes_dovecot doveadm pw -s ARGON2ID'
         variable="smtpPasswordHash"
         errorVariable="smtpPasswordHashError"
-        timeout="60">#smtpPasswordPlain#</cfexecute>
+        input="#smtpPasswordStdin#"
+        timeout="60"></cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
-      <cfif smtpPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", smtpPasswordHash)>
+      <cfset _rxNonWhitespace = "[^" & chr(9) & chr(10) & chr(13) & " ]+">
+      <cfset _rxArgon2Payload = "[^\$]+\$[^\$]+\$[^\$]+\$" & _rxNonWhitespace>
+      <cfset _rxPrefixedArgon2 = "\{[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\}\$[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\$" & _rxArgon2Payload>
+      <cfset _rxBareArgon2 = "\$[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\$" & _rxArgon2Payload>
+      <cfset _smtpHashMatch = REFind(_rxPrefixedArgon2, smtpPasswordHash, 1, true)>
+      <cfif StructKeyExists(_smtpHashMatch, "len") AND ArrayLen(_smtpHashMatch.len) GTE 1 AND _smtpHashMatch.len[1] GT 0>
+        <cfset smtpPasswordHash = Mid(smtpPasswordHash, _smtpHashMatch.pos[1], _smtpHashMatch.len[1])>
+      <cfelse>
+        <cfset _smtpBareHashMatch = REFind(_rxBareArgon2, smtpPasswordHash, 1, true)>
+        <cfif StructKeyExists(_smtpBareHashMatch, "len") AND ArrayLen(_smtpBareHashMatch.len) GTE 1 AND _smtpBareHashMatch.len[1] GT 0>
+          <cfset smtpPasswordHash = "{ARGON2ID}" & Mid(smtpPasswordHash, _smtpBareHashMatch.pos[1], _smtpBareHashMatch.len[1])>
+        </cfif>
+      </cfif>
+      <cfif smtpPasswordHash EQ "" OR REFind("^" & _rxPrefixedArgon2 & "$", smtpPasswordHash) EQ 0>
         <cfthrow message="Credential hash generation failed" detail="SMTP hash command returned invalid output.">
       </cfif>
     <cfcatch type="any">
