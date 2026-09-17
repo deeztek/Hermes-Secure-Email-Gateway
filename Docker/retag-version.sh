@@ -1,25 +1,19 @@
 #!/bin/bash
-# Re-tag an existing release's images to a new version, in the GitLab registry.
+# Re-tag a release's images to a new version, in the GitLab registry.
 #
-# Use this when a release ships without any change to the image build context:
-# `git diff --name-only <oldtag>..HEAD -- Docker/` is empty, so the images are
-# byte-identical and rebuilding them produces the same layers more slowly.
+# For a release that changed no image build context: the images are identical,
+# so rebuilding produces the same layers more slowly. But the new tag still has
+# to EXIST, because docker-compose pins every image with one
+# HERMES_DOCKER_IMG_VERSION and system_update_docker.sh only pins a release tag
+# if `docker manifest inspect` finds it. One missing image and the release
+# cannot be pinned at all.
 #
-# The new tag still has to EXIST, because docker-compose pins every image with
-# one HERMES_DOCKER_IMG_VERSION, and system_update_docker.sh only pins a release
-# tag if `docker manifest inspect` finds it. One missing image means the whole
-# release cannot be pinned.
+# An image ALREADY at the target tag is left alone. That is how a genuinely
+# rebuilt image survives this: it is already there, so there is nothing to
+# remember and no flag to get wrong. Re-running is therefore safe.
 #
-# Images changed for this release are skipped with --skip, so a rebuilt image
-# is not overwritten by an older one carrying the same new tag.
-#
-# Usage: ./retag-version.sh <from-version> <to-version> [--skip img,img] [--dry-run]
-#
-# Example, where only Link Guard was rebuilt:
-#     ./retag-version.sh v260815 v260912 --skip hermes-linkguard
-#
-# Pulls from the registry if an image is not already local, so it works on a
-# clean machine. Afterwards, promote-gl-to-ghcr.sh moves the set to ghcr.
+# Usage: ./retag-version.sh <from-version> <to-version> [--dry-run]
+# Example: ./retag-version.sh v260815 v260912
 set -uo pipefail
 
 REGISTRY="hub.deeztek.com/dedwards/hermes-seg-docker-gl"
@@ -31,95 +25,62 @@ IMAGES=(
     "hermes-linkguard"
 )
 
-FROM_VER=""; TO_VER=""; SKIP=""; DRY=0
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --skip)     SKIP="$2"; shift 2 ;;
-        --skip=*)   SKIP="${1#*=}"; shift ;;
-        --dry-run)  DRY=1; shift ;;
-        -h|--help)  sed -n '2,25p' "$0"; exit 0 ;;
-        *) if   [[ -z "$FROM_VER" ]]; then FROM_VER="$1"
-           elif [[ -z "$TO_VER"   ]]; then TO_VER="$1"
-           else echo "Unexpected argument: $1" >&2; exit 2; fi; shift ;;
-    esac
-done
+FROM_VER="${1:-}"; TO_VER="${2:-}"; DRY=0
+[[ "${3:-}" == "--dry-run" ]] && DRY=1
 
 if [[ -z "$FROM_VER" || -z "$TO_VER" ]]; then
-    echo "Usage: $0 <from-version> <to-version> [--skip img,img] [--dry-run]" >&2
-    echo "Example: $0 v260815 v260912 --skip hermes-linkguard" >&2
+    echo "Usage: $0 <from-version> <to-version> [--dry-run]" >&2
+    echo "Example: $0 v260815 v260912" >&2
     exit 2
 fi
 
-echo "Re-tag ${FROM_VER} -> ${TO_VER}"
-echo "  registry: ${REGISTRY}"
-[[ -n "$SKIP" ]] && echo "  skipping: ${SKIP}"
-[[ $DRY -eq 1 ]] && echo "  DRY RUN, nothing will be pushed"
+echo "Re-tag ${FROM_VER} -> ${TO_VER} on ${REGISTRY}"
+[[ $DRY -eq 1 ]] && echo "DRY RUN"
 echo
 
-OK=(); FAILED=(); SKIPPED=()
+FAILED=0
 
 for img in "${IMAGES[@]}"; do
-    if [[ ",${SKIP}," == *",${img},"* ]]; then
-        echo "[skip] ${img}"
-        SKIPPED+=("$img")
+    src="${REGISTRY}/${img}:${FROM_VER}"
+    dst="${REGISTRY}/${img}:${TO_VER}"
+
+    if docker manifest inspect "$dst" >/dev/null 2>&1; then
+        echo "${img}: already at ${TO_VER}, left alone"
         continue
     fi
 
-    src="${REGISTRY}/${img}:${FROM_VER}"
-    dst="${REGISTRY}/${img}:${TO_VER}"
-    echo "[${img}]"
-
-    # Pull only when it is not already local, so a rerun is fast.
     if ! docker image inspect "$src" >/dev/null 2>&1; then
-        echo "  pulling ${FROM_VER}"
         if ! docker pull "$src" >/dev/null 2>&1; then
-            echo "  FAILED: ${FROM_VER} not found locally or in the registry"
-            FAILED+=("$img")
+            echo "${img}: FAILED, ${FROM_VER} not found"
+            FAILED=$((FAILED + 1))
             continue
         fi
     fi
 
     if [[ $DRY -eq 1 ]]; then
-        echo "  would tag and push ${TO_VER}"
-        OK+=("$img")
+        echo "${img}: would tag ${TO_VER}"
         continue
     fi
 
-    docker tag "$src" "$dst" || { echo "  FAILED: tag"; FAILED+=("$img"); continue; }
-    if docker push "$dst" >/dev/null 2>&1; then
-        echo "  pushed ${TO_VER}"
-        OK+=("$img")
+    if docker tag "$src" "$dst" && docker push "$dst" >/dev/null 2>&1; then
+        echo "${img}: tagged ${TO_VER}"
     else
-        echo "  FAILED: push (is docker logged in to ${REGISTRY%%/*}?)"
-        FAILED+=("$img")
+        echo "${img}: FAILED to tag or push"
+        FAILED=$((FAILED + 1))
     fi
 done
 
+# The release needs EVERY image at the tag, so check rather than assume.
 echo
-echo "========================================"
-echo "Summary: ${#OK[@]} ok, ${#SKIPPED[@]} skipped, ${#FAILED[@]} failed"
-echo "========================================"
-[[ ${#SKIPPED[@]} -gt 0 ]] && printf '  skipped: %s\n' "${SKIPPED[*]}"
-[[ ${#FAILED[@]}  -gt 0 ]] && printf '  FAILED:  %s\n' "${FAILED[*]}"
-
-# Verify the full set, including anything skipped, since a release needs every
-# image at the tag or the version cannot be pinned.
-echo
-echo "Checking all ${#IMAGES[@]} images at ${TO_VER}:"
 MISSING=0
 for img in "${IMAGES[@]}"; do
-    if docker manifest inspect "${REGISTRY}/${img}:${TO_VER}" >/dev/null 2>&1; then
-        echo "  ok      ${img}"
-    else
-        echo "  MISSING ${img}"
-        MISSING=$((MISSING + 1))
-    fi
+    docker manifest inspect "${REGISTRY}/${img}:${TO_VER}" >/dev/null 2>&1 \
+        || { echo "MISSING ${img}"; MISSING=$((MISSING + 1)); }
 done
 
-echo
-if [[ $MISSING -eq 0 ]]; then
-    echo "All ${#IMAGES[@]} images present at ${TO_VER}. Ready for promote-gl-to-ghcr.sh."
+if [[ $MISSING -eq 0 && $FAILED -eq 0 ]]; then
+    echo "All ${#IMAGES[@]} images present at ${TO_VER}."
     exit 0
 fi
-echo "${MISSING} image(s) missing at ${TO_VER}. The release cannot be pinned until they exist."
+echo "${MISSING} missing at ${TO_VER}. Release cannot be pinned."
 exit 1
