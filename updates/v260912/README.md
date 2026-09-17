@@ -5,7 +5,8 @@ current without retyping them, and the remaining work on the legacy migration
 path. Plus a set of fixes, one of which affects every gateway freshly installed
 at v260815.
 
-This release changes the database schema. Upgrading is still a single command.
+This release changes the database schema and ships new container images.
+Upgrading is still a single command.
 
 ## Read this first
 
@@ -75,6 +76,18 @@ maintain; it does not make it safe. Scoped relay permission is tracked
 separately and is not in this release.
 
 ## What is fixed
+
+### Link Guard detection improvements
+
+_Pro Edition._ Link Guard is better at catching credential-phishing pages hosted on public cloud storage services, a common pattern because the host itself looks trustworthy.
+
+Reputation checks and the built-in threat feeds were also strengthened against a common evasion technique.
+
+Reputation lookups now record their outcome in the Link Guard container log, so a decision can be explained after the fact.
+
+These changes are in the Link Guard container image and arrive with the upgrade. No configuration change is needed.
+
+**Recommended:** if you have not already, add a VirusTotal or Google Safe Browsing API key on **Content Checks > Link Guard**. Both are free for this volume of use, and Link Guard's reputation layer only runs when a key is present.
 
 ### Ranges that Postfix rejects can no longer be saved
 
