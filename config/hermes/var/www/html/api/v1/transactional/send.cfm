@@ -364,7 +364,7 @@ function txAudit(required struct row) {
 <cfset mailType = (messageHtml NEQ "") ? "html" : "text">
 
 <cftry>
-  <cfmail to="#toList#" from="#fromAddress#" subject="#messageSubject#" charset="utf-8" failto="#fromAddress#" type="#mailType#">
+  <cfmail to="#toList#" from="#fromAddress#" subject="#messageSubject#" charset="utf-8" failto="#fromAddress#" type="#mailType#" server="hermes_postfix_dkim" port="10026">
 <cfif messageText NEQ ""><cfmailpart type="text/plain" charset="utf-8"><cfscript>writeOutput(messageText);</cfscript></cfmailpart></cfif>
 <cfif messageHtml NEQ ""><cfmailpart type="text/html" charset="utf-8"><cfscript>writeOutput(messageHtml);</cfscript></cfmailpart></cfif>
 <cfmailparam name="Message-ID" value="<#messageId#>">
