@@ -245,27 +245,17 @@ queryExecute(
     <cfset _transLength = 32>
     <cfinclude template="./inc/generate_customtrans.cfm">
     <cfset smtpPasswordPlain = customtrans3>
-    <cfset smtpPasswordTempFile = "/opt/hermes/tmp/" & Replace(CreateUUID(), "-", "", "all") & "_tx_smtp_pw">
 
     <cftry>
-      <cffile action="write" file="#smtpPasswordTempFile#" output="#smtpPasswordPlain#" addnewline="no">
-      <cfexecute name="/bin/chmod" arguments="600 #smtpPasswordTempFile#" timeout="10"></cfexecute>
       <cfexecute name="/usr/local/bin/docker"
         arguments="exec -i hermes_dovecot doveadm pw -s ARGON2ID"
-        inputfile="#smtpPasswordTempFile#"
         variable="smtpPasswordHash"
-        timeout="60"></cfexecute>
+        timeout="60">#smtpPasswordPlain#</cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
       <cfif smtpPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", smtpPasswordHash)>
         <cfthrow message="Credential hash generation failed">
       </cfif>
-      <cfif FileExists(smtpPasswordTempFile)>
-        <cffile action="delete" file="#smtpPasswordTempFile#">
-      </cfif>
     <cfcatch type="any">
-      <cfif IsDefined("smtpPasswordTempFile") AND FileExists(smtpPasswordTempFile)>
-        <cffile action="delete" file="#smtpPasswordTempFile#">
-      </cfif>
       <cfset session.m = 30>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
     </cfcatch>

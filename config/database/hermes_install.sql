@@ -2071,7 +2071,8 @@ CREATE TABLE IF NOT EXISTS `transactional_api_tokens` (
   `last_used_at` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_tx_api_token_hash` (`token_hash`),
-  KEY `idx_tx_api_active` (`active`)
+  KEY `idx_tx_api_active` (`active`),
+  KEY `idx_tx_api_active_prefix` (`active`,`token_prefix`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- -------- transactional_email_audit             [truncate] --------

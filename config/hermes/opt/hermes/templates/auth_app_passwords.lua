@@ -251,5 +251,5 @@ function auth_passdb_lookup(req)
     end
 
     db_close(env, conn)
-    return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "no matching app password"
+    return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
 end
