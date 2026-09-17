@@ -263,8 +263,7 @@ queryExecute(
         arguments='exec -i hermes_dovecot doveadm pw -s ARGON2ID'
         variable="smtpPasswordHash"
         errorVariable="smtpPasswordHashError"
-        input="#smtpPasswordStdin#"
-        timeout="60"></cfexecute>
+        timeout="60">#smtpPasswordStdin#</cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
       <cfset _rxNonWhitespace = "[^" & chr(9) & chr(10) & chr(13) & " ]+">
       <cfset _rxArgon2Payload = "[^\$]+\$[^\$]+\$[^\$]+\$" & _rxNonWhitespace>
