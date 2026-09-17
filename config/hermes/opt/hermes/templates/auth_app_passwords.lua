@@ -88,6 +88,22 @@ local function tx_auth_rate_limited(conn, auth_identifier)
     if not cur then
         return false, qerr
     end
+
+    local function tx_auth_lock(conn, lock_name)
+        local q = "SELECT GET_LOCK(" .. sql_quote(conn, lock_name) .. ", 5) AS got_lock"
+        local cur, qerr = conn:execute(q)
+        if not cur then
+            return false, qerr
+        end
+        local row = cur:fetch({}, "a")
+        cur:close()
+        return ((tonumber(row and row.got_lock) or 0) == 1), nil
+    end
+
+    local function tx_auth_unlock(conn, lock_name)
+        local q = "SELECT RELEASE_LOCK(" .. sql_quote(conn, lock_name) .. ")"
+        conn:execute(q)
+    end
     local row = cur:fetch({}, "a")
     cur:close()
     return ((tonumber(row and row.cnt) or 0) >= TX_AUTH_FAIL_LIMIT), nil
@@ -177,12 +193,21 @@ function auth_passdb_lookup(req)
 
     if txRow then
         local authId = "smtp:" .. tostring(txRow.id)
+        local authLockName = "tx_smtp_auth_" .. tostring(txRow.id)
+        local gotLock, lockErr = tx_auth_lock(conn, authLockName)
+        if lockErr or not gotLock then
+            req:log_error("transactional_smtp_credentials: auth lock failed: " .. tostring(lockErr or "timeout"))
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "auth lock failed"
+        end
+
         local enabled, enabledErr = tx_service_enabled(conn)
         if enabledErr then
             req:log_warning("transactional_smtp_credentials: enabled check failed: " .. tostring(enabledErr))
         end
         if not enabled then
             tx_audit(conn, authId, sourceIp, "rejected", "TRANSACTIONAL_DISABLED")
+            tx_auth_unlock(conn, authLockName)
             db_close(env, conn)
             return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
         end
@@ -190,11 +215,13 @@ function auth_passdb_lookup(req)
         local limited, limitErr = tx_auth_rate_limited(conn, authId)
         if limitErr then
             req:log_error("transactional_smtp_credentials: auth rate check failed: " .. tostring(limitErr))
+            tx_auth_unlock(conn, authLockName)
             db_close(env, conn)
             return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "auth rate check failed"
         end
         if limited then
             tx_audit(conn, authId, sourceIp, "rejected", "AUTH_RATE_LIMITED")
+            tx_auth_unlock(conn, authLockName)
             db_close(env, conn)
             return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
         end
@@ -212,11 +239,13 @@ function auth_passdb_lookup(req)
                 end
             end
             tx_audit(conn, authId, sourceIp, "accepted", "")
+            tx_auth_unlock(conn, authLockName)
             db_close(env, conn)
             return dovecot.auth.PASSDB_RESULT_OK, {password = txRow.password_hash}
         end
 
         tx_audit(conn, authId, sourceIp, "rejected", "SMTP_AUTH_FAILED")
+        tx_auth_unlock(conn, authLockName)
         db_close(env, conn)
         return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
     end
