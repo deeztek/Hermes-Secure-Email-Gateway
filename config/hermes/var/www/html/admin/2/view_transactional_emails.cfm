@@ -256,59 +256,82 @@ queryExecute(
       <cfset session.m = 30>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
     </cfif>
-    <cfset smtpPasswordStdin = smtpPasswordPlain & chr(10) & smtpPasswordPlain & chr(10)>
+  <cfset smtpPasswordBase64 = ToBase64(smtpPasswordPlain, "UTF-8")>
 
-    <cftry>
-      <cfexecute name="/usr/local/bin/docker"
-        arguments='exec -i hermes_dovecot doveadm pw -s ARGON2ID'
-        variable="smtpPasswordHash"
-        errorVariable="smtpPasswordHashError"
-        timeout="60">#smtpPasswordStdin#</cfexecute>
-      <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
-      <cfset _rxNonWhitespace = "[^" & chr(9) & chr(10) & chr(13) & " ]+">
-      <cfset _rxArgon2Payload = "[^\$]+\$[^\$]+\$[^\$]+\$" & _rxNonWhitespace>
-      <cfset _rxPrefixedArgon2 = "\{[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\}\$[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\$" & _rxArgon2Payload>
-      <cfset _rxBareArgon2 = "\$[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\$" & _rxArgon2Payload>
-      <cfset _smtpHashMatch = REFind(_rxPrefixedArgon2, smtpPasswordHash, 1, true)>
-      <cfif StructKeyExists(_smtpHashMatch, "len") AND ArrayLen(_smtpHashMatch.len) GTE 1 AND _smtpHashMatch.len[1] GT 0>
-        <cfset smtpPasswordHash = Mid(smtpPasswordHash, _smtpHashMatch.pos[1], _smtpHashMatch.len[1])>
-      <cfelse>
-        <cfset _smtpBareHashMatch = REFind(_rxBareArgon2, smtpPasswordHash, 1, true)>
-        <cfif StructKeyExists(_smtpBareHashMatch, "len") AND ArrayLen(_smtpBareHashMatch.len) GTE 1 AND _smtpBareHashMatch.len[1] GT 0>
-          <cfset smtpPasswordHash = "{ARGON2ID}" & Mid(smtpPasswordHash, _smtpBareHashMatch.pos[1], _smtpBareHashMatch.len[1])>
-        </cfif>
-      </cfif>
-      <cfif smtpPasswordHash EQ "" OR REFind("^" & _rxPrefixedArgon2 & "$", smtpPasswordHash) EQ 0>
-        <cfthrow message="Credential hash generation failed" detail="SMTP hash command returned invalid output.">
-      </cfif>
-    <cfcatch type="any">
-      <cfset _hashErrorStderr = IsDefined("smtpPasswordHashError") ? Trim(smtpPasswordHashError) : "">
-      <cfif IsDefined("smtpPasswordPlain") AND smtpPasswordPlain NEQ "">
-        <cfset _hashErrorStderr = ReplaceNoCase(_hashErrorStderr, smtpPasswordPlain, "[REDACTED]", "all")>
-      </cfif>
-      <cfset _hashErrorRaw = LCase(Trim(cfcatch.message & " " & cfcatch.detail & " " & _hashErrorStderr))>
-      <cfset _hashErrorLog = _hashErrorRaw>
-      <cfset _smtpHashErrorCategory = "unknown_failure">
-      <cfif Find("unknown scheme", _hashErrorRaw) OR Find("invalid scheme", _hashErrorRaw)>
-        <cfset _smtpHashErrorCategory = "unsupported_scheme">
-        <cfset session.smtpCredentialErrorDetail = "Dovecot hash scheme is not available in the container.">
-      <cfelseif Find("script_utility_missing", _hashErrorRaw)>
-        <cfset _smtpHashErrorCategory = "script_utility_missing">
-        <cfset session.smtpCredentialErrorDetail = "Required script utility is missing in the Dovecot container.">
-      <cfelseif Find("not found", _hashErrorRaw) OR Find("command not found", _hashErrorRaw)>
-        <cfset _smtpHashErrorCategory = "command_missing">
-        <cfset session.smtpCredentialErrorDetail = "Dovecot hash command failed in the container.">
-      <cfelseif Find("permission denied", _hashErrorRaw)>
-        <cfset _smtpHashErrorCategory = "permission_denied">
-        <cfset session.smtpCredentialErrorDetail = "Permission was denied while generating the SMTP hash.">
-      <cfelse>
-        <cfset session.smtpCredentialErrorDetail = "Hash generation failed. Check Hermes application logs for details.">
-      </cfif>
-      <cflog file="hermes" type="error" text="Transactional SMTP hash generation failed (category=#_smtpHashErrorCategory#): #Left(_hashErrorLog, 1000)#">
-      <cfset session.m = 30>
-      <cflocation url="view_transactional_emails.cfm" addtoken="no">
-    </cfcatch>
-    </cftry>
+<cftry>
+  <!--
+    Lucee cfexecute does not support stdin/input.
+    Pass the password as Base64 so the actual password never appears
+    in the shell command or process arguments.
+  -->
+  <cfexecute
+    name="/bin/sh"
+    arguments='-c "printf %s "#smtpPasswordBase64#" | base64 -d | /usr/local/bin/docker exec -i hermes_dovecot doveadm pw -s ARGON2ID"'
+    variable="smtpPasswordHash"
+    errorVariable="smtpPasswordHashError"
+    timeout="60"></cfexecute>
+
+  <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
+
+  <!--
+    Expected format:
+    {ARGON2ID}$argon2id$v=19$m=...,t=...,p=...$salt$hash
+  -->
+  <cfset _rxPrefixedArgon2 = "^\{[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\}\$[Aa][Rr][Gg][Oo][Nn]2[Ii][Dd]\$[^\$]+\$[^\$]+\$[^\$]+\$[^\$]+$">
+
+  <cfif smtpPasswordHash EQ "" OR REFind(_rxPrefixedArgon2, smtpPasswordHash) EQ 0>
+    <cfthrow
+      message="Credential hash generation failed"
+      detail="doveadm returned invalid ARGON2ID output.">
+  </cfif>
+
+<cfcatch type="any">
+
+  <cfset _hashErrorStderr = "">
+  <cfif IsDefined("smtpPasswordHashError")>
+    <cfset _hashErrorStderr = Trim(smtpPasswordHashError)>
+  </cfif>
+
+  <cfset _hashErrorRaw = LCase(
+    Trim(
+      cfcatch.message & " " &
+      cfcatch.detail & " " &
+      _hashErrorStderr
+    )
+  )>
+
+  <cfset _smtpHashErrorCategory = "unknown_failure">
+
+  <cfif Find("unknown scheme", _hashErrorRaw) OR Find("invalid scheme", _hashErrorRaw)>
+    <cfset _smtpHashErrorCategory = "unsupported_scheme">
+    <cfset session.smtpCredentialErrorDetail = "Dovecot hash scheme is not available in the container.">
+
+  <cfelseif Find("not found", _hashErrorRaw) OR Find("command not found", _hashErrorRaw)>
+    <cfset _smtpHashErrorCategory = "command_missing">
+    <cfset session.smtpCredentialErrorDetail = "Dovecot hash command failed in the container.">
+
+  <cfelseif Find("permission denied", _hashErrorRaw)>
+    <cfset _smtpHashErrorCategory = "permission_denied">
+    <cfset session.smtpCredentialErrorDetail = "Permission was denied while generating the SMTP hash.">
+
+  <cfelseif Find("invalid ARGON2ID output", _hashErrorRaw)>
+    <cfset _smtpHashErrorCategory = "invalid_hash_output">
+    <cfset session.smtpCredentialErrorDetail = "Dovecot returned an unexpected password hash format.">
+
+  <cfelse>
+    <cfset session.smtpCredentialErrorDetail = "Hash generation failed. Check Hermes application logs for details.">
+  </cfif>
+
+  <cflog
+    file="hermes"
+    type="error"
+    text="Transactional SMTP hash generation failed (category=#_smtpHashErrorCategory#): #Left(_hashErrorRaw, 1000)#">
+
+  <cfset session.m = 30>
+  <cflocation url="view_transactional_emails.cfm" addtoken="no">
+
+</cfcatch>
+</cftry>
 
     <cfquery datasource="hermes">
       INSERT INTO transactional_smtp_credentials
