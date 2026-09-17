@@ -82,7 +82,7 @@ local function tx_auth_rate_limited(conn, auth_identifier)
               "WHERE auth_method='smtp' " ..
               "  AND auth_identifier = " .. sql_quote(conn, auth_identifier) .. " " ..
               "  AND result='rejected' " ..
-              "  AND rejection_reason='SMTP_AUTH_FAILED' " ..
+              "  AND rejection_reason IN ('SMTP_AUTH_FAILED','AUTH_RATE_LIMITED') " ..
               "  AND created_at >= DATE_SUB(NOW(), INTERVAL " .. tostring(TX_AUTH_FAIL_WINDOW_SECONDS) .. " SECOND)"
     local cur, qerr = conn:execute(q)
     if not cur then
