@@ -41,15 +41,23 @@ So **after the install you can log in, but mail won't actually flow** until you 
 
 ## Step 1: System Identity (all topologies)
 
+Two pages, because these settings do not live together.
+
+### 1a. Hostname
+
 **Page**: System → Server Setup
 
-The install script sets `myhostname` from what you typed at the FQDN prompt, but you should double-check it matches your DNS A / MX records. Also set:
-
-- **Postmaster address**: where bounce messages and admin notifications go
-- **Admin email**: where alerts (license, system events) get delivered
-- **Time zone**: affects log timestamps and report scheduling
+The install script sets `myhostname` from what you typed at the FQDN prompt, but you should double-check it matches your DNS A / MX records.
 
 > **Dashboard nudge**: an orange callout `Placeholder hostname` fires (any topology) if `myhostname` still equals the seed default `hermes.domain.tld` or `console.host` equals `smtp.domain.tld`. Both should never appear on a Docker install (the install script overrides them), but if they do, this is the page to fix.
+
+### 1b. Notification addresses and time zone
+
+**Page**: System → System Settings
+
+- **Postmaster address**: where bounce messages and admin notifications go
+- **Admin email**: where alerts (license, system events) get delivered, including notification of a failed scheduled job
+- **Time zone**: affects log timestamps and report scheduling
 
 ---
 
