@@ -6,6 +6,25 @@
 # This script migrates a legacy (non-Docker) Hermes SEG installation to Docker.
 # It processes backups created by the legacy system_backup.sh script.
 #
+# ============================================================================
+# FINAL RELEASE: v260912 is the last release that supports this path.
+#
+# The script is scoped to legacy build 240815 and reconciles an arbitrary older
+# gateway against the current baseline, additively, without overwriting operator
+# changes. That is the hardest of the three install paths and it costs
+# maintenance on every release that seeds a new table, since each one needs its
+# natural key adding to SEED_MERGE_KEYS or its rows never arrive.
+#
+# The cutoff is viable because #322 made a migrated gateway stamp build_no to
+# the release it arrived at rather than the one it came from. Before that a
+# migrated gateway could never take the normal upgrade path, so the migration
+# had to stay available indefinitely. Now: migrate once to v260912, then upgrade
+# normally.
+#
+# Removal is tracked separately. Do not extend this script to a newer legacy
+# build or teach it a new seeded table beyond what v260912 needs.
+# ============================================================================
+#
 # Prerequisites:
 #   - Docker and Docker Compose installed
 #   - Hermes SEG Docker repository cloned anywhere (root is auto-detected)

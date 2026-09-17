@@ -22,9 +22,19 @@ have not been working, silently, and this release fixes that.
 
 ### If you are about to migrate a legacy gateway
 
+**This is the last release that supports migrating directly from a legacy
+bare-metal installation.** Migrate to v260912, then upgrade normally from here
+like any other gateway. The migration script will be removed in a future
+release.
+
 Use this release, not an earlier one. Three defects in the migration path are
 fixed here, and one of them left every migrated gateway carrying a known
 mail-rejecting configuration.
+
+The cutoff is only possible because of those fixes. Until now a migrated
+gateway reported the build it came from rather than the one it arrived at, so
+it could never take the normal upgrade path. It stamps correctly now, which is
+what makes "migrate once, then upgrade like everyone else" work.
 
 ## Network aliases
 
@@ -207,6 +217,22 @@ against a real 240815 backup, that is 377 rows restored, including sixteen
 `system_settings` keys, the ten scheduled job definitions, and the third-party
 malware signature databases. On that same gateway the operator's own 103 custom
 message rules were left untouched.
+
+### Legacy migration ends with this release
+
+The bare-metal to Docker migration path exists for gateways still on build
+240815. It has always been scoped to that build alone, and it is the hardest of
+the three ways to arrive at a release: it reconciles an arbitrary older gateway
+against the current baseline without overwriting anything an operator changed.
+Every release that adds a seeded table has to teach it how to carry those rows.
+
+That cost only makes sense while there are gateways left to move. **v260912 is
+the final release that supports it.** If you are still on bare metal, migrate to
+this release. Afterwards the gateway is an ordinary v260912 install and upgrades
+by the normal path.
+
+Nothing about an already-migrated gateway changes. The removal affects only the
+ability to start a new migration.
 
 ### Post-migration verification
 

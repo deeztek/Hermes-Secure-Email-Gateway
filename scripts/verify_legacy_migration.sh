@@ -47,7 +47,15 @@ q()  { docker exec hermes_db_server mariadb -u root -N -e "$1" 2>/dev/null; }
 # so without it every CREATE TABLE fails with "No database selected". This
 # function used to omit it, and stderr was discarded, so the reference schema
 # silently came out empty and every comparison against it passed vacuously.
-qi() { docker exec -i hermes_db_server mariadb -u root -N "$1" 2>&1; }
+# The database argument is OPTIONAL, because most callers here use
+# fully-qualified `hermes`.`table` names and need no default schema. It is
+# required only where the SQL does not qualify, which is the baseline import
+# below: its CREATE DATABASE and USE lines are stripped, so without a database
+# every CREATE TABLE fails with "No database selected". That is what happened,
+# with stderr discarded, so the reference came out empty and every comparison
+# against it passed vacuously. The real protection is the table-count guard
+# after the import, not this signature.
+qi() { docker exec -i hermes_db_server mariadb -u root -N ${1:+"$1"} 2>&1; }
 
 docker ps --format '{{.Names}}' | grep -qx hermes_db_server \
     || { echo "hermes_db_server is not running." >&2; exit 2; }
