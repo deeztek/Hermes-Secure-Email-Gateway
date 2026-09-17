@@ -155,7 +155,8 @@ function txAudit(required struct row) {
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
 
-<cfset presentedTokenPrefix = Left(bearerToken, 24)>
+<cfset presentedTokenPrefix = Mid(bearerToken, 11, 24)>
+<cfset presentedLegacyPrefix24 = Left(bearerToken, 24)>
 <cfset presentedLegacyPrefix = Left(bearerToken, 18)>
 <cfquery name="getActiveApiTokens" datasource="hermes">
   SELECT id, token_hash, token_salt, allowed_senders, allowed_domains, any_ip, ip_allowlist, active
@@ -163,6 +164,7 @@ function txAudit(required struct row) {
   WHERE active = 1
     AND token_prefix IN (
       <cfqueryparam value="#presentedTokenPrefix#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#presentedLegacyPrefix24#" cfsqltype="cf_sql_varchar">,
       <cfqueryparam value="#presentedLegacyPrefix#" cfsqltype="cf_sql_varchar">
     )
 </cfquery>
@@ -333,9 +335,10 @@ function txAudit(required struct row) {
 
 <cfset messageId = createUUID() & "@" & fromDomain>
 <cfset toList = arrayToList(cleanRecipients, ",")>
+<cfset mailType = (messageHtml NEQ "") ? "html" : "text">
 
 <cftry>
-  <cfmail to="#toList#" from="#fromAddress#" subject="#messageSubject#" charset="utf-8" failto="#fromAddress#" type="html">
+  <cfmail to="#toList#" from="#fromAddress#" subject="#messageSubject#" charset="utf-8" failto="#fromAddress#" type="#mailType#">
 <cfif messageText NEQ ""><cfmailpart type="text/plain" charset="utf-8"><cfscript>writeOutput(messageText);</cfscript></cfmailpart></cfif>
 <cfif messageHtml NEQ ""><cfmailpart type="text/html" charset="utf-8"><cfscript>writeOutput(messageHtml);</cfscript></cfmailpart></cfif>
 <cfmailparam name="Message-ID" value="<#messageId#>">

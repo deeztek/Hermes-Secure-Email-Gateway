@@ -154,7 +154,7 @@ queryExecute(
     <cfset tokenPlain = "hermes_tx_" & customtrans3>
     <cfset tokenSalt = hash(createUUID() & now())>
     <cfset tokenHash = hash(tokenPlain & ":" & tokenSalt, "SHA-256", "UTF-8")>
-    <cfset tokenPrefix = Left(tokenPlain, 24)>
+    <cfset tokenPrefix = Mid(tokenPlain, 11, 24)>
 
     <cfquery datasource="hermes">
       INSERT INTO transactional_api_tokens
