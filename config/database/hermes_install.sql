@@ -2094,14 +2094,34 @@ CREATE TABLE IF NOT EXISTS `transactional_email_audit` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- Seed transactional email defaults
-INSERT IGNORE INTO `parameters2` (`parameter`, `value2`, `module`, `active`, `applied`)
-VALUES ('enabled', '0', 'transactional_email', 1, 1);
-INSERT IGNORE INTO `parameters2` (`parameter`, `value2`, `module`, `active`, `applied`)
-VALUES ('messages_per_minute', '60', 'transactional_email', 1, 1);
-INSERT IGNORE INTO `parameters2` (`parameter`, `value2`, `module`, `active`, `applied`)
-VALUES ('messages_per_hour', '5000', 'transactional_email', 1, 1);
-INSERT IGNORE INTO `parameters2` (`parameter`, `value2`, `module`, `active`, `applied`)
-VALUES ('messages_per_day', '50000', 'transactional_email', 1, 1);
+INSERT INTO parameters2 (parameter, value2, module, active, applied)
+SELECT 'enabled', '0', 'transactional_email', 1, 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM parameters2) p
+    WHERE p.parameter = 'enabled'
+      AND p.module = 'transactional_email'
+);
+INSERT INTO parameters2 (parameter, value2, module, active, applied)
+SELECT 'messages_per_minute', '60', 'transactional_email', 1, 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM parameters2) p
+    WHERE p.parameter = 'messages_per_minute'
+      AND p.module = 'transactional_email'
+);
+INSERT INTO parameters2 (parameter, value2, module, active, applied)
+SELECT 'messages_per_hour', '5000', 'transactional_email', 1, 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM parameters2) p
+    WHERE p.parameter = 'messages_per_hour'
+      AND p.module = 'transactional_email'
+);
+INSERT INTO parameters2 (parameter, value2, module, active, applied)
+SELECT 'messages_per_day', '50000', 'transactional_email', 1, 1
+WHERE NOT EXISTS (
+    SELECT 1 FROM (SELECT * FROM parameters2) p
+    WHERE p.parameter = 'messages_per_day'
+      AND p.module = 'transactional_email'
+);
 
 -- -------- senders                              [truncate] --------
 CREATE TABLE IF NOT EXISTS `senders` (

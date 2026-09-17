@@ -157,32 +157,25 @@ function auth_passdb_lookup(req)
         end
     end
 
-    local is_tx_user = tostring(req.user or ""):match("^smtp_") ~= nil
-    if is_tx_user then
-        local txQuery = string.format(
-            "SELECT id, password_hash, UNIX_TIMESTAMP(last_used_at) AS last_used_ts " ..
-            "  FROM transactional_smtp_credentials " ..
-            " WHERE username = '%s' AND active = 1 " ..
-            " LIMIT 1",
-            conn:escape(req.user))
+    local txQuery = string.format(
+        "SELECT id, password_hash, UNIX_TIMESTAMP(last_used_at) AS last_used_ts " ..
+        "  FROM transactional_smtp_credentials " ..
+        " WHERE username = '%s' AND active = 1 " ..
+        " LIMIT 1",
+        conn:escape(req.user))
 
-        local txCur, txErr = conn:execute(txQuery)
-        if not txCur then
-            req:log_error("transactional_smtp_credentials: query failed: " .. tostring(txErr))
-            db_close(env, conn)
-            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "db query failed"
-        end
+    local txCur, txErr = conn:execute(txQuery)
+    if not txCur then
+        req:log_error("transactional_smtp_credentials: query failed: " .. tostring(txErr))
+        db_close(env, conn)
+        return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "db query failed"
+    end
 
-        local txRow = txCur:fetch({}, "a")
-        txCur:close()
-        local sourceIp = tostring(req.remote_ip or req.remote_addr or "")
+    local txRow = txCur:fetch({}, "a")
+    txCur:close()
+    local sourceIp = tostring(req.remote_ip or req.remote_addr or "")
 
-        if not txRow then
-            tx_audit(conn, "smtp_user:" .. tostring(req.user or ""), sourceIp, "rejected", "SMTP_AUTH_FAILED")
-            db_close(env, conn)
-            return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
-        end
-
+    if txRow then
         local authId = "smtp:" .. tostring(txRow.id)
         local enabled, enabledErr = tx_service_enabled(conn)
         if enabledErr then
@@ -196,7 +189,9 @@ function auth_passdb_lookup(req)
 
         local limited, limitErr = tx_auth_rate_limited(conn, authId)
         if limitErr then
-            req:log_warning("transactional_smtp_credentials: auth rate check failed: " .. tostring(limitErr))
+            req:log_error("transactional_smtp_credentials: auth rate check failed: " .. tostring(limitErr))
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "auth rate check failed"
         end
         if limited then
             tx_audit(conn, authId, sourceIp, "rejected", "AUTH_RATE_LIMITED")

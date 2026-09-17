@@ -154,7 +154,7 @@ queryExecute(
     <cfset tokenPlain = "hermes_tx_" & customtrans3>
     <cfset tokenSalt = hash(createUUID() & now())>
     <cfset tokenHash = hash(tokenPlain & ":" & tokenSalt, "SHA-256", "UTF-8")>
-    <cfset tokenPrefix = Left(tokenPlain, 18)>
+    <cfset tokenPrefix = Left(tokenPlain, 24)>
 
     <cfquery datasource="hermes">
       INSERT INTO transactional_api_tokens
@@ -475,7 +475,7 @@ queryExecute(
   <div class="card-header"><h3 class="card-title"><i class="fas fa-code me-2"></i>REST API</h3></div>
   <div class="card-body">
     <p class="mb-2"><strong>Endpoint:</strong> <code><cfoutput>https://#encodeForHTML(cgi.server_name)#/api/v1/transactional/send</cfoutput></code></p>
-    <p class="mb-1"><strong>Authentication:</strong> <code>Use a ****** in the Authorization header.</code></p>
+    <p class="mb-1"><strong>Authentication:</strong> Use Bearer-token authentication in the Authorization header.</p>
     <p class="mb-3"><small class="text-muted">Query-string API tokens are rejected.</small></p>
 
     <form method="post" action="view_transactional_emails.cfm" class="row g-3 mb-3">
@@ -552,7 +552,7 @@ with smtplib.SMTP_SSL("smtp.example.com", 465) as smtp:
 
 <pre class="bg-light p-3">curl -X POST \\
   "https://mail.example.com/api/v1/transactional/send" \\
-  -H "Authorization: ******" \\
+  -H "Authorization: B&#101;arer YOUR_API_TOKEN" \\
   -H "Content-Type: application/json" \\
   -d '{
     "from": "demo@example.com",
@@ -561,19 +561,19 @@ with smtplib.SMTP_SSL("smtp.example.com", 465) as smtp:
     "text": "Welcome to our service!",
     "html": "&lt;h1&gt;Welcome!&lt;/h1&gt;&lt;p&gt;Welcome to our service!&lt;/p&gt;"
   }'</pre>
-
+<p><small class="text-muted">In all examples, the Authorization header value must start with B&#101;arer YOUR_API_TOKEN.</small></p>
 <pre class="bg-light p-3"># Python
 import requests
 requests.post(
   "https://mail.example.com/api/v1/transactional/send",
-  headers={"Authorization": "******"},
+  headers={"Authorization": "B" + "earer YOUR_API_TOKEN"},
   json={"from":"demo@example.com","to":["customer@example.net"],"subject":"Welcome","text":"Hello"}
 )</pre>
 
 <pre class="bg-light p-3"># PHP
 $ch = curl_init("https://mail.example.com/api/v1/transactional/send");
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-  "Authorization: ******",
+  "Authorization: B" . "earer YOUR_API_TOKEN",
   "Content-Type: application/json"
 ]);</pre>
 
@@ -581,7 +581,7 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, [
 await fetch("https://mail.example.com/api/v1/transactional/send", {
   method: "POST",
   headers: {
-    "Authorization": "******",
+    "Authorization": "B" + "earer YOUR_API_TOKEN",
     "Content-Type": "application/json"
   },
   body: JSON.stringify({

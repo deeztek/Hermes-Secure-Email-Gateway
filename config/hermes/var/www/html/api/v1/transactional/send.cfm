@@ -29,13 +29,15 @@ function txNormalizeList(required string rawVal) {
 
 function txClientIp() {
     var req = getHttpRequestData();
-    if (isStruct(req) AND structKeyExists(req, "headers") AND isStruct(req.headers) AND structKeyExists(req.headers, "X-Forwarded-For")) {
+    var remoteIp = trim(cgi.remote_addr);
+    var trustedProxy = (remoteIp EQ "127.0.0.1" OR remoteIp EQ "::1" OR left(remoteIp, 10) EQ "172.16.32.");
+    if (trustedProxy AND isStruct(req) AND structKeyExists(req, "headers") AND isStruct(req.headers) AND structKeyExists(req.headers, "X-Forwarded-For")) {
         var xff = trim(req.headers["X-Forwarded-For"]);
         if (xff NEQ "") {
             return trim(listFirst(xff, ","));
         }
     }
-    return trim(cgi.remote_addr);
+    return remoteIp;
 }
 
 function txInetBytes(required string ip) {
@@ -128,7 +130,7 @@ function txAudit(required struct row) {
   <cfset authHeader = trim(reqData.headers["Authorization"])>
 </cfif>
 
-<cfif Left(authHeader, 7) NEQ "Bearer ">
+<cfif CompareNoCase(Left(authHeader, 7), "Bearer ") NEQ 0>
   <cfset txAudit({auth_method="api", auth_identifier="token:unknown", source_ip=txClientIp(), sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="AUTHENTICATION_FAILED"})>
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
@@ -139,10 +141,16 @@ function txAudit(required struct row) {
   <cfset txRespond(401, false, "AUTHENTICATION_FAILED", "Authentication failed.")>
 </cfif>
 
+<cfset presentedTokenPrefix = Left(bearerToken, 24)>
+<cfset presentedLegacyPrefix = Left(bearerToken, 18)>
 <cfquery name="getActiveApiTokens" datasource="hermes">
   SELECT id, token_hash, token_salt, allowed_senders, allowed_domains, any_ip, ip_allowlist, active
   FROM transactional_api_tokens
   WHERE active = 1
+    AND token_prefix IN (
+      <cfqueryparam value="#presentedTokenPrefix#" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="#presentedLegacyPrefix#" cfsqltype="cf_sql_varchar">
+    )
 </cfquery>
 
 <cfset foundToken = false>
@@ -184,11 +192,13 @@ function txAudit(required struct row) {
 <cftry>
   <cfset body = deserializeJSON(ToString(reqData.content))>
 <cfcatch type="any">
+  <cfset txAudit({auth_method="api", auth_identifier="token:" & tokenRow.id, source_ip=sourceIp, sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="INVALID_JSON"})>
   <cfset txRespond(400, false, "INVALID_JSON", "Invalid JSON payload.")>
 </cfcatch>
 </cftry>
 
 <cfif NOT IsStruct(body)>
+  <cfset txAudit({auth_method="api", auth_identifier="token:" & tokenRow.id, source_ip=sourceIp, sender="", recipient="", subject="", message_id="", result="rejected", rejection_reason="INVALID_REQUEST"})>
   <cfset txRespond(400, false, "INVALID_REQUEST", "JSON object payload is required.")>
 </cfif>
 
@@ -265,7 +275,29 @@ function txAudit(required struct row) {
 </cfquery>
 
 <cfif val(getRateUsage.cpm) GTE rateSettings["messages_per_minute"] OR val(getRateUsage.cph) GTE rateSettings["messages_per_hour"] OR val(getRateUsage.cpd) GTE rateSettings["messages_per_day"]>
-  <cfheader name="Retry-After" value="60">
+  <cfquery name="getRateWindowAnchors" datasource="hermes">
+    SELECT
+      MIN(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 MINUTE) THEN created_at END) AS oldest_minute,
+      MIN(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 HOUR) THEN created_at END) AS oldest_hour,
+      MIN(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) THEN created_at END) AS oldest_day
+    FROM transactional_email_audit
+    WHERE auth_method='api'
+      AND auth_identifier = <cfqueryparam value="#'token:' & tokenRow.id#" cfsqltype="cf_sql_varchar">
+      AND result='accepted'
+  </cfquery>
+
+  <cfset retryAfter = 1>
+  <cfif val(getRateUsage.cpm) GTE rateSettings["messages_per_minute"] AND IsDate(getRateWindowAnchors.oldest_minute)>
+    <cfset retryAfter = max(retryAfter, 60 - dateDiff("s", getRateWindowAnchors.oldest_minute, now()))>
+  </cfif>
+  <cfif val(getRateUsage.cph) GTE rateSettings["messages_per_hour"] AND IsDate(getRateWindowAnchors.oldest_hour)>
+    <cfset retryAfter = max(retryAfter, 3600 - dateDiff("s", getRateWindowAnchors.oldest_hour, now()))>
+  </cfif>
+  <cfif val(getRateUsage.cpd) GTE rateSettings["messages_per_day"] AND IsDate(getRateWindowAnchors.oldest_day)>
+    <cfset retryAfter = max(retryAfter, 86400 - dateDiff("s", getRateWindowAnchors.oldest_day, now()))>
+  </cfif>
+  <cfset retryAfter = max(1, retryAfter)>
+  <cfheader name="Retry-After" value="#retryAfter#">
   <cfset txAudit({auth_method="api", auth_identifier="token:" & tokenRow.id, source_ip=sourceIp, sender=fromAddress, recipient=arrayToList(cleanRecipients), subject=messageSubject, message_id="", result="rejected", rejection_reason="RATE_LIMIT_EXCEEDED"})>
   <cfset txRespond(429, false, "RATE_LIMIT_EXCEEDED", "Rate limit exceeded. Please retry later.")>
 </cfif>
@@ -280,8 +312,8 @@ function txAudit(required struct row) {
 
 <cftry>
   <cfmail to="#toList#" from="#fromAddress#" subject="#messageSubject#" charset="utf-8" failto="#fromAddress#" type="html">
-<cfif messageText NEQ ""><cfmailpart type="text/plain" charset="utf-8"><cfoutput>#messageText#</cfoutput></cfmailpart></cfif>
-<cfif messageHtml NEQ ""><cfmailpart type="text/html" charset="utf-8"><cfoutput>#messageHtml#</cfoutput></cfmailpart><cfelse><cfoutput>#messageText#</cfoutput></cfif>
+<cfif messageText NEQ ""><cfmailpart type="text/plain" charset="utf-8"><cfscript>writeOutput(messageText);</cfscript></cfmailpart></cfif>
+<cfif messageHtml NEQ ""><cfmailpart type="text/html" charset="utf-8"><cfscript>writeOutput(messageHtml);</cfscript></cfmailpart></cfif>
 <cfmailparam name="Message-ID" value="<#messageId#>">
   </cfmail>
 <cfcatch type="any">
