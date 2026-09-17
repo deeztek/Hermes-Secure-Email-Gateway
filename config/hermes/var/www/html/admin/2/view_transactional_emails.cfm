@@ -245,17 +245,26 @@ queryExecute(
     <cfset _transLength = 32>
     <cfinclude template="./inc/generate_customtrans.cfm">
     <cfset smtpPasswordPlain = customtrans3>
+    <cfset smtpPasswordTempFile = "/opt/hermes/tmp/" & Replace(CreateUUID(), "-", "", "all") & "_tx_smtp_pw">
 
     <cftry>
+      <cffile action="write" file="#smtpPasswordTempFile#" output="#smtpPasswordPlain#" addnewline="no">
+      <cfexecute name="/bin/chmod" arguments="600 #smtpPasswordTempFile#" timeout="10"></cfexecute>
       <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_dovecot doveadm pw -s ARGON2ID -p #smtpPasswordPlain#"
+        arguments='exec hermes_dovecot /bin/sh -lc "pw=$(cat #smtpPasswordTempFile#); doveadm pw -s ARGON2ID -p \"$pw\""'
         variable="smtpPasswordHash"
         timeout="60"></cfexecute>
       <cfset smtpPasswordHash = Trim(smtpPasswordHash)>
       <cfif smtpPasswordHash EQ "" OR NOT FindNoCase("{ARGON2ID}", smtpPasswordHash)>
         <cfthrow message="Credential hash generation failed">
       </cfif>
+      <cfif FileExists(smtpPasswordTempFile)>
+        <cffile action="delete" file="#smtpPasswordTempFile#">
+      </cfif>
     <cfcatch type="any">
+      <cfif IsDefined("smtpPasswordTempFile") AND FileExists(smtpPasswordTempFile)>
+        <cffile action="delete" file="#smtpPasswordTempFile#">
+      </cfif>
       <cfset session.m = 30>
       <cflocation url="view_transactional_emails.cfm" addtoken="no">
     </cfcatch>
@@ -308,7 +317,7 @@ queryExecute(
   ORDER BY created_at DESC
 </cfquery>
 <cfquery name="getApiTokens" datasource="hermes">
-  SELECT id, name, token_prefix, allowed_senders, allowed_domains, any_ip, ip_allowlist, active, created_at
+  SELECT id, name, allowed_senders, allowed_domains, any_ip, ip_allowlist, active, created_at, last_used_at
   FROM transactional_api_tokens
   ORDER BY created_at DESC
 </cfquery>
@@ -493,12 +502,12 @@ queryExecute(
 
     <div class="table-responsive">
       <table class="table table-hover mb-0">
-        <thead><tr><th>Token</th><th>Sender</th><th>IP Restrictions</th><th>Status</th><th class="text-end">Action</th></tr></thead>
+        <thead><tr><th>Token</th><th>Sender</th><th>IP Restrictions</th><th>Last Accessed</th><th>Status</th><th class="text-end">Action</th></tr></thead>
         <tbody>
-        <cfif getApiTokens.recordcount EQ 0><tr><td colspan="5" class="text-muted">No API tokens created yet.</td></tr></cfif>
+        <cfif getApiTokens.recordcount EQ 0><tr><td colspan="6" class="text-muted">No API tokens created yet.</td></tr></cfif>
         <cfoutput query="getApiTokens">
           <tr>
-            <td><code>#encodeForHTML(token_prefix)#••••••••••</code></td>
+            <td><strong>#encodeForHTML(name)#</strong><br><small class="text-muted">Hidden after creation</small></td>
             <td>
               <cfif Len(Trim(allowed_senders))>#encodeForHTML(allowed_senders)#<cfelseif Len(Trim(allowed_domains))>#encodeForHTML(allowed_domains)#<cfelse><span class="text-muted">Any authorized domain</span></cfif>
             </td>
@@ -506,6 +515,7 @@ queryExecute(
               <cfif Val(any_ip) EQ 1><strong>Any IP</strong><br><small class="text-muted">Requests may originate from any source address.</small>
               <cfelse><strong>Restricted</strong><br><small class="text-muted">#encodeForHTML(ip_allowlist)#</small></cfif>
             </td>
+            <td><cfif IsDate(last_used_at)>#DateFormat(last_used_at,"yyyy-mm-dd")# #TimeFormat(last_used_at,"HH:mm:ss")#<cfelse><span class="text-muted">Never</span></cfif></td>
             <td><cfif Val(active) EQ 1><span class="badge text-bg-success">Active</span><cfelse><span class="badge text-bg-secondary">Revoked</span></cfif></td>
             <td class="text-end">
               <cfif Val(active) EQ 1>

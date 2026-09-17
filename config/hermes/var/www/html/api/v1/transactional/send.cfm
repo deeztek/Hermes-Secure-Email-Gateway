@@ -2,7 +2,21 @@
 <cfheader name="Cache-Control" value="no-cache, no-store, must-revalidate">
 
 <cfscript>
+function txReleaseRateLock() {
+    if (StructKeyExists(request, "txRateLock") AND trim(request.txRateLock) NEQ "") {
+        try {
+            queryExecute(
+                "SELECT RELEASE_LOCK(:lock_name)",
+                {lock_name: {value: request.txRateLock, cfsqltype: "cf_sql_varchar"}},
+                {datasource: "hermes"}
+            );
+        } catch (any e) {}
+        request.txRateLock = "";
+    }
+}
+
 function txRespond(required numeric statusCode, required boolean ok, string code="", string message="", struct data={}) {
+    txReleaseRateLock();
     cfheader(statuscode=arguments.statusCode, statustext="");
     var payload = {"success": arguments.ok};
     if (arguments.ok) {
@@ -253,6 +267,16 @@ function txAudit(required struct row) {
   <cfset txAudit({auth_method="api", auth_identifier="token:" & tokenRow.id, source_ip=sourceIp, sender=fromAddress, recipient=arrayToList(cleanRecipients), subject=messageSubject, message_id="", result="rejected", rejection_reason="DOMAIN_NOT_ALLOWED"})>
   <cfset txRespond(403, false, "DOMAIN_NOT_ALLOWED", "The sender domain is not authorized for this API token.")>
 </cfif>
+
+<cfset tokenRateLockName = "tx_api_rate_" & tokenRow.id>
+<cfquery name="getTokenRateLock" datasource="hermes">
+  SELECT GET_LOCK(<cfqueryparam value="#tokenRateLockName#" cfsqltype="cf_sql_varchar">, 5) AS lock_ok
+</cfquery>
+<cfif val(getTokenRateLock.lock_ok) NEQ 1>
+  <cfset txAudit({auth_method="api", auth_identifier="token:" & tokenRow.id, source_ip=sourceIp, sender=fromAddress, recipient=arrayToList(cleanRecipients), subject=messageSubject, message_id="", result="rejected", rejection_reason="RATE_LOCK_UNAVAILABLE"})>
+  <cfset txRespond(429, false, "RATE_LIMIT_EXCEEDED", "Rate limit check is busy. Please retry shortly.")>
+</cfif>
+<cfset request.txRateLock = tokenRateLockName>
 
 <cfquery name="getTxnRateSettings" datasource="hermes">
   SELECT parameter, value2
