@@ -615,6 +615,5 @@ function copyTxSmtpPassword(){
 }
 </script>
 
-<cfinclude template="./inc/html_foot.cfm" />
 </body>
 </html>
