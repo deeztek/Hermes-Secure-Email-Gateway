@@ -14,8 +14,14 @@ function getQuarantineReleaseKey() {
     if (fileExists(keyFile)) {
         return trim(fileRead(keyFile));
     }
-    // Generate a 64-character hex key on first use
-    var newKey = hash(createUUID() & now() & randRange(100000, 999999), "SHA-256");
+    // CSPRNG on first use. The previous construction hashed
+    // createUUID() & now() & randRange(100000,999999): now() carries no entropy,
+    // randRange() without an algorithm argument is java.util.Random rather than
+    // SecureRandom, and createUUID()'s generation is undocumented. Hashing weak
+    // inputs does not enlarge the space behind them. generateSecretKey goes
+    // through javax.crypto.KeyGenerator, seeded from SecureRandom.
+    // Reported by @quietvw.
+    var newKey = generateSecretKey("AES");
     fileWrite(keyFile, newKey);
     return newKey;
 }
