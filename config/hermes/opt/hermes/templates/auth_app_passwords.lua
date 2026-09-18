@@ -32,6 +32,8 @@ local DB_PASS = "hermes_db_password"
 -- IMAP IDLE clients re-authenticate frequently; without this, every IDLE
 -- renewal would generate an UPDATE.
 local LAST_USED_REFRESH_SECONDS = 3600
+local TX_AUTH_FAIL_WINDOW_SECONDS = 300
+local TX_AUTH_FAIL_LIMIT = 20
 
 -- Open a fresh connection per lookup. With use_worker = yes in the passdb
 -- block, lookups serialize within a worker, so connection-per-call is safe
@@ -48,6 +50,63 @@ end
 local function db_close(env, conn)
     if conn then conn:close() end
     if env then env:close() end
+end
+
+local function sql_quote(conn, value)
+    return "'" .. conn:escape(tostring(value or "")) .. "'"
+end
+
+local function tx_service_enabled(conn)
+    local cur, qerr = conn:execute(
+        "SELECT value2 FROM parameters2 " ..
+        "WHERE module='transactional_email' AND parameter='enabled' LIMIT 1")
+    if not cur then
+        return false, qerr
+    end
+    local row = cur:fetch({}, "a")
+    cur:close()
+    return (row and tostring(row.value2) == "1"), nil
+end
+
+local function tx_audit(conn, auth_identifier, source_ip, result, rejection_reason)
+    local q = "INSERT INTO transactional_email_audit " ..
+              "(created_at, auth_method, auth_identifier, source_ip, sender, recipient, subject, message_id, result, rejection_reason) VALUES (" ..
+              "NOW(), 'smtp', " .. sql_quote(conn, auth_identifier) .. ", " .. sql_quote(conn, source_ip) .. ", NULL, NULL, NULL, NULL, " ..
+              sql_quote(conn, result) .. ", " .. sql_quote(conn, rejection_reason) .. ")"
+    conn:execute(q)
+end
+
+local function tx_auth_rate_limited(conn, auth_identifier)
+    local q = "SELECT COUNT(*) AS cnt " ..
+              "FROM transactional_email_audit " ..
+              "WHERE auth_method='smtp' " ..
+              "  AND auth_identifier = " .. sql_quote(conn, auth_identifier) .. " " ..
+              "  AND result='rejected' " ..
+              "  AND rejection_reason IN ('SMTP_AUTH_FAILED','AUTH_RATE_LIMITED') " ..
+              "  AND created_at >= DATE_SUB(NOW(), INTERVAL " .. tostring(TX_AUTH_FAIL_WINDOW_SECONDS) .. " SECOND)"
+    local cur, qerr = conn:execute(q)
+    if not cur then
+        return false, qerr
+    end
+    local row = cur:fetch({}, "a")
+    cur:close()
+    return ((tonumber(row and row.cnt) or 0) >= TX_AUTH_FAIL_LIMIT), nil
+end
+
+local function tx_auth_lock(conn, lock_name)
+    local q = "SELECT GET_LOCK(" .. sql_quote(conn, lock_name) .. ", 5) AS got_lock"
+    local cur, qerr = conn:execute(q)
+    if not cur then
+        return false, qerr
+    end
+    local row = cur:fetch({}, "a")
+    cur:close()
+    return ((tonumber(row and row.got_lock) or 0) == 1), nil
+end
+
+local function tx_auth_unlock(conn, lock_name)
+    local q = "SELECT RELEASE_LOCK(" .. sql_quote(conn, lock_name) .. ")"
+    conn:execute(q)
 end
 
 function auth_passdb_lookup(req)
@@ -114,6 +173,86 @@ function auth_passdb_lookup(req)
         end
     end
 
+    local txQuery = string.format(
+        "SELECT id, password_hash, UNIX_TIMESTAMP(last_used_at) AS last_used_ts " ..
+        "  FROM transactional_smtp_credentials " ..
+        " WHERE username = '%s' AND active = 1 " ..
+        " LIMIT 1",
+        conn:escape(req.user))
+
+    local txCur, txErr = conn:execute(txQuery)
+    if not txCur then
+        req:log_error("transactional_smtp_credentials: query failed: " .. tostring(txErr))
+        db_close(env, conn)
+        return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "db query failed"
+    end
+
+    local txRow = txCur:fetch({}, "a")
+    txCur:close()
+    local sourceIp = tostring(req.remote_ip or req.remote_addr or "")
+
+    if txRow then
+        local authId = "smtp:" .. tostring(txRow.id)
+        local authLockName = "tx_smtp_auth_" .. tostring(txRow.id)
+        local gotLock, lockErr = tx_auth_lock(conn, authLockName)
+        if lockErr or not gotLock then
+            req:log_error("transactional_smtp_credentials: auth lock failed: " .. tostring(lockErr or "timeout"))
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "auth lock failed"
+        end
+
+        local enabled, enabledErr = tx_service_enabled(conn)
+        if enabledErr then
+            req:log_error("transactional_smtp_credentials: enabled check failed: " .. tostring(enabledErr))
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "service enabled check failed"
+        end
+        if not enabled then
+            tx_audit(conn, authId, sourceIp, "rejected", "TRANSACTIONAL_DISABLED")
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
+        end
+
+        local limited, limitErr = tx_auth_rate_limited(conn, authId)
+        if limitErr then
+            req:log_error("transactional_smtp_credentials: auth rate check failed: " .. tostring(limitErr))
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_INTERNAL_FAILURE, "auth rate check failed"
+        end
+        if limited then
+            tx_audit(conn, authId, sourceIp, "rejected", "AUTH_RATE_LIMITED")
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
+        end
+
+        local ok = req:password_verify(txRow.password_hash, req.password)
+        if ok > 0 then
+            local now = os.time()
+            local txLastUsed = tonumber(txRow.last_used_ts) or 0
+            if (now - txLastUsed) > LAST_USED_REFRESH_SECONDS then
+                local _, updateErr = conn:execute(string.format(
+                    "UPDATE transactional_smtp_credentials SET last_used_at = NOW() WHERE id = %d",
+                    tonumber(txRow.id)))
+                if updateErr then
+                    req:log_warning("transactional_smtp_credentials: last_used_at update failed: " .. tostring(updateErr))
+                end
+            end
+            tx_audit(conn, authId, sourceIp, "accepted", "")
+            tx_auth_unlock(conn, authLockName)
+            db_close(env, conn)
+            return dovecot.auth.PASSDB_RESULT_OK, {password = txRow.password_hash}
+        end
+
+        tx_audit(conn, authId, sourceIp, "rejected", "SMTP_AUTH_FAILED")
+        tx_auth_unlock(conn, authLockName)
+        db_close(env, conn)
+        return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
+    end
+
     db_close(env, conn)
-    return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "no matching app password"
+    return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "authentication failed"
 end
