@@ -184,39 +184,37 @@ $(document).ready(function() {
                 <cfdirectory action="create" directory="#certsDir#" mode="755">
             </cfif>
 
-            <!--- Delete old certificate if exists --->
-            <cfif len(caCertFilename) AND fileExists("#certsDir#/#caCertFilename#")>
-                <cffile action="delete" file="#certsDir#/#caCertFilename#">
-            </cfif>
+            <!--- Upload BEFORE removing the current bundle. The old order
+                 deleted first, so a rejected upload (wrong type, bad file)
+                 left no bundle at all. With an LDAPS mapping on tls_reqcert
+                 demand that breaks authentication as the result of a failed
+                 attempt to ADD a certificate, which is the worst possible
+                 moment to lose trust. --->
+            <cfset caCertTarget = "global_remoteauth_ca.pem">
 
-            <!--- Generate unique filename --->
-            <cfset caCertFilename = "global_remoteauth_ca.pem">
-
-            <!--- Upload the certificate file --->
             <cffile action="upload"
                 fileField="ca_cert_file"
                 destination="#certsDir#"
-                nameConflict="overwrite"
+                nameConflict="makeunique"
                 accept="application/x-x509-ca-cert,application/pkix-cert,application/x-pem-file,text/plain,.pem,.crt,.cer">
 
-            <!--- Rename to standardized filename --->
-            <cfif cffile.serverFile NEQ caCertFilename>
+            <cfset caCertUploaded = cffile.serverFile>
+
+            <!--- Only now is the previous bundle expendable. --->
+            <cfif caCertUploaded NEQ caCertTarget>
+                <cfif fileExists("#certsDir#/#caCertTarget#")>
+                    <cffile action="delete" file="#certsDir#/#caCertTarget#">
+                </cfif>
                 <cffile action="rename"
-                    source="#certsDir#/#cffile.serverFile#"
-                    destination="#certsDir#/#caCertFilename#">
+                    source="#certsDir#/#caCertUploaded#"
+                    destination="#certsDir#/#caCertTarget#">
             </cfif>
+
+            <cfset caCertFilename = caCertTarget>
         </cfif>
 
         <!--- Update TLS settings in database --->
-        <cfquery name="updateStarttls" datasource="hermes">
-            UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#form.tls_starttls#" cfsqltype="cf_sql_varchar">
-            WHERE setting_name = 'tls_starttls'
-        </cfquery>
-        <cfquery name="updateReqcert" datasource="hermes">
-            UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#form.tls_reqcert#" cfsqltype="cf_sql_varchar">
-            WHERE setting_name = 'tls_reqcert'
-        </cfquery>
-        <cfquery name="updateCaCert" datasource="hermes">
+                        <cfquery name="updateCaCert" datasource="hermes">
             UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#caCertFilename#" cfsqltype="cf_sql_varchar">
             WHERE setting_name = 'ca_cert_file'
         </cfquery>
@@ -283,14 +281,32 @@ $(document).ready(function() {
 
 <!--- Add Mapping --->
 <cfif action EQ "add_mapping">
+    <!--- STARTTLS cannot run on a connection that is already TLS. With the
+         STARTTLS control removed from this page, refusing here would be a dead
+         end: there would be no way to satisfy the requirement. So it resolves
+         itself and says what it did. The seed default is already "no", so this
+         fires only on an install that set it years ago. --->
+    <cfif val(form.use_ldaps) EQ 1>
+        <cfquery name="starttlsOn" datasource="hermes">
+            SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'tls_starttls'
+        </cfquery>
+        <cfif starttlsOn.recordcount GTE 1 AND starttlsOn.setting_value EQ "yes">
+            <cfquery datasource="hermes">
+                UPDATE remoteauth_settings SET setting_value = 'no' WHERE setting_name = 'tls_starttls'
+            </cfquery>
+            <cfset session.raNotice = "STARTTLS was turned off because this mapping uses LDAPS, which is already encrypted and cannot be upgraded again. Any plain mapping that was being upgraded is now unencrypted. Test those mappings, or move them to LDAPS as well.">
+        </cfif>
+    </cfif>
+
     <cftry>
         <!--- TLS settings are now global, not per-mapping --->
         <cfquery name="insertMapping" datasource="hermes">
-            INSERT INTO remoteauth_mappings (domain_name, server_address, server_port, remote_dn_pattern, description, enabled, ldap_synced)
+            INSERT INTO remoteauth_mappings (domain_name, server_address, server_port, use_ldaps, remote_dn_pattern, description, enabled, ldap_synced)
             VALUES (
                 <cfqueryparam value="#trim(form.domain_name)#" cfsqltype="cf_sql_varchar">,
                 <cfqueryparam value="#trim(form.server_address)#" cfsqltype="cf_sql_varchar">,
                 <cfqueryparam value="#val(form.server_port)#" cfsqltype="cf_sql_integer">,
+                <cfqueryparam value="#(val(form.use_ldaps) EQ 1 ? 1 : 0)#" cfsqltype="cf_sql_integer">,
                 <cfqueryparam value="#trim(form.remote_dn_pattern)#" cfsqltype="cf_sql_varchar">,
                 <cfqueryparam value="#trim(form.description)#" cfsqltype="cf_sql_varchar">,
                 1,
@@ -319,7 +335,7 @@ $(document).ready(function() {
 
         <!--- Get domain names for the mappings to check for assigned users --->
         <cfquery name="getMappingDomains" datasource="hermes">
-            SELECT id, domain_name, ca_cert_file FROM remoteauth_mappings
+            SELECT id, domain_name FROM remoteauth_mappings
             WHERE id IN (<cfqueryparam value="#idList#" cfsqltype="cf_sql_integer" list="yes">)
         </cfquery>
 
@@ -363,16 +379,6 @@ $(document).ready(function() {
         </cfif>
 
         <!--- Safe to delete - no users assigned --->
-        <!--- Delete certificate files --->
-        <cfloop query="getMappingDomains">
-            <cfif len(getMappingDomains.ca_cert_file)>
-                <cfset certPath = "/opt/hermes/certs/remoteauth/#getMappingDomains.ca_cert_file#">
-                <cfif fileExists(certPath)>
-                    <cffile action="delete" file="#certPath#">
-                </cfif>
-            </cfif>
-        </cfloop>
-
         <cfquery name="deleteMappings" datasource="hermes">
             DELETE FROM remoteauth_mappings WHERE id IN (<cfqueryparam value="#idList#" cfsqltype="cf_sql_integer" list="yes">)
         </cfquery>
@@ -441,15 +447,29 @@ $(document).ready(function() {
         <cfset testDn = Replace(testDn, "{email}", form.test_email, "ALL")>
     </cfif>
 
-    <!--- Build LDAP URL --->
-    <cfset ldapUrl = "ldap://" & form.test_server & ":" & form.test_port>
+    <!--- Build the LDAP URL. LDAPS only (#335): the overlay is pinned to
+         the mapping's own transport, so a probe on the wrong scheme would pass
+         on a directory that production cannot reach. --->
+    <cfparam name="form.test_use_ldaps" default="0">
+    <cfset testScheme = (val(form.test_use_ldaps) EQ 1) ? "ldaps" : "ldap">
+    <cfset ldapUrl = testScheme & "://" & form.test_server & ":" & form.test_port>
 
-    <!--- Build ldapwhoami command to test authentication --->
-    <!--- Using ldapwhoami for a simple bind test --->
-    <cfset ldapCommand = "exec hermes_ldap ldapwhoami -x -H ""#ldapUrl#"" -D ""#testDn#"" -w ""#form.test_password#""">
+    <!--- ldapwhoami reads its TLS settings from the client config, not from
+         olcRemoteAuthTLS, so the overlay's posture is passed explicitly.
+         Without this the probe would silently verify nothing. --->
+    <!--- Mirrors what the sync derives: choosing LDAPS is choosing verification,
+         so the probe must verify too. A probe that is laxer than production
+         passes on a directory production will refuse. --->
+    <cfset testReqcert = (testScheme IS "ldaps")
+                       ? "demand"
+                       : (structKeyExists(globalTLS, "tls_reqcert") ? globalTLS.tls_reqcert : "never")>
+    <cfset testEnv = " -e LDAPTLS_REQCERT=#testReqcert#">
+    <cfif structKeyExists(globalTLS, "ca_cert_file") AND len(globalTLS.ca_cert_file)>
+        <cfset testEnv = testEnv & " -e LDAPTLS_CACERT=/opt/hermes/certs/remoteauth/#globalTLS.ca_cert_file#">
+    </cfif>
 
-    <!--- Add STARTTLS if enabled in global settings --->
-    <cfif structKeyExists(globalTLS, "tls_starttls") AND globalTLS.tls_starttls EQ "yes">
+    <cfset ldapCommand = "exec#testEnv# hermes_ldap ldapwhoami -x -H ""#ldapUrl#"" -D ""#testDn#"" -w ""#form.test_password#""">
+    <cfif testScheme IS "ldap" AND structKeyExists(globalTLS, "tls_starttls") AND globalTLS.tls_starttls EQ "yes">
         <cfset ldapCommand = ldapCommand & " -ZZ">
     </cfif>
 
@@ -462,8 +482,13 @@ $(document).ready(function() {
             timeout="30">
         </cfexecute>
 
-        <!--- Check if successful (ldapwhoami returns the bound DN on success) --->
-        <cfif FindNoCase("dn:", testResult) GT 0 OR FindNoCase("u:", testResult) GT 0 OR testError EQ "">
+        <!--- Success is ldapwhoami echoing the bound identity, nothing else.
+             This previously also accepted an empty stderr as success, which
+             reported a healthy directory whenever the command produced no
+             output at all. A probe that passes when nothing happened is worse
+             than no probe, because it is what an admin checks before
+             concluding their DC is fine. --->
+        <cfif FindNoCase("dn:", testResult) GT 0 OR FindNoCase("u:", testResult) GT 0>
             <cfset session.m = "ra_test_success">
             <cfset session.testDomain = form.test_domain>
             <cfset session.testDn = testDn>
@@ -472,7 +497,17 @@ $(document).ready(function() {
             <cfset session.m = "ra_test_fail">
             <cfset session.testDomain = form.test_domain>
             <cfset session.testDn = testDn>
-            <cfset session.testError = testError>
+            <!--- Name the likely cause. The two new failure modes after the
+                 move to mandatory LDAPS are a directory with no LDAPS
+                 listener, and a certificate whose subject does not match the
+                 address entered, which demand checks as well as the chain. --->
+            <cfset testHint = "">
+            <cfif FindNoCase("Can't contact LDAP server", testError) GT 0>
+                <cfset testHint = "Could not reach #form.test_server# on port #form.test_port# over #UCase(testScheme)#. Check the address, the port, and that the directory is listening on it.">
+            <cfelseif FindNoCase("TLS", testError) GT 0 OR FindNoCase("certificate", testError) GT 0>
+                <cfset testHint = "The server certificate was rejected. Upload a CA bundle that covers it, and make sure the address above matches the certificate's hostname rather than being an IP.">
+            </cfif>
+            <cfset session.testError = Len(testHint) ? testHint & " (" & testError & ")" : testError>
         </cfif>
     <cfcatch type="any">
         <cfset session.m = "ra_test_fail">
@@ -601,12 +636,30 @@ $(document).ready(function() {
     <cfset session.m = 0>
 </cfif>
 
+<cfparam name="session.raNotice" default="">
+<cfif Len(session.raNotice)>
+    <cfoutput>
+    <div class="alert alert-warning alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h4><i class="icon fa fa-triangle-exclamation"></i> Heads up</h4>
+        #EncodeForHTML(session.raNotice)#
+    </div>
+    </cfoutput>
+    <cfset session.raNotice = "">
+</cfif>
+
 <cfif m EQ "ra_error">
+    <cfparam name="session.raError" default="">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         <h4><i class="icon fa fa-ban"></i> Error!</h4>
-        An error occurred. Please try again.
+        <cfif Len(session.raError)>
+            <cfoutput>#EncodeForHTML(session.raError)#</cfoutput>
+        <cfelse>
+            An error occurred. Please try again.
+        </cfif>
     </div>
+    <cfset session.raError = "">
     <cfset session.m = 0>
 </cfif>
 
@@ -681,7 +734,7 @@ $(document).ready(function() {
 </cfloop>
 
 <cfquery name="getMappings" datasource="hermes">
-    SELECT id, domain_name, server_address, server_port, remote_dn_pattern, tls_starttls, tls_reqcert, retry_count, description, enabled, ldap_synced
+    SELECT id, domain_name, server_address, server_port, use_ldaps, remote_dn_pattern, retry_count, description, enabled, ldap_synced
     FROM remoteauth_mappings
     ORDER BY domain_name
 </cfquery>
@@ -767,6 +820,12 @@ $(document).ready(function() {
         <p><strong>RemoteAuth</strong> enables pass-through authentication to external LDAP servers (including Active Directory, OpenLDAP, 389 Directory Server, FreeIPA, etc.).
         Users can authenticate using their existing directory credentials without storing passwords in Hermes.</p>
         <p><strong>Domain Mappings:</strong> Each mapping connects a domain identifier to a remote LDAP server and defines the DN pattern for user lookups.</p>
+        <div class="callout callout-info mb-3">
+            <p class="mb-1"><strong>Recipients always sign in with their e-mail address.</strong></p>
+            <p class="mb-0"><small>Their username in your directory can be anything &mdash; <code>jsmith</code>, <code>John Smith</code>, an employee number &mdash; and Hermes never asks for it.
+            The e-mail address is the Hermes username; the DN pattern below is only how Hermes locates that person in your directory in order to hand the password check over to it.
+            (System users are the exception: their username is whatever an administrator sets, and is unrelated to this page.)</small></p>
+        </div>
         <p><strong>Remote DN Pattern:</strong> This must match how users are named in your directory. Common patterns:</p>
         <ul>
             <li><code>cn={firstname} {lastname},ou=Users,dc=example,dc=com</code> - If directory uses display name as CN (e.g., "John Smith")</li>
@@ -850,7 +909,12 @@ $(document).ready(function() {
     </div>
     <div class="card-body">
         <div class="alert alert-info mb-3">
-            <i class="fas fa-info-circle"></i> <strong>Global TLS Settings:</strong> OpenLDAP remoteauth uses a singleton overlay. These TLS settings apply <strong>globally to ALL domain mappings</strong>.
+            <i class="fas fa-info-circle"></i> <strong>Transport is chosen per mapping, and there are two states:</strong>
+<ul class="mb-1 mt-1">
+  <li><strong>Plain LDAP</strong> &mdash; not encrypted. The user's password crosses the network in the clear.</li>
+  <li><strong>LDAPS</strong> &mdash; encrypted, and the directory's certificate is verified against the CA bundle below. The address you enter must match the certificate's hostname.</li>
+</ul>
+There is no separate verification setting: choosing LDAPS is choosing verification. The CA bundle and retry count below are shared by <strong>every</strong> mapping, because the overlay is a singleton.
             <p class="mt-2 mb-0"><strong>Connecting to multiple LDAP servers with different CA certificates?</strong> Create a CA bundle by concatenating all CA certificates into a single PEM file:</p>
             <pre class="bg-dark text-light p-2 mt-2 mb-0" style="font-size: 0.85em;">cat server1-ca.pem server2-ca.pem server3-ca.pem > ca-bundle.pem</pre>
             <small class="text-muted d-block mt-1">Then upload the ca-bundle.pem file below. OpenLDAP will use all certificates in the bundle to validate any server.</small>
@@ -858,34 +922,6 @@ $(document).ready(function() {
         <form name="UpdateTLSSettings" method="post" enctype="multipart/form-data">
             <input type="hidden" name="action" value="update_tls_settings">
             <div class="row">
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label"><strong>Use STARTTLS</strong></label>
-                        <select name="tls_starttls" class="form-select">
-                            <cfif structKeyExists(settings, "tls_starttls") AND settings.tls_starttls EQ "yes">
-                                <option value="no">No</option>
-                                <option value="yes" selected>Yes</option>
-                            <cfelse>
-                                <option value="no" selected>No</option>
-                                <option value="yes">Yes</option>
-                            </cfif>
-                        </select>
-                        <small class="text-muted">Enable STARTTLS for all remote LDAP connections</small>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="mb-3">
-                        <label class="form-label"><strong>TLS Certificate Requirement</strong></label>
-                        <select name="tls_reqcert" class="form-select" id="global_tls_reqcert">
-                            <cfset currentReqcert = structKeyExists(settings, "tls_reqcert") ? settings.tls_reqcert : "never">
-                            <option value="never" <cfif currentReqcert EQ "never">selected</cfif>>Never (no verification)</option>
-                            <option value="allow" <cfif currentReqcert EQ "allow">selected</cfif>>Allow (verify if possible)</option>
-                            <option value="try" <cfif currentReqcert EQ "try">selected</cfif>>Try (require valid cert if provided)</option>
-                            <option value="demand" <cfif currentReqcert EQ "demand">selected</cfif>>Demand (require valid cert)</option>
-                        </select>
-                        <small class="text-muted">TLS certificate verification level</small>
-                    </div>
-                </div>
                 <div class="col-md-3" id="global_cacert_group">
                     <div class="mb-3">
                         <label class="form-label"><strong>CA Certificate (or Bundle)</strong></label>
@@ -940,6 +976,7 @@ $(document).ready(function() {
                         <th>Domain</th>
                         <th>Server</th>
                         <th>Port</th>
+                        <th>Transport</th>
                         <th>Remote DN Pattern</th>
                         <th>Description</th>
                         <th>Enabled</th>
@@ -951,10 +988,11 @@ $(document).ready(function() {
                         <tr>
                             <td><input type="checkbox" name="mapping_id" value="#id#"></td>
                             <td><a href="edit_remoteauth_mapping.cfm?id=#id#" class="btn btn-secondary btn-sm"><i class="fas fa-edit"></i></a></td>
-                            <td><button type="button" class="btn btn-info btn-sm test-btn" data-bs-toggle="modal" data-bs-target="##test_modal" data-domain="#domain_name#" data-server="#server_address#" data-port="#server_port#" data-dnpattern="#htmlEditFormat(remote_dn_pattern)#"><i class="fas fa-vial"></i></button></td>
+                            <td><button type="button" class="btn btn-info btn-sm test-btn" data-bs-toggle="modal" data-bs-target="##test_modal" data-domain="#domain_name#" data-server="#server_address#" data-port="#server_port#" data-dnpattern="#htmlEditFormat(remote_dn_pattern)#" data-useldaps="#val(use_ldaps)#"><i class="fas fa-vial"></i></button></td>
                             <td>#domain_name#</td>
                             <td>#server_address#</td>
                             <td>#server_port#</td>
+                            <td><cfif val(use_ldaps) EQ 1><span class="badge bg-success">LDAPS</span><cfelse><span class="badge bg-secondary">Plain</span></cfif></td>
                             <td><cfif remote_dn_pattern NEQ ""><small>#remote_dn_pattern#</small><cfelse><span class="text-muted">Not set</span></cfif></td>
                             <td><cfif description NEQ "">#description#<cfelse><span class="text-muted">-</span></cfif></td>
                             <td><cfif settings.enabled EQ "1" AND enabled EQ 1><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary">No</span></cfif></td>
@@ -970,6 +1008,7 @@ $(document).ready(function() {
                         <th>Domain</th>
                         <th>Server</th>
                         <th>Port</th>
+                        <th>Transport</th>
                         <th>Remote DN Pattern</th>
                         <th>Description</th>
                         <th>Enabled</th>
@@ -1008,14 +1047,22 @@ $(document).ready(function() {
                         <small class="text-muted">Hostname or IP address of the remote LDAP server</small>
                     </div>
                     <div class="mb-3">
+                        <label class="form-label">Transport</label>
+                        <select name="use_ldaps" id="add_use_ldaps" class="form-select" onchange="hermesSyncLdapPort(this, 'add_server_port')">
+                            <option value="0" selected>Plain LDAP</option>
+                            <option value="1">LDAPS</option>
+                        </select>
+                        <small class="text-muted">LDAPS is required for Google Secure LDAP. Mappings may differ: each one gets its own URI, so an existing plain connection is unaffected by adding an LDAPS one.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Server Port</label>
-                        <input type="number" name="server_port" class="form-control" value="389" min="1" max="65535">
+                        <input type="number" name="server_port" id="add_server_port" class="form-control" value="389" min="1" max="65535">
                         <small class="text-muted">LDAP port (389 for standard, 636 for LDAPS)</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Remote DN Pattern <span class="text-danger">*</span></label>
                         <input type="text" name="remote_dn_pattern" class="form-control" required placeholder="e.g., cn={firstname} {lastname},ou=Users,dc=example,dc=com">
-                        <small class="text-muted">
+                        <small class="text-muted"><strong>This is not the sign-in username.</strong> Recipients always sign in as their e-mail address; this is only how Hermes finds them in your directory.<br>
                             The DN pattern must match your directory user naming convention. Placeholders: <code>{username}</code>, <code>{firstname}</code>, <code>{lastname}</code>, <code>{email}</code><br>
                             <strong>AD (display name as CN):</strong> <code>cn={firstname} {lastname},ou=Users,dc=example,dc=com</code><br>
                             <strong>AD (username as CN):</strong> <code>cn={username},ou=Users,dc=example,dc=com</code><br>
@@ -1027,7 +1074,7 @@ $(document).ready(function() {
                         <input type="text" name="description" class="form-control" placeholder="Optional description">
                     </div>
                     <div class="alert alert-info mb-0">
-                        <small><i class="fas fa-info-circle"></i> TLS settings (STARTTLS, certificate verification, CA certificate, retry count) are configured globally in the "Global TLS Settings" card above.</small>
+                        <small><i class="fas fa-info-circle"></i> <strong>Transport is per mapping.</strong> Choosing LDAPS also turns on certificate verification for it, so the directory must present a certificate that validates and whose hostname matches the address above. The CA bundle and retry count are shared by every mapping and live in the "Global TLS Settings" card.</small>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -1076,6 +1123,7 @@ $(document).ready(function() {
                     <input type="hidden" name="test_domain" id="test_domain" value="">
                     <input type="hidden" name="test_server" id="test_server" value="">
                     <input type="hidden" name="test_port" id="test_port" value="">
+                    <input type="hidden" name="test_use_ldaps" id="test_use_ldaps" value="0">
                     <input type="hidden" name="test_dnpattern" id="test_dnpattern" value="">
 
                     <div class="alert alert-info">
@@ -1148,29 +1196,7 @@ mybutton.addEventListener("click", function() {
     document.documentElement.scrollTop = 0;
 });
 
-// Show/hide CA certificate field based on global TLS reqcert selection
 document.addEventListener('DOMContentLoaded', function() {
-    const globalTlsReqcertSelect = document.getElementById('global_tls_reqcert');
-    const globalCacertGroup = document.getElementById('global_cacert_group');
-
-    function toggleGlobalCacertField() {
-        if (globalTlsReqcertSelect && globalCacertGroup) {
-            if (globalTlsReqcertSelect.value === 'never') {
-                globalCacertGroup.style.display = 'none';
-            } else {
-                globalCacertGroup.style.display = 'block';
-            }
-        }
-    }
-
-    // Initial state
-    toggleGlobalCacertField();
-
-    // On change
-    if (globalTlsReqcertSelect) {
-        globalTlsReqcertSelect.addEventListener('change', toggleGlobalCacertField);
-    }
-
     // Test modal - populate fields when test button is clicked
     const testModal = document.getElementById('test_modal');
     if (testModal) {
@@ -1180,16 +1206,19 @@ document.addEventListener('DOMContentLoaded', function() {
             const server = button.getAttribute('data-server');
             const port = button.getAttribute('data-port');
             const dnpattern = button.getAttribute('data-dnpattern');
+            const useLdaps = button.getAttribute('data-useldaps') || '0';
 
             // Set hidden fields
             document.getElementById('test_domain').value = domain;
             document.getElementById('test_server').value = server;
             document.getElementById('test_port').value = port;
             document.getElementById('test_dnpattern').value = dnpattern;
+            document.getElementById('test_use_ldaps').value = useLdaps;
 
             // Set display fields
             document.getElementById('test_domain_display').textContent = domain;
-            document.getElementById('test_server_display').textContent = server + ':' + port;
+            document.getElementById('test_server_display').textContent =
+                (useLdaps === '1' ? 'ldaps://' : 'ldap://') + server + ':' + port;
 
             // Clear previous inputs and results
             document.getElementById('test_username').value = '';
@@ -1201,6 +1230,21 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+</script>
+
+<script>
+// Transport and port are separate fields, so the dropdown must not claim a
+// port. It moves the port to the conventional default as a convenience, but
+// only when the field still holds the other convention's default: a directory
+// deliberately on 6636 is not clobbered by toggling transport.
+function hermesSyncLdapPort(sel, portId) {
+    var port = document.getElementById(portId);
+    if (!port) { return; }
+    var v = (port.value || '').trim();
+    var wantsLdaps = (sel.value === '1' || sel.value === 'ldaps');
+    if (wantsLdaps  && (v === '' || v === '389')) { port.value = '636'; }
+    if (!wantsLdaps && (v === '' || v === '636')) { port.value = '389'; }
+}
 </script>
 
 </body>

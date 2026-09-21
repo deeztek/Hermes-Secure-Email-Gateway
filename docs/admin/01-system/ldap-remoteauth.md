@@ -82,6 +82,34 @@ Two user-bearing tables carry RemoteAuth references:
 
 The `mailboxes` table does **not** carry `auth_type` yet. RemoteAuth-for-mailboxes is planned but not yet wired (see [Future work](#future-work)).
 
+## The sign-in username is always the e-mail address
+
+This is the single most common point of confusion, so state it plainly to anyone
+you support:
+
+> A recipient signs into the Hermes user portal with their **e-mail address**.
+> Their username in the remote directory is irrelevant and is never typed into
+> Hermes.
+
+Their directory account can be `jsmith`, `John Smith`, an employee number, or a
+UPN that differs from their mail address. Hermes does not care. The local stub
+entry is always created as `cn=<email>` (`ldap_add_user_relay_remoteauth.cfm`
+sets `ldapUsername = LCase(recipientEmail)` unconditionally), and the overlay
+uses `seeAlso` on that entry to reach the real directory account.
+
+So the DN pattern is **not** a username field. It is only how Hermes locates the
+person in the remote directory in order to delegate the password check. Getting
+it wrong produces a failed bind, not a wrong username.
+
+**The one exception:** console *system users* have a username an administrator
+chooses, which may be anything and is unrelated to this page.
+
+Auto-provisioning sidesteps the pattern entirely for the recipients it creates:
+it read them out of the directory, so it knows each one's real DN and writes
+that to `seeAlso` directly. That is why a directory whose account names differ
+from the e-mail local part provisions correctly even when the DN pattern would
+not have resolved.
+
 ## DN pattern placeholders
 
 The `remote_dn_pattern` column stores the upstream DN with four substitutable tokens. Substitution happens in `inc/ldap_add_user_remoteauth.cfm` at user-create time, baked into the `seeAlso` attribute on the local stub entry.

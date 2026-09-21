@@ -57,12 +57,39 @@ Sets:
 </cfloop>
 
 <!--- SET DEFAULTS FOR GLOBAL TLS SETTINGS IF NOT PRESENT --->
+<!--- Global TLS negotiation. slapo-remoteauth carries ONE olcRemoteAuthTLS
+     line for the whole overlay, so starttls and tls_reqcert apply to every
+     mapping. The URI scheme does NOT: olcRemoteAuthMapping is written once per
+     domain and each line carries its own URI, so transports mix freely.
+
+     A plain ldap:// mapping negotiates no TLS at all, so tls_reqcert is never
+     consulted for it. That is what lets an existing AD mapping keep working
+     untouched beside a new LDAPS mapping that does get the full check. --->
 <cfif NOT structKeyExists(settings, "tls_starttls")>
     <cfset settings.tls_starttls = "no">
 </cfif>
 <cfif NOT structKeyExists(settings, "tls_reqcert")>
     <cfset settings.tls_reqcert = "never">
 </cfif>
+
+<!--- STARTTLS cannot run on a connection that is already TLS, so the two are
+     mutually exclusive. The save path refuses this combination, but a database
+     edited by hand could still produce it; forcing starttls off is the safe
+     resolution because the ldaps:// mappings are the ones that would otherwise
+     fail outright. --->
+<cfquery name="countLdapsMappings" datasource="hermes">
+    SELECT COUNT(*) AS n FROM remoteauth_mappings WHERE enabled = 1 AND use_ldaps = 1
+</cfquery>
+<cfif countLdapsMappings.n GT 0>
+    <cfset settings.tls_starttls = "no">
+    <!--- Verification is implied by choosing LDAPS, not a separate decision.
+         "Encrypted but unverified" is the appearance of security with none of
+         it, and on this path the thing left unprotected is the user's own
+         password, which RemoteAuth forwards to the directory. So the console
+         offers no way to select it and the sync derives it. --->
+    <cfset settings.tls_reqcert = "demand">
+</cfif>
+
 <cfif NOT structKeyExists(settings, "ca_cert_file")>
     <cfset settings.ca_cert_file = "">
 </cfif>
@@ -72,7 +99,7 @@ Sets:
 
 <!--- GET ENABLED MAPPINGS FROM DATABASE --->
 <cfquery name="getMappings" datasource="hermes">
-    SELECT id, domain_name, server_address, server_port
+    SELECT id, domain_name, server_address, server_port, use_ldaps
     FROM remoteauth_mappings
     WHERE enabled = 1
     ORDER BY domain_name
@@ -100,7 +127,10 @@ Sets:
     <cfloop query="getMappings">
         <cfset mappingStruct = {
             "domain_name": getMappings.domain_name,
-            "server_address": "ldap://#getMappings.server_address#:#getMappings.server_port#"
+            <!--- Scheme comes from the mapping. This was hardcoded to ldap://,
+                 which is the whole reason Google Secure LDAP could not be
+                 reached regardless of certificates. --->
+            "server_address": "#(val(getMappings.use_ldaps) EQ 1 ? 'ldaps' : 'ldap')#://#getMappings.server_address#:#getMappings.server_port#"
         }>
         <cfset arrayAppend(remoteauthMappingsArray, mappingStruct)>
     </cfloop>

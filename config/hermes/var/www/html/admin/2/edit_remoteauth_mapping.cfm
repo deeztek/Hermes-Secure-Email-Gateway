@@ -90,11 +90,31 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif action EQ "update_mapping">
     <cftry>
         <!--- TLS settings are now global, not per-mapping --->
+        <!--- Resolve rather than refuse: the STARTTLS control no longer exists
+             on the RemoteAuth page, so telling the admin to go and change it
+             would be a dead end. --->
+        <cfif val(form.use_ldaps) EQ 1>
+            <cfquery name="starttlsOn" datasource="hermes">
+                SELECT setting_value FROM remoteauth_settings WHERE setting_name = 'tls_starttls'
+            </cfquery>
+            <cfif starttlsOn.recordcount GTE 1 AND starttlsOn.setting_value EQ "yes">
+                <cfquery datasource="hermes">
+                    UPDATE remoteauth_settings SET setting_value = 'no' WHERE setting_name = 'tls_starttls'
+                </cfquery>
+                <cfset session.raNotice = "STARTTLS was turned off because this mapping uses LDAPS, which is already encrypted and cannot be upgraded again. Any plain mapping that was being upgraded is now unencrypted.">
+            </cfif>
+        </cfif>
+
+        <!--- errorMessage is only ever set on a failure path, and the panel at
+             the bottom of this page keys on IsDefined, so it must stay
+             undefined on the happy path rather than being cfparam'd to "". --->
+        <cfif NOT (IsDefined("errorMessage") AND Len(errorMessage))>
         <cfquery name="updateMapping" datasource="hermes">
             UPDATE remoteauth_mappings SET
                 domain_name = <cfqueryparam value="#trim(form.domain_name)#" cfsqltype="cf_sql_varchar">,
                 server_address = <cfqueryparam value="#trim(form.server_address)#" cfsqltype="cf_sql_varchar">,
                 server_port = <cfqueryparam value="#val(form.server_port)#" cfsqltype="cf_sql_integer">,
+                use_ldaps = <cfqueryparam value="#(val(form.use_ldaps) EQ 1 ? 1 : 0)#" cfsqltype="cf_sql_integer">,
                 remote_dn_pattern = <cfqueryparam value="#trim(form.remote_dn_pattern)#" cfsqltype="cf_sql_varchar">,
                 description = <cfqueryparam value="#trim(form.description)#" cfsqltype="cf_sql_varchar">,
                 enabled = <cfqueryparam value="#val(form.enabled)#" cfsqltype="cf_sql_integer">,
@@ -106,6 +126,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfquery>
         <cfset session.m = "ra_mapping_updated">
         <cflocation url="view_remoteauth.cfm" addtoken="no">
+        </cfif>
         <cfcatch type="database">
             <cfif cfcatch.message CONTAINS "Duplicate">
                 <cfset errorMessage = "A domain mapping with that name already exists.">
@@ -120,7 +141,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif action EQ "delete_mapping">
     <!--- Get the mapping domain name for user check --->
     <cfquery name="getMappingDomain" datasource="hermes">
-        SELECT domain_name, ca_cert_file FROM remoteauth_mappings
+        SELECT domain_name FROM remoteauth_mappings
         WHERE id = <cfqueryparam value="#val(form.mapping_id)#" cfsqltype="cf_sql_integer">
     </cfquery>
 
@@ -144,14 +165,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset errorMessage = "Cannot delete this mapping. #totalAssigned# user(s)/recipient(s) are configured to use this domain for remote authentication. Please reassign or delete these users/recipients first.">
         <cfelse>
             <!--- Safe to delete --->
-            <!--- Delete certificate file if exists --->
-            <cfif len(getMappingDomain.ca_cert_file)>
-                <cfset certPath = "/opt/hermes/certs/remoteauth/#getMappingDomain.ca_cert_file#">
-                <cfif fileExists(certPath)>
-                    <cffile action="delete" file="#certPath#">
-                </cfif>
-            </cfif>
-
             <cfquery name="deleteMapping" datasource="hermes">
                 DELETE FROM remoteauth_mappings WHERE id = <cfqueryparam value="#val(form.mapping_id)#" cfsqltype="cf_sql_integer">
             </cfquery>
@@ -166,7 +179,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- FETCH MAPPING DATA --->
 <cfquery name="getMapping" datasource="hermes">
-    SELECT id, domain_name, server_address, server_port, remote_dn_pattern, tls_starttls, tls_reqcert, ca_cert_file, retry_count, description, enabled, ldap_synced
+    SELECT id, domain_name, server_address, server_port, use_ldaps, remote_dn_pattern, retry_count, description, enabled, ldap_synced
     FROM remoteauth_mappings
     WHERE id = <cfqueryparam value="#val(url.id)#" cfsqltype="cf_sql_integer">
 </cfquery>
@@ -245,8 +258,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
                 <div class="col-md-6">
                     <div class="mb-3">
+                        <label class="form-label">Transport</label>
+                        <select name="use_ldaps" id="edit_use_ldaps" class="form-select" onchange="hermesSyncLdapPort(this, 'edit_server_port')">
+                            <option value="0"<cfif val(getMapping.use_ldaps) NEQ 1> selected</cfif>>Plain LDAP</option>
+                            <option value="1"<cfif val(getMapping.use_ldaps) EQ 1> selected</cfif>>LDAPS</option>
+                        </select>
+                        <small class="text-muted">LDAPS is required for Google Secure LDAP. Mappings may differ: each one gets its own URI, so an existing plain connection is unaffected by adding an LDAPS one.</small>
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">Server Port</label>
-                        <input type="number" name="server_port" class="form-control" value="<cfoutput>#getMapping.server_port#</cfoutput>" min="1" max="65535">
+                        <input type="number" name="server_port" id="edit_server_port" class="form-control" value="<cfoutput>#getMapping.server_port#</cfoutput>" min="1" max="65535">
                         <small class="text-muted">LDAP port (389 for standard, 636 for LDAPS)</small>
                     </div>
                 </div>
@@ -291,7 +312,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
             </div>
             <div class="alert alert-info mb-0">
-                <small><i class="fas fa-info-circle"></i> TLS settings (STARTTLS, certificate verification, CA certificate, retry count) are configured globally on the main RemoteAuth page.</small>
+                <small><i class="fas fa-info-circle"></i> <strong>Transport is per mapping.</strong> Choosing LDAPS also turns on certificate verification for it. The CA bundle and retry count are shared by every mapping and live on the main RemoteAuth page.</small>
             </div>
         </div>
         <div class="card-footer">
@@ -336,6 +357,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 </div><!-- ./app-wrapper -->
 
+
+<script>
+// Transport and port are separate fields, so the dropdown must not claim a
+// port. It moves the port to the conventional default as a convenience, but
+// only when the field still holds the other convention's default: a directory
+// deliberately on 6636 is not clobbered by toggling transport.
+function hermesSyncLdapPort(sel, portId) {
+    var port = document.getElementById(portId);
+    if (!port) { return; }
+    var v = (port.value || '').trim();
+    var wantsLdaps = (sel.value === '1' || sel.value === 'ldaps');
+    if (wantsLdaps  && (v === '' || v === '389')) { port.value = '636'; }
+    if (!wantsLdaps && (v === '' || v === '636')) { port.value = '389'; }
+}
+</script>
 
 </body>
 </html>

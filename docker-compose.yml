@@ -833,6 +833,7 @@ services:
       - ldap_data:/var/lib/ldap
       - ldap_logs:/var/log
       - ./config/ldap/hermes:/custom
+      - ./config/hermes/opt/hermes/certs:/opt/hermes/certs:ro
       - ./config/hermes/opt/hermes/tmp:/opt/hermes/tmp
       - ./config/ldap/etc/rsyslog.d/slapd.conf:/etc/rsyslog.d/slapd.conf
       - ./config/ldap/etc/rsyslog.d/mysql.conf:/etc/rsyslog.d/mysql.conf
