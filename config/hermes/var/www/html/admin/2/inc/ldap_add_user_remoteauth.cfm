@@ -50,6 +50,22 @@ via the remoteauth overlay. The seeAlso attribute points to the remote DN.
        {email}     = full email address (e.g. jsmith@example.com)
        {firstname} = First Name field
        {lastname}  = Last Name field --->
+<!--- Auto-provisioning (#332) read these users out of the directory itself, so
+     it knows each one's REAL DN and passes it in dirSourceDnByEmail. Use that
+     in preference to rebuilding one from the pattern.
+
+     This matters because {username} is only ever the email local part. Where a
+     directory's account name differs from it, jdoe versus john.doe, a
+     reconstructed DN points at nothing and the user cannot sign in. The
+     enumerated DN cannot be wrong: the directory returned it. --->
+<cfset ldapSeeAlso = "">
+<cfif isDefined("dirSourceDnByEmail") AND IsStruct(dirSourceDnByEmail)
+      AND StructKeyExists(dirSourceDnByEmail, LCase(ldapEmail))
+      AND Len(Trim(dirSourceDnByEmail[LCase(ldapEmail)]))>
+    <cfset ldapSeeAlso = Trim(dirSourceDnByEmail[LCase(ldapEmail)])>
+</cfif>
+
+<cfif NOT Len(ldapSeeAlso)>
 <cfset ldapSeeAlso = getRemoteMapping.remote_dn_pattern>
 <!--- ListFirst on `@` handles both shapes:
        mailbox/relay users: ldapUsername = "jsmith@company.com" -> "jsmith"
@@ -58,6 +74,7 @@ via the remoteauth overlay. The seeAlso attribute points to the remote DN.
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{firstname}", ldapFirstName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{lastname}", ldapLastName, "ALL")>
 <cfset ldapSeeAlso = ReplaceNoCase(ldapSeeAlso, "{email}", ldapEmail, "ALL")>
+</cfif>
 
 <cftry>
 

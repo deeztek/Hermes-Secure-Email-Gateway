@@ -70,12 +70,12 @@ from the user portal on demand. The web login uses their organization
 <p>Your mailbox has been created on Hermes SEG. Your email address is: <strong>#recipientEmail#</strong></p>
 
 <div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 15px; margin: 20px 0; border-radius: 5px;">
-    <p style="margin: 0;">Your mailbox uses your <strong>organization (AD/LDAP) password</strong> for authentication. Your administrator will provide your login username separately. If you need help, contact them directly.</p>
+    <p style="margin: 0;">Sign in with your email address <strong>#recipientEmail#</strong> and your usual <strong>organization password</strong>. Hermes does not store that password and never asks you to change it here. If you need help, contact your administrator.</p>
 </div>
 
 <div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 20px; margin: 20px 0; border-radius: 5px;">
     <h3 style="margin-top: 0; color: ##805500;">Setting Up Email on Your Phone or Computer</h3>
-    <p style="margin: 0 0 10px 0;">Your organization (AD/LDAP) password works for the website only. For your email apps (phone, tablet, Thunderbird, Outlook, Apple Mail, etc.), you need an <strong>app password</strong>.</p>
+    <p style="margin: 0 0 10px 0;">Your organization password works for the website only. For your email apps (phone, tablet, Thunderbird, Outlook, Apple Mail, etc.), you need an <strong>app password</strong>.</p>
 
     <p style="margin: 0 0 10px 0;"><strong>Easy path &mdash; the Setup wizard.</strong> Sign in to the user portal at <a href="#loginUrl#">#loginUrl#</a>, then click <strong>Set Up Your Devices</strong> in the sidebar. The wizard walks you through each device type with the right values pre-filled, and gives Apple devices a one-click downloadable setup file.</p>
 

@@ -304,10 +304,17 @@ select policy_id, default_policy from spam_policies where default_policy='1'
          Remote auth: minimal reference email (portal URL, AD password
          note) — admin handles username handoff out-of-band. --->
     <cfset recipientName = recipientEmail>
-    <cfif show_auth_type EQ "remote">
-        <cfinclude template="send_recipient_welcome_email_remoteauth.cfm">
-    <cfelse>
-        <cfinclude template="send_recipient_welcome_email.cfm">
+    <!--- Directory provisioning (#332) can suppress the welcome email: a first
+         bulk import of people who already have mail flowing should not send
+         hundreds of "reset your password" notices at once. Unset for every
+         other caller, so the default is unchanged. --->
+    <cfparam name="suppressWelcomeEmail" default="false">
+    <cfif NOT suppressWelcomeEmail>
+        <cfif show_auth_type EQ "remote">
+            <cfinclude template="send_recipient_welcome_email_remoteauth.cfm">
+        <cfelse>
+            <cfinclude template="send_recipient_welcome_email.cfm">
+        </cfif>
     </cfif>
     <!--- CREATE LDAP USER FOR RECIPIENT ENDS HERE --->
 

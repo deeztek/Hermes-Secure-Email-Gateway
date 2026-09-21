@@ -236,6 +236,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </a>
             </li>
             <li class="nav-item">
+              <a href="view_directory_connections.cfm" class="nav-link">
+                <i class="nav-icon fas fa-address-book"></i>
+                <p>Auto-Provisioning</p>
+              </a>
+            </li>
+            <li class="nav-item">
               <a href="view_virtual_recipients.cfm" class="nav-link">
                 <i class="nav-icon fas fa-key"></i>
                 <p>Virtual Recipients</p>

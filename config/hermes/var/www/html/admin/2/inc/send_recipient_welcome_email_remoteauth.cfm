@@ -61,7 +61,7 @@ Requires the following variables to be set before including:
 <p>Your email address <strong>#recipientEmail#</strong> is now protected by Hermes SEG. Incoming mail passes through quarantine and delivery rules before reaching your regular mailbox.</p>
 
 <div style="background-color: ##fff8e6; border: 1px solid ##ffe09a; padding: 15px; margin: 20px 0; border-radius: 5px;">
-    <p style="margin: 0;">Your Hermes user portal uses your <strong>organization (AD/LDAP) password</strong> for authentication. Your administrator will provide your login username separately. If you need help, contact them directly.</p>
+    <p style="margin: 0;">Sign in with your email address <strong>#recipientEmail#</strong> and your usual <strong>organization password</strong>. Hermes does not store that password and never asks you to change it here. If you need help, contact your administrator.</p>
 </div>
 
 <div style="background-color: ##f8f9fa; border: 1px solid ##dee2e6; padding: 20px; margin: 20px 0; border-radius: 5px;">

@@ -270,6 +270,109 @@ INSERT IGNORE INTO `crontab_entries` VALUES (4,'15 */8 * * *','Every 8 Hours');
 INSERT IGNORE INTO `crontab_entries` VALUES (5,'15 */12 * * *','Every 12 Hours');
 INSERT IGNORE INTO `crontab_entries` VALUES (6,'30 0 * * *','Every 24 Hours');
 
+-- -------- directory_connections (#332 directory enumeration) --------
+-- One row per directory Hermes enumerates relay recipients from.
+-- `provider` names the source: 'ldap' is the only connector wired today (it
+-- shells out to ldapsearch inside hermes_ldap, not cfldap, so it shares slapd's
+-- trust store and gets real paging); 'graph' and 'google' are reserved for the
+-- REST connectors.
+-- `remoteauth_mapping_id` says where the recipients this directory creates will
+-- AUTHENTICATE. It supplies recipients.remoteauth_domain and nothing else: the
+-- server fields above are the read source, and the two are commonly the same
+-- host but need not be. Bind credentials live here because remoteauth_mappings
+-- deliberately has none, RemoteAuth binding as the end user via
+-- remote_dn_pattern rather than a service account.
+-- `bind_password` is AES/Base64 under /opt/hermes/keys/hermes.key, never
+-- written to a file under the web root (that was the legacy AD sync's mistake).
+-- Scheduling is one shared ofelia_jobs row, not a schedule per connection.
+CREATE TABLE IF NOT EXISTS `directory_connections` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `entry_name` varchar(255) NOT NULL,
+  `provider` varchar(20) NOT NULL DEFAULT 'ldap',
+  `remoteauth_mapping_id` int(11) DEFAULT NULL,
+  `server_address` varchar(255) DEFAULT NULL,
+  -- Defaults to LDAPS on 636, but Plain is selectable. Enumeration binds with a
+  -- service account password, and unlike a user login that credential is
+  -- standing and re-sent on every sync, so plain LDAP puts a reusable password
+  -- on the wire repeatedly. The console warns about that rather than forbidding
+  -- it: a directory with no TLS listener at all would otherwise be impossible
+  -- to enumerate, which is a worse outcome than an informed choice.
+  --
+  -- Independent of remoteauth_mappings.use_ldaps. Enumeration and login are
+  -- separate connections and need not use the same transport, or even the same
+  -- directory.
+  `server_port` int(11) DEFAULT 636,
+  `tls_mode` varchar(10) NOT NULL DEFAULT 'ldaps',
+  `base_dn` varchar(500) DEFAULT NULL,
+  `bind_dn` varchar(500) DEFAULT NULL,
+  `bind_password` varchar(1024) DEFAULT NULL,
+  `object_class` varchar(64) NOT NULL DEFAULT 'user',
+  `mail_attribute` varchar(64) NOT NULL DEFAULT 'mail',
+  `extra_filter` varchar(500) DEFAULT NULL,
+  -- Provisioning defaults, applied to every recipient this connection creates.
+  -- auth_type is independent of `provider`: the directory Hermes enumerates is
+  -- not necessarily the one it authenticates against. A tenant synced from
+  -- on-prem AD is enumerated from Google or M365 and authenticated against that
+  -- AD over ordinary LDAP, which is the common hybrid shape.
+  -- 'remote' requires remoteauth_mapping_id; import refuses without it.
+  `auth_type` varchar(10) NOT NULL DEFAULT 'local',
+  `policy_id` int(11) DEFAULT NULL,
+  `report_enabled` varchar(3) NOT NULL DEFAULT 'YES',
+  -- TINYINT(3), not (1): Lucee maps TINYINT(1) to a boolean, and these values
+  -- are passed straight through to the recipients / user_settings inserts,
+  -- which expect 0 and 1.
+  `train_bayes` tinyint(3) NOT NULL DEFAULT 0,
+  `download_msg` tinyint(3) NOT NULL DEFAULT 0,
+  `enforce_mfa` tinyint(3) NOT NULL DEFAULT 0,
+  -- Off for a first bulk import of people who already have mail flowing and
+  -- have never heard of Hermes. On for steady state, when a new hire appears.
+  `send_welcome` tinyint(3) NOT NULL DEFAULT 1,
+  -- 0 stages for review, 1 provisions unattended from the scheduled job.
+  -- New connections start at 0 so the first run is inspectable. Deletions are
+  -- never auto-applied at any setting.
+  `auto_apply` tinyint(3) NOT NULL DEFAULT 0,
+  `enabled` tinyint(1) NOT NULL DEFAULT 1,
+  `last_run_at` datetime DEFAULT NULL,
+  `last_run_status` varchar(32) DEFAULT NULL,
+  `last_run_message` text DEFAULT NULL,
+  `last_found_count` int(11) DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `updated_at` datetime NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_directory_entry_name` (`entry_name`),
+  KEY `idx_directory_enabled` (`enabled`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- -------- directory_import_staging (#332 directory enumeration) --------
+-- The result of one enumeration run, staged for admin review. Nothing reaches
+-- `recipients` until an admin applies it.
+-- `action` values:
+--   insert   = present upstream, no matching recipient yet (candidate to add)
+--   existing = present in both, nothing to do
+--   vanished = a recipient this connection created is gone upstream
+-- 'vanished' is REPORT ONLY. Recipients are never deleted automatically: a
+-- relay domain set to ANY still delivers their mail, so a bad or partial sync
+-- must not be able to strip portal access and encryption from live users.
+CREATE TABLE IF NOT EXISTS `directory_import_staging` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `connection_id` int(11) NOT NULL,
+  `run_id` varchar(32) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `display_name` varchar(255) DEFAULT NULL,
+  `first_name` varchar(128) DEFAULT NULL,
+  `last_name` varchar(128) DEFAULT NULL,
+  `source_dn` varchar(500) DEFAULT NULL,
+  `action` enum('insert','existing','vanished') NOT NULL,
+  `status` enum('pending','applied','skipped','failed') NOT NULL DEFAULT 'pending',
+  `error_message` text DEFAULT NULL,
+  `created_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `applied_at` datetime DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_dis_run` (`run_id`),
+  KEY `idx_dis_conn_status` (`connection_id`,`status`),
+  KEY `idx_dis_email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- disclaimers                          [truncate] --------
 CREATE TABLE IF NOT EXISTS `disclaimers` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1272,6 +1375,18 @@ INSERT IGNORE INTO `ofelia_jobs` VALUES (13,'[job-exec \"hermes-process-cert-que
 INSERT IGNORE INTO `ofelia_jobs` VALUES (14,'[job-exec \"hermes-fangfrisch-refresh\"]','@every 10m','/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf refresh','hermes_mail_filter',NULL,NULL,NULL,NULL,'malware_feeds',1,0);
 INSERT IGNORE INTO `ofelia_jobs` VALUES (15,'[job-exec \"hermes-refresh-network-aliases\"]',' 0 30 03 * * *','/usr/bin/curl --silent http://localhost:8888/schedule/refresh_network_aliases.cfm','hermes_commandbox',NULL,NULL,NULL,NULL,'hermes',1,0);
 
+-- #332 directory enumeration. One shared job drains every enabled connection;
+-- there is no schedule per connection. No UNIQUE KEY on job_name, so this uses
+-- WHERE NOT EXISTS rather than INSERT IGNORE to stay idempotent.
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `schedule`, `command`, `container`, `image`, `user`, `volume`, `network`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec "hermes-directory-sync"]', '@every 6h',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/directory_sync.cfm',
+       'hermes_commandbox', NULL, NULL, NULL, NULL, 'hermes', 1, 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-directory-sync"]'
+);
+
 -- -------- org_signatures                       [truncate] --------
 CREATE TABLE IF NOT EXISTS `org_signatures` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -2051,9 +2166,23 @@ CREATE TABLE IF NOT EXISTS `remoteauth_mappings` (
   `server_address` varchar(255) NOT NULL,
   `server_port` int(11) DEFAULT 389,
   `remote_dn_pattern` varchar(500) DEFAULT NULL,
-  `tls_starttls` varchar(10) DEFAULT 'no',
-  `tls_reqcert` varchar(20) DEFAULT 'never',
-  `ca_cert_file` varchar(255) DEFAULT NULL,
+  -- Transport for THIS mapping (#335). The overlay writes one
+  -- olcRemoteAuthMapping line per domain, each carrying its own URI, so the
+  -- scheme varies per mapping even though starttls and tls_reqcert in
+  -- remoteauth_settings are global to the overlay.
+  --
+  -- 0 emits ldap://, which is what every existing mapping used and is why the
+  -- default is 0: an upgrade must not change how anyone already authenticates.
+  -- Console administrators can sit on RemoteAuth too (system_users.auth_type),
+  -- so a transport change that fails locks the admin out of the console, and
+  -- there is no CLI recovery tool yet (#173).
+  --
+  -- 1 emits ldaps://, required for Google Secure LDAP, which is LDAPS-only on
+  -- 636 and will not accept anything else.
+  `use_ldaps` tinyint(3) NOT NULL DEFAULT 0,
+  -- tls_starttls, tls_reqcert and ca_cert_file used to live here as well.
+  -- They were never written by any code path and could not have worked:
+  -- TLS negotiation is global and lives in remoteauth_settings.
   `retry_count` int(11) DEFAULT 3,
   `description` varchar(500) DEFAULT NULL,
   `enabled` tinyint(1) DEFAULT 1,
@@ -2078,8 +2207,8 @@ CREATE TABLE IF NOT EXISTS `remoteauth_settings` (
 -- 6 row(s) for `remoteauth_settings`
 INSERT IGNORE INTO `remoteauth_settings` VALUES (1,'enabled','1','Master enable/disable for RemoteAuth overlay','2026-01-23 11:33:39');
 INSERT IGNORE INTO `remoteauth_settings` VALUES (8,'ldap_synced','1','Whether settings have been synced to LDAP','2026-03-08 11:49:58');
-INSERT IGNORE INTO `remoteauth_settings` VALUES (9,'tls_starttls','no','Global STARTTLS setting (yes/no) - applies to all domain mappings','2026-01-24 11:36:55');
-INSERT IGNORE INTO `remoteauth_settings` VALUES (10,'tls_reqcert','never','Global TLS certificate requirement (never/allow/try/demand)','2026-01-24 11:36:55');
+INSERT IGNORE INTO `remoteauth_settings` VALUES (9,'tls_starttls','no','Derived, not console-editable. Forced to no whenever any mapping uses LDAPS, which is already encrypted and cannot be upgraded again','2026-01-24 11:36:55');
+INSERT IGNORE INTO `remoteauth_settings` VALUES (10,'tls_reqcert','never','Derived, not console-editable. Forced to demand whenever any mapping uses LDAPS; irrelevant for plain mappings, which negotiate no TLS','2026-01-24 11:36:55');
 INSERT IGNORE INTO `remoteauth_settings` VALUES (11,'ca_cert_file','','Global CA certificate filename (stored in /opt/hermes/certs/remoteauth/)','2026-01-24 11:36:55');
 INSERT IGNORE INTO `remoteauth_settings` VALUES (12,'retry_count','3','Global retry count for authentication attempts','2026-01-24 11:36:55');
 

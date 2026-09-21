@@ -625,6 +625,7 @@ select id from policy where id = <cfqueryparam value = #form.policy# CFSQLType =
               <div class="alert alert-info">
                 <h5><i class="icon fas fa-info-circle"></i> Remote Authentication</h5>
                 <p class="mb-0">Select <strong>Remote</strong> to authenticate recipients against an external AD/LDAP server. Recipients use their existing organization credentials &mdash; no local password is created.</p>
+                <p class="mb-0 mt-1"><small>They sign in with their <strong>e-mail address</strong>, not their directory username, whatever that happens to be.</small></p>
               </div>
               <select class="form-control" name="auth_type" id="authType" style="width: 100%;">
                 <option value="local" selected>Local</option>
