@@ -78,6 +78,11 @@ Sets:
             errorVariable="deleteErrorItem"
             timeout="60">
         </cfexecute>
+<!--- cfexecute does not create errorVariable when the command writes
+     nothing to stderr, and it clears any prior value, so the variable
+     can be undefined here even though it was initialised above. Left
+     unguarded the reference below throws and masks the real error. --->
+<cfparam name="deleteErrorItem" default="">
 
         <!--- CLEANUP: DELETE THE TEMP LDIF FILE --->
         <cfif fileExists(tempFile)>

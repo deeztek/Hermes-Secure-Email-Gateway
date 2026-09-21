@@ -47,6 +47,11 @@ Sets the following variables:
     errorVariable="mdbSearchError"
     timeout="30">
 </cfexecute>
+<!--- cfexecute does not create errorVariable when the command writes
+     nothing to stderr, and it clears any prior value, so the variable
+     can be undefined here even though it was initialised above. Left
+     unguarded the reference below throws and masks the real error. --->
+<cfparam name="mdbSearchError" default="">
 
 <!--- Parse MDB index from result like: dn: olcDatabase={1}mdb,cn=config --->
 <cfset mdbMatch = REFind("olcDatabase=\{([0-9]+)\}mdb,cn=config", mdbSearchResult, 1, true)>
@@ -61,6 +66,7 @@ Sets the following variables:
     errorVariable="overlaySearchError"
     timeout="30">
 </cfexecute>
+<cfparam name="overlaySearchError" default="">
 
 <!--- Extract all remoteauth overlay indexes --->
 <cfset overlayMatches = REMatch("olcOverlay=\{([0-9]+)\}remoteauth", overlaySearchResult)>
@@ -82,6 +88,7 @@ Sets the following variables:
     errorVariable="allOverlaysError"
     timeout="30">
 </cfexecute>
+<cfparam name="allOverlaysError" default="">
 
 <!--- Find the highest overlay index across ALL overlays (not just remoteauth) --->
 <cfset highestIndex = -1>
