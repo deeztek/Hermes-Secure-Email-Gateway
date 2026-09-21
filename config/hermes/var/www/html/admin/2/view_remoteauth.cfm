@@ -213,6 +213,88 @@ $(document).ready(function() {
             <cfset caCertFilename = caCertTarget>
         </cfif>
 
+        <!--- Client certificate and key (#335). Mutual TLS: Google Secure LDAP
+             will not accept a connection without one. Same ordering rule as
+             the CA bundle above -- upload first, replace only on success --
+             and the same reason: losing a working certificate as the result
+             of a failed attempt to replace it is the worst outcome.
+
+             The pair is all-or-nothing. A certificate without its key cannot
+             be used, and emitting half of it produces an overlay slapd
+             rejects, so removing either removes both. --->
+        <cfquery name="getCurrentClient" datasource="hermes">
+            SELECT setting_name, setting_value FROM remoteauth_settings
+             WHERE setting_name IN ('client_cert_file', 'client_key_file')
+        </cfquery>
+        <cfset clientCertFilename = "">
+        <cfset clientKeyFilename  = "">
+        <cfloop query="getCurrentClient">
+            <cfif getCurrentClient.setting_name IS "client_cert_file"><cfset clientCertFilename = getCurrentClient.setting_value></cfif>
+            <cfif getCurrentClient.setting_name IS "client_key_file"><cfset clientKeyFilename  = getCurrentClient.setting_value></cfif>
+        </cfloop>
+
+        <cfif structKeyExists(form, "remove_client_cert") AND form.remove_client_cert EQ "1">
+            <cfloop list="#clientCertFilename#,#clientKeyFilename#" index="oneOld">
+                <cfif Len(Trim(oneOld)) AND fileExists("#certsDir#/#Trim(oneOld)#")>
+                    <cffile action="delete" file="#certsDir#/#Trim(oneOld)#">
+                </cfif>
+            </cfloop>
+            <cfset clientCertFilename = "">
+            <cfset clientKeyFilename  = "">
+        </cfif>
+
+        <cfif structKeyExists(form, "client_cert_file") AND len(form.client_cert_file)
+          AND structKeyExists(form, "client_key_file")  AND len(form.client_key_file)>
+
+            <cfif NOT directoryExists(certsDir)>
+                <cfdirectory action="create" directory="#certsDir#" mode="755">
+            </cfif>
+
+            <cfset clientCertTarget = "global_remoteauth_client.pem">
+            <cfset clientKeyTarget  = "global_remoteauth_client.key">
+
+            <cffile action="upload" fileField="client_cert_file" destination="#certsDir#"
+                nameConflict="makeunique"
+                accept="application/x-x509-ca-cert,application/pkix-cert,application/x-pem-file,text/plain,.pem,.crt,.cer">
+            <cfset clientCertUploaded = cffile.serverFile>
+
+            <cffile action="upload" fileField="client_key_file" destination="#certsDir#"
+                nameConflict="makeunique"
+                accept="application/x-pem-file,application/pkcs8,text/plain,.pem,.key">
+            <cfset clientKeyUploaded = cffile.serverFile>
+
+            <cfif clientCertUploaded NEQ clientCertTarget>
+                <cfif fileExists("#certsDir#/#clientCertTarget#")><cffile action="delete" file="#certsDir#/#clientCertTarget#"></cfif>
+                <cffile action="rename" source="#certsDir#/#clientCertUploaded#" destination="#certsDir#/#clientCertTarget#">
+            </cfif>
+            <cfif clientKeyUploaded NEQ clientKeyTarget>
+                <cfif fileExists("#certsDir#/#clientKeyTarget#")><cffile action="delete" file="#certsDir#/#clientKeyTarget#"></cfif>
+                <cffile action="rename" source="#certsDir#/#clientKeyUploaded#" destination="#certsDir#/#clientKeyTarget#">
+            </cfif>
+
+            <!--- slapd reads this as root, but the key should not be readable
+                 to anything else that gains a foothold in either container. --->
+            <cffile action="write" file="/opt/hermes/tmp/remoteauth_keyperm.sh" mode="700"
+                output="##!/bin/bash#Chr(10)#chmod 600 '#certsDir#/#clientKeyTarget#'#Chr(10)#" addNewLine="no">
+            <cftry>
+                <cfexecute name="/bin/bash" arguments="/opt/hermes/tmp/remoteauth_keyperm.sh" timeout="15" variable="kpOut" errorVariable="kpErr"></cfexecute>
+                <cfcatch></cfcatch>
+            </cftry>
+            <cftry><cffile action="delete" file="/opt/hermes/tmp/remoteauth_keyperm.sh"><cfcatch></cfcatch></cftry>
+
+            <cfset clientCertFilename = clientCertTarget>
+            <cfset clientKeyFilename  = clientKeyTarget>
+        </cfif>
+
+        <cfquery datasource="hermes">
+            UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#clientCertFilename#" cfsqltype="cf_sql_varchar">
+             WHERE setting_name = 'client_cert_file'
+        </cfquery>
+        <cfquery datasource="hermes">
+            UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#clientKeyFilename#" cfsqltype="cf_sql_varchar">
+             WHERE setting_name = 'client_key_file'
+        </cfquery>
+
         <!--- Update TLS settings in database --->
                         <cfquery name="updateCaCert" datasource="hermes">
             UPDATE remoteauth_settings SET setting_value = <cfqueryparam value="#caCertFilename#" cfsqltype="cf_sql_varchar">
@@ -426,7 +508,7 @@ $(document).ready(function() {
     <!--- Get global TLS settings from database --->
     <cfquery name="getGlobalTLS" datasource="hermes">
         SELECT setting_name, setting_value FROM remoteauth_settings
-        WHERE setting_name IN ('tls_starttls', 'tls_reqcert', 'ca_cert_file')
+        WHERE setting_name IN ('tls_starttls', 'tls_reqcert', 'ca_cert_file', 'client_cert_file', 'client_key_file')
     </cfquery>
     <cfset globalTLS = {}>
     <cfloop query="getGlobalTLS">
@@ -936,6 +1018,23 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                         </cfif>
                         <input type="file" name="ca_cert_file" class="form-control" accept=".pem,.crt,.cer">
                         <small class="text-muted">Upload CA certificate or bundle (.pem, .crt, .cer). For multiple servers, concatenate CA certs into one file.</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="mb-3">
+                        <label class="form-label"><strong>Client Certificate</strong></label>
+                        <cfif structKeyExists(settings, "client_cert_file") AND len(settings.client_cert_file)>
+                            <div class="mb-2">
+                                <span class="badge bg-success"><i class="fas fa-id-badge"></i> Installed</span>
+                                <div class="form-check mt-1">
+                                    <input class="form-check-input" type="checkbox" name="remove_client_cert" id="remove_client_cert" value="1">
+                                    <label class="form-check-label text-danger" for="remove_client_cert">Remove certificate and key</label>
+                                </div>
+                            </div>
+                        </cfif>
+                        <input type="file" name="client_cert_file" class="form-control mb-1" accept=".pem,.crt,.cer">
+                        <input type="file" name="client_key_file" class="form-control" accept=".pem,.key">
+                        <small class="text-muted">Certificate then private key. Only needed where the directory demands mutual TLS, such as Google Secure LDAP. Upload both together; one without the other cannot be used.</small>
                     </div>
                 </div>
                 <div class="col-md-3">

@@ -6,5 +6,5 @@ olcRemoteAuthDNAttribute: seeAlso
 olcRemoteAuthDomainAttribute: associatedDomain
 olcRemoteAuthDefaultDomain: THE_DEFAULT_DOMAIN
 THE_MAPPING_LINES
-olcRemoteAuthTLS: starttls=THE_STARTTLS tls_reqcert=THE_TLS_REQCERT THE_TLS_CACERT
+olcRemoteAuthTLS: starttls=THE_STARTTLS tls_reqcert=THE_TLS_REQCERT THE_TLS_CACERT THE_TLS_CLIENTCERT
 olcRemoteAuthRetryCount: THE_RETRY_COUNT

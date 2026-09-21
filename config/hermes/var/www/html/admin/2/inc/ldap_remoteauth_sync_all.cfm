@@ -90,6 +90,12 @@ Sets:
     <cfset settings.tls_reqcert = "demand">
 </cfif>
 
+<cfif NOT structKeyExists(settings, "client_cert_file")>
+    <cfset settings.client_cert_file = "">
+</cfif>
+<cfif NOT structKeyExists(settings, "client_key_file")>
+    <cfset settings.client_key_file = "">
+</cfif>
 <cfif NOT structKeyExists(settings, "ca_cert_file")>
     <cfset settings.ca_cert_file = "">
 </cfif>
@@ -142,6 +148,8 @@ Sets:
     <cfset remoteauthTlsReqcert = settings.tls_reqcert>
     <cfset remoteauthCaCertFile = settings.ca_cert_file>
     <cfset remoteauthRetryCount = settings.retry_count>
+    <cfset remoteauthClientCertFile = settings.client_cert_file>
+    <cfset remoteauthClientKeyFile  = settings.client_key_file>
     <!--- remoteauthNextOverlayIndex and remoteauthMdbIndex set by ldap_remoteauth_get_overlay.cfm --->
 
     <!--- Create the overlay with ALL mappings included --->

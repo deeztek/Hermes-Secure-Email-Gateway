@@ -108,6 +108,19 @@ Sets:
     <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CACERT", "", "ALL")>
 </cfif>
 
+<!--- Mutual TLS (#335). Google Secure LDAP will not accept a connection
+     without a client certificate. Both halves are required: a certificate
+     with no key cannot be used, so a half-configured pair emits nothing
+     rather than an overlay slapd will reject. --->
+<cfif isDefined("remoteauthClientCertFile") AND Len(Trim(remoteauthClientCertFile))
+  AND isDefined("remoteauthClientKeyFile")  AND Len(Trim(remoteauthClientKeyFile))>
+    <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CLIENTCERT",
+        "tls_cert=/opt/hermes/certs/remoteauth/#Trim(remoteauthClientCertFile)# tls_key=/opt/hermes/certs/remoteauth/#Trim(remoteauthClientKeyFile)#", "ALL")>
+<cfelse>
+    <cfset ldapLdif = REReplace(ldapLdif, " THE_TLS_CLIENTCERT", "", "ALL")>
+    <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CLIENTCERT", "", "ALL")>
+</cfif>
+
 <cfset ldapLdif = REReplace(ldapLdif, "THE_RETRY_COUNT", remoteauthRetryCount, "ALL")>
 
 <!--- WRITE THE POPULATED LDIF TO TEMP DIRECTORY --->

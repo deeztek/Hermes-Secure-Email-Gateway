@@ -202,7 +202,26 @@ UPDATE `remoteauth_settings`
  WHERE `setting_name` = 'tls_reqcert';
 
 -- ---------------------------------------------------------------------
--- 4. Version stamp -- MUST be the last statement (advances build_no so
+-- 4. RemoteAuth client certificate (#335)
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  (the same two
+-- seed rows are in the baseline's remoteauth_settings block)
+--
+-- Google Secure LDAP requires mutual TLS: the client must present a
+-- certificate, not merely verify the server's. olcRemoteAuthTLS is a single
+-- line for the whole overlay, so this is global rather than per mapping. That
+-- is harmless in practice, because a client certificate is only sent when the
+-- server asks for one and a typical AD does not.
+--
+-- Both default to empty, which emits no tls_cert/tls_key at all, so an
+-- existing overlay is unchanged.
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO `remoteauth_settings` (`setting_name`, `setting_value`, `description`) VALUES
+    ('client_cert_file', '', 'Client certificate filename in /opt/hermes/certs/remoteauth/ (mutual TLS; required by Google Secure LDAP)'),
+    ('client_key_file',  '', 'Client private key filename in /opt/hermes/certs/remoteauth/ (paired with client_cert_file)');
+
+-- ---------------------------------------------------------------------
+-- 5. Version stamp -- MUST be the last statement (advances build_no so
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- the update orchestrator records this release as applied).
 -- ---------------------------------------------------------------------

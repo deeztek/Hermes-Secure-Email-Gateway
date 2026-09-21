@@ -2211,6 +2211,11 @@ INSERT IGNORE INTO `remoteauth_settings` VALUES (9,'tls_starttls','no','Derived,
 INSERT IGNORE INTO `remoteauth_settings` VALUES (10,'tls_reqcert','never','Derived, not console-editable. Forced to demand whenever any mapping uses LDAPS; irrelevant for plain mappings, which negotiate no TLS','2026-01-24 11:36:55');
 INSERT IGNORE INTO `remoteauth_settings` VALUES (11,'ca_cert_file','','Global CA certificate filename (stored in /opt/hermes/certs/remoteauth/)','2026-01-24 11:36:55');
 INSERT IGNORE INTO `remoteauth_settings` VALUES (12,'retry_count','3','Global retry count for authentication attempts','2026-01-24 11:36:55');
+-- Mutual TLS (#335). No explicit id: setting_name is UNIQUE, so these
+-- dedupe on re-run and cannot collide with the explicit ids above.
+INSERT IGNORE INTO `remoteauth_settings` (`setting_name`, `setting_value`, `description`) VALUES
+    ('client_cert_file', '', 'Client certificate filename in /opt/hermes/certs/remoteauth/ (mutual TLS; required by Google Secure LDAP)'),
+    ('client_key_file',  '', 'Client private key filename in /opt/hermes/certs/remoteauth/ (paired with client_cert_file)');
 
 -- salt: classified `drop` (omitted entirely; schema_updates.sql may also DROP IF EXISTS)
 -- -------- scheduled_job_runs                   [truncate] --------
