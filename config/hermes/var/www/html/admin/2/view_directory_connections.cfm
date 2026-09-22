@@ -283,8 +283,6 @@ function dcFillDelete(el) {
           <cfif getConnections.provider IS "google">
             <span class="badge bg-danger"><i class="fab fa-google"></i>&nbsp;Workspace</span>
             <small class="text-muted ms-1">#EncodeForHTML(getConnections.google_subject)#</small>
-          <cfelseif Len(getConnections.mapping_domain)>
-            <span class="badge bg-info">RemoteAuth: #EncodeForHTML(getConnections.mapping_domain)#</span>
           <cfelse>
             #EncodeForHTML(getConnections.server_address)#:#getConnections.server_port#
           </cfif>
@@ -310,7 +308,11 @@ function dcFillDelete(el) {
           </cfif>
           <br>
           <small class="text-muted">
-            Auth: <cfif getConnections.auth_type IS "remote">Remote<cfelse>Local</cfif><cfif val(getConnections.send_welcome) EQ 0>, no welcome e-mail</cfif>
+            <cfif getConnections.auth_type IS "remote">
+              Auth: Remote<cfif Len(Trim(getConnections.mapping_domain))> via #EncodeForHTML(Trim(getConnections.mapping_domain))#<cfelse> <span class="text-danger">(no mapping)</span></cfif>
+            <cfelse>
+              Auth: Local
+            </cfif><cfif val(getConnections.send_welcome) EQ 0>, no welcome e-mail</cfif>
           </small>
         </td>
         <td>
