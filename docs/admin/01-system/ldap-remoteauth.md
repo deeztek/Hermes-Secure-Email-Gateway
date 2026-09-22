@@ -220,6 +220,47 @@ different set of public roots. Nothing needs re-uploading — the rebuild happen
 from what is already stored. Installs with nothing uploaded are unaffected,
 since they use the container's store directly.
 
+### What happens, exactly
+
+**With no internal CA uploaded** — the common case:
+
+| | |
+|---|---|
+| Uploaded file | none |
+| At Apply Settings | nothing is built |
+| `tls_cacert` | **omitted from the overlay entirely** |
+| slapd verifies against | its own `/etc/ssl/certs/ca-certificates.crt`, read in place |
+| Works for | any public-CA directory: Google Secure LDAP, anything commercially signed |
+| Does not work for | an internal AD using a private CA |
+| Can it go stale | no, the container's store is read live |
+
+**After you upload one:**
+
+| | |
+|---|---|
+| On upload | stored as `global_remoteauth_ca.pem`, byte for byte as you gave it. The filename goes in `remoteauth_settings` |
+| At Apply Settings | `remoteauth_ca_effective.pem` is written: your certificate, then the container's public roots |
+| `tls_cacert` | points at `remoteauth_ca_effective.pem` |
+| slapd verifies against | that file, so an internal AD and a public-CA directory both work from one overlay |
+| Can it go stale | yes. It is a snapshot. After an upgrade, click Apply Settings once to rebuild it. Nothing is re-uploaded |
+| If the build fails | nothing is written and `tls_cacert` is omitted, so OpenLDAP falls back to its own store rather than being pointed at a file that verifies nothing |
+
+**After you remove it:**
+
+| | |
+|---|---|
+| On save | the uploaded file is deleted and the setting cleared |
+| At Apply Settings | nothing is built, `tls_cacert` omitted again |
+| Back to | public roots in place, exactly as before you uploaded |
+
+The console reads the database, never the derived file, so **Installed** only
+ever means you uploaded something. A derived file cannot make it claim a
+certificate nobody provided.
+
+The same mechanism runs per directory for auto-provisioning, using
+`/opt/hermes/certs/directories/` and a file named after the directory, so two
+directories can carry different private authorities.
+
 ### Format
 
 **Base-64 encoded X.509 (PEM).** The file begins with `-----BEGIN CERTIFICATE-----`.
