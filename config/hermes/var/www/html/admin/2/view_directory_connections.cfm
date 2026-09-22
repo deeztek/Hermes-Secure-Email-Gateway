@@ -427,7 +427,7 @@ function dcFillDelete(el) {
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
-         <strong>Google Workspace</strong> works on any tier through the Admin SDK. Secure LDAP is an alternative for Business Plus and above: choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636 with a client certificate.</small>
+         <strong>Google Workspace</strong> uses the Admin SDK and works on every tier. Secure LDAP is for <em>authentication</em> and is configured on the RemoteAuth page, not here.</small>
        </div>
      </div>
      <div class="row dcGoogleOnly" id="add_google_wrap" hidden>
@@ -522,7 +522,7 @@ function dcFillDelete(el) {
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>
-         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS, which is unusual. <strong>Google Secure LDAP</strong> is the common case, and that is a Business Plus feature: on any other tier choose Google Workspace (Admin SDK) as the Directory Type instead, which needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory itself requires mutual TLS, which is unusual. <strong>For Google Workspace, use the Google Workspace (Admin SDK) directory type instead</strong> &mdash; it works on every tier and needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>
      </div>
      <hr>
@@ -651,7 +651,7 @@ function dcFillDelete(el) {
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
-         <strong>Google Workspace</strong> works on any tier through the Admin SDK. Secure LDAP is an alternative for Business Plus and above: choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636 with a client certificate.</small>
+         <strong>Google Workspace</strong> uses the Admin SDK and works on every tier. Secure LDAP is for <em>authentication</em> and is configured on the RemoteAuth page, not here.</small>
        </div>
      </div>
      <div class="row dcGoogleOnly" id="edit_google_wrap" hidden>
@@ -753,7 +753,7 @@ function dcFillDelete(el) {
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>
-         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS, which is unusual. <strong>Google Secure LDAP</strong> is the common case, and that is a Business Plus feature: on any other tier choose Google Workspace (Admin SDK) as the Directory Type instead, which needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory itself requires mutual TLS, which is unusual. <strong>For Google Workspace, use the Google Workspace (Admin SDK) directory type instead</strong> &mdash; it works on every tier and needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>
      </div>
      <hr>
