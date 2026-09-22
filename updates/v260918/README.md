@@ -27,6 +27,30 @@ to review or creates them unattended.
 Available in Community edition. Provisioning recipients who authenticate against
 your own directory requires Pro, as RemoteAuth always has.
 
+### Three kinds of directory
+
+| Type | Reads from | Needs |
+| --- | --- | --- |
+| LDAP | Active Directory, OpenLDAP, FreeIPA, 389 DS, or Google Secure LDAP | Server address, base DN, a read-only bind account |
+| Google Workspace | The Admin SDK Directory API | A service account with domain-wide delegation, and a super administrator to impersonate |
+| Microsoft 365 | Microsoft Graph | An app registration with `User.Read.All` application permission and admin consent |
+
+The two cloud connectors read over HTTPS and have no server address, base DN or
+bind account to fill in.
+
+**Google Workspace works on every Workspace edition.** Secure LDAP needs Business
+Plus, but reading the user list does not, so a Starter or Standard tenant can
+have its recipients provisioned without paying to move up a plan. Enumeration and
+sign-in are separate questions here throughout: the directory Hermes reads its
+recipient list from is not necessarily the one it authenticates them against, and
+a tenant enumerated from Google or Microsoft 365 while authenticating against
+on-prem AD is an ordinary configuration, not a workaround.
+
+**Microsoft 365 has no LDAP option at all.** Entra ID exposes no LDAP endpoint,
+and Entra Domain Services is a separate product needing an Azure virtual network
+and a password change for every cloud-only user. Graph is the only route, which
+is why the Microsoft connector is not optional the way the Google one is.
+
 ### It is additive, and it never deletes
 
 A relay domain set to **ANY** already accepts mail for every address in the
@@ -115,11 +139,11 @@ alongside the CA bundle.
 Only needed if your directory demands it. An ordinary Active Directory does not,
 and leaving these empty changes nothing.
 
-Worth stating plainly: this path has not been exercised against a live directory
-that requires mutual TLS, because we do not have one to test against. The
-certificate handling, storage and the configuration it generates are verified;
-an actual mutual-TLS handshake is not. If you are setting this up against Google
-Secure LDAP, treat it as new ground and tell us how it goes.
+This has now been exercised end to end against Google Secure LDAP: certificate
+upload, the generated overlay configuration, the mutual-TLS handshake, and a
+Workspace user signing into the portal with their Google password. Other
+directories that require mutual TLS should work the same way, but Google is the
+one that has actually been run.
 
 ## What is fixed
 

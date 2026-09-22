@@ -380,6 +380,9 @@ Every shell-out uses `docker exec …` per the standard Hermes pattern.
 
 ## Related
 
+- [Auto-Provisioning](auto-provisioning.md) - reads a directory and creates
+  the recipients on this page on a schedule, instead of entering them by
+  hand or pasting CSV. LDAP/AD, Google Workspace and Microsoft 365.
 - [Domains](domains.md) — relay-domain definitions. Required parent
   context: a recipient is meaningless without a domain that accepts
   mail for it. Domain Recipient Delivery `SPECIFIED` is what makes
