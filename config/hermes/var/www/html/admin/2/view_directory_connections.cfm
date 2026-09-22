@@ -288,8 +288,13 @@ function dcFillDelete(el) {
           <cfelse>
             #EncodeForHTML(getConnections.server_address)#:#getConnections.server_port#
           </cfif>
-          <cfif getConnections.tls_mode IS "ldaps"><span class="badge bg-success">LDAPS</span></cfif>
-          <cfif Len(Trim(getConnections.client_cert_file))><span class="badge bg-info" title="Client certificate installed"><i class="fas fa-id-badge"></i></span></cfif>
+          <!--- Transport badges describe an LDAP connection. Admin SDK talks
+                HTTPS REST, and tls_mode simply carries its column default
+                there, so showing LDAPS would state something untrue. --->
+          <cfif getConnections.provider IS NOT "google">
+            <cfif getConnections.tls_mode IS "ldaps"><span class="badge bg-success">LDAPS</span></cfif>
+            <cfif Len(Trim(getConnections.client_cert_file))><span class="badge bg-info" title="Client certificate installed"><i class="fas fa-id-badge"></i></span></cfif>
+          </cfif>
         </td>
         <td>
           <cfif getConnections.enabled EQ 1>
