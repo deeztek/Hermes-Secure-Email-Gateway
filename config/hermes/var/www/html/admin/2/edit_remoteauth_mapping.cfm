@@ -279,7 +279,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     The DN pattern must match your directory user naming convention. Placeholders: <code>{username}</code>, <code>{firstname}</code>, <code>{lastname}</code>, <code>{email}</code><br>
                     <strong>AD (display name as CN):</strong> <code>cn={firstname} {lastname},ou=Users,dc=example,dc=com</code><br>
                     <strong>AD (username as CN):</strong> <code>cn={username},ou=Users,dc=example,dc=com</code><br>
-                    <strong>OpenLDAP/FreeIPA:</strong> <code>uid={username},ou=People,dc=example,dc=com</code>
+                    <strong>OpenLDAP/FreeIPA:</strong> <code>uid={username},ou=People,dc=example,dc=com</code><br>
+                    <strong>Google Workspace:</strong> <code>uid={username},ou=Users,dc=example,dc=com</code>
+                    <span class="d-block mt-1">Google uses the <strong>local part</strong>, so <code>support@example.com</code> is <code>uid=support</code>. <code>{email}</code> here fails as "Invalid credentials", which looks exactly like a wrong password.</span>
                 </small>
             </div>
             <div class="mb-3">

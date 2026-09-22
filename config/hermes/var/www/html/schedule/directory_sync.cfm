@@ -119,7 +119,7 @@ function shq(required string v) {
   SELECT c.*
     FROM directory_connections c
    WHERE c.enabled = 1
-     AND c.provider IN ('ldap', 'google')
+     AND c.provider IN ('ldap', 'google', 'graph')
    <cfif val(url.connection_id) GT 0>
      AND c.id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(url.connection_id)#">
    </cfif>
@@ -148,6 +148,14 @@ function shq(required string v) {
   <cfset runId       = Left(runId, 32)>
   <cfset failMessage = "">
   <cfset foundRows   = []>
+
+  <!--- One decision, made once. 'ldap' shells out to ldapsearch; everything
+        else is a REST connector that returns structured users directly. The
+        rest of this file branches on this flag rather than on a provider name,
+        so a new connector touches the cfswitch below and nothing else. --->
+  <cfset restProviderLabels = { "google" = "Google", "graph" = "Microsoft 365" }>
+  <cfset isRestProvider     = StructKeyExists(restProviderLabels, LCase(getConnections.provider))>
+  <cfset restProviderLabel  = isRestProvider ? restProviderLabels[LCase(getConnections.provider)] : "Directory">
 
   <!--- The connection's own server, always. It used to inherit from the linked
         RemoteAuth mapping, which was wrong: the mapping says where recipients
@@ -182,28 +190,63 @@ function shq(required string v) {
         relay-domain filter, the diff, staging, apply and auto-apply -- is
         provider agnostic and works on the same foundRows array, which is why
         adding Google was a query and nothing else. --->
-  <cfif getConnections.provider IS "google">
+  <cfif isRestProvider>
 
-    <cfset gSaJson  = "">
-    <cfif Len(Trim(getConnections.google_sa_json))>
-      <cftry>
-        <cfset gSaJson = decrypt(Trim(getConnections.google_sa_json), hermesKey, "AES", "Base64")>
-        <cfcatch><cfset gSaJson = ""></cfcatch>
-      </cftry>
-    </cfif>
-    <cfset gSubject = Trim(getConnections.google_subject)>
+    <!--- Every REST connector sets the same three variables, so nothing below
+          this block needs to know which one ran. A new provider is a new
+          include and a case here, and nothing else in this file. --->
+    <cfset restRows     = []>
+    <cfset restError    = "">
+    <cfset restRawCount = 0>
 
-    <cfinclude template="../admin/2/inc/directory_google_enumerate.cfm">
+    <cfswitch expression="#getConnections.provider#">
 
-    <cfif Len(googleError)>
-      <cfset failMessage = googleError>
+      <cfcase value="google">
+        <cfset gSaJson  = "">
+        <cfif Len(Trim(getConnections.google_sa_json))>
+          <cftry>
+            <cfset gSaJson = decrypt(Trim(getConnections.google_sa_json), hermesKey, "AES", "Base64")>
+            <cfcatch><cfset gSaJson = ""></cfcatch>
+          </cftry>
+        </cfif>
+        <cfset gSubject = Trim(getConnections.google_subject)>
+
+        <cfinclude template="../admin/2/inc/directory_google_enumerate.cfm">
+
+        <cfset restRows     = googleRows>
+        <cfset restError    = googleError>
+        <cfset restRawCount = googleRawCount>
+      </cfcase>
+
+      <cfcase value="graph">
+        <cfset msSecret = "">
+        <cfif Len(Trim(getConnections.graph_client_secret))>
+          <cftry>
+            <cfset msSecret = decrypt(Trim(getConnections.graph_client_secret), hermesKey, "AES", "Base64")>
+            <cfcatch><cfset msSecret = ""></cfcatch>
+          </cftry>
+        </cfif>
+        <cfset msTenant   = Trim(getConnections.graph_tenant_id)>
+        <cfset msClientId = Trim(getConnections.graph_client_id)>
+
+        <cfinclude template="../admin/2/inc/directory_graph_enumerate.cfm">
+
+        <cfset restRows     = graphRows>
+        <cfset restError    = graphError>
+        <cfset restRawCount = graphRawCount>
+      </cfcase>
+
+    </cfswitch>
+
+    <cfif Len(restError)>
+      <cfset failMessage = restError>
     </cfif>
 
     <!--- Normalise to the same shape the LDIF parser produces, so the domain
           filter below does not care which connector ran. --->
     <cfset seen     = {}>
-    <cfset records  = googleRows>
-    <cfset rawLdif  = ArrayLen(googleRows) ? "google" : "">
+    <cfset records  = restRows>
+    <cfset rawLdif  = ArrayLen(restRows) ? getConnections.provider : "">
 
   <cfelse>
 
@@ -330,14 +373,20 @@ exit $?
 
   </cfif>
 
-  <cfif getConnections.provider IS "google">
+  <cfif isRestProvider>
 
     <!--- Already structured, so only the relay-domain filter applies. Rule 3
           holds the same either way: an address outside the relay domains is
-          discarded rather than filed under the wrong one, and Google tenants
-          routinely carry addresses Hermes does not relay for. --->
-    <cfloop array="#googleRows#" index="gRow">
-      <cfset addr = LCase(Trim(gRow.email))>
+          discarded rather than filed under the wrong one, and cloud tenants
+          routinely carry addresses Hermes does not relay for.
+
+          dn stays empty for every REST connector. Neither the Admin SDK nor
+          Graph has an LDAP DN to report, so a remote-auth recipient built from
+          one of these gets its seeAlso from the mapping's remote_dn_pattern.
+          That is the opposite of the LDAP connector, which passes the real
+          source DN through and makes the pattern irrelevant. --->
+    <cfloop array="#restRows#" index="rRow">
+      <cfset addr = LCase(Trim(rRow.email))>
       <cfif Len(addr) AND addr CONTAINS "@"
             AND StructKeyExists(relayDomains, LCase(ListLast(addr, "@")))
             AND NOT StructKeyExists(seen, addr)>
@@ -345,9 +394,9 @@ exit $?
         <cfset ArrayAppend(foundRows, {
           email   = addr,
           dn      = "",
-          first   = gRow.first,
-          last    = gRow.last,
-          display = gRow.display
+          first   = rRow.first,
+          last    = rRow.last,
+          display = rRow.display
         })>
       </cfif>
     </cfloop>
@@ -451,8 +500,8 @@ exit $?
     <cfif ArrayLen(records) EQ 0>
       <cfset failMessage = "No entries matched the filter " & theFilter & " under " & Trim(getConnections.base_dn) & ". Previous results left unchanged.">
     <cfelse>
-      <cfif getConnections.provider IS "google">
-        <cfset failMessage = "Google returned " & googleRawCount & " account(s), but none carried an address in a relay domain. Add the domain under Email Relay first, or these users are not ones Hermes relays for. Previous results left unchanged.">
+      <cfif isRestProvider>
+        <cfset failMessage = restProviderLabel & " returned " & restRawCount & " account(s), but none carried an address in a relay domain. Add the domain under Email Relay first, or these users are not ones Hermes relays for. Previous results left unchanged.">
       <cfelse>
         <cfset failMessage = "Directory returned " & ArrayLen(records) & " entries, but none carried an address in a relay domain. Check the Mail Attribute, or whether these users belong in Hermes at all. Previous results left unchanged.">
       </cfif>

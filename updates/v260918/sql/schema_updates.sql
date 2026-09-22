@@ -34,10 +34,11 @@
 -- ---------------------------------------------------------------------
 -- -------- directory_connections (#332 directory enumeration) --------
 -- One row per directory Hermes enumerates relay recipients from.
--- `provider` names the source: 'ldap' is the only connector wired today (it
--- shells out to ldapsearch inside hermes_ldap, not cfldap, so it shares slapd's
--- trust store and gets real paging); 'graph' and 'google' are reserved for the
--- REST connectors.
+-- `provider` names the source. 'ldap' shells out to ldapsearch inside
+-- hermes_ldap, not cfldap, so it shares slapd's trust store and gets real
+-- paging. 'google' (#336) reads the Admin SDK and 'graph' (#337) reads
+-- Microsoft Graph; both are REST and return structured users directly, so
+-- neither has a server address, base DN or bind account.
 -- `remoteauth_mapping_id` says where the recipients this directory creates will
 -- AUTHENTICATE. It supplies recipients.remoteauth_domain and nothing else: the
 -- server fields above are the read source, and the two are commonly the same
@@ -95,6 +96,17 @@ CREATE TABLE IF NOT EXISTS `directory_connections` (
   -- the Directory API will not answer without one.
   `google_sa_json` text DEFAULT NULL,
   `google_subject` varchar(255) DEFAULT NULL,
+  -- Microsoft Graph (#337). An app registration's client credentials. The
+  -- secret is AES/Base64 under /opt/hermes/keys/hermes.key like every other
+  -- credential here; the tenant and client IDs are not secret and are stored
+  -- plainly so they can be shown back in the console for confirmation.
+  --
+  -- There is no LDAP alternative for Microsoft 365 the way there is for
+  -- Google. Entra ID exposes no LDAP endpoint at all, so `graph` is the only
+  -- provider that can enumerate a Microsoft tenant.
+  `graph_tenant_id` varchar(255) DEFAULT NULL,
+  `graph_client_id` varchar(255) DEFAULT NULL,
+  `graph_client_secret` varchar(1024) DEFAULT NULL,
   -- Provisioning defaults, applied to every recipient this connection creates.
   -- auth_type is independent of `provider`: the directory Hermes enumerates is
   -- not necessarily the one it authenticates against. A tenant synced from
@@ -128,6 +140,17 @@ CREATE TABLE IF NOT EXISTS `directory_connections` (
   UNIQUE KEY `uk_directory_entry_name` (`entry_name`),
   KEY `idx_directory_enabled` (`enabled`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- Graph columns as an ALTER as well as in the CREATE above. An environment
+-- that already ran an earlier copy of this file has the table but not these
+-- three columns, and CREATE TABLE IF NOT EXISTS is a no-op there. Safe to
+-- re-run: ADD COLUMN IF NOT EXISTS does nothing the second time.
+ALTER TABLE `directory_connections`
+  ADD COLUMN IF NOT EXISTS `graph_tenant_id` varchar(255) DEFAULT NULL AFTER `google_subject`;
+ALTER TABLE `directory_connections`
+  ADD COLUMN IF NOT EXISTS `graph_client_id` varchar(255) DEFAULT NULL AFTER `graph_tenant_id`;
+ALTER TABLE `directory_connections`
+  ADD COLUMN IF NOT EXISTS `graph_client_secret` varchar(1024) DEFAULT NULL AFTER `graph_client_id`;
 
 -- -------- directory_import_staging (#332 directory enumeration) --------
 -- The result of one enumeration run, staged for admin review. Nothing reaches

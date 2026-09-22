@@ -1020,8 +1020,38 @@ exit 0
             <li><code>cn={firstname} {lastname},ou=Users,dc=example,dc=com</code> - If directory uses display name as CN (e.g., "John Smith")</li>
             <li><code>cn={username},ou=Users,dc=example,dc=com</code> - If directory uses username as CN (e.g., "jsmith")</li>
             <li><code>uid={username},ou=People,dc=example,dc=com</code> - Common for OpenLDAP/FreeIPA</li>
+            <li><code>uid={username},ou=Users,dc=example,dc=com</code> - Google Workspace Secure LDAP</li>
         </ul>
-        <p class="text-muted mb-0"><small><i class="fas fa-info-circle"></i> Check your directory user properties to determine which pattern applies. The DN must exactly match your directory naming convention.</small></p>
+        <p class="text-muted mb-3"><small><i class="fas fa-info-circle"></i> Check your directory user properties to determine which pattern applies. The DN must exactly match your directory naming convention.</small></p>
+
+        <div class="callout callout-warning mb-0">
+            <p class="mb-1"><i class="fab fa-google"></i> <strong>Google Workspace (Secure LDAP)</strong></p>
+            <p class="mb-2"><small>Lets Workspace users sign into the Hermes portal with their Google password.
+            This is <strong>authentication only</strong>. To read the recipient list out of Workspace, use the
+            Admin SDK connector under Email Relay, Auto-Provisioning: it works on every Workspace edition and
+            needs none of the setup below.</small></p>
+            <table class="table table-sm table-borderless mb-2" style="width:auto">
+                <tr><td class="pe-3"><small><strong>Server</strong></small></td><td><small><code>ldap.google.com</code></small></td></tr>
+                <tr><td class="pe-3"><small><strong>Port</strong></small></td><td><small><code>636</code>, Transport LDAPS</small></td></tr>
+                <tr><td class="pe-3"><small><strong>DN pattern</strong></small></td><td><small><code>uid={username},ou=Users,dc=yourdomain,dc=com</code></small></td></tr>
+                <tr><td class="pe-3"><small><strong>CA bundle</strong></small></td><td><small>Not needed. Google chains to a public root.</small></td></tr>
+                <tr><td class="pe-3"><small><strong>Edition</strong></small></td><td><small>Business Plus or higher. Not available on Starter or Standard.</small></td></tr>
+            </table>
+            <p class="mb-1"><small><strong>In the Google Admin console:</strong> Apps, then LDAP, then Add client.
+            Grant "Verify user credentials" and "Read user information" for the entire domain, download the
+            certificate zip (a <code>.crt</code> and a <code>.key</code>, offered only once), and
+            <strong>switch the service status to ON</strong>. A client is created switched off and fails as
+            though it were a network or certificate fault. Google can take up to 24 hours to provision a new
+            client.</small></p>
+            <p class="mb-1"><small><strong>In Hermes:</strong> upload the <code>.crt</code> and <code>.key</code>
+            in the Client Certificate card, then add the mapping above and Test Connection with a real Workspace
+            user before Apply Settings.</small></p>
+            <p class="mb-0"><small><strong>uid is the username, not the address.</strong> Google uses the local
+            part, so <code>support@example.com</code> is <code>uid=support</code>. <code>{username}</code> is
+            already the local part and produces this correctly; <code>{email}</code> does not. It fails as
+            "Invalid credentials", which is the same thing Google says about a wrong password, so a wrong DN
+            pattern looks exactly like a wrong password.</small></p>
+        </div>
     </div>
 </div>
 
@@ -1269,7 +1299,7 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                     <div class="mb-3">
                         <label class="form-label">Server Address <span class="text-danger">*</span></label>
                         <input type="text" name="server_address" class="form-control" required placeholder="e.g., dc01.example.com">
-                        <small class="text-muted">Hostname or IP address of the remote LDAP server</small>
+                        <small class="text-muted">Hostname or IP address of the remote LDAP server. For Google Workspace this is always <code>ldap.google.com</code>.</small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Transport</label>
@@ -1291,15 +1321,30 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                             The DN pattern must match your directory user naming convention. Placeholders: <code>{username}</code>, <code>{firstname}</code>, <code>{lastname}</code>, <code>{email}</code><br>
                             <strong>AD (display name as CN):</strong> <code>cn={firstname} {lastname},ou=Users,dc=example,dc=com</code><br>
                             <strong>AD (username as CN):</strong> <code>cn={username},ou=Users,dc=example,dc=com</code><br>
-                            <strong>OpenLDAP/FreeIPA:</strong> <code>uid={username},ou=People,dc=example,dc=com</code>
+                            <strong>OpenLDAP/FreeIPA:</strong> <code>uid={username},ou=People,dc=example,dc=com</code><br>
+                            <strong>Google Workspace:</strong> <code>uid={username},ou=Users,dc=example,dc=com</code>
                         </small>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Description</label>
                         <input type="text" name="description" class="form-control" placeholder="Optional description">
                     </div>
-                    <div class="alert alert-info mb-0">
+                    <div class="alert alert-info">
                         <small><i class="fas fa-info-circle"></i> <strong>Transport is per mapping.</strong> Choosing LDAPS also turns on certificate verification for it, so the directory must present a certificate that validates and whose hostname matches the address above. The CA bundle and retry count are shared by every mapping and live in the "Global TLS Settings" card.</small>
+                    </div>
+                    <div class="alert alert-secondary mb-0">
+                        <small>
+                        <i class="fab fa-google"></i> <strong>Google Workspace (Secure LDAP)</strong><br>
+                        Server <code>ldap.google.com</code>, port <code>636</code>, Transport <strong>LDAPS</strong>,
+                        DN pattern <code>uid={username},ou=Users,dc=yourdomain,dc=com</code>.
+                        No CA bundle is needed; Google chains to a public root.<br>
+                        <strong>uid is the username, not the address.</strong> Google uses the local part, so
+                        <code>support@example.com</code> is <code>uid=support</code>. Using <code>{email}</code>
+                        here fails as "Invalid credentials", which looks exactly like a wrong password.<br>
+                        Requires a <strong>client certificate</strong> (upload it in the Client Certificate card), an
+                        LDAP client created under Apps then LDAP in the Google Admin console with its
+                        <strong>service status switched ON</strong>, and Business Plus or higher.
+                        </small>
                     </div>
                 </div>
                 <div class="modal-footer">

@@ -69,8 +69,13 @@ function dcFillEdit(el) {
     document.getElementById('edit_tls_mode').value         = d.tls;
     document.getElementById('edit_provider').value         = d.provider;
     document.getElementById('edit_google_subject').value   = d.gsubject || '';
+    document.getElementById('edit_graph_tenant_id').value  = d.gtenant || '';
+    document.getElementById('edit_graph_client_id').value  = d.gclient || '';
+    document.getElementById('edit_graph_client_secret').value = '';
     var saWrap = document.getElementById('edit_has_sa_wrap');
     if (saWrap) { saWrap.hidden = (d.hassa !== '1'); }
+    var secWrap = document.getElementById('edit_has_secret_wrap');
+    if (secWrap) { secWrap.hidden = (d.hassecret !== '1'); }
     dcProviderChanged(document.getElementById('edit_provider'), 'edit_');
     document.getElementById('edit_auth_type').value        = d.authtype;
     document.getElementById('edit_policy_id').value        = d.policyid;
@@ -106,11 +111,12 @@ function dcAuthChanged(sel, mapSelectId) {
     if (!remote) { map.value = '0'; }
 }
 
-// Google reads over REST and has none of the LDAP connection fields. Hiding
-// them by the input's own name rather than tagging every row keeps the markup
-// from sprouting classes that only JavaScript reads.
+// The REST providers read over HTTPS and have none of the LDAP connection
+// fields. Hiding them by the input's own name rather than tagging every row
+// keeps the markup from sprouting classes that only JavaScript reads.
 function dcProviderChanged(sel, prefix) {
-    var isGoogle = (sel.value === 'google');
+    var prov  = sel.value;
+    var isRest = (prov === 'google' || prov === 'graph');
     var scope = sel.closest('.modal-body') || document;
     var ldapOnly = ['server_address','server_port','tls_mode','base_dn','bind_dn',
                     'bind_password','object_class','mail_attribute','extra_filter',
@@ -119,12 +125,12 @@ function dcProviderChanged(sel, prefix) {
         var el = scope.querySelector('[name="' + n + '"]');
         if (!el) { return; }
         var box = el.closest('.row') || el.closest('.mb-3');
-        if (box) { box.hidden = isGoogle; }
+        if (box) { box.hidden = isRest; }
 
         // A hidden field that is still required blocks submit, and the browser
         // cannot focus it to say why, so the button appears to do nothing.
         // Remembering the original lets LDAP get its validation back.
-        if (isGoogle) {
+        if (isRest) {
             if (el.required) { el.dataset.wasRequired = '1'; }
             el.required = false;
         } else if (el.dataset.wasRequired === '1') {
@@ -134,10 +140,14 @@ function dcProviderChanged(sel, prefix) {
 
     // Blocks whose input sits deeper than the box that should disappear, so
     // closest() finds an inner row and leaves the label and help behind.
-    scope.querySelectorAll('.dcLdapOnly').forEach(function (b) { b.hidden = isGoogle; });
+    scope.querySelectorAll('.dcLdapOnly').forEach(function (b) { b.hidden = isRest; });
 
-    var g = document.getElementById(prefix + 'google_wrap');
-    if (g) { g.hidden = !isGoogle; }
+    // One credential block per REST provider, and at most one visible. Driven
+    // off the provider value so a new connector is one more entry here.
+    ['google','graph'].forEach(function (k) {
+        var w = document.getElementById(prefix + k + '_wrap');
+        if (w) { w.hidden = (prov !== k); }
+    });
 }
 
 function dcAction(name, id, flag) {
@@ -283,13 +293,16 @@ function dcFillDelete(el) {
           <cfif getConnections.provider IS "google">
             <span class="badge bg-danger"><i class="fab fa-google"></i>&nbsp;Workspace</span>
             <small class="text-muted ms-1">#EncodeForHTML(getConnections.google_subject)#</small>
+          <cfelseif getConnections.provider IS "graph">
+            <span class="badge bg-primary"><i class="fab fa-microsoft"></i>&nbsp;Microsoft 365</span>
+            <small class="text-muted ms-1">#EncodeForHTML(getConnections.graph_tenant_id)#</small>
           <cfelse>
             #EncodeForHTML(getConnections.server_address)#:#getConnections.server_port#
           </cfif>
-          <!--- Transport badges describe an LDAP connection. Admin SDK talks
-                HTTPS REST, and tls_mode simply carries its column default
-                there, so showing LDAPS would state something untrue. --->
-          <cfif getConnections.provider IS NOT "google">
+          <!--- Transport badges describe an LDAP connection. The REST
+                connectors talk HTTPS, and tls_mode simply carries its column
+                default there, so showing LDAPS would state something untrue. --->
+          <cfif getConnections.provider IS NOT "google" AND getConnections.provider IS NOT "graph">
             <cfif getConnections.tls_mode IS "ldaps"><span class="badge bg-success">LDAPS</span></cfif>
             <cfif Len(Trim(getConnections.client_cert_file))><span class="badge bg-info" title="Client certificate installed"><i class="fas fa-id-badge"></i></span></cfif>
           </cfif>
@@ -376,6 +389,9 @@ function dcFillDelete(el) {
                   data-hascert="#(Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file)) ? 1 : 0)#"
                   data-hasca="#(Len(Trim(getConnections.ca_cert_file)) ? 1 : 0)#"
                   data-gsubject="#EncodeForHTMLAttribute(getConnections.google_subject)#"
+                  data-gtenant="#EncodeForHTMLAttribute(getConnections.graph_tenant_id)#"
+                  data-gclient="#EncodeForHTMLAttribute(getConnections.graph_client_id)#"
+                  data-hassecret="#(Len(Trim(getConnections.graph_client_secret)) ? 1 : 0)#"
                   data-hassa="#(Len(Trim(getConnections.google_sa_json)) ? 1 : 0)#">
             <i class="fas fa-edit"></i>
           </button>
@@ -426,6 +442,7 @@ function dcFillDelete(el) {
          <select class="form-select" name="provider" id="add_provider" onchange="dcProviderChanged(this, 'add_')">
            <option value="ldap">LDAP / Active Directory</option>
            <option value="google">Google Workspace (Admin SDK)</option>
+           <option value="graph">Microsoft 365 (Graph)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
@@ -449,6 +466,29 @@ function dcFillDelete(el) {
            <p class="mb-0"><small>Google Admin console &rarr; Security &rarr; Access and data control &rarr; API controls &rarr; Domain-wide delegation. Add the service account's <strong>client ID</strong> with the scope
            <code>https://www.googleapis.com/auth/admin.directory.user.readonly</code>.
            Your organisation may require a second super administrator to approve it.</small></p>
+         </div>
+       </div>
+     </div>
+     <div class="row dcGraphOnly" id="add_graph_wrap" hidden>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Directory (tenant) ID</strong></label>
+         <input type="text" class="form-control" name="graph_tenant_id" id="add_graph_tenant_id" maxlength="255" placeholder="00000000-0000-0000-0000-000000000000">
+         <small class="text-muted">From the app registration's Overview page. The tenant's domain name works too.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Application (client) ID</strong></label>
+         <input type="text" class="form-control" name="graph_client_id" id="add_graph_client_id" maxlength="255" placeholder="00000000-0000-0000-0000-000000000000">
+         <small class="text-muted">Also on the Overview page. Not the Object ID, which looks identical and will not work.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Client Secret</strong></label>
+         <input type="password" class="form-control" name="graph_client_secret" id="add_graph_client_secret" maxlength="512" autocomplete="new-password">
+         <small class="text-muted">The secret <strong>Value</strong>, not the Secret ID. Entra shows the Value once, at creation. Stored encrypted.</small>
+       </div>
+       <div class="col-md-12 mb-3">
+         <div class="callout callout-info mb-0">
+           <p class="mb-1"><strong>Before this works, grant the app permission in Entra.</strong></p>
+           <p class="mb-0"><small>Entra admin center &rarr; App registrations &rarr; your app &rarr; API permissions. Add <strong>Microsoft Graph &rarr; Application permissions &rarr; <code>User.Read.All</code></strong>, then click <strong>Grant admin consent</strong>. Both steps are needed: the permission alone does nothing until consent is granted. A <em>Delegated</em> permission will not work, because nobody is signed in when the scheduled sync runs.</small></p>
          </div>
        </div>
      </div>
@@ -650,6 +690,7 @@ function dcFillDelete(el) {
          <select class="form-select" name="provider" id="edit_provider" onchange="dcProviderChanged(this, 'edit_')">
            <option value="ldap">LDAP / Active Directory</option>
            <option value="google">Google Workspace (Admin SDK)</option>
+           <option value="graph">Microsoft 365 (Graph)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
@@ -677,6 +718,33 @@ function dcFillDelete(el) {
            <p class="mb-0"><small>Google Admin console &rarr; Security &rarr; Access and data control &rarr; API controls &rarr; Domain-wide delegation. Add the service account's <strong>client ID</strong> with the scope
            <code>https://www.googleapis.com/auth/admin.directory.user.readonly</code>.
            Your organisation may require a second super administrator to approve it.</small></p>
+         </div>
+       </div>
+     </div>
+     <div class="row dcGraphOnly" id="edit_graph_wrap" hidden>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Directory (tenant) ID</strong></label>
+         <input type="text" class="form-control" name="graph_tenant_id" id="edit_graph_tenant_id" maxlength="255" placeholder="00000000-0000-0000-0000-000000000000">
+         <small class="text-muted">From the app registration's Overview page. The tenant's domain name works too.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Application (client) ID</strong></label>
+         <input type="text" class="form-control" name="graph_client_id" id="edit_graph_client_id" maxlength="255" placeholder="00000000-0000-0000-0000-000000000000">
+         <small class="text-muted">Also on the Overview page. Not the Object ID, which looks identical and will not work.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Client Secret</strong></label>
+         <div class="form-check mb-1" id="edit_has_secret_wrap" hidden>
+           <span class="badge bg-success"><i class="fas fa-key"></i> Installed</span>
+           <small class="text-muted ms-1">Leave blank to keep it. Type a new one only to replace it.</small>
+         </div>
+         <input type="password" class="form-control" name="graph_client_secret" id="edit_graph_client_secret" maxlength="512" autocomplete="new-password">
+         <small class="text-muted">The secret <strong>Value</strong>, not the Secret ID. Entra shows the Value once, at creation. Stored encrypted.</small>
+       </div>
+       <div class="col-md-12 mb-3">
+         <div class="callout callout-info mb-0">
+           <p class="mb-1"><strong>Before this works, grant the app permission in Entra.</strong></p>
+           <p class="mb-0"><small>Entra admin center &rarr; App registrations &rarr; your app &rarr; API permissions. Add <strong>Microsoft Graph &rarr; Application permissions &rarr; <code>User.Read.All</code></strong>, then click <strong>Grant admin consent</strong>. Both steps are needed: the permission alone does nothing until consent is granted. A <em>Delegated</em> permission will not work, because nobody is signed in when the scheduled sync runs.</small></p>
          </div>
        </div>
      </div>

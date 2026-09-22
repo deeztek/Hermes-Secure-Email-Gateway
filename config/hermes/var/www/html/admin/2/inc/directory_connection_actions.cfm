@@ -46,6 +46,9 @@
     <cfparam name="form.extra_filter"          default="">
     <cfparam name="form.connection_id"         default="0">
     <cfparam name="form.google_subject"        default="">
+    <cfparam name="form.graph_tenant_id"       default="">
+    <cfparam name="form.graph_client_id"       default="">
+    <cfparam name="form.graph_client_secret"   default="">
     <!--- Provisioning defaults. auth_type is independent of provider: the
           directory we enumerate is not necessarily the one we authenticate
           against. --->
@@ -108,12 +111,27 @@
       <cflocation url="view_directory_connections.cfm" addtoken="no">
     </cfif>
 
-    <!--- Google reads over REST, so none of the LDAP connection fields apply.
-          It needs the service account key and somebody to impersonate. --->
+    <!--- The REST providers have none of the LDAP connection fields, so the
+          base DN check below does not apply to them. Each needs its own
+          credentials instead. --->
     <cfif dcProvider IS "google">
       <cfif NOT Len(Trim(form.google_subject))>
         <cfset session.m = "dc_error">
         <cfset session.dcError = "Enter the super administrator the service account should impersonate. Domain-wide delegation will not work without one.">
+        <cflocation url="view_directory_connections.cfm" addtoken="no">
+      </cfif>
+    <cfelseif dcProvider IS "graph">
+      <cfif NOT Len(Trim(form.graph_tenant_id)) OR NOT Len(Trim(form.graph_client_id))>
+        <cfset session.m = "dc_error">
+        <cfset session.dcError = "Microsoft 365 needs both the Directory (tenant) ID and the Application (client) ID from the app registration.">
+        <cflocation url="view_directory_connections.cfm" addtoken="no">
+      </cfif>
+      <!--- Only on add. On edit a blank secret means "keep the stored one",
+            the same convention the bind password already uses, so demanding
+            one here would force it to be retyped on every unrelated edit. --->
+      <cfif form.action IS "add" AND NOT Len(Trim(form.graph_client_secret))>
+        <cfset session.m = "dc_error">
+        <cfset session.dcError = "Enter the client secret VALUE from the app registration. Entra shows it only once, at creation.">
         <cflocation url="view_directory_connections.cfm" addtoken="no">
       </cfif>
     <cfelseif NOT Len(Trim(form.base_dn))>
@@ -133,8 +151,9 @@
 
     <!--- The server is where the user list is read from, and nothing else
           supplies it. The RemoteAuth mapping answers a different question.
-          Google has no server to enter. --->
-    <cfif dcProvider IS NOT "google" AND NOT Len(Trim(form.server_address))>
+          Neither REST provider has a server to enter: the endpoint is fixed
+          and the tenant is identified by credentials, not by address. --->
+    <cfif dcProvider IS NOT "google" AND dcProvider IS NOT "graph" AND NOT Len(Trim(form.server_address))>
       <cfset session.m = "dc_error">
       <cfset session.dcError = "Enter the address of the directory to read the user list from.">
       <cflocation url="view_directory_connections.cfm" addtoken="no">
@@ -290,6 +309,20 @@
       </cftry>
     </cfif>
 
+    <!--- Graph client secret. Same convention as the bind password: blank on
+          edit leaves the stored one in place. --->
+    <cfset encGraphSecret = "">
+    <cfif Len(Trim(form.graph_client_secret))>
+      <cftry>
+        <cfset encGraphSecret = encrypt(Trim(form.graph_client_secret), hermesKey, "AES", "Base64")>
+        <cfcatch>
+          <cfset session.m = "dc_error">
+          <cfset session.dcError = "Could not encrypt the client secret.">
+          <cflocation url="view_directory_connections.cfm" addtoken="no">
+        </cfcatch>
+      </cftry>
+    </cfif>
+
     <cfset encPw = "">
     <cfif Len(Trim(form.bind_password))>
       <cftry>
@@ -309,7 +342,8 @@
             (entry_name, provider, remoteauth_mapping_id, server_address, server_port,
              tls_mode, base_dn, bind_dn, bind_password, object_class, mail_attribute, extra_filter,
              client_cert_file, client_key_file, ca_cert_file,
-             google_sa_json, google_subject, enabled,
+             google_sa_json, google_subject,
+             graph_tenant_id, graph_client_id, graph_client_secret, enabled,
              auth_type, policy_id, report_enabled, train_bayes, download_msg, enforce_mfa, send_welcome, auto_apply)
           VALUES (
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(dcName,255)#">,
@@ -329,6 +363,9 @@
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
             <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#dcSaJson#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.google_subject),255)#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.graph_tenant_id),255)#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.graph_client_id),255)#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#encGraphSecret#">,
             1,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
             <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
@@ -360,6 +397,8 @@
                  ca_cert_file          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
                  google_sa_json        = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#dcSaJson#">,
                  google_subject        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.google_subject),255)#">,
+                 graph_tenant_id       = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.graph_tenant_id),255)#">,
+                 graph_client_id       = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.graph_client_id),255)#">,
                  auth_type             = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
                  policy_id             = <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
                  report_enabled        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcReport#">,
@@ -370,6 +409,7 @@
                  auto_apply            = <cfqueryparam cfsqltype="cf_sql_integer" value="#dcAuto#">
                  <!--- Blank password on edit means "leave it alone". --->
                  <cfif Len(encPw)>, bind_password = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encPw#"></cfif>
+                 <cfif Len(encGraphSecret)>, graph_client_secret = <cfqueryparam cfsqltype="cf_sql_varchar" value="#encGraphSecret#"></cfif>
            WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.connection_id)#">
         </cfquery>
         <cfset session.m = "dc_edit">
