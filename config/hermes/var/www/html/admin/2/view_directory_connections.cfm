@@ -506,7 +506,7 @@ function dcFillDelete(el) {
        <div class="col-md-12 mb-3">
          <label class="form-label"><strong>CA Bundle</strong> <span class="text-muted">(LDAPS only)</span></label>
          <input type="file" class="form-control" name="ca_cert_file" accept=".pem,.crt,.cer">
-         <small class="text-muted">Required when Transport is LDAPS: the directory's certificate is always verified. Upload the certificate of the authority that <strong>issued</strong> it, not the directory's own, and in <strong>Base-64 encoded X.509</strong> (begins <code>-----BEGIN CERTIFICATE-----</code>). For Active Directory, <code>certutil -ca.cert ca.cer</code> on the CA server. Separate from the RemoteAuth bundle.</small>
+         <small class="text-muted">Only needed for a directory with a <strong>private</strong> certificate authority, such as an internal AD. Public roots are always trusted, so nothing is needed here for a cloud or commercially signed directory. Upload the certificate of the authority that <strong>issued</strong> it, not the directory's own, in <strong>Base-64 encoded X.509</strong>. For Active Directory, <code>certutil -ca.cert ca.cer</code> on the CA server. Separate from the RemoteAuth bundle.</small>
        </div>
      </div>
      <div class="row">
@@ -733,7 +733,7 @@ function dcFillDelete(el) {
            <label class="form-check-label text-danger" for="edit_remove_ca_cert">Remove the installed CA bundle</label>
          </div>
          <input type="file" class="form-control" name="ca_cert_file" accept=".pem,.crt,.cer">
-         <small class="text-muted">Required when Transport is LDAPS. Export the <strong>issuing</strong> authority, Base-64 encoded X.509. Separate from the RemoteAuth bundle.</small>
+         <small class="text-muted">Only needed for a private certificate authority. Public roots are always trusted. Export the <strong>issuing</strong> authority, Base-64 encoded X.509. Separate from the RemoteAuth bundle.</small>
        </div>
      </div>
      <div class="row">

@@ -100,10 +100,22 @@ Sets:
 <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_REQCERT", remoteauthTlsReqcert, "ALL")>
 
 <!--- Handle optional CA certificate - if provided, add tls_cacert option --->
-<cfif isDefined("remoteauthCaCertFile") AND remoteauthCaCertFile NEQ "">
-    <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CACERT", "tls_cacert=/opt/hermes/certs/remoteauth/#remoteauthCaCertFile#", "ALL")>
+<!--- tls_cacert points at a DERIVED bundle, never the uploaded file: setting
+     it replaces the system trust store instead of adding to it, so an
+     uploaded private CA would silently cost every public root and break
+     verification of anything with a commercial certificate. The helper
+     rebuilds uploaded-plus-public on every apply. --->
+<cfset caSourceDir     = "/opt/hermes/certs/remoteauth">
+<cfset caUploadedFile  = isDefined("remoteauthCaCertFile") ? Trim(remoteauthCaCertFile) : "">
+<cfset caEffectiveName = "remoteauth_ca_effective.pem">
+<cfinclude template="ldap_build_ca_bundle.cfm">
+
+<cfif Len(caEffectivePath)>
+    <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CACERT", "tls_cacert=#caEffectivePath#", "ALL")>
 <cfelse>
-    <!--- No CA cert - remove placeholder --->
+    <!--- Could not build one. Omit the option so OpenLDAP falls back to its
+         own default rather than being pointed at a file that verifies
+         nothing. --->
     <cfset ldapLdif = REReplace(ldapLdif, " THE_TLS_CACERT", "", "ALL")>
     <cfset ldapLdif = REReplace(ldapLdif, "THE_TLS_CACERT", "", "ALL")>
 </cfif>

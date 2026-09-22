@@ -251,8 +251,18 @@ function shq(required string v) {
       <cfset reqCert = (getConnections.tls_mode IS "ldaps") ? "demand" : "never">
       <cfset envOpts = "-e LDAPTLS_REQCERT=" & shq(reqCert)>
 
-      <cfif Len(Trim(getConnections.ca_cert_file))>
-        <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.ca_cert_file)) & "'">
+      <!--- Derived bundle, not the uploaded file, for the same reason the
+           overlay uses one: LDAPTLS_CACERT replaces the system trust store
+           rather than adding to it, so uploading a private CA would break
+           verification of any directory with a commercial certificate. Named
+           per directory so two can hold different private CAs. --->
+      <cfset caSourceDir     = "/opt/hermes/certs/directories">
+      <cfset caUploadedFile  = Trim(getConnections.ca_cert_file)>
+      <cfset caEffectiveName = "dir_" & connId & "_ca_effective.pem">
+      <cfinclude template="../admin/2/inc/ldap_build_ca_bundle.cfm">
+
+      <cfif Len(caEffectivePath)>
+        <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='" & shq(caEffectivePath) & "'">
       </cfif>
 
       <cffile action="write" file="#pwPath#" output="#bindPW#" charset="utf-8" mode="600" addNewLine="no">

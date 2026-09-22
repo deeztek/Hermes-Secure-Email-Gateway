@@ -184,6 +184,42 @@ Two different certificates can be uploaded, and they answer opposite questions.
 | **CA bundle** | "Do I trust the directory I am connecting to?" | Any mapping set to LDAPS |
 | **Client certificate + key** | "Can I prove who I am to the directory?" | Only where the directory demands mutual TLS, such as Google Secure LDAP |
 
+### You only upload a PRIVATE authority
+
+Public roots are always trusted. A directory with a commercial or cloud
+certificate — Google Secure LDAP, anything behind a public CA — needs nothing
+uploaded at all.
+
+The CA bundle is for a directory whose certificate was issued by an authority
+only your organisation knows about, which in practice means an internal
+Active Directory CA.
+
+**Why this needs saying:** `tls_cacert` *replaces* OpenLDAP's trust store
+rather than adding to it. OpenLDAP falls back to the public roots only when no
+CA is configured. So uploading an internal CA used to silently cost you every
+public one, and verifying `ldap.google.com` alongside an internal AD then
+failed — reported, unhelpfully, as `Can't contact LDAP server`.
+
+Hermes now combines them. What you upload is stored untouched, and at **Apply
+Settings** a derived bundle is written containing your upload plus the
+container's public roots. `tls_cacert` points at that. Upload nothing and the
+option is omitted entirely, so OpenLDAP uses its own store directly.
+
+| You have | Upload | Result |
+|---|---|---|
+| A cloud or commercial directory | nothing | Public roots, used in place |
+| One internal CA | that CA | Yours plus public roots |
+| Several internal CAs | all of them concatenated into one file | Yours plus public roots |
+
+You never need to track down a public root and paste it onto the end. That was
+the old workaround and it is no longer necessary.
+
+**After a Hermes upgrade**, if you have a bundle uploaded, click Apply Settings
+once. The derived file is a snapshot, and a rebuilt container image can carry a
+different set of public roots. Nothing needs re-uploading — the rebuild happens
+from what is already stored. Installs with nothing uploaded are unaffected,
+since they use the container's store directly.
+
 ### Format
 
 **Base-64 encoded X.509 (PEM).** The file begins with `-----BEGIN CERTIFICATE-----`.

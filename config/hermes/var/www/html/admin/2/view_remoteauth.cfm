@@ -1069,6 +1069,10 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                         </cfif>
                         <input type="file" name="ca_cert_file" class="form-control" accept=".pem,.crt,.cer">
                         <small class="text-muted">
+                          <strong>Only needed for a directory with a private certificate authority</strong>
+                          &mdash; an internal AD, typically. Public roots are always trusted, so a
+                          directory with a commercial or cloud certificate needs nothing here.
+                          <br>
                           Upload the certificate of the authority that <strong>issued</strong> the directory's
                           certificate, not the directory's own, unless that certificate is self-signed.
                           Must be <strong>Base-64 encoded X.509</strong> (PEM, begins <code>-----BEGIN CERTIFICATE-----</code>).
@@ -1078,7 +1082,8 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                           <code>certutil -ca.cert ca.cer</code>, or export from
                           <em>Certificates (Local Computer) &rarr; Trusted Root Certification Authorities</em>
                           choosing <em>Base-64 encoded X.509 (.CER)</em>.
-                          If there is an intermediate, concatenate issuer then intermediate into one file.
+                          Several internal authorities go in one file, concatenated. You never need to add a
+                          public root: Hermes combines whatever you upload with the system trust store.
                         </small>
                         <small class="text-muted">Upload CA certificate or bundle (.pem, .crt, .cer). For multiple servers, concatenate CA certs into one file.</small>
                     </div>
