@@ -175,6 +175,92 @@ docker exec hermes_ldap getent hosts <ad-hostname>
 
 Publicly-resolvable hostnames don't need this step.
 
+## Certificates: what to export and in what format
+
+Two different certificates can be uploaded, and they answer opposite questions.
+
+| Upload | Answers | Needed when |
+|---|---|---|
+| **CA bundle** | "Do I trust the directory I am connecting to?" | Any mapping set to LDAPS |
+| **Client certificate + key** | "Can I prove who I am to the directory?" | Only where the directory demands mutual TLS, such as Google Secure LDAP |
+
+### Format
+
+**Base-64 encoded X.509 (PEM).** The file begins with `-----BEGIN CERTIFICATE-----`.
+DER is not accepted, and the failure appears at connection time rather than on
+upload, as a TLS error that does not obviously say "wrong format".
+
+Check a file before uploading:
+
+```bash
+openssl x509 -in ca.cer -noout -subject -issuer -dates
+```
+
+If that errors, it is probably DER. Convert it:
+
+```bash
+openssl x509 -inform der -in ca.cer -out ca.pem
+```
+
+### Which certificate to export
+
+Export the certificate of the authority that **issued** the directory's
+certificate, not the directory's own. A domain controller's certificate changes
+when it is renewed; its issuer does not, so a bundle containing the issuer keeps
+working across renewals.
+
+The exception is a self-signed directory certificate with no issuer, in which
+case that certificate is what you upload.
+
+### Active Directory
+
+On the CA server:
+
+```
+certutil -ca.cert ca.cer
+```
+
+Or through the GUI: **Certificates (Local Computer)** &rarr; **Trusted Root
+Certification Authorities** &rarr; **Certificates**, find the issuing CA, *All
+Tasks* &rarr; *Export*, and choose **Base-64 encoded X.509 (.CER)**. The default
+is DER, which is the wrong one.
+
+If the chain has an intermediate, concatenate both into a single file, issuer
+first:
+
+```bash
+cat issuing-ca.pem root-ca.pem > bundle.pem
+```
+
+### Enabling LDAPS on a domain controller
+
+A DC starts answering on 636 by itself once a suitable certificate is present in
+**Local Computer &rarr; Personal**. It needs a private key, the Server
+Authentication EKU, and a Subject or SAN matching the FQDN you put in the
+mapping. With AD CS the Domain Controller template auto-enrols and there is
+nothing else to do.
+
+Verify with `ldp.exe` on the DC (Connection &rarr; Connect, port 636, SSL), then
+from Hermes:
+
+```bash
+docker exec -e LDAPTLS_REQCERT=never hermes_ldap \
+  ldapsearch -x -H ldaps://dc.example.com:636 -b '' -s base '(objectClass=*)'
+```
+
+The root DSE coming back means LDAPS is live. `Can't contact LDAP server` means
+either no listener or a firewall between the Docker host and the DC.
+
+### The hostname has to match
+
+Any mapping set to LDAPS forces `tls_reqcert=demand` for the overlay, and demand
+checks the **hostname** against the certificate as well as the chain. A mapping
+pointing at an IP address will fail unless the certificate carries a matching IP
+SAN, which is unusual. Use the FQDN the certificate was issued to.
+
+This is per mapping. A mapping left on plain LDAP negotiates no TLS at all, so
+it is unaffected by the setting and can sit beside an LDAPS one on an IP.
+
 ## TLS settings reference
 
 | Setting | Values | Notes |

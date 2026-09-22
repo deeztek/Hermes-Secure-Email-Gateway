@@ -1054,6 +1054,18 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                             </div>
                         </cfif>
                         <input type="file" name="ca_cert_file" class="form-control" accept=".pem,.crt,.cer">
+                        <small class="text-muted">
+                          Upload the certificate of the authority that <strong>issued</strong> the directory's
+                          certificate, not the directory's own, unless that certificate is self-signed.
+                          Must be <strong>Base-64 encoded X.509</strong> (PEM, begins <code>-----BEGIN CERTIFICATE-----</code>).
+                          DER will be rejected at connection time rather than on upload.
+                          <br>
+                          <strong>Active Directory:</strong> on the CA server run
+                          <code>certutil -ca.cert ca.cer</code>, or export from
+                          <em>Certificates (Local Computer) &rarr; Trusted Root Certification Authorities</em>
+                          choosing <em>Base-64 encoded X.509 (.CER)</em>.
+                          If there is an intermediate, concatenate issuer then intermediate into one file.
+                        </small>
                         <small class="text-muted">Upload CA certificate or bundle (.pem, .crt, .cer). For multiple servers, concatenate CA certs into one file.</small>
                     </div>
                 </div>
