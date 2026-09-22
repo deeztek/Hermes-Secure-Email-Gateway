@@ -134,15 +134,17 @@
     <cfset dcSlug     = ReReplaceNoCase(LCase(dcName), "[^a-z0-9]", "_", "all")>
     <cfset dcCertFile = "">
     <cfset dcKeyFile  = "">
+    <cfset dcCaFile   = "">
 
     <cfif form.action IS "edit">
       <cfquery name="dcPriorCert" datasource="hermes">
-        SELECT client_cert_file, client_key_file FROM directory_connections
+        SELECT client_cert_file, client_key_file, ca_cert_file FROM directory_connections
          WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.connection_id)#">
       </cfquery>
       <cfif dcPriorCert.recordcount GTE 1>
         <cfset dcCertFile = dcPriorCert.client_cert_file>
         <cfset dcKeyFile  = dcPriorCert.client_key_file>
+        <cfset dcCaFile   = dcPriorCert.ca_cert_file>
       </cfif>
     </cfif>
 
@@ -154,6 +156,37 @@
       </cfloop>
       <cfset dcCertFile = "">
       <cfset dcKeyFile  = "">
+    </cfif>
+
+    <cfif StructKeyExists(form, "remove_ca_cert") AND form.remove_ca_cert EQ "1">
+      <cfif Len(Trim(dcCaFile)) AND FileExists("#dcCertDir#/#Trim(dcCaFile)#")>
+        <cftry><cffile action="delete" file="#dcCertDir#/#Trim(dcCaFile)#"><cfcatch></cfcatch></cftry>
+      </cfif>
+      <cfset dcCaFile = "">
+    </cfif>
+
+    <cfif StructKeyExists(form, "ca_cert_file") AND Len(form.ca_cert_file)>
+      <cftry>
+        <cfif NOT DirectoryExists(dcCertDir)>
+          <cfdirectory action="create" directory="#dcCertDir#" mode="755">
+        </cfif>
+        <!--- Upload before replacing, so a rejected file cannot destroy a
+              working bundle. --->
+        <cffile action="upload" fileField="ca_cert_file" destination="#dcCertDir#"
+                nameConflict="makeunique" accept="application/x-x509-ca-cert,application/pkix-cert,application/x-pem-file,text/plain,.pem,.crt,.cer">
+        <cfset dcUpCa  = cffile.serverFile>
+        <cfset dcNewCa = dcSlug & "_ca.pem">
+        <cfif dcUpCa NEQ dcNewCa>
+          <cfif FileExists("#dcCertDir#/#dcNewCa#")><cffile action="delete" file="#dcCertDir#/#dcNewCa#"></cfif>
+          <cffile action="rename" source="#dcCertDir#/#dcUpCa#" destination="#dcCertDir#/#dcNewCa#">
+        </cfif>
+        <cfset dcCaFile = dcNewCa>
+        <cfcatch>
+          <cfset session.m = "dc_error">
+          <cfset session.dcError = "CA bundle upload failed: " & cfcatch.message>
+          <cflocation url="view_directory_connections.cfm" addtoken="no">
+        </cfcatch>
+      </cftry>
     </cfif>
 
     <!--- Both or neither. Half a pair produces a handshake that fails in a
@@ -218,7 +251,7 @@
           INSERT INTO directory_connections
             (entry_name, provider, remoteauth_mapping_id, server_address, server_port,
              tls_mode, base_dn, bind_dn, bind_password, object_class, mail_attribute, extra_filter,
-             client_cert_file, client_key_file, enabled,
+             client_cert_file, client_key_file, ca_cert_file, enabled,
              auth_type, policy_id, report_enabled, train_bayes, download_msg, enforce_mfa, send_welcome, auto_apply)
           VALUES (
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(dcName,255)#">,
@@ -235,6 +268,7 @@
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.extra_filter),500)#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
             1,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
             <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
@@ -263,6 +297,7 @@
                  extra_filter          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.extra_filter),500)#">,
                  client_cert_file      = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
                  client_key_file       = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
+                 ca_cert_file          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
                  auth_type             = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
                  policy_id             = <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
                  report_enabled        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcReport#">,

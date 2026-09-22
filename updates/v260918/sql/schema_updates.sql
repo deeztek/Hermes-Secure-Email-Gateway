@@ -81,6 +81,11 @@ CREATE TABLE IF NOT EXISTS `directory_connections` (
   -- so a certificate for one should never be offered to the other.
   `client_cert_file` varchar(255) DEFAULT NULL,
   `client_key_file` varchar(255) DEFAULT NULL,
+  -- CA bundle for verifying THIS directory, for the same reasons the client
+  -- certificate is per directory: the RemoteAuth page is Pro while
+  -- Auto-Provisioning is Community, and the directory read from is not
+  -- necessarily the one authenticated against.
+  `ca_cert_file` varchar(255) DEFAULT NULL,
   -- Provisioning defaults, applied to every recipient this connection creates.
   -- auth_type is independent of `provider`: the directory Hermes enumerates is
   -- not necessarily the one it authenticates against. A tenant synced from

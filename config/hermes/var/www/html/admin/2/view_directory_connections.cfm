@@ -80,6 +80,10 @@ function dcFillEdit(el) {
     var rmWrap = document.getElementById('edit_remove_cert_wrap');
     var rmBox  = document.getElementById('edit_remove_client_cert');
     if (rmWrap) { rmWrap.hidden = (d.hascert !== '1'); }
+    var caWrap = document.getElementById('edit_remove_ca_wrap');
+    var caBox  = document.getElementById('edit_remove_ca_cert');
+    if (caWrap) { caWrap.hidden = (d.hasca !== '1'); }
+    if (caBox)  { caBox.checked = false; }
     if (rmBox)  { rmBox.checked = false; }
 }
 
@@ -319,7 +323,8 @@ function dcFillDelete(el) {
                   data-mfa="#val(getConnections.enforce_mfa)#"
                   data-welcome="#val(getConnections.send_welcome)#"
                   data-autoapply="#val(getConnections.auto_apply)#"
-                  data-hascert="#(Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file)) ? 1 : 0)#">
+                  data-hascert="#(Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file)) ? 1 : 0)#"
+                  data-hasca="#(Len(Trim(getConnections.ca_cert_file)) ? 1 : 0)#">
             <i class="fas fa-edit"></i>
           </button>
           <button type="button" class="btn btn-sm btn-secondary" title="Enable or disable"
@@ -427,6 +432,13 @@ function dcFillDelete(el) {
        </div>
      </div>
 
+     <div class="row">
+       <div class="col-md-12 mb-3">
+         <label class="form-label"><strong>CA Bundle</strong> <span class="text-muted">(LDAPS only)</span></label>
+         <input type="file" class="form-control" name="ca_cert_file" accept=".pem,.crt,.cer">
+         <small class="text-muted">Required when Transport is LDAPS: the directory's certificate is always verified. Upload the certificate of the authority that <strong>issued</strong> it, not the directory's own, and in <strong>Base-64 encoded X.509</strong> (begins <code>-----BEGIN CERTIFICATE-----</code>). For Active Directory, <code>certutil -ca.cert ca.cer</code> on the CA server. Separate from the RemoteAuth bundle.</small>
+       </div>
+     </div>
      <div class="row">
        <div class="col-md-12 mb-3">
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
@@ -613,6 +625,17 @@ function dcFillDelete(el) {
        </div>
      </div>
 
+     <div class="row">
+       <div class="col-md-12 mb-3">
+         <label class="form-label"><strong>CA Bundle</strong> <span class="text-muted">(LDAPS only)</span></label>
+         <div class="form-check mb-1" id="edit_remove_ca_wrap" hidden>
+           <input class="form-check-input" type="checkbox" name="remove_ca_cert" id="edit_remove_ca_cert" value="1">
+           <label class="form-check-label text-danger" for="edit_remove_ca_cert">Remove the installed CA bundle</label>
+         </div>
+         <input type="file" class="form-control" name="ca_cert_file" accept=".pem,.crt,.cer">
+         <small class="text-muted">Required when Transport is LDAPS. Export the <strong>issuing</strong> authority, Base-64 encoded X.509. Separate from the RemoteAuth bundle.</small>
+       </div>
+     </div>
      <div class="row">
        <div class="col-md-12 mb-3">
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>

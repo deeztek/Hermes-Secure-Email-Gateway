@@ -212,51 +212,20 @@ function shq(required string v) {
 
     <cfset ldapUri = (getConnections.tls_mode IS "ldaps" ? "ldaps" : "ldap") & "://" & ldapServer & ":" & ldapPort>
 
-    <!--- Mirror the RemoteAuth trust settings so enumeration and login agree
-         about which directories are acceptable. --->
-    <cfquery name="getRaTls" datasource="hermes">
-      SELECT setting_name, setting_value FROM remoteauth_settings
-       WHERE setting_name IN ('tls_reqcert', 'ca_cert_file')
-    </cfquery>
-    <cfset raTls = {}>
-    <cfloop query="getRaTls"><cfset raTls[getRaTls.setting_name] = getRaTls.setting_value></cfloop>
-    <!--- LDAPS means verified, same rule the RemoteAuth sync applies. It cannot
-         be read from remoteauth_settings: that sync derives "demand" in memory
-         and leaves the stored value alone, so reading the row here would pick
-         up a stale "never" and encrypt to a server it never authenticated. --->
-    <cfset reqCert = "never">
-    <cfif getConnections.tls_mode IS "ldaps">
-      <cfset reqCert = "demand">
-    <cfelseif StructKeyExists(raTls,"tls_reqcert") AND Len(raTls.tls_reqcert)>
-      <cfset reqCert = raTls.tls_reqcert>
-    </cfif>
+    <!--- Trust settings are this directory's own, not RemoteAuth's. Reading
+         them from remoteauth_settings coupled two independent things and put
+         the only upload on a Pro-gated page, which is the same mistake the
+         client certificate started out making.
+
+         Verification is implied by the transport: LDAPS verifies, plain has
+         no TLS to verify. There is nothing for an operator to choose. --->
+    <cfset reqCert = (getConnections.tls_mode IS "ldaps") ? "demand" : "never">
     <cfset envOpts = "-e LDAPTLS_REQCERT=" & shq(reqCert)>
-    <cfif StructKeyExists(raTls,"ca_cert_file") AND Len(raTls.ca_cert_file)>
-      <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/remoteauth/" & shq(raTls.ca_cert_file) & "'">
+
+    <cfif Len(Trim(getConnections.ca_cert_file))>
+      <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.ca_cert_file)) & "'">
     </cfif>
 
-    <!--- Mutual TLS, from THIS directory's own certificate (#335). That is
-         what lets provider='ldap' enumerate Google Secure LDAP:
-         ldap.google.com is an ordinary LDAPS endpoint that simply insists the
-         client prove who it is, and without these two the handshake is
-         refused. No REST connector would help, because the obstacle was never
-         the protocol.
-
-         Deliberately NOT RemoteAuth's certificate. Auto-Provisioning is
-         Community and the RemoteAuth page is Pro, so sharing would gate
-         enumeration behind a licence it does not need; and the directory read
-         from is not necessarily the one authenticated against.
-
-         Both or neither: a certificate with no key cannot be used. --->
-    <cfif Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file))>
-      <cfset envOpts = envOpts & " -e LDAPTLS_CERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.client_cert_file)) & "'">
-      <cfset envOpts = envOpts & " -e LDAPTLS_KEY='/opt/hermes/certs/directories/"  & shq(Trim(getConnections.client_key_file))  & "'">
-    </cfif>
-
-    <!--- addNewLine="no" is load-bearing. ldapsearch -y uses the COMPLETE
-         contents of the file as the password, trailing newline included, and
-         cffile appends one by default. Without this the bind fails as AD
-         data 52e, which reads as a wrong password rather than a stray byte. --->
     <cffile action="write" file="#pwPath#" output="#bindPW#" charset="utf-8" mode="600" addNewLine="no">
 
     <cfsavecontent variable="shBody"><cfoutput>##!/bin/bash
