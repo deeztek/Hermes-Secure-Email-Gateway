@@ -360,10 +360,11 @@ function dcFillDelete(el) {
          <label class="form-label mt-2"><strong>Directory Type</strong></label>
          <select class="form-select" name="provider" id="add_provider">
            <option value="ldap">LDAP / Active Directory</option>
-           <option value="google" disabled>Google Workspace (Admin SDK connector not built)</option>
+           <option value="google" disabled>Google Workspace via Admin SDK (connector not built &mdash; use LDAP / Active Directory for Google Secure LDAP)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
-         <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.</small>
+         <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
+         For <strong>Google Workspace</strong>, choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636: Secure LDAP is an ordinary LDAPS endpoint that requires the client certificate uploaded on the RemoteAuth page. Business Plus or above.</small>
        </div>
      </div>
      <div class="row">
@@ -540,10 +541,11 @@ function dcFillDelete(el) {
          <label class="form-label mt-2"><strong>Directory Type</strong></label>
          <select class="form-select" name="provider" id="edit_provider">
            <option value="ldap">LDAP / Active Directory</option>
-           <option value="google" disabled>Google Workspace (Admin SDK connector not built)</option>
+           <option value="google" disabled>Google Workspace via Admin SDK (connector not built &mdash; use LDAP / Active Directory for Google Secure LDAP)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
-         <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.</small>
+         <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
+         For <strong>Google Workspace</strong>, choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636: Secure LDAP is an ordinary LDAPS endpoint that requires the client certificate uploaded on the RemoteAuth page. Business Plus or above.</small>
        </div>
      </div>
      <div class="row">
