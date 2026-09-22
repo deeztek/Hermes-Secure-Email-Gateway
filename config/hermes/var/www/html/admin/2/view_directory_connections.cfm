@@ -433,17 +433,17 @@ function dcFillDelete(el) {
    <div class="modal-body">
      <cfoutput>
      <div class="row">
-       <div class="col-md-12 mb-3">
+       <div class="col-md-6 mb-3">
          <label class="form-label"><strong>Name</strong></label>
          <input type="text" class="form-control" name="entry_name" maxlength="255" required>
          <small class="text-muted">A label for this connection.</small>
-
-         <label class="form-label mt-2"><strong>Directory Type</strong></label>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Directory Type</strong></label>
          <select class="form-select" name="provider" id="add_provider" onchange="dcProviderChanged(this, 'add_')">
            <option value="ldap">LDAP / Active Directory</option>
            <option value="google">Google Workspace (Admin SDK)</option>
            <option value="graph">Microsoft 365 (Graph)</option>
-           <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
          <strong>Google Workspace</strong> uses the Admin SDK and works on every tier. Secure LDAP is for <em>authentication</em> and is configured on the RemoteAuth page, not here.</small>
@@ -682,16 +682,17 @@ function dcFillDelete(el) {
    <div class="modal-body">
      <cfoutput>
      <div class="row">
-       <div class="col-md-12 mb-3">
+       <div class="col-md-6 mb-3">
          <label class="form-label"><strong>Name</strong></label>
          <input type="text" class="form-control" name="entry_name" id="edit_entry_name" maxlength="255" required>
-
-         <label class="form-label mt-2"><strong>Directory Type</strong></label>
+         <small class="text-muted">A label for this connection.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Directory Type</strong></label>
          <select class="form-select" name="provider" id="edit_provider" onchange="dcProviderChanged(this, 'edit_')">
            <option value="ldap">LDAP / Active Directory</option>
            <option value="google">Google Workspace (Admin SDK)</option>
            <option value="graph">Microsoft 365 (Graph)</option>
-           <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
          <strong>Google Workspace</strong> uses the Admin SDK and works on every tier. Secure LDAP is for <em>authentication</em> and is configured on the RemoteAuth page, not here.</small>
