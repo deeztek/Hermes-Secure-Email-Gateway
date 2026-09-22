@@ -444,11 +444,11 @@ function dcFillDelete(el) {
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
          <div class="row g-2">
            <div class="col-md-6">
-             <label class="form-label mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+             <label class="form-label d-block mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
              <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
            </div>
            <div class="col-md-6">
-             <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
+             <label class="form-label d-block mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>
@@ -651,11 +651,11 @@ function dcFillDelete(el) {
          </div>
          <div class="row g-2">
            <div class="col-md-6">
-             <label class="form-label mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+             <label class="form-label d-block mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
              <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
            </div>
            <div class="col-md-6">
-             <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
+             <label class="form-label d-block mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>

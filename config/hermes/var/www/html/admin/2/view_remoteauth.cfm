@@ -1085,7 +1085,7 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                 </div>
                 <div class="col-md-3">
                     <div class="mb-3">
-                        <label class="form-label"><strong>Client Certificate</strong></label>
+                        <label class="form-label d-block"><strong>Client Certificate</strong></label>
                         <cfif structKeyExists(settings, "client_cert_file") AND len(settings.client_cert_file)>
                             <div class="mb-2">
                                 <span class="badge bg-success"><i class="fas fa-id-badge"></i> Installed</span>
@@ -1095,9 +1095,9 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                                 </div>
                             </div>
                         </cfif>
-                        <label class="form-label mb-1 mt-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+                        <label class="form-label d-block mb-1 mt-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
                         <input type="file" name="client_cert_file" class="form-control mb-2" accept=".pem,.crt,.cer">
-                        <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
+                        <label class="form-label d-block mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
                         <input type="file" name="client_key_file" class="form-control" accept=".pem,.key">
                         <small class="text-muted">Only needed where the directory demands mutual TLS, such as Google Secure LDAP. Upload both together; one without the other cannot be used.</small>
                     </div>
