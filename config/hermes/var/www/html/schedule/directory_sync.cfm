@@ -119,7 +119,7 @@ function shq(required string v) {
   SELECT c.*
     FROM directory_connections c
    WHERE c.enabled = 1
-     AND c.provider = 'ldap'
+     AND c.provider IN ('ldap', 'google')
    <cfif val(url.connection_id) GT 0>
      AND c.id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(url.connection_id)#">
    </cfif>
@@ -178,203 +178,260 @@ function shq(required string v) {
   </cfif>
   <cfset theFilter = theFilter & ")">
 
+  <!--- Two connectors, one downstream. Everything after this point -- the
+        relay-domain filter, the diff, staging, apply and auto-apply -- is
+        provider agnostic and works on the same foundRows array, which is why
+        adding Google was a query and nothing else. --->
+  <cfif getConnections.provider IS "google">
+
+    <cfset gSaJson  = "">
+    <cfif Len(Trim(getConnections.google_sa_json))>
+      <cftry>
+        <cfset gSaJson = decrypt(Trim(getConnections.google_sa_json), hermesKey, "AES", "Base64")>
+        <cfcatch><cfset gSaJson = ""></cfcatch>
+      </cftry>
+    </cfif>
+    <cfset gSubject = Trim(getConnections.google_subject)>
+
+    <cfinclude template="../admin/2/inc/directory_google_enumerate.cfm">
+
+    <cfif Len(googleError)>
+      <cfset failMessage = googleError>
+    </cfif>
+
+    <!--- Normalise to the same shape the LDIF parser produces, so the domain
+          filter below does not care which connector ran. --->
+    <cfset seen     = {}>
+    <cfset records  = googleRows>
+    <cfset rawLdif  = ArrayLen(googleRows) ? "google" : "">
+
+  <cfelse>
+
   <!--- The query runs as ldapsearch inside hermes_ldap, not as cfldap here.
 
-       Three reasons, all of which cfldap loses:
+         Three reasons, all of which cfldap loses:
 
-       1. TRUST. cfldap runs on the JVM and validates LDAPS against the JVM
-          truststore, which nothing in Hermes populates. ldapsearch in
-          hermes_ldap uses the same CA bundle slapd does, so the certificate an
-          admin uploaded for RemoteAuth covers enumeration too. One trust store,
-          not two.
-       2. PAGING. Active Directory caps a single search at MaxPageSize, 1000 by
-          default, and silently truncates. -E pr=1000/noprompt pages properly.
-       3. Shelling out to ldapsearch via docker exec is already the pattern
-          here; see inc/ldap_get_user_groups.cfm.
+         1. TRUST. cfldap runs on the JVM and validates LDAPS against the JVM
+            truststore, which nothing in Hermes populates. ldapsearch in
+            hermes_ldap uses the same CA bundle slapd does, so the certificate an
+            admin uploaded for RemoteAuth covers enumeration too. One trust store,
+            not two.
+         2. PAGING. Active Directory caps a single search at MaxPageSize, 1000 by
+            default, and silently truncates. -E pr=1000/noprompt pages properly.
+         3. Shelling out to ldapsearch via docker exec is already the pattern
+            here; see inc/ldap_get_user_groups.cfm.
 
-       The bind password goes to a file read with -y, never into an argument,
-       so it cannot be read out of the host process list. -LLL drops comments
-       and the version header, -o ldif-wrap=no stops LDIF folding long values
-       across continuation lines. --->
-  <cfset tmpId    = dsTempId()>
-  <cfset pwPath   = "/opt/hermes/tmp/#tmpId#_dirsync.pw">
-  <cfset shPath   = "/opt/hermes/tmp/#tmpId#_dirsync.sh">
-  <cfset outPath  = "/opt/hermes/tmp/#tmpId#_dirsync.out">
-  <cfset errPath  = "/opt/hermes/tmp/#tmpId#_dirsync.err">
-  <cfset rawLdif  = "">
-  <cfset rawErr   = "">
+         The bind password goes to a file read with -y, never into an argument,
+         so it cannot be read out of the host process list. -LLL drops comments
+         and the version header, -o ldif-wrap=no stops LDIF folding long values
+         across continuation lines. --->
+    <cfset tmpId    = dsTempId()>
+    <cfset pwPath   = "/opt/hermes/tmp/#tmpId#_dirsync.pw">
+    <cfset shPath   = "/opt/hermes/tmp/#tmpId#_dirsync.sh">
+    <cfset outPath  = "/opt/hermes/tmp/#tmpId#_dirsync.out">
+    <cfset errPath  = "/opt/hermes/tmp/#tmpId#_dirsync.err">
+    <cfset rawLdif  = "">
+    <cfset rawErr   = "">
 
-  <cftry>
+    <cftry>
 
-    <cfif NOT Len(ldapServer) OR NOT Len(Trim(getConnections.base_dn))>
-      <cfthrow message="Connection is missing a server address or base DN">
-    </cfif>
+      <cfif NOT Len(ldapServer) OR NOT Len(Trim(getConnections.base_dn))>
+        <cfthrow message="Connection is missing a server address or base DN">
+      </cfif>
 
-    <cfset ldapUri = (getConnections.tls_mode IS "ldaps" ? "ldaps" : "ldap") & "://" & ldapServer & ":" & ldapPort>
+      <cfset ldapUri = (getConnections.tls_mode IS "ldaps" ? "ldaps" : "ldap") & "://" & ldapServer & ":" & ldapPort>
 
-    <!--- Trust settings are this directory's own, not RemoteAuth's. Reading
-         them from remoteauth_settings coupled two independent things and put
-         the only upload on a Pro-gated page, which is the same mistake the
-         client certificate started out making.
+      <!--- Trust settings are this directory's own, not RemoteAuth's. Reading
+           them from remoteauth_settings coupled two independent things and put
+           the only upload on a Pro-gated page, which is the same mistake the
+           client certificate started out making.
 
-         Verification is implied by the transport: LDAPS verifies, plain has
-         no TLS to verify. There is nothing for an operator to choose. --->
-    <cfset reqCert = (getConnections.tls_mode IS "ldaps") ? "demand" : "never">
-    <cfset envOpts = "-e LDAPTLS_REQCERT=" & shq(reqCert)>
+           Verification is implied by the transport: LDAPS verifies, plain has
+           no TLS to verify. There is nothing for an operator to choose. --->
+      <cfset reqCert = (getConnections.tls_mode IS "ldaps") ? "demand" : "never">
+      <cfset envOpts = "-e LDAPTLS_REQCERT=" & shq(reqCert)>
 
-    <cfif Len(Trim(getConnections.ca_cert_file))>
-      <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.ca_cert_file)) & "'">
-    </cfif>
+      <cfif Len(Trim(getConnections.ca_cert_file))>
+        <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.ca_cert_file)) & "'">
+      </cfif>
 
-    <cffile action="write" file="#pwPath#" output="#bindPW#" charset="utf-8" mode="600" addNewLine="no">
+      <cffile action="write" file="#pwPath#" output="#bindPW#" charset="utf-8" mode="600" addNewLine="no">
 
-    <cfsavecontent variable="shBody"><cfoutput>##!/bin/bash
+      <cfsavecontent variable="shBody"><cfoutput>##!/bin/bash
 /usr/local/bin/docker exec #envOpts# hermes_ldap ldapsearch -LLL -o ldif-wrap=no -x \
-  -H '#shq(ldapUri)#' \
-  -D '#shq(bindDN)#' \
-  -y '#pwPath#' \
-  -b '#shq(Trim(getConnections.base_dn))#' \
-  -s sub \
-  -E pr=1000/noprompt \
-  '#shq(theFilter)#' \
-  dn '#shq(mailAttr)#' givenName sn displayName \
-  > '#outPath#' 2> '#errPath#'
+    -H '#shq(ldapUri)#' \
+    -D '#shq(bindDN)#' \
+    -y '#pwPath#' \
+    -b '#shq(Trim(getConnections.base_dn))#' \
+    -s sub \
+    -E pr=1000/noprompt \
+    '#shq(theFilter)#' \
+    dn '#shq(mailAttr)#' givenName sn displayName \
+    > '#outPath#' 2> '#errPath#'
 exit $?
 </cfoutput></cfsavecontent>
 
-    <cffile action="write" file="#shPath#" output="#shBody#" charset="utf-8" mode="700">
+      <cffile action="write" file="#shPath#" output="#shBody#" charset="utf-8" mode="700">
 
-    <cfexecute name="/bin/bash" arguments="#shPath#" timeout="300" variable="shOut" errorVariable="shErr"></cfexecute>
+      <cfexecute name="/bin/bash" arguments="#shPath#" timeout="300" variable="shOut" errorVariable="shErr"></cfexecute>
 
-    <cfif FileExists(outPath)><cffile action="read" file="#outPath#" variable="rawLdif" charset="utf-8"></cfif>
-    <cfif FileExists(errPath)><cffile action="read" file="#errPath#" variable="rawErr" charset="utf-8"></cfif>
+      <cfif FileExists(outPath)><cffile action="read" file="#outPath#" variable="rawLdif" charset="utf-8"></cfif>
+      <cfif FileExists(errPath)><cffile action="read" file="#errPath#" variable="rawErr" charset="utf-8"></cfif>
 
-    <!--- stderr is never treated as data. inc/rbl_test_entry.cfm learned this
-         the expensive way: an unseparated stderr got folded into the output
-         variable and an error string passed the emptiness test. ldapsearch
-         writes progress notes to stderr on success, so only text that names a
-         failure counts. --->
-    <cfif Len(Trim(rawErr))
-          AND (FindNoCase("ldap_bind", rawErr) GT 0
-            OR FindNoCase("Can't contact", rawErr) GT 0
-            OR FindNoCase("Invalid credentials", rawErr) GT 0
-            OR FindNoCase("error", rawErr) GT 0)>
-      <cfset failMessage = "ldapsearch failed: " & Left(Trim(rawErr), 400)>
-    </cfif>
+      <!--- stderr is never treated as data. inc/rbl_test_entry.cfm learned this
+           the expensive way: an unseparated stderr got folded into the output
+           variable and an error string passed the emptiness test. ldapsearch
+           writes progress notes to stderr on success, so only text that names a
+           failure counts. --->
+      <cfif Len(Trim(rawErr))
+            AND (FindNoCase("ldap_bind", rawErr) GT 0
+              OR FindNoCase("Can't contact", rawErr) GT 0
+              OR FindNoCase("Invalid credentials", rawErr) GT 0
+              OR FindNoCase("error", rawErr) GT 0)>
+        <cfset failMessage = "ldapsearch failed: " & Left(Trim(rawErr), 400)>
+      </cfif>
 
-    <cfcatch>
-      <cfset failMessage = "LDAP query failed: " & cfcatch.message>
-    </cfcatch>
-  </cftry>
+      <cfcatch>
+        <cfset failMessage = "LDAP query failed: " & cfcatch.message>
+      </cfcatch>
+    </cftry>
 
-  <!--- The password file goes first and unconditionally. --->
-  <cfloop list="#pwPath#,#shPath#,#outPath#,#errPath#" index="junk">
-    <cftry><cfif FileExists(junk)><cffile action="delete" file="#junk#"></cfif><cfcatch></cfcatch></cftry>
-  </cfloop>
+    <!--- The password file goes first and unconditionally. --->
+    <cfloop list="#pwPath#,#shPath#,#outPath#,#errPath#" index="junk">
+      <cftry><cfif FileExists(junk)><cffile action="delete" file="#junk#"></cfif><cfcatch></cfcatch></cftry>
+    </cfloop>
 
-  <!--- Rule 1. Anything other than a successful, non-empty result stops here
-        and leaves the previous staged run alone. --->
-  <cfif Len(failMessage) OR NOT Len(Trim(rawLdif))>
-    <cfif NOT Len(failMessage)>
-      <cfset failMessage = "Directory returned no entries for filter " & theFilter & ". Previous results left unchanged.">
-    </cfif>
-    <cfquery datasource="hermes">
-      UPDATE directory_connections
-         SET last_run_at      = <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">,
-             last_run_status  = 'failed',
-             last_run_message = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#failMessage#">
-       WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#connId#">
-    </cfquery>
-    <cfset ArrayAppend(summary, connName & ": FAILED -- " & failMessage)>
-    <cfcontinue>
-  </cfif>
-
-  <!--- Parse the LDIF into records.
-
-        -o ldif-wrap=no means one attribute per line, so no continuation
-        unfolding is needed. A blank line ends a record. ldapsearch base64
-        encodes any value that is not safe as plain UTF-8, signalled by a
-        double colon, which is how a name with an accent or a leading space
-        arrives; those are decoded rather than stored mangled.
-
-        A multi-valued attribute such as proxyAddresses appears as repeated
-        lines, and each value carries an "smtp:" or "SMTP:" prefix, so both
-        shapes are handled rather than assuming one bare address in `mail`. --->
-  <cfset seen    = {}>
-  <cfset records = []>
-  <cfset curRec  = {}>
-
-  <!--- ListToArray with includeEmptyFields, NOT cfloop list. A CFML list
-        collapses consecutive delimiters, so a list loop never yields the blank
-        line between LDIF records and every entry merges into one: the first
-        user's givenName and sn end up attached to every address in the tree,
-        and dn becomes every DN concatenated. --->
-  <cfset ldifLines = ListToArray(rawLdif, Chr(10), true)>
-
-  <cfloop array="#ldifLines#" index="ldifLine">
-    <cfset ldifLine = Replace(ldifLine, Chr(13), "", "all")>
-
-    <cfif NOT Len(Trim(ldifLine))>
-      <cfif NOT StructIsEmpty(curRec)><cfset ArrayAppend(records, curRec)></cfif>
-      <cfset curRec = {}>
+    <!--- Rule 1. Anything other than a successful, non-empty result stops here
+          and leaves the previous staged run alone. --->
+    <cfif Len(failMessage) OR NOT Len(Trim(rawLdif))>
+      <cfif NOT Len(failMessage)>
+        <cfset failMessage = "Directory returned no entries for filter " & theFilter & ". Previous results left unchanged.">
+      </cfif>
+      <cfquery datasource="hermes">
+        UPDATE directory_connections
+           SET last_run_at      = <cfqueryparam cfsqltype="cf_sql_timestamp" value="#Now()#">,
+               last_run_status  = 'failed',
+               last_run_message = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#failMessage#">
+         WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#connId#">
+      </cfquery>
+      <cfset ArrayAppend(summary, connName & ": FAILED -- " & failMessage)>
       <cfcontinue>
     </cfif>
-    <cfif Left(ldifLine, 1) IS "##"><cfcontinue></cfif>
 
-    <cfset colonAt = Find(":", ldifLine)>
-    <cfif colonAt LTE 1><cfcontinue></cfif>
+  </cfif>
 
-    <cfset attrName = LCase(Left(ldifLine, colonAt - 1))>
-    <cfset attrVal  = Mid(ldifLine, colonAt + 1, Len(ldifLine))>
+  <cfif getConnections.provider IS "google">
 
-    <cfif Left(attrVal, 1) IS ":">
-      <cftry>
-        <cfset attrVal = ToString(ToBinary(Trim(Mid(attrVal, 2, Len(attrVal)))), "utf-8")>
-        <cfcatch><cfset attrVal = ""></cfcatch>
-      </cftry>
-    <cfelse>
-      <cfset attrVal = Trim(attrVal)>
-    </cfif>
-
-    <cfif Len(attrVal)>
-      <cfif StructKeyExists(curRec, attrName)>
-        <cfset curRec[attrName] = curRec[attrName] & Chr(9) & attrVal>
-      <cfelse>
-        <cfset curRec[attrName] = attrVal>
-      </cfif>
-    </cfif>
-  </cfloop>
-  <cfif NOT StructIsEmpty(curRec)><cfset ArrayAppend(records, curRec)></cfif>
-
-  <cfset mailKey = LCase(mailAttr)>
-
-  <cfloop array="#records#" index="rec">
-    <cfset recDn      = StructKeyExists(rec, "dn")          ? ListFirst(rec.dn, Chr(9))          : "">
-    <cfset recFirst   = StructKeyExists(rec, "givenname")   ? ListFirst(rec.givenname, Chr(9))   : "">
-    <cfset recLast    = StructKeyExists(rec, "sn")          ? ListFirst(rec.sn, Chr(9))          : "">
-    <cfset recDisplay = StructKeyExists(rec, "displayname") ? ListFirst(rec.displayname, Chr(9)) : "">
-    <cfset recMail    = StructKeyExists(rec, mailKey)       ? rec[mailKey]    : "">
-
-    <cfloop list="#recMail#" index="oneAddr" delimiters="#Chr(9)#">
-      <cfset addr = LCase(Trim(oneAddr))>
-      <cfif addr CONTAINS ":">
-        <cfset addr = LCase(Trim(ListLast(addr, ":")))>
-      </cfif>
-
-      <!--- Rule 3. One connection populates exactly one relay domain. --->
-      <cfif Len(addr) AND addr CONTAINS "@" AND StructKeyExists(relayDomains, LCase(ListLast(addr, "@")))
+    <!--- Already structured, so only the relay-domain filter applies. Rule 3
+          holds the same either way: an address outside the relay domains is
+          discarded rather than filed under the wrong one, and Google tenants
+          routinely carry addresses Hermes does not relay for. --->
+    <cfloop array="#googleRows#" index="gRow">
+      <cfset addr = LCase(Trim(gRow.email))>
+      <cfif Len(addr) AND addr CONTAINS "@"
+            AND StructKeyExists(relayDomains, LCase(ListLast(addr, "@")))
             AND NOT StructKeyExists(seen, addr)>
         <cfset seen[addr] = true>
         <cfset ArrayAppend(foundRows, {
           email   = addr,
-          dn      = recDn,
-          first   = recFirst,
-          last    = recLast,
-          display = recDisplay
+          dn      = "",
+          first   = gRow.first,
+          last    = gRow.last,
+          display = gRow.display
         })>
       </cfif>
     </cfloop>
-  </cfloop>
+
+  <cfelse>
+
+  <!--- Parse the LDIF into records.
+
+          -o ldif-wrap=no means one attribute per line, so no continuation
+          unfolding is needed. A blank line ends a record. ldapsearch base64
+          encodes any value that is not safe as plain UTF-8, signalled by a
+          double colon, which is how a name with an accent or a leading space
+          arrives; those are decoded rather than stored mangled.
+
+          A multi-valued attribute such as proxyAddresses appears as repeated
+          lines, and each value carries an "smtp:" or "SMTP:" prefix, so both
+          shapes are handled rather than assuming one bare address in `mail`. --->
+    <cfset seen    = {}>
+    <cfset records = []>
+    <cfset curRec  = {}>
+
+    <!--- ListToArray with includeEmptyFields, NOT cfloop list. A CFML list
+          collapses consecutive delimiters, so a list loop never yields the blank
+          line between LDIF records and every entry merges into one: the first
+          user's givenName and sn end up attached to every address in the tree,
+          and dn becomes every DN concatenated. --->
+    <cfset ldifLines = ListToArray(rawLdif, Chr(10), true)>
+
+    <cfloop array="#ldifLines#" index="ldifLine">
+      <cfset ldifLine = Replace(ldifLine, Chr(13), "", "all")>
+
+      <cfif NOT Len(Trim(ldifLine))>
+        <cfif NOT StructIsEmpty(curRec)><cfset ArrayAppend(records, curRec)></cfif>
+        <cfset curRec = {}>
+        <cfcontinue>
+      </cfif>
+      <cfif Left(ldifLine, 1) IS "##"><cfcontinue></cfif>
+
+      <cfset colonAt = Find(":", ldifLine)>
+      <cfif colonAt LTE 1><cfcontinue></cfif>
+
+      <cfset attrName = LCase(Left(ldifLine, colonAt - 1))>
+      <cfset attrVal  = Mid(ldifLine, colonAt + 1, Len(ldifLine))>
+
+      <cfif Left(attrVal, 1) IS ":">
+        <cftry>
+          <cfset attrVal = ToString(ToBinary(Trim(Mid(attrVal, 2, Len(attrVal)))), "utf-8")>
+          <cfcatch><cfset attrVal = ""></cfcatch>
+        </cftry>
+      <cfelse>
+        <cfset attrVal = Trim(attrVal)>
+      </cfif>
+
+      <cfif Len(attrVal)>
+        <cfif StructKeyExists(curRec, attrName)>
+          <cfset curRec[attrName] = curRec[attrName] & Chr(9) & attrVal>
+        <cfelse>
+          <cfset curRec[attrName] = attrVal>
+        </cfif>
+      </cfif>
+    </cfloop>
+    <cfif NOT StructIsEmpty(curRec)><cfset ArrayAppend(records, curRec)></cfif>
+
+    <cfset mailKey = LCase(mailAttr)>
+
+    <cfloop array="#records#" index="rec">
+      <cfset recDn      = StructKeyExists(rec, "dn")          ? ListFirst(rec.dn, Chr(9))          : "">
+      <cfset recFirst   = StructKeyExists(rec, "givenname")   ? ListFirst(rec.givenname, Chr(9))   : "">
+      <cfset recLast    = StructKeyExists(rec, "sn")          ? ListFirst(rec.sn, Chr(9))          : "">
+      <cfset recDisplay = StructKeyExists(rec, "displayname") ? ListFirst(rec.displayname, Chr(9)) : "">
+      <cfset recMail    = StructKeyExists(rec, mailKey)       ? rec[mailKey]    : "">
+
+      <cfloop list="#recMail#" index="oneAddr" delimiters="#Chr(9)#">
+        <cfset addr = LCase(Trim(oneAddr))>
+        <cfif addr CONTAINS ":">
+          <cfset addr = LCase(Trim(ListLast(addr, ":")))>
+        </cfif>
+
+        <!--- Rule 3. One connection populates exactly one relay domain. --->
+        <cfif Len(addr) AND addr CONTAINS "@" AND StructKeyExists(relayDomains, LCase(ListLast(addr, "@")))
+              AND NOT StructKeyExists(seen, addr)>
+          <cfset seen[addr] = true>
+          <cfset ArrayAppend(foundRows, {
+            email   = addr,
+            dn      = recDn,
+            first   = recFirst,
+            last    = recLast,
+            display = recDisplay
+          })>
+        </cfif>
+      </cfloop>
+    </cfloop>
+
+  </cfif>
 
   <cfif ArrayLen(foundRows) LT 1>
     <!--- Zero records is a filter that matched nothing, not entries that
@@ -384,7 +441,11 @@ exit $?
     <cfif ArrayLen(records) EQ 0>
       <cfset failMessage = "No entries matched the filter " & theFilter & " under " & Trim(getConnections.base_dn) & ". Previous results left unchanged.">
     <cfelse>
-      <cfset failMessage = "Directory returned " & ArrayLen(records) & " entries, but none carried an address in a relay domain. Check the Mail Attribute, or whether these users belong in Hermes at all. Previous results left unchanged.">
+      <cfif getConnections.provider IS "google">
+        <cfset failMessage = "Google returned " & googleRawCount & " account(s), but none carried an address in a relay domain. Add the domain under Email Relay first, or these users are not ones Hermes relays for. Previous results left unchanged.">
+      <cfelse>
+        <cfset failMessage = "Directory returned " & ArrayLen(records) & " entries, but none carried an address in a relay domain. Check the Mail Attribute, or whether these users belong in Hermes at all. Previous results left unchanged.">
+      </cfif>
     </cfif>
     <cfquery datasource="hermes">
       UPDATE directory_connections

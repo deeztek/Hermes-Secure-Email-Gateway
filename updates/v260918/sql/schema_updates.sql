@@ -86,6 +86,15 @@ CREATE TABLE IF NOT EXISTS `directory_connections` (
   -- Auto-Provisioning is Community, and the directory read from is not
   -- necessarily the one authenticated against.
   `ca_cert_file` varchar(255) DEFAULT NULL,
+  -- Google Admin SDK (#336). The service account JSON key, AES/Base64 under
+  -- /opt/hermes/keys/hermes.key like every other credential here. TEXT because
+  -- the key file is a couple of kilobytes before encryption.
+  --
+  -- google_subject is the super administrator the service account impersonates.
+  -- Domain-wide delegation authorises the service account to act as a user, and
+  -- the Directory API will not answer without one.
+  `google_sa_json` text DEFAULT NULL,
+  `google_subject` varchar(255) DEFAULT NULL,
   -- Provisioning defaults, applied to every recipient this connection creates.
   -- auth_type is independent of `provider`: the directory Hermes enumerates is
   -- not necessarily the one it authenticates against. A tenant synced from

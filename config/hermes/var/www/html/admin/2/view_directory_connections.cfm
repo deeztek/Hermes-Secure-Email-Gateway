@@ -28,6 +28,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 $(document).ready(function() {
     var addAuth = document.getElementById('add_auth_type');
     if (addAuth) { dcAuthChanged(addAuth, 'add_mapping_id'); }
+    var addProv = document.getElementById('add_provider');
+    if (addProv) { dcProviderChanged(addProv, 'add_'); }
 
     $('#dcTable').DataTable({
         dom: 'Blfrtip',
@@ -66,6 +68,10 @@ function dcFillEdit(el) {
     document.getElementById('edit_bind_password').value    = '';
     document.getElementById('edit_tls_mode').value         = d.tls;
     document.getElementById('edit_provider').value         = d.provider;
+    document.getElementById('edit_google_subject').value   = d.gsubject || '';
+    var saWrap = document.getElementById('edit_has_sa_wrap');
+    if (saWrap) { saWrap.hidden = (d.hassa !== '1'); }
+    dcProviderChanged(document.getElementById('edit_provider'), 'edit_');
     document.getElementById('edit_auth_type').value        = d.authtype;
     document.getElementById('edit_policy_id').value        = d.policyid;
     document.getElementById('edit_report_enabled').value   = d.report;
@@ -98,6 +104,25 @@ function dcAuthChanged(sel, mapSelectId) {
     group.hidden  = !remote;
     map.required  = remote;
     if (!remote) { map.value = '0'; }
+}
+
+// Google reads over REST and has none of the LDAP connection fields. Hiding
+// them by the input's own name rather than tagging every row keeps the markup
+// from sprouting classes that only JavaScript reads.
+function dcProviderChanged(sel, prefix) {
+    var isGoogle = (sel.value === 'google');
+    var scope = sel.closest('.modal-body') || document;
+    var ldapOnly = ['server_address','server_port','tls_mode','base_dn','bind_dn',
+                    'bind_password','object_class','mail_attribute','extra_filter',
+                    'ca_cert_file','client_cert_file','client_key_file'];
+    ldapOnly.forEach(function (n) {
+        var el = scope.querySelector('[name="' + n + '"]');
+        if (!el) { return; }
+        var box = el.closest('.row') || el.closest('.mb-3');
+        if (box) { box.hidden = isGoogle; }
+    });
+    var g = document.getElementById(prefix + 'google_wrap');
+    if (g) { g.hidden = !isGoogle; }
 }
 
 function dcAction(name, id, flag) {
@@ -240,7 +265,10 @@ function dcFillDelete(el) {
       <tr>
         <td>#EncodeForHTML(getConnections.entry_name)#</td>
         <td>
-          <cfif Len(getConnections.mapping_domain)>
+          <cfif getConnections.provider IS "google">
+            <span class="badge bg-danger"><i class="fab fa-google"></i>&nbsp;Workspace</span>
+            <small class="text-muted ms-1">#EncodeForHTML(getConnections.google_subject)#</small>
+          <cfelseif Len(getConnections.mapping_domain)>
             <span class="badge bg-info">RemoteAuth: #EncodeForHTML(getConnections.mapping_domain)#</span>
           <cfelse>
             #EncodeForHTML(getConnections.server_address)#:#getConnections.server_port#
@@ -324,7 +352,9 @@ function dcFillDelete(el) {
                   data-welcome="#val(getConnections.send_welcome)#"
                   data-autoapply="#val(getConnections.auto_apply)#"
                   data-hascert="#(Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file)) ? 1 : 0)#"
-                  data-hasca="#(Len(Trim(getConnections.ca_cert_file)) ? 1 : 0)#">
+                  data-hasca="#(Len(Trim(getConnections.ca_cert_file)) ? 1 : 0)#"
+                  data-gsubject="#EncodeForHTMLAttribute(getConnections.google_subject)#"
+                  data-hassa="#(Len(Trim(getConnections.google_sa_json)) ? 1 : 0)#">
             <i class="fas fa-edit"></i>
           </button>
           <button type="button" class="btn btn-sm btn-secondary" title="Enable or disable"
@@ -371,16 +401,36 @@ function dcFillDelete(el) {
          <small class="text-muted">A label for this connection.</small>
 
          <label class="form-label mt-2"><strong>Directory Type</strong></label>
-         <select class="form-select" name="provider" id="add_provider">
+         <select class="form-select" name="provider" id="add_provider" onchange="dcProviderChanged(this, 'add_')">
            <option value="ldap">LDAP / Active Directory</option>
-           <option value="google" disabled>Google Workspace via Admin SDK (connector not built &mdash; use LDAP / Active Directory for Google Secure LDAP)</option>
+           <option value="google">Google Workspace (Admin SDK)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
-         For <strong>Google Workspace</strong>, choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636: Secure LDAP is an ordinary LDAPS endpoint that requires the client certificate uploaded on the RemoteAuth page. Business Plus or above.</small>
+         <strong>Google Workspace</strong> works on any tier through the Admin SDK. Secure LDAP is an alternative for Business Plus and above: choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636 with a client certificate.</small>
        </div>
      </div>
-     <div class="row">
+     <div class="row dcGoogleOnly" id="add_google_wrap" hidden>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Service Account Key</strong></label>
+         <input type="file" class="form-control" name="google_sa_json" accept=".json,application/json">
+         <small class="text-muted">The JSON key file downloaded when you created the service account. Stored encrypted.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Impersonate Administrator</strong></label>
+         <input type="email" class="form-control" name="google_subject" id="add_google_subject" placeholder="admin@yourdomain.com" maxlength="255">
+         <small class="text-muted">A super administrator in that Workspace. Domain-wide delegation lets the service account act as this person; the Directory API will not answer without one.</small>
+       </div>
+       <div class="col-md-12 mb-3">
+         <div class="callout callout-info mb-0">
+           <p class="mb-1"><strong>Before this works, authorise the service account in Google.</strong></p>
+           <p class="mb-0"><small>Google Admin console &rarr; Security &rarr; Access and data control &rarr; API controls &rarr; Domain-wide delegation. Add the service account's <strong>client ID</strong> with the scope
+           <code>https://www.googleapis.com/auth/admin.directory.user.readonly</code>.
+           Your organisation may require a second super administrator to approve it.</small></p>
+         </div>
+       </div>
+     </div>
+     <div class="row dcLdapOnly" id="add_ldap_wrap">
        <div class="col-md-6 mb-3">
          <label class="form-label"><strong>Server Address</strong></label>
          <input type="text" class="form-control" name="server_address" maxlength="255" placeholder="dc01.example.local">
@@ -575,16 +625,40 @@ function dcFillDelete(el) {
          <input type="text" class="form-control" name="entry_name" id="edit_entry_name" maxlength="255" required>
 
          <label class="form-label mt-2"><strong>Directory Type</strong></label>
-         <select class="form-select" name="provider" id="edit_provider">
+         <select class="form-select" name="provider" id="edit_provider" onchange="dcProviderChanged(this, 'edit_')">
            <option value="ldap">LDAP / Active Directory</option>
-           <option value="google" disabled>Google Workspace via Admin SDK (connector not built &mdash; use LDAP / Active Directory for Google Secure LDAP)</option>
+           <option value="google">Google Workspace (Admin SDK)</option>
            <option value="graph" disabled>Microsoft 365 (Graph connector not built)</option>
          </select>
          <small class="text-muted">Where the user list is read from. How recipients authenticate is set separately below.<br>
-         For <strong>Google Workspace</strong>, choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636: Secure LDAP is an ordinary LDAPS endpoint that requires the client certificate uploaded on the RemoteAuth page. Business Plus or above.</small>
+         <strong>Google Workspace</strong> works on any tier through the Admin SDK. Secure LDAP is an alternative for Business Plus and above: choose LDAP / Active Directory and point it at <code>ldap.google.com</code> on 636 with a client certificate.</small>
        </div>
      </div>
-     <div class="row">
+     <div class="row dcGoogleOnly" id="edit_google_wrap" hidden>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Service Account Key</strong></label>
+         <div class="form-check mb-1" id="edit_has_sa_wrap" hidden>
+           <span class="badge bg-success"><i class="fas fa-key"></i> Installed</span>
+           <small class="text-muted ms-1">Upload a new file only to replace it.</small>
+         </div>
+         <input type="file" class="form-control" name="google_sa_json" accept=".json,application/json">
+         <small class="text-muted">The JSON key file downloaded when you created the service account. Stored encrypted.</small>
+       </div>
+       <div class="col-md-6 mb-3">
+         <label class="form-label"><strong>Impersonate Administrator</strong></label>
+         <input type="email" class="form-control" name="google_subject" id="edit_google_subject" placeholder="admin@yourdomain.com" maxlength="255">
+         <small class="text-muted">A super administrator in that Workspace. Domain-wide delegation lets the service account act as this person; the Directory API will not answer without one.</small>
+       </div>
+       <div class="col-md-12 mb-3">
+         <div class="callout callout-info mb-0">
+           <p class="mb-1"><strong>Before this works, authorise the service account in Google.</strong></p>
+           <p class="mb-0"><small>Google Admin console &rarr; Security &rarr; Access and data control &rarr; API controls &rarr; Domain-wide delegation. Add the service account's <strong>client ID</strong> with the scope
+           <code>https://www.googleapis.com/auth/admin.directory.user.readonly</code>.
+           Your organisation may require a second super administrator to approve it.</small></p>
+         </div>
+       </div>
+     </div>
+     <div class="row dcLdapOnly" id="edit_ldap_wrap">
        <div class="col-md-6 mb-3">
          <label class="form-label"><strong>Server Address</strong></label>
          <input type="text" class="form-control" name="server_address" id="edit_server_address" maxlength="255">

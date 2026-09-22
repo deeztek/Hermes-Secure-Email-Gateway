@@ -45,6 +45,7 @@
     <cfparam name="form.mail_attribute"        default="mail">
     <cfparam name="form.extra_filter"          default="">
     <cfparam name="form.connection_id"         default="0">
+    <cfparam name="form.google_subject"        default="">
     <!--- Provisioning defaults. auth_type is independent of provider: the
           directory we enumerate is not necessarily the one we authenticate
           against. --->
@@ -101,9 +102,23 @@
     <!--- A connection with no base DN enumerates the whole tree, and one with
           no domain has nowhere to file what it finds. Both are refused rather
           than defaulted. --->
-    <cfif NOT Len(dcName) OR NOT Len(Trim(form.base_dn))>
+    <cfif NOT Len(dcName)>
       <cfset session.m = "dc_error">
-      <cfset session.dcError = "Name and base DN are both required.">
+      <cfset session.dcError = "A name is required.">
+      <cflocation url="view_directory_connections.cfm" addtoken="no">
+    </cfif>
+
+    <!--- Google reads over REST, so none of the LDAP connection fields apply.
+          It needs the service account key and somebody to impersonate. --->
+    <cfif dcProvider IS "google">
+      <cfif NOT Len(Trim(form.google_subject))>
+        <cfset session.m = "dc_error">
+        <cfset session.dcError = "Enter the super administrator the service account should impersonate. Domain-wide delegation will not work without one.">
+        <cflocation url="view_directory_connections.cfm" addtoken="no">
+      </cfif>
+    <cfelseif NOT Len(Trim(form.base_dn))>
+      <cfset session.m = "dc_error">
+      <cfset session.dcError = "A base DN is required.">
       <cflocation url="view_directory_connections.cfm" addtoken="no">
     </cfif>
 
@@ -117,8 +132,9 @@
     </cfif>
 
     <!--- The server is where the user list is read from, and nothing else
-          supplies it. The RemoteAuth mapping answers a different question. --->
-    <cfif NOT Len(Trim(form.server_address))>
+          supplies it. The RemoteAuth mapping answers a different question.
+          Google has no server to enter. --->
+    <cfif dcProvider IS NOT "google" AND NOT Len(Trim(form.server_address))>
       <cfset session.m = "dc_error">
       <cfset session.dcError = "Enter the address of the directory to read the user list from.">
       <cflocation url="view_directory_connections.cfm" addtoken="no">
@@ -233,6 +249,47 @@
       </cftry>
     </cfif>
 
+    <!--- Service account key. Encrypted like every other credential here, and
+          kept out of the certs directory because it is not a certificate: it
+          is a password-equivalent that can act as a super administrator. --->
+    <cfset dcSaJson = "">
+    <cfif form.action IS "edit">
+      <cfquery name="dcPriorSa" datasource="hermes">
+        SELECT google_sa_json FROM directory_connections
+         WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.connection_id)#">
+      </cfquery>
+      <cfif dcPriorSa.recordcount GTE 1><cfset dcSaJson = dcPriorSa.google_sa_json></cfif>
+    </cfif>
+
+    <cfif StructKeyExists(form, "google_sa_json") AND Len(form.google_sa_json)>
+      <cftry>
+        <cfset dcSaTmp = "/opt/hermes/tmp/" & dcSlug & "_sa_upload.json">
+        <cffile action="upload" fileField="google_sa_json" destination="/opt/hermes/tmp"
+                nameConflict="makeunique" accept="application/json,text/plain,.json">
+        <cfset dcSaUploaded = "/opt/hermes/tmp/" & cffile.serverFile>
+        <cffile action="read" file="#dcSaUploaded#" variable="dcSaRaw" charset="utf-8">
+        <cftry><cffile action="delete" file="#dcSaUploaded#"><cfcatch></cfcatch></cftry>
+
+        <!--- Validate before storing. A key that is not JSON, or is the OAuth
+              client file rather than the service account key, fails later as
+              an authentication error that says nothing about the upload. --->
+        <cfif NOT IsJSON(Trim(dcSaRaw))>
+          <cfthrow message="That file is not valid JSON.">
+        </cfif>
+        <cfset dcSaParsed = DeserializeJSON(Trim(dcSaRaw))>
+        <cfif NOT StructKeyExists(dcSaParsed, "client_email") OR NOT StructKeyExists(dcSaParsed, "private_key")>
+          <cfthrow message="That JSON has no client_email or private_key, so it is not a service account key. Download the key from the service account itself, not the OAuth client.">
+        </cfif>
+
+        <cfset dcSaJson = encrypt(Trim(dcSaRaw), hermesKey, "AES", "Base64")>
+        <cfcatch>
+          <cfset session.m = "dc_error">
+          <cfset session.dcError = "Service account key rejected: " & cfcatch.message>
+          <cflocation url="view_directory_connections.cfm" addtoken="no">
+        </cfcatch>
+      </cftry>
+    </cfif>
+
     <cfset encPw = "">
     <cfif Len(Trim(form.bind_password))>
       <cftry>
@@ -251,7 +308,8 @@
           INSERT INTO directory_connections
             (entry_name, provider, remoteauth_mapping_id, server_address, server_port,
              tls_mode, base_dn, bind_dn, bind_password, object_class, mail_attribute, extra_filter,
-             client_cert_file, client_key_file, ca_cert_file, enabled,
+             client_cert_file, client_key_file, ca_cert_file,
+             google_sa_json, google_subject, enabled,
              auth_type, policy_id, report_enabled, train_bayes, download_msg, enforce_mfa, send_welcome, auto_apply)
           VALUES (
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(dcName,255)#">,
@@ -269,6 +327,8 @@
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
+            <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#dcSaJson#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.google_subject),255)#">,
             1,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
             <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
@@ -298,6 +358,8 @@
                  client_cert_file      = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
                  client_key_file       = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
                  ca_cert_file          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCaFile#">,
+                 google_sa_json        = <cfqueryparam cfsqltype="cf_sql_longvarchar" value="#dcSaJson#">,
+                 google_subject        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.google_subject),255)#">,
                  auth_type             = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
                  policy_id             = <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
                  report_enabled        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcReport#">,
