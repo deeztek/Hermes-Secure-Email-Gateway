@@ -164,6 +164,13 @@ paths = [
     '''\.tar\.gz$''',
     '''\.tar\.xz$''',
 
+    # manifest.json is a list of SHA-256 hashes of Pro template files. High
+    # entropy by definition, which trips generic-api-key, but a digest of a
+    # file that ships in the repo is not a secret: anyone holding the file
+    # can recompute it. The rule only fires on whichever hashes changed in a
+    # given commit, so it surfaces sporadically and reads as a new leak.
+    '''manifest\.json$''',
+
     # Fail2ban default configs (not our secrets)
     '''config/fail2ban/config/fail2ban/action\.d/''',
     '''config/fail2ban/config/fail2ban/jail\.conf''',
