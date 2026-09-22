@@ -573,7 +573,7 @@ $(document).ready(function() {
     <cfset testScheme = (val(form.test_use_ldaps) EQ 1) ? "ldaps" : "ldap">
     <cfset ldapUrl = testScheme & "://" & form.test_server & ":" & form.test_port>
 
-    <!--- ldapwhoami reads its TLS settings from the client config, not from
+    <!--- ldapsearch reads its TLS settings from the client config, not from
          olcRemoteAuthTLS, so the overlay's posture is passed explicitly.
          Without this the probe would silently verify nothing. --->
     <!--- Mirrors what the sync derives: choosing LDAPS is choosing verification,
@@ -608,7 +608,15 @@ $(document).ready(function() {
          contain an apostrophe, and these are all operator input. --->
     <cfset tcPw = "/opt/hermes/tmp/" & LCase(Left(Replace(CreateUUID(), "-", "", "all"), 10)) & "_ra_test.pw">
     <cffile action="write" file="#tcPw#" output="#form.test_password#" charset="utf-8" mode="600" addNewLine="no">
-    <cfset ldapCommand = "exec#testEnv# hermes_ldap ldapwhoami -x -H '#raShq(ldapUrl)#' -D '#raShq(testDn)#' -y '#tcPw#'">
+    <!--- A root DSE read, not ldapwhoami. Whoami is an EXTENDED OPERATION and
+         Google Secure LDAP does not implement it, so a perfectly good bind
+         came back as "Protocol error (2)" from the whoami step and the probe
+         reported failure for every correctly configured Google mapping.
+
+         A base-scope read of the root DSE is supported everywhere and tests
+         the same thing: ldapsearch exits before searching if the bind is
+         refused, so a returned entry proves the credentials were accepted. --->
+    <cfset ldapCommand = "exec#testEnv# hermes_ldap ldapsearch -LLL -o ldif-wrap=no -x -H '#raShq(ldapUrl)#' -D '#raShq(testDn)#' -y '#tcPw#' -b '' -s base '(objectClass=*)' 1.1">
     <cfif testScheme IS "ldap" AND structKeyExists(globalTLS, "tls_starttls") AND globalTLS.tls_starttls EQ "yes">
         <cfset ldapCommand = ldapCommand & " -ZZ">
     </cfif>
@@ -616,7 +624,7 @@ $(document).ready(function() {
     <!--- Run it through a temp script that redirects both streams to files
          and always exits 0.
 
-         cfexecute throws when the command exits non-zero, and ldapwhoami does
+         cfexecute throws when the command exits non-zero, and ldapsearch does
          exactly that on a rejected bind. Worse, it does not reliably populate
          errorVariable on that path, so the catch had nothing to report and
          showed Lucee's "Error invoking external process" instead of the LDAP
