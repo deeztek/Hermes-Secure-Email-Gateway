@@ -104,11 +104,19 @@ it wrong produces a failed bind, not a wrong username.
 **The one exception:** console *system users* have a username an administrator
 chooses, which may be anything and is unrelated to this page.
 
-Auto-provisioning sidesteps the pattern entirely for the recipients it creates:
-it read them out of the directory, so it knows each one's real DN and writes
-that to `seeAlso` directly. That is why a directory whose account names differ
-from the e-mail local part provisions correctly even when the DN pattern would
-not have resolved.
+**Auto-provisioning may or may not use the pattern, depending on the connector.**
+
+| Auto-Provisioning type | `seeAlso` comes from |
+|---|---|
+| LDAP | The user's **real DN**, read from the directory. The pattern is not consulted at all, so a directory whose account names differ from the e-mail local part provisions correctly even when the pattern would not have resolved |
+| Google Workspace (Admin SDK) | **This pattern** |
+| Microsoft 365 (Graph) | **This pattern** |
+
+The two cloud connectors are REST APIs and have no DN to report, so the pattern
+on the mapping is what builds the entry. Get it right *before* importing: for
+Google that means `uid={username},...`, not `{email}`. See
+[Google Secure LDAP](#google-secure-ldap) below and
+[Auto-Provisioning](../02-email-relay/auto-provisioning.md).
 
 ## DN pattern placeholders
 
@@ -234,16 +242,63 @@ Hermes. The DN pattern only tells Hermes where to find them in Google.
 
 ## Test Connection button
 
-The Test modal does **not** consult the saved settings end-to-end — it does its own `ldapwhoami` against the mapping's `server_address:server_port`, applying the same DN pattern substitution the overlay would and honoring the global STARTTLS setting. The credentials entered in the modal are used for one bind attempt:
+The Test modal does **not** consult the saved settings end to end. It runs its
+own bind against the mapping's `server_address:server_port`, applying the same
+DN pattern substitution the overlay would. The credentials typed into the modal
+are used for one bind attempt and are never stored.
 
 ```
-docker exec hermes_ldap ldapwhoami -x -H ldap://<server>:<port> \
-    -D "<DN expanded from pattern>" -w "<password>"  [-ZZ if STARTTLS]
+docker exec hermes_ldap ldapsearch -LLL -o ldif-wrap=no -x \
+    -H ldaps://<server>:<port> \
+    -D "<DN expanded from pattern>" -y <password file> \
+    -b "" -s base "(objectClass=*)" 1.1
 ```
 
-Success is detected by `dn:` or `u:` in the response. Failure surfaces the raw stderr from `ldapwhoami`. The bind credentials are never stored — they live only for the duration of the request, then disappear.
+This is intentionally **separate from the overlay flow**: it lets you verify the
+DN pattern and network path before clicking Apply Settings, which rebuilds the
+overlay and could break live logins.
 
-This is intentionally **separate from the overlay flow**: it lets an admin verify the DN pattern and network path before clicking Apply Settings (which would rebuild the overlay and potentially break live logins).
+### Why a root DSE read and not `ldapwhoami`
+
+`ldapwhoami` is an LDAP **extended operation**, and Google Secure LDAP does not
+implement it. A perfectly good bind came back as `Protocol error (2)` from the
+whoami step, so the probe failed on every correctly configured Google mapping.
+
+A base-scope read of the root DSE is supported everywhere and tests the same
+thing. `ldapsearch` exits before it searches if the bind is refused, so the
+command getting as far as a result at all proves the credentials were accepted.
+
+### What counts as failure
+
+**The question is whether the credentials were accepted, not whether that user
+can read anything.** Those are different, and conflating them is what made the
+probe fail against a directory that was authenticating perfectly.
+
+Only authentication and transport errors are treated as failure:
+
+| In stderr | Meaning |
+| --- | --- |
+| `Invalid credentials` | Wrong password, or a DN that does not exist |
+| `data 52e` | Active Directory's wrong-password code |
+| `Can't contact` | Network path, DNS, or wrong port |
+| `Confidentiality`, `TLS`, `certificate` | Transport or trust failure |
+| `Protocol error` | The server rejected the request itself |
+| *nothing on either stream* | The command never ran. A probe that passes when nothing happened is worse than no probe |
+
+Anything the directory said **after** accepting the bind is a pass:
+
+- **`Insufficient access (50)`** is what Google returns when an ordinary user
+  reads the root DSE. It is an *authorization* error, and authorization only
+  happens after authentication, so it proves the bind worked. This is the normal
+  result for a successful Google Secure LDAP test.
+- **`No such object`** on a base that does not exist, likewise.
+
+### Reading a Google failure
+
+Google returns **`Invalid credentials (49), Incorrect password`** for a DN that
+does not exist, not "no such object". So a wrong DN pattern and a wrong password
+produce the identical message. If the password is definitely right, suspect the
+DN pattern, and check it uses `{username}` and not `{email}`.
 
 ## DNS resolution prerequisite
 
