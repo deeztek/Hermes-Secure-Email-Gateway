@@ -120,7 +120,22 @@ function dcProviderChanged(sel, prefix) {
         if (!el) { return; }
         var box = el.closest('.row') || el.closest('.mb-3');
         if (box) { box.hidden = isGoogle; }
+
+        // A hidden field that is still required blocks submit, and the browser
+        // cannot focus it to say why, so the button appears to do nothing.
+        // Remembering the original lets LDAP get its validation back.
+        if (isGoogle) {
+            if (el.required) { el.dataset.wasRequired = '1'; }
+            el.required = false;
+        } else if (el.dataset.wasRequired === '1') {
+            el.required = true;
+        }
     });
+
+    // Blocks whose input sits deeper than the box that should disappear, so
+    // closest() finds an inner row and leaves the label and help behind.
+    scope.querySelectorAll('.dcLdapOnly').forEach(function (b) { b.hidden = isGoogle; });
+
     var g = document.getElementById(prefix + 'google_wrap');
     if (g) { g.hidden = !isGoogle; }
 }
@@ -490,7 +505,7 @@ function dcFillDelete(el) {
        </div>
      </div>
      <div class="row">
-       <div class="col-md-12 mb-3">
+       <div class="col-md-12 mb-3 dcLdapOnly">
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
          <div class="row g-2">
            <div class="col-md-6">
@@ -717,7 +732,7 @@ function dcFillDelete(el) {
        </div>
      </div>
      <div class="row">
-       <div class="col-md-12 mb-3">
+       <div class="col-md-12 mb-3 dcLdapOnly">
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
          <div class="form-check mb-1" id="edit_remove_cert_wrap" hidden>
            <input class="form-check-input" type="checkbox" name="remove_client_cert" id="edit_remove_client_cert" value="1">
