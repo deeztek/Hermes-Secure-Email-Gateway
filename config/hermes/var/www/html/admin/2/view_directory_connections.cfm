@@ -75,6 +75,12 @@ function dcFillEdit(el) {
     document.getElementById('edit_send_welcome').value     = d.welcome;
     document.getElementById('edit_auto_apply').value       = d.autoapply;
     dcAuthChanged(document.getElementById('edit_auth_type'), 'edit_mapping_id');
+
+    // The remove option only means something when a pair is installed.
+    var rmWrap = document.getElementById('edit_remove_cert_wrap');
+    var rmBox  = document.getElementById('edit_remove_client_cert');
+    if (rmWrap) { rmWrap.hidden = (d.hascert !== '1'); }
+    if (rmBox)  { rmBox.checked = false; }
 }
 
 // The mapping only means anything for Remote auth, so it is hidden rather than
@@ -236,6 +242,7 @@ function dcFillDelete(el) {
             #EncodeForHTML(getConnections.server_address)#:#getConnections.server_port#
           </cfif>
           <cfif getConnections.tls_mode IS "ldaps"><span class="badge bg-success">LDAPS</span></cfif>
+          <cfif Len(Trim(getConnections.client_cert_file))><span class="badge bg-info" title="Client certificate installed"><i class="fas fa-id-badge"></i></span></cfif>
         </td>
         <td>
           <cfif getConnections.enabled EQ 1>
@@ -311,7 +318,8 @@ function dcFillDelete(el) {
                   data-bayes="#val(getConnections.train_bayes)#"
                   data-mfa="#val(getConnections.enforce_mfa)#"
                   data-welcome="#val(getConnections.send_welcome)#"
-                  data-autoapply="#val(getConnections.auto_apply)#">
+                  data-autoapply="#val(getConnections.auto_apply)#"
+                  data-hascert="#(Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file)) ? 1 : 0)#">
             <i class="fas fa-edit"></i>
           </button>
           <button type="button" class="btn btn-sm btn-secondary" title="Enable or disable"
@@ -345,7 +353,7 @@ function dcFillDelete(el) {
 <div class="modal fade" id="addModal" tabindex="-1">
  <div class="modal-dialog modal-lg">
   <div class="modal-content">
-   <form method="post" action="">
+   <form method="post" action="" enctype="multipart/form-data">
    <input type="hidden" name="action" value="add">
    <div class="modal-header"><h5 class="modal-title">Add Directory</h5>
      <button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -419,6 +427,16 @@ function dcFillDelete(el) {
        </div>
      </div>
 
+     <div class="row">
+       <div class="col-md-12 mb-3">
+         <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
+         <div class="d-flex gap-2">
+           <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
+           <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+         </div>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+       </div>
+     </div>
      <hr>
      <h6 class="text-muted text-uppercase"><strong>Provisioning Defaults</strong></h6>
      <p class="text-muted"><small>Applied to every recipient this connection creates. Encryption is deliberately not here: turn S/MIME or PGP on afterwards from Relay Recipients using Bulk Edit.</small></p>
@@ -526,7 +544,7 @@ function dcFillDelete(el) {
 <div class="modal fade" id="editModal" tabindex="-1">
  <div class="modal-dialog modal-lg">
   <div class="modal-content">
-   <form method="post" action="">
+   <form method="post" action="" enctype="multipart/form-data">
    <input type="hidden" name="action" value="edit">
    <input type="hidden" name="connection_id" id="edit_connection_id">
    <div class="modal-header"><h5 class="modal-title">Edit Directory</h5>
@@ -595,6 +613,20 @@ function dcFillDelete(el) {
        </div>
      </div>
 
+     <div class="row">
+       <div class="col-md-12 mb-3">
+         <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
+         <div class="form-check mb-1" id="edit_remove_cert_wrap" hidden>
+           <input class="form-check-input" type="checkbox" name="remove_client_cert" id="edit_remove_client_cert" value="1">
+           <label class="form-check-label text-danger" for="edit_remove_client_cert">Remove the installed certificate and key</label>
+         </div>
+         <div class="d-flex gap-2">
+           <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
+           <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+         </div>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+       </div>
+     </div>
      <hr>
      <h6 class="text-muted text-uppercase"><strong>Provisioning Defaults</strong></h6>
      <p class="text-muted"><small>Applied to every recipient this connection creates. Encryption is deliberately not here: turn S/MIME or PGP on afterwards from Relay Recipients using Bulk Edit.</small></p>
@@ -702,7 +734,7 @@ function dcFillDelete(el) {
 <div class="modal fade" id="deleteModal" tabindex="-1">
  <div class="modal-dialog">
   <div class="modal-content">
-   <form method="post" action="">
+   <form method="post" action="" enctype="multipart/form-data">
    <input type="hidden" name="action" value="delete">
    <input type="hidden" name="connection_id" id="delete_connection_id">
    <div class="modal-header bg-danger"><h5 class="modal-title">Delete Directory</h5>

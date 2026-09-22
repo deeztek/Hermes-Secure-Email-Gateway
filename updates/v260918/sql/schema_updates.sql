@@ -71,6 +71,16 @@ CREATE TABLE IF NOT EXISTS `directory_connections` (
   `object_class` varchar(64) NOT NULL DEFAULT 'user',
   `mail_attribute` varchar(64) NOT NULL DEFAULT 'mail',
   `extra_filter` varchar(500) DEFAULT NULL,
+  -- Mutual TLS for THIS directory, independent of RemoteAuth's own client
+  -- certificate (#335). Google Secure LDAP is an ordinary LDAPS endpoint that
+  -- insists the client prove who it is, so enumerating Google needs a pair
+  -- here. Kept per directory rather than shared with RemoteAuth for two
+  -- reasons: Auto-Provisioning is Community while the RemoteAuth page is Pro,
+  -- so sharing would gate enumeration behind a licence it does not need; and
+  -- the directory read from is not necessarily the one authenticated against,
+  -- so a certificate for one should never be offered to the other.
+  `client_cert_file` varchar(255) DEFAULT NULL,
+  `client_key_file` varchar(255) DEFAULT NULL,
   -- Provisioning defaults, applied to every recipient this connection creates.
   -- auth_type is independent of `provider`: the directory Hermes enumerates is
   -- not necessarily the one it authenticates against. A tenant synced from

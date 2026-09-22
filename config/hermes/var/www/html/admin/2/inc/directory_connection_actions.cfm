@@ -124,6 +124,82 @@
       <cflocation url="view_directory_connections.cfm" addtoken="no">
     </cfif>
 
+    <!--- Mutual TLS for this directory (#335). Stored under
+          /opt/hermes/certs/directories/, keyed by connection so two
+          directories can hold different pairs. Written before the row exists
+          on an add, so the filename is derived from entry_name and settled
+          on the connection id afterwards is not worth the complexity: the
+          name is unique because entry_name is. --->
+    <cfset dcCertDir  = "/opt/hermes/certs/directories">
+    <cfset dcSlug     = ReReplaceNoCase(LCase(dcName), "[^a-z0-9]", "_", "all")>
+    <cfset dcCertFile = "">
+    <cfset dcKeyFile  = "">
+
+    <cfif form.action IS "edit">
+      <cfquery name="dcPriorCert" datasource="hermes">
+        SELECT client_cert_file, client_key_file FROM directory_connections
+         WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.connection_id)#">
+      </cfquery>
+      <cfif dcPriorCert.recordcount GTE 1>
+        <cfset dcCertFile = dcPriorCert.client_cert_file>
+        <cfset dcKeyFile  = dcPriorCert.client_key_file>
+      </cfif>
+    </cfif>
+
+    <cfif StructKeyExists(form, "remove_client_cert") AND form.remove_client_cert EQ "1">
+      <cfloop list="#dcCertFile#,#dcKeyFile#" index="oneOld">
+        <cfif Len(Trim(oneOld)) AND FileExists("#dcCertDir#/#Trim(oneOld)#")>
+          <cftry><cffile action="delete" file="#dcCertDir#/#Trim(oneOld)#"><cfcatch></cfcatch></cftry>
+        </cfif>
+      </cfloop>
+      <cfset dcCertFile = "">
+      <cfset dcKeyFile  = "">
+    </cfif>
+
+    <!--- Both or neither. Half a pair produces a handshake that fails in a
+          way that reads as a server problem. --->
+    <cfif StructKeyExists(form, "client_cert_file") AND Len(form.client_cert_file)
+      AND StructKeyExists(form, "client_key_file")  AND Len(form.client_key_file)>
+      <cftry>
+        <cfif NOT DirectoryExists(dcCertDir)>
+          <cfdirectory action="create" directory="#dcCertDir#" mode="755">
+        </cfif>
+        <cffile action="upload" fileField="client_cert_file" destination="#dcCertDir#"
+                nameConflict="makeunique" accept="application/x-x509-ca-cert,application/pkix-cert,application/x-pem-file,text/plain,.pem,.crt,.cer">
+        <cfset dcUpCert = cffile.serverFile>
+        <cffile action="upload" fileField="client_key_file" destination="#dcCertDir#"
+                nameConflict="makeunique" accept="application/x-pem-file,application/pkcs8,text/plain,.pem,.key">
+        <cfset dcUpKey = cffile.serverFile>
+
+        <cfset dcNewCert = dcSlug & "_client.pem">
+        <cfset dcNewKey  = dcSlug & "_client.key">
+        <cfif dcUpCert NEQ dcNewCert>
+          <cfif FileExists("#dcCertDir#/#dcNewCert#")><cffile action="delete" file="#dcCertDir#/#dcNewCert#"></cfif>
+          <cffile action="rename" source="#dcCertDir#/#dcUpCert#" destination="#dcCertDir#/#dcNewCert#">
+        </cfif>
+        <cfif dcUpKey NEQ dcNewKey>
+          <cfif FileExists("#dcCertDir#/#dcNewKey#")><cffile action="delete" file="#dcCertDir#/#dcNewKey#"></cfif>
+          <cffile action="rename" source="#dcCertDir#/#dcUpKey#" destination="#dcCertDir#/#dcNewKey#">
+        </cfif>
+
+        <cffile action="write" file="/opt/hermes/tmp/dc_keyperm.sh" mode="700" addNewLine="no"
+                output="##!/bin/bash#Chr(10)#chmod 600 '#dcCertDir#/#dcNewKey#'#Chr(10)#">
+        <cftry>
+          <cfexecute name="/bin/bash" arguments="/opt/hermes/tmp/dc_keyperm.sh" timeout="15" variable="dcKpOut" errorVariable="dcKpErr"></cfexecute>
+          <cfcatch></cfcatch>
+        </cftry>
+        <cftry><cffile action="delete" file="/opt/hermes/tmp/dc_keyperm.sh"><cfcatch></cfcatch></cftry>
+
+        <cfset dcCertFile = dcNewCert>
+        <cfset dcKeyFile  = dcNewKey>
+        <cfcatch>
+          <cfset session.m = "dc_error">
+          <cfset session.dcError = "Client certificate upload failed: " & cfcatch.message>
+          <cflocation url="view_directory_connections.cfm" addtoken="no">
+        </cfcatch>
+      </cftry>
+    </cfif>
+
     <cfset encPw = "">
     <cfif Len(Trim(form.bind_password))>
       <cftry>
@@ -141,7 +217,8 @@
         <cfquery datasource="hermes">
           INSERT INTO directory_connections
             (entry_name, provider, remoteauth_mapping_id, server_address, server_port,
-             tls_mode, base_dn, bind_dn, bind_password, object_class, mail_attribute, extra_filter, enabled,
+             tls_mode, base_dn, bind_dn, bind_password, object_class, mail_attribute, extra_filter,
+             client_cert_file, client_key_file, enabled,
              auth_type, policy_id, report_enabled, train_bayes, download_msg, enforce_mfa, send_welcome, auto_apply)
           VALUES (
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(dcName,255)#">,
@@ -156,6 +233,8 @@
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.object_class),64)#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.mail_attribute),64)#">,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.extra_filter),500)#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
+            <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
             1,
             <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
             <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
@@ -182,6 +261,8 @@
                  object_class          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.object_class),64)#">,
                  mail_attribute        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.mail_attribute),64)#">,
                  extra_filter          = <cfqueryparam cfsqltype="cf_sql_varchar" value="#Left(Trim(form.extra_filter),500)#">,
+                 client_cert_file      = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcCertFile#">,
+                 client_key_file       = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcKeyFile#">,
                  auth_type             = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcAuth#">,
                  policy_id             = <cfif val(form.policy_id) GT 0><cfqueryparam cfsqltype="cf_sql_integer" value="#val(form.policy_id)#"><cfelse>NULL</cfif>,
                  report_enabled        = <cfqueryparam cfsqltype="cf_sql_varchar" value="#dcReport#">,

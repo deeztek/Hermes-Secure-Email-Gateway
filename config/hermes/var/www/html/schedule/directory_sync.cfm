@@ -216,7 +216,7 @@ function shq(required string v) {
          about which directories are acceptable. --->
     <cfquery name="getRaTls" datasource="hermes">
       SELECT setting_name, setting_value FROM remoteauth_settings
-       WHERE setting_name IN ('tls_reqcert', 'ca_cert_file', 'client_cert_file', 'client_key_file')
+       WHERE setting_name IN ('tls_reqcert', 'ca_cert_file')
     </cfquery>
     <cfset raTls = {}>
     <cfloop query="getRaTls"><cfset raTls[getRaTls.setting_name] = getRaTls.setting_value></cfloop>
@@ -235,19 +235,22 @@ function shq(required string v) {
       <cfset envOpts = envOpts & " -e LDAPTLS_CACERT='/opt/hermes/certs/remoteauth/" & shq(raTls.ca_cert_file) & "'">
     </cfif>
 
-    <!--- Mutual TLS, sharing the client certificate uploaded for RemoteAuth
-         (#335). This is what lets provider='ldap' enumerate Google Secure
-         LDAP: ldap.google.com is an ordinary LDAPS endpoint that simply
-         insists the client prove who it is. Without these two the connection
-         is refused during the handshake and no REST connector would help,
-         because the obstacle was never the protocol.
+    <!--- Mutual TLS, from THIS directory's own certificate (#335). That is
+         what lets provider='ldap' enumerate Google Secure LDAP:
+         ldap.google.com is an ordinary LDAPS endpoint that simply insists the
+         client prove who it is, and without these two the handshake is
+         refused. No REST connector would help, because the obstacle was never
+         the protocol.
 
-         Both or neither, as with the overlay: a certificate with no key
-         cannot be used. --->
-    <cfif StructKeyExists(raTls,"client_cert_file") AND Len(raTls.client_cert_file)
-      AND StructKeyExists(raTls,"client_key_file")  AND Len(raTls.client_key_file)>
-      <cfset envOpts = envOpts & " -e LDAPTLS_CERT='/opt/hermes/certs/remoteauth/" & shq(raTls.client_cert_file) & "'">
-      <cfset envOpts = envOpts & " -e LDAPTLS_KEY='/opt/hermes/certs/remoteauth/"  & shq(raTls.client_key_file)  & "'">
+         Deliberately NOT RemoteAuth's certificate. Auto-Provisioning is
+         Community and the RemoteAuth page is Pro, so sharing would gate
+         enumeration behind a licence it does not need; and the directory read
+         from is not necessarily the one authenticated against.
+
+         Both or neither: a certificate with no key cannot be used. --->
+    <cfif Len(Trim(getConnections.client_cert_file)) AND Len(Trim(getConnections.client_key_file))>
+      <cfset envOpts = envOpts & " -e LDAPTLS_CERT='/opt/hermes/certs/directories/" & shq(Trim(getConnections.client_cert_file)) & "'">
+      <cfset envOpts = envOpts & " -e LDAPTLS_KEY='/opt/hermes/certs/directories/"  & shq(Trim(getConnections.client_key_file))  & "'">
     </cfif>
 
     <!--- addNewLine="no" is load-bearing. ldapsearch -y uses the COMPLETE
