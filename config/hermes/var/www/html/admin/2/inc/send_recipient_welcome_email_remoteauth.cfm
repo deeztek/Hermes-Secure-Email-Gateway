@@ -24,7 +24,7 @@ Minimal reference email for remote-auth relay recipients. Unlike the
 mailbox case, this email IS delivered to the recipient's actual (external)
 inbox via the relay chain, so they can read it without logging in first.
 We still skip detailed credential instructions because the Hermes-side
-username (full email) differs from the user's AD username — admins
+username (full email) differs from the user's AD username - admins
 handle that out-of-band. The email's job is to explain what the Hermes
 user portal is for and how to reach it.
 

@@ -51,7 +51,7 @@ select policy_id, default_policy from spam_policies where default_policy='1'
      Supported CSV shapes (all work without admin editing):
        * PowerShell Get-ADUser | Select GivenName,Surname,Mail | Export-Csv
          (has header row, columns named GivenName/Surname/Mail)
-       * CSVDE (AD built-in) — has DN column first, then givenName/sn/mail
+       * CSVDE (AD built-in) - has DN column first, then givenName/sn/mail
          headers → DN column is ignored
        * No header, positional: First,Last,Email
      ==================================================================== --->
@@ -163,7 +163,7 @@ select policy_id, default_policy from spam_policies where default_policy='1'
                 lastName:  _parsed[_colMap.last]
             })>
         <cfelse>
-            <!--- Malformed row — will surface as "invalid email" below for visibility. --->
+            <!--- Malformed row - will surface as "invalid email" below for visibility. --->
             <cfset ArrayAppend(recipientRows, {
                 email: LCase(_line),
                 firstName: "",
@@ -302,7 +302,7 @@ select policy_id, default_policy from spam_policies where default_policy='1'
     <!--- SEND WELCOME EMAIL TO NEW RECIPIENT.
          Local auth: full reset-password instructions.
          Remote auth: minimal reference email (portal URL, AD password
-         note) — admin handles username handoff out-of-band. --->
+         note) - admin handles username handoff out-of-band. --->
     <cfset recipientName = recipientEmail>
     <!--- Directory provisioning (#332) can suppress the welcome email: a first
          bulk import of people who already have mail flowing should not send
