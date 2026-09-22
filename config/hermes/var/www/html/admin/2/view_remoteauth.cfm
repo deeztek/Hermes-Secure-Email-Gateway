@@ -485,6 +485,30 @@ $(document).ready(function() {
 </cfif>
 
 <!--- Test Connection --->
+<cffunction name="raShq" access="private" returntype="string" output="false">
+    <cfargument name="v" type="string" required="true">
+    <cfreturn Replace(arguments.v, "'", "'\''", "all")>
+</cffunction>
+
+<cffunction name="raTestExplain" access="private" returntype="string" output="false">
+    <cfargument name="raw"    type="string" required="true">
+    <cfargument name="server" type="string" required="true">
+    <cfargument name="port"   type="string" required="true">
+    <cfargument name="scheme" type="string" required="true">
+    <cfset var txt  = Trim(arguments.raw)>
+    <cfset var hint = "">
+    <cfif FindNoCase("Invalid credentials", txt) GT 0 OR FindNoCase("data 52e", txt) GT 0>
+        <cfset hint = "The directory accepted the connection but rejected the password for that user. The Bind DN shown below is the account it tried; if that DN looks wrong, the mapping's DN pattern is what to fix.">
+    <cfelseif FindNoCase("Can't contact LDAP server", txt) GT 0>
+        <cfset hint = "Could not reach " & arguments.server & " on port " & arguments.port & " over " & UCase(arguments.scheme) & ". Check the address, the port, and that the directory is listening on it.">
+    <cfelseif FindNoCase("No such object", txt) GT 0 OR FindNoCase("data 525", txt) GT 0>
+        <cfset hint = "The directory has no account at that DN. The mapping's DN pattern does not match how users are named there.">
+    <cfelseif FindNoCase("TLS", txt) GT 0 OR FindNoCase("certificate", txt) GT 0>
+        <cfset hint = "The server certificate was rejected. Upload a CA bundle that covers it, and make sure the address above matches the certificate's hostname rather than being an IP.">
+    </cfif>
+    <cfreturn Len(hint) ? hint & " (" & txt & ")" : txt>
+</cffunction>
+
 <cfif action EQ "test_connection">
     <!--- Validate required parameters --->
     <cfif NOT StructKeyExists(form, "test_server") OR form.test_server EQ "">
@@ -545,59 +569,72 @@ $(document).ready(function() {
     <cfset testReqcert = (testScheme IS "ldaps")
                        ? "demand"
                        : (structKeyExists(globalTLS, "tls_reqcert") ? globalTLS.tls_reqcert : "never")>
-    <cfset testEnv = " -e LDAPTLS_REQCERT=#testReqcert#">
+    <cfset testEnv = " -e LDAPTLS_REQCERT='#raShq(testReqcert)#'">
     <cfif structKeyExists(globalTLS, "ca_cert_file") AND len(globalTLS.ca_cert_file)>
-        <cfset testEnv = testEnv & " -e LDAPTLS_CACERT=/opt/hermes/certs/remoteauth/#globalTLS.ca_cert_file#">
+        <cfset testEnv = testEnv & " -e LDAPTLS_CACERT='/opt/hermes/certs/remoteauth/#raShq(globalTLS.ca_cert_file)#'">
     </cfif>
 
-    <cfset ldapCommand = "exec#testEnv# hermes_ldap ldapwhoami -x -H ""#ldapUrl#"" -D ""#testDn#"" -w ""#form.test_password#""">
+    <!--- Password goes to a file read with -y, never into the command. It used
+         to be an argument, visible in the host process list, and moving the
+         command into a script would have put it on disk in the script itself.
+         Every other value is single-quoted and escaped: a DN can legitimately
+         contain an apostrophe, and these are all operator input. --->
+    <cfset tcPw = "/opt/hermes/tmp/" & LCase(Left(Replace(CreateUUID(), "-", "", "all"), 10)) & "_ra_test.pw">
+    <cffile action="write" file="#tcPw#" output="#form.test_password#" charset="utf-8" mode="600" addNewLine="no">
+    <cfset ldapCommand = "exec#testEnv# hermes_ldap ldapwhoami -x -H '#raShq(ldapUrl)#' -D '#raShq(testDn)#' -y '#tcPw#'">
     <cfif testScheme IS "ldap" AND structKeyExists(globalTLS, "tls_starttls") AND globalTLS.tls_starttls EQ "yes">
         <cfset ldapCommand = ldapCommand & " -ZZ">
     </cfif>
 
-    <!--- Execute the test --->
-    <cftry>
-        <cfexecute name="/usr/local/bin/docker"
-            arguments="#ldapCommand#"
-            variable="testResult"
-            errorVariable="testError"
-            timeout="30">
-        </cfexecute>
+    <!--- Run it through a temp script that redirects both streams to files
+         and always exits 0.
 
-        <!--- Success is ldapwhoami echoing the bound identity, nothing else.
-             This previously also accepted an empty stderr as success, which
-             reported a healthy directory whenever the command produced no
-             output at all. A probe that passes when nothing happened is worse
-             than no probe, because it is what an admin checks before
-             concluding their DC is fine. --->
-        <cfif FindNoCase("dn:", testResult) GT 0 OR FindNoCase("u:", testResult) GT 0>
-            <cfset session.m = "ra_test_success">
-            <cfset session.testDomain = form.test_domain>
-            <cfset session.testDn = testDn>
-            <cfset session.testResult = testResult>
-        <cfelse>
-            <cfset session.m = "ra_test_fail">
-            <cfset session.testDomain = form.test_domain>
-            <cfset session.testDn = testDn>
-            <!--- Name the likely cause. The two new failure modes after the
-                 move to mandatory LDAPS are a directory with no LDAPS
-                 listener, and a certificate whose subject does not match the
-                 address entered, which demand checks as well as the chain. --->
-            <cfset testHint = "">
-            <cfif FindNoCase("Can't contact LDAP server", testError) GT 0>
-                <cfset testHint = "Could not reach #form.test_server# on port #form.test_port# over #UCase(testScheme)#. Check the address, the port, and that the directory is listening on it.">
-            <cfelseif FindNoCase("TLS", testError) GT 0 OR FindNoCase("certificate", testError) GT 0>
-                <cfset testHint = "The server certificate was rejected. Upload a CA bundle that covers it, and make sure the address above matches the certificate's hostname rather than being an IP.">
-            </cfif>
-            <cfset session.testError = Len(testHint) ? testHint & " (" & testError & ")" : testError>
-        </cfif>
-    <cfcatch type="any">
-        <cfset session.m = "ra_test_fail">
-        <cfset session.testDomain = form.test_domain>
-        <cfset session.testDn = testDn>
-        <cfset session.testError = cfcatch.message>
-    </cfcatch>
+         cfexecute throws when the command exits non-zero, and ldapwhoami does
+         exactly that on a rejected bind. Worse, it does not reliably populate
+         errorVariable on that path, so the catch had nothing to report and
+         showed Lucee's "Error invoking external process" instead of the LDAP
+         reason. Capturing the streams in the shell sidesteps both: the exit
+         code is neutralised and the text is on disk either way.
+
+         Same approach directory_sync.cfm uses, for the same reason. --->
+    <cfset tcId   = LCase(Left(Replace(CreateUUID(), "-", "", "all"), 10))>
+    <cfset tcSh   = "/opt/hermes/tmp/#tcId#_ra_test.sh">
+    <cfset tcOut  = "/opt/hermes/tmp/#tcId#_ra_test.out">
+    <cfset tcErr  = "/opt/hermes/tmp/#tcId#_ra_test.err">
+    <cfset testResult = "">
+    <cfset testError  = "">
+
+    <cftry>
+        <cfsavecontent variable="tcBody"><cfoutput>##!/bin/bash
+/usr/local/bin/docker #ldapCommand# > '#tcOut#' 2> '#tcErr#'
+exit 0
+</cfoutput></cfsavecontent>
+        <cffile action="write" file="#tcSh#" output="#tcBody#" charset="utf-8" mode="700" addNewLine="no">
+        <cfexecute name="/bin/bash" arguments="#tcSh#" timeout="45" variable="tcShOut" errorVariable="tcShErr"></cfexecute>
+
+        <cfif FileExists(tcOut)><cffile action="read" file="#tcOut#" variable="testResult" charset="utf-8"></cfif>
+        <cfif FileExists(tcErr)><cffile action="read" file="#tcErr#" variable="testError"  charset="utf-8"></cfif>
+
+        <cfcatch type="any">
+            <cfset testError = Len(Trim(testError)) ? testError : cfcatch.message>
+        </cfcatch>
     </cftry>
+
+    <cfloop list="#tcSh#,#tcOut#,#tcErr#,#tcPw#" index="tcJunk">
+        <cftry><cfif FileExists(tcJunk)><cffile action="delete" file="#tcJunk#"></cfif><cfcatch></cfcatch></cftry>
+    </cfloop>
+
+    <cfset session.testDomain = form.test_domain>
+    <cfset session.testDn     = testDn>
+
+    <cfif FindNoCase("dn:", testResult) GT 0 OR FindNoCase("u:", testResult) GT 0>
+        <cfset session.m = "ra_test_success">
+        <cfset session.testResult = testResult>
+    <cfelse>
+        <cfset session.m = "ra_test_fail">
+        <cfset session.testError = raTestExplain(testError, form.test_server, form.test_port, testScheme)>
+    </cfif>
+
     <cflocation url="view_remoteauth.cfm" addtoken="no">
 </cfif>
 
