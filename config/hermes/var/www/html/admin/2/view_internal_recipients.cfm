@@ -1602,7 +1602,24 @@ modal markup don't need a rename cascade.)
             <td><a href="view_recipient_certificates.cfm?type=1&id=#theID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-shield"></i></a></td>
             <td><a href="view_recipient_keyrings.cfm?type=1&id=#theOtherID#" class="btn btn-secondary btn-sm" role="button"><i class="fas fa-user-lock"></i></a></td>
             <td>#recipient#</td>
-            <td><cfif auth_type EQ "remote"><span class="badge bg-primary" title="#remoteauth_domain#"><i class="fas fa-cloud me-1"></i>REMOTE</span><cfelse><span class="badge bg-secondary">LOCAL</span></cfif></td>
+            <!--- The RemoteAuth connection was only ever in a title attribute,
+                  so which directory a recipient authenticates against was
+                  invisible unless you hovered the badge. With mappings now
+                  able to differ in transport, that is worth reading at a
+                  glance. --->
+            <td>
+              <cfif auth_type EQ "remote">
+                <span class="badge bg-primary"><i class="fas fa-cloud me-1"></i>REMOTE</span>
+                <cfif Len(Trim(remoteauth_domain))>
+                  <small class="text-muted ms-1">#EncodeForHTML(Trim(remoteauth_domain))#</small>
+                <cfelse>
+                  <small class="text-danger ms-1" title="auth_type is remote but no RemoteAuth mapping is recorded, so this recipient cannot sign in">no mapping</small>
+                </cfif>
+              <cfelse>
+                <span class="badge bg-secondary">LOCAL</span>
+                <small class="text-muted ms-1">N/A</small>
+              </cfif>
+            </td>
             <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
             <td><!--- 2FA column: two orthogonal states, two independent pills.
                   "Enrolled" reads cn=two_factor LDAP membership (user has
@@ -1619,7 +1636,9 @@ modal markup don't need a rename cascade.)
                 <span class="badge bg-warning text-dark" title="Admin requires 2FA &mdash; set via Edit Options. Independent of enrollment state."><i class="fas fa-exclamation-triangle me-1"></i>Required</span>
               </cfif>
               <cfif NOT isTwoFactor AND Val(enforce_mfa) NEQ 1>
-                <span class="text-muted">&mdash;</span>
+                <!--- Was an em dash, which at this size reads as an underscore
+                      and looks like a rendering fault rather than a state. --->
+                <span class="text-muted">None</span>
               </cfif>
             </td>
             <td>#policy_name#</td>

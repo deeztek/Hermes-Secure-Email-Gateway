@@ -495,12 +495,25 @@ $(document).ready(function() {
     <cfargument name="server" type="string" required="true">
     <cfargument name="port"   type="string" required="true">
     <cfargument name="scheme" type="string" required="true">
+    <cfargument name="hasCa"   type="boolean" required="false" default="true">
     <cfset var txt  = Trim(arguments.raw)>
     <cfset var hint = "">
     <cfif FindNoCase("Invalid credentials", txt) GT 0 OR FindNoCase("data 52e", txt) GT 0>
         <cfset hint = "The directory accepted the connection but rejected the password for that user. The Bind DN shown below is the account it tried; if that DN looks wrong, the mapping's DN pattern is what to fix.">
     <cfelseif FindNoCase("Can't contact LDAP server", txt) GT 0>
-        <cfset hint = "Could not reach " & arguments.server & " on port " & arguments.port & " over " & UCase(arguments.scheme) & ". Check the address, the port, and that the directory is listening on it.">
+        <!--- OpenLDAP reports a failed TLS handshake as the same -1 "can't
+             contact" as a dead port, so this message is ambiguous on LDAPS.
+             Lead with the certificate when verification is on and there is no
+             CA bundle to verify against, because that is by far the more
+             likely cause and the other reading sends an administrator to
+             check a firewall that is fine. --->
+        <cfif arguments.scheme IS "ldaps" AND NOT arguments.hasCa>
+            <cfset hint = "Most likely the server certificate could not be verified: no CA bundle is uploaded, and an LDAPS mapping always verifies. OpenLDAP reports a rejected certificate with the same message as an unreachable server, so this may instead mean nothing is listening on " & arguments.server & ":" & arguments.port & ".">
+        <cfelseif arguments.scheme IS "ldaps">
+            <cfset hint = "Either " & arguments.server & ":" & arguments.port & " is unreachable, or the server certificate was rejected -- OpenLDAP reports both the same way. Check that the CA bundle covers this server and that the address matches the certificate's hostname rather than being an IP.">
+        <cfelse>
+            <cfset hint = "Could not reach " & arguments.server & " on port " & arguments.port & ". Check the address, the port, and that the directory is listening on it.">
+        </cfif>
     <cfelseif FindNoCase("No such object", txt) GT 0 OR FindNoCase("data 525", txt) GT 0>
         <cfset hint = "The directory has no account at that DN. The mapping's DN pattern does not match how users are named there.">
     <cfelseif FindNoCase("TLS", txt) GT 0 OR FindNoCase("certificate", txt) GT 0>
@@ -632,7 +645,8 @@ exit 0
         <cfset session.testResult = testResult>
     <cfelse>
         <cfset session.m = "ra_test_fail">
-        <cfset session.testError = raTestExplain(testError, form.test_server, form.test_port, testScheme)>
+        <cfset session.testError = raTestExplain(testError, form.test_server, form.test_port, testScheme,
+                    (structKeyExists(globalTLS, "ca_cert_file") AND Len(Trim(globalTLS.ca_cert_file))))>
     </cfif>
 
     <cflocation url="view_remoteauth.cfm" addtoken="no">
