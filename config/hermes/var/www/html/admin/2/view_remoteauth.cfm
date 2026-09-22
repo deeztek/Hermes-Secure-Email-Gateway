@@ -22,6 +22,23 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <!--- DataTable Script --->
 <script>
 $(document).ready(function() {
+    // Help cards collapse by default (chevron down/up). They are reference
+    // material, not something you read on every visit, and this page carries a
+    // lot of it: what RemoteAuth is, DN patterns, the Google Secure LDAP setup
+    // and the internal-DNS prerequisite.
+    [['toggleRaAbout', 'raAbout'], ['toggleRaDns', 'raDns']].forEach(function (pair) {
+        var btn = '#' + pair[0], box = '#' + pair[1];
+        $(btn).on('click', function () { $(box).collapse('toggle'); });
+        $(box).on('shown.bs.collapse', function () {
+            $(btn).find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+            $(btn).attr('title', 'Collapse');
+        });
+        $(box).on('hidden.bs.collapse', function () {
+            $(btn).find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+            $(btn).attr('title', 'Expand');
+        });
+    });
+
     $('#mappingsTable').DataTable({
         dom: 'Blfrtip',
         buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],
@@ -1000,11 +1017,17 @@ exit 0
 </div>
 --->
 
-<!-- Info Card -->
+<!-- Info Card (collapsible, matches the Intrusion Prevention troubleshooting pattern) -->
 <div class="card mb-4">
     <div class="card-header bg-info text-white">
-        <h3 class="card-title"><i class="fas fa-info-circle"></i> About LDAP RemoteAuth (Pass-Through Authentication)</h3>
+        <h3 class="card-title">
+            <button type="button" class="btn btn-sm btn-outline-light me-2" id="toggleRaAbout" title="Expand">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <i class="fas fa-info-circle"></i> About LDAP RemoteAuth (Pass-Through Authentication)
+        </h3>
     </div>
+    <div class="collapse" id="raAbout">
     <div class="card-body">
         <p><strong>RemoteAuth</strong> enables pass-through authentication to external LDAP servers (including Active Directory, OpenLDAP, 389 Directory Server, FreeIPA, etc.).
         Users can authenticate using their existing directory credentials without storing passwords in Hermes.</p>
@@ -1053,13 +1076,20 @@ exit 0
             pattern looks exactly like a wrong password.</small></p>
         </div>
     </div>
+    </div>
 </div>
 
-<!-- DNS Resolution Prerequisite Card -->
+<!-- DNS Resolution Prerequisite Card (collapsible) -->
 <div class="card mb-4">
     <div class="card-header bg-warning text-dark">
-        <h3 class="card-title"><i class="fas fa-exclamation-triangle"></i> Prerequisite: DNS Resolution for Internal AD/LDAP Hostnames</h3>
+        <h3 class="card-title">
+            <button type="button" class="btn btn-sm btn-outline-dark me-2" id="toggleRaDns" title="Expand">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <i class="fas fa-exclamation-triangle"></i> Prerequisite: DNS Resolution for Internal AD/LDAP Hostnames
+        </h3>
     </div>
+    <div class="collapse" id="raDns">
     <div class="card-body">
         <p>If your AD/LDAP server hostname is resolvable only <strong>inside your internal network</strong> (e.g., <code>homedc01.corp.example.com</code>, <code>dc01.internal</code>, or anything on a split-horizon/private DNS zone), Hermes will not be able to reach it out of the box. The <code>hermes_ldap</code> container resolves hostnames through Hermes&rsquo;s internal Unbound DNS resolver, which by default queries public recursive DNS &mdash; it will not know about your internal-only names and RemoteAuth bind operations will fail with <code>remoteauth_bind operations error</code>.</p>
         <p><strong>Fix before creating a mapping:</strong></p>
@@ -1071,6 +1101,7 @@ exit 0
         <p class="mb-2"><strong>Verify from inside the LDAP container:</strong></p>
 <pre class="bg-light p-2 mb-3 small"><code>docker exec hermes_ldap getent hosts &lt;ad-hostname&gt;</code></pre>
         <p class="mb-0"><small class="text-muted"><i class="fas fa-info-circle"></i> Publicly-resolvable hostnames (e.g., if your AD lives at a hostname with a real A record in public DNS) don&rsquo;t need a Local Record &mdash; skip this step. Test with the command above; if it returns an IP, you&rsquo;re already good.</small></p>
+    </div>
     </div>
 </div>
 
