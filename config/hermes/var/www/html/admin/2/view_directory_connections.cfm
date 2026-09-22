@@ -442,9 +442,15 @@ function dcFillDelete(el) {
      <div class="row">
        <div class="col-md-12 mb-3">
          <label class="form-label"><strong>Client Certificate</strong> <span class="text-muted">(optional)</span></label>
-         <div class="d-flex gap-2">
-           <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
-           <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+         <div class="row g-2">
+           <div class="col-md-6">
+             <label class="form-label mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+             <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
+           </div>
+           <div class="col-md-6">
+             <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
+             <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+           </div>
          </div>
          <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>
@@ -643,9 +649,15 @@ function dcFillDelete(el) {
            <input class="form-check-input" type="checkbox" name="remove_client_cert" id="edit_remove_client_cert" value="1">
            <label class="form-check-label text-danger" for="edit_remove_client_cert">Remove the installed certificate and key</label>
          </div>
-         <div class="d-flex gap-2">
-           <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
-           <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+         <div class="row g-2">
+           <div class="col-md-6">
+             <label class="form-label mb-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+             <input type="file" class="form-control" name="client_cert_file" accept=".pem,.crt,.cer">
+           </div>
+           <div class="col-md-6">
+             <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
+             <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
+           </div>
          </div>
          <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>

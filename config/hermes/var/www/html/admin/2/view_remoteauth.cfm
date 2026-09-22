@@ -1095,9 +1095,11 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                                 </div>
                             </div>
                         </cfif>
-                        <input type="file" name="client_cert_file" class="form-control mb-1" accept=".pem,.crt,.cer">
+                        <label class="form-label mb-1 mt-1"><small class="text-muted">Certificate (<code>.pem</code>, <code>.crt</code>, <code>.cer</code>)</small></label>
+                        <input type="file" name="client_cert_file" class="form-control mb-2" accept=".pem,.crt,.cer">
+                        <label class="form-label mb-1"><small class="text-muted">Private key (<code>.pem</code>, <code>.key</code>)</small></label>
                         <input type="file" name="client_key_file" class="form-control" accept=".pem,.key">
-                        <small class="text-muted">Certificate then private key. Only needed where the directory demands mutual TLS, such as Google Secure LDAP. Upload both together; one without the other cannot be used.</small>
+                        <small class="text-muted">Only needed where the directory demands mutual TLS, such as Google Secure LDAP. Upload both together; one without the other cannot be used.</small>
                     </div>
                 </div>
                 <div class="col-md-3">
