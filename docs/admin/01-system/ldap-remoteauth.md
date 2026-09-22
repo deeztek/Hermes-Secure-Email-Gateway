@@ -150,6 +150,71 @@ associatedDomain: company                            <-- the mapping key
 
 At bind time the overlay reads `associatedDomain`, looks up the matching `olcRemoteAuthMapping`, opens an LDAP connection to that upstream URI, and re-binds as `seeAlso` with the supplied password. The local entry has no password to validate against, so the overlay's decision is the only decision.
 
+## Google Secure LDAP
+
+Authenticating Workspace users against Google, so they sign into the Hermes
+portal with their Google password.
+
+**This is authentication only.** To read the recipient list out of Workspace,
+use the Admin SDK directory type under Auto-Provisioning instead: it works on
+every Workspace edition and needs none of this. Secure LDAP can also enumerate,
+but there is no reason to choose it for that.
+
+### Edition requirement
+
+Secure LDAP is available on **Business Plus**, Enterprise Standard and Plus,
+Frontline Standard and Plus, Enterprise Essentials Plus, and the Education
+editions. It is **not** on Business Starter or Business Standard.
+
+Auto-provisioning has no such requirement, which is the point of keeping the
+two separate: a Starter tenant can have its users provisioned and sign in with
+Hermes passwords, and only pays more if it wants single sign-on.
+
+### In the Google Admin console
+
+| # | |
+|---|---|
+| 1 | **Apps** &rarr; **LDAP** &rarr; **Add client**. If LDAP is not listed, look under Apps &rarr; Additional Google services, or search for it |
+| 2 | Name it, then set access permissions: **Verify user credentials** for the entire domain, and **Read user information** for the entire domain |
+| 3 | Download the **certificate**. You get a zip holding a `.crt` and a `.key`. Keep it: Google will not let you download the key again |
+| 4 | **Turn the service status to ON.** A client is created switched off and does nothing until you do |
+| 5 | Note the **base DN** shown on the client's page |
+
+Step 4 is the one that gets missed. A client left off behaves like a
+certificate or network problem rather than saying it is disabled.
+
+Google also takes time to provision a new client, up to 24 hours by their own
+documentation. Until it is ready, connections fail the same way.
+
+### In Hermes
+
+| # | |
+|---|---|
+| 1 | RemoteAuth page &rarr; **Client Certificate** &rarr; upload the `.crt` and `.key` together &rarr; Save |
+| 2 | Add a mapping: server `ldap.google.com`, port **636**, Transport **LDAPS** |
+| 3 | DN pattern, typically `uid={email},ou=Users,dc=yourdomain,dc=com`. Check the base DN from step 5 above |
+| 4 | **Test Connection**, filling in the e-mail field as well as the username, since that pattern uses `{email}` |
+| 5 | **Apply Settings** once the test passes |
+
+**No CA bundle is needed.** Google's certificate chains to a public root that
+is already trusted.
+
+### Things worth knowing
+
+**The client certificate is global to the overlay.** OpenLDAP's remoteauth
+overlay holds one TLS configuration for every mapping, so Google's certificate
+is also offered to any other directory you have mapped. That is harmless, since
+a certificate is only sent when the server asks for one and an ordinary Active
+Directory does not, but it does mean an existing mapping is in the blast radius
+if something is wrong. Test before Apply Settings.
+
+**Mappings may differ in transport.** An internal AD on plain LDAP and Google
+on LDAPS coexist on the same overlay. A plain connection negotiates no TLS at
+all, so the certificate requirements never apply to it.
+
+**Recipients still sign in with their e-mail address**, as everywhere else in
+Hermes. The DN pattern only tells Hermes where to find them in Google.
+
 ## Test Connection button
 
 The Test modal does **not** consult the saved settings end-to-end — it does its own `ldapwhoami` against the mapping's `server_address:server_port`, applying the same DN pattern substitution the overlay would and honoring the global STARTTLS setting. The credentials entered in the modal are used for one bind attempt:
