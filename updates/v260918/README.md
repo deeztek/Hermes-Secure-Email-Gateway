@@ -105,6 +105,22 @@ present a certificate that validates against your CA bundle, with a hostname
 matching the address you entered. An IP address will not match a certificate
 issued to a hostname.
 
+### Client certificates, for directories that require them
+
+Some directories will not accept a connection unless the client proves its own
+identity as well, Google Secure LDAP being the notable one. Both the RemoteAuth
+page and each auto-provisioning directory now take a client certificate and key
+alongside the CA bundle.
+
+Only needed if your directory demands it. An ordinary Active Directory does not,
+and leaving these empty changes nothing.
+
+Worth stating plainly: this path has not been exercised against a live directory
+that requires mutual TLS, because we do not have one to test against. The
+certificate handling, storage and the configuration it generates are verified;
+an actual mutual-TLS handshake is not. If you are setting this up against Google
+Secure LDAP, treat it as new ground and tell us how it goes.
+
 ## What is fixed
 
 ### Uploaded RemoteAuth CA certificates were never readable
