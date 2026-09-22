@@ -192,12 +192,29 @@ documentation. Until it is ready, connections fail the same way.
 |---|---|
 | 1 | RemoteAuth page &rarr; **Client Certificate** &rarr; upload the `.crt` and `.key` together &rarr; Save |
 | 2 | Add a mapping: server `ldap.google.com`, port **636**, Transport **LDAPS** |
-| 3 | DN pattern, typically `uid={email},ou=Users,dc=yourdomain,dc=com`. Check the base DN from step 5 above |
-| 4 | **Test Connection**, filling in the e-mail field as well as the username, since that pattern uses `{email}` |
+| 3 | DN pattern: `uid={username},ou=Users,dc=yourdomain,dc=com`. Check the base DN against step 5 above |
+| 4 | **Test Connection** with a real Workspace user and their Google password |
 | 5 | **Apply Settings** once the test passes |
 
 **No CA bundle is needed.** Google's certificate chains to a public root that
 is already trusted.
+
+### uid is the username, not the address
+
+Google's DN uses the **local part** of the address, not the whole thing:
+
+```
+uid=example-user,ou=Users,dc=example,dc=com
+```
+
+So `support@example.com` is `uid=support,...`. Hermes' `{username}` placeholder
+is already the local part, so `uid={username},...` produces exactly this.
+`{email}` would produce `uid=support@example.com,...` and fail.
+
+It fails in a way that does not say so. **Google returns "Invalid credentials
+(49), Incorrect password" for an unknown DN**, not "no such object", so a wrong
+DN pattern is indistinguishable from a wrong password. If the password is
+definitely right, suspect the DN.
 
 ### Things worth knowing
 
