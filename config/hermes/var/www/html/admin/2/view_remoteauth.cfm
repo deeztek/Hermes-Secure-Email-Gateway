@@ -654,7 +654,16 @@ exit 0
     <cfset session.testDomain = form.test_domain>
     <cfset session.testDn     = testDn>
 
-    <cfif FindNoCase("dn:", testResult) GT 0 OR FindNoCase("u:", testResult) GT 0>
+    <!--- The bind was accepted if the search ran at all: ldapsearch exits
+         before searching when a bind is refused, so any returned entry proves
+         the credentials were good. Checking for an error in stderr as well,
+         because a server can answer with a referral and no entry.
+
+         An empty stderr was once treated as success here, which reported a
+         healthy directory whenever the command produced no output at all. A
+         probe that passes when nothing happened is worse than no probe. --->
+    <cfif FindNoCase("dn:", testResult) GT 0
+       OR (Len(Trim(testResult)) AND FindNoCase("ldap_", testError) LTE 0)>
         <cfset session.m = "ra_test_success">
         <cfset session.testResult = testResult>
     <cfelse>
