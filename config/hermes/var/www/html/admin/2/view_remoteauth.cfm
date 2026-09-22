@@ -583,8 +583,22 @@ $(document).ready(function() {
                        ? "demand"
                        : (structKeyExists(globalTLS, "tls_reqcert") ? globalTLS.tls_reqcert : "never")>
     <cfset testEnv = " -e LDAPTLS_REQCERT='#raShq(testReqcert)#'">
+    <!--- The DERIVED bundle, matching what the overlay verifies against. The
+         uploaded file alone is missing the public roots, so a probe using it
+         would reject a directory production accepts. --->
     <cfif structKeyExists(globalTLS, "ca_cert_file") AND len(globalTLS.ca_cert_file)>
-        <cfset testEnv = testEnv & " -e LDAPTLS_CACERT='/opt/hermes/certs/remoteauth/#raShq(globalTLS.ca_cert_file)#'">
+        <cfset testEnv = testEnv & " -e LDAPTLS_CACERT='/opt/hermes/certs/remoteauth/remoteauth_ca_effective.pem'">
+    </cfif>
+
+    <!--- The client certificate reached the overlay and enumeration but never
+         this probe, so a directory requiring mutual TLS dropped the handshake
+         here while working in production. OpenLDAP reports that as "can't
+         contact", which reads as an unreachable server and sends an
+         administrator to check a firewall that is fine. --->
+    <cfif structKeyExists(globalTLS, "client_cert_file") AND len(globalTLS.client_cert_file)
+      AND structKeyExists(globalTLS, "client_key_file")  AND len(globalTLS.client_key_file)>
+        <cfset testEnv = testEnv & " -e LDAPTLS_CERT='/opt/hermes/certs/remoteauth/#raShq(globalTLS.client_cert_file)#'">
+        <cfset testEnv = testEnv & " -e LDAPTLS_KEY='/opt/hermes/certs/remoteauth/#raShq(globalTLS.client_key_file)#'">
     </cfif>
 
     <!--- Password goes to a file read with -y, never into the command. It used
@@ -1308,6 +1322,11 @@ There is no separate verification setting: choosing LDAPS is choosing verificati
                     <div class="mb-3">
                         <label class="form-label"><strong>Username</strong> <span class="text-danger">*</span></label>
                         <input type="text" name="test_username" id="test_username" class="form-control" required placeholder="e.g., jsmith">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">E-mail address</label>
+                        <input type="email" name="test_email" id="test_email" class="form-control" placeholder="e.g., jsmith@example.com">
+                        <small class="text-muted">Only needed when the DN pattern uses <code>{email}</code>, as Google Secure LDAP does. Left blank, that placeholder cannot be substituted and the bind is attempted against a DN containing it literally.</small>
                         <small class="text-muted">Enter the directory username (uid or sAMAccountName)</small>
                     </div>
 
@@ -1391,6 +1410,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // Clear previous inputs and results
             document.getElementById('test_username').value = '';
+            var tEmail = document.getElementById('test_email');
+            if (tEmail) { tEmail.value = ''; }
             document.getElementById('test_firstname').value = '';
             document.getElementById('test_lastname').value = '';
             document.getElementById('test_password').value = '';
