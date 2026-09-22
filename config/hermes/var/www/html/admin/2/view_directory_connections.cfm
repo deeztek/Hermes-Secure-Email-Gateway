@@ -502,7 +502,7 @@ function dcFillDelete(el) {
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>
-         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS, which is unusual. <strong>Google Secure LDAP</strong> is the common case, and that is a Business Plus feature: on any other tier choose Google Workspace (Admin SDK) as the Directory Type instead, which needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>
      </div>
      <hr>
@@ -733,7 +733,7 @@ function dcFillDelete(el) {
              <input type="file" class="form-control" name="client_key_file" accept=".pem,.key">
            </div>
          </div>
-         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS. <strong>Google Workspace:</strong> generate an LDAP client in the Google Admin console and upload the pair it gives you. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
+         <small class="text-muted">Certificate then private key, uploaded together. Only needed where the directory requires mutual TLS, which is unusual. <strong>Google Secure LDAP</strong> is the common case, and that is a Business Plus feature: on any other tier choose Google Workspace (Admin SDK) as the Directory Type instead, which needs no certificate. Separate from the RemoteAuth certificate, so enumerating one directory and authenticating against another stays independent.</small>
        </div>
      </div>
      <hr>
