@@ -160,13 +160,23 @@ $(document).ready(function() {
   <div class="card-header"><h3 class="card-title"><i class="fas fa-server"></i>&nbsp;#EncodeForHTML(getConn.entry_name)#</h3></div>
   <div class="card-body">
     <dl class="row mb-0">
-      <dt class="col-sm-3">RemoteAuth mapping</dt>
+      <dt class="col-sm-3">Authentication</dt>
       <dd class="col-sm-9">
-        <cfif Len(getConn.mapping_domain)>
-          #EncodeForHTML(getConn.mapping_domain)#
+        <!--- The missing-mapping warning only means anything for remote auth.
+              Shown unconditionally it told a Local directory that nobody would
+              be able to sign in, which is the opposite of true: local
+              recipients get a Hermes password and the reset flow. --->
+        <cfif getConn.auth_type IS "remote">
+          <span class="badge bg-primary"><i class="fas fa-cloud me-1"></i>Remote</span>
+          <cfif Len(Trim(getConn.mapping_domain))>
+            <small class="text-muted ms-1">against #EncodeForHTML(Trim(getConn.mapping_domain))#</small>
+          <cfelse>
+            <span class="badge bg-warning text-dark ms-1">Not linked</span>
+            <small class="text-muted ms-1">Remote authentication needs a RemoteAuth mapping. Import is refused until one is chosen, or the directory is switched to Local.</small>
+          </cfif>
         <cfelse>
-          <span class="badge bg-warning text-dark">Not linked</span>
-          <small class="text-muted">Imported recipients would have no way to sign in. Link a mapping before importing.</small>
+          <span class="badge bg-secondary">Local</span>
+          <small class="text-muted ms-1">Recipients get a Hermes password and are sent a reset link. No RemoteAuth mapping is involved.</small>
         </cfif>
       </dd>
       <dt class="col-sm-3">Last run</dt>
