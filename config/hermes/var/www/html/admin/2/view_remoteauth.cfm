@@ -670,8 +670,33 @@ exit 0
          An empty stderr was once treated as success here, which reported a
          healthy directory whenever the command produced no output at all. A
          probe that passes when nothing happened is worse than no probe. --->
-    <cfif FindNoCase("dn:", testResult) GT 0
-       OR (Len(Trim(testResult)) AND FindNoCase("ldap_", testError) LTE 0)>
+    <!--- The question is whether the CREDENTIALS were accepted, not whether
+         this user can read anything. Those are different, and conflating them
+         made the probe fail on a directory that authenticated perfectly.
+
+         Google refuses an ordinary user the root DSE with "Insufficient
+         access (50)". That is an AUTHORIZATION error, and authorization only
+         happens after authentication -- so it proves the bind worked. Same for
+         "No such object" on a base that does not exist.
+
+         Only authentication and transport failures count as failure. Anything
+         the directory answered after accepting the bind is a pass, because the
+         bind is the whole point of the test. --->
+    <cfset tcFailed = (FindNoCase("Invalid credentials", testError) GT 0
+                    OR FindNoCase("data 52e", testError) GT 0
+                    OR FindNoCase("Can't contact", testError) GT 0
+                    OR FindNoCase("Confidentiality", testError) GT 0
+                    OR FindNoCase("TLS", testError) GT 0
+                    OR FindNoCase("certificate", testError) GT 0
+                    OR FindNoCase("Protocol error", testError) GT 0)>
+
+    <!--- Nothing at all on either stream means the command never ran, which is
+         not a pass. That was the original bug here. --->
+    <cfif NOT Len(Trim(testResult)) AND NOT Len(Trim(testError))>
+        <cfset tcFailed = true>
+    </cfif>
+
+    <cfif NOT tcFailed>
         <cfset session.m = "ra_test_success">
         <cfset session.testResult = testResult>
     <cfelse>
