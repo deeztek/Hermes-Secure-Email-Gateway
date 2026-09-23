@@ -1,4 +1,4 @@
-# Deploying Nextcloud Talk + High-Performance Backend for Hermes SEG
+# Nextcloud Talk and the High-Performance Backend
 
 Operator guide. Turns the Nextcloud that ships with Hermes SEG into a self-hosted
 team chat, calls, and meetings platform by enabling **Nextcloud Talk** and
@@ -131,7 +131,7 @@ In the Hermes Nextcloud, as an administrator:
    it is on. This needs the **local Nextcloud admin**, which takes one extra step in
    Hermes: see [Enabling Talk requires the local Nextcloud admin](#enabling-talk-requires-the-local-nextcloud-admin)
    immediately below.
-2. Go to **Settings -> Administration -> Talk**.
+2. Go to **Settings &rarr; Administration &rarr; Talk**.
 3. **STUN servers:** add `signal.yourdomain.com:3478`.
 4. **TURN servers:** choose `turns:` only, host `signal.yourdomain.com:5349`, and in
    the secret field paste the **Static Secret** from the install output.
@@ -139,7 +139,7 @@ In the Hermes Nextcloud, as an administrator:
    `https://signal.yourdomain.com/standalone-signaling/`, and in the shared-secret
    field paste the **Shared Secret** from the install output.
 
-Which secret goes where matters: **Static Secret -> TURN**, **Shared Secret -> HPB**.
+Which secret goes where matters: **Static Secret &rarr; TURN**, **Shared Secret &rarr; HPB**.
 
 ### Enabling Talk requires the local Nextcloud admin
 
@@ -151,7 +151,7 @@ matter which Hermes account you use.
 
 Hermes ships a supported way to get in, so do not disable anything by hand:
 
-**Email Server Settings -> Nextcloud Maintenance Mode**
+**Email Server Settings &rarr; Nextcloud Maintenance Mode**
 
 | # | |
 |---|---|
@@ -234,15 +234,24 @@ sudo bash upgrade_nextcloud_signal.sh
 Prompts for the release version, stops the stack, updates the Janus image, pulls new
 images, and restarts while preserving local configuration.
 
-## Positioning
+## What you get, and what you do not
 
-This is a **Community Edition** capability: Nextcloud ships with Hermes, Talk is a
-free Nextcloud app, and the HPB is optional infrastructure you host, not a paid tier. Talk also has native desktop clients (Windows, macOS, Linux) and mobile apps (iOS, Android) in addition to the browser, which is worth surfacing for the Teams comparison.
-Present it as chat + calls + meetings (a Microsoft Teams-style tool), with screen
-sharing but not screen control. Real-time document co-authoring is a separate
-Nextcloud capability via the Nextcloud Office (Collabora) app, out of scope here.
+Talk is a **Community Edition** capability. Nextcloud ships with Hermes, Talk is a
+free Nextcloud app, and the HPB is optional infrastructure you host yourself. There
+is no paid tier involved at any point.
 
-## Related
+| Capability | Available |
+|---|---|
+| Team chat | yes |
+| Voice and video calls | yes, with the HPB deployed |
+| Meetings with multiple participants | yes, with the HPB deployed |
+| Screen sharing | yes |
+| Screen **control** (taking over a remote desktop) | no |
+| Desktop clients | Windows, macOS, Linux |
+| Mobile clients | iOS, Android |
+| Browser | yes, no client install needed |
+| Real-time document co-authoring | **no**. That is Nextcloud Office (Collabora), a separate app, out of scope here |
 
-- [Email Flow](email-flow.md) - how the Hermes containers fit together
-- [Authentication and Credential Model](../admin/authentication/01-credential-model.md) - app passwords, which Talk clients can use
+Calls and meetings without the HPB are a preview rather than a feature. The built-in
+peer-to-peer mode frequently fails to connect even one-to-one, so treat the HPB as
+required if anyone is going to rely on this.

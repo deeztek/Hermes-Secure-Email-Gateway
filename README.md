@@ -158,7 +158,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Calendars (CalDAV) and contacts (CardDAV)
 - Single sign-on via Authelia OIDC
 - Pre-provisioning of Nextcloud user accounts on first login
-- Team chat, voice/video calls, and meetings via Nextcloud Talk (optional: the app is not enabled by default, and dependable calls need the high-performance backend, deployed separately. See [Nextcloud Talk + HPB deployment](docs/general/nextcloud-talk-hpb-deployment.md))
+- Team chat, voice/video calls, and meetings via Nextcloud Talk (optional: the app is not enabled by default, and dependable calls need the high-performance backend, deployed separately. See [Nextcloud Talk and the High-Performance Backend](docs/general/nextcloud-talk-hpb-deployment.md))
 
 ### Admin and user experience (Community)
 

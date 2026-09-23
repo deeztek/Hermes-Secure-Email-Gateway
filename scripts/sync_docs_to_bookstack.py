@@ -67,6 +67,7 @@ BOOKS = [
             REPO_ROOT / "docs" / "install" / "legacy-to-docker.md",
             REPO_ROOT / "docs" / "install" / "legacy-to-docker-post-migration.md",
             REPO_ROOT / "docs" / "general" / "email-flow.md",
+            REPO_ROOT / "docs" / "general" / "nextcloud-talk-hpb-deployment.md",
             # Intentionally NOT syncing:
             #   docs/general/introduction.md  -- still a "_Placeholder_" stub
             #   docs/api/                     -- empty placeholder for #222
