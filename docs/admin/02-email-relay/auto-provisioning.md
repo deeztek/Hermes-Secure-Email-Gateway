@@ -111,13 +111,30 @@ In **Hermes**:
 
 ## Setting up Microsoft 365
 
-In the **Entra admin center**:
+### First, if your mail domain is not already in the tenant
+
+You will usually want the tenant to know about the domain your recipients
+actually use, so that `mail` and the aliases come back as real addresses rather
+than `@yourtenant.onmicrosoft.com`.
+
+🔴 **Verify ownership only. Do not let Microsoft change your DNS.**
+
+Adding a domain to a tenant is a TXT record and is completely harmless. What is
+not harmless is the setup wizard's offer to manage DNS for you, or its "update
+your DNS records" step: those rewrite your **MX** records to
+`*.mail.protection.outlook.com` and your live mail stops being delivered
+wherever it goes today. Decline every DNS step except the ownership TXT.
+
+A licensed mailbox can exist in Exchange Online for an address whose MX points
+somewhere else entirely. Nothing breaks. External mail continues to follow MX.
+
+### In the Entra admin center
 
 | # | |
 |---|---|
-| 1 | **App registrations > New registration**. Single tenant is fine; no redirect URI is needed |
-| 2 | From the app's **Overview**, note the **Directory (tenant) ID** and the **Application (client) ID**. Not the Object ID, which looks identical and will not work |
-| 3 | **Certificates and secrets > New client secret**. Copy the **Value** column immediately: Entra shows it once and never again. The Secret ID is not the secret |
+| 1 | **App registrations > New registration**. Single tenant is fine, and no redirect URI is needed: the client credentials grant never redirects |
+| 2 | From the app's **Overview**, note the **Directory (tenant) ID** and the **Application (client) ID** |
+| 3 | **Certificates and secrets > New client secret**. Copy the **Value** column immediately |
 | 4 | **API permissions > Add a permission > Microsoft Graph > Application permissions > `User.Read.All`** |
 | 5 | **Grant admin consent.** The permission does nothing until this is done |
 
@@ -125,31 +142,120 @@ Step 4 must be an **Application** permission, not a Delegated one. Delegated
 permissions act on behalf of a signed-in user, and nobody is signed in when the
 scheduled sync runs.
 
-In **Hermes**: add a directory, Type **Microsoft 365**, and enter the three
-values from steps 2 and 3.
+### The three values, and the two that look like them
+
+Hermes needs exactly three things. Two of the values on those Entra pages are
+near-identical twins of the ones you want, and picking the twin produces an
+error that does not obviously say so.
+
+| Hermes field | Entra label | Looks like | Confused with |
+|---|---|---|---|
+| Directory (tenant) ID | Directory (tenant) ID | GUID | nothing |
+| Application (client) ID | Application (client) ID | GUID | **Object ID**, which sits directly beneath it on the same page and is also a GUID |
+| Client Secret | the secret's **Value** | ~40 characters with tildes and dots, **not** a GUID | **Secret ID**, the adjacent column, which is a GUID |
+
+🔴 **The Secret ID is never used by anything.** It is not sent in the request and
+Hermes has no field for it. It exists only so you can tell two secrets apart in
+the portal. The request Hermes makes is:
+
+```
+POST https://login.microsoftonline.com/<Directory (tenant) ID>/oauth2/v2.0/token
+
+grant_type    = client_credentials
+client_id     = <Application (client) ID>
+client_secret = <the secret Value>
+scope         = https://graph.microsoft.com/.default
+```
+
+The secret **Value** is shown once, at creation. Navigate away and it is masked
+forever, and there is no way to reveal it: create a new secret instead.
+
+### In Hermes
+
+Add a directory, Type **Microsoft 365**, and enter the three values. The LDAP
+connection fields disappear when you choose the type, because Graph has no
+server address, base DN or bind account.
 
 ### If it fails
 
+The run message leads with what to do and puts Microsoft's own text in
+parentheses after it. Hovering the message in the directories table shows the
+untruncated version.
+
 | Message contains | Cause |
 | --- | --- |
-| `AADSTS7000215` | Wrong client secret, commonly the Secret ID pasted instead of the Value |
+| `AADSTS7000215` | The **Secret ID** was pasted instead of the secret **Value**. By far the most common setup mistake |
 | `AADSTS7000222` | The client secret has expired |
-| `AADSTS700016` | No app with that client ID in this tenant |
+| `AADSTS700016` | No app with that client ID in this tenant. Commonly the **Object ID** pasted instead of the Application (client) ID |
 | `AADSTS90002` | Wrong tenant |
-| `Authorization_RequestDenied` | Step 4 or step 5 was not done |
-| "throttling requests" | Graph rate-limited the tenant. Nothing was changed; the next scheduled sync retries |
+| `Authorization_RequestDenied` | Step 4 or step 5 was not done, or a Delegated permission was added instead of an Application one |
+| "throttling requests" | Graph rate-limited the tenant. Nothing was changed and the next scheduled sync retries |
+| "returned no accounts at all" | The credentials were accepted. The tenant really did return nobody |
+
+### Licences are not optional for this
+
+An account with no licence has **no mailbox**, which has three consequences:
+
+1. `mail` comes back empty, so the address is taken from the **UPN** instead.
+   That is usually `@yourtenant.onmicrosoft.com`, which rule 3 then discards.
+2. The alias UI is hidden for that user, so you cannot give them one.
+3. Nothing about that account is wrong, it simply is not a mail recipient.
+
+If a sync stages `@...onmicrosoft.com` addresses, or stages nothing at all from a
+tenant you know has users, check licensing first.
+
+### Aliases
+
+Aliases are the reason to bother with `proxyAddresses`, and they are worth
+testing deliberately because they exercise a code path the primary address does
+not.
+
+**Microsoft 365 admin center:** Users > Active users > click the user > the
+**Aliases** section > **Manage username and email**.
+
+The label has changed over time and older guides call it "Manage email aliases".
+Two things hide the option entirely:
+
+- the user has **no licence** assigned
+- your own role is not Exchange-based. Exchange Administrator or Global
+  Administrator is required
+
+**Exchange admin center** is the more direct route if the admin center is being
+awkward: `admin.exchange.microsoft.com` > Recipients > Mailboxes > select the
+mailbox > **Manage email address types**. This writes `proxyAddresses`, which is
+exactly what the connector reads.
+
+Allow a few minutes before syncing. Microsoft documents up to 24 hours for alias
+propagation, though in practice it is usually a minute or two.
 
 ### What gets enumerated
 
 The primary address, plus every `smtp:` entry in `proxyAddresses`, for each
-account. Then rule 3 applies: anything outside your relay domains is discarded.
+account. Each address is staged as its own row, so a mailbox with two aliases
+produces three rows. Then rule 3 applies: anything outside your relay domains is
+discarded.
+
+`proxyAddresses` mixes schemes. Only the `smtp:` ones are mail addresses;
+`x500:`, `sip:` and `SPO:` entries are ignored. The `SMTP:` / `smtp:` case
+distinction marks primary versus alias and is not meaningful here, because the
+primary is already in the list.
 
 - **Guests are skipped.** Their UPN carries the `#EXT#` marker and they belong to
-  another organisation.
+  another organisation. They are skipped by shape rather than left to rule 3,
+  because a guest invited from a domain you do relay for would otherwise be
+  provisioned as though they were staff.
 - **Disabled accounts are kept.** `accountEnabled = false` blocks sign-in, not
   delivery. The mailbox still exists and still receives mail, which is precisely
   when quarantine matters.
-- Accounts with no `mail` value fall back to their UPN.
+- Accounts with no `mail` value fall back to their UPN. See the licensing note
+  above.
+- **Addresses already in Hermes stage as `existing`**, not as additions, so
+  re-running a sync over a roster you have already imported offers nothing new.
+
+There is no delta endpoint in use. Graph offers one, but a delta token that
+expires or is lost turns into a silent partial sync, and for a mail gateway that
+means someone quietly has no portal access. A full list every run with a local
+diff cannot drift.
 
 ## Provisioning defaults
 
