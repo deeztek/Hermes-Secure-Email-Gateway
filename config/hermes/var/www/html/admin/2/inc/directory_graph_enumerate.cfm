@@ -85,16 +85,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset msBody = msTokenCall.fileContent>
     <cfset msHint = "">
     <cfif FindNoCase("AADSTS7000215", msBody) GT 0>
-      <cfset msHint = " The client secret is wrong. Note that Entra shows the secret VALUE only once, at creation: if what you have is the Secret ID instead, create a new secret and copy the Value column.">
+      <cfset msHint = "The client secret is wrong. Note that Entra shows the secret VALUE only once, at creation: if what you have is the Secret ID instead, create a new secret and copy the Value column.">
     <cfelseif FindNoCase("AADSTS7000222", msBody) GT 0>
-      <cfset msHint = " The client secret has expired. Create a new one on the app registration under Certificates and secrets.">
+      <cfset msHint = "The client secret has expired. Create a new one on the app registration under Certificates and secrets.">
     <cfelseif FindNoCase("AADSTS700016", msBody) GT 0>
-      <cfset msHint = " No application with that client ID exists in this tenant. Either the Application (client) ID is wrong, or it belongs to a different tenant.">
+      <cfset msHint = "No application with that client ID exists in this tenant. Either the Application (client) ID is wrong, or it belongs to a different tenant.">
     <cfelseif FindNoCase("AADSTS90002", msBody) GT 0>
-      <cfset msHint = " That tenant does not exist. Use the Directory (tenant) ID from the app registration's Overview page, or the tenant's domain name.">
+      <cfset msHint = "That tenant does not exist. Use the Directory (tenant) ID from the app registration's Overview page, or the tenant's domain name.">
     </cfif>
     <cfset msErrText = StructKeyExists(msTokenResp, "error_description") ? ListFirst(msTokenResp.error_description, Chr(13) & Chr(10)) : msTokenResp.error>
-    <cfthrow message="Microsoft refused the credentials: #msErrText##msHint#">
+    <!--- The hint goes FIRST. Entra's error_description is a paragraph with a
+         trace ID, a correlation ID and a timestamp, and the console truncates
+         a run message, so anything appended after it is exactly what gets cut.
+         What the admin has to DO leads; what Microsoft said follows. --->
+    <cfif Len(msHint)>
+      <cfthrow message="#msHint# (Microsoft said: #msErrText#)">
+    <cfelse>
+      <cfthrow message="Microsoft refused the credentials: #msErrText#">
+    </cfif>
   </cfif>
 
   <cfif NOT StructKeyExists(msTokenResp, "access_token")>
@@ -144,9 +152,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset msMsg = (IsStruct(msList.error) AND StructKeyExists(msList.error, "message")) ? msList.error.message : "unknown error">
       <cfset msHint2 = "">
       <cfif FindNoCase("Authorization_RequestDenied", msListCall.fileContent) GT 0>
-        <cfset msHint2 = " The app registration is missing the User.Read.All APPLICATION permission, or it was added but never granted admin consent. Both steps are required.">
+        <cfset msHint2 = "The app registration is missing the User.Read.All APPLICATION permission, or it was added but never granted admin consent. Both steps are required.">
       </cfif>
-      <cfthrow message="Microsoft rejected the directory request: #msMsg##msHint2#">
+      <cfif Len(msHint2)>
+        <cfthrow message="#msHint2# (Microsoft said: #msMsg#)">
+      <cfelse>
+        <cfthrow message="Microsoft rejected the directory request: #msMsg#">
+      </cfif>
     </cfif>
 
     <cfif StructKeyExists(msList, "value") AND IsArray(msList.value)>

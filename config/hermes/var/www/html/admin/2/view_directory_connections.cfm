@@ -336,7 +336,10 @@ function dcFillDelete(el) {
               <span class="badge bg-danger">Failed</span>
             </cfif>
             <br><small class="text-muted">#DateFormat(getConnections.last_run_at, "yyyy-mm-dd")# #TimeFormat(getConnections.last_run_at, "HH:mm")#</small>
-            <br><small>#EncodeForHTML(Left(getConnections.last_run_message, 160))#</small>
+            <!--- Truncated so one long Entra paragraph cannot wreck the row,
+                  but the full text is on the title so it is still reachable
+                  without going to the database. --->
+            <br><small title="#EncodeForHTMLAttribute(getConnections.last_run_message)#">#EncodeForHTML(Left(getConnections.last_run_message, 160))#<cfif Len(getConnections.last_run_message) GT 160>...</cfif></small>
           <cfelse>
             <span class="text-muted">Never run</span>
           </cfif>
