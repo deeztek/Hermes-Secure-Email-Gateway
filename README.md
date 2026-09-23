@@ -22,8 +22,6 @@
 
 <p align="center">
   <a href="https://www.hermesseg.io/features/">Features</a> &middot;
-  <a href="https://www.hermesseg.io/pro/">Pro</a> &middot;
-  <a href="https://www.hermesseg.io/pricing/">Pricing</a> &middot;
   <a href="https://docs.deeztek.com/shelves/hermes-seg-docker">Docs</a> &middot;
   <a href="https://www.hermesseg.io/support/">Support</a>
 </p>
@@ -94,8 +92,6 @@ Hermes can be deployed three ways:
 
 This Docker Edition packages the entire stack as a set of containers managed by Docker Compose, replacing the legacy bare-metal Ubuntu installer with a portable, reproducible deployment.
 
-> **Looking for a managed version?** Hermes is self-hosted by design. If you want to support development and get vendor support, see [Pro pricing](https://www.hermesseg.io/pricing/): per-server licensing, no per-mailbox fees.
-
 ## Editions
 
 Hermes ships in two editions:
@@ -103,7 +99,7 @@ Hermes ships in two editions:
 | Edition | License | What you get |
 |---|---|---|
 | **Community** | [AGPL v3](https://www.gnu.org/licenses/agpl.html), free and open source | The entire mail gateway and email server stack. All core security, encryption, mailbox hosting, and administration features. |
-| **Pro** | Commercial, see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). [Pricing &rarr;](https://www.hermesseg.io/pricing/) |
+| **Pro** | Commercial, see [EULA](https://docs.deeztek.com/books/hermes-seg-general-documentation/page/hermes-secure-email-gateway-pro-end-user-license-agreement-eula) | Everything in Community plus 6 advanced features (see [Pro Features](#pro-features) below). |
 
 A Pro license is purchased separately. Community Edition needs no license file and works fully without one.
 
@@ -122,7 +118,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Custom message rules, score overrides, custom file expressions/extensions/rules
 - Quarantine, queue management, train as spam/ham, download messages
 - **Full email archiving**: every processed message is archived, not only blocked mail. Clean deliveries, spam, banned attachments, and infected mail are each written to their own store. Searchable by date range, sender, recipient, subject, score, and verdict
-- **Self-service recovery**: recipients search Message History and release messages back to their own mailbox from the per-mailbox portal, without administrator involvement. Administrators see the whole system record and can release on any user's behalf; release always delivers to the original recipient, so it cannot be used to redirect another user's mail. Retention is set by policy, not by a fixed window
+- **Self-service recovery**: recipients search Message History and release messages back to their own mailbox from the per-mailbox portal, without administrator involvement. Administrators see the whole system record and can release on any user's behalf; release always delivers to the original recipient, so it cannot be used to redirect another user's mail. History depth is a function of allocated archive storage: there is no retention setting to configure, and the oldest messages are pruned automatically once the archive disk crosses its capacity threshold
 
 ### Encryption and authentication (Community)
 
@@ -162,6 +158,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Calendars (CalDAV) and contacts (CardDAV)
 - Single sign-on via Authelia OIDC
 - Pre-provisioning of Nextcloud user accounts on first login
+- Team chat, voice/video calls, and meetings via Nextcloud Talk (optional: the app is not enabled by default, and dependable calls need the high-performance backend, deployed separately. See [Nextcloud Talk + HPB deployment](docs/general/nextcloud-talk-hpb-deployment.md))
 
 ### Admin and user experience (Community)
 
@@ -177,7 +174,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 
 ### Pro features
 
-Pro Edition adds the following capabilities on top of everything in Community. [Full Pro feature page &rarr;](https://www.hermesseg.io/pro/)
+Pro Edition adds the following capabilities on top of everything in Community.
 
 | Pro Feature | What it does |
 |---|---|
@@ -222,7 +219,7 @@ Hermes splits storage across **five independent tiers** so each can live on the 
 |---|---|---|---|
 | **Config** | install root (implicit) | Repo working tree, generated config, secrets, `.env` | Fast SSD; sized by repo location |
 | **Data** | `/mnt/data` | Databases, service logs, mail-filter state, Postfix queue | Fast SSD; sized for DB growth and log retention. **High write rate, backup-critical.** |
-| **Archive** | `/mnt/archive` | Email archive: every processed message (clean, spam, banned, infected) | Cheap bulk; sized for retention policy &times; total mail volume. Grows unboundedly, cold access. |
+| **Archive** | `/mnt/archive` | Email archive: every processed message (clean, spam, banned, infected) | Cheap bulk; sized for total mail volume, not just blocked mail. Grows unboundedly, cold access. |
 | **Vmail** | `/mnt/vmail` | Dovecot mailboxes | Cheap bulk; sized for users &times; quota |
 | **Nextcloud** | `/mnt/files` | Nextcloud app + user files + Redis cache | Cheap bulk; sized for user file storage |
 
@@ -251,7 +248,7 @@ For a production install, give **each storage tier its own physical or virtual d
 | Tier | Disk it wants | Why a dedicated disk |
 | --- | --- | --- |
 | **Data** | Fast SSD | High write rate (databases, logs, Postfix queue) and backup-critical; isolating it from the OS disk is the single biggest performance win |
-| **Archive** | Commodity bulk | The email archive holds every processed message and grows unboundedly with retention; keep that growth off the DB/OS disk |
+| **Archive** | Commodity bulk | The email archive holds every processed message and grows unboundedly with mail volume; keep that growth off the DB/OS disk |
 | **Vmail** | Commodity bulk | Dovecot mailboxes scale with users &times; quota; size and grow independently |
 | **Nextcloud** | Commodity bulk | User files + Redis cache; size for file-storage growth independently |
 
