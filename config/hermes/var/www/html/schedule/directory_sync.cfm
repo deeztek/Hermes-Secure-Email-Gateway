@@ -498,7 +498,21 @@ exit $?
          an address" reads as a contradiction and sends the admin looking at
          their relay domains instead of their filter. --->
     <cfif ArrayLen(records) EQ 0>
-      <cfset failMessage = "No entries matched the filter " & theFilter & " under " & Trim(getConnections.base_dn) & ". Previous results left unchanged.">
+      <!--- A connector that already said why keeps its message.
+
+           This used to overwrite failMessage unconditionally, which threw
+           away the real cause (a refused token, a missing admin consent, a
+           throttled tenant) and replaced it with a description of an LDAP
+           filter and base DN that a REST connector does not have and never
+           used. The admin was then sent to look at a filter that was not the
+           problem and does not exist. --->
+      <cfif Len(Trim(failMessage))>
+        <!--- keep the connector's own message --->
+      <cfelseif isRestProvider>
+        <cfset failMessage = restProviderLabel & " returned no accounts at all. The credentials were accepted, so this is the directory being empty rather than a configuration error. Previous results left unchanged.">
+      <cfelse>
+        <cfset failMessage = "No entries matched the filter " & theFilter & " under " & Trim(getConnections.base_dn) & ". Previous results left unchanged.">
+      </cfif>
     <cfelse>
       <cfif isRestProvider>
         <cfset failMessage = restProviderLabel & " returned " & restRawCount & " account(s), but none carried an address in a relay domain. Add the domain under Email Relay first, or these users are not ones Hermes relays for. Previous results left unchanged.">
