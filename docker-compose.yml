@@ -127,13 +127,28 @@ services:
       #- MYSQL_PASSWORD=DATABASE_PASSWORD #optional
       #- REMOTE_SQL=http://URL1/your.sql,https://URL2/your.sql #optional
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "--silent"]
+      # Authenticated. An unauthenticated `mysqladmin ping` reports success
+      # even when the bind is REFUSED (the server answered, so ping is
+      # satisfied), so the old probe went green on a database that could
+      # not authenticate anyone, while writing an access-denied warning
+      # every 10 seconds. That filled the error log with 17GB on a
+      # long-running install and buried everything else in it. #339
+      #
+      # MYSQL_PWD rather than -p so the password never reaches the
+      # process list. The secret is already mounted here for
+      # FILE__MYSQL_ROOT_PASSWORD, so nothing new is introduced.
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$(cat /run/secrets/MYSQL_ROOT_PASSWORD)\" mysqladmin ping -u root --silent"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
     volumes:
       - db_data:/config
+      # Hermes-owned MariaDB settings. /etc/my.cnf does `!includedir
+      # /etc/my.cnf.d`, and the image starts mariadbd with
+      # --defaults-extra-file=/config/custom.cnf, so this is read first
+      # and custom.cnf layers on top. Only set what custom.cnf omits. #339
+      - ./config/database/etc/my.cnf.d/hermes.cnf:/etc/my.cnf.d/hermes.cnf:ro
       - ./config/hermes/opt/hermes:/opt/hermes
     # No host ports exposed — only accessed by containers on Docker network
     restart: always
