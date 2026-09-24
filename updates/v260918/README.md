@@ -13,6 +13,13 @@ delivers mail. Auto-provisioning is new and switched off until you configure a
 directory. Every existing RemoteAuth mapping keeps the exact transport it has
 today.
 
+**One thing does change for your recipients.** The key behind quarantine release
+links is rotated during the upgrade, so release links already sitting in people's
+inboxes stop working. Links are valid for 72 hours, so that is at most 72 hours of
+notices whose Release button now reports the link as invalid. Anything older had
+already expired. Recipients can still release those messages from the User Portal.
+See [Quarantine release links are rotated](#quarantine-release-links-are-rotated).
+
 ## Auto-provisioning
 
 Relay recipients have always been entered by hand, or pasted in as CSV exported
@@ -129,6 +136,21 @@ present a certificate that validates against your CA bundle, with a hostname
 matching the address you entered. An IP address will not match a certificate
 issued to a hostname.
 
+**If you use STARTTLS today, read this before adding an LDAPS mapping.**
+
+Upgrading changes nothing: a gateway using STARTTLS keeps using it, because that
+setting is preserved and no existing mapping is switched to LDAPS for you.
+
+The one thing to know is what happens *later*. STARTTLS and LDAPS cannot coexist,
+because the overlay holds a single TLS configuration for every mapping and
+STARTTLS cannot run on a connection that is already encrypted. So the first time
+you add an LDAPS mapping, STARTTLS is switched off for the whole overlay, and any
+mapping still on plain LDAP goes from STARTTLS-encrypted to unencrypted.
+
+That matters because what crosses the wire on those connections is the user's own
+password. If you have STARTTLS mappings and want to introduce LDAPS, move them all
+to LDAPS rather than leaving some behind on plain.
+
 ### Client certificates, for directories that require them
 
 Some directories will not accept a connection unless the client proves its own
@@ -146,6 +168,79 @@ directories that require mutual TLS should work the same way, but Google is the
 one that has actually been run.
 
 ## What is fixed
+
+### Quarantine release links are rotated
+
+The key used to sign quarantine release links was derived from inputs that carried
+far less randomness than their length suggested. Hashing a weak input does not
+enlarge the space behind it, it only makes the result look random. The key is now
+generated properly.
+
+**This was not remotely exploitable on its own.** Forging a working link also
+requires a message identifier that is not guessable from outside the gateway. It
+was still not a property worth keeping.
+
+Because the old key is read back from disk whenever it exists, fixing the
+generation alone would have left every existing gateway on its old key
+permanently. Only rotating it reaches them, and that is what the upgrade does.
+
+**What you will see.** Release links issued in the last 72 hours stop working, and
+a recipient clicking one is told the link is not valid. Links older than that had
+already expired. Nothing is lost: those messages are still in quarantine and can
+be released from the User Portal, or by an administrator from Message History.
+
+Nothing to do. The next quarantine notice mints the new key automatically.
+
+Reported by @quietvw.
+
+### The database filled its own disk until mail stopped
+
+Two defects in the database container, together, would eventually stop your
+gateway accepting mail. The symptom gave no hint of the cause:
+
+```
+452 4.3.1 Insufficient system storage
+```
+
+Postfix refuses to accept a message when free disk falls below a threshold. Mail
+is deferred rather than lost and senders retry, but delivery halts, and nothing in
+that message points at a database.
+
+**Binary logs were never deleted.** A ten day retention was configured and
+correct, and never once executed. Every automatic purge in MariaDB waits for a
+replica to consume the log first, and Hermes has no replicas, so the wait never
+ended. On a gateway running since early 2025 this had reached **fifteen months of
+logs, around 51 GB**, against a database of 6 GB. Nothing read them. They exist
+for replication and point-in-time recovery, neither of which Hermes uses, since
+backups are taken as dumps.
+
+This is now corrected, and it repairs itself. The retention that was always
+configured simply starts working, and the accumulated backlog is cleared
+automatically at the next log rotation. **You do not need to delete anything by
+hand**, and you should not: MariaDB tracks these files in an index and removing
+them directly corrupts it.
+
+**The database healthcheck reported healthy no matter what.** It connected without
+credentials, and the command it used treats a refused login as a successful
+response, so it passed on every probe while writing an access denied warning each
+time. At one probe every ten seconds that reached a **17 GB** error log on the
+same install.
+
+The worse half was silent: other services wait for that healthcheck before
+starting, and it could not tell a working database from one refusing every
+connection. The probe now authenticates, which stops the log growth at source and
+makes the check mean something.
+
+The error log is the one thing that does not clean itself, because the fix stops
+it growing rather than shrinking what is there. If yours is large, empty it in
+place rather than deleting it, since the file is open:
+
+```bash
+docker exec hermes_db_server sh -c ': > /config/log/mysql/mariadb-error.log'
+```
+
+Worth checking your disk after upgrading if you have been running a while. On the
+affected install these two accounted for **68 GB**.
 
 ### Uploaded RemoteAuth CA certificates were never readable
 
@@ -185,6 +280,20 @@ the username separately, which sent people asking for something they were alread
 looking at. The RemoteAuth pages now say the same thing, since the DN pattern
 there is not a username field and has been read as one.
 
+### Row buttons in the Mailboxes and RemoteAuth tables were misaligned
+
+Cosmetic, but visible on every row: action buttons sat at inconsistent heights
+because each was wrapped in its own form inside the table cell. They now use the
+same pattern as the rest of the console.
+
+## New documentation
+
+| | |
+|---|---|
+| [Auto-Provisioning](../../docs/admin/02-email-relay/auto-provisioning.md) | The three directory types, the Google and Microsoft 365 setup steps including which misstep produces which error, and what is guaranteed never to happen to your recipient list |
+| [LDAP RemoteAuth](../../docs/admin/01-system/ldap-remoteauth.md) | Rewritten around Google Secure LDAP: the edition requirement, the setup step everyone misses, and why a wrong DN pattern looks exactly like a wrong password |
+| [Nextcloud Talk and the High-Performance Backend](../../docs/general/nextcloud-talk-hpb-deployment.md) | Optional. Chat, calls and meetings on the Nextcloud that already ships with Hermes |
+
 ## Upgrading
 
 Standard procedure. The schema change is applied for you and there are no manual
@@ -197,3 +306,15 @@ sudo ./scripts/system_update_docker.sh v260918
 
 Take a backup or a snapshot first, as always. On a hypervisor a VM snapshot is the
 quickest way back. Otherwise run `./scripts/system_backup.sh` from the host.
+
+This release changes how the database container reports its health, and every
+other service waits for that before starting. It has been verified on two
+gateways, but if an upgrade ever stalls with services not coming up, check that
+container first:
+
+```bash
+docker ps --filter name=hermes_db_server --format '{{.Names}}\t{{.Status}}'
+docker inspect hermes_db_server --format '{{json .State.Health}}'
+```
+
+It should reach `healthy` within about ninety seconds of starting.
