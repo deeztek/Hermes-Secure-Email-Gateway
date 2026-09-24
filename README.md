@@ -117,6 +117,7 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Per-recipient spam/virus/file policies
 - Custom message rules, score overrides, custom file expressions/extensions/rules
 - Quarantine, queue management, train as spam/ham, download messages
+- **Recipient auto-provisioning**: read the relay recipient roster from a directory on a schedule instead of typing or pasting it. Reads from LDAP/Active Directory, Google Workspace (Admin SDK, works on every Workspace edition) or Microsoft 365 (Microsoft Graph). Stages results for review, or provisions unattended. Additive only: it never deletes a recipient, and an empty or failed read changes nothing
 - **Full email archiving**: every processed message is archived, not only blocked mail. Clean deliveries, spam, banned attachments, and infected mail are each written to their own store. Searchable by date range, sender, recipient, subject, score, and verdict
 - **Self-service recovery**: recipients search Message History and release messages back to their own mailbox from the per-mailbox portal, without administrator involvement. Administrators see the whole system record and can release on any user's behalf; release always delivers to the original recipient, so it cannot be used to redirect another user's mail. History depth is a function of allocated archive storage: there is no retention setting to configure, and the oldest messages are pruned automatically once the archive disk crosses its capacity threshold
 
@@ -321,7 +322,7 @@ This polls GitHub for the latest release, fetches the new tag, pulls updated ima
 ### Update to a specific release
 
 ```bash
-sudo ./scripts/system_update_docker.sh v260601
+sudo ./scripts/system_update_docker.sh v260918
 ```
 
 ### Preview without applying changes
