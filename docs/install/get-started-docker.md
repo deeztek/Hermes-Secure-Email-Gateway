@@ -6,13 +6,13 @@ Skip these and Postfix will silently bounce or reject mail. The admin dashboard 
 
 ## Which steps apply to you?
 
-Hermes supports three deployment topologies. **Step 1 (System Identity) and the Optional/DNS sections apply to everyone**, and **Step 2 (Console FQDN and a real certificate) is required for anything that uses Nextcloud**. The middle of this guide then splits into a **Relay** path and a **Mail server** path. Follow only the one(s) for your topology:
+Hermes supports three deployment topologies. **Step 0 (First login), Step 1 (System Identity), and the Optional/DNS sections apply to everyone**, and **Step 2 (Console FQDN and a real certificate) is required for anything that uses Nextcloud**. The middle of this guide then splits into a **Relay** path and a **Mail server** path. Follow only the one(s) for your topology:
 
 | Topology | What it is | Follow |
 | --- | --- | --- |
-| **Relay-only** | Hermes filters mail and forwards it to a downstream mail server (MX) | Step 1 → **Relay configuration** |
-| **Mail-server-only** | Hermes hosts the mailboxes itself (Dovecot + webmail) | Step 1 → **Step 2** → **Mail server configuration** |
-| **Hybrid** | Both: some domains relay out, others have local mailboxes | Step 1 → **Step 2** → **Relay configuration** → **Mail server configuration** |
+| **Relay-only** | Hermes filters mail and forwards it to a downstream mail server (MX) | Step 0 → Step 1 → **Relay configuration** |
+| **Mail-server-only** | Hermes hosts the mailboxes itself (Dovecot + webmail) | Step 0 → Step 1 → **Step 2** → **Mail server configuration** |
+| **Hybrid** | Both: some domains relay out, others have local mailboxes | Step 0 → Step 1 → **Step 2** → **Relay configuration** → **Mail server configuration** |
 
 > **Legacy reference**: this page replaces the [pre-Docker 16-step page](https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/getting-started). The Docker install script absorbs ~6 of those steps, so the list below is shorter.
 
@@ -36,6 +36,80 @@ You don't need to redo any of this; `install_hermes_docker.sh` handled it during
 > **Why the console address is an IP.** At install time there is usually no DNS record yet for the FQDN you intend to use, so the installer deliberately points the console, Nginx, Authelia and Nextcloud at the host IP. That way you can log in immediately. Once DNS resolves, save **System → Console Settings** with your FQDN and Hermes re-renders the whole web stack. Do this before handing the console to anyone else.
 
 So **after the install you can log in, but mail won't actually flow** until you complete the steps below.
+
+---
+
+## Step 0: First login (do these before anything else)
+
+Five minutes, and they gate everything after. Two of them are security items that
+nothing in Hermes will ever remind you about.
+
+| # | What | Where |
+| --- | --- | --- |
+| 1 | Log in as the bootstrap admin | `https://<host-ip>/admin/2/` |
+| 2 | Point the admin account at a real mailbox | System → System Users |
+| 3 | Change the admin password (optional) | System → System Users |
+| 4 | Require MFA on the admin account | System → System Users |
+| 5 | Change the CipherMail console password | `/ciphermail` |
+
+### 0a. Log in
+
+The install printed the bootstrap admin username and password in `INSTALL_SUMMARY`.
+The console answers on the **host IP** at this point, not on your FQDN. That is
+deliberate, and Step 2 fixes it.
+
+### 0b. Point the admin account at a real mailbox
+
+**Page**: System → System Users (edit the admin user), or the **My Profile** link at the top of the sidebar
+
+The install created the account with a generated address of the form
+`<admin-username>@<your-mail-domain>`, for example `apologise4567@example.com`. That
+address is where Hermes sends **admin notifications and password-reset mail**.
+
+Do this before the password change below, not after. If you lock yourself out later
+the reset goes to whatever address is on the account, and an address nobody reads is
+the same as no reset at all.
+
+### 0c. Change the admin password
+
+**Page**: System → System Users
+
+**Optional, and genuinely optional.** The installer generated this password randomly
+and printed it once, so unlike a stock default there is nothing weak about it. Change
+it if you would rather have one your team's password manager holds. Keep it if you are
+happy with the generated one. Either is a defensible choice.
+
+### 0d. Require MFA on the admin account
+
+**Page**: System → System Users, edit the admin user, set the authentication level to **Two Factor**
+
+New accounts land in `one_factor`, which is password only. Moving the account to Two
+Factor makes Authelia prompt for enrolment (TOTP, WebAuthn or Duo Push) at the next
+login.
+
+Do this before the console becomes reachable from anywhere but your own network,
+which in practice means before Step 2 gives it a public FQDN.
+
+### 0e. Change the CipherMail console password
+
+**Page**: the CipherMail console at `/ciphermail`
+
+CipherMail has its **own** administrator account, separate from the Hermes login, and
+it ships with CipherMail's stock credentials:
+
+| Username | Password |
+| --- | --- |
+| `admin` | `admin` |
+
+**This is the only stock credential anywhere in Hermes.** Every other account the
+install creates, the Hermes admin included, plus the Nextcloud local admin and every
+service account, gets a randomly generated password.
+
+Two things are true at once here. Authelia gates the `/ciphermail` path, so this is
+not reachable from the internet. And nothing in Hermes manages this account, so no
+dashboard nudge will ever fire and nothing else will prompt you. Neither is a reason
+to leave a stock credential on an admin interface. Sign in with `admin` / `admin` and
+change it while you are thinking about it.
 
 ---
 
@@ -186,6 +260,12 @@ By default Hermes only trusts `127.0.0.1` and the Docker bridge subnet (`172.16.
 
 Add the individual recipients (or wildcards) that Hermes should accept mail for. Validated mail is then forwarded to the destination set on the domain row in step A. Without at least one recipient, mail for the domain is rejected as unknown.
 
+> **You may not have to type these.** If your recipients live in a directory,
+> **Email Relay → Auto-Provisioning** reads the list on a schedule instead:
+> LDAP / Active Directory, Google Workspace (any edition) or Microsoft 365. It stages
+> what it finds for review before creating anything, and it never deletes a recipient.
+> See [Auto-Provisioning](../admin/02-email-relay/auto-provisioning.md).
+
 ---
 
 ## Mail server configuration
@@ -264,11 +344,6 @@ Beyond the gateway itself, DNS is what makes mail actually arrive. The install s
 | `DKIM` selector → public key | Generated under Content Checks → DKIM Settings | Cryptographic signing of outbound |
 | `DMARC` policy | TXT at `_dmarc.example.com` | Defines what receivers do with SPF/DKIM failures |
 
-### Review the Admin Account Email *(all topologies)*
-**Page**: System → System Users (edit the admin user), or your **My Profile** link (top of the sidebar)
-
-The install created the admin account with a generated email of the form `<admin-username>@<your-mail-domain>` (e.g. `apologise4567@example.com`). That address is where Hermes sends **admin notifications and password-reset mail**, so unless it maps to a real, monitored mailbox, change it to one that does.
-
 ### Antispam Settings (Pyzor / Razor / Bayes) *(all topologies)*
 **Page**: Content Checks → **Antispam Settings** (both the on/off switches and the one-time actions)
 
@@ -300,18 +375,66 @@ The Bayesian classifier learns what *your* mail looks like. It ships **empty** a
 ### Barracuda Central Registration *(all topologies)*
 Hermes' Postfix `postscreen` DNSBL list includes **`b.barracudacentral.org`**, and Barracuda Central only answers queries from **registered** IPs. Register your gateway's sending IP (free) at the Barracuda Reputation Block List site so those lookups return results instead of being silently ignored.
 
-### CipherMail Console Admin Password *(all topologies (encryption))*
-**Page**: the CipherMail console at `/ciphermail` (behind Authelia SSO)
-
-The CipherMail encryption console has its **own** administrator account, separate from the Hermes/Authelia admin login. It ships with CipherMail's stock default credentials:
-
-| Username | Password |
-| --- | --- |
-| `admin` | `admin` |
-
-Sign in with those and change the password immediately. The account is not managed by Hermes, so nothing else will prompt you and no dashboard nudge fires for it. Authelia SSO gates the `/ciphermail` path, which means the default is not reachable from the internet, but it remains a stock credential on an admin interface and should not survive your first login.
-
 ---
+
+## Before you hand this over
+
+Mail flows once the steps above are done. These are what separate a working gateway
+from one you can operate.
+
+### Backups *(all topologies)*
+**Page**: System → Backup/Restore
+
+**Nothing here is scheduled for you.** `system_backup.sh` runs from **host cron**, not
+from the in-app scheduler, and that is deliberate: a backup that depends on the stack
+being healthy is not a backup.
+
+The page documents the flags and the restore side. Two things worth doing in order:
+
+1. Run a backup by hand once and confirm it completes.
+2. Verify the e-mail notification path *before* wiring it into cron, so a failure
+   actually reaches you instead of failing quietly at 3am.
+
+This is the one item on this page that cannot be fixed after you need it.
+
+### Know how you will notice a full disk *(all topologies)*
+
+**Hermes does not alert you when a disk fills.** Worth stating plainly, because the
+first symptom is not a disk warning, it is mail being deferred:
+
+```
+452 4.3.1 Insufficient system storage
+```
+
+Postfix refuses to accept a message when free space drops below a threshold. Senders
+retry so nothing is lost, but delivery stops, and nothing in that message points
+anywhere near the disk.
+
+What grows without a ceiling:
+
+| Tier | Holds | Sized by |
+| --- | --- | --- |
+| **Archive** | Every processed message, not only blocked mail | Total mail volume |
+| **Data** | Databases, queues and all service logs | Volume plus log retention |
+
+There is one automatic safeguard and it is narrow: when `/mnt/data` crosses **90%**,
+the message cleanup job drops the oldest 30 day window of quarantined mail. It checks
+that one filesystem only, it does not look at the Archive tier or the OS disk, and it
+sends nothing to anyone.
+
+So `df -h` on the host belongs in whatever monitoring you already run. That is the
+whole recommendation.
+
+### Access hardening *(Pro)*
+**Pages**: System → IPS, System → Console Firewall
+
+Fail2ban protects **every** install, Community included. The container runs regardless
+of edition and bans on the same triggers. What Pro adds is the interface: seeing active
+bans, tuning jails, thresholds and durations, and Console Firewall for restricting
+which source IPs can reach the admin console at all.
+
+On Community there is nothing to configure here and nothing missing. The protection is
+already running.
 
 ## Things that look broken but aren't
 
@@ -367,5 +490,10 @@ Each banner links directly to the page where you'd fix the underlying condition 
 3. **Webmail test** *(mail server / hybrid)*: log in to `https://<console-host>/nc/` as one of your new mailbox users (Authelia SSO) and confirm send/receive. If this fails with "Could not reach the OpenID Connect provider", [Step 2](#step-2-console-fqdn-and-a-real-certificate) is incomplete: the console is still on an IP, or the certificate does not cover the name in use.
 4. Open the **Admin Console** home page and confirm both setup nudges are gone (placeholder hostname + self-signed cert).
 5. If you set up Pro features, verify `session.edition` reads "Pro" in the top-right corner of any admin page.
+6. **Confirm the security items from Step 0 actually stuck**, since none of them nudge you:
+   - Signing out and back in prompts for your second factor
+   - `admin` / `admin` no longer works at `/ciphermail`
+   - The admin account's e-mail address is one you read
+7. **Confirm a backup has run** and that its notification reached you, not just that cron is installed.
 
 You're done. Welcome to Hermes SEG.
