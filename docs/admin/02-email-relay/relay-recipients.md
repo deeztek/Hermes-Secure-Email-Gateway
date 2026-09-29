@@ -60,7 +60,7 @@ recipients table  (one row per email address)
 ├── enforce_mfa               0 | 1   (admin policy — see #225 Phase 2)
 ├── policy_id  ─────────────► spam_policies.policy_id (SVF policy)
 ├── pdf_enabled / smime_enabled / pgp_enabled / digital_sign
-├── backend_server / backend_port / backend_tls   (per-recipient override)
+├── backend_server / backend_port / backend_tls   (per-recipient override, not yet routed: #157)
 └── (cert+keyring slots populated lazily by the queue)
 ```
 
@@ -139,7 +139,7 @@ DataTables Buttons; `stateSave: true`). Columns:
 | PGP | link to `view_recipient_keyrings.cfm?type=1&id=…` | Per-recipient keyring manager |
 | Recipient | `recipients.recipient` | Email address |
 | Auth | `recipients.auth_type` + `remoteauth_domain` | `LOCAL` badge (secondary) or `REMOTE` badge (primary, tooltip shows mapping key) |
-| Backend | `recipients.backend_server[:port]` | Per-recipient override or `(domain default)` placeholder |
+| Backend | `recipients.backend_server[:port]` | Per-recipient override or `(domain default)` placeholder. **Stored only; delivery does not consult it yet ([#157](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/157))** |
 | 2FA | LDAP `cn=two_factor` + `enforce_mfa` | **Two independent pills** — see [Two-pill 2FA column](#two-pill-2fa-column) below |
 | Policy | `policy.policy_name` via join | Assigned SVF policy |
 | Quarantine Notifications | `user_settings.report_enabled` | `YES` / `NO` badge |
@@ -249,15 +249,28 @@ so the next scheduler tick re-attempts them.
 
 ## Edit Backend page
 
+> **This page stores a value that nothing currently acts on.** The
+> columns are written and displayed correctly, but no Postfix lookup
+> reads them, so a recipient with an override still follows the parent
+> domain's `transport` row. Tracked on
+> [#157](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/157).
+> Do not rely on it to route mail until that is closed.
+
 Per-recipient override of the downstream backend server / port / TLS
-mode. The default is `NULL` on all three columns, which falls back to
-the parent domain's `transport` row (set on the [Domains](domains.md)
-page). Useful for routing specific recipients to a different MX —
-e.g., a single user whose mailbox is on a different server than the
+mode. The intent is that `NULL` on all three columns falls back to the
+parent domain's `transport` row (set on the [Domains](domains.md)
+page), so a single recipient can be routed to a different MX from the
 rest of the domain.
 
+What exists today is the schema and this editor. The delivery side was
+designed around a `COALESCE` in a MySQL `transport_maps` query, but
+`transport_maps` is a hash file (`hash:/etc/postfix/transport`) and the
+MySQL lookup is commented out in `main.cf`, so the override is never
+consulted.
+
 The Backend column on the main table shows the override host (and
-port via tooltip) or `(domain default)` for the fallback case.
+port via tooltip) or `(domain default)` for the fallback case. Both
+reflect what is stored, not what delivery will do.
 
 ## Reset 2FA Devices modal
 
