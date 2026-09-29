@@ -141,6 +141,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 backend_tls = NULL
             WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
         </cfquery>
+        <!--- Regenerate the per-destination TLS policy map (#157).
+
+             transport_maps is a live MySQL lookup, so routing needs nothing
+             here. smtp_tls_policy_maps is a hash file, so a changed or
+             cleared backend_tls only takes effect once this rewrites it and
+             runs postmap.
+
+             datasource is set first because generate_tls_policy.cfm reads it
+             and does not default it, the same as every other caller. --->
+        <cfset datasource = "hermes">
+        <cfinclude template="inc/generate_tls_policy.cfm">
         <cfset session.backendMessage = "success_default">
         <cflocation url="view_internal_recipients.cfm" addtoken="no">
 
@@ -176,6 +187,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     backend_tls = <cfqueryparam value="#custom_tls#" cfsqltype="cf_sql_varchar">
                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
             </cfquery>
+            <!--- Regenerate the per-destination TLS policy map (#157).
+
+                 transport_maps is a live MySQL lookup, so routing needs nothing
+                 here. smtp_tls_policy_maps is a hash file, so a changed or
+                 cleared backend_tls only takes effect once this rewrites it and
+                 runs postmap.
+
+                 datasource is set first because generate_tls_policy.cfm reads
+                 it and does not default it, the same as every other caller. --->
+            <cfset datasource = "hermes">
+            <cfinclude template="inc/generate_tls_policy.cfm">
             <cfset session.backendMessage = "success_custom">
             <cflocation url="view_internal_recipients.cfm" addtoken="no">
         </cfif>
