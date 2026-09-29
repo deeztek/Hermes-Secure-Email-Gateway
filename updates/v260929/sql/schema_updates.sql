@@ -1,0 +1,26 @@
+-- =====================================================================
+-- Hermes SEG schema updates -- v260929
+--
+-- Idempotent (safe to re-run). Applied by apply_schema_updates() /
+-- system_update_docker.sh for installs upgrading from an earlier build;
+-- NOT run on fresh installs (those get the current schema from
+-- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
+--
+-- Contents: nothing. This release has no schema work.
+--
+-- #157 needed none: recipients.backend_server, backend_port and backend_tls
+-- have existed since the Docker rewrite. What was missing was anything that
+-- read them, which is a Postfix lookup change and a host shell artifact
+-- (scripts/10-rerender-transport-lookup.sh), not SQL.
+--
+-- The version stamp below is required even so: the update orchestrator reads
+-- build_no to decide which release directories are still pending, and warns
+-- if a release finishes without advancing it.
+-- ---------------------------------------------------------------------
+
+-- ---------------------------------------------------------------------
+-- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- the update orchestrator records this release as applied).
+-- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
+-- ---------------------------------------------------------------------
+UPDATE system_settings SET value = 'v260929' WHERE parameter = 'build_no';
