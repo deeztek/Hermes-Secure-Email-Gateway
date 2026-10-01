@@ -111,6 +111,68 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     ORDER BY recipient
 </cfquery>
 
+<!--- Prefill the form from what the selected recipients already have.
+
+     The page previously rendered the fields blank and pre-checked "Use Domain
+     Default" regardless, so editing an existing override meant retyping the
+     server and port from scratch while the header displayed the very values
+     being asked for. Worse, the port silently showed 25 rather than the one in
+     force, so a careless save would quietly move the recipient to a different
+     port.
+
+     Bulk edit is why it was built this way: several recipients can be selected
+     at once and they need not agree. So prefill only when they DO agree, and
+     say plainly when they do not rather than showing one recipient's values as
+     if they applied to all.
+
+     A unit separator joins the three columns because none of them can contain
+     it, unlike any character a hostname or TLS mode might legitimately use. --->
+<cfset prefillServer = "">
+<cfset prefillPort   = 25>
+<cfset prefillTls    = "may">
+<cfset prefillCustom = false>
+<cfset prefillMixed  = false>
+
+<cfset backendSigs = []>
+<cfloop query="getSelectedRecipients">
+    <cfif Len(Trim(getSelectedRecipients.backend_server))>
+        <cfset ArrayAppend(backendSigs, Trim(getSelectedRecipients.backend_server) & Chr(31)
+                                      & val(getSelectedRecipients.backend_port)    & Chr(31)
+                                      & Trim(getSelectedRecipients.backend_tls))>
+    <cfelse>
+        <cfset ArrayAppend(backendSigs, "")>
+    </cfif>
+</cfloop>
+
+<cfset backendAllSame = true>
+<cfloop from="2" to="#ArrayLen(backendSigs)#" index="sigIdx">
+    <cfif backendSigs[sigIdx] NEQ backendSigs[1]>
+        <cfset backendAllSame = false>
+        <cfbreak>
+    </cfif>
+</cfloop>
+
+<cfif backendAllSame AND Len(backendSigs[1])>
+    <!--- includeEmptyFields, because an empty TLS mode would otherwise shift
+         the port into its place. --->
+    <cfset sigParts = ListToArray(backendSigs[1], Chr(31), true)>
+    <cfset prefillServer = sigParts[1]>
+    <cfset prefillPort   = sigParts[2]>
+    <cfset prefillTls    = ArrayLen(sigParts) GTE 3 AND Len(sigParts[3]) ? sigParts[3] : "may">
+    <cfset prefillCustom = true>
+<cfelseif NOT backendAllSame>
+    <cfset prefillMixed = true>
+</cfif>
+
+<!--- A failed save redisplays what was typed, not what is stored. --->
+<cfif StructKeyExists(form, "backend_type")>
+    <cfset prefillCustom = (form.backend_type EQ "custom")>
+    <cfset prefillMixed  = false>
+</cfif>
+<cfif StructKeyExists(form, "custom_server")><cfset prefillServer = form.custom_server></cfif>
+<cfif StructKeyExists(form, "custom_port") AND Len(Trim(form.custom_port))><cfset prefillPort = form.custom_port></cfif>
+<cfif StructKeyExists(form, "custom_tls") AND Len(Trim(form.custom_tls))><cfset prefillTls = form.custom_tls></cfif>
+
 <cfif getSelectedRecipients.recordcount LT 1>
     <div class="alert alert-danger">
         <h5><i class="icon fas fa-ban"></i> Error</h5>
@@ -269,7 +331,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <label class="form-label"><strong>Backend Server</strong></label>
 
                 <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_default" value="default" checked>
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_default" value="default"<cfoutput><cfif NOT prefillCustom> checked</cfif></cfoutput>>
                     <label class="form-check-label" for="backend_default">
                         <strong>Use Domain Default</strong>
                         <br><small class="text-muted">Route to the backend server configured in the recipient's domain settings</small>
@@ -277,7 +339,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
 
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_custom" value="custom">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_custom" value="custom"<cfoutput><cfif prefillCustom> checked</cfif></cfoutput>>
                     <label class="form-check-label" for="backend_custom">
                         <strong>Custom Backend Server</strong>
                         <br><small class="text-muted">Override domain default with a specific backend server for these recipients</small>
@@ -285,25 +347,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
             </div>
 
-            <!--- Custom backend fields (shown/hidden via JS) --->
-            <div id="custom_backend_fields" style="display: none; padding-left: 25px; border-left: 3px solid #007bff;">
+            <cfoutput><cfif prefillMixed>
+            <div class="alert alert-warning py-2">
+                <small><strong>The selected recipients do not share one backend.</strong>
+                The fields below are therefore blank rather than showing one recipient's
+                settings as if they applied to all. Saving replaces the backend on every
+                selected recipient.</small>
+            </div>
+            </cfif></cfoutput>
+
+            <!--- Custom backend fields. Shown on load when an override is already
+                 in force, since the JS below only reacts to a change event. --->
+            <div id="custom_backend_fields" style="<cfoutput><cfif prefillCustom>display: block;<cfelse>display: none;</cfif></cfoutput> padding-left: 25px; border-left: 3px solid #007bff;">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label for="custom_server" class="form-label"><strong>Server Address</strong></label>
-                        <input type="text" class="form-control" id="custom_server" name="custom_server" placeholder="e.g., mail.example.com or 192.168.1.10">
+                        <input type="text" class="form-control" id="custom_server" name="custom_server" value="<cfoutput>#EncodeForHTMLAttribute(prefillServer)#</cfoutput>" placeholder="e.g., mail.example.com or 192.0.2.10">
                         <small class="text-muted">FQDN or IP address of the backend mail server</small>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label for="custom_port" class="form-label"><strong>Port</strong></label>
-                        <input type="number" class="form-control" id="custom_port" name="custom_port" value="25" min="1" max="65535">
+                        <input type="number" class="form-control" id="custom_port" name="custom_port" value="<cfoutput>#EncodeForHTMLAttribute(prefillPort)#</cfoutput>" min="1" max="65535">
                         <small class="text-muted">SMTP port (default: 25)</small>
                     </div>
                     <div class="col-md-3 mb-3">
                         <label for="custom_tls" class="form-label"><strong>TLS Mode</strong></label>
                         <select class="form-control" id="custom_tls" name="custom_tls">
-                            <option value="may" selected>May (Opportunistic)</option>
-                            <option value="encrypt">Encrypt (Required)</option>
-                            <option value="none">None (Disabled)</option>
+                            <cfoutput>
+                            <option value="may"<cfif prefillTls EQ "may"> selected</cfif>>May (Opportunistic)</option>
+                            <option value="encrypt"<cfif prefillTls EQ "encrypt"> selected</cfif>>Encrypt (Required)</option>
+                            <option value="none"<cfif prefillTls EQ "none"> selected</cfif>>None (Disabled)</option>
+                            </cfoutput>
                         </select>
                         <small class="text-muted">TLS encryption mode</small>
                     </div>
