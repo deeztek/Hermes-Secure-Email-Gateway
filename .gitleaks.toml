@@ -40,6 +40,17 @@ regexes = [
     # re-trips the rule and forces a fresh look. Set by
     # inc/mint_system_app_password.cfm.
     '''(?i)password\s*=\s*mintedAppPasswordPlain''',
+    # Same shape, same file set, in inc/mailbox_provision_core.cfm:
+    #   <cfset ncMailPassword = initialAppPasswordPlain>
+    # Named explicitly for the same reason as the line above.
+    '''(?i)password\s*=\s*initialAppPasswordPlain''',
+    # CFML ternary guard, where the credential arrives as the variable named
+    # inside the test and never as a literal:
+    #   <cfset recipientAppPassword = (IsDefined("ncProvisionAppPassword")) ? ...
+    # The rule's match stops at the opening paren, so there is no variable
+    # name to pin this to. Matched on the IsDefined call instead, which is a
+    # CFML construct and cannot be a secret in any form.
+    '''(?i)password\s*=\s*\(IsDefined\("''',
     '''(?i)password\s*=\s*['"]?password['"]?''',
     # Variable references (shell, CFML, Perl)
     '''(?i)password\s*=\s*['"]?\$''',
