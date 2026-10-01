@@ -257,6 +257,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </cfif>
 
+<!--- BACKEND SERVER UPDATE MESSAGES
+      edit_internal_recipient_backend.cfm sets session.backendMessage and
+      redirects to whichever list it was opened from. Only the Relay
+      Recipients list read it, so saving from here showed no confirmation at
+      all and left the key set in the session, where it then surfaced as a
+      stale success banner the next time Relay Recipients was opened.
+      Same block as view_internal_recipients.cfm, worded for mailboxes. --->
+<cfif StructKeyExists(session, "backendMessage")>
+  <cfif session.backendMessage EQ "success_default">
+    <div class="alert alert-success alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Success!</h4>
+      Mail delivery override cleared. Mail for the selected mailboxes is delivered locally again.
+    </div>
+  <cfelseif session.backendMessage EQ "success_custom">
+    <div class="alert alert-success alert-dismissible">
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      <h4><i class="icon fa fa-check"></i> Success!</h4>
+      Mail delivery updated. Mail for the selected mailboxes now goes to the backend you specified; the mailboxes themselves are kept.
+    </div>
+  </cfif>
+  <cfset StructDelete(session, "backendMessage")>
+</cfif>
+
 <!--- QUERY ALL MAILBOXES --->
 <!--- #226 Phase 2B: per-domain dept name list, used by the Edit
      Mailbox modal's department datalist (typeahead). Sets
@@ -365,6 +389,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <option value="">All</option>
       <option value="Local">Local only</option>
       <option value="Routed">Routed elsewhere</option>
+      <option value="Unknown">Unknown (no recipient record)</option>
     </select>
   </div>
   </cfif>
@@ -462,13 +487,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td>#HTMLEditFormat(domain)#</td>
           <!--- Mail Delivery. A mailbox whose mail is routed away looks
                 entirely normal everywhere else in this table, so without this
-                an administrator has no way to tell it receives nothing. The
-                leading badge word is also the filter token used below. --->
-          <td>
+                an administrator has no way to tell it receives nothing.
+
+                data-search carries what the Delivery filter below matches,
+                rather than the filter reading the cell itself. DataTables
+                takes a DOM-sourced cell's search text from its innerHTML with
+                tags stripped, which leaves the markup's own leading newline
+                and indentation in front of the badge word, so a start-anchored
+                filter on that word matched nothing and every Delivery option
+                emptied the whole table. The token comes first so the anchor
+                works, and the backend detail follows it so the global search
+                box still finds a mailbox by the host its mail goes to. --->
+          <cfif Len(Trim(backend_server))>
+            <cfset deliveryPort   = Val(backend_port) GT 0 ? Val(backend_port) : 25>
+            <cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#">
+          <cfelseif Val(recipient_id) GT 0>
+            <cfset deliverySearch = "Local">
+          <cfelse>
+            <cfset deliverySearch = "Unknown no recipient record">
+          </cfif>
+          <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
             <cfif Len(Trim(backend_server))>
               <span class="badge bg-warning text-dark">Routed</span>
               <div class="small text-muted">
-                to #HTMLEditFormat(backend_server)#:<cfif Val(backend_port) GT 0>#Val(backend_port)#<cfelse>25</cfif>
+                to #HTMLEditFormat(backend_server)#:#deliveryPort#
                 <cfif Len(Trim(backend_tls))><br>TLS: #HTMLEditFormat(backend_tls)#</cfif>
               </div>
               <div class="small text-muted"><em>mailbox kept, not delivered to</em></div>
@@ -1093,8 +1135,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       // 6 Domain, then the rest. Send As was inserted after Email, which
       // shifted every index from 4 onwards; the Domain filter below moved
       // with it. stateSave persists the sort by index, but DataTables
-      // discards a saved state whose column COUNT differs and this table
-      // went from 21 columns to 22, so old state is dropped on its own.
+      // discards a saved state whose column COUNT differs and this table has
+      // gone 21 -> 22 -> 23 (Mail Delivery), so old state is dropped on its
+      // own each time a column is added.
       "order": [[3, "asc"]],
       "pageLength": 25,
       "stateSave": true,
@@ -1110,11 +1153,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       table.column(6).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
     });
 
-    // Delivery filter (column 7 = Mail Delivery). Anchored to the leading
-    // badge word so "Local" cannot match inside a routed hostname.
+    // Delivery filter (column 7 = Mail Delivery). Matches the cell's
+    // data-search attribute, not its markup, for the reason given on the cell
+    // itself. Start-anchored so "Local" cannot match inside a routed hostname.
     $('#deliveryFilter').on('change', function() {
       var v = $(this).val();
       table.column(7).search(v ? '^' + $.fn.dataTable.util.escapeRegex(v) : '', true, false).draw();
+    });
+
+    // stateSave restores the per-column searches but knows nothing about the
+    // two dropdowns above the table, so returning to this page after setting
+    // a filter brought the list back still filtered while both selects read
+    // "All" - rows missing with nothing on screen to say why. Put the
+    // controls back in step with the state DataTables restored, and if a
+    // restored term matches no option any more, drop it rather than leave the
+    // list filtered by something unreachable.
+    [[6, $('#domainFilter')], [7, $('#deliveryFilter')]].forEach(function (pair) {
+      var colIdx = pair[0], $sel = pair[1], term = table.column(colIdx).search();
+      if (!term || !$sel.length) { return; }
+      var val = term.replace(/^\^/, '').replace(/\$$/, '').replace(/\\(.)/g, '$1');
+      var match = false;
+      $sel.find('option').each(function () { if (this.value === val) { match = true; } });
+      if (match) { $sel.val(val); } else { table.column(colIdx).search('').draw(); }
     });
 
     // Initialize Tom Select for the edit-mailbox timezone dropdown
