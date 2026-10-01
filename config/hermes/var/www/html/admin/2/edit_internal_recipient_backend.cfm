@@ -48,7 +48,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
-              <li class="breadcrumb-item"><a href="view_internal_recipients.cfm">Relay Recipients</a></li>
+              <li class="breadcrumb-item"><cfoutput><a href="#backUrl#"><cfif returnTo EQ "mailboxes">Mailboxes<cfelse>Relay Recipients</cfif></a></cfoutput></li>
               <li class="breadcrumb-item active">Edit Backend</li>
             </ol>
           </div><!-- /.col -->
@@ -68,6 +68,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset StructDelete(session, "backendMessage")>
 </cfif>
 
+<!--- Where Save and Cancel go back to. The same editor now serves two lists:
+     Relay Recipients, and Mailboxes, where it is the only way to send a
+     mailbox user's mail somewhere other than the local store.
+
+     Matched against a fixed set rather than used as given. A return path
+     taken from the query string and handed to cflocation is an open redirect
+     if it is ever trusted verbatim. --->
+<cfparam name="returnTo" default="">
+<cfif StructKeyExists(url, "returnTo")>
+    <cfset returnTo = url.returnTo>
+<cfelseif StructKeyExists(form, "returnTo")>
+    <cfset returnTo = form.returnTo>
+</cfif>
+<cfset backUrl   = (returnTo EQ "mailboxes") ? "view_mailboxes.cfm" : "view_internal_recipients.cfm">
+<cfset backLabel = (returnTo EQ "mailboxes") ? "Back to Mailboxes"  : "Back to Recipients">
+
 <cfparam name="ids" default="">
 <cfif StructKeyExists(url, "ids")>
     <cfset ids = url.ids>
@@ -81,7 +97,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         <p class="mb-0">No recipients selected. Please select at least one recipient.</p>
     </div>
-    <a href="view_internal_recipients.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Recipients</a>
+    <cfoutput><a href="#backUrl#" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>#backLabel#</a></cfoutput>
     <cfabort>
 </cfif>
 
@@ -99,7 +115,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         <p class="mb-0">Invalid recipient IDs provided.</p>
     </div>
-    <a href="view_internal_recipients.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Recipients</a>
+    <cfoutput><a href="#backUrl#" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>#backLabel#</a></cfoutput>
     <cfabort>
 </cfif>
 
@@ -178,7 +194,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         <p class="mb-0">Selected recipients not found.</p>
     </div>
-    <a href="view_internal_recipients.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Recipients</a>
+    <cfoutput><a href="#backUrl#" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>#backLabel#</a></cfoutput>
     <cfabort>
 </cfif>
 
@@ -215,7 +231,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset datasource = "hermes">
         <cfinclude template="inc/generate_tls_policy.cfm">
         <cfset session.backendMessage = "success_default">
-        <cflocation url="view_internal_recipients.cfm" addtoken="no">
+        <cflocation url="#backUrl#" addtoken="no">
 
     <cfelseif backend_type EQ "custom">
         <!--- Validate custom backend fields --->
@@ -261,7 +277,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset datasource = "hermes">
             <cfinclude template="inc/generate_tls_policy.cfm">
             <cfset session.backendMessage = "success_custom">
-            <cflocation url="view_internal_recipients.cfm" addtoken="no">
+            <cflocation url="#backUrl#" addtoken="no">
         </cfif>
     </cfif>
 </cfif>
@@ -293,7 +309,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- BACK BUTTON --->
 <p>
-    <a href="view_internal_recipients.cfm" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>Back to Recipients</a>
+    <cfoutput><a href="#backUrl#" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i>#backLabel#</a></cfoutput>
 </p>
 
 <!--- SELECTED RECIPIENTS CARD --->
@@ -326,6 +342,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <form method="post" action="">
             <input type="hidden" name="action" value="save">
             <input type="hidden" name="ids" value="<cfoutput>#ArrayToList(validIds)#</cfoutput>">
+            <input type="hidden" name="returnTo" value="<cfoutput>#EncodeForHTMLAttribute(returnTo)#</cfoutput>">
 
             <div class="mb-3">
                 <label class="form-label"><strong>Backend Server</strong></label>
@@ -388,7 +405,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Saving...';this.form.submit();">
                     <i class="fas fa-save me-1"></i>Save Changes
                 </button>
-                <a href="view_internal_recipients.cfm" class="btn btn-secondary ms-2">
+                <cfoutput><a href="#backUrl#" class="btn btn-secondary ms-2"></cfoutput>
                     <i class="fas fa-times me-1"></i>Cancel
                 </a>
             </div>

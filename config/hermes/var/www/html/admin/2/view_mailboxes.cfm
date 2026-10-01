@@ -269,6 +269,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            d.domain, d.default_quota_mb,
            r.id AS recipient_id, r.id AS theID, r.id AS theOtherID,
            r.policy_id, r.auth_type, r.remoteauth_domain, r.enforce_mfa,
+           r.backend_server, r.backend_port, r.backend_tls,
            IF(r.pdf_enabled = 1, 'YES', 'NO') AS pdf_enabled,
            IF(r.smime_enabled = '1', 'YES', 'NO') AS smime_enabled,
            IF(r.pgp_enabled = 1, 'YES', 'NO') AS pgp_enabled,
@@ -359,6 +360,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <option value="#HTMLEditFormat(domain)#">#HTMLEditFormat(domain)#</option>
       </cfoutput>
     </select>
+    <label class="mb-0 ms-3"><strong>Delivery:</strong></label>
+    <select class="form-control form-control-sm" id="deliveryFilter" style="width:auto;">
+      <option value="">All</option>
+      <option value="Local">Local only</option>
+      <option value="Routed">Routed elsewhere</option>
+    </select>
   </div>
   </cfif>
 </div>
@@ -380,6 +387,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>Send As</th>
           <th>Display Name</th>
           <th>Domain</th>
+          <th>Mail Delivery</th>
           <th>Quota</th>
           <th>Auth</th>
           <th>2FA</th>
@@ -414,6 +422,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="##" onclick="loadEncryptionModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-lock me-2"></i>Edit Encryption</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadAccessControlModal(#id#, '#JSStringFormat(username)#', '#JSStringFormat(ldap_username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Reset 2FA Devices</a></li>
                 <li><a class="dropdown-item" href="##" onclick="loadSendAsModal(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-paper-plane me-2"></i>Send As</a></li>
+                <cfif Val(recipient_id) GT 0>
+                  <li><a class="dropdown-item" href="edit_internal_recipient_backend.cfm?ids=#recipient_id#&returnTo=mailboxes"><i class="fas fa-route me-2"></i>Edit Mail Delivery</a></li>
+                </cfif>
                 <li><a class="dropdown-item" href="view_mailbox_app_passwords.cfm?mailbox_id=#id#"><i class="fas fa-key me-2"></i>Manage App Passwords</a></li>
                 <li><a class="dropdown-item" href="##" onclick="confirmResendMobileSetup(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</a></li>
                 <cfif Val(mb_nextcloud) EQ 1>
@@ -449,6 +460,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           </td>
           <td>#HTMLEditFormat(name)#</td>
           <td>#HTMLEditFormat(domain)#</td>
+          <!--- Mail Delivery. A mailbox whose mail is routed away looks
+                entirely normal everywhere else in this table, so without this
+                an administrator has no way to tell it receives nothing. The
+                leading badge word is also the filter token used below. --->
+          <td>
+            <cfif Len(Trim(backend_server))>
+              <span class="badge bg-warning text-dark">Routed</span>
+              <div class="small text-muted">
+                to #HTMLEditFormat(backend_server)#:<cfif Val(backend_port) GT 0>#Val(backend_port)#<cfelse>25</cfif>
+                <cfif Len(Trim(backend_tls))><br>TLS: #HTMLEditFormat(backend_tls)#</cfif>
+              </div>
+              <div class="small text-muted"><em>mailbox kept, not delivered to</em></div>
+            <cfelseif Val(recipient_id) GT 0>
+              <span class="badge bg-success">Local</span>
+            <cfelse>
+              <!--- The recipients join is a LEFT JOIN. No row means no routing
+                   record exists at all, which is not the same as "delivers
+                   locally" and should not be shown as if it were. --->
+              <span class="badge bg-secondary">Unknown</span>
+              <div class="small text-muted">no recipient record</div>
+            </cfif>
+          </td>
           <td>
             <cfif quotaGb GTE 1>
               <cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB
@@ -518,6 +551,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <th>Send As</th>
           <th>Display Name</th>
           <th>Domain</th>
+          <th>Mail Delivery</th>
           <th>Quota</th>
           <th>Auth</th>
           <th>2FA</th>
@@ -1074,6 +1108,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('#domainFilter').on('change', function() {
       var val = $(this).val();
       table.column(6).search(val ? '^' + $.fn.dataTable.util.escapeRegex(val) + '$' : '', true, false).draw();
+    });
+
+    // Delivery filter (column 7 = Mail Delivery). Anchored to the leading
+    // badge word so "Local" cannot match inside a routed hostname.
+    $('#deliveryFilter').on('change', function() {
+      var v = $(this).val();
+      table.column(7).search(v ? '^' + $.fn.dataTable.util.escapeRegex(v) : '', true, false).draw();
     });
 
     // Initialize Tom Select for the edit-mailbox timezone dropdown
