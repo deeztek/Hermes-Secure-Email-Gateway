@@ -1,4 +1,19 @@
 <!DOCTYPE html>
+<!--- Where Save and Cancel go back to. The same editor now serves two lists:
+     Relay Recipients, and Mailboxes, where it is the only way to send a
+     mailbox user's mail somewhere other than the local store.
+
+     Matched against a fixed set rather than used as given. A return path
+     taken from the query string and handed to cflocation is an open redirect
+     if it is ever trusted verbatim. --->
+<cfparam name="returnTo" default="">
+<cfif StructKeyExists(url, "returnTo")>
+    <cfset returnTo = url.returnTo>
+<cfelseif StructKeyExists(form, "returnTo")>
+    <cfset returnTo = form.returnTo>
+</cfif>
+<cfset backUrl   = (returnTo EQ "mailboxes") ? "view_mailboxes.cfm" : "view_internal_recipients.cfm">
+<cfset backLabel = (returnTo EQ "mailboxes") ? "Back to Mailboxes"  : "Back to Recipients">
 
 <!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
@@ -68,21 +83,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset StructDelete(session, "backendMessage")>
 </cfif>
 
-<!--- Where Save and Cancel go back to. The same editor now serves two lists:
-     Relay Recipients, and Mailboxes, where it is the only way to send a
-     mailbox user's mail somewhere other than the local store.
-
-     Matched against a fixed set rather than used as given. A return path
-     taken from the query string and handed to cflocation is an open redirect
-     if it is ever trusted verbatim. --->
-<cfparam name="returnTo" default="">
-<cfif StructKeyExists(url, "returnTo")>
-    <cfset returnTo = url.returnTo>
-<cfelseif StructKeyExists(form, "returnTo")>
-    <cfset returnTo = form.returnTo>
-</cfif>
-<cfset backUrl   = (returnTo EQ "mailboxes") ? "view_mailboxes.cfm" : "view_internal_recipients.cfm">
-<cfset backLabel = (returnTo EQ "mailboxes") ? "Back to Mailboxes"  : "Back to Recipients">
 
 <cfparam name="ids" default="">
 <cfif StructKeyExists(url, "ids")>
