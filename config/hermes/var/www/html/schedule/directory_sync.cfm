@@ -138,9 +138,23 @@ function shq(required string v) {
   <!--- Every relay domain, not one chosen at setup. add_internal_recipients
         already rejects an address whose domain is not here, so scoping to a
         single domain only forced one directory per domain for an AD that
-        serves several. --->
+        serves several.
+
+        Mailbox domains are excluded, matching Postfix's own relay_domains
+        condition exactly. This query had no type filter despite the variable
+        being named relayDomains, so a directory pointed at a mailbox domain
+        would enumerate its users and provision them as RELAY recipients. Those
+        have no row in `mailboxes`, and a mailbox domain validates recipients
+        against `mailboxes` via virtual_mailbox_maps, so every one of them was
+        rejected at RCPT TO. Provisioned, visible in the console, and unable to
+        receive mail.
+
+        Auto-provisioning only ever creates relay recipients, so a mailbox
+        domain was never a valid target for it. --->
   <cfquery name="getRelayDomains" datasource="hermes">
-    SELECT LOWER(domain) AS domain FROM domains WHERE domain IS NOT NULL AND domain <> ''
+    SELECT LOWER(domain) AS domain FROM domains
+     WHERE domain IS NOT NULL AND domain <> ''
+       AND (type IS NULL OR type <> 'mailbox')
   </cfquery>
   <cfset relayDomains = {}>
   <cfloop query="getRelayDomains"><cfset relayDomains[getRelayDomains.domain] = true></cfloop>

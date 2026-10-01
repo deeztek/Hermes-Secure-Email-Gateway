@@ -1,16 +1,27 @@
 # Hermes SEG v260929
 
-**A per-recipient setting that never did anything now does.** Small release: one
-fix, and the documentation that described the broken behaviour as working.
+**Per-recipient mail routing.** A setting that has been storable since early 2026
+and never affected delivery now works, and it is available on mailboxes as well as
+relay recipients.
 
 No schema change. No image rebuild.
 
 ## Read this first
 
-Nothing in this release changes how your gateway currently routes mail, unless
-you had already set a per-recipient backend override. If you did, that override
-starts being honoured, which is what you asked for when you set it but may not be
-what your mail has been doing since. See below.
+Two things change behaviour on upgrade. Both are narrow, and both are easy to
+check before you start.
+
+**Existing backend overrides start working.** If anyone has ever set a per-recipient
+backend override, it has had no effect on delivery until now. After this upgrade it
+is honoured, so that recipient's mail goes where the setting says rather than where
+it has actually been going. Review them under **Email Relay > Relay Recipients**,
+where the Backend column shows each one.
+
+**Auto-provisioning stops targeting mailbox domains.** It only ever creates relay
+recipients, which a mailbox domain rejects, so this corrects a configuration that
+could not work. Nothing already provisioned is removed.
+
+Everything else is unchanged.
 
 ## Per-recipient backend overrides now route
 
@@ -33,6 +44,45 @@ and clear any that are stale.
 
 Recipients with no override, which is almost certainly all of them, are
 unaffected.
+
+## Mailboxes can now be routed elsewhere too
+
+The same control is now on **Email Server > Mailboxes**, under each row's Actions
+menu as **Edit Mail Delivery**.
+
+This matters more than it sounds. Until now, deciding at setup time that a domain
+would host local mailboxes was effectively permanent. If you later wanted one
+person's mail to go to Microsoft 365 or Google instead, there was no way to say so:
+a mailbox domain cannot be converted to a relay domain, and it cannot be deleted
+while mailboxes exist. The only route was to delete every mailbox on the domain,
+delete the domain, recreate it as a relay domain, and rebuild everything.
+
+Now it is one setting on one mailbox, and the mailbox itself is left alone.
+
+**The mailbox is kept, not deleted.** Its mail simply arrives somewhere else from
+then on. Anything already in it stays where it is. Clearing the override sends new
+mail back to the local mailbox again.
+
+### Seeing which mailboxes are affected
+
+A mailbox whose mail goes elsewhere looks identical to every other mailbox in every
+other column, so the Mailboxes list gained a **Mail Delivery** column showing where
+each one's mail actually goes, and a **Delivery** filter for narrowing the list to
+those routed away.
+
+A mailbox with no recipient record reads **Unknown** rather than Local, because no
+routing record is not the same thing as delivering locally.
+
+## Auto-provisioning no longer targets mailbox domains
+
+Auto-provisioning creates **relay** recipients, so a mailbox domain was never a
+valid target for it. The domain filter did not enforce that, so pointing a directory
+at a mailbox domain would enumerate its users and create recipients that were then
+rejected at RCPT TO. They appeared in the console and could not receive mail.
+
+The filter now matches Postfix's own rule. If you have been auto-provisioning onto a
+mailbox domain, those recipients stop being created; the ones already there are left
+alone, and you should remove them.
 
 ### Why it never worked
 
