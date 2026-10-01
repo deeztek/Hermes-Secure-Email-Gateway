@@ -68,6 +68,18 @@ if grep -q '^query[[:space:]]*=' "$LIVE"; then
     exit 0
 fi
 
+# Check the SOURCE, not just the destination. Without this the script will
+# happily render an old template over an old live file and report success,
+# because both ends look the same and neither is the new query. That is a
+# silent no-op dressed up as a fix, and it costs more to diagnose than it
+# saves. An install whose conf_files/ predates this release hits exactly that.
+if ! grep -q '^query[[:space:]]*=' "$TEMPLATE"; then
+    echo "  WARNING: ${TEMPLATE} does not carry the override query." >&2
+    echo "  This install has an older copy of the template, so there is nothing to render." >&2
+    echo "  Left unchanged. Per-recipient backend overrides will not route until it is updated." >&2
+    exit 0
+fi
+
 # Pull the credentials out of the file we are replacing.
 DB_USER="$(sed -n 's/^user[[:space:]]*=[[:space:]]*//p' "$LIVE" | head -1)"
 DB_PASS="$(sed -n 's/^password[[:space:]]*=[[:space:]]*//p' "$LIVE" | head -1)"
