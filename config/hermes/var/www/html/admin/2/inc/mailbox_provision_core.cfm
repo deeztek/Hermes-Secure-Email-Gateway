@@ -148,13 +148,16 @@ credential). Everything else is the same work in the same order.
      two rows for one address and whichever the next reader picked would be a
      coin toss. Update when the row is there, insert when it is not. --->
 <cfif provisionMode EQ "convert">
+    <!--- COUNT(*), not a column: user_settings has no id and no primary key,
+         which is the same reason a plain insert here could silently leave two
+         rows for one address. --->
     <cfquery name="existingUserSettings" datasource="hermes">
-        SELECT id FROM user_settings
+        SELECT COUNT(*) AS n FROM user_settings
         WHERE email = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
     </cfquery>
 </cfif>
 
-<cfif provisionMode EQ "convert" AND existingUserSettings.recordcount GTE 1>
+<cfif provisionMode EQ "convert" AND Val(existingUserSettings.n) GTE 1>
 <cfquery name="insertUserSettings" datasource="hermes">
     UPDATE user_settings SET
       report_enabled = <cfqueryparam value="#form.reports#" cfsqltype="cf_sql_varchar">,
