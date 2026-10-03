@@ -285,11 +285,185 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset session.backendMessage = "success_custom">
             <cflocation url="#backUrl#" addtoken="no">
         </cfif>
+
+    <cfelseif backend_type EQ "builtin">
+        <!--- #290. Host these recipients here instead of sending their mail on.
+
+             Two halves. The mailbox has to exist before the routing points at
+             it, or mail arrives at a userdb that does not know the address and
+             Dovecot refuses it, so provisioning runs first and routing is
+             written after the loop.
+
+             The provisioning itself is not written here. It runs
+             inc/mailbox_provision_core.cfm, the same file Add Mailbox runs,
+             with provisionMode = "convert". A second implementation of those
+             steps would have started out identical and drifted the first time
+             only one was updated. --->
+        <cfparam name="builtin_quota_gb" default="5">
+        <cfparam name="builtin_nextcloud" default="0">
+        <cfparam name="builtin_reports" default="YES">
+        <cfparam name="builtin_train_bayes" default="0">
+        <cfparam name="builtin_download_msg" default="0">
+        <cfloop list="builtin_quota_gb,builtin_nextcloud,builtin_reports,builtin_train_bayes,builtin_download_msg" index="bfld">
+            <cfif StructKeyExists(form, bfld)><cfset variables[bfld] = Trim(form[bfld])></cfif>
+        </cfloop>
+
+        <cfif NOT IsNumeric(builtin_quota_gb) OR builtin_quota_gb LTE 0>
+            <cfset m = "error_builtin_quota">
+        <cfelse>
+
+            <!--- An address that is already a mailbox has nothing to convert,
+                 and running the provisioning again would try to insert a
+                 second mailboxes row for it. Reject the whole batch rather
+                 than silently skipping part of it, so the admin knows what
+                 they selected. --->
+            <cfquery name="alreadyMailbox" datasource="hermes">
+                SELECT recipient FROM recipients
+                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                   AND recipient_type = 'mailbox'
+            </cfquery>
+
+            <cfif alreadyMailbox.recordcount GTE 1>
+                <cfset m = "error_builtin_already">
+                <cfset session.builtinAlready = ValueList(alreadyMailbox.recipient)>
+            <cfelse>
+
+                <cfquery name="toConvert" datasource="hermes">
+                    SELECT id, recipient, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
+                           digital_sign, auth_type, remoteauth_domain, enforce_mfa,
+                           SUBSTRING_INDEX(recipient, '@', -1) AS recipient_domain
+                      FROM recipients
+                     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                     ORDER BY recipient ASC
+                </cfquery>
+
+                <cfset convertedCount = 0>
+                <cfset convertSkipped  = "">
+
+                <cfloop query="toConvert">
+
+                    <!--- The domain must be a row in domains, which it is for
+                         any relay recipient, and it is looked up WITHOUT a
+                         type filter: this is the one place that deliberately
+                         accepts a relay domain as a mailbox host. --->
+                    <cfquery name="getDomain" datasource="hermes">
+                        SELECT id, domain, default_quota_mb
+                          FROM domains
+                         WHERE domain = <cfqueryparam value="#toConvert.recipient_domain#" cfsqltype="cf_sql_varchar">
+                         LIMIT 1
+                    </cfquery>
+
+                    <cfif getDomain.recordcount LT 1>
+                        <cfset convertSkipped = ListAppend(convertSkipped, toConvert.recipient)>
+                        <cfcontinue>
+                    </cfif>
+
+                    <cfset recipientEmail = toConvert.recipient>
+
+                    <!--- Name from what the directory already gave us. --->
+                    <cfinclude template="inc/resolve_recipient_display_name.cfm">
+                    <cfset displayName = resolvedDisplayName>
+
+                    <cfset quotaBytes = Round(builtin_quota_gb * 1024 * 1024 * 1024)>
+
+                    <!--- Carried over from the recipient, not asked for. --->
+                    <cfset form.policy            = toConvert.policy_id>
+                    <cfset form.pdf_enabled       = toConvert.pdf_enabled>
+                    <cfset form.smime_enabled     = toConvert.smime_enabled>
+                    <cfset form.pgp_enabled       = toConvert.pgp_enabled>
+                    <cfset form.sign              = toConvert.digital_sign>
+                    <cfset form.auth_type         = toConvert.auth_type>
+                    <cfset form.remoteauth_domain = Len(Trim(toConvert.remoteauth_domain)) ? toConvert.remoteauth_domain : "">
+                    <cfset form.enforce_mfa       = Val(toConvert.enforce_mfa)>
+
+                    <!--- From the form, one value for the whole batch. --->
+                    <cfset form.quota_gb          = builtin_quota_gb>
+                    <cfset form.nextcloud_enabled = builtin_nextcloud>
+                    <cfset form.reports           = builtin_reports>
+                    <cfset form.train_bayes       = builtin_train_bayes>
+                    <cfset form.download_msg      = builtin_download_msg>
+                    <cfset form.timezone          = "">
+
+                    <!--- Empty on purpose. Step 7 of the core is guarded on
+                         form.ca being non-empty, so no certificate is minted
+                         by a conversion. An existing one is untouched and a
+                         new one can be issued afterwards as usual. --->
+                    <cfset form.ca = "">
+
+                    <!--- enforce_mfa drives which Authelia group the account
+                         joins, the same as Add Mailbox. --->
+                    <cfset ldapAccessControl = (Val(toConvert.enforce_mfa) EQ 1) ? "two_factor" : "one_factor">
+
+                    <cfset provisionMode = "convert">
+                    <cfinclude template="inc/mailbox_provision_core.cfm">
+
+                    <cfset convertedCount = convertedCount + 1>
+                </cfloop>
+
+                <!--- Routing, after the mailboxes exist. lmtp to the built-in
+                     server, which beats the domain's own transport because the
+                     transport lookup asks for the recipient first. backend_tls
+                     is NULL: this is a container-to-container hop inside the
+                     Docker network and never leaves the host. --->
+                <cfquery datasource="hermes">
+                    UPDATE recipients
+                       SET backend_transport = 'lmtp',
+                           backend_server    = 'hermes_dovecot',
+                           backend_port      = 24,
+                           backend_tls       = NULL
+                     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                </cfquery>
+
+                <!--- Mark every domain involved as hybrid, so the console stops
+                     treating it as relay-only and its new mailboxes become
+                     visible and manageable. Relay domains stay in Postfix's
+                     relay_domains either way, because that lookup excludes
+                     type='mailbox' only, so the recipients left on the
+                     provider are unaffected. A domain that is already
+                     type='mailbox' is left alone. --->
+                <cfquery datasource="hermes">
+                    UPDATE domains
+                       SET type = 'hybrid'
+                     WHERE domain IN (
+                             SELECT DISTINCT SUBSTRING_INDEX(recipient, '@', -1)
+                               FROM recipients
+                              WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                           )
+                       AND (type IS NULL OR type NOT IN ('mailbox', 'hybrid'))
+                </cfquery>
+
+                <!--- The TLS policy map is keyed by destination, and clearing
+                     backend_tls above has to be reflected in it. --->
+                <cfset datasource = "hermes">
+                <cfinclude template="inc/generate_tls_policy.cfm">
+
+                <cfset session.backendMessage = "success_builtin">
+                <cfset session.builtinCount   = convertedCount>
+                <cfset session.builtinSkipped = convertSkipped>
+                <cflocation url="#backUrl#" addtoken="no">
+            </cfif>
+        </cfif>
     </cfif>
 </cfif>
 
 <!--- ERROR/SUCCESS MESSAGES --->
-<cfif m EQ "error_server_empty">
+<cfif m EQ "error_builtin_quota">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> Error</h5>
+        The mailbox quota must be a number greater than zero.
+    </div>
+<cfelseif m EQ "error_builtin_already">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> Nothing to convert</h5>
+        <p class="mb-1">These already have a mailbox on this server, so there is nothing to create for them:</p>
+        <p class="mb-0"><strong><cfoutput>#HTMLEditFormat(StructKeyExists(session, "builtinAlready") ? session.builtinAlready : "")#</cfoutput></strong></p>
+        <p class="mb-0 mt-2"><small>Nothing was changed. Deselect them and try again. To change where an existing
+        mailbox's mail goes, use <strong>Edit Mail Delivery</strong> on the Mailboxes page.</small></p>
+    </div>
+    <cfset StructDelete(session, "builtinAlready")>
+<cfelseif m EQ "error_server_empty">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         <h5><i class="icon fas fa-ban"></i> Error</h5>
@@ -361,11 +535,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     </label>
                 </div>
 
-                <div class="form-check">
+                <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="backend_type" id="backend_custom" value="custom"<cfoutput><cfif prefillCustom> checked</cfif></cfoutput>>
                     <label class="form-check-label" for="backend_custom">
                         <strong>Custom Backend Server</strong>
                         <br><small class="text-muted">Override domain default with a specific backend server for these recipients</small>
+                    </label>
+                </div>
+
+                <!--- #290. The third destination is Hermes itself. Choosing it
+                     does more than change routing: the address has no mailbox
+                     to deliver into, so one is created, which is why this
+                     option carries settings and the other two do not. --->
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin">
+                    <label class="form-check-label" for="backend_builtin">
+                        <strong>Built-in Email Server</strong>
+                        <br><small class="text-muted">Host these recipients' mail on Hermes instead of sending it on. Creates a mailbox for each one, keeping their existing login.</small>
                     </label>
                 </div>
             </div>
@@ -407,6 +593,71 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
             </div>
 
+            <!--- Built-in mailbox settings. Deliberately short. Everything
+                 that can be carried over from the recipient is carried over
+                 rather than asked for: the spam policy, the encryption flags,
+                 signing, MFA enforcement, and the authentication type with its
+                 directory. What is left is what genuinely has no previous
+                 value, and it is applied to every selected recipient.
+
+                 Not asked for, and why:
+                   display name   taken from what the directory already told us
+                                  during provisioning, falling back to the
+                                  address local part
+                   password       not touched. A remote-auth recipient keeps
+                                  authenticating against the provider, and a
+                                  local one keeps the password it already has.
+                                  Converting forty people must not reset forty
+                                  passwords
+                   certificates   no S/MIME is minted here. Existing
+                                  certificates are untouched, and a new one can
+                                  be issued afterwards as usual --->
+            <div id="builtin_backend_fields" style="display: none; padding-left: 25px; border-left: 3px solid #198754;">
+                <div class="alert alert-info py-2">
+                    <small><strong>Each selected recipient gets a mailbox on this server.</strong>
+                    Their existing login still works, nothing is sent to the old backend any more,
+                    and the spam policy, encryption and authentication settings they already have
+                    are kept. Their domain becomes a hybrid domain: the recipients you do not
+                    convert carry on going to the provider exactly as before.</small>
+                </div>
+                <div class="row">
+                    <div class="col-md-3 mb-3">
+                        <label for="builtin_quota_gb" class="form-label"><strong>Mailbox Quota (GB)</strong></label>
+                        <input type="number" class="form-control" id="builtin_quota_gb" name="builtin_quota_gb" value="5" step="0.01" min="0.01">
+                        <small class="text-muted">Applied to every selected recipient</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="builtin_nextcloud" class="form-label"><strong>Nextcloud Access</strong></label>
+                        <select class="form-control" id="builtin_nextcloud" name="builtin_nextcloud">
+                            <option value="0" selected>No</option>
+                            <option value="1">Yes</option>
+                        </select>
+                        <small class="text-muted">Files, calendar and contacts</small>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="builtin_reports" class="form-label"><strong>Quarantine Notices</strong></label>
+                        <select class="form-control" id="builtin_reports" name="builtin_reports">
+                            <option value="YES" selected>Yes</option>
+                            <option value="NO">No</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="builtin_train_bayes" class="form-label"><strong>Bayes Training</strong></label>
+                        <select class="form-control" id="builtin_train_bayes" name="builtin_train_bayes">
+                            <option value="0" selected>No</option>
+                            <option value="1">Yes</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2 mb-3">
+                        <label for="builtin_download_msg" class="form-label"><strong>Message Download</strong></label>
+                        <select class="form-control" id="builtin_download_msg" name="builtin_download_msg">
+                            <option value="0" selected>No</option>
+                            <option value="1">Yes</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             <div class="mt-4">
                 <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Saving...';this.form.submit();">
                     <i class="fas fa-save me-1"></i>Save Changes
@@ -431,12 +682,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- JavaScript for showing/hiding custom backend fields --->
 <script>
 $(document).ready(function() {
-    // Show/hide custom fields based on radio selection
+    // Show the panel belonging to the selected destination, hide the other.
+    // Only one can be open, so this does not toggle them independently.
     $('input[name="backend_type"]').on('change', function() {
-        if ($(this).val() === 'custom') {
+        var v = $(this).val();
+        if (v === 'custom') {
+            $('#builtin_backend_fields').slideUp();
             $('#custom_backend_fields').slideDown();
+        } else if (v === 'builtin') {
+            $('#custom_backend_fields').slideUp();
+            $('#builtin_backend_fields').slideDown();
         } else {
             $('#custom_backend_fields').slideUp();
+            $('#builtin_backend_fields').slideUp();
         }
     });
 });

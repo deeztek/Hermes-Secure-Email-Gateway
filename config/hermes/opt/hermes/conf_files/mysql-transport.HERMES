@@ -10,13 +10,19 @@ password = HERMES-PASSWORD
 # the branches in order, so an override wins if both somehow matched.
 #
 # Branch 1 is the recipient override. It is built rather than stored because
-# the columns hold host, port and TLS mode separately. The nexthop is bracketed
-# so Postfix treats it as a literal host and does no MX lookup: an override
-# names a specific machine, which is the whole point of setting one.
+# the columns hold transport, host, port and TLS mode separately. The nexthop is
+# bracketed so Postfix treats it as a literal host and does no MX lookup: an
+# override names a specific machine, which is the whole point of setting one.
+#
+# backend_transport is normally empty, meaning smtp, and is lmtp when the
+# recipient is routed to the built-in mail server. That cannot be inferred from
+# the address, because lmtp is a different protocol rather than a different
+# host. NULLIF collapses an empty string to NULL so both an unset column and a
+# blank one fall back to smtp.
 #
 # Branch 2 is the existing domain-level row, whose `transport` column already
 # holds a complete value such as smtp:[host]:25 or lmtp:[hermes_dovecot]:24.
 #
 # NOT filtered by recipient_type. A value an administrator set explicitly
 # should be honoured; silently ignoring it is the bug this replaces.
-query = (SELECT CONCAT('smtp:[', backend_server, ']:', COALESCE(backend_port, 25)) FROM recipients WHERE recipient = '%s' AND backend_server IS NOT NULL AND backend_server <> '') UNION ALL (SELECT transport FROM transport WHERE domain = '%s') LIMIT 1
+query = (SELECT CONCAT(COALESCE(NULLIF(backend_transport,''),'smtp'), ':[', backend_server, ']:', COALESCE(backend_port, 25)) FROM recipients WHERE recipient = '%s' AND backend_server IS NOT NULL AND backend_server <> '') UNION ALL (SELECT transport FROM transport WHERE domain = '%s') LIMIT 1

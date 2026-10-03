@@ -73,6 +73,55 @@ those routed away.
 A mailbox with no recipient record reads **Unknown** rather than Local, because no
 routing record is not the same thing as delivering locally.
 
+## Keep the executives on Microsoft 365 and host everyone else here
+
+The reason to run a split setup is cost. If you pay a provider per mailbox,
+and only some of your people need what that provider gives them, the rest can
+be hosted on Hermes and you stop paying for those seats.
+
+That was not possible before. A domain was either a relay domain, where every
+recipient's mail is passed on, or a mailbox domain, where every recipient's
+mail is kept here. Mixing them meant running two domains or moving everyone.
+
+**Email Relay > Relay Recipients > Edit Backend** now offers a third
+destination: **Built-in Email Server**. Select the recipients you want to host
+locally, choose it, set a quota, and each one gets a mailbox on this server.
+Everyone you do not select carries on going to the provider exactly as before.
+
+So a company paying for fifty mailboxes who needs ten of them keeps those ten
+pointed at the provider and hosts the other forty here. Forty seats.
+
+### What is kept
+
+Their existing login still works. Nothing about how they authenticate changes:
+if they sign in against Microsoft 365 or Google, they carry on doing that and
+collect their mail from here with the same password. If they have a local
+password, they keep it. **No passwords are reset and nobody has to be told
+anything.**
+
+Their spam policy, encryption settings, signing and MFA requirement all carry
+over. Their name comes from what the directory told Hermes when the recipient
+was created, so the mailbox is not called `jsmith`.
+
+Nothing is minted that was not there before. No new certificates are issued by
+a conversion, and existing ones are untouched.
+
+### Their domain becomes a hybrid domain
+
+A domain hosting some mailboxes locally and relaying the rest is now a
+recognised arrangement rather than an accident. Those mailboxes appear under
+**Email Server > Mailboxes** and behave like any other: aliases, shared
+mailboxes, organizational signatures, external banners, autodiscover and
+certificate coverage all work.
+
+It stays listed under Relay Domains, because that is what it still mostly is.
+It does not appear under Mailbox Domains.
+
+### Going back
+
+Clear the override with **Use Domain Default** and their mail goes to the
+provider again. The mailbox is kept, not deleted, so nothing in it is lost.
+
 ## Auto-provisioning no longer targets mailbox domains
 
 Auto-provisioning creates **relay** recipients, so a mailbox domain was never a
@@ -101,6 +150,30 @@ in Postfix attaches to the **destination server**, not to the recipient. Two
 recipients pointed at the same backend therefore share one policy, and if they
 disagree the stricter of the two is used for both. If that matters to you, send
 them to different backends or give them the same setting.
+
+## Scheduled tasks now say what they do
+
+**System > Scheduled Tasks** listed a name, a schedule, a container and a
+command. Working out whether a task was safe to turn off meant knowing what
+the script behind it did.
+
+Every task now carries a **Purpose**, written for someone deciding whether to
+touch it. Two of them exist to stop the disk filling up, and they now say so
+and ask for confirmation before being disabled.
+
+## Dovecot's log files are no longer unbounded
+
+Dovecot wrote three log files and nothing ever rotated them. On a server where
+debug logging had been switched on at some point, one of them had reached
+1.5 GB. A full disk defers all mail, so this was a real risk rather than
+untidiness.
+
+They are now rotated nightly, compressed, and kept for 30 days, the same as
+the Authelia logs already were.
+
+The first rotation after upgrading will compress whatever has accumulated,
+which on a long-running server can take a few minutes at 02:15 and is a
+one-off.
 
 ## Also in this release
 

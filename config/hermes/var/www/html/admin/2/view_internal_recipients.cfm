@@ -380,6 +380,25 @@ a, a:hover{
             <h4><i class="icon fa fa-check"></i> Success!</h4>
             Backend server override cleared. Selected recipients will now use domain default.
         </div>
+    <cfelseif session.backendMessage EQ "success_builtin">
+        <cfset builtinN = StructKeyExists(session, "builtinCount") ? Val(session.builtinCount) : 0>
+        <cfset builtinS = StructKeyExists(session, "builtinSkipped") ? session.builtinSkipped : "">
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h4><i class="icon fa fa-check"></i> Success!</h4>
+            <p class="mb-1"><cfoutput><strong>#builtinN#</strong> recipient<cfif builtinN NEQ 1>s</cfif></cfoutput>
+            now <cfoutput><cfif builtinN NEQ 1>have mailboxes<cfelse>has a mailbox</cfif></cfoutput> on this server, and mail is
+            no longer sent on to the previous backend. Existing logins are unchanged.</p>
+            <p class="mb-0"><small>Their domain is now a hybrid domain, so these appear under
+            <strong>Email Server &gt; Mailboxes</strong>. Recipients you did not convert carry on
+            going to the provider as before.</small></p>
+            <cfif Len(Trim(builtinS))>
+            <p class="mb-0 mt-2"><small><strong>Skipped, no matching domain record:</strong>
+            <cfoutput>#HTMLEditFormat(builtinS)#</cfoutput></small></p>
+            </cfif>
+        </div>
+        <cfset StructDelete(session, "builtinCount")>
+        <cfset StructDelete(session, "builtinSkipped")>
     <cfelseif session.backendMessage EQ "success_custom">
         <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
