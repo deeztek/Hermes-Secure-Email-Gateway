@@ -102,6 +102,25 @@ recipients pointed at the same backend therefore share one policy, and if they
 disagree the stricter of the two is used for both. If that matters to you, send
 them to different backends or give them the same setting.
 
+## The first message after a quiet period no longer gets delayed
+
+Mail to a local mailbox could be refused on its first delivery attempt and
+accepted on the retry a few minutes later, so messages arrived late rather
+than not at all. On a lightly used server that was most messages.
+
+Dovecot's auth-worker holds one database connection and was never retired, so
+it kept that connection for as long as the container ran. Once the connection
+had gone away, because the database closed it as idle or restarted, the worker
+noticed on next use and crashed instead of reconnecting. It respawned
+immediately and the retry then succeeded, which is why this looked
+intermittent and why nobody saw lost mail.
+
+The worker is now retired after a minute of inactivity, so it cannot be
+holding a connection that has already gone.
+
+Nothing was ever lost to this, and no action is needed. If you have wondered
+why the occasional internal message showed up minutes late, this was it.
+
 ## Also in this release
 
 **The Getting Started guide now starts with first-login security.** Logging in,
