@@ -214,6 +214,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      ORDER BY d.domain ASC
 </cfquery>
 
+<cfquery name="selectedMailboxes" datasource="hermes">
+    SELECT COUNT(*) AS n FROM recipients
+     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+       AND recipient_type = 'mailbox'
+</cfquery>
+<cfset selectedMailboxCount = Val(selectedMailboxes.n)>
+
 <cfset defaultGoesTo   = "">
 <cfset orphanWarnings  = "">
 <cfloop query="selectedDomains">
@@ -324,6 +331,73 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset datasource = "hermes">
             <cfinclude template="inc/generate_tls_policy.cfm">
             <cfset session.backendMessage = "success_custom">
+            <cflocation url="#backUrl#" addtoken="no">
+        </cfif>
+
+    <cfelseif backend_type EQ "revert">
+        <!--- #290. Undo a conversion.
+
+             Deactivate rather than delete. The maildir may hold mail, and a
+             conversion reversed by mistake should cost nothing. active = 0
+             stops Dovecot's userdb resolving the address, so nothing is
+             delivered there and nothing can log into it, while the row and the
+             messages stay exactly where they are.
+
+             The LDAP entry stays too, and only its role changes: out of
+             cn=mailboxes, back into cn=relays. The credential is untouched,
+             the same as on the way in. --->
+        <cfquery name="toRevert" datasource="hermes">
+            SELECT id, recipient, enforce_mfa
+              FROM recipients
+             WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+               AND recipient_type = 'mailbox'
+             ORDER BY recipient ASC
+        </cfquery>
+
+        <cfif toRevert.recordcount LT 1>
+            <cfset m = "error_revert_none">
+        <cfelse>
+            <cfset revertedCount = 0>
+            <cfloop query="toRevert">
+                <cfset ldapUsername = LCase(toRevert.recipient)>
+                <cfparam name="ldapAccessControl" default="one_factor">
+                <cfset ldapAccessControl = (Val(toRevert.enforce_mfa) EQ 1) ? "two_factor" : "one_factor">
+
+                <cfinclude template="inc/ldap_remove_user_groups_mailbox.cfm">
+                <cfinclude template="inc/ldap_add_user_groups_relay.cfm">
+
+                <cfquery datasource="hermes">
+                    UPDATE mailboxes SET active = 0, modified = NOW()
+                     WHERE username = <cfqueryparam value="#toRevert.recipient#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+
+                <cfset revertedCount = revertedCount + 1>
+            </cfloop>
+
+            <!--- Routing cleared and the role put back, so the domain's own
+                 transport applies again, which is what a relay recipient has
+                 always used. --->
+            <cfquery datasource="hermes">
+                UPDATE recipients
+                   SET recipient_type    = 'relay',
+                       backend_transport = NULL,
+                       backend_server    = NULL,
+                       backend_port      = NULL,
+                       backend_tls       = NULL
+                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                   AND recipient_type = 'mailbox'
+            </cfquery>
+
+            <!--- The domain stays hybrid. Another mailbox may still be hosted
+                 on it, and if this was the last one the deactivated mailbox is
+                 still there to be reactivated, which only works while the
+                 console still treats the domain as able to host mailboxes. --->
+
+            <cfset datasource = "hermes">
+            <cfinclude template="inc/generate_tls_policy.cfm">
+
+            <cfset session.backendMessage = "success_revert">
+            <cfset session.revertCount    = revertedCount>
             <cflocation url="#backUrl#" addtoken="no">
         </cfif>
 
@@ -564,6 +638,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         The mailbox quota must be a number greater than zero.
     </div>
+<cfelseif m EQ "error_revert_none">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> Nothing to revert</h5>
+        None of the selected recipients has a mailbox on this server, so there is no conversion to undo.
+    </div>
 <cfelseif m EQ "error_builtin_aliased">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -689,6 +769,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         <br><small class="text-muted">Override domain default with a specific backend server for these recipients</small>
                     </label>
                 </div>
+
+                <!--- #290. Reverting is a separate intention from redirecting,
+                     and conflating them is what made "Use Domain Default" read
+                     like an undo when it is not: that leaves a mailbox in
+                     place, active and quota'd, quietly receiving nothing.
+                     Shown only when something selected actually is a mailbox,
+                     since there is nothing to revert otherwise. --->
+                <cfoutput><cfif selectedMailboxCount GT 0>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_revert" value="revert">
+                    <label class="form-check-label" for="backend_revert">
+                        <strong>Revert to Relay Recipient</strong>
+                        <br><small class="text-muted">Undo the conversion. Mail goes to the domain's backend again and the mailbox is deactivated, not deleted, so nothing in it is lost.</small>
+                    </label>
+                </div>
+                </cfif></cfoutput>
 
                 <!--- #290. The third destination is Hermes itself. Choosing it
                      does more than change routing: the address has no mailbox

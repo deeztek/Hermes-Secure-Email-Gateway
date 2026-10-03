@@ -380,6 +380,21 @@ a, a:hover{
             <h4><i class="icon fa fa-check"></i> Success!</h4>
             Backend server override cleared. Selected recipients will now use domain default.
         </div>
+    <cfelseif session.backendMessage EQ "success_revert">
+        <cfset revertN = StructKeyExists(session, "revertCount") ? Val(session.revertCount) : 0>
+        <div class="alert alert-success alert-dismissible">
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            <h4><i class="icon fa fa-check"></i> Success!</h4>
+            <p class="mb-1"><cfoutput><strong>#revertN#</strong> mailbox<cfif revertN NEQ 1>es</cfif></cfoutput>
+            reverted to relay <cfoutput><cfif revertN NEQ 1>recipients<cfelse>recipient</cfif></cfoutput>.
+            Mail goes to the domain's backend again.</p>
+            <p class="mb-0"><small>The <cfoutput><cfif revertN NEQ 1>mailboxes were<cfelse>mailbox was</cfif></cfoutput>
+            <strong>deactivated, not deleted</strong>, so anything already in
+            <cfoutput><cfif revertN NEQ 1>them is<cfelse>it is</cfif></cfoutput> still there. Deactivated
+            mailboxes stay listed under <strong>Email Server &gt; Mailboxes</strong> with Mail Delivery
+            reading <em>Inactive</em>, so they can be found and either reactivated or deleted.</small></p>
+        </div>
+        <cfset StructDelete(session, "revertCount")>
     <cfelseif session.backendMessage EQ "success_builtin">
         <cfset builtinN = StructKeyExists(session, "builtinCount") ? Val(session.builtinCount) : 0>
         <cfset builtinS = StructKeyExists(session, "builtinSkipped") ? session.builtinSkipped : "">
