@@ -114,8 +114,9 @@ recognised arrangement rather than an accident. Those mailboxes appear under
 mailboxes, organizational signatures, external banners, autodiscover and
 certificate coverage all work.
 
-It stays listed under Relay Domains, because that is what it still mostly is.
-It does not appear under Mailbox Domains.
+It stays listed under Relay Domains, because that is what it still mostly is,
+marked **Hybrid** so the arrangement is visible at a glance. It does not appear
+under Mailbox Domains.
 
 ### Going back
 

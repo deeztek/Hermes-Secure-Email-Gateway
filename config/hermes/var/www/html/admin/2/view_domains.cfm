@@ -75,7 +75,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Get all domains with transport details --->
 <cfquery name="getdomains" datasource="hermes">
-  SELECT d.id, d.domain, d.transport_id, d.senders_id, d.recipients_id,
+  SELECT d.id, d.domain, d.type, d.transport_id, d.senders_id, d.recipients_id,
     t.destination, t.port, t.mx, t.method, t.authentication,
     r.status AS recipient_status,
     CASE WHEN tp.id IS NOT NULL THEN 'YES' ELSE 'NO' END AS tls_enforced,
@@ -92,7 +92,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     FROM dkim_sign
     GROUP BY domain
   ) dks ON dks.domain = d.domain
-  WHERE (d.type IS NULL OR d.type = '' OR d.type = 'relay')
+  <!--- 'hybrid' is a relay domain that also hosts some mailboxes locally
+       (#290), so it belongs in this list. Leaving it out made a domain vanish
+       from the console the moment its first recipient was converted, with
+       nothing to say where it had gone. It is still excluded from Mailbox
+       Domains, which lists the mailbox-hosting entity rather than the relay
+       domain. --->
+  WHERE (d.type IS NULL OR d.type = '' OR d.type IN ('relay', 'hybrid'))
   ORDER BY d.domain ASC
 </cfquery>
 
@@ -343,7 +349,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <tbody>
         <cfoutput query="getdomains">
           <tr>
-            <td>#encodeForHTML(domain)#</td>
+            <td>
+              #encodeForHTML(domain)#
+              <cfif type EQ "hybrid">
+                <br><span class="badge bg-info text-dark" title="Some recipients on this domain have mailboxes on this server; the rest are relayed to the destination below.">Hybrid</span>
+              </cfif>
+            </td>
             <td>
               <cfif method is "discard">
                 <span class="badge bg-warning">Discard</span>
