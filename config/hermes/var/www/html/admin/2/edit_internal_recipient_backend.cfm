@@ -328,6 +328,75 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfset session.builtinAlready = ValueList(alreadyMailbox.recipient)>
             <cfelse>
 
+            <!--- An alias beats a transport override, silently and completely.
+                 Postfix expands virtual_alias_maps during cleanup, so by the
+                 time transport_maps is consulted the recipient has already
+                 been rewritten and the override is read against an address
+                 nobody set one on.
+
+                 A conversion in that state succeeds at every layer anyone
+                 would think to check. The mailbox is created, the LDAP groups
+                 move, the routing is written, postmap returns lmtp, doveadm
+                 resolves the user, and not one message is ever delivered. The
+                 maildir simply stays empty. Found exactly that way on a domain
+                 carrying a catch-all.
+
+                 The lookup mirrors mysql-virtual.cf, which is the union of
+                 virtual_recipients and mailbox_aliases, and it follows
+                 Postfix's own order: a specific entry for the address wins
+                 over the domain catch-all, so a catch-all only matters when
+                 the address has no entry of its own.
+
+                 An address mapped to itself is the standard way to exempt one
+                 recipient from a catch-all, so it is not treated as aliased
+                 away. Mapping to several destinations including itself is also
+                 fine: the local copy still arrives. --->
+            <cfset aliasedAway = "">
+            <cfloop query="toConvert">
+                <cfset thisAddr   = LCase(Trim(toConvert.recipient))>
+                <cfset thisDomain = ListLast(thisAddr, "@")>
+
+                <cfquery name="aliasSpecific" datasource="hermes">
+                    SELECT maps AS target FROM virtual_recipients
+                     WHERE LOWER(virtual_address) = <cfqueryparam value="#thisAddr#" cfsqltype="cf_sql_varchar">
+                    UNION
+                    SELECT delivers_to AS target FROM mailbox_aliases
+                     WHERE LOWER(alias_address) = <cfqueryparam value="#thisAddr#" cfsqltype="cf_sql_varchar">
+                       AND delivers_to <> 'discard:silently'
+                </cfquery>
+
+                <cfif aliasSpecific.recordcount GTE 1>
+                    <!--- Its own entry wins over any catch-all. Delivered here
+                         only if the address appears among its own targets. --->
+                    <cfset keepsLocal = false>
+                    <cfloop query="aliasSpecific">
+                        <cfloop list="#aliasSpecific.target#" index="aliasTarget">
+                            <cfif LCase(Trim(aliasTarget)) EQ thisAddr><cfset keepsLocal = true></cfif>
+                        </cfloop>
+                    </cfloop>
+                    <cfif NOT keepsLocal>
+                        <cfset aliasedAway = ListAppend(aliasedAway, thisAddr & " -> " & ValueList(aliasSpecific.target), ";")>
+                    </cfif>
+                <cfelse>
+                    <cfquery name="aliasCatchAll" datasource="hermes">
+                        SELECT maps AS target FROM virtual_recipients
+                         WHERE LOWER(virtual_address) = <cfqueryparam value="@#thisDomain#" cfsqltype="cf_sql_varchar">
+                        UNION
+                        SELECT delivers_to AS target FROM mailbox_aliases
+                         WHERE LOWER(alias_address) = <cfqueryparam value="@#thisDomain#" cfsqltype="cf_sql_varchar">
+                           AND delivers_to <> 'discard:silently'
+                    </cfquery>
+                    <cfif aliasCatchAll.recordcount GTE 1>
+                        <cfset aliasedAway = ListAppend(aliasedAway, thisAddr & " -> @" & thisDomain & " catch-all -> " & ValueList(aliasCatchAll.target), ";")>
+                    </cfif>
+                </cfif>
+            </cfloop>
+
+            <cfif Len(aliasedAway)>
+                <cfset m = "error_builtin_aliased">
+                <cfset session.builtinAliased = aliasedAway>
+            <cfelse>
+
                 <cfquery name="toConvert" datasource="hermes">
                     SELECT id, recipient, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
                            digital_sign, auth_type, remoteauth_domain, enforce_mfa,
@@ -442,6 +511,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfset session.builtinSkipped = convertSkipped>
                 <cflocation url="#backUrl#" addtoken="no">
             </cfif>
+            </cfif>
         </cfif>
     </cfif>
 </cfif>
@@ -453,6 +523,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         The mailbox quota must be a number greater than zero.
     </div>
+<cfelseif m EQ "error_builtin_aliased">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> An alias would swallow this mail</h5>
+        <p class="mb-1">These addresses are redirected elsewhere by an alias, so a mailbox here would
+        never receive anything:</p>
+        <ul class="mb-1">
+            <cfoutput><cfloop list="#StructKeyExists(session, 'builtinAliased') ? session.builtinAliased : ''#" index="aliasLine" delimiters=";">
+            <li><code>#HTMLEditFormat(aliasLine)#</code></li>
+            </cfloop></cfoutput>
+        </ul>
+        <p class="mb-0"><small>Postfix rewrites the recipient from an alias before it decides where to
+        deliver, so the mailbox, the routing and every check would look correct while the mail went to
+        the alias target instead. <strong>Nothing was changed.</strong></small></p>
+        <p class="mb-0 mt-2"><small>Remove the alias under <strong>Email Relay &gt; Aliases</strong>, or
+        point the address at itself there to exempt it from a catch-all, then convert again.</small></p>
+    </div>
+    <cfset StructDelete(session, "builtinAliased")>
 <cfelseif m EQ "error_builtin_already">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
