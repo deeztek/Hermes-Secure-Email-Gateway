@@ -74,7 +74,7 @@ do NOT write here — enable/disable/edit is future tier work.
       <div class="container-fluid">
 
 <cfquery name="getJobs" datasource="hermes">
-    SELECT job_name, schedule, command, container, active, type, no_overlap
+    SELECT job_name, description, schedule, command, container, active, type, no_overlap
     FROM ofelia_jobs
     ORDER BY type, job_name
 </cfquery>
@@ -202,6 +202,7 @@ do NOT write here — enable/disable/edit is future tier work.
         <thead>
           <tr>
             <th>Name</th>
+            <th>Purpose</th>
             <th>Type</th>
             <th>Schedule</th>
             <th>Container</th>
@@ -216,6 +217,17 @@ do NOT write here — enable/disable/edit is future tier work.
             <cfset displayName = REReplace(job_name, "^\[job-exec\s+""([^""]+)"".*$", "\1")>
             <tr>
               <td><code>#HTMLEditFormat(displayName)#</code></td>
+              <!--- What the job is for. Until this column existed the page
+                    showed a name, a schedule and a command, so working out
+                    whether a job was safe to switch off meant finding the
+                    script or endpoint it called and reading that. --->
+              <td style="min-width:320px;">
+                <cfif Len(Trim(description))>
+                  <small>#HTMLEditFormat(description)#</small>
+                <cfelse>
+                  <small class="text-muted fst-italic">No description recorded</small>
+                </cfif>
+              </td>
               <td><small>#HTMLEditFormat(type)#</small></td>
               <td>
                 <span title="Raw: #HTMLEditFormat(schedule)#">#HTMLEditFormat(humanizeOfeliaSchedule(schedule))#</span>
@@ -326,8 +338,15 @@ do NOT write here — enable/disable/edit is future tier work.
       "order": [[0, "asc"]],
       "pageLength": 25,
       "stateSave": true,
+      // 0 Name, 1 Purpose, 2 Type, 3 Schedule, 4 Container, 5 Command,
+      // 6 Status, 7 Last Run, 8 Actions. Purpose was inserted at 1, which
+      // moved Command from 4 to 5 and Actions from 7 to 8. Sorting by a
+      // sentence or by a button is meaningless, so neither is orderable.
+      // stateSave persists the sort by index, but DataTables discards a saved
+      // state whose column count differs and this table went from 8 columns
+      // to 9, so an old state is dropped on its own.
       "columnDefs": [
-        { "orderable": false, "targets": [4, 7] }
+        { "orderable": false, "targets": [1, 5, 8] }
       ]
     });
 
@@ -337,7 +356,13 @@ do NOT write here — enable/disable/edit is future tier work.
       'renew-acme-certificate',
       'hermes-update-check',
       'hermes-process-cert-queue',
-      'hermes-quarantine-notify'
+      'hermes-quarantine-notify',
+      // Both of these exist to stop the disk filling up, and a full disk
+      // defers all mail. message_cleanup.cfm says so in its own header, that
+      // its disk-full protection "makes it a task an operator cannot safely
+      // disable", and it was missing from this list anyway.
+      'hermes-message-cleanup',
+      'hermes-dovecot-log-rotate'
     ];
 
     // Enable/disable toggle handler

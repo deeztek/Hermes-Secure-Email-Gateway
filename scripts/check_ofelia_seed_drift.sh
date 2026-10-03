@@ -71,10 +71,35 @@ python3 - "$SEED_SQL" > "$EXPECTED" <<'PY'
 import sys
 
 src = open(sys.argv[1], encoding='utf-8').read()
+
+PREFIX = "INSERT IGNORE INTO `ofelia_jobs`"
+
+# Legacy positional order, used only when a row does not name its columns.
+LEGACY = ['id', 'job_name', 'schedule', 'command', 'container', 'image',
+          'user', 'volume', 'network', 'type', 'active', 'no_overlap']
+
 for line in src.splitlines():
-    if not line.startswith("INSERT IGNORE INTO `ofelia_jobs` VALUES ("):
+    if not line.startswith(PREFIX):
         continue
-    body = line[line.index('(') + 1:line.rindex(')')]
+
+    # Rows may name their columns, which they have to once a column is added
+    # anywhere but the end. Read the names when they are there and map by name,
+    # so this check follows the schema instead of constraining it.
+    rest = line[len(PREFIX):].lstrip()
+    if rest.startswith('('):
+        cols = [c.strip().strip('`') for c
+                in rest[1:rest.index(')')].split(',')]
+        rest = rest[rest.index(')') + 1:].lstrip()
+        if not rest.startswith('VALUES'):
+            sys.exit("malformed ofelia_jobs row: %s" % line[:80])
+        vals = rest[len('VALUES'):].lstrip()
+    else:
+        cols = LEGACY
+        if not rest.startswith('VALUES'):
+            continue
+        vals = rest[len('VALUES'):].lstrip()
+
+    body = vals[vals.index('(') + 1:vals.rindex(')')]
     # Split on commas outside single quotes; \" is a SQL escape for a literal ".
     fields, cur, inq, i = [], '', False, 0
     while i < len(body):
@@ -87,12 +112,17 @@ for line in src.splitlines():
             fields.append(cur); cur = ''; i += 1; continue
         cur += c; i += 1
     fields.append(cur)
-    # id, job_name, schedule, command, container, image, user, volume,
-    # network, type, active, no_overlap
-    if len(fields) < 12:
-        sys.exit("malformed ofelia_jobs row: %s" % line[:80])
-    name, sched, cmd, cont = fields[1], fields[2], fields[3], fields[4]
-    active, no_overlap = fields[10].strip(), fields[11].strip()
+    if len(fields) != len(cols):
+        sys.exit("ofelia_jobs row has %d values for %d columns: %s"
+                 % (len(fields), len(cols), line[:80]))
+    row = dict(zip(cols, fields))
+    for required in ('job_name', 'schedule', 'command', 'container',
+                     'active', 'no_overlap'):
+        if required not in row:
+            sys.exit("ofelia_jobs row omits %s: %s" % (required, line[:80]))
+    name, sched = row['job_name'], row['schedule']
+    cmd, cont = row['command'], row['container']
+    active, no_overlap = row['active'].strip(), row['no_overlap'].strip()
     if active != '1':
         continue                     # generator selects WHERE active = '1'
     print()

@@ -6,20 +6,119 @@
 -- NOT run on fresh installs (those get the current schema from
 -- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
 --
--- Contents: nothing. This release has no schema work.
+-- Contents: recipients.backend_transport, and ofelia_jobs.description plus
+-- a description for every job that ships.
 --
--- #157 needed none: recipients.backend_server, backend_port and backend_tls
--- have existed since the Docker rewrite. What was missing was anything that
--- read them, which is a Postfix lookup change and a host shell artifact
--- (scripts/10-rerender-transport-lookup.sh), not SQL.
+-- The three backend_* columns have existed since the Docker rewrite and this
+-- release makes them route (#157). Routing to an EXTERNAL server needs nothing
+-- new, since smtp is the only transport involved. Routing to the built-in mail
+-- server needs lmtp, which is a different transport entirely rather than a
+-- different host, so the transport cannot be inferred from the address.
 --
--- The version stamp below is required even so: the update orchestrator reads
--- build_no to decide which release directories are still pending, and warns
--- if a release finishes without advancing it.
+-- NULL means smtp, so every existing override keeps behaving exactly as it did.
 -- ---------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------
--- 1. Version stamp -- MUST be the last statement (advances build_no so
+-- 1. Per-recipient transport (#157)
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  (the same
+-- column is declared on the recipients table in the baseline)
+-- ---------------------------------------------------------------------
+ALTER TABLE `recipients`
+  ADD COLUMN IF NOT EXISTS `backend_transport` varchar(10) DEFAULT NULL AFTER `backend_tls`;
+
+-- ---------------------------------------------------------------------
+-- 2. What each scheduled task is for
+--
+-- The Scheduled Tasks page listed a job's name, schedule, container and
+-- command and nothing about its purpose. Deciding whether a job is safe to
+-- disable meant reading the command, finding the script or endpoint it calls,
+-- and reading that. Two of them must never be disabled and nothing on screen
+-- said so.
+--
+-- Console metadata only. ofelia_generate_config.cfm names the columns it
+-- selects, so this never reaches the generated Ofelia INI.
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+ALTER TABLE `ofelia_jobs`
+  ADD COLUMN IF NOT EXISTS `description` varchar(500) DEFAULT NULL AFTER `job_name`;
+
+-- Matched on job_name, so a renamed or operator-added job is left alone.
+-- Re-running simply rewrites the same text.
+UPDATE `ofelia_jobs` SET `description` =
+  'Renews the Let''s Encrypt certificate for the console and mail hostnames before it expires, then reloads the services that present it. Leave enabled: an expired certificate breaks the console and TLS on SMTP.'
+  WHERE `job_name` LIKE '%renew-acme-certificate%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Enforces the message retention policy by deleting quarantined and archived mail past its retention period. Leave enabled: its real job is stopping the disk filling up, and a full disk defers all mail.'
+  WHERE `job_name` LIKE '%hermes-message-cleanup%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Asks GitHub once a day whether a newer Hermes release exists and caches the answer to a file, which the dashboard reads on every page load. Disabling it means the dashboard stops telling you about updates; nothing else is affected.'
+  WHERE `job_name` LIKE '%hermes-update-check%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Checks that the public DNS for this host still points at this server, so a failed certificate renewal is reported before the certificate actually expires rather than after.'
+  WHERE `job_name` LIKE '%acme-validate-ip%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Watches the outbound mail queue and alerts when it grows past its threshold, which is the earliest sign that delivery has stalled.'
+  WHERE `job_name` LIKE '%hermes-health-check-mailqueue%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Builds the daily DMARC aggregate reports from received mail and sends them to the reporting addresses the sending domains publish.'
+  WHERE `job_name` LIKE '%hermes-dmarc-report%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Rotates and compresses the Authelia authentication logs so they cannot grow without limit.'
+  WHERE `job_name` LIKE '%hermes-authelia-log-rotate%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Emails each recipient about their own newly quarantined messages, within about a minute of arrival. This is how quarantine notification works: there is no periodic digest. Disabling it means recipients are never told.'
+  WHERE `job_name` LIKE '%hermes-quarantine-notify%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Generates the S/MIME certificates and PGP keyrings queued when a mailbox or recipient is created, five at a time. Disabling it leaves new users waiting for keys that never arrive.'
+  WHERE `job_name` LIKE '%hermes-process-cert-queue%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Refreshes the third-party malware signature feeds that supplement the ClamAV database.'
+  WHERE `job_name` LIKE '%hermes-fangfrisch-refresh%';
+
+UPDATE `ofelia_jobs` SET `description` =
+  'Re-resolves network aliases defined from an SPF record and records what changed. Advisory only: it writes to the alias table and never touches a config file or reloads a service, so a change is not applied until you apply it.'
+  WHERE `job_name` LIKE '%hermes-refresh-network-aliases%';
+
+-- ---------------------------------------------------------------------
+-- 3. Bound Dovecot's log files
+--
+-- Dovecot writes dovecot.log, dovecot-info.log and dovecot-debug.log and grew
+-- all three forever. Nothing anywhere rotated them. On a host that had debug
+-- logging switched on at some point the debug file reached 1.5 GB. A full data
+-- volume defers all mail, which makes this the same class as #339 and #341.
+--
+-- Runs inside hermes_dovecot, not hermes_commandbox, because the log volume is
+-- only mounted there. no_overlap because the first run on a host that has
+-- never rotated may be compressing more than a gigabyte.
+--
+-- WHERE NOT EXISTS rather than INSERT IGNORE: ofelia_jobs has no unique key on
+-- job_name, so IGNORE would not dedupe and a re-run would add a second copy.
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec \"hermes-dovecot-log-rotate\"]',
+       'Rotates and compresses Dovecot''s three log files and deletes archives older than 30 days. Nothing bounded them before, so on a host that had debug logging on they grew without limit. Leave enabled: a full data volume defers all mail.',
+       '0 15 02 * * *', '/scripts/rotate_dovecot_logs.sh', 'hermes_dovecot', 'system', 1, 1
+  FROM DUAL
+ WHERE NOT EXISTS (
+   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` LIKE '%hermes-dovecot-log-rotate%'
+ );
+
+-- ---------------------------------------------------------------------
+-- 4. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- ---------------------------------------------------------------------
