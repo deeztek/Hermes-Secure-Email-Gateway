@@ -189,6 +189,47 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif StructKeyExists(form, "custom_port") AND Len(Trim(form.custom_port))><cfset prefillPort = form.custom_port></cfif>
 <cfif StructKeyExists(form, "custom_tls") AND Len(Trim(form.custom_tls))><cfset prefillTls = form.custom_tls></cfif>
 
+<!--- Where "Use Domain Default" actually sends, and whether choosing it would
+     orphan a mailbox.
+
+     On a mailbox domain the domain default is lmtp to the built-in server, so
+     clearing an override brings mail back to the local mailbox. On a hybrid
+     domain the domain default is the provider, so clearing it sends mail away
+     from a local mailbox that stays sitting there, active and quota'd,
+     receiving nothing. The same option means opposite things and the page said
+     neither.
+
+     Still allowed, because sending a converted person back to the provider is
+     a legitimate thing to want when they are leaving or you have changed your
+     mind. It just has to say so. --->
+<cfquery name="selectedDomains" datasource="hermes">
+    SELECT d.domain, d.type,
+           COALESCE(t.transport, '') AS domain_transport,
+           SUM(CASE WHEN r.recipient_type = 'mailbox' THEN 1 ELSE 0 END) AS mailbox_count
+      FROM recipients r
+      JOIN domains d ON d.domain = SUBSTRING_INDEX(r.recipient, '@', -1)
+      LEFT JOIN transport t ON t.id = d.transport_id
+     WHERE r.id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+     GROUP BY d.domain, d.type, t.transport
+     ORDER BY d.domain ASC
+</cfquery>
+
+<cfset defaultGoesTo   = "">
+<cfset orphanWarnings  = "">
+<cfloop query="selectedDomains">
+    <cfif selectedDomains.recordcount EQ 1 AND Len(Trim(selectedDomains.domain_transport))>
+        <cfset defaultGoesTo = Trim(selectedDomains.domain_transport)>
+    </cfif>
+    <!--- Only a mailbox can be orphaned, and only where the domain default is
+         not the built-in server. --->
+    <cfif Val(selectedDomains.mailbox_count) GT 0
+          AND FindNoCase("hermes_dovecot", selectedDomains.domain_transport) EQ 0>
+        <cfset orphanWarnings = ListAppend(orphanWarnings,
+              selectedDomains.domain & Chr(31) & Val(selectedDomains.mailbox_count)
+              & Chr(31) & Trim(selectedDomains.domain_transport), ";")>
+    </cfif>
+</cfloop>
+
 <cfif getSelectedRecipients.recordcount LT 1>
     <div class="alert alert-danger">
         <h5><i class="icon fas fa-ban"></i> Error</h5>
@@ -618,10 +659,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="backend_type" id="backend_default" value="default"<cfoutput><cfif NOT prefillCustom> checked</cfif></cfoutput>>
                     <label class="form-check-label" for="backend_default">
-                        <strong>Use Domain Default</strong>
+                        <strong>Use Domain Default</strong><cfoutput><cfif Len(defaultGoesTo)> <span class="badge bg-secondary">#HTMLEditFormat(defaultGoesTo)#</span></cfif></cfoutput>
                         <br><small class="text-muted">Route to the backend server configured in the recipient's domain settings</small>
                     </label>
                 </div>
+
+                <cfoutput><cfif Len(orphanWarnings)>
+                <div class="alert alert-warning py-2 ms-4 me-2">
+                    <small>
+                        <strong>Domain default does not mean local delivery here.</strong>
+                        <cfloop list="#orphanWarnings#" index="warnRow" delimiters=";">
+                        <br>On <strong>#HTMLEditFormat(ListGetAt(warnRow, 1, Chr(31)))#</strong>
+                        the domain default is <code>#HTMLEditFormat(ListGetAt(warnRow, 3, Chr(31)))#</code>,
+                        and #HTMLEditFormat(ListGetAt(warnRow, 2, Chr(31)))# of the selected
+                        <cfif ListGetAt(warnRow, 2, Chr(31)) EQ "1">recipient has<cfelse>recipients have</cfif>
+                        a mailbox on this server.
+                        </cfloop>
+                        <br><br>Choosing it sends their mail to that destination instead. The mailbox is
+                        kept, with everything already in it, but it stops receiving anything new.
+                        To deliver to it, choose <strong>Built-in Email Server</strong>.
+                    </small>
+                </div>
+                </cfif></cfoutput>
 
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="backend_type" id="backend_custom" value="custom"<cfoutput><cfif prefillCustom> checked</cfif></cfoutput>>
