@@ -529,7 +529,20 @@ credential). Everything else is the same work in the same order.
         <cfinclude template="send_mailbox_welcome_email.cfm">
     </cfif>
 <cfcatch type="any">
-    <!--- Welcome email failure is non-critical --->
+    <!--- Welcome email failure is non-critical to provisioning: the mailbox
+         works whether or not its owner was told about it, so this must not
+         abort. It was silent as well as non-fatal though, which meant a
+         welcome email that never arrived left nothing at all to look at, and
+         the only way to tell the difference between "not sent" and "sent and
+         lost in transit" was to guess. Record it and carry on. --->
+    <cftry>
+        <cffile action="append"
+            file="/opt/hermes/tmp/welcome_email_errors.log"
+            output="#DateTimeFormat(Now(), 'yyyy-mm-dd HH:nn:ss')# #recipientEmail# auth=#form.auth_type# #cfcatch.message# | #cfcatch.detail#"
+            addnewline="yes"
+            charset="utf-8">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
 </cfcatch>
 </cftry>
 

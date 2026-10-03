@@ -216,7 +216,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             UPDATE recipients
             SET backend_server = NULL,
                 backend_port = NULL,
-                backend_tls = NULL
+                backend_tls = NULL,
+                backend_transport = NULL
             WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
         </cfquery>
         <!--- Regenerate the per-destination TLS policy map (#157).
@@ -262,7 +263,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 UPDATE recipients
                 SET backend_server = <cfqueryparam value="#custom_server#" cfsqltype="cf_sql_varchar">,
                     backend_port = <cfqueryparam value="#custom_port#" cfsqltype="cf_sql_integer">,
-                    backend_tls = <cfqueryparam value="#custom_tls#" cfsqltype="cf_sql_varchar">
+                    backend_tls = <cfqueryparam value="#custom_tls#" cfsqltype="cf_sql_varchar">,
+                    <!--- Explicit, not left as it was. A recipient switched
+                         here from the built-in server still carries
+                         backend_transport = 'lmtp', and lmtp spoken at an
+                         ordinary SMTP backend does not work. --->
+                    backend_transport = 'smtp'
                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
             </cfquery>
             <!--- Regenerate the per-destination TLS policy map (#157).
