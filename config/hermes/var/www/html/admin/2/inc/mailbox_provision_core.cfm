@@ -47,15 +47,28 @@ add_mailbox_action.cfm, recipientEmail, displayName, quotaBytes, getDomain
 
 Optional:
 
-  provisionMode   "create"  (default) the address is new, insert its rows
-                  "convert" the address already exists as a relay recipient,
-                            so update that row in place instead of inserting
-                            a second one. Only step 1 differs; everything
-                            after it is the same work in the same order,
-                            which is the entire reason this file exists.
+  provisionMode       "create"  (default) the address is new, insert its rows
+                      "convert" the address already exists as a relay
+                                recipient, so work with what is there
+
+  resolvedFirstName   from resolve_recipient_display_name.cfm, else NULL
+  resolvedLastName    from resolve_recipient_display_name.cfm, else NULL
+  ldapAccessControl   "one_factor" (default) or "two_factor"
+
+Four steps differ between the two modes and no others, which is the entire
+reason this file exists: recipients (update, not insert), user_settings
+(update when the row is there, since email has no unique key), mailboxes
+(carries the resolved names), and LDAP (change the role, never the
+credential). Everything else is the same work in the same order.
 --->
 
 <cfparam name="provisionMode" default="create">
+
+<!--- Filled in by resolve_recipient_display_name.cfm when the caller has run
+     it. Left empty they write NULL, which is what the mailboxes columns held
+     before anything populated them. --->
+<cfparam name="resolvedFirstName" default="">
+<cfparam name="resolvedLastName"  default="">
 
 <!--- 1. RECIPIENTS TABLE.
 
@@ -168,11 +181,14 @@ Optional:
      because the same column drives both mailbox and relay flows. --->
 <cfquery name="insertMailbox" datasource="hermes">
     INSERT INTO mailboxes
-    (domain_id, username, name, quota, active, nextcloud_enabled, created, modified)
+    (domain_id, username, name, first_name, last_name, quota, active,
+     nextcloud_enabled, created, modified)
     VALUES
     (<cfqueryparam value="#getDomain.id#" cfsqltype="cf_sql_integer">,
      <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
      <cfqueryparam value="#displayName#" cfsqltype="cf_sql_varchar">,
+     <cfqueryparam value="#Trim(resolvedFirstName)#" cfsqltype="cf_sql_varchar" null="#(Trim(resolvedFirstName) EQ '')#">,
+     <cfqueryparam value="#Trim(resolvedLastName)#" cfsqltype="cf_sql_varchar" null="#(Trim(resolvedLastName) EQ '')#">,
      <cfqueryparam value="#quotaBytes#" cfsqltype="cf_sql_bigint">,
      1,
      <cfqueryparam value="#form.nextcloud_enabled#" cfsqltype="cf_sql_tinyint">,
@@ -189,21 +205,52 @@ Optional:
     )
 </cfquery>
 
-<!--- 3c. ON CONVERT, LEAVE THE RELAY GROUP FIRST.
+<!--- 4. LDAP.
 
-     Step 4 below is happy to find the LDAP entry already there, and it adds
-     cn=mailboxes plus the access control group either way, but it has no
-     reason to know the user used to be a relay recipient. Left in cn=relays
-     the account would hold both roles at once, so drop that membership
-     before the mailbox groups go on. The access control groups are untouched
-     here because step 4 sets the right one a moment later. --->
+     On convert there is nothing to create and, above all, no password to set.
+     The entry exists and carries a credential the user is already using: a
+     remote auth recipient authenticates against the provider, and a local one
+     has had an LDAP password since the relay recipient was added. So this
+     changes the account's role and leaves the credential alone. Converting
+     forty people must not reset forty passwords.
+
+     ldap_add_user_mailbox.cfm would mostly cope, since ldap_add_user.cfm
+     reports "Already exists" and declines to modify, but it would still shell
+     out to slappasswd once per user to build a hash that nothing then uses.
+     The four things that do need doing are done directly:
+
+       1. leave cn=relays, or the account holds both roles at once
+       2. join cn=mailboxes and the access control group
+       3. replace displayName, which for a relay entry is the email local part
+          followed by the literal word "User" and is what Authelia's OIDC name
+          claim and Nextcloud both read
+       4. record ldap_username on user_settings --->
 <cfif provisionMode EQ "convert">
-    <cfset ldapUsername = LCase(recipientEmail)>
-    <cfinclude template="ldap_remove_user_groups_relay.cfm">
-</cfif>
 
-<!--- 4. CREATE LDAP USER --->
-<cfif form.auth_type EQ "remote">
+    <cfparam name="ldapAccessControl" type="string" default="one_factor">
+    <cfif ldapAccessControl NEQ "one_factor" AND ldapAccessControl NEQ "two_factor">
+        <cfset ldapAccessControl = "one_factor">
+    </cfif>
+
+    <cfset ldapUsername = LCase(recipientEmail)>
+
+    <cfinclude template="ldap_remove_user_groups_relay.cfm">
+    <cfinclude template="ldap_add_user_groups_mailbox.cfm">
+
+    <cfif IsDefined("displayName") AND Len(Trim(displayName))>
+        <cfset ldapDisplayName = Trim(displayName)>
+        <cfinclude template="ldap_modify_user_displayname.cfm">
+    </cfif>
+
+    <cfquery name="convertLdapUsername" datasource="hermes">
+        UPDATE user_settings
+           SET ldap_username = <cfqueryparam value="#ldapUsername#" cfsqltype="cf_sql_varchar">
+         WHERE email = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+
+    <cfset ldapUserCreated = true>
+
+<cfelseif form.auth_type EQ "remote">
     <!--- Remote Auth: creates LDAP user with seeAlso/associatedDomain, no password --->
     <cfset remoteauthDomain = form.remoteauth_domain>
     <cfinclude template="ldap_add_user_mailbox_remoteauth.cfm">
