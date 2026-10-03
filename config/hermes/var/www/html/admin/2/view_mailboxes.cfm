@@ -314,7 +314,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
              WHERE slm.login_user = m.username
                AND slm.sender    <> m.username) AS send_as_list
     FROM mailboxes m
-    INNER JOIN domains d ON m.domain_id = d.id AND d.type = 'mailbox'
+    INNER JOIN domains d ON m.domain_id = d.id AND d.type IN ('mailbox', 'hybrid')
     LEFT JOIN recipients r ON r.recipient = m.username
     LEFT JOIN spam_policies sp ON sp.policy_id = r.policy_id
     LEFT JOIN user_settings us ON us.email = m.username
@@ -368,7 +368,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getFilterDomains" datasource="hermes">
     SELECT DISTINCT d.domain FROM domains d
     INNER JOIN mailboxes m ON m.domain_id = d.id
-    WHERE d.type = 'mailbox'
+    WHERE d.type IN ('mailbox', 'hybrid')
     ORDER BY d.domain ASC
 </cfquery>
 

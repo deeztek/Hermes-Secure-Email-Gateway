@@ -54,7 +54,7 @@ For now we just write the row; the milter wiring is a separate step.
 <cfquery name="checkDomain" datasource="hermes">
     SELECT id FROM domains
     WHERE id = <cfqueryparam value="#domainId#" cfsqltype="cf_sql_integer">
-      AND type = 'mailbox'
+      AND type IN ('mailbox', 'hybrid')
 </cfquery>
 <cfif checkDomain.recordcount LT 1>
     <cfset session.org_sig_msg = "<strong>Save failed.</strong> The selected domain doesn't exist or isn't a mailbox-hosting domain.">

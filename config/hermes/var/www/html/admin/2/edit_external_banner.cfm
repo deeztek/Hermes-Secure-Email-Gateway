@@ -209,7 +209,7 @@ always shows exactly what save_external_banner_action.cfm will store.
 <cfquery name="getRecipientDomains" datasource="hermes">
     SELECT domain
     FROM domains
-    WHERE type = 'mailbox'
+    WHERE type IN ('mailbox', 'hybrid')
     ORDER BY domain ASC
 </cfquery>
 

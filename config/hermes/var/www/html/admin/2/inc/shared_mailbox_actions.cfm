@@ -77,7 +77,7 @@ Dispatches to the appropriate action based on form.action:
     <cfquery name="getDomain" datasource="hermes">
         SELECT id, domain FROM domains
         WHERE id = <cfqueryparam value="#form.domain_id#" cfsqltype="cf_sql_integer">
-        AND type = 'mailbox'
+        AND type IN ('mailbox', 'hybrid')
     </cfquery>
 
     <cfif getDomain.recordcount LT 1>

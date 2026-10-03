@@ -35,7 +35,7 @@ preserve case as expected.
 <cfquery name="deptOptionsRaw" datasource="hermes">
     SELECT m.domain_id, m.department
     FROM mailboxes m
-    INNER JOIN domains d ON m.domain_id = d.id AND d.type = 'mailbox'
+    INNER JOIN domains d ON m.domain_id = d.id AND d.type IN ('mailbox', 'hybrid')
     WHERE m.department IS NOT NULL
       AND TRIM(m.department) != ''
     GROUP BY m.domain_id, m.department

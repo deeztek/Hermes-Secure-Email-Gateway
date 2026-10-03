@@ -74,7 +74,7 @@ Caller variables (optional):
     FROM mailboxes m
     INNER JOIN domains d
         ON m.domain_id = d.id
-       AND d.type = 'mailbox'
+       AND d.type IN ('mailbox', 'hybrid')
     ORDER BY m.username ASC
 </cfquery>
 

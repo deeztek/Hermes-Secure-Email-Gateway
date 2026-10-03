@@ -5,7 +5,7 @@ Syncs the mailbox_sans table so it contains exactly one row per
 (additional_sans.san + mailbox-hosting domain) combination.
 
 The source of truth for mailbox-hosting domains is:
-  domains WHERE type='mailbox' AND active=1
+  domains WHERE type IN ('mailbox','hybrid') AND active=1
 joined to mailbox_domains (for the cert binding).
 
   - Adds rows for any missing FQDNs with ip='NO', dns='NO'.
@@ -22,7 +22,7 @@ mailbox domains or additional_sans.
     SELECT d.id, d.domain, md.mailbox_certificate
     FROM domains d
     INNER JOIN mailbox_domains md ON md.domain = d.domain
-    WHERE d.type = 'mailbox'
+    WHERE d.type IN ('mailbox', 'hybrid')
 </cfquery>
 
 <cfquery name="syncPrefixes" datasource="hermes">

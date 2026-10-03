@@ -106,7 +106,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- GET MAILBOX DOMAINS --->
 <cfquery name="getMailboxDomains" datasource="hermes">
-    SELECT id, domain, default_quota_mb, nextcloud_enabled, enforce_mfa FROM domains WHERE type = 'mailbox' ORDER BY domain ASC
+    SELECT id, domain, default_quota_mb, nextcloud_enabled, enforce_mfa FROM domains WHERE type IN ('mailbox', 'hybrid') ORDER BY domain ASC
 </cfquery>
 
 <!--- CHECK IF ANY MAILBOX DOMAINS EXIST --->

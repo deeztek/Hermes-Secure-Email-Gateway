@@ -74,7 +74,7 @@ changes to the body milter on-disk artifacts.
     <cfquery name="checkDomain" datasource="hermes">
         SELECT id FROM domains
         WHERE domain = <cfqueryparam value="#effectiveDomain#" cfsqltype="cf_sql_varchar">
-          AND type = 'mailbox'
+          AND type IN ('mailbox', 'hybrid')
     </cfquery>
     <cfif checkDomain.recordcount LT 1>
         <cfset session.ext_banner_msg = "<strong>Save failed.</strong> The selected recipient domain doesn't exist or isn't a mailbox-hosting domain.">

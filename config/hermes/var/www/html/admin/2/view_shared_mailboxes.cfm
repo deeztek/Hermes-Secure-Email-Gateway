@@ -250,7 +250,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            m.quota, m.active,
            (SELECT COUNT(*) FROM shared_mailbox_permissions smp WHERE smp.shared_mailbox_id = sm.id) AS member_count
     FROM shared_mailboxes sm
-    INNER JOIN domains d ON d.id = sm.domain_id AND d.type = 'mailbox'
+    INNER JOIN domains d ON d.id = sm.domain_id AND d.type IN ('mailbox', 'hybrid')
     INNER JOIN mailboxes m ON m.id = sm.mailbox_id
     ORDER BY sm.address ASC
 </cfquery>
@@ -258,7 +258,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- GET MAILBOX DOMAINS FOR ADD FORM --->
 <cfquery name="getMailboxDomains" datasource="hermes">
     SELECT id, domain FROM domains
-    WHERE type = 'mailbox'
+    WHERE type IN ('mailbox', 'hybrid')
     ORDER BY domain ASC
 </cfquery>
 
@@ -266,7 +266,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getFilterDomains" datasource="hermes">
     SELECT DISTINCT d.domain FROM domains d
     INNER JOIN shared_mailboxes sm ON d.id = sm.domain_id
-    WHERE d.type = 'mailbox'
+    WHERE d.type IN ('mailbox', 'hybrid')
     ORDER BY d.domain ASC
 </cfquery>
 
@@ -274,7 +274,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getUserMailboxes" datasource="hermes">
     SELECT m.id, m.username, m.name, d.domain
     FROM mailboxes m
-    INNER JOIN domains d ON m.domain_id = d.id AND d.type = 'mailbox'
+    INNER JOIN domains d ON m.domain_id = d.id AND d.type IN ('mailbox', 'hybrid')
     WHERE m.mailbox_type = 'user'
     AND m.active = 1
     ORDER BY m.username ASC

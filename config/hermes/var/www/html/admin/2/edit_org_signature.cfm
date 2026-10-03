@@ -169,7 +169,7 @@ exactly what save_org_signature_action.cfm will store.
 <cfquery name="getDomains" datasource="hermes">
     SELECT id, domain
     FROM domains
-    WHERE type = 'mailbox'
+    WHERE type IN ('mailbox', 'hybrid')
     ORDER BY domain ASC
 </cfquery>
 

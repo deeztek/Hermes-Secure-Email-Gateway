@@ -53,7 +53,7 @@ Returns 404 if the email's domain is not configured as a mailbox domain.
 <cfquery name="checkDomain" datasource="hermes">
   SELECT id FROM domains
   WHERE domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#emailDomain#">
-  AND type = 'mailbox'
+  AND type IN ('mailbox', 'hybrid')
 </cfquery>
 <cfif checkDomain.recordcount EQ 0>
   <cfheader statuscode="404" statustext="Not Found">

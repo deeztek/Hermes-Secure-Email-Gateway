@@ -44,7 +44,7 @@ Types: forward (delivers to mailbox) or discard (silently drops mail)
 <cfquery name="checkDomain" datasource="hermes">
     SELECT id FROM domains
     WHERE domain = <cfqueryparam value="#aliasDomain#" cfsqltype="cf_sql_varchar">
-    AND type = 'mailbox'
+    AND type IN ('mailbox', 'hybrid')
 </cfquery>
 <cfif checkDomain.recordcount LT 1>
     <cfset session.m = 12>

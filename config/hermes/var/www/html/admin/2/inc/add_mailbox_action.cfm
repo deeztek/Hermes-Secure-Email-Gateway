@@ -72,7 +72,7 @@ Requires form variables:
 <cfquery name="getDomain" datasource="hermes">
     SELECT id, domain, default_quota_mb FROM domains
     WHERE id = <cfqueryparam value="#form.domain_id#" cfsqltype="cf_sql_integer">
-    AND type = 'mailbox'
+    AND type IN ('mailbox', 'hybrid')
 </cfquery>
 
 <cfif getDomain.recordcount LT 1>

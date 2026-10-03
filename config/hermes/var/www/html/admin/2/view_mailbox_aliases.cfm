@@ -193,7 +193,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            GROUP_CONCAT(ma.id ORDER BY ma.delivers_to ASC)          AS dest_ids,
            GROUP_CONCAT(ma.delivers_to ORDER BY ma.delivers_to ASC) AS dest_list
     FROM mailbox_aliases ma
-    INNER JOIN domains d ON d.id = ma.domain_id AND d.type = 'mailbox'
+    INNER JOIN domains d ON d.id = ma.domain_id AND d.type IN ('mailbox', 'hybrid')
     GROUP BY ma.alias_address, d.domain
     ORDER BY ma.alias_address ASC
 </cfquery>
@@ -211,7 +211,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getFilterDomains" datasource="hermes">
     SELECT DISTINCT d.domain FROM domains d
     INNER JOIN mailbox_aliases ma ON d.id = ma.domain_id
-    WHERE d.type = 'mailbox'
+    WHERE d.type IN ('mailbox', 'hybrid')
     ORDER BY d.domain ASC
 </cfquery>
 
