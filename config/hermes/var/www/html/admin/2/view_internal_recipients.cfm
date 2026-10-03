@@ -388,11 +388,9 @@ a, a:hover{
             <p class="mb-1"><cfoutput><strong>#revertN#</strong> mailbox<cfif revertN NEQ 1>es</cfif></cfoutput>
             reverted to relay <cfoutput><cfif revertN NEQ 1>recipients<cfelse>recipient</cfif></cfoutput>.
             Mail goes to the domain's backend again.</p>
-            <p class="mb-0"><small>The <cfoutput><cfif revertN NEQ 1>mailboxes were<cfelse>mailbox was</cfif></cfoutput>
-            <strong>deactivated, not deleted</strong>, so anything already in
-            <cfoutput><cfif revertN NEQ 1>them is<cfelse>it is</cfif></cfoutput> still there. Deactivated
-            mailboxes stay listed under <strong>Email Server &gt; Mailboxes</strong> with Mail Delivery
-            reading <em>Orphaned</em>, so they can be found and either reactivated or deleted.</small></p>
+            <p class="mb-0"><small>The <cfoutput><cfif revertN NEQ 1>mailboxes and their contents were<cfelse>mailbox and its contents were</cfif></cfoutput>
+            deleted. The <cfoutput><cfif revertN NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif></cfoutput>
+            untouched and still <cfoutput><cfif revertN NEQ 1>receive<cfelse>receives</cfif></cfoutput> mail at the domain's backend.</small></p>
         </div>
         <cfset StructDelete(session, "revertCount")>
     <cfelseif session.backendMessage EQ "success_builtin">

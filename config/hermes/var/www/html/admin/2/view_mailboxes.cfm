@@ -279,11 +279,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <p class="mb-1"><cfoutput><strong>#revertN#</strong> mailbox<cfif revertN NEQ 1>es</cfif></cfoutput>
           reverted to relay <cfoutput><cfif revertN NEQ 1>recipients<cfelse>recipient</cfif></cfoutput>.
           Mail goes to the domain's backend again.</p>
-          <p class="mb-0"><small>The <cfoutput><cfif revertN NEQ 1>mailboxes were<cfelse>mailbox was</cfif></cfoutput>
-          <strong>deactivated, not deleted</strong>, so anything already in
-          <cfoutput><cfif revertN NEQ 1>them is<cfelse>it is</cfif></cfoutput> still there. Deactivated
-          mailboxes stay listed under <strong>Email Server &gt; Mailboxes</strong> with Mail Delivery
-          reading <em>Orphaned</em>, so they can be found and either reactivated or deleted.</small></p>
+          <p class="mb-0"><small>The <cfoutput><cfif revertN NEQ 1>mailboxes and their contents were<cfelse>mailbox and its contents were</cfif></cfoutput>
+          deleted. The <cfoutput><cfif revertN NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif></cfoutput>
+          untouched and still <cfoutput><cfif revertN NEQ 1>receive<cfelse>receives</cfif></cfoutput> mail at the domain's backend.</small></p>
       </div>
       <cfset StructDelete(session, "revertCount")>
   <cfelseif session.backendMessage EQ "success_builtin">
@@ -424,7 +422,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <option value="Local">Local only</option>
       <option value="Routed">Routed elsewhere</option>
       <option value="Unknown">Unknown (no recipient record)</option>
-      <option value="Orphaned">Orphaned (reverted, mailbox kept)</option>
     </select>
   </div>
   </cfif>
@@ -534,9 +531,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 works, and the backend detail follows it so the global search
                 box still finds a mailbox by the host its mail goes to. --->
           <cfset deliveryPort = Val(backend_port) GT 0 ? Val(backend_port) : 25>
-          <cfif Val(active) NEQ 1>
-            <cfset deliverySearch = "Orphaned inactive deactivated reverted to relay recipient">
-          <cfelseif Len(Trim(backend_server))>
+          <cfif Len(Trim(backend_server))>
             <cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#">
           <cfelseif Val(recipient_id) GT 0>
             <cfset deliverySearch = "Local">
@@ -544,25 +539,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset deliverySearch = "Unknown no recipient record">
           </cfif>
           <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
-            <!--- Inactive wins over everything else here. A deactivated
-                 mailbox receives nothing whatever its routing column says, and
-                 the usual place that would show, the Status column, is the
-                 last of twenty-three. This is a mailbox left behind by a
-                 revert: still on disk, still holding whatever was in it, and
-                 nothing else on the page says so.
-
-                 "Orphaned" rather than "Inactive" because it is exact. Nothing
-                 else in the application ever writes mailboxes.active, and
-                 there is no active toggle on the mailbox form, so active = 0
-                 can only have come from a revert. --->
-            <cfif Val(active) NEQ 1>
-              <span class="badge bg-dark">Orphaned</span>
-              <div class="small text-muted">
-                not receiving mail
-                <cfif Len(Trim(backend_server))><br>was routed to #HTMLEditFormat(backend_server)#:#deliveryPort#</cfif>
-              </div>
-              <div class="small text-muted"><em>reverted to relay recipient, mailbox kept</em></div>
-            <cfelseif Len(Trim(backend_server))>
+            <cfif Len(Trim(backend_server))>
               <span class="badge bg-warning text-dark">Routed</span>
               <div class="small text-muted">
                 to #HTMLEditFormat(backend_server)#:#deliveryPort#

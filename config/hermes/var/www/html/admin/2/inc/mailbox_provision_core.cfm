@@ -182,12 +182,13 @@ credential). Everything else is the same work in the same order.
 <!--- 3. INSERT INTO MAILBOXES TABLE (Dovecot userdb).
      enforce_mfa lives on recipients (see step 1 above), not mailboxes,
      because the same column drives both mailbox and relay flows. --->
-<!--- A revert deactivates the mailbox rather than deleting it, so converting
-     the same address again finds a row already there. Inserting a second one
-     would be worse than an error: Dovecot's SQL userdb is single-row, so two
-     rows for one username breaks the lookup for that user entirely. Reactivate
-     and re-apply the settings instead, which also brings back whatever was in
-     the maildir. --->
+<!--- Kept as a guard even though the normal flow should never reach it. A
+     revert deletes the mailbox row, and converting an address that is already
+     a mailbox is refused before this file runs, so a row should not exist
+     here. If one somehow does, inserting a second would be worse than an
+     error: Dovecot's SQL userdb is single-row, so two rows for one username
+     break the lookup for that user entirely and the symptom is a mailbox that
+     resolves for nobody. Cheap insurance against a silent, total failure. --->
 <cfif provisionMode EQ "convert">
     <cfquery name="existingMailbox" datasource="hermes">
         SELECT COUNT(*) AS n FROM mailboxes

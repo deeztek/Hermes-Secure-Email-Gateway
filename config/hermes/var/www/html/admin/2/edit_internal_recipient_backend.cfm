@@ -354,8 +354,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
              ORDER BY recipient ASC
         </cfquery>
 
+        <cfparam name="revert_confirm" default="0">
+        <cfif StructKeyExists(form, "revert_confirm")><cfset revert_confirm = form.revert_confirm></cfif>
+
         <cfif toRevert.recordcount LT 1>
             <cfset m = "error_revert_none">
+        <cfelseif revert_confirm NEQ "1">
+            <!--- Checked on the server as well as the form. This deletes mail. --->
+            <cfset m = "error_revert_unconfirmed">
         <cfelse>
             <cfset revertedCount = 0>
             <cfloop query="toRevert">
@@ -366,10 +372,64 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfinclude template="inc/ldap_remove_user_groups_mailbox.cfm">
                 <cfinclude template="inc/ldap_add_user_groups_relay.cfm">
 
+                <!--- Everything below is scoped to the MAILBOX. The recipient,
+                     its LDAP account, its user_settings and its certificates
+                     are deliberately untouched, because the recipient is not
+                     going away: it goes back to being a relay recipient with
+                     the same login and carries on receiving mail at the
+                     domain's backend.
+
+                     This is why delete_mailbox_action.cfm cannot be reused. It
+                     is correct when the recipient IS the mailbox: it strips the
+                     access-control groups, deletes the recipients row, deletes
+                     the LDAP account and deletes user_settings. Running it here
+                     would delete the person along with the mailbox. --->
+                <cfset revertAddr = toRevert.recipient>
+
                 <cfquery datasource="hermes">
-                    UPDATE mailboxes SET active = 0, modified = NOW()
-                     WHERE username = <cfqueryparam value="#toRevert.recipient#" cfsqltype="cf_sql_varchar">
+                    DELETE FROM sender_login_maps WHERE login_user = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
                 </cfquery>
+                <cfquery datasource="hermes">
+                    DELETE FROM shared_mailbox_permissions WHERE username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfquery datasource="hermes">
+                    DELETE FROM dovecot_acl_shared WHERE to_user = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                       OR from_user = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfquery datasource="hermes">
+                    DELETE FROM dovecot_acl WHERE username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                       OR mailbox LIKE <cfqueryparam value="#revertAddr#/%" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfquery datasource="hermes">
+                    DELETE FROM user_folder_shares WHERE shared_with_username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                       OR owner_username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cfquery datasource="hermes">
+                    DELETE FROM mailbox_aliases WHERE delivers_to = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+                <cftry>
+                    <cfquery datasource="hermes">
+                        DELETE FROM user_vacation WHERE email = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                    </cfquery>
+                <cfcatch type="any"></cfcatch>
+                </cftry>
+
+                <cfquery datasource="hermes">
+                    DELETE FROM mailboxes WHERE username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                </cfquery>
+
+                <!--- The maildir, same path and method delete_mailbox_action.cfm
+                     uses. Non-fatal: a missing directory is the end state we
+                     wanted anyway. --->
+                <cftry>
+                    <cfset revertLocal  = ListFirst(revertAddr, "@")>
+                    <cfset revertDomain = ListLast(revertAddr, "@")>
+                    <cfexecute name="/usr/local/bin/docker"
+                        arguments="exec hermes_dovecot rm -rf /srv/mail/#revertDomain#/#revertLocal#"
+                        variable="revertRmOut" errorVariable="revertRmErr" timeout="120">
+                    </cfexecute>
+                <cfcatch type="any"></cfcatch>
+                </cftry>
 
                 <cfset revertedCount = revertedCount + 1>
             </cfloop>
@@ -389,9 +449,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfquery>
 
             <!--- The domain stays hybrid. Another mailbox may still be hosted
-                 on it, and if this was the last one the deactivated mailbox is
-                 still there to be reactivated, which only works while the
-                 console still treats the domain as able to host mailboxes. --->
+                 on it, and a domain that once hosted one is a domain someone
+                 may host one on again. Nothing breaks from a hybrid domain
+                 with no mailboxes: Postfix never saw the distinction, and the
+                 relay recipients on it are unaffected. --->
 
             <cfset datasource = "hermes">
             <cfinclude template="inc/generate_tls_policy.cfm">
@@ -638,6 +699,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         The mailbox quota must be a number greater than zero.
     </div>
+<cfelseif m EQ "error_revert_unconfirmed">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> Not confirmed</h5>
+        Reverting deletes the mailbox and everything in it, so the confirmation box has to be ticked.
+        Nothing was changed.
+    </div>
 <cfelseif m EQ "error_revert_none">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -781,8 +849,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <input class="form-check-input" type="radio" name="backend_type" id="backend_revert" value="revert">
                     <label class="form-check-label" for="backend_revert">
                         <strong>Revert to Relay Recipient</strong>
-                        <br><small class="text-muted">Undo the conversion. Mail goes to the domain's backend again and the mailbox is deactivated, not deleted, so nothing in it is lost.</small>
+                        <br><small class="text-muted">Undo the conversion. Mail goes to the domain's backend again and the mailbox is deleted.</small>
                     </label>
+                </div>
+
+                <div id="revert_confirm_fields" style="display: none; padding-left: 25px; border-left: 3px solid #dc3545;">
+                    <div class="alert alert-danger py-2">
+                        <small>
+                            <strong>This deletes the <cfif selectedMailboxCount NEQ 1>#selectedMailboxCount# mailboxes<cfelse>mailbox</cfif> and everything in <cfif selectedMailboxCount NEQ 1>them<cfelse>it</cfif>.</strong>
+                            Any mail delivered here since the conversion is removed and cannot be recovered.
+                            <br><br>The <cfif selectedMailboxCount NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif>
+                            not deleted: <cfif selectedMailboxCount NEQ 1>they go<cfelse>it goes</cfif> back to being
+                            a relay recipient, keeps the same login, and receives mail at the domain's backend again.
+                        </small>
+                    </div>
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" name="revert_confirm" id="revert_confirm" value="1">
+                        <label class="form-check-label" for="revert_confirm">
+                            I understand the <cfif selectedMailboxCount NEQ 1>mailboxes<cfelse>mailbox</cfif> and <cfif selectedMailboxCount NEQ 1>their<cfelse>its</cfif> contents will be deleted
+                        </label>
+                    </div>
                 </div>
                 </cfif></cfoutput>
 
@@ -934,10 +1020,16 @@ $(document).ready(function() {
             $('#custom_backend_fields').slideDown();
         } else if (v === 'builtin') {
             $('#custom_backend_fields').slideUp();
+            $('#revert_confirm_fields').slideUp();
             $('#builtin_backend_fields').slideDown();
+        } else if (v === 'revert') {
+            $('#custom_backend_fields').slideUp();
+            $('#builtin_backend_fields').slideUp();
+            $('#revert_confirm_fields').slideDown();
         } else {
             $('#custom_backend_fields').slideUp();
             $('#builtin_backend_fields').slideUp();
+            $('#revert_confirm_fields').slideUp();
         }
     });
 });
