@@ -182,6 +182,33 @@ credential). Everything else is the same work in the same order.
 <!--- 3. INSERT INTO MAILBOXES TABLE (Dovecot userdb).
      enforce_mfa lives on recipients (see step 1 above), not mailboxes,
      because the same column drives both mailbox and relay flows. --->
+<!--- A revert deactivates the mailbox rather than deleting it, so converting
+     the same address again finds a row already there. Inserting a second one
+     would be worse than an error: Dovecot's SQL userdb is single-row, so two
+     rows for one username breaks the lookup for that user entirely. Reactivate
+     and re-apply the settings instead, which also brings back whatever was in
+     the maildir. --->
+<cfif provisionMode EQ "convert">
+    <cfquery name="existingMailbox" datasource="hermes">
+        SELECT COUNT(*) AS n FROM mailboxes
+         WHERE username = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+</cfif>
+
+<cfif provisionMode EQ "convert" AND Val(existingMailbox.n) GTE 1>
+<cfquery name="insertMailbox" datasource="hermes">
+    UPDATE mailboxes SET
+      domain_id         = <cfqueryparam value="#getDomain.id#" cfsqltype="cf_sql_integer">,
+      name              = <cfqueryparam value="#displayName#" cfsqltype="cf_sql_varchar">,
+      first_name        = <cfqueryparam value="#Trim(resolvedFirstName)#" cfsqltype="cf_sql_varchar" null="#(Trim(resolvedFirstName) EQ '')#">,
+      last_name         = <cfqueryparam value="#Trim(resolvedLastName)#" cfsqltype="cf_sql_varchar" null="#(Trim(resolvedLastName) EQ '')#">,
+      quota             = <cfqueryparam value="#quotaBytes#" cfsqltype="cf_sql_bigint">,
+      active            = 1,
+      nextcloud_enabled = <cfqueryparam value="#form.nextcloud_enabled#" cfsqltype="cf_sql_tinyint">,
+      modified          = NOW()
+    WHERE username = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+</cfquery>
+<cfelse>
 <cfquery name="insertMailbox" datasource="hermes">
     INSERT INTO mailboxes
     (domain_id, username, name, first_name, last_name, quota, active,
@@ -198,6 +225,7 @@ credential). Everything else is the same work in the same order.
      NOW(),
      NOW())
 </cfquery>
+</cfif>
 
 <!--- 3b. INSERT INTO SENDER_LOGIN_MAPS (allows user to send as their own address) --->
 <cfquery datasource="hermes">

@@ -392,7 +392,7 @@ a, a:hover{
             <strong>deactivated, not deleted</strong>, so anything already in
             <cfoutput><cfif revertN NEQ 1>them is<cfelse>it is</cfif></cfoutput> still there. Deactivated
             mailboxes stay listed under <strong>Email Server &gt; Mailboxes</strong> with Mail Delivery
-            reading <em>Inactive</em>, so they can be found and either reactivated or deleted.</small></p>
+            reading <em>Orphaned</em>, so they can be found and either reactivated or deleted.</small></p>
         </div>
         <cfset StructDelete(session, "revertCount")>
     <cfelseif session.backendMessage EQ "success_builtin">

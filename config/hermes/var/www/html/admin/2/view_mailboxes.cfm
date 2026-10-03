@@ -283,7 +283,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <strong>deactivated, not deleted</strong>, so anything already in
           <cfoutput><cfif revertN NEQ 1>them is<cfelse>it is</cfif></cfoutput> still there. Deactivated
           mailboxes stay listed under <strong>Email Server &gt; Mailboxes</strong> with Mail Delivery
-          reading <em>Inactive</em>, so they can be found and either reactivated or deleted.</small></p>
+          reading <em>Orphaned</em>, so they can be found and either reactivated or deleted.</small></p>
       </div>
       <cfset StructDelete(session, "revertCount")>
   <cfelseif session.backendMessage EQ "success_builtin">
@@ -424,7 +424,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <option value="Local">Local only</option>
       <option value="Routed">Routed elsewhere</option>
       <option value="Unknown">Unknown (no recipient record)</option>
-      <option value="Inactive">Inactive (reverted, mailbox kept)</option>
+      <option value="Orphaned">Orphaned (reverted, mailbox kept)</option>
     </select>
   </div>
   </cfif>
@@ -535,7 +535,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 box still finds a mailbox by the host its mail goes to. --->
           <cfset deliveryPort = Val(backend_port) GT 0 ? Val(backend_port) : 25>
           <cfif Val(active) NEQ 1>
-            <cfset deliverySearch = "Inactive deactivated reverted to relay recipient orphan">
+            <cfset deliverySearch = "Orphaned inactive deactivated reverted to relay recipient">
           <cfelseif Len(Trim(backend_server))>
             <cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#">
           <cfelseif Val(recipient_id) GT 0>
@@ -549,9 +549,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  the usual place that would show, the Status column, is the
                  last of twenty-three. This is a mailbox left behind by a
                  revert: still on disk, still holding whatever was in it, and
-                 nothing else on the page says so. --->
+                 nothing else on the page says so.
+
+                 "Orphaned" rather than "Inactive" because it is exact. Nothing
+                 else in the application ever writes mailboxes.active, and
+                 there is no active toggle on the mailbox form, so active = 0
+                 can only have come from a revert. --->
             <cfif Val(active) NEQ 1>
-              <span class="badge bg-dark">Inactive</span>
+              <span class="badge bg-dark">Orphaned</span>
               <div class="small text-muted">
                 not receiving mail
                 <cfif Len(Trim(backend_server))><br>was routed to #HTMLEditFormat(backend_server)#:#deliveryPort#</cfif>
