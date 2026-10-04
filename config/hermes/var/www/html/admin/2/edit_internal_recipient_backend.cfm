@@ -224,6 +224,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset selectedMailboxCount = Val(selectedMailboxes.n)>
 
+<!--- Nextcloud is a mailbox attribute: nextcloud_enabled exists on mailboxes
+     and domains, never on recipients, and only the mailbox flows grant or
+     remove cn=nextcloud. So a reverted recipient cannot keep it; there is no
+     column to record it and nothing that would ever clean it up. --->
+<cfquery name="selectedNcMailboxes" datasource="hermes">
+    SELECT COUNT(*) AS n
+      FROM recipients r
+      JOIN mailboxes m ON m.username = r.recipient
+     WHERE r.id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+       AND r.recipient_type = 'mailbox'
+       AND m.nextcloud_enabled = 1
+</cfquery>
+<cfset selectedNcCount = Val(selectedNcMailboxes.n)>
+
 <cfquery name="overrideCount" datasource="hermes">
     SELECT COUNT(*) AS n FROM recipients
      WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
@@ -442,6 +456,25 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <cfquery datasource="hermes">
                         DELETE FROM user_vacation WHERE email = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
                     </cfquery>
+                <cfcatch type="any"></cfcatch>
+                </cftry>
+
+                <!--- Nextcloud, the same two steps delete_mailbox_action.cfm
+                     takes: leave cn=nextcloud, then occ user:delete, which
+                     removes the account's files, mail accounts and app
+                     passwords. A relay recipient has no nextcloud_enabled
+                     column, so leaving either behind would be a state nothing
+                     could see or undo. Non-fatal, as there. --->
+                <cftry>
+                    <cfset ldapUsername = LCase(revertAddr)>
+                    <cfinclude template="inc/ldap_remove_user_groups_nextcloud.cfm">
+                <cfcatch type="any"></cfcatch>
+                </cftry>
+                <cftry>
+                    <cfexecute name="/usr/local/bin/docker"
+                        arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ user:delete #revertAddr#"
+                        variable="revertNcOut" errorVariable="revertNcErr" timeout="120">
+                    </cfexecute>
                 <cfcatch type="any"></cfcatch>
                 </cftry>
 
@@ -918,6 +951,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                             <br><br>The <cfif selectedMailboxCount NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif>
                             not deleted: <cfif selectedMailboxCount NEQ 1>they go<cfelse>it goes</cfif> back to being
                             a relay recipient, keeps the same login, and receives mail at the domain's backend again.
+                            <cfif selectedNcCount GT 0>
+                            <br><br><strong>Nextcloud <cfif selectedNcCount NEQ 1>accounts are<cfelse>access is</cfif> removed too,</strong>
+                            along with <cfif selectedNcCount NEQ 1>their<cfelse>its</cfif> files, calendars and contacts.
+                            Nextcloud belongs to a mailbox, so a relay recipient cannot keep it.
+                            </cfif>
                             <br><br><strong>If you need to keep this mail,</strong> cancel and use
                             <strong>Delete Mailbox &rarr; Convert to a shared mailbox</strong> on the Mailboxes page
                             instead. That keeps the address delivering here and the messages reachable.
