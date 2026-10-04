@@ -171,7 +171,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 </cfloop>
 
-<cfif backendAllSame AND Len(backendSigs[1])>
+<!--- An override pointing at hermes_dovecot IS the built-in server; it is what
+     choosing Built-in writes. Treating it as a Custom backend and filling the
+     host and port boxes with it was true to the data and nonsense to read: the
+     page reported a converted mailbox as a custom backend that happens to be
+     us. --->
+<cfset prefillBuiltin = false>
+<cfif backendAllSame AND Len(backendSigs[1])
+      AND FindNoCase("hermes_dovecot", ListFirst(backendSigs[1], Chr(31))) GT 0>
+    <cfset prefillBuiltin = true>
+</cfif>
+
+<cfif backendAllSame AND Len(backendSigs[1]) AND NOT prefillBuiltin>
     <!--- includeEmptyFields, because an empty TLS mode would otherwise shift
          the port into its place. --->
     <cfset sigParts = ListToArray(backendSigs[1], Chr(31), true)>
@@ -185,8 +196,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- A failed save redisplays what was typed, not what is stored. --->
 <cfif StructKeyExists(form, "backend_type")>
-    <cfset prefillCustom = (form.backend_type EQ "custom")>
-    <cfset prefillMixed  = false>
+    <cfset prefillCustom  = (form.backend_type EQ "custom")>
+    <cfset prefillBuiltin = (form.backend_type EQ "builtin")>
+    <cfset prefillMixed   = false>
 </cfif>
 <cfif StructKeyExists(form, "custom_server")><cfset prefillServer = form.custom_server></cfif>
 <cfif StructKeyExists(form, "custom_port") AND Len(Trim(form.custom_port))><cfset prefillPort = form.custom_port></cfif>
@@ -255,6 +267,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      ORDER BY ma.alias_address ASC
 </cfquery>
 <cfset selectedAliasCount = selectedAliasesIn.recordcount>
+
+<!--- Exemptions pointing an address at itself. Converting creates these to lift
+     a recipient out of a domain catch-all, and only ever for addresses nobody
+     had made an individual decision about.
+
+     Reverting removes them, because otherwise reverting is not a revert: before
+     the conversion the catch-all applied and mail went to its target, and
+     leaving the entry behind means mail now goes to the domain's backend under
+     the recipient's own name instead. A silent change in where someone's mail
+     ends up, caused by undoing something.
+
+     Identified by system = '3', which only the conversion writes, rather than
+     by the row pointing at itself. There is no history of what a conversion
+     did, so without a marker this would be a guess from the shape of the row,
+     and it would take an exemption somebody created by hand along with it. --->
+<!--- virtual_recipients only. A conversion can also write the exemption into
+     mailbox_aliases, when that is where the catch-all lives, but those are
+     already counted and removed by the alias handling above: a self-pointing
+     alias has delivers_to equal to the address, so the existing "aliases
+     delivering to this mailbox" query and deletion cover it. Counting it here
+     too would report it twice. mailbox_aliases has no system column to mark
+     either way. --->
+<cfquery name="selectedSelfExempt" datasource="hermes">
+    SELECT vr.virtual_address AS addr, 'virtual' AS src
+      FROM virtual_recipients vr
+      JOIN recipients r ON LOWER(r.recipient) = LOWER(vr.virtual_address)
+     WHERE r.id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+       AND r.recipient_type = 'mailbox'
+       AND vr.system = '3'
+</cfquery>
+<cfset selectedExemptCount = selectedSelfExempt.recordcount>
 
 <cfquery name="overrideCount" datasource="hermes">
     SELECT COUNT(*) AS n FROM recipients
@@ -563,6 +606,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfquery datasource="hermes">
                     DELETE FROM mailbox_aliases WHERE delivers_to = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
                 </cfquery>
+
+                <!--- The exemption a conversion created, identified by its
+                     marker rather than by its shape. Removed so the domain
+                     catch-all applies to this address again, which is where it
+                     was before converting; leaving it behind would silently
+                     change where the mail goes as a result of undoing
+                     something.
+
+                     system = '3' is only ever written by the conversion above,
+                     so an entry you made by hand is never touched, whatever it
+                     points at. --->
+                <cfquery datasource="hermes">
+                    DELETE FROM virtual_recipients
+                     WHERE LOWER(virtual_address) = <cfqueryparam value="#LCase(revertAddr)#" cfsqltype="cf_sql_varchar">
+                       AND system = '3'
+                </cfquery>
                 <cftry>
                     <cfquery datasource="hermes">
                         DELETE FROM user_vacation WHERE email = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
@@ -787,10 +846,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                                          WHERE LOWER(virtual_address) = <cfqueryparam value="#LCase(recipientEmail)#" cfsqltype="cf_sql_varchar">
                                     </cfquery>
                                     <cfif Val(exExists.n) LT 1>
+                                        <!--- system = '3' marks this as created by a
+                                             conversion, so reverting can remove exactly
+                                             what converting added instead of guessing from
+                                             the shape of the row. '1' is system-managed and
+                                             '2' is user-created; Postfix does not read the
+                                             column, and the Virtual Recipients list does not
+                                             filter on it, so a '3' is still visible and
+                                             editable like any other. --->
                                         <cfquery datasource="hermes">
                                             INSERT INTO virtual_recipients (virtual_address, maps, system)
                                             VALUES (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
-                                                    <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">, '2')
+                                                    <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">, '3')
                                         </cfquery>
                                     </cfif>
                                 <cfelse>
@@ -990,7 +1057,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <div class="col-md-4 col-sm-6 mb-2">
                     <span class="badge bg-secondary me-1"><i class="fas fa-envelope me-1"></i>#recipient#</span>
                     <cfif Len(Trim(backend_server)) GT 0>
+                        <!--- Name it rather than print the container host. The
+                             built-in server reading as "hermes_dovecot:24" is
+                             accurate and tells an administrator nothing. --->
+                        <cfif FindNoCase("hermes_dovecot", backend_server) GT 0>
+                            <small class="text-success">(built-in email server)</small>
+                        <cfelse>
                         <small class="text-primary">(#backend_server#:#backend_port#)</small>
+                        </cfif>
                     <cfelse>
                         <small class="text-muted">(domain default)</small>
                     </cfif>
@@ -1030,7 +1104,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                      to deliver into, so one is created, which is why this
                      option carries settings and the other two do not. --->
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin"<cfoutput><cfif prefillBuiltin> checked</cfif></cfoutput>>
                     <label class="form-check-label" for="backend_builtin">
                         <strong>Built-in Email Server</strong>
                         <br><small class="text-muted">Host these recipients' mail on Hermes instead of sending it on. Creates a mailbox for each one, keeping their existing login.</small>
@@ -1086,6 +1160,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                             <br><br>The <cfif selectedMailboxCount NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif>
                             not deleted: <cfif selectedMailboxCount NEQ 1>they go<cfelse>it goes</cfif> back to being
                             a relay recipient, keeps the same login, and receives mail at the domain's backend again.
+                            <cfif selectedExemptCount GT 0>
+                            <br><br><strong>#selectedExemptCount# catch-all
+                            <cfif selectedExemptCount NEQ 1>exemptions are<cfelse>exemption is</cfif> removed</strong>,
+                            so the domain's catch-all applies to
+                            <cfif selectedExemptCount NEQ 1>these addresses<cfelse>this address</cfif>
+                            again, exactly as before the conversion.
+                            </cfif>
                             <cfif selectedAliasCount GT 0>
                             <br><br><strong>#selectedAliasCount# alias<cfif selectedAliasCount NEQ 1>es</cfif>
                             delivering to <cfif selectedMailboxCount NEQ 1>these mailboxes<cfelse>this mailbox</cfif>
@@ -1170,7 +1251,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                    certificates   no S/MIME is minted here. Existing
                                   certificates are untouched, and a new one can
                                   be issued afterwards as usual --->
-            <div id="builtin_backend_fields" style="display: none; padding-left: 25px; border-left: 3px solid #198754;">
+            <div id="builtin_backend_fields" style="<cfoutput><cfif prefillBuiltin>display: block;<cfelse>display: none;</cfif></cfoutput> padding-left: 25px; border-left: 3px solid #198754;">
                 <div class="alert alert-info py-2">
                     <small><strong>Each selected recipient gets a mailbox on this server.</strong>
                     Their existing login still works, nothing is sent to the old backend any more,
