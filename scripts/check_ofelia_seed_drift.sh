@@ -70,59 +70,128 @@ trap 'rm -f "$EXPECTED" "$ACTUAL"' EXIT
 python3 - "$SEED_SQL" > "$EXPECTED" <<'PY'
 import sys
 
-src = open(sys.argv[1], encoding='utf-8').read()
+import re
 
-PREFIX = "INSERT IGNORE INTO `ofelia_jobs`"
+src = open(sys.argv[1], encoding='utf-8').read()
 
 # Legacy positional order, used only when a row does not name its columns.
 LEGACY = ['id', 'job_name', 'schedule', 'command', 'container', 'image',
           'user', 'volume', 'network', 'type', 'active', 'no_overlap']
 
-for line in src.splitlines():
-    if not line.startswith(PREFIX):
-        continue
+def split_values(body):
+    """Split on commas outside single quotes. Backslash is a SQL escape.
 
-    # Rows may name their columns, which they have to once a column is added
-    # anywhere but the end. Read the names when they are there and map by name,
-    # so this check follows the schema instead of constraining it.
-    rest = line[len(PREFIX):].lstrip()
-    if rest.startswith('('):
-        cols = [c.strip().strip('`') for c
-                in rest[1:rest.index(')')].split(',')]
-        rest = rest[rest.index(')') + 1:].lstrip()
-        if not rest.startswith('VALUES'):
-            sys.exit("malformed ofelia_jobs row: %s" % line[:80])
-        vals = rest[len('VALUES'):].lstrip()
-    else:
-        cols = LEGACY
-        if not rest.startswith('VALUES'):
-            continue
-        vals = rest[len('VALUES'):].lstrip()
-
-    body = vals[vals.index('(') + 1:vals.rindex(')')]
-    # Split on commas outside single quotes; \" is a SQL escape for a literal ".
+    Whitespace OUTSIDE the quotes is dropped and whitespace inside is kept
+    exactly. Both matter: the multi-line INSERT..SELECT form indents its values
+    across several lines, while at least one schedule is stored with a leading
+    space inside its quotes that the generator emits verbatim. Stripping the
+    field afterwards would lose the second; not stripping would keep the
+    first."""
     fields, cur, inq, i = [], '', False, 0
     while i < len(body):
         c = body[i]
-        if c == '\\':
+        if c == '\\' and inq:
             cur += body[i + 1]; i += 2; continue
         if c == "'":
             inq = not inq; i += 1; continue
         if c == ',' and not inq:
             fields.append(cur); cur = ''; i += 1; continue
+        if not inq and c in ' \t\r\n':
+            i += 1; continue
         cur += c; i += 1
     fields.append(cur)
+    return fields
+
+# Statement-based, not line-based, and comment-aware.
+#
+# A row seeded with
+#   INSERT INTO `ofelia_jobs` (cols) SELECT vals WHERE NOT EXISTS (...)
+# spans several lines and is the form used when there is no unique key to
+# dedupe on. The previous parser read a line at a time and matched only the
+# single-line INSERT IGNORE ... VALUES form, so it could not see those at all.
+# hermes-directory-sync was seeded that way, missing from the shipped
+# config.ini, and reported as no drift for an entire release. That is precisely
+# the failure this check exists to prevent, so both forms are read now and a
+# shape it does not recognise is a hard error rather than a silent skip.
+def split_statements(sql):
+    """Split on semicolons OUTSIDE quoted strings and outside -- comments.
+
+    A naive split(';') breaks any statement whose values contain a semicolon,
+    and at least one job description does. mysql itself parses this correctly
+    when the file is piped in, so the SQL is valid and only this check was
+    wrong."""
+    out, cur, i, inq, incomment = [], '', 0, False, False
+    while i < len(sql):
+        c = sql[i]
+        if incomment:
+            cur += c
+            if c == '\n': incomment = False
+            i += 1; continue
+        if not inq and c == '-' and sql[i:i + 2] == '--':
+            incomment = True; cur += c; i += 1; continue
+        if c == '\\' and inq:
+            cur += sql[i:i + 2]; i += 2; continue
+        if c == "'":
+            if inq and sql[i:i + 2] == "''":
+                cur += "''"; i += 2; continue
+            inq = not inq; cur += c; i += 1; continue
+        if c == ';' and not inq:
+            out.append(cur); cur = ''; i += 1; continue
+        cur += c; i += 1
+    out.append(cur)
+    return out
+
+for stmt in split_statements(src):
+    stmt = "\n".join(l for l in stmt.split("\n")
+                      if not l.strip().startswith('--')).strip()
+    low = stmt.lower()
+    if not low.startswith('insert ') or '`ofelia_jobs`' not in low:
+        continue
+
+    rest = stmt[stmt.index('`ofelia_jobs`') + len('`ofelia_jobs`'):].strip()
+
+    if rest.startswith('('):
+        depth, i = 0, 0
+        while i < len(rest):
+            if rest[i] == '(': depth += 1
+            elif rest[i] == ')':
+                depth -= 1
+                if depth == 0: break
+            i += 1
+        cols = [c.strip().strip('`') for c in rest[1:i].split(',')]
+        rest = rest[i + 1:].strip()
+    else:
+        cols = LEGACY
+
+    if rest.lower().startswith('values'):
+        vals = rest[len('values'):].strip()
+        body = vals[vals.index('(') + 1:vals.rindex(')')]
+    elif rest.lower().startswith('select'):
+        body = rest[len('select'):]
+        cut = re.search(r'\s+FROM\s+DUAL\b|\s+WHERE\s+NOT\s+EXISTS\b',
+                        body, re.IGNORECASE)
+        if not cut:
+            sys.exit("ofelia_jobs INSERT..SELECT with no WHERE NOT EXISTS: %s"
+                     % stmt[:80])
+        body = body[:cut.start()].strip()
+    else:
+        sys.exit("unrecognised ofelia_jobs insert: %s" % stmt[:80])
+
+    fields = split_values(body)
     if len(fields) != len(cols):
         sys.exit("ofelia_jobs row has %d values for %d columns: %s"
-                 % (len(fields), len(cols), line[:80]))
+                 % (len(fields), len(cols), stmt[:80]))
     row = dict(zip(cols, fields))
     for required in ('job_name', 'schedule', 'command', 'container',
                      'active', 'no_overlap'):
         if required not in row:
-            sys.exit("ofelia_jobs row omits %s: %s" % (required, line[:80]))
+            sys.exit("ofelia_jobs row omits %s: %s" % (required, stmt[:80]))
+
+    # Not stripped: the generator emits these verbatim, and one schedule is
+    # stored with a leading space inside its quotes.
     name, sched = row['job_name'], row['schedule']
     cmd, cont = row['command'], row['container']
-    active, no_overlap = row['active'].strip(), row['no_overlap'].strip()
+    active, no_overlap = row['active'], row['no_overlap']
     if active != '1':
         continue                     # generator selects WHERE active = '1'
     print()

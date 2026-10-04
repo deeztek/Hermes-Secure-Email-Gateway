@@ -91,6 +91,32 @@ UPDATE `ofelia_jobs` SET `description` =
   WHERE `job_name` LIKE '%hermes-refresh-network-aliases%';
 
 -- ---------------------------------------------------------------------
+-- 2b. Directory sync: a description, and an hour instead of six
+--
+-- The job was seeded by v260918 with INSERT .. SELECT .. WHERE NOT EXISTS
+-- rather than INSERT IGNORE, which is why it had no description after section
+-- 2 above: that section matches on job_name and the row was there, but the
+-- sweep that wrote the descriptions into the baseline missed this form.
+--
+-- Six hours was too long. Connections with auto-apply enabled create their
+-- recipients during the sync, so the interval is how long a new account at the
+-- provider waits before it can receive mail here. An hour is still only
+-- twenty-four runs a day, and Run Now covers the impatient case.
+--
+-- Only the shipped schedule is changed. An operator who has set their own is
+-- left alone.
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+UPDATE `ofelia_jobs` SET `description` =
+  'Enumerates every enabled directory connection and stages the addresses it finds. Connections with auto-apply switched on also get their recipients created here, so this interval is how long a new account at the provider waits before it can receive mail through Hermes. Run Now forces it.'
+  WHERE `job_name` LIKE '%hermes-directory-sync%';
+
+UPDATE `ofelia_jobs` SET `schedule` = '@every 1h'
+  WHERE `job_name` LIKE '%hermes-directory-sync%'
+    AND `schedule` = '@every 6h';
+
+-- ---------------------------------------------------------------------
 -- 3. Bound Dovecot's log files
 --
 -- Dovecot writes dovecot.log, dovecot-info.log and dovecot-debug.log and grew
