@@ -137,15 +137,14 @@ does, and when somebody leaves their **Sent** folder is often what colleagues
 need most. Existing shared mailboxes pick this up the next time their
 membership is changed.
 
-Two things worth knowing in a mail client:
+Members are subscribed to those folders automatically, so they appear in a mail
+client without anyone hunting for them. That is what the **Auto Subscribe**
+setting on a shared mailbox has always said it did; until now nothing read it,
+and it could be set either way with no effect. Turn it off and members are
+given access without the folders being added to their client.
 
-There is no "Inbox" underneath the shared mailbox. The shared mailbox entry
-itself is the inbox.
-
-The subfolders are reachable but are not advertised when a client asks for the
-folder list, so they may need adding by name, as `Shared/<address>/Sent` and so
-on. This is how Dovecot handles shared mailboxes rather than something specific
-to Hermes.
+One thing worth knowing in a mail client: there is no "Inbox" underneath the
+shared mailbox. The shared mailbox entry itself is the inbox.
 
 This is the Microsoft 365 behaviour, and it is what the old "also delete all
 email messages" checkbox was reaching for. Unticking that used to delete the
