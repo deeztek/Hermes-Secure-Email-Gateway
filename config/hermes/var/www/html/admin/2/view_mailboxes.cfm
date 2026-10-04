@@ -309,12 +309,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <p class="mb-0"><small>Their domain is now a hybrid domain, so these appear under
           <strong>Email Server &gt; Mailboxes</strong>. Recipients you did not convert carry on
           going to the provider as before.</small></p>
-            <cfif builtinE GT 0>
-  <p class="mb-0 mt-2"><small><strong>#builtinE#</strong> catch-all
-  <cfif builtinE NEQ 1>exemptions were<cfelse>exemption was</cfif> created so their mail
-  reaches the new <cfif builtinE NEQ 1>mailboxes<cfelse>mailbox</cfif>. The rest of the
-  domain is redirected exactly as before.</small></p>
-  </cfif>
+          <cfoutput><cfif builtinE GT 0>
+          <p class="mb-0 mt-2"><small><strong>#builtinE#</strong> catch-all
+          <cfif builtinE NEQ 1>exemptions were<cfelse>exemption was</cfif> created so their mail
+          reaches the new <cfif builtinE NEQ 1>mailboxes<cfelse>mailbox</cfif>. The rest of the
+          domain is redirected exactly as before.</small></p>
+          </cfif></cfoutput>
 <cfif Len(Trim(builtinS))>
           <p class="mb-0 mt-2"><small><strong>Skipped, no matching domain record:</strong>
           <cfoutput>#HTMLEditFormat(builtinS)#</cfoutput></small></p>
