@@ -1,25 +1,42 @@
 # Hermes SEG v260929
 
-**Per-recipient mail routing.** A setting that has been storable since early 2026
-and never affected delivery now works, and it is available on mailboxes as well as
-relay recipients.
+**Host some of a domain's mail yourself and relay the rest.** A company paying a
+provider per mailbox can keep the few people who need that provider and host
+everyone else on Hermes, on the same domain, without rebuilding anything. Fifty
+seats become ten.
 
-No schema change. No image rebuild.
+Around that: a mailbox can be converted to a shared one when its owner leaves,
+a conversion can be undone, scheduled tasks say what they are for, and Dovecot's
+log files stop growing forever.
+
+Schema changes, no image rebuild.
 
 ## Read this first
 
-Two things change behaviour on upgrade. Both are narrow, and both are easy to
+Four things change behaviour on upgrade. All are narrow, and all are easy to
 check before you start.
 
-**Existing backend overrides start working.** If anyone has ever set a per-recipient
-backend override, it has had no effect on delivery until now. After this upgrade it
-is honoured, so that recipient's mail goes where the setting says rather than where
-it has actually been going. Review them under **Email Relay > Relay Recipients**,
-where the Backend column shows each one.
+**Existing backend overrides start working.** If anyone has ever set a
+per-recipient backend override, it has had no effect on delivery until now.
+After this upgrade it is honoured, so that recipient's mail goes where the
+setting says rather than where it has actually been going. Review them under
+**Email Relay > Relay Recipients**, where the Backend column shows each one.
 
-**Auto-provisioning stops targeting mailbox domains.** It only ever creates relay
-recipients, which a mailbox domain rejects, so this corrects a configuration that
-could not work. Nothing already provisioned is removed.
+**Auto-provisioning stops targeting mailbox domains.** It only ever creates
+relay recipients, which a mailbox domain rejects, so this corrects a
+configuration that could not work. Nothing already provisioned is removed.
+
+**Directory sync runs every fifteen minutes instead of every six hours.** On
+connections with auto-apply enabled, that interval is how long a new account at
+the provider waits before it can receive mail here, so six hours was too long.
+Only installations still on the shipped schedule are changed; if you set your
+own, it is left alone.
+
+**Deleting a mailbox no longer offers to keep the messages.** It offered that as
+a checkbox, and unticking it deleted the mailbox, the account and the recipient
+while leaving the messages on disk with nothing referencing them. The option is
+replaced by converting the mailbox to a shared one, which keeps the mail
+reachable instead of merely undeleted.
 
 Everything else is unchanged.
 
@@ -60,18 +77,30 @@ delete the domain, recreate it as a relay domain, and rebuild everything.
 Now it is one setting on one mailbox, and the mailbox itself is left alone.
 
 **The mailbox is kept, not deleted.** Its mail simply arrives somewhere else from
-then on. Anything already in it stays where it is. Clearing the override sends new
-mail back to the local mailbox again.
+then on. Anything already in it stays where it is, and on a mailbox domain
+clearing the override sends new mail back to the local mailbox again.
 
-### Seeing which mailboxes are affected
+### Seeing where a mailbox's mail goes
 
-A mailbox whose mail goes elsewhere looks identical to every other mailbox in every
-other column, so the Mailboxes list gained a **Mail Delivery** column showing where
-each one's mail actually goes, and a **Delivery** filter for narrowing the list to
-those routed away.
+A mailbox whose mail goes elsewhere looks identical to every other mailbox in
+every other column, so the Mailboxes list gained a **Mail Delivery** column and
+a **Delivery** filter. The column says what is actually true rather than what
+was configured:
 
-A mailbox with no recipient record reads **Unknown** rather than Local, because no
-routing record is not the same thing as delivering locally.
+| | |
+| --- | --- |
+| **Local** | Delivered to this mailbox |
+| **Kept here (converted)** | Delivered here by an override of its own, while the rest of the domain relays elsewhere. This is a converted recipient |
+| **Routed** | Sent to another server, naming it |
+| **Not delivered here** | The domain sends this address elsewhere and the mailbox receives nothing. Shown in red, because it is broken rather than configured |
+| **Unknown** | No routing record exists at all, which is not the same as delivering locally |
+
+The filter offers only the states a mailbox is actually in, and does not appear
+at all when every mailbox is in the same state.
+
+That red state is worth knowing about. The column used to read "no override" as
+"delivered locally", which is true on a mailbox domain and false on a domain
+that relays, so a mailbox receiving nothing showed a healthy green badge.
 
 ## Keep the executives on Microsoft 365 and host everyone else here
 
@@ -105,6 +134,29 @@ was created, so the mailbox is not called `jsmith`.
 
 Nothing is minted that was not there before. No new certificates are issued by
 a conversion, and existing ones are untouched.
+
+### Addresses that are redirected elsewhere
+
+Postfix rewrites a redirected recipient before it works out where to deliver, so
+an address covered by a **Virtual Recipient** entry, or by a `@domain` catch-all,
+would get a mailbox here and never receive anything. Every check would pass and
+the mailbox would stay empty.
+
+Converting now looks first.
+
+Where the only thing redirecting an address is the domain's catch-all, the
+conversion offers to create an entry pointing that address at itself, which
+lifts it out of the catch-all. Postfix prefers a specific entry over a
+catch-all, so the rest of the domain carries on being redirected exactly as
+before. That is ticked by default and is what makes converting forty people
+practical; without it you would be creating forty entries by hand.
+
+Where an address has an entry of its own pointing somewhere else, the conversion
+is refused and says which. Somebody deliberately forwards that address, and
+quietly overwriting it would be wrong.
+
+Reverting removes the entries the conversion created, and only those. An entry
+you made by hand is never touched.
 
 ### Their domain becomes a hybrid domain
 
@@ -241,6 +293,16 @@ and on the fact that fail2ban protects every edition.
 **The Relay Recipients documentation** described the backend override as working.
 Corrected, and now accurate either way.
 
+**Directory sync was missing from the shipped scheduler config.** It is seeded
+into the task table and was absent from the file the scheduler actually reads,
+so there was a window on a fresh install where directory enumeration did not
+run. The check that exists to catch exactly that could not see the job, because
+it only understood one of the two ways a task is seeded. Both fixed.
+
+**Disabling a critical task now says what will happen.** It recited the same
+four reasons whatever you were disabling, which stopped being true as soon as
+anything else was added to the list.
+
 ## Upgrading
 
 Standard procedure. No manual steps.
@@ -252,8 +314,20 @@ sudo ./scripts/system_update_docker.sh v260929
 
 Take a backup or a snapshot first, as always.
 
-One file is rewritten in place during the upgrade: the Postfix transport lookup,
-so that it consults recipient overrides. Your database credentials are read out
-of the existing file and carried across, and a timestamped copy is kept beside
-it. If the upgrade cannot read those credentials it leaves the file alone and
-says so, in which case overrides stay inert and nothing else is affected.
+### What the upgrade changes
+
+**Two columns are added.** `recipients.backend_transport` records whether a
+routed recipient is reached over SMTP or delivered to the built-in server, which
+cannot be inferred from an address. `ofelia_jobs.description` holds what each
+scheduled task is for. Both are additive and empty means what it meant before.
+
+**One file is rewritten in place:** the Postfix transport lookup, so that it
+consults recipient overrides. Your database credentials are read out of the
+existing file and carried across, and a timestamped copy is kept beside it. If
+the upgrade cannot read those credentials it leaves the file alone and says so,
+in which case overrides stay inert and nothing else is affected.
+
+**The first log rotation runs at 02:15** the night after you upgrade. On a
+server that has been running a while, and particularly one that had Dovecot
+debug logging switched on at some point, this may spend a few minutes
+compressing. It runs at low priority and does not interrupt mail.
