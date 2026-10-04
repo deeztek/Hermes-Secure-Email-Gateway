@@ -458,20 +458,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfloop query="getMailboxes">
         <cfset deliveryStatesPresent[getMailboxes.delivery_state] = true>
     </cfloop>
-    <cfset showLocal   = StructKeyExists(deliveryStatesPresent, "local_override")
-                      OR StructKeyExists(deliveryStatesPresent, "local_domain")>
-    <cfset showRouted  = StructKeyExists(deliveryStatesPresent, "routed")>
-    <cfset showStranded = StructKeyExists(deliveryStatesPresent, "not_delivered")>
-    <cfset showUnknown = StructKeyExists(deliveryStatesPresent, "unknown")>
+    <!--- One option per state, no collapsing. An earlier version folded
+         "delivered here because the domain does" and "kept here by its own
+         override" into a single Local option, which is precisely the
+         distinction worth filtering on: the second is a converted recipient on
+         a hybrid domain, sitting among ordinary mailboxes. Folding them also
+         meant a host with only those two states offered one option, so the
+         filter hid itself.
 
-    <!--- A filter offering one option filters nothing. --->
-    <cfset deliveryOptionCount = (showLocal ? 1 : 0) + (showRouted ? 1 : 0)
-                               + (showStranded ? 1 : 0) + (showUnknown ? 1 : 0)>
-    <cfif deliveryOptionCount GT 1>
+         A filter offering one option filters nothing, so it still hides when
+         every mailbox is in the same state, which on a plain mailbox domain
+         they all are. --->
+    <cfset showKept     = StructKeyExists(deliveryStatesPresent, "local_override")>
+    <cfset showLocal    = StructKeyExists(deliveryStatesPresent, "local_domain")>
+    <cfset showRouted   = StructKeyExists(deliveryStatesPresent, "routed")>
+    <cfset showStranded = StructKeyExists(deliveryStatesPresent, "not_delivered")>
+    <cfset showUnknown  = StructKeyExists(deliveryStatesPresent, "unknown")>
+
+    <cfif StructCount(deliveryStatesPresent) GT 1>
     <label class="mb-0 ms-3"><strong>Delivery:</strong></label>
     <select class="form-control form-control-sm" id="deliveryFilter" style="width:auto;">
       <option value="">All</option>
-      <cfif showLocal><option value="Local">Local only</option></cfif>
+      <cfif showLocal><option value="Local">Local</option></cfif>
+      <cfif showKept><option value="Kept">Kept here (converted)</option></cfif>
       <cfif showRouted><option value="Routed">Routed elsewhere</option></cfif>
       <cfif showStranded><option value="Elsewhere">Not delivered here (needs attention)</option></cfif>
       <cfif showUnknown><option value="Unknown">Unknown (no recipient record)</option></cfif>
@@ -611,7 +620,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfset deliveryPort  = Val(backend_port) GT 0 ? Val(backend_port) : 25>
           <cfset deliveryState = delivery_state>
           <cfswitch expression="#deliveryState#">
-            <cfcase value="local_override"><cfset deliverySearch = "Local delivered here built-in"></cfcase>
+            <cfcase value="local_override"><cfset deliverySearch = "Kept here converted override local"></cfcase>
             <cfcase value="routed"><cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#"></cfcase>
             <cfcase value="unknown"><cfset deliverySearch = "Unknown no recipient record"></cfcase>
             <cfcase value="local_domain"><cfset deliverySearch = "Local domain delivers here"></cfcase>
