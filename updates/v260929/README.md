@@ -6,8 +6,14 @@ everyone else on Hermes, on the same domain, without rebuilding anything. Fifty
 seats become ten.
 
 Around that: a mailbox can be converted to a shared one when its owner leaves,
-a conversion can be undone, scheduled tasks say what they are for, and Dovecot's
-log files stop growing forever.
+a conversion can be undone, and scheduled tasks say what they are for.
+
+This release also closes a class of problem rather than one instance of it.
+Nothing in Hermes rotated most of its log files, upgrading never reclaimed the
+disk the previous release's images were using, and a Nextcloud upgrade across
+two major versions would fail partway through. All three end the same way, with
+a full disk and mail being deferred, and none of them look like a disk problem
+when they happen.
 
 Schema changes, no image rebuild.
 
@@ -266,19 +272,69 @@ console were side effects of unrelated work, and outside it meant a shell.
 
 There is now an **Apply Schedule** button on the Scheduled Tasks page.
 
-## Dovecot's log files are no longer unbounded
+## Log files no longer grow forever
 
-Dovecot wrote three log files and nothing ever rotated them. On a server where
-debug logging had been switched on at some point, one of them had reached
-1.5 GB. A full disk defers all mail, so this was a real risk rather than
-untidiness.
+Hermes wrote eight separate log volumes and rotated two of them. The other six
+grew without limit: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx.
+On a long-running server the Postfix log volume had reached 20 GB and one
+Dovecot log 1.5 GB.
 
-They are now rotated nightly, compressed, and kept for 30 days, the same as
-the Authelia logs already were.
+The cause is the same for all of them and is not per-service. No Hermes
+container image runs cron, so the `logrotate` configuration that the Ubuntu
+packages install inside those images is present and never executed. Rotation
+only ever happened where something scheduled it explicitly, and only two
+volumes had that.
 
-The first rotation after upgrading will compress whatever has accumulated,
-which on a long-running server can take a few minutes at 02:15 and is a
-one-off.
+All eight are now rotated nightly, compressed, and kept for as many days as the
+**Log Retention** period under **System > System Logs**. That setting already
+controlled how long log entries survive in the searchable database; it now
+governs the files those entries came from as well, so there is one number rather
+than two.
+
+Nextcloud is handled separately: it rotates its own log, and this release pins
+the ceiling at 50 MB rather than leaving it at whatever the bundled release
+happens to default to.
+
+Two containers were also logging their own output without any size cap, which
+accumulated outside the storage tiers you sized. Both are capped now, the same
+as the other sixteen already were.
+
+The first rotation after upgrading compresses whatever has accumulated. On a
+long-running server that can take a few minutes, runs at 02:45 at low priority,
+and does not interrupt mail.
+
+## Upgrading no longer fills the disk by itself
+
+Every release pulls a full set of images and nothing ever removed any. Twelve
+images arrive per release and it accrued forever. A long-running install was
+observed holding 157 images and 50 GB, 86% of it reclaimable, on the Docker root
+rather than on any of the four storage tiers you size and watch.
+
+Upgrading now reclaims that, after the upgrade has otherwise finished so a
+failed run never deletes anything it may still need. It keeps the release you
+just moved to **and the one before it**, because reverting to the previously
+cached release is the documented way back and removing it would take away the
+rollback. Images that are not Hermes images are never touched.
+
+## A Nextcloud upgrade that cannot work now says so first
+
+Nextcloud major versions have to be applied one at a time. The updater ran a
+single upgrade step regardless, which is correct for one hop and wrong for
+anything else, so an installation that had skipped a Hermes release could arrive
+two majors behind and fail partway through, leaving Nextcloud half-upgraded.
+
+It now checks first and refuses, before changing anything, naming what to do:
+upgrade through the intervening releases one at a time. Nothing can be automated
+here, because each hop needs that release's Nextcloud image and only one is
+published per release. A clear refusal is the whole improvement.
+
+This release does not change the bundled Nextcloud version, which is the point
+of shipping the check now. It is in place and inert before the release that
+needs it, rather than being new on the upgrade it has to catch.
+
+Also in the same area: Nextcloud needs a temp directory that nothing created,
+and the next major will not complete an upgrade without one. It is created and
+configured now, on both fresh installs and upgrades, so it is already there.
 
 ## Also in this release
 
@@ -302,6 +358,25 @@ it only understood one of the two ways a task is seeded. Both fixed.
 **Disabling a critical task now says what will happen.** It recited the same
 four reasons whatever you were disabling, which stopped being true as soon as
 anything else was added to the list.
+
+**Legacy migration now refuses to run from the wrong release.** v260912 is the
+final release that supports migrating from a bare-metal installation, and the
+script said so in a comment that nothing enforced. Run from a later checkout it
+would have appeared to succeed while recording the gateway as a release it had
+not actually been migrated to, marking every release in between as already
+applied. It now refuses and names the two steps: migrate on v260912, then
+upgrade normally.
+
+**System Logs now says what it cannot show you.** The page searches the log
+database, which carries Postfix, the mail filter, DMARC and LDAP. Everything
+else writes to a file and was simply absent with no indication that it existed.
+A new panel lists each of those twelve sources, what it covers, and the command
+that reads it.
+
+**Six configuration files that looked like working log rotation were deleted.**
+They described rotating Dovecot's logs, were mounted nowhere, and sat in images
+with no `logrotate` installed. Anyone auditing this for log rotation would have
+found them and reasonably concluded it was handled.
 
 ## Upgrading
 
@@ -327,7 +402,15 @@ existing file and carried across, and a timestamped copy is kept beside it. If
 the upgrade cannot read those credentials it leaves the file alone and says so,
 in which case overrides stay inert and nothing else is affected.
 
-**The first log rotation runs at 02:15** the night after you upgrade. On a
-server that has been running a while, and particularly one that had Dovecot
-debug logging switched on at some point, this may spend a few minutes
+**The first log rotation runs at 02:15 and 02:45** the night after you upgrade.
+On a server that has been running a while this may spend a few minutes
 compressing. It runs at low priority and does not interrupt mail.
+
+**Three containers are recreated rather than restarted.** The application
+container gains the six log volumes so one task can rotate them all, and the
+web server and directory containers gain a log size cap. A changed volume or
+logging definition means Compose recreates the container rather than restarting
+it, which is normal and takes seconds.
+
+**Superseded images are removed at the end.** The release you upgrade from is
+kept, so the rollback path is intact. Anything older than that is deleted.
