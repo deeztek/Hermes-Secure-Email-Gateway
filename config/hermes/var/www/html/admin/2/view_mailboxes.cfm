@@ -224,6 +224,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h4><i class="icon fa fa-ban"></i> Send As Not Updated</h4>
     <p class="mb-0">The Send As permissions could not be saved and nothing was changed. Reload the page and try again.</p>
   </div>
+<cfelseif m EQ 62>
+  <cfset sharedAddr = StructKeyExists(session, "sharedConvertedAddr") ? session.sharedConvertedAddr : "">
+  <cfset session.sharedConvertedAddr = "">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Converted to a shared mailbox</h4>
+    <p class="mb-1"><cfoutput><strong>#HTMLEditFormat(sharedAddr)#</strong></cfoutput> is now a shared mailbox.
+    Every message is still there and it carries on receiving mail at the same address. The user's login
+    has been removed.</p>
+    <p class="mb-0"><small><strong>Nobody can open it yet.</strong> Assign members under
+    <a href="view_shared_mailboxes.cfm">Email Server &gt; Shared Mailboxes</a>.</small></p>
+  </div>
 <cfelseif m EQ 100>
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -1057,17 +1069,46 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
           <p>Are you sure you want to delete <strong id="deleteMailboxEmail"></strong>?</p>
 
-          <div class="form-check mt-3">
-            <input class="form-check-input" type="checkbox" name="delete_maildir" id="deleteMaildir" value="1" checked>
-            <label class="form-check-label" for="deleteMaildir">
-              Also delete all email messages from the server
-            </label>
-            <small class="form-text text-danger d-block"><i class="fas fa-exclamation-triangle me-1"></i>When checked, all messages in this mailbox will be permanently removed from the mail server. This cannot be undone.</small>
+          <!--- Two outcomes, not a checkbox.
+
+               This used to be "Also delete all email messages from the server",
+               and unticking it produced something with no name and no way back:
+               the mailboxes row, the LDAP account, the recipient and
+               user_settings were all deleted while the maildir stayed on disk
+               with nothing referencing it. No row, no user, nothing listing it
+               anywhere. Keeping someone's mail is a reasonable thing to want
+               when they leave; leaving it somewhere nobody can reach is not.
+
+               So the second outcome is the one people actually mean: the
+               mailbox becomes shared, keeping every message, and colleagues are
+               given access afterwards from Shared Mailboxes. Nobody has access
+               until that is done, which is deliberate: it is one decision at a
+               time, and the members page already exists to make it. --->
+          <div class="mt-3">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="radio" name="delete_disposition" id="dispositionDelete" value="delete" checked>
+              <label class="form-check-label" for="dispositionDelete">
+                <strong>Delete the mailbox and all its messages</strong>
+                <br><small class="text-danger"><i class="fas fa-exclamation-triangle me-1"></i>Everything is permanently removed from the mail server. This cannot be undone.</small>
+              </label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="delete_disposition" id="dispositionShared" value="shared">
+              <label class="form-check-label" for="dispositionShared">
+                <strong>Convert to a shared mailbox</strong>
+                <br><small class="text-muted">Keeps every message at the same address, and it carries on receiving mail. The user's login is removed. Assign who can open it under <strong>Email Server &gt; Shared Mailboxes</strong>.</small>
+              </label>
+            </div>
+          </div>
+
+          <div id="dispositionSharedNote" class="alert alert-info py-2 mt-2" style="display:none;">
+            <small>Until you add members, nobody will be able to open this mailbox. Nothing is lost in the
+            meantime: the messages stay exactly where they are and new mail keeps arriving.</small>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-          <button type="submit" class="btn btn-danger">Delete Mailbox</button>
+          <button type="submit" class="btn btn-danger" id="deleteMailboxSubmit">Delete Mailbox</button>
         </div>
       </form>
     </div>
@@ -1207,6 +1248,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       var match = false;
       $sel.find('option').each(function () { if (this.value === val) { match = true; } });
       if (match) { $sel.val(val); } else { table.column(colIdx).search('').draw(); }
+    });
+
+    // The button says what it will do, because the two outcomes are not
+    // equally destructive and the label is the last thing read before clicking.
+    $('input[name="delete_disposition"]').on('change', function() {
+      var shared = $(this).val() === 'shared';
+      $('#dispositionSharedNote').toggle(shared);
+      $('#deleteMailboxSubmit')
+        .toggleClass('btn-danger', !shared)
+        .toggleClass('btn-warning', shared)
+        .text(shared ? 'Convert to Shared Mailbox' : 'Delete Mailbox');
+    });
+
+    // Reset to the safe-to-read default each time the dialog opens, or it
+    // reopens showing the previous mailbox's choice.
+    $('#deleteMailboxModal').on('show.bs.modal', function() {
+      $('#dispositionDelete').prop('checked', true).trigger('change');
     });
 
     // Initialize Tom Select for the edit-mailbox timezone dropdown

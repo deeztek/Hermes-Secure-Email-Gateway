@@ -178,6 +178,19 @@
     <!--- DELETE LDAP USER FOR RECIPIENT ENDS HERE --->
 
     <!-- DELETE FROM RECIPIENTS, MAILADDR AND WBLIST STARTS HERE -->
+    <!--- keepRecipientRow lets a caller run the whole of the rest of this
+         teardown, the Authelia devices, the LDAP account, the certificates and
+         the keyrings, while leaving the recipient itself in place.
+
+         Converting a mailbox to a shared mailbox (#290) needs exactly that: the
+         person's login goes, but the address carries on receiving mail, and on
+         a hybrid domain the recipients row is what makes Postfix accept it at
+         RCPT TO and what carries the lmtp override that delivers it locally.
+         Deleting it would silently start rejecting mail to the shared mailbox.
+
+         Defaults to false, so every existing caller behaves exactly as before. --->
+    <cfparam name="keepRecipientRow" default="false">
+    <cfif NOT keepRecipientRow>
     <cfquery name="delete" datasource="hermes">
     delete from recipients where id='#delete_id#'
     </cfquery>
@@ -204,6 +217,7 @@
     </cfquery>
     
     <!-- /CFIF for getmailaddrid.recordcount -->
+    </cfif>
     </cfif>
     
     <!-- DELETE FROM RECIPIENTS, MAILADDR AND WBLIST ENDS HERE -->

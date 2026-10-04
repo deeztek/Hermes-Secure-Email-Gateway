@@ -40,7 +40,7 @@ Removes a mailbox user from all systems:
 
 <!--- GET MAILBOX DETAILS --->
 <cfquery name="getMailbox" datasource="hermes">
-    SELECT m.id, m.username, m.domain_id
+    SELECT m.id, m.username, m.domain_id, m.name
     FROM mailboxes m
     WHERE m.id = <cfqueryparam value="#form.delete_mailbox_id#" cfsqltype="cf_sql_integer">
 </cfquery>
@@ -51,6 +51,27 @@ Removes a mailbox user from all systems:
 </cfif>
 
 <cfset recipient = getMailbox.username>
+
+<!--- #290. Two outcomes, chosen in the dialog.
+
+     "delete"  everything goes, including the messages.
+     "shared"  the person's login goes and the mailbox stays, as a shared
+               mailbox at the same address, keeping every message and carrying
+               on receiving mail. Members are assigned afterwards from Shared
+               Mailboxes.
+
+     This replaces a checkbox that kept the messages by not deleting the
+     maildir, while deleting the mailboxes row, the LDAP account, the recipient
+     and user_settings. That left a directory on disk with nothing referencing
+     it anywhere. Keeping someone's mail when they leave is reasonable; leaving
+     it somewhere nobody can reach is not. --->
+<cfparam name="form.delete_disposition" default="delete">
+<cfset convertToShared = (form.delete_disposition EQ "shared")>
+
+<!--- The recipient survives a conversion. On a hybrid domain it is what makes
+     Postfix accept the address at RCPT TO, and it carries the lmtp override
+     that delivers it locally; on a mailbox domain it is harmless. --->
+<cfset keepRecipientRow = convertToShared>
 
 <!--- GET RECIPIENT ID FROM RECIPIENTS TABLE --->
 <cfquery name="getRecipientId" datasource="hermes">
@@ -343,8 +364,9 @@ Removes a mailbox user from all systems:
 <!--- 6. DELETE MAILDIR FILES from Dovecot container.
      Maildir path: /srv/mail/<domain>/<localpart>/
      Uses docker exec since commandbox has the vmail volume read-only. --->
-<cfparam name="form.delete_maildir" default="0">
-<cfif form.delete_maildir EQ "1">
+<!--- Kept in full on a conversion: the messages are the entire point of
+     converting rather than deleting. --->
+<cfif NOT convertToShared>
     <cftry>
         <cfset mailDomain = ListLast(recipient, "@")>
         <cfset mailLocal = ListFirst(recipient, "@")>
@@ -360,10 +382,59 @@ Removes a mailbox user from all systems:
     </cftry>
 </cfif>
 
-<!--- 7. DELETE FROM MAILBOXES TABLE (Dovecot userdb) --->
-<cfquery datasource="hermes">
-    DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
-</cfquery>
+<!--- 7. THE MAILBOX ROW ITSELF.
+
+     On a conversion the row stays and changes type, which is all a shared
+     mailbox is. Dovecot's userdb does not filter on mailbox_type, so the
+     address keeps resolving and keeps receiving without any routing change.
+     nextcloud_enabled is cleared to match how shared_mailbox_actions.cfm
+     builds one: a shared mailbox has no person behind it to give file access
+     to. --->
+<cfif convertToShared>
+    <cfquery datasource="hermes">
+        UPDATE mailboxes
+           SET mailbox_type      = 'shared',
+               nextcloud_enabled = 0,
+               modified          = NOW()
+         WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+
+    <cfquery name="existingShared" datasource="hermes">
+        SELECT COUNT(*) AS n FROM shared_mailboxes
+         WHERE mailbox_id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfif Val(existingShared.n) LT 1>
+        <cfquery datasource="hermes">
+            INSERT INTO shared_mailboxes
+              (mailbox_id, address, display_name, domain_id, auto_subscribe, created_at, modified_at)
+            VALUES (
+              <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">,
+              <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+              <cfqueryparam value="#getMailbox.name#" cfsqltype="cf_sql_varchar">,
+              <cfqueryparam value="#getMailbox.domain_id#" cfsqltype="cf_sql_integer">,
+              1, NOW(), NOW())
+        </cfquery>
+    </cfif>
+
+    <!--- The address has to remain a valid sender, the same entry
+         shared_mailbox_actions.cfm creates. Its login_user rows were removed
+         with the rest of the person's access above; members granted send-as
+         later get their own. --->
+    <cfquery datasource="hermes">
+        INSERT IGNORE INTO sender_login_maps (sender, login_user)
+        VALUES (<cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">,
+                <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">)
+    </cfquery>
+
+    <cftry>
+        <cfinclude template="sync_shared_mailbox_acl_file.cfm">
+    <cfcatch type="any"></cfcatch>
+    </cftry>
+<cfelse>
+    <cfquery datasource="hermes">
+        DELETE FROM mailboxes WHERE id = <cfqueryparam value="#getMailbox.id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+</cfif>
 
 <!--- #226 Phase 2B: drop the deleted mailbox from signature_by_sender
      and sender_data.json so the milter no longer carries a stale
@@ -376,5 +447,6 @@ Removes a mailbox user from all systems:
 </cftry>
 
 <!--- SUCCESS --->
-<cfset session.m = 3>
+<cfset session.m = convertToShared ? 62 : 3>
+<cfif convertToShared><cfset session.sharedConvertedAddr = recipient></cfif>
 <cflocation url="view_mailboxes.cfm" addtoken="no">
