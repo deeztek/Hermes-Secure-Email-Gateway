@@ -451,7 +451,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset backend_type = form.backend_type>
     </cfif>
 
-    <cfif backend_type EQ "default" AND defaultWouldOrphan>
+    <cfif NOT StructKeyExists(form, "backend_type")>
+        <!--- Nothing selected. Options that are already in force are no longer
+             rendered, so there is often nothing checked on arrival, and the
+             cfparam default of "default" would otherwise produce a message
+             about domain defaults to someone who simply did not choose. --->
+        <cfset m = "error_no_selection">
+
+    <cfelseif backend_type EQ "default" AND defaultWouldOrphan>
         <!--- The radio is not rendered in this case, but a hidden control is
              not a validation. A mailbox whose domain default is not the
              built-in server would receive nothing. --->
@@ -939,6 +946,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         The mailbox quota must be a number greater than zero.
+    </div>
+<cfelseif m EQ "error_no_selection">
+    <div class="alert alert-warning alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-hand-point-right"></i> Nothing selected</h5>
+        Choose what should happen to these recipients, then save. Nothing was changed.
     </div>
 <cfelseif m EQ "error_default_would_orphan">
     <div class="alert alert-danger alert-dismissible">
