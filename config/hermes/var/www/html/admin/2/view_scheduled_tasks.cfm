@@ -396,6 +396,25 @@ do NOT write here — enable/disable/edit is future tier work.
 
     // Jobs where disabling could cause operational pain — prompt for confirmation.
     // Names here should match the display-friendly (between-quotes) form.
+    // Why each of these matters, so the confirmation can say something true
+    // about the job being disabled. The list used to recite the same four
+    // reasons whatever you clicked, which stopped being accurate the moment
+    // anything else was added to it.
+    var criticalReasons = {
+      'renew-acme-certificate':
+        'the certificate will expire, breaking the console and TLS on SMTP',
+      'hermes-update-check':
+        'the dashboard will stop telling you about new releases',
+      'hermes-process-cert-queue':
+        'new users will wait for S/MIME certificates and PGP keys that never arrive',
+      'hermes-quarantine-notify':
+        'recipients will never be told about their quarantined mail',
+      'hermes-message-cleanup':
+        'nothing will enforce the retention policy and the disk will fill, which defers all mail',
+      'hermes-dovecot-log-rotate':
+        'Dovecot\'s logs will grow without limit and fill the disk, which defers all mail'
+    };
+
     var criticalJobs = [
       'renew-acme-certificate',
       'hermes-update-check',
@@ -420,10 +439,10 @@ do NOT write here — enable/disable/edit is future tier work.
 
       // Warn when disabling a job on the critical list.
       if (newState === '2' && criticalJobs.indexOf(displayName) !== -1) {
+        var why = criticalReasons[displayName] || 'this task is core to Hermes operation';
         if (!confirm(
-          'Disabling "' + displayName + '" may cause operational issues ' +
-          '(certificate renewal / update checks / cert queue / quarantine notifications ' +
-          'are core to Hermes operation). Continue?'
+          'Disable "' + displayName + '"?\n\n' +
+          'If you do, ' + why + '.\n\nContinue?'
         )) {
           $toggle.prop('checked', originallyChecked);
           return;
