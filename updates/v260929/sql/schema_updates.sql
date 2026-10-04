@@ -91,7 +91,7 @@ UPDATE `ofelia_jobs` SET `description` =
   WHERE `job_name` LIKE '%hermes-refresh-network-aliases%';
 
 -- ---------------------------------------------------------------------
--- 2b. Directory sync: a description, and an hour instead of six
+-- 2b. Directory sync: a description, and fifteen minutes instead of six hours
 --
 -- The job was seeded by v260918 with INSERT .. SELECT .. WHERE NOT EXISTS
 -- rather than INSERT IGNORE, which is why it had no description after section
