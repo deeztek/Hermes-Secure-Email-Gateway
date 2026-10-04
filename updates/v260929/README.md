@@ -118,10 +118,38 @@ It stays listed under Relay Domains, because that is what it still mostly is,
 marked **Hybrid** so the arrangement is visible at a glance. It does not appear
 under Mailbox Domains.
 
-### Going back
+### When someone leaves
 
-Clear the override with **Use Domain Default** and their mail goes to the
-provider again. The mailbox is kept, not deleted, so nothing in it is lost.
+An address delivers in one place. It is hosted here or it relays to the
+provider, not both, which makes this two choices rather than one.
+
+**Keep their mail.** On the Mailboxes page, Delete now offers **Convert to a
+shared mailbox** instead. Every message stays exactly where it is, at the same
+address, and the address carries on receiving. Their login is removed, along
+with their Nextcloud account. Nobody can open it until you add members under
+**Email Server > Shared Mailboxes**, which the dialog says and the confirmation
+repeats.
+
+This is the Microsoft 365 behaviour, and it is what the old "also delete all
+email messages" checkbox was reaching for. Unticking that used to delete the
+mailbox, the account and the recipient while leaving the messages on disk with
+nothing referencing them: no row, no user, nothing listing it anywhere. That
+option is gone.
+
+**Put the address back on the provider.** **Edit Mail Delivery > Revert to
+Relay Recipient** undoes the conversion. They become a relay recipient again
+with the same login, and mail goes to the domain's backend.
+
+This deletes the mailbox and everything in it. The confirmation says so and has
+to be ticked, and it also names what else goes: any aliases delivering to that
+mailbox, the Nextcloud account if they had one, and the catch-all exemption the
+conversion created, so the domain's catch-all applies to that address again
+exactly as it did before.
+
+**What you cannot do is both.** There is no way to relay the address to the
+provider while keeping its old mail here, because the mail lives at that
+address. If you need the history and the address back on the provider, keep it
+as a shared mailbox and relay under a different address.
 
 ## Auto-provisioning no longer targets mailbox domains
 
