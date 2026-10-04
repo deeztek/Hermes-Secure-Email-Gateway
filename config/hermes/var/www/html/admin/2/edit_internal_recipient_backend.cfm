@@ -568,6 +568,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfset session.builtinAlready = ValueList(alreadyMailbox.recipient)>
             <cfelse>
 
+            <!--- Queried here rather than further down, because the alias
+                 guard below reads it and a guard has to run before anything is
+                 written. --->
+            <cfquery name="toConvert" datasource="hermes">
+                SELECT id, recipient, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
+                       digital_sign, auth_type, remoteauth_domain, enforce_mfa,
+                       SUBSTRING_INDEX(recipient, '@', -1) AS recipient_domain
+                  FROM recipients
+                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                 ORDER BY recipient ASC
+            </cfquery>
+
             <!--- An alias beats a transport override, silently and completely.
                  Postfix expands virtual_alias_maps during cleanup, so by the
                  time transport_maps is consulted the recipient has already
@@ -636,15 +648,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfset m = "error_builtin_aliased">
                 <cfset session.builtinAliased = aliasedAway>
             <cfelse>
-
-                <cfquery name="toConvert" datasource="hermes">
-                    SELECT id, recipient, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
-                           digital_sign, auth_type, remoteauth_domain, enforce_mfa,
-                           SUBSTRING_INDEX(recipient, '@', -1) AS recipient_domain
-                      FROM recipients
-                     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
-                     ORDER BY recipient ASC
-                </cfquery>
 
                 <cfset convertedCount = 0>
                 <cfset convertSkipped  = "">
