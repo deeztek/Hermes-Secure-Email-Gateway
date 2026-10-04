@@ -344,6 +344,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
            m.nextcloud_enabled AS mb_nextcloud,
            d.domain, d.default_quota_mb, d.type AS domain_type,
            COALESCE(dt.transport, '') AS domain_transport,
+           /* Where this mailbox's mail actually goes, decided once here so the
+              cell below and the filter above cannot disagree, and so the
+              filter can offer only the states that occur. */
+           CASE
+             WHEN r.backend_server IS NOT NULL AND r.backend_server <> ''
+                  AND r.backend_server LIKE '%hermes_dovecot%'      THEN 'local_override'
+             WHEN r.backend_server IS NOT NULL AND r.backend_server <> '' THEN 'routed'
+             WHEN r.id IS NULL                                      THEN 'unknown'
+             WHEN COALESCE(dt.transport, '') LIKE '%hermes_dovecot%' THEN 'local_domain'
+             ELSE 'not_delivered'
+           END AS delivery_state,
            r.id AS recipient_id, r.id AS theID, r.id AS theOtherID,
            r.policy_id, r.auth_type, r.remoteauth_domain, r.enforce_mfa,
            r.backend_server, r.backend_port, r.backend_tls, r.backend_transport,
@@ -438,14 +449,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <option value="#HTMLEditFormat(domain)#">#HTMLEditFormat(domain)#</option>
       </cfoutput>
     </select>
+    <!--- Only the states that actually occur. Offering "Unknown (no recipient
+         record)" on an installation that has none is a filter that can only
+         ever return nothing, and two of these five are states you would hope
+         never to see. Tallied from the same delivery_state the rows use, so
+         the list cannot drift from the table. --->
+    <cfset deliveryStatesPresent = {}>
+    <cfloop query="getMailboxes">
+        <cfset deliveryStatesPresent[getMailboxes.delivery_state] = true>
+    </cfloop>
+    <cfset showLocal   = StructKeyExists(deliveryStatesPresent, "local_override")
+                      OR StructKeyExists(deliveryStatesPresent, "local_domain")>
+    <cfset showRouted  = StructKeyExists(deliveryStatesPresent, "routed")>
+    <cfset showStranded = StructKeyExists(deliveryStatesPresent, "not_delivered")>
+    <cfset showUnknown = StructKeyExists(deliveryStatesPresent, "unknown")>
+
+    <!--- A filter offering one option filters nothing. --->
+    <cfset deliveryOptionCount = (showLocal ? 1 : 0) + (showRouted ? 1 : 0)
+                               + (showStranded ? 1 : 0) + (showUnknown ? 1 : 0)>
+    <cfif deliveryOptionCount GT 1>
     <label class="mb-0 ms-3"><strong>Delivery:</strong></label>
     <select class="form-control form-control-sm" id="deliveryFilter" style="width:auto;">
       <option value="">All</option>
-      <option value="Local">Local only</option>
-      <option value="Routed">Routed elsewhere</option>
-      <option value="Elsewhere">Not delivered here (needs attention)</option>
-      <option value="Unknown">Unknown (no recipient record)</option>
+      <cfif showLocal><option value="Local">Local only</option></cfif>
+      <cfif showRouted><option value="Routed">Routed elsewhere</option></cfif>
+      <cfif showStranded><option value="Elsewhere">Not delivered here (needs attention)</option></cfif>
+      <cfif showUnknown><option value="Unknown">Unknown (no recipient record)</option></cfif>
     </select>
+    </cfif>
   </div>
   </cfif>
 </div>
@@ -577,26 +608,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                So the answer now comes from where mail actually goes: an
                explicit override to the built-in server, an override to
                somewhere else, or the domain's own transport. --->
-          <cfset deliveryPort   = Val(backend_port) GT 0 ? Val(backend_port) : 25>
-          <cfset domainIsLocal  = FindNoCase("hermes_dovecot", domain_transport) GT 0>
-          <cfset routedLocal    = FindNoCase("hermes_dovecot", backend_server) GT 0>
-
-          <cfif Len(Trim(backend_server)) AND routedLocal>
-            <cfset deliveryState  = "local_override">
-            <cfset deliverySearch = "Local delivered here built-in">
-          <cfelseif Len(Trim(backend_server))>
-            <cfset deliveryState  = "routed">
-            <cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#">
-          <cfelseif Val(recipient_id) LT 1>
-            <cfset deliveryState  = "unknown">
-            <cfset deliverySearch = "Unknown no recipient record">
-          <cfelseif domainIsLocal>
-            <cfset deliveryState  = "local_domain">
-            <cfset deliverySearch = "Local domain delivers here">
-          <cfelse>
-            <cfset deliveryState  = "not_delivered">
-            <cfset deliverySearch = "Elsewhere not delivered here #Trim(domain_transport)#">
-          </cfif>
+          <cfset deliveryPort  = Val(backend_port) GT 0 ? Val(backend_port) : 25>
+          <cfset deliveryState = delivery_state>
+          <cfswitch expression="#deliveryState#">
+            <cfcase value="local_override"><cfset deliverySearch = "Local delivered here built-in"></cfcase>
+            <cfcase value="routed"><cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#"></cfcase>
+            <cfcase value="unknown"><cfset deliverySearch = "Unknown no recipient record"></cfcase>
+            <cfcase value="local_domain"><cfset deliverySearch = "Local domain delivers here"></cfcase>
+            <cfdefaultcase><cfset deliverySearch = "Elsewhere not delivered here #Trim(domain_transport)#"></cfdefaultcase>
+          </cfswitch>
           <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
             <cfif deliveryState EQ "local_override">
               <span class="badge bg-success">Local</span>
@@ -1330,7 +1350,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     // list filtered by something unreachable.
     [[6, $('#domainFilter')], [7, $('#deliveryFilter')]].forEach(function (pair) {
       var colIdx = pair[0], $sel = pair[1], term = table.column(colIdx).search();
-      if (!term || !$sel.length) { return; }
+      if (!term) { return; }
+      // The Delivery select is only rendered when more than one state exists,
+      // so a saved term can outlive the control that set it. Leaving it
+      // applied would hide rows with nothing on screen to explain why.
+      if (!$sel.length) { table.column(colIdx).search('').draw(); return; }
       var val = term.replace(/^\^/, '').replace(/\$$/, '').replace(/\\(.)/g, '$1');
       var match = false;
       $sel.find('option').each(function () { if (this.value === val) { match = true; } });
