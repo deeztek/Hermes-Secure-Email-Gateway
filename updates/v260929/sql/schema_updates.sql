@@ -100,8 +100,16 @@ UPDATE `ofelia_jobs` SET `description` =
 --
 -- Six hours was too long. Connections with auto-apply enabled create their
 -- recipients during the sync, so the interval is how long a new account at the
--- provider waits before it can receive mail here. An hour is still only
--- twenty-four runs a day, and Run Now covers the impatient case.
+-- provider waits before it can receive mail here.
+--
+-- Fifteen minutes is safe rather than merely responsive: no_overlap means a
+-- slow run skips the next tick instead of stacking, and the auto-apply budget
+-- of 25 per run caps the write side whatever the interval. The only real cost
+-- is that every run is a full enumeration, which on a large Microsoft 365
+-- tenant is a lot of Graph calls. That same budget means a big onboarding
+-- batch takes several runs anyway, which argues for the shorter interval.
+--
+-- Run Now still covers the impatient case.
 --
 -- Only the shipped schedule is changed. An operator who has set their own is
 -- left alone.
@@ -112,7 +120,7 @@ UPDATE `ofelia_jobs` SET `description` =
   'Enumerates every enabled directory connection and stages the addresses it finds. Connections with auto-apply switched on also get their recipients created here, so this interval is how long a new account at the provider waits before it can receive mail through Hermes. Run Now forces it.'
   WHERE `job_name` LIKE '%hermes-directory-sync%';
 
-UPDATE `ofelia_jobs` SET `schedule` = '@every 1h'
+UPDATE `ofelia_jobs` SET `schedule` = '@every 15m'
   WHERE `job_name` LIKE '%hermes-directory-sync%'
     AND `schedule` = '@every 6h';
 

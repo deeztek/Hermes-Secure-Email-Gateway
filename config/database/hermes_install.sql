@@ -1420,7 +1420,7 @@ INSERT INTO `ofelia_jobs`
   (`job_name`, `description`, `schedule`, `command`, `container`, `image`, `user`, `volume`, `network`, `type`, `active`, `no_overlap`)
 SELECT '[job-exec "hermes-directory-sync"]',
        'Enumerates every enabled directory connection and stages the addresses it finds. Connections with auto-apply switched on also get their recipients created here, so this interval is how long a new account at the provider waits before it can receive mail through Hermes. Run Now forces it.',
-       '@every 1h',
+       '@every 15m',
        '/usr/bin/curl --silent http://localhost:8888/schedule/directory_sync.cfm',
        'hermes_commandbox', NULL, NULL, NULL, NULL, 'hermes', 1, 1
 WHERE NOT EXISTS (
