@@ -1093,18 +1093,44 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
         <div class="modal-body">
-          <div class="alert alert-danger">
+          <!--- One list per outcome. This was a single list describing a
+               delete, shown whichever option was chosen, which made it wrong
+               for a conversion: that keeps the mailbox, so most of what it
+               named survives. --->
+          <div id="deleteMailboxWarnDelete" class="alert alert-danger">
             <h5><i class="icon fas fa-exclamation-triangle"></i> Warning!</h5>
             <p>This will permanently delete the mailbox and remove the user from all systems:</p>
             <ul>
+              <li>All email messages in the mailbox</li>
               <li>LDAP user account</li>
               <li>Encryption settings and certificates</li>
               <li>User portal settings</li>
               <li>Quarantine preferences</li>
               <li>Mailbox aliases pointing to this mailbox</li>
+              <li>BCC rules referencing this address</li>
               <li>User mail filters (sieve rules)</li>
             </ul>
             <p class="mb-0"><strong>This action cannot be undone.</strong></p>
+          </div>
+
+          <div id="deleteMailboxWarnShared" class="alert alert-warning" style="display:none;">
+            <h5><i class="icon fas fa-exchange-alt"></i> The mailbox stays, the person goes</h5>
+            <p class="mb-1"><strong>Kept:</strong></p>
+            <ul class="mb-2">
+              <li>Every email message, at the same address</li>
+              <li>Delivery, so new mail keeps arriving</li>
+              <li>Mailbox aliases pointing to this mailbox</li>
+              <li>BCC rules referencing this address</li>
+            </ul>
+            <p class="mb-1"><strong>Removed, because a shared mailbox has no user:</strong></p>
+            <ul class="mb-2">
+              <li>LDAP user account and their ability to log in</li>
+              <li>Nextcloud account, files, calendar and contacts</li>
+              <li>Encryption settings and certificates</li>
+              <li>User mail filters (sieve rules)</li>
+            </ul>
+            <p class="mb-0"><small>Nobody can open it until you assign members under
+            <strong>Email Server &gt; Shared Mailboxes</strong>.</small></p>
           </div>
 
           <!--- BCC map cascade warning - populated by AJAX on modal open --->
@@ -1301,6 +1327,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     $('input[name="delete_disposition"]').on('change', function() {
       var shared = $(this).val() === 'shared';
       $('#dispositionSharedNote').toggle(shared);
+      $('#deleteMailboxWarnDelete').toggle(!shared);
+      $('#deleteMailboxWarnShared').toggle(shared);
       $('#deleteMailboxSubmit')
         .toggleClass('btn-danger', !shared)
         .toggleClass('btn-warning', shared)

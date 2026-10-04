@@ -286,21 +286,35 @@ Removes a mailbox user from all systems:
     </cftry>
 </cfloop>
 
-<!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox --->
-<cfquery datasource="hermes">
-    DELETE FROM mailbox_aliases
-    WHERE delivers_to = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
-</cfquery>
+<!--- 4. DELETE MAILBOX ALIASES pointing to this mailbox.
+
+     Skipped on a conversion. These deliver INTO the mailbox, and a shared
+     mailbox is the same mailbox at the same address still receiving mail, so
+     an alias pointing at it goes on working. Deleting them would quietly break
+     every address that forwarded to the person whose mail everyone was trying
+     to keep. --->
+<cfif NOT convertToShared>
+    <cfquery datasource="hermes">
+        DELETE FROM mailbox_aliases
+        WHERE delivers_to = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+</cfif>
 
 <!--- 4b. DELETE BCC MAP ENTRIES referencing this mailbox (as watched address
      OR as BCC destination). Postfix reads bcc_maps via MySQL lookup tables
      (mysql-*-bcc-maps.cf) so no postmap regeneration is required - lookups
-     hit the live DB on every message. --->
-<cfquery datasource="hermes">
-    DELETE FROM bcc_maps
-    WHERE address = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
-       OR bcc_to  = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
-</cfquery>
+     hit the live DB on every message.
+
+     Also skipped on a conversion, for the same reason: the address still
+     exists and still receives, so a rule watching it or copying to it is still
+     meaningful. --->
+<cfif NOT convertToShared>
+    <cfquery datasource="hermes">
+        DELETE FROM bcc_maps
+        WHERE address = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+           OR bcc_to  = <cfqueryparam value="#recipient#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+</cfif>
 
 <!--- 4c. INVALIDATE USER SESSIONS (force immediate logout) --->
 <cftry>
