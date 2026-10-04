@@ -1055,6 +1055,18 @@ provision_mount_dirs() {
     mkdir -p "${FILES_MOUNT}/app"                       # nextcloud volume
     mkdir -p "${FILES_MOUNT}/redis"                     # nextcloud_redis volume
 
+    # Nextcloud's temp directory (#338). Nextcloud 34 will not complete an
+    # upgrade without one, and the failure comes partway through rather than
+    # as a refusal up front. The path is inside the nextcloud volume, which is
+    # ${FILES_MOUNT}/app bound to /var/www/html in the container, so this is
+    # the host side of /var/www/html/data/nextcloudtmp.
+    #
+    # 33:33 is www-data in the official Nextcloud image. Created here rather
+    # than left to the container because Nextcloud will not create a
+    # tempdirectory it has been pointed at.
+    mkdir -p "${FILES_MOUNT}/app/data/nextcloudtmp"     # NC tempdirectory (#338)
+    chown 33:33 "${FILES_MOUNT}/app/data/nextcloudtmp" 2>/dev/null || true
+
     # Pre-create empty log-file placeholders that fail2ban globs at startup.
     # If the glob matches zero files, fail2ban exits 255. On a fresh install
     # this races against Authelia/Dovecot creating their own log files.
@@ -4460,6 +4472,31 @@ run_phase2_db_init() {
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:system:set defaultapp --value="mail,calendar,contacts,dashboard" >> "$LOG_FILE" 2>&1 \
             && log "  Set default app to Mail" \
             || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
+
+        # Bound nextcloud.log. Nextcloud rotates its own log once it passes
+        # log_rotate_size and keeps one archive, but the value is only a
+        # default until something sets it, and Hermes set nothing. Pinning it
+        # makes the ceiling explicit and auditable rather than inherited from
+        # whatever the bundled release happens to default to. 50 MB live plus
+        # one archive, on the Files tier.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:system:set log_rotate_size --value="52428800" >> "$LOG_FILE" 2>&1 \
+            && log "  Bounded nextcloud.log at 50MB + 1 archive" \
+            || log "  WARNING: Failed to set log_rotate_size"
+
+        # Point Nextcloud at a temp directory inside its own data volume (#338).
+        # Nextcloud 34 will not complete an upgrade without one: the default
+        # location is too small or not writable in this image, and the upgrade
+        # fails partway rather than refusing up front. provision_mount_dirs()
+        # created the directory; this is the config key that makes NC use it.
+        #
+        # Set now rather than at the release that bumps Nextcloud, so the key is
+        # already in place before the upgrade that needs it. It is harmless
+        # until then.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" >> "$LOG_FILE" 2>&1 \
+            && log "  Set tempdirectory to /var/www/html/data/nextcloudtmp" \
+            || log "  WARNING: Failed to set tempdirectory"
 
         # Install third-party apps from the app store
         log "  Installing Nextcloud apps from app store..."
