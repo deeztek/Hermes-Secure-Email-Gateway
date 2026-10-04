@@ -238,6 +238,24 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset selectedNcCount = Val(selectedNcMailboxes.n)>
 
+<!--- Aliases that deliver INTO the selected mailboxes. A hybrid domain can have
+     them: view_mailbox_aliases.cfm and add_mailbox_alias_action.cfm both accept
+     'hybrid', so sales@ can be pointed at a converted mailbox.
+
+     Reverting deletes them, which is right because the mailbox is going and
+     they would deliver nowhere, and it is what deleting a mailbox already
+     does. It should not be a surprise, so it is counted here and disclosed in
+     the confirmation. --->
+<cfquery name="selectedAliasesIn" datasource="hermes">
+    SELECT ma.alias_address
+      FROM mailbox_aliases ma
+      JOIN recipients r ON r.recipient = ma.delivers_to
+     WHERE r.id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+       AND r.recipient_type = 'mailbox'
+     ORDER BY ma.alias_address ASC
+</cfquery>
+<cfset selectedAliasCount = selectedAliasesIn.recordcount>
+
 <cfquery name="overrideCount" datasource="hermes">
     SELECT COUNT(*) AS n FROM recipients
      WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
@@ -257,6 +275,99 @@ This file is part of Hermes Secure Email Gateway Community Edition.
      Revert, which also removes the mailbox that would otherwise sit there
      dead, or by Custom, which at least names the destination. Set below, once
      orphanWarnings is known. --->
+
+<!--- Which selected addresses have their mail redirected before Postfix gets
+     to decide where to deliver, split by whether anyone made a decision about
+     that address specifically.
+
+     Postfix expands virtual_alias_maps during cleanup, so a redirected address
+     is rewritten before transport_maps is read and a Built-in conversion
+     delivers nothing while every check passes. Computed here, at render time,
+     rather than only on submit: the fix for the catch-all case is something to
+     offer before the choice is made, not to report after it.
+
+       redirectCatchAll   only the domain catch-all matches. Nobody decided
+                          anything about this address, so exempting it is safe
+                          to offer.
+       redirectExplicit   the address has its own entry pointing elsewhere.
+                          Someone deliberately forwards it, and overwriting
+                          that silently would be wrong, so it is refused.
+
+     Each row is address, source table, matched key, targets, Chr(31)
+     separated. The two source tables are different features with different
+     names in the console, Email Relay > Virtual Recipients and Email Server >
+     Aliases, so which matched is carried through to the message. --->
+<cfset redirectCatchAll  = "">
+<cfset redirectExplicit  = "">
+
+<cfquery name="selectedAddrs" datasource="hermes">
+    SELECT recipient FROM recipients
+     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+     ORDER BY recipient ASC
+</cfquery>
+
+<cfloop query="selectedAddrs">
+    <cfset rAddr   = LCase(Trim(selectedAddrs.recipient))>
+    <cfset rDomain = ListLast(rAddr, "@")>
+
+    <cfquery name="rSpecific" datasource="hermes">
+        SELECT 'virtual' AS src, maps AS target FROM virtual_recipients
+         WHERE LOWER(virtual_address) = <cfqueryparam value="#rAddr#" cfsqltype="cf_sql_varchar">
+        UNION ALL
+        SELECT 'alias' AS src, delivers_to AS target FROM mailbox_aliases
+         WHERE LOWER(alias_address) = <cfqueryparam value="#rAddr#" cfsqltype="cf_sql_varchar">
+           AND delivers_to <> 'discard:silently'
+    </cfquery>
+
+    <cfif rSpecific.recordcount GTE 1>
+        <!--- An address mapped to itself is the standard way to exempt one
+             recipient from a catch-all. Several targets including itself is
+             also fine: the local copy still arrives. --->
+        <cfset rKeepsLocal = false>
+        <cfloop query="rSpecific">
+            <cfloop list="#rSpecific.target#" index="rTarget">
+                <cfif LCase(Trim(rTarget)) EQ rAddr><cfset rKeepsLocal = true></cfif>
+            </cfloop>
+        </cfloop>
+        <cfif NOT rKeepsLocal>
+            <cfset redirectExplicit = ListAppend(redirectExplicit,
+                  rAddr & Chr(31) & rSpecific.src & Chr(31) & rAddr
+                  & Chr(31) & ValueList(rSpecific.target), ";")>
+        </cfif>
+    <cfelse>
+        <cfquery name="rCatchAll" datasource="hermes">
+            SELECT 'virtual' AS src, maps AS target FROM virtual_recipients
+             WHERE LOWER(virtual_address) = <cfqueryparam value="@#rDomain#" cfsqltype="cf_sql_varchar">
+            UNION ALL
+            SELECT 'alias' AS src, delivers_to AS target FROM mailbox_aliases
+             WHERE LOWER(alias_address) = <cfqueryparam value="@#rDomain#" cfsqltype="cf_sql_varchar">
+               AND delivers_to <> 'discard:silently'
+        </cfquery>
+        <cfif rCatchAll.recordcount GTE 1>
+            <cfset redirectCatchAll = ListAppend(redirectCatchAll,
+                  rAddr & Chr(31) & rCatchAll.src & Chr(31) & "@" & rDomain
+                  & Chr(31) & ValueList(rCatchAll.target), ";")>
+        </cfif>
+    </cfif>
+</cfloop>
+
+<cfset redirectCatchAllCount = ListLen(redirectCatchAll, ";")>
+<cfset redirectExplicitCount = ListLen(redirectExplicit, ";")>
+
+<!--- One shared cause stated once beats the same sentence forty times, which
+     is the size the bulk case actually is. --->
+<cfset catchAllKey = "">
+<cfset catchAllTo  = "">
+<cfset catchAllSrc = "">
+<cfif redirectCatchAllCount GT 0>
+    <cfset firstRow    = ListFirst(redirectCatchAll, ";")>
+    <cfset catchAllSrc = ListGetAt(firstRow, 2, Chr(31))>
+    <cfset catchAllKey = ListGetAt(firstRow, 3, Chr(31))>
+    <cfset catchAllTo  = ListGetAt(firstRow, 4, Chr(31))>
+    <cfloop list="#redirectCatchAll#" index="rRow" delimiters=";">
+        <cfif ListGetAt(rRow, 3, Chr(31)) NEQ catchAllKey><cfset catchAllKey = ""></cfif>
+    </cfloop>
+</cfif>
 
 <cfset defaultGoesTo   = "">
 <cfset orphanWarnings  = "">
@@ -580,79 +691,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  ORDER BY recipient ASC
             </cfquery>
 
-            <!--- A redirect beats a transport override, silently and completely.
+            <!--- The split was computed at render time, above, because the
+                 catch-all case is something to offer a fix for before the
+                 choice is made rather than report after it. Enforced here
+                 regardless of what the form said. --->
+            <cfparam name="builtin_exempt_catchall" default="0">
+            <cfif StructKeyExists(form, "builtin_exempt_catchall")>
+                <cfset builtin_exempt_catchall = form.builtin_exempt_catchall>
+            </cfif>
 
-                 Postfix expands virtual_alias_maps during cleanup, so by the
-                 time transport_maps is consulted the recipient has already
-                 been rewritten and the override is read against an address
-                 nobody set one on.
-
-                 A conversion in that state succeeds at every layer anyone
-                 would think to check. The mailbox is created, the LDAP groups
-                 move, the routing is written, postmap returns lmtp, doveadm
-                 resolves the user, and not one message is ever delivered. The
-                 maildir simply stays empty. Found exactly that way on a relay
-                 domain carrying a catch-all virtual recipient.
-
-                 The lookup mirrors mysql-virtual.cf, which is the union of
-                 virtual_recipients and mailbox_aliases, and it follows
-                 Postfix's own order: an entry for the address wins over the
-                 domain catch-all, so a catch-all only matters when the address
-                 has no entry of its own.
-
-                 The two tables are different features with different names in
-                 the console, so which one matched is recorded and reported:
-                 virtual_recipients is Email Relay > Virtual Recipients, and
-                 mailbox_aliases is Email Server > Aliases. Telling someone to
-                 go and remove an "alias" that is actually a virtual recipient
-                 sends them to the wrong page.
-
-                 An address mapped to itself is the standard way to exempt one
-                 recipient from a catch-all, so it is not treated as redirected
-                 away. Mapping to several destinations including itself is also
-                 fine: the local copy still arrives. --->
-            <cfset aliasedAway = "">
-            <cfloop query="toConvert">
-                <cfset thisAddr   = LCase(Trim(toConvert.recipient))>
-                <cfset thisDomain = ListLast(thisAddr, "@")>
-
-                <cfquery name="aliasSpecific" datasource="hermes">
-                    SELECT 'virtual' AS src, maps AS target FROM virtual_recipients
-                     WHERE LOWER(virtual_address) = <cfqueryparam value="#thisAddr#" cfsqltype="cf_sql_varchar">
-                    UNION ALL
-                    SELECT 'alias' AS src, delivers_to AS target FROM mailbox_aliases
-                     WHERE LOWER(alias_address) = <cfqueryparam value="#thisAddr#" cfsqltype="cf_sql_varchar">
-                       AND delivers_to <> 'discard:silently'
-                </cfquery>
-
-                <cfif aliasSpecific.recordcount GTE 1>
-                    <cfset keepsLocal = false>
-                    <cfloop query="aliasSpecific">
-                        <cfloop list="#aliasSpecific.target#" index="aliasTarget">
-                            <cfif LCase(Trim(aliasTarget)) EQ thisAddr><cfset keepsLocal = true></cfif>
-                        </cfloop>
-                    </cfloop>
-                    <cfif NOT keepsLocal>
-                        <cfset aliasedAway = ListAppend(aliasedAway,
-                              thisAddr & Chr(31) & aliasSpecific.src & Chr(31) & thisAddr
-                              & Chr(31) & ValueList(aliasSpecific.target), ";")>
-                    </cfif>
-                <cfelse>
-                    <cfquery name="aliasCatchAll" datasource="hermes">
-                        SELECT 'virtual' AS src, maps AS target FROM virtual_recipients
-                         WHERE LOWER(virtual_address) = <cfqueryparam value="@#thisDomain#" cfsqltype="cf_sql_varchar">
-                        UNION ALL
-                        SELECT 'alias' AS src, delivers_to AS target FROM mailbox_aliases
-                         WHERE LOWER(alias_address) = <cfqueryparam value="@#thisDomain#" cfsqltype="cf_sql_varchar">
-                           AND delivers_to <> 'discard:silently'
-                    </cfquery>
-                    <cfif aliasCatchAll.recordcount GTE 1>
-                        <cfset aliasedAway = ListAppend(aliasedAway,
-                              thisAddr & Chr(31) & aliasCatchAll.src & Chr(31) & "@" & thisDomain
-                              & Chr(31) & ValueList(aliasCatchAll.target), ";")>
-                    </cfif>
-                </cfif>
-            </cfloop>
+            <cfset aliasedAway = redirectExplicit>
+            <cfif redirectCatchAllCount GT 0 AND builtin_exempt_catchall NEQ "1">
+                <!--- Redirected by a catch-all and the admin declined to exempt
+                     them, so the mailboxes would receive nothing. --->
+                <cfset aliasedAway = ListAppend(aliasedAway, redirectCatchAll, ";")>
+            </cfif>
 
             <cfif Len(aliasedAway)>
                 <cfset m = "error_builtin_aliased">
@@ -660,6 +713,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfelse>
 
                 <cfset convertedCount = 0>
+                <cfset exemptedCount  = 0>
                 <cfset convertSkipped  = "">
 
                 <cfloop query="toConvert">
@@ -716,6 +770,48 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                          joins, the same as Add Mailbox. --->
                     <cfset ldapAccessControl = (Val(toConvert.enforce_mfa) EQ 1) ? "two_factor" : "one_factor">
 
+                    <!--- Exempt this address from the domain catch-all, if it
+                         was caught by one and the admin asked for it. A
+                         specific entry wins over @domain in Postfix's own
+                         resolution order, so the rest of the domain keeps
+                         being redirected exactly as before. Only ever created
+                         for addresses nobody made an individual decision
+                         about: one with its own entry pointing elsewhere was
+                         refused above rather than overwritten. --->
+                    <cfif builtin_exempt_catchall EQ "1">
+                        <cfloop list="#redirectCatchAll#" index="exRow" delimiters=";">
+                            <cfif LCase(ListGetAt(exRow, 1, Chr(31))) EQ LCase(recipientEmail)>
+                                <cfif ListGetAt(exRow, 2, Chr(31)) EQ "virtual">
+                                    <cfquery name="exExists" datasource="hermes">
+                                        SELECT COUNT(*) AS n FROM virtual_recipients
+                                         WHERE LOWER(virtual_address) = <cfqueryparam value="#LCase(recipientEmail)#" cfsqltype="cf_sql_varchar">
+                                    </cfquery>
+                                    <cfif Val(exExists.n) LT 1>
+                                        <cfquery datasource="hermes">
+                                            INSERT INTO virtual_recipients (virtual_address, maps, system)
+                                            VALUES (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                                                    <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">, '2')
+                                        </cfquery>
+                                    </cfif>
+                                <cfelse>
+                                    <cfquery name="exExists" datasource="hermes">
+                                        SELECT COUNT(*) AS n FROM mailbox_aliases
+                                         WHERE LOWER(alias_address) = <cfqueryparam value="#LCase(recipientEmail)#" cfsqltype="cf_sql_varchar">
+                                    </cfquery>
+                                    <cfif Val(exExists.n) LT 1>
+                                        <cfquery datasource="hermes">
+                                            INSERT INTO mailbox_aliases (alias_address, delivers_to, domain_id)
+                                            VALUES (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                                                    <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                                                    <cfqueryparam value="#getDomain.id#" cfsqltype="cf_sql_integer">)
+                                        </cfquery>
+                                    </cfif>
+                                </cfif>
+                                <cfset exemptedCount = exemptedCount + 1>
+                            </cfif>
+                        </cfloop>
+                    </cfif>
+
                     <cfset provisionMode = "convert">
                     <cfinclude template="inc/mailbox_provision_core.cfm">
 
@@ -761,7 +857,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
                 <cfset session.backendMessage = "success_builtin">
                 <cfset session.builtinCount   = convertedCount>
-                <cfset session.builtinSkipped = convertSkipped>
+                <cfset session.builtinSkipped  = convertSkipped>
+                <cfset session.builtinExempted = exemptedCount>
                 <cflocation url="#backUrl#" addtoken="no">
             </cfif>
             </cfif>
@@ -989,6 +1086,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                             <br><br>The <cfif selectedMailboxCount NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif>
                             not deleted: <cfif selectedMailboxCount NEQ 1>they go<cfelse>it goes</cfif> back to being
                             a relay recipient, keeps the same login, and receives mail at the domain's backend again.
+                            <cfif selectedAliasCount GT 0>
+                            <br><br><strong>#selectedAliasCount# alias<cfif selectedAliasCount NEQ 1>es</cfif>
+                            delivering to <cfif selectedMailboxCount NEQ 1>these mailboxes<cfelse>this mailbox</cfif>
+                            <cfif selectedAliasCount NEQ 1>are<cfelse>is</cfif> deleted too:</strong>
+                            <cfloop query="selectedAliasesIn"><code>#HTMLEditFormat(selectedAliasesIn.alias_address)#</code> </cfloop>
+                            Mail sent to <cfif selectedAliasCount NEQ 1>them<cfelse>it</cfif> would otherwise go nowhere.
+                            </cfif>
                             <cfif selectedNcCount GT 0>
                             <br><br><strong>Nextcloud <cfif selectedNcCount NEQ 1>accounts are<cfelse>access is</cfif> removed too,</strong>
                             along with <cfif selectedNcCount NEQ 1>their<cfelse>its</cfif> files, calendars and contacts.
@@ -1074,6 +1178,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     are kept. Their domain becomes a hybrid domain: the recipients you do not
                     convert carry on going to the provider exactly as before.</small>
                 </div>
+                <cfoutput><cfif redirectExplicitCount GT 0>
+                <div class="alert alert-danger py-2">
+                    <small>
+                        <strong>#redirectExplicitCount# of these <cfif redirectExplicitCount NEQ 1>addresses are<cfelse>address is</cfif> deliberately redirected elsewhere</strong>
+                        and cannot be hosted here until that is changed. Saving will be refused.
+                        <ul class="mb-0 mt-1">
+                        <cfloop list="#redirectExplicit#" index="rRow" delimiters=";">
+                            <li><code>#HTMLEditFormat(ListGetAt(rRow, 1, Chr(31)))#</code> &rarr;
+                            <code>#HTMLEditFormat(ListGetAt(rRow, 4, Chr(31)))#</code>, under
+                            <cfif ListGetAt(rRow, 2, Chr(31)) EQ "virtual"><a href="view_virtual_recipients.cfm">Virtual Recipients</a><cfelse><a href="view_mailbox_aliases.cfm">Aliases</a></cfif></li>
+                        </cfloop>
+                        </ul>
+                    </small>
+                </div>
+                </cfif></cfoutput>
+
+                <cfoutput><cfif redirectCatchAllCount GT 0>
+                <div class="alert alert-warning py-2">
+                    <small>
+                        <strong>#redirectCatchAllCount# of these <cfif redirectCatchAllCount NEQ 1>addresses have<cfelse>address has</cfif> mail redirected by a catch-all</strong><cfif Len(catchAllKey)>, <code>#HTMLEditFormat(catchAllKey)#</code> &rarr; <code>#HTMLEditFormat(catchAllTo)#</code></cfif>.
+                        Postfix rewrites the recipient before it decides where to deliver, so without an
+                        entry of their own the new <cfif redirectCatchAllCount NEQ 1>mailboxes<cfelse>mailbox</cfif>
+                        would never receive anything.
+                    </small>
+                    <div class="form-check mt-2">
+                        <input class="form-check-input" type="checkbox" name="builtin_exempt_catchall" id="builtin_exempt_catchall" value="1" checked>
+                        <label class="form-check-label" for="builtin_exempt_catchall">
+                            <small>Create a
+                            <cfif catchAllSrc EQ "virtual">Virtual Recipient<cfelse>Alias</cfif>
+                            for each one pointing at itself, so their mail is delivered here.
+                            A specific entry wins over a catch-all, so the rest of the domain is unaffected.</small>
+                        </label>
+                    </div>
+                </div>
+                </cfif></cfoutput>
+
                 <div class="row">
                     <div class="col-md-3 mb-3">
                         <label for="builtin_quota_gb" class="form-label"><strong>Mailbox Quota (GB)</strong></label>

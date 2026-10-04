@@ -396,6 +396,7 @@ a, a:hover{
     <cfelseif session.backendMessage EQ "success_builtin">
         <cfset builtinN = StructKeyExists(session, "builtinCount") ? Val(session.builtinCount) : 0>
         <cfset builtinS = StructKeyExists(session, "builtinSkipped") ? session.builtinSkipped : "">
+    <cfset builtinE = StructKeyExists(session, "builtinExempted") ? Val(session.builtinExempted) : 0>
         <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
             <h4><i class="icon fa fa-check"></i> Success!</h4>
@@ -405,13 +406,20 @@ a, a:hover{
             <p class="mb-0"><small>Their domain is now a hybrid domain, so these appear under
             <strong>Email Server &gt; Mailboxes</strong>. Recipients you did not convert carry on
             going to the provider as before.</small></p>
-            <cfif Len(Trim(builtinS))>
+                <cfif builtinE GT 0>
+    <p class="mb-0 mt-2"><small><strong>#builtinE#</strong> catch-all
+    <cfif builtinE NEQ 1>exemptions were<cfelse>exemption was</cfif> created so their mail
+    reaches the new <cfif builtinE NEQ 1>mailboxes<cfelse>mailbox</cfif>. The rest of the
+    domain is redirected exactly as before.</small></p>
+    </cfif>
+<cfif Len(Trim(builtinS))>
             <p class="mb-0 mt-2"><small><strong>Skipped, no matching domain record:</strong>
             <cfoutput>#HTMLEditFormat(builtinS)#</cfoutput></small></p>
             </cfif>
         </div>
         <cfset StructDelete(session, "builtinCount")>
         <cfset StructDelete(session, "builtinSkipped")>
+    <cfset StructDelete(session, "builtinExempted")>
     <cfelseif session.backendMessage EQ "success_custom">
         <div class="alert alert-success alert-dismissible">
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
