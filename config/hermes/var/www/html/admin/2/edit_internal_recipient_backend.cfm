@@ -1099,16 +1099,134 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <div class="mb-3">
                 <label class="form-label"><strong><cfoutput><cfif allOnDomainDefault>Change delivery to<cfelse>Backend Server</cfif></cfoutput></strong></label>
 
+                <cfoutput><cfif prefillBuiltin>
+                <div class="alert alert-secondary py-2">
+                    <strong>Currently</strong> delivered to the
+                    <cfif ListLen(ArrayToList(validIds)) GT 1>mailboxes<cfelse>mailbox</cfif>
+                    on this server.
+                </div>
+                </cfif></cfoutput>
+
                 <!--- #290. The third destination is Hermes itself. Choosing it
                      does more than change routing: the address has no mailbox
                      to deliver into, so one is created, which is why this
-                     option carries settings and the other two do not. --->
+                     option carries settings and the other two do not.
+
+                     Not offered when that is already the case. It would be
+                     refused on save as "nothing to convert", which is a poor
+                     way to learn that the page preselected something
+                     unusable, and the settings in its panel belong to creating
+                     a mailbox rather than editing one: quota and the rest are
+                     changed on the mailbox itself. --->
+                <cfoutput><cfif NOT prefillBuiltin>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin"<cfoutput><cfif prefillBuiltin> checked</cfif></cfoutput>>
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin">
                     <label class="form-check-label" for="backend_builtin">
                         <strong>Built-in Email Server</strong>
                         <br><small class="text-muted">Host these recipients' mail on Hermes instead of sending it on. Creates a mailbox for each one, keeping their existing login.</small>
                     </label>
+                </div>
+                </cfif></cfoutput>
+
+                <!--- Built-in mailbox settings. Deliberately short. Everything
+                that can be carried over from the recipient is carried over
+                rather than asked for: the spam policy, the encryption flags,
+                signing, MFA enforcement, and the authentication type with its
+                directory. What is left is what genuinely has no previous
+                value, and it is applied to every selected recipient.
+
+                Not asked for, and why:
+                display name   taken from what the directory already told us
+                during provisioning, falling back to the
+                address local part
+                password       not touched. A remote-auth recipient keeps
+                authenticating against the provider, and a
+                local one keeps the password it already has.
+                Converting forty people must not reset forty
+                passwords
+                certificates   no S/MIME is minted here. Existing
+                certificates are untouched, and a new one can
+                be issued afterwards as usual --->
+                <div id="builtin_backend_fields" style="display: none; padding-left: 25px; border-left: 3px solid #198754;">
+                <div class="alert alert-info py-2">
+                <small><strong>Each selected recipient gets a mailbox on this server.</strong>
+                Their existing login still works, nothing is sent to the old backend any more,
+                and the spam policy, encryption and authentication settings they already have
+                are kept. Their domain becomes a hybrid domain: the recipients you do not
+                convert carry on going to the provider exactly as before.</small>
+                </div>
+                <cfoutput><cfif redirectExplicitCount GT 0>
+                <div class="alert alert-danger py-2">
+                <small>
+                <strong>#redirectExplicitCount# of these <cfif redirectExplicitCount NEQ 1>addresses are<cfelse>address is</cfif> deliberately redirected elsewhere</strong>
+                and cannot be hosted here until that is changed. Saving will be refused.
+                <ul class="mb-0 mt-1">
+                <cfloop list="#redirectExplicit#" index="rRow" delimiters=";">
+                <li><code>#HTMLEditFormat(ListGetAt(rRow, 1, Chr(31)))#</code> &rarr;
+                <code>#HTMLEditFormat(ListGetAt(rRow, 4, Chr(31)))#</code>, under
+                <cfif ListGetAt(rRow, 2, Chr(31)) EQ "virtual"><a href="view_virtual_recipients.cfm">Virtual Recipients</a><cfelse><a href="view_mailbox_aliases.cfm">Aliases</a></cfif></li>
+                </cfloop>
+                </ul>
+                </small>
+                </div>
+                </cfif></cfoutput>
+
+                <cfoutput><cfif redirectCatchAllCount GT 0>
+                <div class="alert alert-warning py-2">
+                <small>
+                <strong>#redirectCatchAllCount# of these <cfif redirectCatchAllCount NEQ 1>addresses have<cfelse>address has</cfif> mail redirected by a catch-all</strong><cfif Len(catchAllKey)>, <code>#HTMLEditFormat(catchAllKey)#</code> &rarr; <code>#HTMLEditFormat(catchAllTo)#</code></cfif>.
+                Postfix rewrites the recipient before it decides where to deliver, so without an
+                entry of their own the new <cfif redirectCatchAllCount NEQ 1>mailboxes<cfelse>mailbox</cfif>
+                would never receive anything.
+                </small>
+                <div class="form-check mt-2">
+                <input class="form-check-input" type="checkbox" name="builtin_exempt_catchall" id="builtin_exempt_catchall" value="1" checked>
+                <label class="form-check-label" for="builtin_exempt_catchall">
+                <small>Create a
+                <cfif catchAllSrc EQ "virtual">Virtual Recipient<cfelse>Alias</cfif>
+                for each one pointing at itself, so their mail is delivered here.
+                A specific entry wins over a catch-all, so the rest of the domain is unaffected.</small>
+                </label>
+                </div>
+                </div>
+                </cfif></cfoutput>
+
+                <div class="row">
+                <div class="col-md-3 mb-3">
+                <label for="builtin_quota_gb" class="form-label"><strong>Mailbox Quota (GB)</strong></label>
+                <input type="number" class="form-control" id="builtin_quota_gb" name="builtin_quota_gb" value="5" step="0.01" min="0.01">
+                <small class="text-muted">Applied to every selected recipient</small>
+                </div>
+                <div class="col-md-3 mb-3">
+                <label for="builtin_nextcloud" class="form-label"><strong>Nextcloud Access</strong></label>
+                <select class="form-control" id="builtin_nextcloud" name="builtin_nextcloud">
+                <option value="0" selected>No</option>
+                <option value="1">Yes</option>
+                </select>
+                <small class="text-muted">Files, calendar and contacts</small>
+                </div>
+                <div class="col-md-2 mb-3">
+                <label for="builtin_reports" class="form-label"><strong>Quarantine Notices</strong></label>
+                <select class="form-control" id="builtin_reports" name="builtin_reports">
+                <option value="YES" selected>Yes</option>
+                <option value="NO">No</option>
+                </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                <label for="builtin_train_bayes" class="form-label"><strong>Bayes Training</strong></label>
+                <select class="form-control" id="builtin_train_bayes" name="builtin_train_bayes">
+                <option value="0" selected>No</option>
+                <option value="1">Yes</option>
+                </select>
+                </div>
+                <div class="col-md-2 mb-3">
+                <label for="builtin_download_msg" class="form-label"><strong>Message Download</strong></label>
+                <select class="form-control" id="builtin_download_msg" name="builtin_download_msg">
+                <option value="0" selected>No</option>
+                <option value="1">Yes</option>
+                </select>
+                </div>
+                </div>
                 </div>
 
                 <cfoutput><cfif NOT allOnDomainDefault AND NOT defaultWouldOrphan>
@@ -1128,6 +1246,34 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         <strong>Custom Backend Server</strong>
                         <br><small class="text-muted">Override domain default with a specific backend server for these recipients</small>
                     </label>
+                </div>
+
+                <!--- Custom backend fields. Shown on load when an override is already
+                in force, since the JS below only reacts to a change event. --->
+                <div id="custom_backend_fields" style="<cfoutput><cfif prefillCustom>display: block;<cfelse>display: none;</cfif></cfoutput> padding-left: 25px; border-left: 3px solid #007bff;">
+                <div class="row">
+                <div class="col-md-6 mb-3">
+                <label for="custom_server" class="form-label"><strong>Server Address</strong></label>
+                <input type="text" class="form-control" id="custom_server" name="custom_server" value="<cfoutput>#EncodeForHTMLAttribute(prefillServer)#</cfoutput>" placeholder="e.g., mail.example.com or 192.0.2.10">
+                <small class="text-muted">FQDN or IP address of the backend mail server</small>
+                </div>
+                <div class="col-md-3 mb-3">
+                <label for="custom_port" class="form-label"><strong>Port</strong></label>
+                <input type="number" class="form-control" id="custom_port" name="custom_port" value="<cfoutput>#EncodeForHTMLAttribute(prefillPort)#</cfoutput>" min="1" max="65535">
+                <small class="text-muted">SMTP port (default: 25)</small>
+                </div>
+                <div class="col-md-3 mb-3">
+                <label for="custom_tls" class="form-label"><strong>TLS Mode</strong></label>
+                <select class="form-control" id="custom_tls" name="custom_tls">
+                <cfoutput>
+                <option value="may"<cfif prefillTls EQ "may"> selected</cfif>>May (Opportunistic)</option>
+                <option value="encrypt"<cfif prefillTls EQ "encrypt"> selected</cfif>>Encrypt (Required)</option>
+                <option value="none"<cfif prefillTls EQ "none"> selected</cfif>>None (Disabled)</option>
+                </cfoutput>
+                </select>
+                <small class="text-muted">TLS encryption mode</small>
+                </div>
+                </div>
                 </div>
 
                 <cfoutput><cfif selectedMailboxCount GT 0>
@@ -1204,134 +1350,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </div>
             </cfif></cfoutput>
 
-            <!--- Custom backend fields. Shown on load when an override is already
-                 in force, since the JS below only reacts to a change event. --->
-            <div id="custom_backend_fields" style="<cfoutput><cfif prefillCustom>display: block;<cfelse>display: none;</cfif></cfoutput> padding-left: 25px; border-left: 3px solid #007bff;">
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="custom_server" class="form-label"><strong>Server Address</strong></label>
-                        <input type="text" class="form-control" id="custom_server" name="custom_server" value="<cfoutput>#EncodeForHTMLAttribute(prefillServer)#</cfoutput>" placeholder="e.g., mail.example.com or 192.0.2.10">
-                        <small class="text-muted">FQDN or IP address of the backend mail server</small>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="custom_port" class="form-label"><strong>Port</strong></label>
-                        <input type="number" class="form-control" id="custom_port" name="custom_port" value="<cfoutput>#EncodeForHTMLAttribute(prefillPort)#</cfoutput>" min="1" max="65535">
-                        <small class="text-muted">SMTP port (default: 25)</small>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="custom_tls" class="form-label"><strong>TLS Mode</strong></label>
-                        <select class="form-control" id="custom_tls" name="custom_tls">
-                            <cfoutput>
-                            <option value="may"<cfif prefillTls EQ "may"> selected</cfif>>May (Opportunistic)</option>
-                            <option value="encrypt"<cfif prefillTls EQ "encrypt"> selected</cfif>>Encrypt (Required)</option>
-                            <option value="none"<cfif prefillTls EQ "none"> selected</cfif>>None (Disabled)</option>
-                            </cfoutput>
-                        </select>
-                        <small class="text-muted">TLS encryption mode</small>
-                    </div>
-                </div>
-            </div>
 
-            <!--- Built-in mailbox settings. Deliberately short. Everything
-                 that can be carried over from the recipient is carried over
-                 rather than asked for: the spam policy, the encryption flags,
-                 signing, MFA enforcement, and the authentication type with its
-                 directory. What is left is what genuinely has no previous
-                 value, and it is applied to every selected recipient.
 
-                 Not asked for, and why:
-                   display name   taken from what the directory already told us
-                                  during provisioning, falling back to the
-                                  address local part
-                   password       not touched. A remote-auth recipient keeps
-                                  authenticating against the provider, and a
-                                  local one keeps the password it already has.
-                                  Converting forty people must not reset forty
-                                  passwords
-                   certificates   no S/MIME is minted here. Existing
-                                  certificates are untouched, and a new one can
-                                  be issued afterwards as usual --->
-            <div id="builtin_backend_fields" style="<cfoutput><cfif prefillBuiltin>display: block;<cfelse>display: none;</cfif></cfoutput> padding-left: 25px; border-left: 3px solid #198754;">
-                <div class="alert alert-info py-2">
-                    <small><strong>Each selected recipient gets a mailbox on this server.</strong>
-                    Their existing login still works, nothing is sent to the old backend any more,
-                    and the spam policy, encryption and authentication settings they already have
-                    are kept. Their domain becomes a hybrid domain: the recipients you do not
-                    convert carry on going to the provider exactly as before.</small>
-                </div>
-                <cfoutput><cfif redirectExplicitCount GT 0>
-                <div class="alert alert-danger py-2">
-                    <small>
-                        <strong>#redirectExplicitCount# of these <cfif redirectExplicitCount NEQ 1>addresses are<cfelse>address is</cfif> deliberately redirected elsewhere</strong>
-                        and cannot be hosted here until that is changed. Saving will be refused.
-                        <ul class="mb-0 mt-1">
-                        <cfloop list="#redirectExplicit#" index="rRow" delimiters=";">
-                            <li><code>#HTMLEditFormat(ListGetAt(rRow, 1, Chr(31)))#</code> &rarr;
-                            <code>#HTMLEditFormat(ListGetAt(rRow, 4, Chr(31)))#</code>, under
-                            <cfif ListGetAt(rRow, 2, Chr(31)) EQ "virtual"><a href="view_virtual_recipients.cfm">Virtual Recipients</a><cfelse><a href="view_mailbox_aliases.cfm">Aliases</a></cfif></li>
-                        </cfloop>
-                        </ul>
-                    </small>
-                </div>
-                </cfif></cfoutput>
 
-                <cfoutput><cfif redirectCatchAllCount GT 0>
-                <div class="alert alert-warning py-2">
-                    <small>
-                        <strong>#redirectCatchAllCount# of these <cfif redirectCatchAllCount NEQ 1>addresses have<cfelse>address has</cfif> mail redirected by a catch-all</strong><cfif Len(catchAllKey)>, <code>#HTMLEditFormat(catchAllKey)#</code> &rarr; <code>#HTMLEditFormat(catchAllTo)#</code></cfif>.
-                        Postfix rewrites the recipient before it decides where to deliver, so without an
-                        entry of their own the new <cfif redirectCatchAllCount NEQ 1>mailboxes<cfelse>mailbox</cfif>
-                        would never receive anything.
-                    </small>
-                    <div class="form-check mt-2">
-                        <input class="form-check-input" type="checkbox" name="builtin_exempt_catchall" id="builtin_exempt_catchall" value="1" checked>
-                        <label class="form-check-label" for="builtin_exempt_catchall">
-                            <small>Create a
-                            <cfif catchAllSrc EQ "virtual">Virtual Recipient<cfelse>Alias</cfif>
-                            for each one pointing at itself, so their mail is delivered here.
-                            A specific entry wins over a catch-all, so the rest of the domain is unaffected.</small>
-                        </label>
-                    </div>
-                </div>
-                </cfif></cfoutput>
-
-                <div class="row">
-                    <div class="col-md-3 mb-3">
-                        <label for="builtin_quota_gb" class="form-label"><strong>Mailbox Quota (GB)</strong></label>
-                        <input type="number" class="form-control" id="builtin_quota_gb" name="builtin_quota_gb" value="5" step="0.01" min="0.01">
-                        <small class="text-muted">Applied to every selected recipient</small>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label for="builtin_nextcloud" class="form-label"><strong>Nextcloud Access</strong></label>
-                        <select class="form-control" id="builtin_nextcloud" name="builtin_nextcloud">
-                            <option value="0" selected>No</option>
-                            <option value="1">Yes</option>
-                        </select>
-                        <small class="text-muted">Files, calendar and contacts</small>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="builtin_reports" class="form-label"><strong>Quarantine Notices</strong></label>
-                        <select class="form-control" id="builtin_reports" name="builtin_reports">
-                            <option value="YES" selected>Yes</option>
-                            <option value="NO">No</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="builtin_train_bayes" class="form-label"><strong>Bayes Training</strong></label>
-                        <select class="form-control" id="builtin_train_bayes" name="builtin_train_bayes">
-                            <option value="0" selected>No</option>
-                            <option value="1">Yes</option>
-                        </select>
-                    </div>
-                    <div class="col-md-2 mb-3">
-                        <label for="builtin_download_msg" class="form-label"><strong>Message Download</strong></label>
-                        <select class="form-control" id="builtin_download_msg" name="builtin_download_msg">
-                            <option value="0" selected>No</option>
-                            <option value="1">Yes</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
 
             <div class="mt-4">
                 <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Saving...';this.form.submit();">

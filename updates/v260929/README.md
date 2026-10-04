@@ -190,6 +190,14 @@ Every task now carries a **Purpose**, written for someone deciding whether to
 touch it. Two of them exist to stop the disk filling up, and they now say so
 and ask for confirmation before being disabled.
 
+### Applying a schedule change
+
+Ofelia reads a rendered file, not the task table, so a change to a schedule did
+nothing until something re-rendered it. The only ways to do that from the
+console were side effects of unrelated work, and outside it meant a shell.
+
+There is now an **Apply Schedule** button on the Scheduled Tasks page.
+
 ## Dovecot's log files are no longer unbounded
 
 Dovecot wrote three log files and nothing ever rotated them. On a server where

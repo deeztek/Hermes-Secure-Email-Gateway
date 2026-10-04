@@ -190,6 +190,16 @@ do NOT write here — enable/disable/edit is future tier work.
 <div class="card">
   <div class="card-header">
     <h3 class="card-title"><i class="fas fa-clock me-2"></i>Scheduled Tasks (<cfoutput>#getJobs.recordcount#</cfoutput>)</h3>
+    <!--- Ofelia reads a rendered file, not this table, so a change made here or
+         in the database does nothing until the render runs. Until now the only
+         ways to trigger it from the console were side effects of unrelated
+         work, toggling a job off and on or saving SPF, DMARC, ACME or malware
+         feed settings, and outside the console it meant a docker exec. --->
+    <div class="card-tools">
+      <button type="button" class="btn btn-sm btn-outline-primary" id="regenScheduleBtn">
+        <i class="fas fa-sync-alt me-1"></i>Apply Schedule
+      </button>
+    </div>
   </div>
   <div class="card-body">
     <cfif getJobs.recordcount EQ 0>
@@ -348,6 +358,40 @@ do NOT write here — enable/disable/edit is future tier work.
       "columnDefs": [
         { "orderable": false, "targets": [1, 5, 8] }
       ]
+    });
+
+    // Re-render /etc/ofelia/config.ini from this table and restart the
+    // scheduler. The same generator the toggle uses, so there is one render
+    // path rather than two.
+    $('#regenScheduleBtn').on('click', function() {
+      var $b = $(this).prop('disabled', true);
+      var original = $b.html();
+      $b.html('<i class="fas fa-spinner fa-spin me-1"></i>Applying...');
+      $.post('./inc/regen_ofelia_schedule_action.cfm')
+        .done(function(data) {
+          var r = (typeof data === 'string') ? JSON.parse(data) : data;
+          if (r.success) {
+            $b.removeClass('btn-outline-primary').addClass('btn-success')
+              .html('<i class="fas fa-check me-1"></i>Applied (' + r.jobs + ' active)');
+            setTimeout(function() {
+              $b.removeClass('btn-success').addClass('btn-outline-primary')
+                .html(original).prop('disabled', false);
+            }, 4000);
+          } else {
+            $b.removeClass('btn-outline-primary').addClass('btn-danger')
+              .html('<i class="fas fa-times me-1"></i>Failed');
+            alert('Could not apply the schedule: ' + (r.error || 'unknown error'));
+            setTimeout(function() {
+              $b.removeClass('btn-danger').addClass('btn-outline-primary')
+                .html(original).prop('disabled', false);
+            }, 4000);
+          }
+        })
+        .fail(function() {
+          $b.removeClass('btn-outline-primary').addClass('btn-danger')
+            .html('<i class="fas fa-times me-1"></i>Failed').prop('disabled', false);
+          alert('Could not reach the server to apply the schedule.');
+        });
     });
 
     // Jobs where disabling could cause operational pain — prompt for confirmation.
