@@ -853,7 +853,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     </label>
                 </div>
 
-                <div id="revert_confirm_fields" style="display: none; padding-left: 25px; border-left: 3px solid #dc3545;">
+                <!--- ##dc3545, doubled: this block is inside a cfoutput, where a single #
+                     opens an expression. --->
+                <div id="revert_confirm_fields" style="display: none; padding-left: 25px; border-left: 3px solid ##dc3545;">
                     <div class="alert alert-danger py-2">
                         <small>
                             <strong>This deletes the <cfif selectedMailboxCount NEQ 1>#selectedMailboxCount# mailboxes<cfelse>mailbox</cfif> and everything in <cfif selectedMailboxCount NEQ 1>them<cfelse>it</cfif>.</strong>
