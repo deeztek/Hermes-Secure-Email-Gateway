@@ -91,6 +91,30 @@ Behavior:
     </cfif>
 </cfloop>
 
+<!--- auto_subscribe has been on the shared_mailboxes table and on the add and
+     edit forms since shared mailboxes shipped, and nothing has ever read it.
+     It is what decides the subscribe pass below, which is the behaviour the
+     setting was named for. --->
+<cfquery name="qAclAutoSub" datasource="hermes">
+    SELECT auto_subscribe FROM shared_mailboxes
+     WHERE address = <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
+     LIMIT 1
+</cfquery>
+<cfset aclAutoSubscribe = (qAclAutoSub.recordcount GTE 1 AND Val(qAclAutoSub.auto_subscribe) EQ 1)>
+
+<!--- Members with any right at all, for the subscribe pass below. --->
+<cfset aclMemberList = "">
+<cfloop query="qAclPerms">
+    <cfif qAclPerms.can_read EQ 1 OR qAclPerms.can_write EQ 1 OR qAclPerms.can_delete EQ 1
+       OR qAclPerms.can_insert EQ 1 OR qAclPerms.can_post EQ 1 OR qAclPerms.can_admin EQ 1>
+        <cfset aclMemberList = ListAppend(aclMemberList, LCase(Trim(qAclPerms.username)), " ")>
+    </cfif>
+</cfloop>
+
+<!--- An empty member list makes the subscribe loop a no-op, which is how
+     auto_subscribe = 0 is honoured without a second code path. --->
+<cfif NOT aclAutoSubscribe><cfset aclMemberList = ""></cfif>
+
 <cfinclude template="generate_customtrans.cfm">
 
 <cftry>
@@ -118,7 +142,21 @@ Behavior:
 
          A folder created after this runs will not have one. The sync runs on
          every permission change, so it corrects itself the next time anyone
-         touches the membership. --->
+         touches the membership.
+
+         Members are then subscribed to each folder when the mailbox has
+         auto_subscribe set, which is the half that makes the ACLs useful. Dovecot does not advertise a shared
+         subfolder in a LIST even when the member has lookup on it and can
+         open it by name, and no mail client offers a way to type one in, so
+         granting access without subscribing produces folders that are
+         reachable in theory and invisible in practice. Clients build their
+         tree from the subscribed list, so subscribing is what puts them on
+         screen. See GitHub #344.
+
+         Maildir++ names subfolders .Sent and nested ones .Parent.Child, while
+         the namespace separator is /, hence the leading dot is dropped and the
+         rest translated. Failures are ignored: a member whose account has gone
+         away must not stop the ACLs being written. --->
     <cfsavecontent variable="aclScript"><cfoutput>#chr(35)#!/bin/bash
 set -e
 docker exec -i hermes_dovecot sh -c "
@@ -131,6 +169,15 @@ docker exec -i hermes_dovecot sh -c "
     cp '#aclFilePath#' \"\$d/dovecot-acl\"
     chown vmail:vmail \"\$d/dovecot-acl\"
     chmod 0660 \"\$d/dovecot-acl\"
+  done
+
+  for u in #aclMemberList# ; do
+    doveadm mailbox subscribe -u \"\$u\" 'Shared/#sharedAddress#' 2>/dev/null || true
+    for d in '#aclMailDirPath#'/.[A-Za-z]*/ ; do
+      [ -d \"\$d\" ] || continue
+      f=\$(basename \"\$d\") ; f=\${f#.} ; f=\$(echo \"\$f\" | tr '.' '/')
+      doveadm mailbox subscribe -u \"\$u\" \"Shared/#sharedAddress#/\$f\" 2>/dev/null || true
+    done
   done
 " <<'HERMES_ACL_EOF'
 #aclFileContent#HERMES_ACL_EOF
