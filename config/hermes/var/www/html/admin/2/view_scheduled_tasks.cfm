@@ -412,7 +412,9 @@ do NOT write here — enable/disable/edit is future tier work.
       'hermes-message-cleanup':
         'nothing will enforce the retention policy and the disk will fill, which defers all mail',
       'hermes-dovecot-log-rotate':
-        'Dovecot\'s logs will grow without limit and fill the disk, which defers all mail'
+        'Dovecot\'s logs will grow without limit and fill the disk, which defers all mail',
+      'hermes-service-log-rotate':
+        'the Postfix, mail filter, DMARC, OpenARC, LDAP and Nginx logs will grow without limit and fill the disk, which defers all mail'
     };
 
     var criticalJobs = [
@@ -425,7 +427,10 @@ do NOT write here — enable/disable/edit is future tier work.
       // its disk-full protection "makes it a task an operator cannot safely
       // disable", and it was missing from this list anyway.
       'hermes-message-cleanup',
-      'hermes-dovecot-log-rotate'
+      'hermes-dovecot-log-rotate',
+      // Same class again: no Hermes image runs cron, so nothing else bounds
+      // the six service log volumes this one covers.
+      'hermes-service-log-rotate'
     ];
 
     // Enable/disable toggle handler

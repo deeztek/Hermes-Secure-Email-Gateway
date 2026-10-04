@@ -175,6 +175,124 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!-- LOGS NOT SHOWN HERE -->
+<div class="card card-secondary card-outline mb-4">
+  <div class="card-header">
+    <h3 class="card-title"><i class="fas fa-circle-info"></i> Logs Not Shown Here</h3>
+    <div class="card-tools">
+      <button type="button" class="btn btn-tool" data-bs-toggle="collapse"
+        data-bs-target="#logsNotShownBody" aria-expanded="false" title="Expand">
+        <i class="fas fa-plus"></i>
+      </button>
+    </div>
+  </div>
+  <div id="logsNotShownBody" class="collapse">
+   <div class="card-body">
+
+    <p>
+      The viewer below reads the system log database. Postfix, the mail filter and
+      DMARC send their mail log there, and so does the LDAP directory, which is why
+      those appear in the <strong>Facility</strong> list. Everything else writes to a
+      file or to its container's own output and never reaches the database, so it
+      cannot be searched here.
+    </p>
+
+    <p class="mb-3">
+      To read one of those, run its command on the Hermes host over SSH. Change
+      <code>200</code> for the number of lines you want, or use
+      <code>grep</code> in place of <code>tail</code> to search:
+    </p>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-striped align-middle">
+        <thead>
+          <tr>
+            <th>Source</th>
+            <th>What it covers</th>
+            <th>How to read it</th>
+          </tr>
+        </thead>
+        <tbody>
+            <tr>
+              <td class="text-nowrap"><strong>Nginx</strong></td>
+              <td>Console access and errors, TLS handshake failures</td>
+              <td><code class="user-select-all">docker exec hermes_nginx tail -n 200 /var/log/nginx/hermes_error.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Dovecot</strong></td>
+              <td>IMAP and POP sessions, LMTP delivery into mailboxes, quota</td>
+              <td><code class="user-select-all">docker exec hermes_dovecot tail -n 200 /logs/dovecot.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Authelia</strong></td>
+              <td>Console logins, MFA prompts and enrolment, lockouts</td>
+              <td><code class="user-select-all">docker exec hermes_authelia tail -n 200 /logs/authelia.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>OpenARC</strong></td>
+              <td>ARC sealing and verification</td>
+              <td><code class="user-select-all">docker exec hermes_openarc tail -n 200 /var/log/openarc.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>ClamAV</strong></td>
+              <td>Signature database updates and load failures</td>
+              <td><code class="user-select-all">docker exec hermes_mail_filter tail -n 200 /var/log/clamav/clamav.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Body milter</strong></td>
+              <td>Disclaimers, external banners and signatures: whether each applied, and which rule matched</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_body_milter</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Link Guard</strong></td>
+              <td>Link rewriting and click verdicts</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_linkguard</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Nextcloud</strong></td>
+              <td>File sharing, the user portal, OIDC sign-in</td>
+              <td><code class="user-select-all">docker exec hermes_nextcloud tail -n 200 /var/www/html/data/nextcloud.log</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>CipherMail</strong></td>
+              <td>S/MIME and PGP encryption and decryption</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_ciphermail</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Unbound</strong></td>
+              <td>DNS resolution, DNSSEC and DNSBL lookups</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_unbound</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>MariaDB</strong></td>
+              <td>Database errors and startup problems</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_db_server</code></td>
+            </tr>
+            <tr>
+              <td class="text-nowrap"><strong>Fail2Ban</strong></td>
+              <td>Bans and the rules that triggered them</td>
+              <td><code class="user-select-all">docker logs --tail 200 hermes_fail2ban</code></td>
+            </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout callout-info mb-0">
+      <p class="mb-1">
+        <strong>Older entries may be in an archive.</strong> These logs are rotated
+        daily and compressed, keeping as many days as the retention period above. An
+        entry older than today's file is in a <code>.gz</code> beside it, which
+        <code>zgrep</code> searches without unpacking:
+      </p>
+      <p class="mb-0">
+        <code class="user-select-all">docker exec hermes_dovecot sh -c "zgrep PATTERN /logs/*.gz"</code>
+      </p>
+    </div>
+
+   </div>
+  </div>
+</div>
+
 <!-- LOG VIEWER CARD -->
 <div class="card card-primary card-outline mb-4">
   <div class="card-header">

@@ -192,6 +192,10 @@ services:
   hermes_nginx:
     image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-nginx:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_nginx
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
     dns:
       - ${IPV4SUBNET}.117
     environment:
@@ -345,6 +349,12 @@ services:
       - ./config/certbot/conf:/etc/letsencrypt
       - ./config/ofelia:/etc/ofelia
       - authelia_logs:/opt/hermes/logs/authelia
+      - postfix_dkim_logs:/opt/hermes/logs/postfix_dkim
+      - mail_filter_logs:/opt/hermes/logs/mail_filter
+      - dmarc_logs:/opt/hermes/logs/dmarc
+      - openarc_logs:/opt/hermes/logs/openarc
+      - ldap_logs:/opt/hermes/logs/ldap
+      - nginx_logs:/opt/hermes/logs/nginx
       - ./config/authelia:/etc/authelia
       - ./config/unbound/conf.d:/etc/unbound/conf.d # Unbound
       - ./config/nginx/etc/nginx:/etc/nginx
@@ -821,6 +831,10 @@ services:
   hermes_ldap:
     image: ${IMAGE_REGISTRY:-ghcr.io/deeztek}/hermes-openldap:${HERMES_DOCKER_IMG_VERSION}
     container_name: hermes_ldap
+    logging:
+      options:
+        max-size: 10m
+        max-file: "5"
     dns:
       - ${IPV4SUBNET}.117
     #entrypoint: ["sleep", "infinity"]

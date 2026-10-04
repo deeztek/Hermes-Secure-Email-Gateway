@@ -77,24 +77,69 @@ The `mail.*` selector covers everything that uses syslog facility 2
   RemoteAuth](ldap-remoteauth.md))
 - OpenARC output if the optional service is enabled
 
-What is **not** here:
+What is **not** here, and how to read it instead:
 
-- **nginx access / error logs** — not configured to ship to syslog;
-  read them with `docker exec hermes_nginx tail -f /var/log/nginx/...`
-  or via [Admin Console Firewall](admin-console-firewall.md) /
-  [Intrusion Prevention](intrusion-prevention.md) for the security
-  view.
-- **Authelia auth logs** — written to `/remotelogs/authelia/
-  authelia.log` for fail2ban consumption; see
-  [Authentication Settings](authentication-settings.md) and
-  [Intrusion Prevention](intrusion-prevention.md).
-- **Dovecot login / IMAP logs** — written to
-  `/remotelogs/dovecot/dovecot-info.log` for fail2ban; the LMTP
-  delivery side that Postfix talks to is visible here because Postfix
-  logs the LMTP handoff result.
-- **CommandBox / Lucee application logs** — Lucee internal logs live
-  under the Lucee server home on the data tier, not in `SystemEvents`.
-- **Container stdout/stderr** — `docker logs <name>` only.
+Everything below writes to a file or to its container's own output and never
+reaches the database, so it cannot be searched on this page. The console lists
+these under **Logs Not Shown Here**, with the same commands. Run them on the
+Hermes host over SSH.
+
+| Source | What it covers | How to read it |
+|---|---|---|
+| Nginx | Console access and errors, TLS handshake failures | `docker exec hermes_nginx tail -n 200 /var/log/nginx/hermes_error.log` |
+| Dovecot | IMAP and POP sessions, LMTP delivery into mailboxes, quota | `docker exec hermes_dovecot tail -n 200 /logs/dovecot.log` |
+| Authelia | Console logins, MFA prompts and enrolment, lockouts | `docker exec hermes_authelia tail -n 200 /logs/authelia.log` |
+| OpenARC | ARC sealing and verification | `docker exec hermes_openarc tail -n 200 /var/log/openarc.log` |
+| ClamAV | Signature database updates and load failures | `docker exec hermes_mail_filter tail -n 200 /var/log/clamav/clamav.log` |
+| Body milter | Disclaimers, external banners and signatures: whether each applied, and which rule matched | `docker logs --tail 200 hermes_body_milter` |
+| Link Guard | Link rewriting and click verdicts | `docker logs --tail 200 hermes_linkguard` |
+| Nextcloud | File sharing, the user portal, OIDC sign-in | `docker exec hermes_nextcloud tail -n 200 /var/www/html/data/nextcloud.log` |
+| CipherMail | S/MIME and PGP encryption and decryption | `docker logs --tail 200 hermes_ciphermail` |
+| Unbound | DNS resolution, DNSSEC and DNSBL lookups | `docker logs --tail 200 hermes_unbound` |
+| MariaDB | Database errors and startup problems | `docker logs --tail 200 hermes_db_server` |
+| Fail2Ban | Bans and the rules that triggered them | `docker logs --tail 200 hermes_fail2ban` |
+
+Swap `tail` for `grep` to search, and raise or lower `200` for more or fewer
+lines.
+
+Two paths are worth being precise about, because the obvious guess is wrong.
+Dovecot's and Authelia's logs are each mounted into `hermes_fail2ban` at
+`/remotelogs/...` so fail2ban can watch them. That is a read-only view for one
+consumer, not where to read them: use the commands above, which read the files
+where the service that writes them sees them.
+
+Lucee's own application logs are a third case. They are under the Lucee server
+home on the Data tier and neither this page nor `docker logs` shows them.
+
+### Older entries are in an archive
+
+These files are rotated nightly and compressed, keeping as many days as the
+Log Retention period set on this page. So an entry older than today is in a
+`.gz` beside the live file rather than in it. `zgrep` reads those without
+unpacking:
+
+```bash
+docker exec hermes_dovecot sh -c "zgrep PATTERN /logs/*.gz"
+```
+
+Rotation is covered by two scheduled tasks, and they divide along which
+container the log volume is mounted in rather than along anything meaningful
+to an operator:
+
+| Task | Covers |
+|---|---|
+| `hermes-dovecot-log-rotate` | Dovecot's three log files |
+| `hermes-service-log-rotate` | Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx |
+| `hermes-authelia-log-rotate` | Authelia |
+
+Nextcloud rotates `nextcloud.log` itself at 50MB and keeps one archive, so it
+has no task. MariaDB and the containers that log only to their own output are
+capped by Docker rather than rotated.
+
+Leave all three enabled. Nothing else bounds these files, and a full Data
+volume makes Postfix defer every message with
+`452 4.3.1 Insufficient system storage`, which reads as a mail problem and is
+not one.
 
 This page is the operator's one-stop view for *mail-flow* questions.
 Auth and HTTP-side concerns have their own log surfaces.

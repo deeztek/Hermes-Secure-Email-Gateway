@@ -104,6 +104,27 @@ enabled.
 | `hermes-refresh-network-aliases` | Daily 03:30 | `hermes_commandbox` | Re-resolves enabled SPF-backed [network aliases](network-aliases.md), applies the pages that reference any alias whose ranges moved, and emails a record of what changed. Added v260912 |
 | `hermes-directory-sync` | Every 15 min, `no-overlap` | `hermes_commandbox` | Enumerates every enabled directory connection and stages what it finds. Connections with auto-apply also get their recipients created here. Added v260918, interval shortened from 6h in v260929 |
 | `hermes-dovecot-log-rotate` | Daily 02:15, `no-overlap` | `hermes_dovecot` | Rotates and compresses Dovecot's three log files, keeping 30 days. Added v260929 |
+| `hermes-service-log-rotate` | Daily 02:45, `no-overlap` | `hermes_commandbox` | Rotates and compresses the Postfix, mail filter, DMARC, OpenARC, LDAP and Nginx log volumes, keeping as many days as the Log Retention setting. Added v260929 |
+
+### Why log rotation is three tasks and not one
+
+No Hermes container image runs cron or systemd. The `logrotate` config
+files that Ubuntu's own packages install are therefore present in the
+images and never executed, so every log file written to disk grows
+forever unless a scheduled task bounds it explicitly.
+
+The split across three tasks follows where each log volume is mounted,
+not anything meaningful about the logs:
+
+| Task | Runs in | Because |
+|---|---|---|
+| `hermes-authelia-log-rotate` | `hermes_commandbox` | Authelia's log volume is mounted there |
+| `hermes-dovecot-log-rotate` | `hermes_dovecot` | Dovecot's log volume is mounted only in its own container |
+| `hermes-service-log-rotate` | `hermes_commandbox` | The other six volumes were mounted there in v260929 so one task could cover them all |
+
+Nextcloud is not in any of them. It rotates `nextcloud.log` itself at
+50MB and keeps one archive. Containers that log only to their own
+output are capped by Docker instead.
 
 New jobs added by later features (signature-map regen for the body
 milter, the post-upgrade hook caller, etc.) appear here automatically as
@@ -161,9 +182,10 @@ page.
 The JS layer surfaces a confirm prompt before disabling jobs on a
 **critical list**: `renew-acme-certificate`, `hermes-update-check`,
 `hermes-process-cert-queue`, `hermes-quarantine-notify`,
-`hermes-message-cleanup` and `hermes-dovecot-log-rotate`. The last two
-were added in v260929 because both exist to stop the disk filling, and
-a full disk defers all mail.
+`hermes-message-cleanup`, `hermes-dovecot-log-rotate` and
+`hermes-service-log-rotate`. The last three were added in v260929
+because all of them exist to stop the disk filling, and a full disk
+defers all mail.
 
 Each carries its own reason, so the prompt says what will actually
 happen rather than reciting the same four consequences whatever you

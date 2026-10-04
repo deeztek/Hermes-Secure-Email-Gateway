@@ -152,6 +152,41 @@ SELECT '[job-exec \"hermes-dovecot-log-rotate\"]',
  );
 
 -- ---------------------------------------------------------------------
+-- 3b. Bound the remaining six service log volumes
+--
+-- Section 3 covered Dovecot. These are the rest: Postfix, the mail filter,
+-- DMARC, OpenARC, LDAP and Nginx. The cause is the same for all of them and is
+-- not per-service: no Hermes image runs cron or systemd, so the
+-- /etc/logrotate.d/* files Ubuntu's packages install are never executed. Two
+-- volumes were already bounded (Authelia, Dovecot) only because each got an
+-- explicit job. These six never did.
+--
+-- Runs in hermes_commandbox rather than one job per container, because each
+-- volume is mounted in exactly one service and a per-container job would mean
+-- placing the script inside six images and keeping six entries in step. The
+-- volumes are mounted into commandbox by docker-compose.yml for this purpose,
+-- which is why this release recreates that container on upgrade.
+--
+-- Retention is read from parameters2.system_log_retention, the setting behind
+-- System > System Logs, which already governs how long rows survive in the
+-- Syslog database. One control now covers the rows and the files.
+--
+-- WHERE NOT EXISTS rather than INSERT IGNORE: ofelia_jobs has no unique key on
+-- job_name, so IGNORE would not dedupe and a re-run would add a second copy.
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec \"hermes-service-log-rotate\"]',
+       'Rotates and compresses the six service log volumes that nothing else bounds: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. No Hermes image runs cron or systemd, so the logrotate files Ubuntu''s packages install are never executed and these grew without limit. Honours the System Log Retention setting. Leave enabled: a full data volume defers all mail.',
+       '0 45 02 * * *', '/opt/hermes/schedule/rotate_service_logs.sh', 'hermes_commandbox', 'system', 1, 1
+  FROM DUAL
+ WHERE NOT EXISTS (
+   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` LIKE '%hermes-service-log-rotate%'
+ );
+
+-- ---------------------------------------------------------------------
 -- 4. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
