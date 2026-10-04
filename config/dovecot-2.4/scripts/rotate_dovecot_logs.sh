@@ -54,9 +54,17 @@ for NAME in dovecot.log dovecot-info.log dovecot-debug.log; do
     SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
     echo "$(date) - rotated ${NAME} (${SIZE} bytes), compressing"
 
-    # nice/ionice because the first run on a host that has never rotated can
-    # be compressing well over a gigabyte, and this runs on a live mail server.
+    # nice because the first run on a host that has never rotated can be
+    # compressing well over a gigabyte, and this runs on a live mail server.
     nice -n 19 gzip -f "$ROTATED" 2>/dev/null || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
+
+    # The script runs as root, so the copy and the archive it compresses to are
+    # root-owned while Dovecot's own logs are vmail. Match them, so an archive
+    # is readable by whatever reads the logs and nothing needs root to tidy up.
+    if [ -f "${ROTATED}.gz" ]; then
+        chown vmail:vmail "${ROTATED}.gz" 2>/dev/null || true
+        chmod 0600 "${ROTATED}.gz" 2>/dev/null || true
+    fi
 done
 
 # Tell Dovecot to reopen its log files. Only needed if anything above replaced
