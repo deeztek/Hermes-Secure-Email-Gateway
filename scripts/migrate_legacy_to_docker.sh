@@ -1046,6 +1046,54 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 # ----------------------------------------------------------------------------
+# Enforce the supported TARGET checkout.
+#
+# REQUIRED_BUILD below rejects an unsupported legacy SOURCE. This is its
+# mirror: it rejects an unsupported Docker TARGET. Both exist for the same
+# reason, that the schema-forward delta is calibrated to one pair of ends and
+# silently produces a broken system off either of them.
+#
+# v260912 is the final release that supports this path. The header at the top
+# of this file says so, but nothing enforced it, and the consequence is not a
+# visible failure. stamp_build_no() derives build_no from the newest
+# updates/v<YYMMDD>/ directory in whatever checkout the script is run from, so
+# a run against a later checkout reconciles legacy data against a baseline this
+# path was never calibrated for and then stamps the gateway as that release.
+# Every release after v260912 is thereafter recorded as already applied, and
+# system_update_docker.sh has nothing left to do. The gateway looks current and
+# is missing every delta in between.
+#
+# Checked against updates/ rather than a git tag so it still holds in a tarball
+# export, which is how some bare-metal operators take the repo.
+# ----------------------------------------------------------------------------
+FINAL_MIGRATION_RELEASE="v260912"
+
+if [[ -n "$HERMES_ROOT" && -d "${HERMES_ROOT}/updates" ]]; then
+    _checkout_release=$(ls -1 "${HERMES_ROOT}/updates/" 2>/dev/null         | grep -oE '^v[0-9]{6}$'         | sort         | tail -1)
+
+    # Lexical comparison is safe here: the format is a fixed-width v + 6 digits.
+    if [[ -n "$_checkout_release" && "$_checkout_release" > "$FINAL_MIGRATION_RELEASE" ]]; then
+        error "This checkout is ${_checkout_release}. Legacy migration is supported only up to ${FINAL_MIGRATION_RELEASE}.
+
+  Migration is calibrated to one pair of ends: legacy build ${REQUIRED_BUILD:-240815} in, ${FINAL_MIGRATION_RELEASE} out.
+  Running it from a later checkout would reconcile against a baseline it was
+  never calibrated for, then stamp this gateway as ${_checkout_release}, marking every
+  release in between as already applied.
+
+  Do this instead, in the same clone:
+
+    git checkout ${FINAL_MIGRATION_RELEASE}
+    docker compose up -d
+    sudo $(basename "$0") <same arguments>
+
+  Then take the normal upgrade path to the current release:
+
+    git checkout main
+    sudo scripts/system_update_docker.sh"
+    fi
+fi
+
+# ----------------------------------------------------------------------------
 # Validate a backup filename and enforce the supported source build + type.
 # Legacy system_backup.sh names files: hermes-<type>-<build>-<MM-DD-YYYY>-<HHMM>.tar.gz
 # This migration path is validated ONLY for build 240815 (the final legacy
