@@ -418,11 +418,95 @@ nc_upgrade_if_needed() {
         return 0
     fi
 
+    # ------------------------------------------------------------------
+    # Make sure the temp directory and the log ceiling are in place (#338).
+    #
+    # Runs before the version comparison below, so it applies on every update
+    # and not only on one that bumps Nextcloud. That is deliberate: the key has
+    # to already be set on the release BEFORE the one that needs it, or the
+    # first install to need it is also the first to test this code.
+    #
+    # Nextcloud 34 will not complete an upgrade without a tempdirectory, and it
+    # fails partway rather than refusing up front. Nextcloud will not create the
+    # directory itself, so it is created here. 33:33 is www-data in the image.
+    #
+    # Both calls are idempotent and non-fatal. A failure here must not stop an
+    # update that is otherwise fine.
+    # ------------------------------------------------------------------
+    log "  Ensuring Nextcloud temp directory and log ceiling (#338)..."
+    docker exec -u root hermes_nextcloud sh -c \
+        'mkdir -p /var/www/html/data/nextcloudtmp && chown 33:33 /var/www/html/data/nextcloudtmp' \
+        >> "$LOG_FILE" 2>&1 || warn "    could not create nextcloudtmp (see $LOG_FILE)"
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set tempdirectory (see $LOG_FILE)"
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        config:system:set log_rotate_size --value="52428800" \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set log_rotate_size (see $LOG_FILE)"
+
     # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1
     # vs declared=30.0.15). Prefix-match is the same rule test_nc_integration.sh uses.
     if [[ "$live_nc" == "$declared_nc"* ]]; then
         log "  Live NC version '${live_nc}' matches declared '${declared_nc}' ✓"
         return 0
+    fi
+
+    # ------------------------------------------------------------------
+    # Refuse a multi-major gap (#338).
+    #
+    # Nextcloud majors must be applied strictly one at a time: 32 to 33 to 34.
+    # This function runs ONE `occ upgrade`, which is correct for a single hop
+    # and wrong for anything else. An install that skipped a Hermes release can
+    # arrive here two or more majors behind, and the old behaviour was to run
+    # that single upgrade anyway and fail partway through, leaving Nextcloud
+    # half-upgraded on a customer system.
+    #
+    # Multi-hop cannot be automated from here, because each hop needs the
+    # intermediate Nextcloud image and only one tag is published per release.
+    # So the correct behaviour is to refuse before touching anything and name
+    # the releases to go through. That turns a half-broken install into a clear
+    # instruction.
+    #
+    # Checked on the major component only. Minor and patch gaps are fine.
+    # ------------------------------------------------------------------
+    local live_major declared_major major_gap
+    live_major="${live_nc%%.*}"
+    declared_major="${declared_nc%%.*}"
+
+    if [[ "$live_major" =~ ^[0-9]+$ && "$declared_major" =~ ^[0-9]+$ ]]; then
+        major_gap=$(( declared_major - live_major ))
+
+        if (( major_gap > 1 )); then
+            fatal "Nextcloud cannot be upgraded ${live_major} -> ${declared_major} in one step.
+
+  Live:     ${live_nc}
+  Declared: ${declared_nc}
+
+  Nextcloud majors must be applied one at a time (${live_major} -> $(( live_major + 1 )) -> ... -> ${declared_major}),
+  and each hop needs that release's Nextcloud image. This update publishes one.
+
+  Nothing has been changed. Nextcloud is still running ${live_nc}.
+
+  Upgrade through the intervening Hermes releases one at a time instead of
+  jumping to the newest. Each release carries the Nextcloud major it expects:
+
+    scripts/system_update_docker.sh --target <next release tag>
+
+  Release tags are listed at:
+    https://github.com/deeztek/Hermes-Secure-Email-Gateway/releases"
+        fi
+
+        if (( major_gap < 0 )); then
+            fatal "Nextcloud is newer than this release expects: live ${live_nc}, declared ${declared_nc}.
+
+  occ cannot downgrade, so this is not something the updater can resolve.
+  Nothing has been changed. This usually means a newer release was applied
+  previously and then an older target was selected. Re-run against the newer
+  release tag."
+        fi
+    else
+        warn "  Could not parse NC major versions (live='${live_nc}' declared='${declared_nc}')"
+        warn "  Skipping the multi-major safety check; proceeding with a single occ upgrade."
     fi
 
     log "  NC version drift detected: live='${live_nc}' declared='${declared_nc}'"
@@ -1052,6 +1136,92 @@ summarize() {
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+# ============================================================================
+# PHASE 6: RECLAIM DISK FROM SUPERSEDED IMAGES (#340)
+# ============================================================================
+# Every release pulls a full set of images and nothing ever removed anything.
+# A search of this script for prune, rmi or `image rm` used to return nothing.
+# Roughly twelve images arrive per release and it accrues forever; a long-running
+# install was observed at 157 images, 50.72GB, 86% reclaimable. That lands on the
+# Docker/OS root, which is not one of the four storage tiers an operator sizes and
+# is not the filesystem anything watches.
+#
+# Two passes, deliberately conservative:
+#
+#   1. Dangling images. Untagged layers left behind when a tag moves to a new
+#      digest. Nothing can reference these, so removing them is always safe.
+#
+#   2. Hermes images older than the previous release. KEEP_RELEASES=2 keeps the
+#      current one and the one before it, because reverting to the previously
+#      cached release is the documented rollback path and deleting it would
+#      remove the thing that makes rollback possible. `latest` is never a
+#      candidate: it is matched out, not relied upon to be in use.
+#
+# Non-Hermes images are never touched. Neither is anything in use: docker
+# refuses to remove an image a container references, and that refusal is logged
+# and skipped rather than treated as an error.
+#
+# Runs after phase 5, so a failed update never deletes the images it might need.
+phase6_prune_images() {
+    header "Phase 6 — Reclaim disk from superseded images (#340)"
+
+    local KEEP_RELEASES=2
+
+    if (( DRY_RUN )); then
+        echo -e "${CYAN}[dry-run]${NC} docker image prune -f" | tee -a "$LOG_FILE"
+        echo -e "${CYAN}[dry-run]${NC} (then remove Hermes images older than the newest ${KEEP_RELEASES} releases)" | tee -a "$LOG_FILE"
+        return 0
+    fi
+
+    local before_bytes after_bytes
+    before_bytes=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)
+
+    # --- pass 1: dangling
+    log "Removing dangling images..."
+    docker image prune -f >> "$LOG_FILE" 2>&1 || warn "  docker image prune failed (see $LOG_FILE)"
+
+    # --- pass 2: superseded Hermes release tags
+    #
+    # Only tags shaped v<6 digits> are candidates, which is the release tag
+    # format. Anything else (latest, a hand-applied tag, a branch build) is left
+    # alone because this cannot know what it means.
+    local versions keep_list
+    versions=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+        | grep -E '/hermes-[a-z_]+:v[0-9]{6}$' \
+        | sed 's/.*:v/v/' \
+        | sort -u)
+
+    if [[ -z "$versions" ]]; then
+        log "  No version-tagged Hermes images found; nothing to reclaim."
+        return 0
+    fi
+
+    keep_list=$(echo "$versions" | sort | tail -n "$KEEP_RELEASES")
+    log "  Keeping: $(echo "$keep_list" | tr '\n' ' ')"
+
+    local removed=0 ver img
+    for ver in $(echo "$versions" | sort); do
+        if echo "$keep_list" | grep -qx "$ver"; then
+            continue
+        fi
+
+        for img in $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
+                     | grep -E "/hermes-[a-z_]+:${ver}$"); do
+            if docker rmi "$img" >> "$LOG_FILE" 2>&1; then
+                log "    removed ${img}"
+                removed=$(( removed + 1 ))
+            else
+                # In use, or another tag shares the digest. Both are fine.
+                log "    kept ${img} (in use or shared layers)"
+            fi
+        done
+    done
+
+    after_bytes=$(docker system df --format '{{.Size}}' 2>/dev/null | head -1)
+    log "  Removed ${removed} superseded image tag(s)"
+    log "  Image store: ${before_bytes:-unknown} -> ${after_bytes:-unknown}"
+}
+
 main() {
     header "Hermes SEG Update Orchestrator (#221)"
     log "HERMES_ROOT: $HERMES_ROOT"
@@ -1090,6 +1260,7 @@ main() {
     phase3_apply_release_artifacts
     phase4_finalize
     phase5_post_upgrade
+    phase6_prune_images
     summarize
 }
 
