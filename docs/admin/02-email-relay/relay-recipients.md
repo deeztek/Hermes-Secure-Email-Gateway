@@ -60,7 +60,8 @@ recipients table  (one row per email address)
 ├── enforce_mfa               0 | 1   (admin policy — see #225 Phase 2)
 ├── policy_id  ─────────────► spam_policies.policy_id (SVF policy)
 ├── pdf_enabled / smime_enabled / pgp_enabled / digital_sign
-├── backend_server / backend_port / backend_tls   (per-recipient override, not yet routed: #157)
+├── backend_server / backend_port / backend_tls   (per-recipient override)
+├── backend_transport                             (empty = smtp, 'lmtp' = built-in server)
 └── (cert+keyring slots populated lazily by the queue)
 ```
 
@@ -139,7 +140,7 @@ DataTables Buttons; `stateSave: true`). Columns:
 | PGP | link to `view_recipient_keyrings.cfm?type=1&id=…` | Per-recipient keyring manager |
 | Recipient | `recipients.recipient` | Email address |
 | Auth | `recipients.auth_type` + `remoteauth_domain` | `LOCAL` badge (secondary) or `REMOTE` badge (primary, tooltip shows mapping key) |
-| Backend | `recipients.backend_server[:port]` | Per-recipient override or `(domain default)` placeholder. **Stored only; delivery does not consult it yet ([#157](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/157))** |
+| Backend | `recipients.backend_server[:port]` | Per-recipient override, or `(domain default)`. Routed by `transport_maps`, which asks for the recipient before the domain |
 | 2FA | LDAP `cn=two_factor` + `enforce_mfa` | **Two independent pills** — see [Two-pill 2FA column](#two-pill-2fa-column) below |
 | Policy | `policy.policy_name` via join | Assigned SVF policy |
 | Quarantine Notifications | `user_settings.report_enabled` | `YES` / `NO` badge |
@@ -249,28 +250,123 @@ so the next scheduler tick re-attempts them.
 
 ## Edit Backend page
 
-> **This page stores a value that nothing currently acts on.** The
-> columns are written and displayed correctly, but no Postfix lookup
-> reads them, so a recipient with an override still follows the parent
-> domain's `transport` row. Tracked on
-> [#157](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/157).
-> Do not rely on it to route mail until that is closed.
+Where this recipient's mail is delivered, overriding the parent domain's
+`transport` row. Reached from the bulk action bar with one or more
+recipients selected, and from **Email Server > Mailboxes** as
+**Edit Mail Delivery**, which is the same page.
 
-Per-recipient override of the downstream backend server / port / TLS
-mode. The intent is that `NULL` on all three columns falls back to the
-parent domain's `transport` row (set on the [Domains](domains.md)
-page), so a single recipient can be routed to a different MX from the
-rest of the domain.
+The page offers only the choices that would change something. An option
+already in force is not shown, and the current state is stated above the
+list instead.
 
-What exists today is the schema and this editor. The delivery side was
-designed around a `COALESCE` in a MySQL `transport_maps` query, but
-`transport_maps` is a hash file (`hash:/etc/postfix/transport`) and the
-MySQL lookup is commented out in `main.cf`, so the override is never
-consulted.
+| Option | What it does |
+|---|---|
+| **Built-in Email Server** | Hosts the mail here. Creates a mailbox for each selected recipient and routes `lmtp:[hermes_dovecot]:24` to it |
+| **Use Domain Default** | Clears the override, so the domain's own `transport` row applies. Not offered where that would leave a mailbox receiving nothing |
+| **Custom Backend Server** | Sends to a named host, port and TLS mode |
+| **Revert to Relay Recipient** | Undoes a conversion. Deletes the mailbox and puts the recipient back |
 
-The Backend column on the main table shows the override host (and
-port via tooltip) or `(domain default)` for the fallback case. Both
-reflect what is stored, not what delivery will do.
+### How the override reaches Postfix
+
+`transport_maps` is `mysql:/etc/postfix/mysql-transport.cf`, whose query
+asks for the recipient first and falls back to the domain:
+
+```sql
+(SELECT CONCAT(COALESCE(NULLIF(backend_transport,''),'smtp'), ':[', backend_server, ']:',
+               COALESCE(backend_port, 25))
+   FROM recipients
+  WHERE recipient = '%s' AND backend_server IS NOT NULL AND backend_server <> '')
+UNION ALL
+(SELECT transport FROM transport WHERE domain = '%s')
+LIMIT 1
+```
+
+`backend_transport` is empty for an ordinary override, meaning SMTP, and
+`lmtp` for a recipient delivered to the built-in server. That cannot be
+inferred from the address, which is why the column exists.
+
+Note that `postmap -q` tests one literal key and does **not** walk
+`user@domain` to `domain` the way Postfix does. Querying a full address
+returns a result only if that recipient has an override; otherwise it is
+correctly empty and the domain row is what applies.
+
+### Converting a relay recipient to a mailbox
+
+Choosing **Built-in Email Server** runs
+`inc/mailbox_provision_core.cfm` with `provisionMode = "convert"`, the
+same file **Add Mailbox** runs, so a converted mailbox cannot drift from
+a created one. Four steps differ and no others:
+
+| Step | Difference |
+|---|---|
+| `recipients` | Updated in place, not inserted. `recipient_type` goes relay to mailbox. This is the row Postfix already accepts mail for |
+| `user_settings` | Updated when a row exists. `email` carries no unique key, so a plain insert would silently leave two rows |
+| `mailboxes` | Carries the name resolved from the directory |
+| LDAP | The entry stays and only its role changes. **No password is set** |
+
+**No credential is touched.** A remote-auth recipient carries on
+authenticating against the provider; a local one keeps the password it
+has had since the recipient was created. Converting forty people must not
+reset forty passwords.
+
+**Names come from `directory_import_staging`,** which auto-provisioning
+fills with `display_name`, `first_name` and `last_name` as it enumerates.
+Those rows survive later syncs, which clear only `pending` and `failed`.
+An address added by hand falls back to the local part.
+
+**No certificates are minted.** `form.ca` is deliberately empty, which is
+what step 7 of the provisioning core is guarded on. Existing certificates
+are untouched.
+
+### Addresses that are redirected elsewhere
+
+Postfix expands `virtual_alias_maps` during cleanup, so a redirected
+recipient is rewritten before `transport_maps` is read. A conversion in
+that state succeeds at every layer and delivers nothing: the mailbox is
+created, LDAP moves, `postmap -q` returns `lmtp`, `doveadm user`
+resolves, and the maildir stays empty.
+
+The page checks before converting, and splits by whether anyone decided
+anything about that address specifically:
+
+| Situation | Handling |
+|---|---|
+| Only the domain `@domain` catch-all matches | Offers to create an entry pointing the address at itself, ticked by default. Postfix prefers a specific entry, so the rest of the domain is unaffected |
+| The address has its own entry pointing elsewhere | Refused, naming the entry and which page it lives on |
+
+The lookup mirrors `mysql-virtual.cf`, the union of `virtual_recipients`
+and `mailbox_aliases`. Those are different features with different names
+in the console, **Email Relay > Virtual Recipients** and
+**Email Server > Aliases**, and the refusal names whichever matched.
+
+Entries created this way are written with `virtual_recipients.system = '3'`,
+which only a conversion writes, so reverting removes exactly those and
+leaves anything made by hand alone.
+
+### Reverting
+
+**Revert to Relay Recipient** undoes a conversion. It is offered only when
+something selected is a mailbox, requires a confirmation, and deletes:
+
+- the mailbox and its maildir
+- aliases delivering to that mailbox
+- the catch-all exemption the conversion created
+- the Nextcloud account, files, calendars and contacts
+- `sender_login_maps`, shared-mailbox permissions, ACLs, folder shares and
+  the vacation rule
+
+It does **not** delete the recipient, its `user_settings`, its
+certificates or its LDAP account. The account moves from `cn=mailboxes`
+back to `cn=relays` and keeps its access-control group, so the person can
+still log in.
+
+The confirmation names each of those counts before it is ticked, because
+one of them is somebody's files.
+
+**To keep the mail instead,** use **Delete Mailbox > Convert to a shared
+mailbox** on the Mailboxes page. An address delivers in one place, so
+relaying it to the provider and keeping its old mail here are mutually
+exclusive.
 
 ## Reset 2FA Devices modal
 

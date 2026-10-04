@@ -327,6 +327,45 @@ the message is refused at submission with
 Documented for end users in
 [Set up your devices](../../users/set-up-your-devices.md).
 
+## Edit Mail Delivery
+
+Opens the same page as **Edit Backend** on
+[Relay Recipients](../02-email-relay/relay-recipients.md#edit-backend-page),
+headed *Edit Mail Delivery* when reached from here. It decides where a
+mailbox's mail is delivered, and whether the address should stop being a
+mailbox at all.
+
+A mailbox on a hybrid domain can be sent to a different server, or
+reverted to a plain relay recipient. **Use Domain Default** is not offered
+on a hybrid domain, because the domain default there is the provider and a
+mailbox set to it can never receive anything. That state is not something
+anyone wants, so the page will not produce it, and a posted attempt is
+refused.
+
+### Mail Delivery column
+
+The Mailboxes list says where each mailbox's mail actually goes, which is
+not the same as what is configured:
+
+| Badge | Meaning |
+|---|---|
+| **Local** | Delivered to this mailbox |
+| **Local**, with the domain named | Delivered here by an override of its own while the domain relays elsewhere, a converted recipient |
+| **Routed** | Sent to another server, naming host and port |
+| **Not delivered here** (red) | The domain sends this address elsewhere and the mailbox receives nothing |
+| **Unknown** | No `recipients` row at all, which is not the same as delivering locally |
+
+The state is decided once in SQL as `delivery_state`, so the column and
+the Delivery filter cannot disagree, and the filter offers only states
+that actually occur, disappearing when every mailbox is in the same one.
+
+The red state exists because the column used to read "no override" as
+"delivered locally". That is true on a mailbox domain and false on one
+that relays, so a dead mailbox showed a healthy green badge.
+
+A hybrid domain is marked **Hybrid** in the Domain column, matching the
+badge on [Email Relay > Domains](../02-email-relay/domains.md).
+
 ## Reset 2FA Devices modal
 
 Single-purpose modal that clears Authelia TOTP and WebAuthn device
@@ -403,11 +442,58 @@ The Nextcloud user/data preservation is opt-in via the `Keep Nextcloud
 account data` checkbox surfaced when toggling NC off in Edit Options
 — deletion from this page asks the same question.
 
-> **Dovecot mailbox data on disk is NOT deleted.**
-> `/mnt/vmail/<domain>/<user>/` survives the delete. If you intend
-> to permanently retire the mailbox, remove the directory from the
-> host after the delete completes. This matches the per-domain
-> behavior on [Domains](domains.md).
+### Two outcomes, not a checkbox
+
+The dialog asks what should happen to the mailbox, and the two answers
+are genuinely different operations:
+
+| Outcome | Result |
+|---|---|
+| **Delete the mailbox and all its messages** | The pipeline above, plus the maildir, aliases delivering to it and BCC rules referencing it |
+| **Convert to a shared mailbox** | The person goes, the mailbox stays at the same address and carries on receiving |
+
+This replaced a checkbox, `Also delete all email messages from the
+server`. Unticking it deleted the `mailboxes` row, the LDAP account, the
+recipient and `user_settings` while leaving the maildir on disk with
+nothing referencing it anywhere, no row, no user, nothing listing it.
+Keeping somebody's mail is a reasonable thing to want; leaving it where
+nobody can reach it is not.
+
+### Convert to a shared mailbox
+
+The same teardown runs, minus the parts that would take the mailbox or
+the address with it:
+
+| Kept | Removed |
+|---|---|
+| The maildir and every message | LDAP account and the ability to log in |
+| `recipients`, so Postfix still accepts the address | Nextcloud account, files, calendars, contacts |
+| `user_settings` | Certificates and keyrings |
+| Aliases delivering to it | Their `sender_login_maps` login rows |
+| BCC rules referencing it | Mail filters |
+
+The `mailboxes` row changes `mailbox_type` to `shared` and gains a
+`shared_mailboxes` row. Dovecot's userdb does not filter on
+`mailbox_type`, so the address keeps resolving and keeps receiving with
+no routing change at all.
+
+**The `recipients` row must survive.** On a hybrid domain it is what
+makes Postfix accept the address at RCPT TO and it carries the `lmtp`
+override that delivers it locally. Deleting it would silently start
+rejecting mail to the shared mailbox. It is kept on a mailbox domain too,
+rather than branching on domain type.
+
+That is why `delete_internal_recipients.cfm` takes a `keepRecipientRow`
+parameter. It defaults to false, so every other caller is unchanged, and
+it skips only the block deleting `recipients`, `recipients_temp`,
+`wblist`, `user_settings` and `mailaddr`. The CipherMail, LDAP,
+certificate and keyring teardown still runs, because a shared mailbox has
+no person behind it.
+
+**Nobody has access until members are assigned** under
+[Shared Mailboxes](shared-mailboxes.md). The dialog says so and the
+success message repeats it. That is deliberate: one decision at a time,
+and the members page already exists.
 
 ## Local-auth vs RemoteAuth — the credential split
 

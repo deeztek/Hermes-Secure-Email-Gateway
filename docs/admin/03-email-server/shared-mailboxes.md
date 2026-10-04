@@ -94,20 +94,69 @@ Add Shared Mailbox  ──► shared_mailbox_actions.cfm (add_shared_mailbox)
                               │     - INSERT dovecot_acl_shared (namespace)
                               │     - INSERT sender_login_maps if Send-As
                               │ 10. cfinclude sync_shared_mailbox_acl_file.cfm
-                              │     → writes /srv/mail/<dom>/<local>/dovecot-acl
-                              │       via temp shell script + docker exec -i
-                              │       (heredoc pattern; vmail:vmail 0660)
+                              │     → writes dovecot-acl into the maildir root
+                              │       AND every .Folder beneath it
+                              │     → subscribes each member to each folder
+                              │       (when auto_subscribe = 1)
                               v
                   cflocation → session.m = 1
 ```
 
 Add / Edit / Remove permission flows follow the same shape but only
 touch the rows for one member, then re-call
-`sync_shared_mailbox_acl_file.cfm` to rebuild that mailbox's
-`dovecot-acl` file in place. The sync include uses the **temp shell
-script + heredoc + `docker exec -i`** pattern (it has to — Lucee
-`cfexecute` argument quoting can't reliably ship multiline content
-with embedded special characters through `docker exec`).
+`sync_shared_mailbox_acl_file.cfm` to rebuild that mailbox's ACLs in
+place. The sync include uses the **temp shell script + heredoc +
+`docker exec -i`** pattern (it has to, Lucee `cfexecute` argument
+quoting can't reliably ship multiline content with embedded special
+characters through `docker exec`).
+
+### One ACL file per folder, not one per mailbox
+
+Dovecot's vfile backend reads a `dovecot-acl` per mailbox and **does not
+inherit**, so a file at the maildir root grants `INBOX` alone. The same
+file is therefore copied into every `.Folder` directory beside `cur/`.
+Maildir++ names nested folders `.Parent.Child`, so one glob covers both,
+and each copy is made from the root file rather than rendered again.
+
+This was invisible for a shared mailbox created from scratch, which has
+no history worth reaching. It matters for one converted from somebody's
+personal mailbox, where their Sent, Archive and Drafts would otherwise
+sit on disk unreachable, and when somebody leaves, Sent is usually the
+folder colleagues need most.
+
+### Subscription is what makes folders visible
+
+Granting the ACL is not enough. Dovecot does **not** advertise a shared
+subfolder in a `LIST` even when the member has `lookup` on it and can
+open it by name, and no mail client offers a way to type one in. Clients
+build their folder tree from the *subscribed* set, so the sync subscribes
+each member to the mailbox and each of its folders.
+
+```
+doveadm mailbox list -s -u member@example.com
+  Shared/<box>@example.com
+  Shared/<box>@example.com/Archive
+  Shared/<box>@example.com/Drafts
+  Shared/<box>@example.com/Sent
+  Shared/<box>@example.com/Spam
+  Shared/<box>@example.com/Trash
+```
+
+Thunderbird picks these up on its next refresh with nothing ticked by
+hand, because it is reflecting the server's subscription list.
+
+**`shared_mailboxes.auto_subscribe` decides this.** The column has been
+on the table and on the add and edit forms since shared mailboxes
+shipped and nothing read it; an administrator could set it either way
+with no effect. It now gates the subscribe pass. Set it to No and members
+are given access without the folders being added to their client.
+
+A folder created *after* the last membership change will have neither an
+ACL nor a subscription until the next one, since that is what runs the
+sync.
+
+> **There is no "Inbox" under a shared mailbox.** The shared mailbox
+> entry itself is the inbox. Expect people to look for one.
 
 ## Cards and modals on the page
 

@@ -102,11 +102,26 @@ enabled.
 | `hermes-process-cert-queue` | Every 60s, `no-overlap` | `hermes_commandbox` | Drains the encryption cert lookup queue for outbound S/MIME / PGP recipients |
 | `hermes-fangfrisch-refresh` | Every 10 min | `hermes_mail_filter` | Refreshes third-party ClamAV signature feeds (SecuriteInfo, Sanesecurity, etc.) |
 | `hermes-refresh-network-aliases` | Daily 03:30 | `hermes_commandbox` | Re-resolves enabled SPF-backed [network aliases](network-aliases.md), applies the pages that reference any alias whose ranges moved, and emails a record of what changed. Added v260912 |
+| `hermes-directory-sync` | Every 15 min, `no-overlap` | `hermes_commandbox` | Enumerates every enabled directory connection and stages what it finds. Connections with auto-apply also get their recipients created here. Added v260918, interval shortened from 6h in v260929 |
+| `hermes-dovecot-log-rotate` | Daily 02:15, `no-overlap` | `hermes_dovecot` | Rotates and compresses Dovecot's three log files, keeping 30 days. Added v260929 |
 
 New jobs added by later features (signature-map regen for the body
 milter, the post-upgrade hook caller, etc.) appear here automatically as
 they are seeded into `ofelia_jobs`. The page renders whatever is in the
 table — there is no hardcoded job list in the CFML.
+
+> **A seeded job must also be in `config/ofelia/config.ini`.** That file
+> is bind-mounted straight onto `/etc/ofelia` and is what the scheduler
+> runs until something re-renders it, and what an upgrade restores over
+> the live schedule. `scripts/check_ofelia_seed_drift.sh` guards the pair
+> and runs from the pre-commit hook when either file is staged.
+>
+> `hermes-directory-sync` was seeded in v260918 and missing from that
+> file, because the check only understood the single-line
+> `INSERT IGNORE .. VALUES` form and this job uses
+> `INSERT .. SELECT .. WHERE NOT EXISTS`, which is what you use when
+> there is no unique key to dedupe on. Both fixed in v260929; the check
+> is statement-based now and reads either form.
 
 ## The page columns
 
@@ -115,6 +130,7 @@ The DataTable renders one row per `ofelia_jobs` row.
 | Column | What it shows |
 |---|---|
 | **Name** | The display-friendly name (text between the quotes in `job_name`) |
+| **Purpose** | `ofelia_jobs.description`, what the job is for, written for someone deciding whether to touch it. An operator-added job with no description reads *No description recorded*. Added v260929 |
 | **Type** | The `type` category tag |
 | **Schedule** | Humanized form — `@every 60s` becomes "Every 60 seconds", `0 30 04 * * *` becomes "Daily at 04:30", `0 0 02 * * *` becomes "Daily at 02:00", and so on. Hover for the raw cron expression (commit `8e954d1d`). Anything the humanizer can't cleanly parse falls through to the raw string. |
 | **Container** | Target container (`hermes_commandbox`, `hermes_dmarc`, `hermes_mail_filter`, ...) |
@@ -143,11 +159,38 @@ confusing situation an admin would not be able to diagnose from this
 page.
 
 The JS layer surfaces a confirm prompt before disabling jobs on a
-**critical list** (`renew-acme-certificate`, `hermes-update-check`,
-`hermes-process-cert-queue`, `hermes-quarantine-notify`). The backend
-trusts the request — admins with web access already have the means to
+**critical list**: `renew-acme-certificate`, `hermes-update-check`,
+`hermes-process-cert-queue`, `hermes-quarantine-notify`,
+`hermes-message-cleanup` and `hermes-dovecot-log-rotate`. The last two
+were added in v260929 because both exist to stop the disk filling, and
+a full disk defers all mail.
+
+Each carries its own reason, so the prompt says what will actually
+happen rather than reciting the same four consequences whatever you
+clicked. The backend trusts the request. Admins with web access already have the means to
 disable everything via direct SQL if they want to. The prompt is a
 guard against an accidental click, not an authorization gate.
+
+## Apply Schedule
+
+Ofelia reads `/etc/ofelia/config.ini`, which is rendered from
+`ofelia_jobs`. **Changing that table does nothing until the render
+runs.** Before v260929 the only ways to trigger it from the console were
+side effects of unrelated work, toggling a job off and on again, or
+saving SPF, DMARC, ACME or malware-feed settings, and outside the
+console it meant:
+
+```bash
+docker exec hermes_commandbox curl -s http://localhost:8888/schedule/regen_ofelia_config.cfm
+```
+
+**Saving Email Server Settings does not do it.** That regenerates
+Dovecot's configuration, which is easy to assume and wrong.
+
+The **Apply Schedule** button in the card header posts to
+`inc/regen_ofelia_schedule_action.cfm`, which runs the same
+`ofelia_generate_config.cfm` the toggle uses, so there is one render path
+rather than two. It reports how many jobs are active afterwards.
 
 ## Run Now
 

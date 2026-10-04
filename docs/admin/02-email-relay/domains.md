@@ -58,16 +58,53 @@ inbound domains here, outbound smarthost there.
                 +-----------+
 ```
 
-| Topology | `domains` rows | `mailbox_domains` rows | This page edits |
+| Topology | `domains.type` | `mailbox_domains` rows | This page edits |
 |---|---|---|---|
-| Relay-only | one or more | none | Yes |
-| Mail-server-only | none | one or more | No — use [Email Server > Domains](../03-email-server/domains.md) |
-| Hybrid | one or more (forwarded) | one or more (delivered locally) | Yes, for the relay subset |
+| Relay-only | `relay`, `''` or NULL | none | Yes |
+| Mail-server-only | `mailbox` | one | No, use [Email Server > Domains](../03-email-server/domains.md) |
+| Mixed estate | separate domains, each of the above | per mailbox domain | The relay ones |
+| **Hybrid** | `hybrid` | none | **Yes** |
 
 `view_domains.cfm` filters its main query with
-`WHERE (d.type IS NULL OR d.type = '' OR d.type = 'relay')` so it
-only shows relay-mode rows. Add Domain writes `type='relay'`
-explicitly so the row is unambiguously routed to this page.
+`WHERE (d.type IS NULL OR d.type = '' OR d.type IN ('relay', 'hybrid'))`.
+Add Domain writes `type='relay'` explicitly so the row is unambiguously
+routed to this page.
+
+### Hybrid domains
+
+A **hybrid** domain is one domain where some recipients are hosted here
+and the rest are relayed on. It is not two domains, and it is not a
+mailbox domain.
+
+A relay domain becomes hybrid the first time one of its recipients is
+converted to a built-in mailbox, from
+[Relay Recipients > Edit Backend](relay-recipients.md#edit-backend-page).
+It stays listed on this page, marked **Hybrid**, because that is what it
+still mostly is. It does not appear under Email Server > Domains.
+
+**Postfix needs no changes for this,** which is the part worth
+understanding. A hybrid domain deliberately gets **no** `mailbox_domains`
+row:
+
+| Lookup | Reads | Hybrid domain |
+|---|---|---|
+| `relay_domains` | `domains` where `type <> 'mailbox'` | **Included.** Relay recipients keep being accepted |
+| `virtual_mailbox_domains` | `mailbox_domains` | Excluded, so the domain is never reclassified |
+| `relay_recipient_maps` | `recipients` | Covers both the relay recipients and the converted mailboxes |
+| `transport_maps` | recipient first, then domain | Converted addresses go to the built-in server, everyone else to the domain's backend |
+
+That exclusion matters. `virtual_mailbox_domains` outranks
+`relay_domains` in Postfix, so adding a `mailbox_domains` row would
+reclassify the whole domain and move recipient validation to a map that
+does not cover the relay recipients, their mail would start being
+rejected.
+
+Twenty-one console queries that previously asserted only a
+`type='mailbox'` domain could host mailboxes now accept `hybrid` as
+well, which is what makes those mailboxes visible and manageable. The
+Mailbox Domains CRUD pages deliberately still ask for `mailbox` alone,
+so a hybrid domain is never offered there as an entity to edit or
+delete.
 
 ## How a relay domain becomes Postfix config
 
