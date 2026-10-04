@@ -21,7 +21,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!---
 SYNC SHARED MAILBOX DOVECOT-ACL FILE (vfile driver, Dovecot 2.4+)
 
-Rebuilds /srv/mail/<domain>/<local>/dovecot-acl from the authoritative
+Rebuilds the dovecot-acl files under /srv/mail/<domain>/<local> from the authoritative
 shared_mailbox_permissions table. Dovecot 2.4 removed the non-upstream
 SQL rights driver; vfile (per-Maildir dovecot-acl files) is the only
 shipped driver for per-mailbox rights.
@@ -101,9 +101,38 @@ Behavior:
          cfexecute runs the wrapper shell script; the shell handles the
          heredoc + docker exec -i pipe, sidestepping Lucee's cfexecute
          argument-quoting quirks. --->
+    <!--- The same ACL goes into every folder, not just the maildir root.
+
+         Dovecot's vfile backend reads a dovecot-acl per mailbox and does not
+         inherit, so a file at the root grants INBOX alone. That was invisible
+         for a shared mailbox created from scratch, which has no history worth
+         reaching, and wrong the moment a mailbox is converted from someone's
+         personal one: their Sent, Archive and Drafts sit on disk and nobody
+         can open them. When somebody leaves, Sent is often the folder
+         colleagues need most.
+
+         Maildir++ keeps subfolders as .Name directories beside cur/, nested
+         ones as .Parent.Child, so one glob covers both. The root file is
+         written from stdin and copied into each, which keeps them identical
+         by construction rather than by two code paths agreeing.
+
+         A folder created after this runs will not have one. The sync runs on
+         every permission change, so it corrects itself the next time anyone
+         touches the membership. --->
     <cfsavecontent variable="aclScript"><cfoutput>#chr(35)#!/bin/bash
 set -e
-docker exec -i hermes_dovecot sh -c "mkdir -p '#aclMailDirPath#' && cat > '#aclFilePath#' && chown vmail:vmail '#aclFilePath#' && chmod 0660 '#aclFilePath#'" <<'HERMES_ACL_EOF'
+docker exec -i hermes_dovecot sh -c "
+  mkdir -p '#aclMailDirPath#' &&
+  cat > '#aclFilePath#' &&
+  chown vmail:vmail '#aclFilePath#' &&
+  chmod 0660 '#aclFilePath#' &&
+  for d in '#aclMailDirPath#'/.[A-Za-z]*/ ; do
+    [ -d \"\$d\" ] || continue
+    cp '#aclFilePath#' \"\$d/dovecot-acl\"
+    chown vmail:vmail \"\$d/dovecot-acl\"
+    chmod 0660 \"\$d/dovecot-acl\"
+  done
+" <<'HERMES_ACL_EOF'
 #aclFileContent#HERMES_ACL_EOF
 </cfoutput></cfsavecontent>
 

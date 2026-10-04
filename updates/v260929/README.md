@@ -130,6 +130,16 @@ with their Nextcloud account. Nobody can open it until you add members under
 **Email Server > Shared Mailboxes**, which the dialog says and the confirmation
 repeats.
 
+Members see the whole mailbox, not just its inbox. Shared mailboxes previously
+granted access to the inbox alone, which nobody noticed because a shared
+mailbox created from scratch has no history to reach. A converted one does, and
+when somebody leaves their **Sent** folder is often what colleagues need most.
+Existing shared mailboxes pick this up the next time their membership is
+changed.
+
+One thing worth knowing in a mail client: there is no "Inbox" underneath the
+shared mailbox. The shared mailbox entry itself is the inbox.
+
 This is the Microsoft 365 behaviour, and it is what the old "also delete all
 email messages" checkbox was reaching for. Unticking that used to delete the
 mailbox, the account and the recipient while leaving the messages on disk with
