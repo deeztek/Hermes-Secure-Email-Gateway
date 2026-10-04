@@ -130,15 +130,22 @@ with their Nextcloud account. Nobody can open it until you add members under
 **Email Server > Shared Mailboxes**, which the dialog says and the confirmation
 repeats.
 
-Members see the whole mailbox, not just its inbox. Shared mailboxes previously
-granted access to the inbox alone, which nobody noticed because a shared
-mailbox created from scratch has no history to reach. A converted one does, and
-when somebody leaves their **Sent** folder is often what colleagues need most.
-Existing shared mailboxes pick this up the next time their membership is
-changed.
+Members can now reach the whole mailbox, not just its inbox. Shared mailboxes
+previously granted access to the inbox alone, which nobody noticed because a
+shared mailbox created from scratch has no history to reach. A converted one
+does, and when somebody leaves their **Sent** folder is often what colleagues
+need most. Existing shared mailboxes pick this up the next time their
+membership is changed.
 
-One thing worth knowing in a mail client: there is no "Inbox" underneath the
-shared mailbox. The shared mailbox entry itself is the inbox.
+Two things worth knowing in a mail client:
+
+There is no "Inbox" underneath the shared mailbox. The shared mailbox entry
+itself is the inbox.
+
+The subfolders are reachable but are not advertised when a client asks for the
+folder list, so they may need adding by name, as `Shared/<address>/Sent` and so
+on. This is how Dovecot handles shared mailboxes rather than something specific
+to Hermes.
 
 This is the Microsoft 365 behaviour, and it is what the old "also delete all
 email messages" checkbox was reaching for. Unticking that used to delete the
