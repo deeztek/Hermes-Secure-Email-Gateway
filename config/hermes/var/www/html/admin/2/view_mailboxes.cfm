@@ -585,7 +585,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
             <cfif deliveryState EQ "local_override">
               <span class="badge bg-success">Local</span>
-              <div class="small text-muted">delivered to this mailbox</div>
+              <cfif NOT domainIsLocal>
+                <!--- Delivered here only because of its own override, while
+                     the domain sends everyone else away. That is a converted
+                     recipient, and it is the one thing about this row worth
+                     saying: "delivered to this mailbox" merely repeated the
+                     badge. --->
+                <div class="small text-muted">
+                  kept here; the domain sends to
+                  <cfif Len(Trim(domain_transport))>#HTMLEditFormat(domain_transport)#<cfelse>its own backend</cfif>
+                </div>
+              </cfif>
             <cfelseif deliveryState EQ "routed">
               <span class="badge bg-warning text-dark">Routed</span>
               <div class="small text-muted">
