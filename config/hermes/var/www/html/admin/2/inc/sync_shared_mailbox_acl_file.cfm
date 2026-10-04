@@ -100,7 +100,10 @@ Behavior:
      WHERE address = <cfqueryparam value="#sharedAddress#" cfsqltype="cf_sql_varchar">
      LIMIT 1
 </cfquery>
-<cfset aclAutoSubscribe = (qAclAutoSub.recordcount GTE 1 AND Val(qAclAutoSub.auto_subscribe) EQ 1)>
+<cfset aclAutoSubscribe = false>
+<cfif qAclAutoSub.recordcount GTE 1>
+    <cfset aclAutoSubscribe = (Val(qAclAutoSub.auto_subscribe) EQ 1)>
+</cfif>
 
 <!--- Members with any right at all, for the subscribe pass below. --->
 <cfset aclMemberList = "">
@@ -175,7 +178,7 @@ docker exec -i hermes_dovecot sh -c "
     doveadm mailbox subscribe -u \"\$u\" 'Shared/#sharedAddress#' 2>/dev/null || true
     for d in '#aclMailDirPath#'/.[A-Za-z]*/ ; do
       [ -d \"\$d\" ] || continue
-      f=\$(basename \"\$d\") ; f=\${f#.} ; f=\$(echo \"\$f\" | tr '.' '/')
+      f=\$(basename \"\$d\") ; f=\${f##.} ; f=\$(echo \"\$f\" | tr '.' '/')
       doveadm mailbox subscribe -u \"\$u\" \"Shared/#sharedAddress#/\$f\" 2>/dev/null || true
     done
   done
