@@ -334,10 +334,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getMailboxes" datasource="hermes">
     SELECT m.id, m.username, m.name, m.quota, m.active, m.created, m.modified, m.domain_id,
            m.nextcloud_enabled AS mb_nextcloud,
-           d.domain, d.default_quota_mb,
+           d.domain, d.default_quota_mb, d.type AS domain_type,
+           COALESCE(dt.transport, '') AS domain_transport,
            r.id AS recipient_id, r.id AS theID, r.id AS theOtherID,
            r.policy_id, r.auth_type, r.remoteauth_domain, r.enforce_mfa,
-           r.backend_server, r.backend_port, r.backend_tls,
+           r.backend_server, r.backend_port, r.backend_tls, r.backend_transport,
            IF(r.pdf_enabled = 1, 'YES', 'NO') AS pdf_enabled,
            IF(r.smime_enabled = '1', 'YES', 'NO') AS smime_enabled,
            IF(r.pgp_enabled = 1, 'YES', 'NO') AS pgp_enabled,
@@ -359,6 +360,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                AND slm.sender    <> m.username) AS send_as_list
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id AND d.type IN ('mailbox', 'hybrid')
+    LEFT JOIN transport dt ON dt.id = d.transport_id
     LEFT JOIN recipients r ON r.recipient = m.username
     LEFT JOIN spam_policies sp ON sp.policy_id = r.policy_id
     LEFT JOIN user_settings us ON us.email = m.username
@@ -433,6 +435,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <option value="">All</option>
       <option value="Local">Local only</option>
       <option value="Routed">Routed elsewhere</option>
+      <option value="Elsewhere">Not delivered here (needs attention)</option>
       <option value="Unknown">Unknown (no recipient record)</option>
     </select>
   </div>
@@ -542,30 +545,65 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 emptied the whole table. The token comes first so the anchor
                 works, and the backend detail follows it so the global search
                 box still finds a mailbox by the host its mail goes to. --->
-          <cfset deliveryPort = Val(backend_port) GT 0 ? Val(backend_port) : 25>
-          <cfif Len(Trim(backend_server))>
+          <!--- This column used to read "no override" as "delivered locally",
+               which is only true on a mailbox domain. On a hybrid domain no
+               override means the domain default applies, and the domain
+               default there is the provider, so the mailbox receives nothing.
+               It showed a green Local badge for a mailbox that was dead.
+
+               So the answer now comes from where mail actually goes: an
+               explicit override to the built-in server, an override to
+               somewhere else, or the domain's own transport. --->
+          <cfset deliveryPort   = Val(backend_port) GT 0 ? Val(backend_port) : 25>
+          <cfset domainIsLocal  = FindNoCase("hermes_dovecot", domain_transport) GT 0>
+          <cfset routedLocal    = FindNoCase("hermes_dovecot", backend_server) GT 0>
+
+          <cfif Len(Trim(backend_server)) AND routedLocal>
+            <cfset deliveryState  = "local_override">
+            <cfset deliverySearch = "Local delivered here built-in">
+          <cfelseif Len(Trim(backend_server))>
+            <cfset deliveryState  = "routed">
             <cfset deliverySearch = "Routed #Trim(backend_server)#:#deliveryPort#">
-          <cfelseif Val(recipient_id) GT 0>
-            <cfset deliverySearch = "Local">
-          <cfelse>
+          <cfelseif Val(recipient_id) LT 1>
+            <cfset deliveryState  = "unknown">
             <cfset deliverySearch = "Unknown no recipient record">
+          <cfelseif domainIsLocal>
+            <cfset deliveryState  = "local_domain">
+            <cfset deliverySearch = "Local domain delivers here">
+          <cfelse>
+            <cfset deliveryState  = "not_delivered">
+            <cfset deliverySearch = "Elsewhere not delivered here #Trim(domain_transport)#">
           </cfif>
           <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
-            <cfif Len(Trim(backend_server))>
+            <cfif deliveryState EQ "local_override">
+              <span class="badge bg-success">Local</span>
+              <div class="small text-muted">delivered to this mailbox</div>
+            <cfelseif deliveryState EQ "routed">
               <span class="badge bg-warning text-dark">Routed</span>
               <div class="small text-muted">
                 to #HTMLEditFormat(backend_server)#:#deliveryPort#
                 <cfif Len(Trim(backend_tls))><br>TLS: #HTMLEditFormat(backend_tls)#</cfif>
               </div>
               <div class="small text-muted"><em>mailbox kept, not delivered to</em></div>
-            <cfelseif Val(recipient_id) GT 0>
-              <span class="badge bg-success">Local</span>
-            <cfelse>
+            <cfelseif deliveryState EQ "unknown">
               <!--- The recipients join is a LEFT JOIN. No row means no routing
                    record exists at all, which is not the same as "delivers
                    locally" and should not be shown as if it were. --->
               <span class="badge bg-secondary">Unknown</span>
               <div class="small text-muted">no recipient record</div>
+            <cfelseif deliveryState EQ "local_domain">
+              <span class="badge bg-success">Local</span>
+            <cfelse>
+              <!--- A mailbox on a hybrid domain with no override. The domain
+                   default sends its mail to the provider, so this mailbox
+                   exists and receives nothing. Red, because it is broken
+                   rather than merely configured oddly. --->
+              <span class="badge bg-danger">Not delivered here</span>
+              <div class="small text-muted">
+                domain default sends to
+                <cfif Len(Trim(domain_transport))>#HTMLEditFormat(domain_transport)#<cfelse>the domain backend</cfif>
+              </div>
+              <div class="small text-muted"><em>this mailbox receives nothing</em></div>
             </cfif>
           </td>
           <td>

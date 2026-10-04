@@ -14,6 +14,9 @@
 </cfif>
 <cfset backUrl   = (returnTo EQ "mailboxes") ? "view_mailboxes.cfm" : "view_internal_recipients.cfm">
 <cfset backLabel = (returnTo EQ "mailboxes") ? "Back to Mailboxes"  : "Back to Recipients">
+<!--- The Mailboxes row action is labelled "Edit Mail Delivery", so the page
+     it opens should not be headed "Edit Backend Server". --->
+<cfset pageTitle = (returnTo EQ "mailboxes") ? "Edit Mail Delivery" : "Edit Backend Server">
 
 <!---
 Hermes Secure Email Gateway Copyright Dionyssios Edwards 2011-2026. All Rights Reserved.
@@ -39,7 +42,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Hermes SEG | Edit Backend Server</title>
+  <cfoutput><title>Hermes SEG | #pageTitle#</title></cfoutput>
 
   <cfinclude template="./inc/html_head.cfm" />
 
@@ -58,13 +61,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="container-fluid">
         <div class="row mb-2">
           <div class="col-sm-6">
-            <h1 class="m-0">Edit Backend Server</h1>
+            <cfoutput><h1 class="m-0">#pageTitle#</h1></cfoutput>
           </div><!-- /.col -->
           <div class="col-sm-6">
             <ol class="breadcrumb float-sm-end">
               <li class="breadcrumb-item"><a href="#">Home</a></li>
               <li class="breadcrumb-item"><cfoutput><a href="#backUrl#"><cfif returnTo EQ "mailboxes">Mailboxes<cfelse>Relay Recipients</cfif></a></cfoutput></li>
-              <li class="breadcrumb-item active">Edit Backend</li>
+              <cfoutput><li class="breadcrumb-item active">#pageTitle#</li></cfoutput>
             </ol>
           </div><!-- /.col -->
         </div><!-- /.row -->
@@ -221,6 +224,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfquery>
 <cfset selectedMailboxCount = Val(selectedMailboxes.n)>
 
+<cfquery name="overrideCount" datasource="hermes">
+    SELECT COUNT(*) AS n FROM recipients
+     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+       AND backend_server IS NOT NULL AND backend_server <> ''
+</cfquery>
+<!--- Offering "Use Domain Default" when every selected recipient is already on
+     it is an option that does nothing, and it then needs a paragraph
+     explaining what it would do, competing with the decision actually being
+     made. Shown only when there is an override to clear. --->
+<cfset allOnDomainDefault = (Val(overrideCount.n) EQ 0)>
+
+<!--- A mailbox on a domain whose default is not the built-in server can never
+     receive mail: the domain sends it to the provider instead. There is no
+     configuration in which that is what someone wanted, so it is not a warning,
+     it is a state the page should not be able to produce. Sending a converted
+     person back to the provider is still available, and better served by
+     Revert, which also removes the mailbox that would otherwise sit there
+     dead, or by Custom, which at least names the destination. Set below, once
+     orphanWarnings is known. --->
+
 <cfset defaultGoesTo   = "">
 <cfset orphanWarnings  = "">
 <cfloop query="selectedDomains">
@@ -236,6 +259,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               & Chr(31) & Trim(selectedDomains.domain_transport), ";")>
     </cfif>
 </cfloop>
+
+<cfset defaultWouldOrphan = Len(orphanWarnings) GT 0>
 
 <cfif getSelectedRecipients.recordcount LT 1>
     <div class="alert alert-danger">
@@ -258,7 +283,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset backend_type = form.backend_type>
     </cfif>
 
-    <cfif backend_type EQ "default">
+    <cfif backend_type EQ "default" AND defaultWouldOrphan>
+        <!--- The radio is not rendered in this case, but a hidden control is
+             not a validation. A mailbox whose domain default is not the
+             built-in server would receive nothing. --->
+        <cfset m = "error_default_would_orphan">
+
+    <cfelseif backend_type EQ "default">
         <!--- Clear backend override (set to NULL) --->
         <cfquery datasource="hermes">
             UPDATE recipients
@@ -699,6 +730,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <h5><i class="icon fas fa-ban"></i> Error</h5>
         The mailbox quota must be a number greater than zero.
     </div>
+<cfelseif m EQ "error_default_would_orphan">
+    <div class="alert alert-danger alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <h5><i class="icon fas fa-ban"></i> That would leave the mailbox receiving nothing</h5>
+        <p class="mb-1">The domain default on this domain is not the built-in server, so a mailbox
+        set to it can never receive mail.</p>
+        <p class="mb-0"><small>Choose <strong>Built-in Email Server</strong> to deliver here,
+        <strong>Custom Backend Server</strong> to send it somewhere specific, or
+        <strong>Revert to Relay Recipient</strong> if the mailbox is no longer wanted.
+        Nothing was changed.</small></p>
+    </div>
 <cfelseif m EQ "error_revert_unconfirmed">
     <div class="alert alert-danger alert-dismissible">
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
@@ -801,34 +843,42 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <input type="hidden" name="ids" value="<cfoutput>#ArrayToList(validIds)#</cfoutput>">
             <input type="hidden" name="returnTo" value="<cfoutput>#EncodeForHTMLAttribute(returnTo)#</cfoutput>">
 
-            <div class="mb-3">
-                <label class="form-label"><strong>Backend Server</strong></label>
+            <cfoutput><cfif allOnDomainDefault AND Len(defaultGoesTo)>
+            <div class="alert <cfif selectedMailboxCount GT 0 AND FindNoCase("hermes_dovecot", defaultGoesTo) EQ 0>alert-danger<cfelse>alert-secondary</cfif> py-2">
+                <strong>Currently</strong>
+                <cfif ListLen(ArrayToList(validIds)) GT 1>mail for the selected recipients goes to<cfelse>mail for this recipient goes to</cfif>
+                <code>#HTMLEditFormat(defaultGoesTo)#</code>, the domain default.
+                <cfif selectedMailboxCount GT 0 AND FindNoCase("hermes_dovecot", defaultGoesTo) EQ 0>
+                <br><strong><cfif selectedMailboxCount NEQ 1>#selectedMailboxCount# of them have mailboxes<cfelse>This recipient has a mailbox</cfif> on this server, receiving nothing.</strong>
+                </cfif>
+            </div>
+            </cfif></cfoutput>
 
-                <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_default" value="default"<cfoutput><cfif NOT prefillCustom> checked</cfif></cfoutput>>
-                    <label class="form-check-label" for="backend_default">
-                        <strong>Use Domain Default</strong><cfoutput><cfif Len(defaultGoesTo)> <span class="badge bg-secondary">#HTMLEditFormat(defaultGoesTo)#</span></cfif></cfoutput>
-                        <br><small class="text-muted">Route to the backend server configured in the recipient's domain settings</small>
+            <div class="mb-3">
+                <label class="form-label"><strong><cfoutput><cfif allOnDomainDefault>Change delivery to<cfelse>Backend Server</cfif></cfoutput></strong></label>
+
+                <!--- #290. The third destination is Hermes itself. Choosing it
+                     does more than change routing: the address has no mailbox
+                     to deliver into, so one is created, which is why this
+                     option carries settings and the other two do not. --->
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin">
+                    <label class="form-check-label" for="backend_builtin">
+                        <strong>Built-in Email Server</strong>
+                        <br><small class="text-muted">Host these recipients' mail on Hermes instead of sending it on. Creates a mailbox for each one, keeping their existing login.</small>
                     </label>
                 </div>
 
-                <cfoutput><cfif Len(orphanWarnings)>
-                <div class="alert alert-warning py-2 ms-4 me-2">
-                    <small>
-                        <strong>Domain default does not mean local delivery here.</strong>
-                        <cfloop list="#orphanWarnings#" index="warnRow" delimiters=";">
-                        <br>On <strong>#HTMLEditFormat(ListGetAt(warnRow, 1, Chr(31)))#</strong>
-                        the domain default is <code>#HTMLEditFormat(ListGetAt(warnRow, 3, Chr(31)))#</code>,
-                        and #HTMLEditFormat(ListGetAt(warnRow, 2, Chr(31)))# of the selected
-                        <cfif ListGetAt(warnRow, 2, Chr(31)) EQ "1">recipient has<cfelse>recipients have</cfif>
-                        a mailbox on this server.
-                        </cfloop>
-                        <br><br>Choosing it sends their mail to that destination instead. The mailbox is
-                        kept, with everything already in it, but it stops receiving anything new.
-                        To deliver to it, choose <strong>Built-in Email Server</strong>.
-                    </small>
+                <cfoutput><cfif NOT allOnDomainDefault AND NOT defaultWouldOrphan>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="backend_type" id="backend_default" value="default"<cfif NOT prefillCustom> checked</cfif>>
+                    <label class="form-check-label" for="backend_default">
+                        <strong>Use Domain Default</strong><cfif Len(defaultGoesTo)> <span class="badge bg-secondary">#HTMLEditFormat(defaultGoesTo)#</span></cfif>
+                        <br><small class="text-muted">Route to the backend server configured in the recipient's domain settings</small>
+                    </label>
                 </div>
                 </cfif></cfoutput>
+
 
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="backend_type" id="backend_custom" value="custom"<cfoutput><cfif prefillCustom> checked</cfif></cfoutput>>
@@ -837,6 +887,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         <br><small class="text-muted">Override domain default with a specific backend server for these recipients</small>
                     </label>
                 </div>
+
+                <cfoutput><cfif selectedMailboxCount GT 0>
+                <hr class="my-3">
+                <label class="form-label"><strong>Change what this recipient is</strong></label>
+                </cfif></cfoutput>
 
                 <!--- #290. Reverting is a separate intention from redirecting,
                      and conflating them is what made "Use Domain Default" read
@@ -863,6 +918,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                             <br><br>The <cfif selectedMailboxCount NEQ 1>recipients themselves are<cfelse>recipient itself is</cfif>
                             not deleted: <cfif selectedMailboxCount NEQ 1>they go<cfelse>it goes</cfif> back to being
                             a relay recipient, keeps the same login, and receives mail at the domain's backend again.
+                            <br><br><strong>If you need to keep this mail,</strong> cancel and use
+                            <strong>Delete Mailbox &rarr; Convert to a shared mailbox</strong> on the Mailboxes page
+                            instead. That keeps the address delivering here and the messages reachable.
                         </small>
                     </div>
                     <div class="form-check mb-2">
@@ -874,17 +932,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </div>
                 </cfif></cfoutput>
 
-                <!--- #290. The third destination is Hermes itself. Choosing it
-                     does more than change routing: the address has no mailbox
-                     to deliver into, so one is created, which is why this
-                     option carries settings and the other two do not. --->
-                <div class="form-check">
-                    <input class="form-check-input" type="radio" name="backend_type" id="backend_builtin" value="builtin">
-                    <label class="form-check-label" for="backend_builtin">
-                        <strong>Built-in Email Server</strong>
-                        <br><small class="text-muted">Host these recipients' mail on Hermes instead of sending it on. Creates a mailbox for each one, keeping their existing login.</small>
-                    </label>
-                </div>
             </div>
 
             <cfoutput><cfif prefillMixed>
