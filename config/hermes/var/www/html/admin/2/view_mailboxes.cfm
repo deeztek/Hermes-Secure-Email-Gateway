@@ -539,7 +539,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td>#HTMLEditFormat(name)#</td>
-          <td>#HTMLEditFormat(domain)#</td>
+          <!--- Same badge the Domains list uses. Hybrid is a property of the
+                domain, not of any one mailbox, and naming it here is what
+                makes the Mail Delivery column next to it readable: on a hybrid
+                domain, Local means this mailbox is one of the ones kept here
+                while the rest of the domain relays. --->
+          <!--- data-search is the domain alone. The Domain filter below matches
+                this column exactly, anchored at both ends, and without this the
+                badge would put "deeztek.net Hybrid" in the cell's search text
+                and the filter would match nothing. Same trap the Delivery
+                filter hit. --->
+          <td data-search="#HTMLEditFormat(domain)#">
+            #HTMLEditFormat(domain)#
+            <cfif domain_type EQ "hybrid">
+              <br><span class="badge bg-info text-dark" title="Some recipients on this domain have mailboxes here; the rest are relayed to the domain's backend.">Hybrid</span>
+            </cfif>
+          </td>
           <!--- Mail Delivery. A mailbox whose mail is routed away looks
                 entirely normal everywhere else in this table, so without this
                 an administrator has no way to tell it receives nothing.
@@ -585,17 +600,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td data-search="#EncodeForHTMLAttribute(deliverySearch)#">
             <cfif deliveryState EQ "local_override">
               <span class="badge bg-success">Local</span>
-              <cfif NOT domainIsLocal>
-                <!--- Delivered here only because of its own override, while
-                     the domain sends everyone else away. That is a converted
-                     recipient, and it is the one thing about this row worth
-                     saying: "delivered to this mailbox" merely repeated the
-                     badge. --->
-                <div class="small text-muted">
-                  kept here; the domain sends to
-                  <cfif Len(Trim(domain_transport))>#HTMLEditFormat(domain_transport)#<cfelse>its own backend</cfif>
-                </div>
-              </cfif>
+
             <cfelseif deliveryState EQ "routed">
               <span class="badge bg-warning text-dark">Routed</span>
               <div class="small text-muted">
