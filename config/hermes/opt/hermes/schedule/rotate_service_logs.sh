@@ -82,6 +82,44 @@ retention_for() {
     esac
 }
 
+# Tell a service to reopen its log file, where that service needs telling.
+#
+# Truncating in place normally makes this unnecessary: the inode is kept, and a
+# daemon that opened its log O_APPEND resumes writing at the new end of file.
+# That holds for rsyslog, nginx, slapd and Dovecot.
+#
+# Authelia is the exception and it is not a guess: the script this replaced sent
+# SIGHUP after truncating and documented it as requiring Authelia 4.39+ for log
+# file reopening. Without it there is a real failure mode, where Authelia keeps
+# writing at its pre-truncation offset and the file reads as hundreds of MB of
+# leading NUL bytes. Harmless if it turns out to be unnecessary, so it stays.
+#
+# Non-fatal. A failure here means the log may need a container restart to
+# resume, which is not worth aborting the other seven volumes over.
+post_rotate() {  # <target>
+    case "$1" in
+        authelia)
+            if /usr/local/bin/docker kill --signal=SIGHUP hermes_authelia 2>/dev/null; then
+                echo "$(date) - SIGHUP sent to hermes_authelia (reopen log)"
+            else
+                echo "$(date) - WARNING: could not SIGHUP hermes_authelia; its log may need a container restart to resume"
+            fi
+            ;;
+        dovecot)
+            # The script this replaced ran `doveadm log reopen` and judged it
+            # unnecessary, since it truncates rather than renames. That is
+            # probably right. It is here anyway, because the identical
+            # inference about Authelia's SIGHUP was wrong, and the cost of
+            # being wrong twice is higher than the cost of one docker exec.
+            if /usr/local/bin/docker exec hermes_dovecot doveadm log reopen 2>/dev/null; then
+                echo "$(date) - doveadm log reopen done"
+            else
+                echo "$(date) - WARNING: doveadm log reopen failed (not fatal, the logs were truncated in place)"
+            fi
+            ;;
+    esac
+}
+
 # Rotate one file: copy aside, compress, truncate in place. Used for the
 # per-directory scan below and for the explicit files after it.
 rotate_one() {  # <path>
@@ -139,9 +177,17 @@ for TARGET in $TARGETS; do
     # maxdepth 2 because one service nests its log (clamav/clamav.log under
     # mail_filter). Matching *.log is also what stops this re-rotating its own
     # output, since an archive is named <name>.log.<date>.gz.
-    find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null | while read -r f; do
-        rotate_one "$f"
+    ROTATED_ANY=0
+    for f in $(find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null); do
+        if [ -s "$f" ]; then
+            rotate_one "$f"
+            ROTATED_ANY=1
+        fi
     done
+
+    # Only signal if something was actually rotated, so a quiet service does
+    # not get a pointless SIGHUP every night.
+    [ "$ROTATED_ANY" -eq 1 ] && post_rotate "$TARGET"
 
     DELETED=$(find "$DIR" -maxdepth 2 -type f -name '*.log.*.gz' \
         -mtime +"${KEEP}" -print -delete 2>/dev/null | wc -l)

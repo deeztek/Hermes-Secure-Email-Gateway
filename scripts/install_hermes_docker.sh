@@ -4493,6 +4493,18 @@ run_phase2_db_init() {
             && log "  nextcloud.log rotation handed to hermes-service-log-rotate" \
             || log "  WARNING: Failed to set log_rotate_size"
 
+        # Switch background jobs from AJAX mode to cron mode (#346).
+        #
+        # AJAX mode is the default and runs ONE queued job per page load, so on
+        # a gateway whose Nextcloud is rarely opened the queue barely turns
+        # over. The hermes-nextcloud-cron task now runs cron.php every five
+        # minutes; this tells Nextcloud so, which both stops the AJAX fallback
+        # and makes the admin overview report the real state.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            background:cron >> "$LOG_FILE" 2>&1 \
+            && log "  Background jobs switched to cron mode" \
+            || log "  WARNING: Failed to set background job mode"
+
         # Point Nextcloud at a temp directory inside its own data volume (#338).
         # Nextcloud 34 will not complete an upgrade without one: the default
         # location is too small or not writable in this image, and the upgrade

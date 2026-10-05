@@ -307,9 +307,24 @@ about a gigabyte in total. Nextcloud's internal rotation is now switched off and
 the nightly task takes it over, which also compresses and then ages out the
 archive Nextcloud left behind.
 
-Nextcloud's background jobs not running is a wider problem than its log file,
-affecting trash and version expiry among other things. That is filed separately
-and is not fixed here.
+## Nextcloud's background jobs now actually run
+
+The log was the measurable symptom of something larger: **nothing ran
+Nextcloud's background job queue at all.** No scheduled task, no cron inside the
+container, and the mode left unset, so Nextcloud fell back to running one queued
+job per page load. On a gateway whose Nextcloud is opened occasionally that means
+the queue barely turns over. On one nobody opens, never.
+
+That queue is not only logs. It carries trash and file version expiry, which is
+why storage keeps growing, along with preview generation, notification delivery,
+token cleanup and app repair. None of it could be assumed to be running.
+
+A task now runs it every five minutes, which is what Nextcloud documents, and
+Nextcloud is told so, which also makes its own admin overview report the truth.
+
+If your install has a large trash or many old file versions, expect some
+housekeeping to happen over the first few days after upgrading as a backlog that
+has been building clears.
 
 Two containers were also logging their own output without any size cap, which
 accumulated outside the storage tiers you sized. Both are capped now, the same

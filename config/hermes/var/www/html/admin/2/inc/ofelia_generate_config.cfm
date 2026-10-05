@@ -21,7 +21,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 
 <cfquery name="getofeliajobs" datasource="hermes">
- select job_name, schedule, command, container, active, no_overlap from ofelia_jobs where active = '1'
+ select job_name, schedule, command, container, `user`, active, no_overlap from ofelia_jobs where active = '1'
   </cfquery>
 
 <cfif #getofeliajobs.recordcount# GTE 1>
@@ -39,6 +39,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfoutput query="getofeliajobs">
 
 <cfset jobBlock = "#job_name##chr(10)#schedule = #schedule##chr(10)#container = #container##chr(10)#command = #command#">
+<!--- Ofelia's job-exec runs as root unless told otherwise. Only one job needs
+      a different user (Nextcloud's cron, which must be www-data or it leaves
+      root-owned files in the data directory), so this is emitted only when the
+      column is set. check_ofelia_seed_drift.sh renders the same field in the
+      same position; the two must stay in step. --->
+<cfif Len(Trim(user))><cfset jobBlock = jobBlock & "#chr(10)#user = #Trim(user)#"></cfif>
 <cfif no_overlap EQ 1><cfset jobBlock = jobBlock & "#chr(10)#no-overlap = true"></cfif>
 <cffile action = "append"
     file = "/opt/hermes/tmp/#customtrans3#_ofelia_jobs"

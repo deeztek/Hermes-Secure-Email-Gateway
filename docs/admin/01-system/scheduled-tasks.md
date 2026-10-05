@@ -103,6 +103,7 @@ enabled.
 | `hermes-refresh-network-aliases` | Daily 03:30 | `hermes_commandbox` | Re-resolves enabled SPF-backed [network aliases](network-aliases.md), applies the pages that reference any alias whose ranges moved, and emails a record of what changed. Added v260912 |
 | `hermes-directory-sync` | Every 15 min, `no-overlap` | `hermes_commandbox` | Enumerates every enabled directory connection and stages what it finds. Connections with auto-apply also get their recipients created here. Added v260918, interval shortened from 6h in v260929 |
 | `hermes-service-log-rotate` | Daily 02:00, `no-overlap` | `hermes_commandbox` | Rotates and compresses all eight service log volumes plus `nextcloud.log`, keeping as many days as the Log Retention setting. Added v260929, replacing the separate Authelia and Dovecot tasks |
+| `hermes-nextcloud-cron` | Every 5 min, `no-overlap` | `hermes_nextcloud` | Runs Nextcloud's background job queue as `www-data`. Added v260929; before it, Nextcloud ran jobs in AJAX mode and they barely ran |
 
 ### Why log rotation is one task and not eight
 
@@ -138,9 +139,25 @@ that silently did nothing.
 Nextcloud's log is covered too, by explicit path rather than by
 scanning its data directory, which would be slow and would rotate any
 file a user uploaded with a `.log` extension. Nextcloud's own rotation
-is switched off, because it is a background job and nothing schedules
-Nextcloud's cron, so it barely ran. Containers that log only to their
-own output are capped by Docker instead.
+is switched off, because it is one of the background jobs that
+`hermes-nextcloud-cron` now runs, and keeping two rotators on one file
+would split it unpredictably. Containers that log only to their own
+output are capped by Docker instead.
+
+### Nextcloud's background jobs
+
+`hermes-nextcloud-cron` is the only task that runs as a user other than
+`root`. Ofelia's `job-exec` defaults to root, and Nextcloud's cron run
+as root leaves root-owned files in the data directory that the web
+server then cannot read, so the job sets `user = www-data`.
+
+Before v260929 nothing ran this at all, and Nextcloud fell back to
+**AJAX mode**, where one queued job fires per page load. On a gateway
+whose Nextcloud is opened occasionally that means the queue barely
+turns over, and on one that nobody opens, never. The queue carries
+trash and file version expiry, preview generation, notification
+delivery, token cleanup and app repair, so none of those could be
+assumed to be running.
 
 New jobs added by later features (signature-map regen for the body
 milter, the post-upgrade hook caller, etc.) appear here automatically as

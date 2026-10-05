@@ -448,6 +448,12 @@ nc_upgrade_if_needed() {
         config:system:set log_rotate_size --value="0" \
         >> "$LOG_FILE" 2>&1 || warn "    could not set log_rotate_size (see $LOG_FILE)"
 
+    # Background jobs from AJAX to cron mode (#346). Idempotent, and paired
+    # with the hermes-nextcloud-cron task this release seeds.
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        background:cron \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set background job mode (see $LOG_FILE)"
+
     # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1
     # vs declared=30.0.15). Prefix-match is the same rule test_nc_integration.sh uses.
     if [[ "$live_nc" == "$declared_nc"* ]]; then

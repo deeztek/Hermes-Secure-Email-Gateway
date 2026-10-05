@@ -65,6 +65,7 @@ trap 'rm -f "$EXPECTED" "$ACTUAL"' EXIT
 #   schedule = <schedule>
 #   container = <container>
 #   command = <command>
+#   user = <user>            (only when the user column is set)
 #   no-overlap = true        (only when no_overlap = 1, and it comes LAST)
 #
 python3 - "$SEED_SQL" > "$EXPECTED" <<'PY'
@@ -199,6 +200,13 @@ for stmt in split_statements(src):
     print("schedule = %s" % sched)
     print("container = %s" % cont)
     print("command = %s" % cmd)
+    # Emitted only when set, matching ofelia_generate_config.cfm. Ofelia's
+    # job-exec runs as root otherwise.
+    # The SQL parser yields the literal string 'NULL' for a NULL column, so
+    # that has to count as unset alongside empty and whitespace.
+    job_user = row.get('user', '').strip()
+    if job_user and job_user.upper() != 'NULL':
+        print("user = %s" % job_user)
     if no_overlap == '1':
         print("no-overlap = true")
 PY

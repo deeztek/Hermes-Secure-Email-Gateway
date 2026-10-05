@@ -175,6 +175,41 @@ DELETE FROM `ofelia_jobs`
     OR `job_name` LIKE '%hermes-dovecot-log-rotate%';
 
 -- ---------------------------------------------------------------------
+-- 3c. Run Nextcloud's background job queue (#346)
+--
+-- Nothing ran Nextcloud's cron: no scheduler entry, no cron in the image, and
+-- background_jobs mode unset. Nextcloud therefore fell back to AJAX mode, where
+-- one queued job fires per page load, so on a gateway whose Nextcloud UI is
+-- rarely opened the queue barely turns over.
+--
+-- Found because log rotation is one of those jobs and so gives a measurable
+-- read on it: one install had a 580 MB live log beside a six month old 496 MB
+-- archive. The log itself is handled by section 3 above, which takes it off this
+-- queue entirely. This is the rest of the queue: trash and file version expiry,
+-- previews, notification delivery, token and session cleanup, app repair.
+--
+-- Five minutes is what Nextcloud documents for cron mode. no_overlap because a
+-- backlogged first run can take far longer than the interval.
+--
+-- user = www-data is required rather than cosmetic: Ofelia's job-exec runs as
+-- root by default, and Nextcloud's cron run as root leaves root-owned files in
+-- the data directory that www-data then cannot read. This is the first job to
+-- use that column, so ofelia_generate_config.cfm and
+-- scripts/check_ofelia_seed_drift.sh were both taught to render it.
+--
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `user`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec \"hermes-nextcloud-cron\"]',
+       'Runs Nextcloud''s background job queue every five minutes. Without it Nextcloud falls back to AJAX mode, where one job runs per page load, so on a gateway whose Nextcloud is rarely opened the queue barely turns over: trash and file version expiry, previews, notifications and token cleanup all stall. Runs as www-data; running it as root would leave root-owned files in the data directory.',
+       '@every 5m', 'php -f /var/www/html/cron.php', 'hermes_nextcloud', 'www-data', 'system', 1, 1
+  FROM DUAL
+ WHERE NOT EXISTS (
+   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` LIKE '%hermes-nextcloud-cron%'
+ );
+
+-- ---------------------------------------------------------------------
 -- 4. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
