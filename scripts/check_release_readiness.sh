@@ -164,8 +164,36 @@ fi
 untracked="$(git status --porcelain 2>/dev/null | grep -cE '^\?\?' || true)"
 (( untracked > 0 )) && warn "${untracked} untracked file(s). Confirm none belong in the release"
 
-# ---------------------------------------------------------------- 8. tag
-echo "${BOLD}8. Tag${NC}"
+# ---------------------------------------------------------------- 8. build room
+# Twelve --no-cache builds, nine of which run apt-get upgrade, need real
+# headroom. Observed before this check existed: 68.55 GB of Docker build cache
+# on a disk with 47 GB free at 91% used, which would have failed part way
+# through a release build.
+#
+# Docker/build-all.sh prunes the cache itself now, but that script is
+# gitignored and so does not exist in a fresh clone. This check is the tracked
+# half: it reports the condition even where the local script is absent.
+echo "${BOLD}8. Room to build${NC}"
+if ! command -v docker >/dev/null 2>&1; then
+    warn "docker not on PATH, skipping build-space check (build host only)"
+else
+    droot="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null)"
+    [[ -n "$droot" ]] || droot=/var/lib/docker
+    free_gb="$(df -BG "$droot" 2>/dev/null | tail -1 | awk '{gsub(/G/,"",$4); print $4}')"
+    cache="$(docker system df --format '{{.Type}} {{.Reclaimable}}' 2>/dev/null | awk '/Build Cache/{print $3}')"
+    if [[ -z "$free_gb" ]]; then
+        warn "could not read free space on $droot"
+    elif (( free_gb >= 40 )); then
+        pass "${free_gb}G free on $droot"
+    else
+        fail "only ${free_gb}G free on $droot; twelve --no-cache builds need ~40G"
+        echo "        docker builder prune -f        # reclaimable cache: ${cache:-unknown}"
+        echo "        docker images | grep hermes-   # old version tags (#340 on the build host)"
+    fi
+fi
+
+# ---------------------------------------------------------------- 9. tag
+echo "${BOLD}9. Tag${NC}"
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
     warn "$VERSION already exists locally. Fine at step 9+, wrong at step 1"
 else
