@@ -70,7 +70,20 @@ treated as success (user wasn't in the group).
     </cfif>
 
     <!--- Idempotent: not being in the group is fine --->
-    <cfif errorDetail CONTAINS "No such object" OR errorDetail CONTAINS "No such attribute">
+    <!--- Idempotent: the end state we wanted is already true.
+         Checks cfcatch.detail as well as errorDetail. cfexecute THROWS on a
+         non-zero exit, and when it throws, ldapmodify's stderr lands in
+         cfcatch.detail rather than in the errorVariable. Testing errorDetail
+         alone therefore missed every case this guard exists for: reverting a
+         converted mailbox that never had Nextcloud enabled failed with
+         "modify/delete: member: no such value" while the error shown ended in
+         an empty "LDAP Error:", which is the tell.
+         "no such value" is included because that is the text OpenLDAP uses
+         for a member that is not in the group. --->
+    <cfset ldapIdempotentMsg = errorDetail & " " & cfcatch.message & " " & cfcatch.detail>
+    <cfif ldapIdempotentMsg CONTAINS "No such object"
+       OR ldapIdempotentMsg CONTAINS "No such attribute"
+       OR ldapIdempotentMsg CONTAINS "no such value">
         <!--- User wasn't in nextcloud group, nothing to do --->
     <cfelse>
         <cfset m="LDAP Remove Nextcloud Group: #cfcatch.message# | Detail: #cfcatch.detail# | LDAP Error: #errorDetail#">
