@@ -126,6 +126,16 @@ rotate_one() {  # <path> [dead]
     LOG_FILE="$1"
     DEAD="${2:-}"
 
+    # A dead archive that is already empty: nothing writes to it and there is
+    # nothing left to keep, so remove it rather than leaving a 0-byte file
+    # behind forever. This also tidies up the ones an earlier version of this
+    # script truncated instead of removing.
+    if [ -n "$DEAD" ] && [ -f "$LOG_FILE" ] && [ ! -s "$LOG_FILE" ]; then
+        rm -f "$LOG_FILE"
+        echo "$(date) - removed empty ${LOG_FILE}"
+        return 0
+    fi
+
     # Empty is the normal case for several of these (Dovecot's debug log above
     # all) and is not a problem.
     [ -s "$LOG_FILE" ] || return 0
@@ -216,24 +226,46 @@ for TARGET in $TARGETS; do
     KEEP=$(retention_for "$TARGET")
 
     # maxdepth 2 because services nest logs (clamav/clamav.log under
-    # mail_filter, nginx/*.log under nginx). Matching *.log is also what stops
-    # this re-rotating its own output, since an archive is named
-    # <name>.log.<date>.gz.
+    # mail_filter, nginx/*.log under nginx).
     #
-    # The exclusions are Debian build artifacts, not logs. Docker seeds a new
-    # named volume from the image's own /var/log, so dpkg.log, alternatives.log,
-    # bootstrap.log, apt/* and dbconfig-common/* arrive in every one of these
-    # volumes. They record what the image installed at build time and never
-    # change again, so rotating them destroys install history to save nothing
-    # and buries the real logs in output. faillog and lastlog are excluded for
-    # a different reason: they are sparse binary files, not text.
+    # MATCHED BY NAME, NOT JUST *.log. rsyslog on Ubuntu writes plenty of logs
+    # whose names do not end in .log: syslog, mail.err, mail.warn, mail.info,
+    # messages, debug. Matching only *.log missed every one of them. On a live
+    # server syslog had reached 10.4 GB, the same size as the mail.log beside
+    # it, because the stock config writes *.* to syslog AND mail.* to mail.log,
+    # so every Postfix line is stored twice. Rotating one copy and leaving the
+    # other bounded nothing.
+    #
+    # Two kinds of exclusion:
+    #
+    #  - Debian build artifacts. Docker seeds a new named volume from the
+    #    image's own /var/log, so dpkg.log, alternatives.log, bootstrap.log,
+    #    apt/* and dbconfig-common/* land in every one of these volumes. They
+    #    record what the image installed at build time, never change again, and
+    #    rotating them destroys install history to save nothing.
+    #
+    #  - Binary accounting files: btmp, wtmp, faillog, lastlog, plus journal/
+    #    and private/. lastlog is sparse, so compressing it would produce
+    #    something far larger than its apparent size.
+    #
+    # -type f also excludes the README symlink the systemd package leaves here.
+    # The date-stamped exclusion stops an archive being picked up as a log, now
+    # that the name patterns are broader than .log.
     ROTATED_ANY=0
-    for f in $(find "$DIR" -maxdepth 2 -type f -name '*.log' \
+    for f in $(find "$DIR" -maxdepth 2 -type f \
+                    \( -name '*.log' -o -name '*.err' -o -name '*.warn' \
+                       -o -name '*.info' -o -name 'syslog' -o -name 'messages' \
+                       -o -name 'debug' \) \
+                    -not -name '*.[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].gz' \
                     -not -path '*/apt/*' \
                     -not -path '*/dbconfig-common/*' \
+                    -not -path '*/journal/*' \
+                    -not -path '*/private/*' \
                     -not -name 'dpkg.log' \
                     -not -name 'alternatives.log' \
                     -not -name 'bootstrap.log' \
+                    -not -name 'btmp' \
+                    -not -name 'wtmp' \
                     -not -name 'faillog' \
                     -not -name 'lastlog' \
                     2>/dev/null); do
@@ -247,7 +279,8 @@ for TARGET in $TARGETS; do
     # not get a pointless SIGHUP every night.
     [ "$ROTATED_ANY" -eq 1 ] && post_rotate "$TARGET"
 
-    DELETED=$(find "$DIR" -maxdepth 2 -type f -name '*.log.*.gz' \
+    DELETED=$(find "$DIR" -maxdepth 2 -type f \
+        -name '*.[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9].gz' \
         -mtime +"${KEEP}" -print -delete 2>/dev/null | wc -l)
     if [ "$DELETED" -gt 0 ]; then
         echo "$(date) - ${TARGET}: deleted ${DELETED} archive(s) older than ${KEEP} days"

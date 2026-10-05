@@ -276,8 +276,13 @@ There is now an **Apply Schedule** button on the Scheduled Tasks page.
 
 Hermes writes eight log volumes and rotated two of them. The other six grew
 without limit: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. On a
-long-running server the Postfix log volume had reached 20 GB and one Dovecot log
-1.5 GB.
+long-running server the Postfix volume alone held two files of 10.4 GB each, and
+one Dovecot log had reached 1.5 GB.
+
+Two files of the same size because Postfix's logging is stored twice: the stock
+rsyslog configuration writes everything to `syslog` and mail separately to
+`mail.log`, so every line appears in both. Both are now rotated. Not storing it
+twice in the first place is a separate question and is not changed here.
 
 The cause is the same for all of them and is not per-service. No Hermes
 container image runs cron, so the `logrotate` configuration that the Ubuntu
