@@ -182,7 +182,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <div class="alert alert-warning alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fas fa-exclamation-triangle"></i> Password Check Unavailable</h4>
-    Unable to verify password against breach database. Please try again later.
+    Could not reach api.pwnedpasswords.com to check this password. Either give the gateway outbound HTTPS access to it, or set <strong>Check Password Against haveibeenpwned.com</strong> to NO.
   </div>
 </cfif>
 
@@ -352,7 +352,29 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <i class="fas fa-random"></i> Generate
           </button>
         </div>
-        <small class="text-muted">Minimum 12 characters. No special characters. Password will be checked against known data breaches.</small>
+        <small class="text-muted">Minimum 12 characters. No special characters.</small>
+      </div>
+
+      <!--- HIBP CHECK TOGGLE.
+           The same control System Users has offered all along. Without it the
+           breach check was unconditional here, and it fails closed: if
+           api.pwnedpasswords.com cannot be reached the form refuses the
+           password with "Password Check Unavailable" and there was no way
+           past it, so a gateway with no outbound 443 could not create a
+           mailbox at all. Defaults to YES, so the check stays on. --->
+      <div class="form-group mb-3">
+        <label><strong>Check Password Against haveibeenpwned.com</strong></label>
+        <select class="form-select" name="hibp">
+          <option value="YES" selected>YES</option>
+          <option value="NO">NO</option>
+        </select>
+        <small class="text-muted">
+          Checks the password against known data breaches via
+          <a href="https://haveibeenpwned.com/Passwords" target="_blank">haveibeenpwned.com</a>,
+          which needs outbound HTTPS to api.pwnedpasswords.com. Set to NO on a
+          gateway without outbound Internet access, or the password cannot be
+          verified and will be refused.
+        </small>
       </div>
 
       <!--- QUOTA --->

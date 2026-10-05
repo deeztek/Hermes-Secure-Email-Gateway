@@ -406,9 +406,16 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
         <!--- HIBP breach check --->
         <cfset form.password = form.edit_password>
-        <cfset nextstep = "hibp_done">
-        <cfset hibpRedirectUrl = "view_mailboxes.cfm">
-        <cfinclude template="check_hibp.cfm">
+        <cfparam name="form.hibp" default="YES">
+        <!--- Gated for the same reason as inc/add_mailbox_action.cfm:
+             check_hibp.cfm fails closed when api.pwnedpasswords.com is
+             unreachable, which blocked every password change on a gateway
+             with no outbound 443. Default YES. --->
+        <cfif form.hibp is "YES">
+            <cfset nextstep = "hibp_done">
+            <cfset hibpRedirectUrl = "view_mailboxes.cfm">
+            <cfinclude template="check_hibp.cfm">
+        </cfif>
 
         <!--- Generate LDAP password hash --->
         <cfinclude template="generate_ldap_password.cfm">

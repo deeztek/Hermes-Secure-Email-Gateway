@@ -283,10 +283,20 @@ Requires form variables:
         <cfset session.m = 16>
         <cflocation url="add_mailbox.cfm" addtoken="no">
     </cfif>
-    <!--- HIBP breach check --->
-    <cfset nextstep = "hibp_done">
-    <cfset hibpRedirectUrl = "add_mailbox.cfm">
-    <cfinclude template="check_hibp.cfm">
+    <!--- HIBP breach check.
+         Gated on form.hibp, matching inc/system_user_actions.cfm. It used to
+         be unconditional, and check_hibp.cfm fails CLOSED: a non-200 from
+         api.pwnedpasswords.com sets session.m=100 and redirects, so on a
+         gateway without outbound 443 no mailbox could be created at all. A
+         system user could, because that form has always offered the choice.
+         Default is YES, so checking stays on unless an administrator turns it
+         off for this submission. --->
+    <cfparam name="form.hibp" default="YES">
+    <cfif form.hibp is "YES">
+        <cfset nextstep = "hibp_done">
+        <cfset hibpRedirectUrl = "add_mailbox.cfm">
+        <cfinclude template="check_hibp.cfm">
+    </cfif>
 </cfif>
 
 <!--- VALIDATE NEXTCLOUD TOGGLE --->
