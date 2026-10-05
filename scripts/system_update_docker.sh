@@ -393,6 +393,36 @@ nc_upgrade_if_needed() {
         return 0
     fi
 
+    # ------------------------------------------------------------------
+    # Nextcloud's temp directory (#338). Deliberately the FIRST thing done,
+    # above the occ probe.
+    #
+    # The whole point of shipping this before the release that bumps Nextcloud
+    # is that it is already in place when that release lands. It only needs a
+    # running container, not a responsive occ, so making it wait behind the occ
+    # probe and the version parse created a window where a slow-starting
+    # Nextcloud meant the directory was silently never created and the operator
+    # got only a warning. Two releases later the Nextcloud bump would then fail
+    # partway through, which is precisely the failure #338 exists to prevent.
+    #
+    # Nextcloud 34 will not complete an upgrade without this directory and will
+    # not create one it has been pointed at. 33:33 is www-data in the image.
+    # /var/www/html/data already exists and is owned by www-data on any
+    # installed system, so mkdir -p creates only the leaf.
+    #
+    # Idempotent and non-fatal: it must not stop an update that is otherwise
+    # fine.
+    # ------------------------------------------------------------------
+    log "  Ensuring Nextcloud temp directory (#338)..."
+    if docker exec -u root hermes_nextcloud sh -c \
+        'mkdir -p /var/www/html/data/nextcloudtmp && chown 33:33 /var/www/html/data/nextcloudtmp' \
+        >> "$LOG_FILE" 2>&1; then
+        log "    /var/www/html/data/nextcloudtmp ready"
+    else
+        warn "    could not create nextcloudtmp (see $LOG_FILE)"
+        warn "    A future release that bumps Nextcloud will fail without it. Re-run this updater."
+    fi
+
     # Wait briefly for occ to be responsive (NC may still be initializing
     # after Phase 2's `docker compose up -d`).
     local status_json="" attempt
@@ -408,6 +438,33 @@ nc_upgrade_if_needed() {
         return 0
     fi
 
+    # ------------------------------------------------------------------
+    # Nextcloud settings that need occ but NOT the version comparison (#338,
+    # #346, #347-adjacent).
+    #
+    # Placed before versionstring is parsed, because none of them depend on it.
+    # They used to sit after, which meant an unparseable version string skipped
+    # them even though occ was demonstrably responsive.
+    #
+    # tempdirectory: points Nextcloud at the directory created above.
+    # log_rotate_size=0: switches Nextcloud's internal rotation off, because it
+    #   is a background job and rotate_service_logs.sh owns that file instead.
+    # background:cron: stops Nextcloud running jobs in AJAX mode, where one job
+    #   fires per page load and the queue barely turns over (#346).
+    #
+    # All idempotent and non-fatal.
+    # ------------------------------------------------------------------
+    log "  Applying Nextcloud settings..."
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set tempdirectory (see $LOG_FILE)"
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        config:system:set log_rotate_size --value="0" \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set log_rotate_size (see $LOG_FILE)"
+    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+        background:cron \
+        >> "$LOG_FILE" 2>&1 || warn "    could not set background job mode (see $LOG_FILE)"
+
     # Extract versionstring without depending on host jq.
     local live_nc
     live_nc="$(echo "$status_json" | grep -oE '"versionstring":"[^"]+"' \
@@ -417,42 +474,6 @@ nc_upgrade_if_needed() {
         warn "Could not parse versionstring from occ status output -- skipping NC upgrade detection."
         return 0
     fi
-
-    # ------------------------------------------------------------------
-    # Make sure the temp directory and the log ceiling are in place (#338).
-    #
-    # Runs before the version comparison below, so it applies on every update
-    # and not only on one that bumps Nextcloud. That is deliberate: the key has
-    # to already be set on the release BEFORE the one that needs it, or the
-    # first install to need it is also the first to test this code.
-    #
-    # Nextcloud 34 will not complete an upgrade without a tempdirectory, and it
-    # fails partway rather than refusing up front. Nextcloud will not create the
-    # directory itself, so it is created here. 33:33 is www-data in the image.
-    #
-    # Both calls are idempotent and non-fatal. A failure here must not stop an
-    # update that is otherwise fine.
-    # ------------------------------------------------------------------
-    log "  Ensuring Nextcloud temp directory and log ceiling (#338)..."
-    docker exec -u root hermes_nextcloud sh -c \
-        'mkdir -p /var/www/html/data/nextcloudtmp && chown 33:33 /var/www/html/data/nextcloudtmp' \
-        >> "$LOG_FILE" 2>&1 || warn "    could not create nextcloudtmp (see $LOG_FILE)"
-    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-        config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" \
-        >> "$LOG_FILE" 2>&1 || warn "    could not set tempdirectory (see $LOG_FILE)"
-    # 0 disables Nextcloud's own rotation, which is a background job that
-    # nothing on Hermes schedules (no cron entry, none in the image,
-    # background_jobs unset). rotate_service_logs.sh takes it over by explicit
-    # path. Two rotators on one file would split it unpredictably.
-    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-        config:system:set log_rotate_size --value="0" \
-        >> "$LOG_FILE" 2>&1 || warn "    could not set log_rotate_size (see $LOG_FILE)"
-
-    # Background jobs from AJAX to cron mode (#346). Idempotent, and paired
-    # with the hermes-nextcloud-cron task this release seeds.
-    docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-        background:cron \
-        >> "$LOG_FILE" 2>&1 || warn "    could not set background job mode (see $LOG_FILE)"
 
     # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1
     # vs declared=30.0.15). Prefix-match is the same rule test_nc_integration.sh uses.
