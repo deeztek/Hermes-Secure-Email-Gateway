@@ -32,9 +32,21 @@ The version stamp is stored in two `system_settings` rows:
 
 ### Image registry
 
-Container images live at `ghcr.io/deeztek/hermes-<service>:<tag>`. The registry hostname is configurable via the `IMAGE_REGISTRY` env var in `.env` so the legacy GitLab CR (`hub.deeztek.com/dedwards/hermes-seg-docker-gl`) can still be used during the bootstrap period before ghcr.io is fully populated.
+Container images live at `ghcr.io/deeztek/hermes-<service>:<tag>`, which is the **public** registry every customer install pulls from.
 
-Build/push via `Docker/build-all-ghcr.sh` + `Docker/push-all-ghcr.sh` (ghcr) or `Docker/build-all.sh` + `Docker/push-all.sh` (legacy hub). **When you add a new service container, add it to BOTH the build-all and push-all scripts of the relevant pair** (the `build_image` call and the `IMAGES`/echo lists) — otherwise the release build silently omits it.
+The GitLab CR (`hub.deeztek.com/dedwards/hermes-seg-docker-gl`) is **not** legacy. It is the **staging registry**, and it is where every release is built and tested first. `IMAGE_REGISTRY` in `.env` selects which one a host pulls from, so a Test box can run release candidates that have never been published.
+
+> 🔴 **Nothing reaches ghcr.io until testing has passed.** ghcr.io is GitHub, and publishing there is publishing. Images are promoted to it from the GitLab CR with `Docker/promote-gl-to-ghcr.sh`, which retags the exact bytes that were tested rather than rebuilding them. Nine of the Dockerfiles run `apt-get upgrade`, so a rebuild for the public registry would ship an artifact nobody tested.
+
+Two script families, and the order matters:
+
+| Stage | Scripts | Registry |
+|---|---|---|
+| Build a release candidate | `Docker/build-all.sh` + `Docker/push-all.sh` | GitLab CR (staging) |
+| Publish, after testing | `Docker/promote-gl-to-ghcr.sh` | ghcr.io (public) |
+| Build directly to public | `Docker/build-all-ghcr.sh` + `Docker/push-all-ghcr.sh` | ghcr.io. **Avoid for a release cut**: it publishes before testing |
+
+**When you add a new service container, add it to BOTH the build-all and push-all scripts of the relevant pair** (the `build_image` call and the `IMAGES`/echo lists) and to the promote script, otherwise the release build silently omits it.
 
 **ghcr push auth:** pushing to `ghcr.io/deeztek` needs a token with the **`write:packages`** scope; a plain `gh auth login` does NOT include it (its default scopes are `repo`/`workflow`/`read:org`/`gist`). Add it with `gh auth refresh -h github.com -s write:packages` then `gh auth token | docker login ghcr.io -u deeztek --password-stdin`, or use a classic PAT created with `write:packages` + `read:packages`. A brand-new package (e.g. the first push of a new service) lands **private** by default — set it Public on the GitHub package settings page for a public release.
 
@@ -311,7 +323,11 @@ For maintainers preparing a release:
 
    > **Why the derivation exists.** `schema_updates.sql` advances `build_no` on **upgrades only** (`--apply-schema`); a fresh install imports the baseline and stops. From v260612 through v260723 the baseline literal was never re-bumped, so every fresh install of four consecutive releases reported `v260612`. Fixed 2026-07-31 (#288).
 4. **Add CFML / bash migrations** as needed under `updates/v<DATE>/cfml/` and `updates/v<DATE>/scripts/`.
-5. **Update `.env.template`**: bump `HERMES_DOCKER_IMG_VERSION=v<DATE>` and (if NC bumped) `NCVERSION=...`. `NCVERSION` is release-managed per [#261](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/261) — operators never edit it; bumps land here only after the integration check in step 6 passes.
+5. **Update `.env.template`**, if anything there changed for this release.
+
+   `NCVERSION` is release-managed per [#261](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/261): operators never edit it, and a bump lands here only after the integration check in step 6 passes.
+
+   > 🔴 **`HERMES_DOCKER_IMG_VERSION` stays `latest`. Do not pin it to the release.** `.env.template` is what a *fresh install* copies, and a fresh install should pull whatever `:latest` currently is, so that installing six months from now gets the then-current release rather than this one forever. Pinning a release candidate for testing is done per host with `install_hermes_docker.sh --image-version=`, not in the template.
 6. **(If `NCVERSION` was bumped in step 5) Run the NC integration check on a Test box**:
 
    ```bash
@@ -326,30 +342,99 @@ For maintainers preparing a release:
 
    If anything fails, fix the integration (or revert the `NCVERSION` bump and pin to the prior NC) before continuing. Do not publish a release that ships a failing NC integration.
 
-7. **Draft the GitHub Release body for `v<DATE>`**: list every change in the release. Per-release notes live on the GitHub Release page (created when the tag is pushed) — the cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
-8. **Build + push images at the version tag**: `./Docker/build-all-ghcr.sh v<DATE> && ./Docker/push-all-ghcr.sh v<DATE>`.
+7. **Write `updates/v<DATE>/README.md` as the release notes.** This file *is* the GitHub Release body: `git_release.sh` passes it to `gh release create --notes-file` at step 12, so it is written for customers, not for maintainers. The cumulative `RELEASE-NOTES.md` was retired because release notes belong to a specific tag, not an ever-growing file.
+8. **Build + push the release candidate to the STAGING registry** (GitLab CR, **not** ghcr.io):
 
-   Both scripts take the version as an argument and prompt for it if omitted. They build and push `ghcr.io/deeztek/hermes-<service>:v<DATE>` for all 12 services. `push-all-ghcr.sh` then asks whether to promote what it pushed to `:latest`.
+   ```bash
+   ./Docker/build-all.sh v<DATE> && ./Docker/push-all.sh v<DATE>
+   ```
 
-   > **Answer no to that prompt.** Promote `:latest` only after the release has been tested (step 10). Until then `:latest` keeps pointing at the previous release, so a fresh install during the test window gets the last known-good stack, and `:v<DATE>` gives you something immutable to test against and to roll back to.
+   > 🔴 **Not `build-all-ghcr.sh` here.** ghcr.io is GitHub, and nothing goes to GitHub until testing has passed. The ghcr scripts build *and* publish in one step, which is right for a hotfix you have already validated and wrong for a release cut. Images reach ghcr.io at step 11, by promotion, not by building there.
 
    > **Build all 12 even when only one Dockerfile changed.** `docker-compose.yml` resolves every service through a single `${HERMES_DOCKER_IMG_VERSION}`, so pinning is all-or-nothing and a partially-tagged release breaks `compose pull`. A full `--no-cache` rebuild also picks up base-image security updates across the stack, which is worth doing every release for mail-facing containers. It does widen the test surface: every container is new, not just the one you changed.
 
-   > **Relationship to the `Release images` workflow.** `.github/workflows/release-images.yml` fires on the tag push and copies `:latest` into `:v<DATE>` for all 12 images. When step 8 has already published `:v<DATE>`, the workflow finds the tags present and no-ops, because it refuses to overwrite an existing image tag. That is the intended outcome: the workflow is a backstop for a release cut without these scripts, not the primary mechanism. Release image tags are immutable once published.
-   >
-   > Per-release image tags are what make a release reproducible. Before they existed, ghcr.io carried only `:latest`, a git tag did not correspond to a known set of containers, `--image-version` had nothing to point at, and there was no image-level rollback (#288).
+9. **Tag locally and push the tag to GitLab only**:
 
-9. **Tag + push**: `./scripts/git_release.sh --release v<DATE>` (pushes branch + tag to both GitLab and GitHub). This is what triggers the image-tagging workflow.
+   ```bash
+   git tag v<DATE>
+   git push gitlab v<DATE>
+   ```
 
-   > Push the **tag** at this point, not the GitHub Release. The orchestrator resolves a target by git tag, so the tag has to exist before step 10 can test the upgrade, but nothing reaches customers until the Release is published in step 11. The tag can be force-moved freely while it is unpublished.
+   The orchestrator resolves a target by git tag, so the tag has to exist before step 10 can test the upgrade. It must exist on **GitLab only** at this point.
 
-10. **Test the release**: run `./scripts/system_update_docker.sh v<DATE>` on the Test box and confirm a clean upgrade, then run a fresh install and confirm it comes up. Exercise the actual mail path, not just container health: authenticate to IMAP as a mailbox user and push one message end to end through Amavis. Container-and-database checks alone missed five first-run defects that shipped for months (#292).
+   > **Do not run `scripts/git_release.sh --release` here.** That script pushes the branch and tag to *both* remotes **and creates the GitHub Release in the same run** — there is no tag-only mode. It belongs at step 12, after testing. Until then the tag lives on GitLab alone and can be force-moved freely.
 
-11. **Promote `:latest` and publish**: re-run `./Docker/push-all-ghcr.sh v<DATE>` and answer **yes** to the promotion prompt (or `docker tag`/`docker push` each image by hand), then create the GitHub Release.
+10. **Test the release candidate on the Test box.** Point it at the staging registry first:
 
-    > This is the point of no return, and the reason `:latest` was held back. Everything before it is reversible: the tag can move, and no install pulls a new image until `:latest` does.
+    ```bash
+    # in Test's .env
+    IMAGE_REGISTRY=hub.deeztek.com/dedwards/hermes-seg-docker-gl
+    ```
 
-12. **Verify**: GitHub Release page exists, ghcr.io shows both `:v<DATE>` and an updated `:latest`, and the console reports the new version after an upgrade.
+    Then exercise **both** install paths. Fresh install first, because a broken fresh install is the defect class that has shipped undetected most often:
+
+    ```bash
+    # fresh install -- --image-version is REQUIRED, because .env.template ships
+    # HERMES_DOCKER_IMG_VERSION=latest and :latest is still the PREVIOUS release
+    sudo ./scripts/install_hermes_docker.sh --image-version=v<DATE>
+
+    # upgrade -- --remote=gitlab because GitHub does not have the tag yet
+    sudo ./scripts/system_update_docker.sh --remote=gitlab v<DATE>
+    ```
+
+    **Exercise the actual mail path, not just container health**: authenticate to IMAP as a mailbox user and push one message end to end through Amavis. Container-and-database checks alone missed five first-run defects that shipped for months (#292).
+
+    Anything that only runs during an upgrade needs deliberate setup to be reachable. Image pruning keeps the newest two releases, so it removes nothing unless a third is present:
+
+    ```bash
+    docker pull <staging>/hermes-nginx:v<OLDER>    # before the upgrade
+    ```
+
+11. **Promote the TESTED images to ghcr.io**:
+
+    ```bash
+    gh auth token | docker login ghcr.io -u deeztek --password-stdin
+    ./Docker/promote-gl-to-ghcr.sh v<DATE>        # answer NO to the :latest prompt
+    ```
+
+    This retags the exact bytes that passed step 10 and pushes them. It does not build. Answer **no** to the `:latest` prompt: `:latest` must keep pointing at the previous release until step 13, so a fresh install during the publish window still gets the last known-good stack.
+
+    Images must reach ghcr.io **before** the Release is published, or the first customer to act on the Release announcement finds no images.
+
+12. **Publish the release**:
+
+    ```bash
+    ./scripts/git_release.sh --release v<DATE>
+    ```
+
+    Pushes the branch and tag to both remotes and creates the GitHub Release, using `updates/v<DATE>/README.md` as the body. `--prerelease` marks it as a pre-release if you want it visible but not flagged latest.
+
+    > `.github/workflows/release-images.yml` fires on the tag push and copies `:latest` into `:v<DATE>` for all 12 images. Step 11 has already published `:v<DATE>`, so the workflow finds the tags present and no-ops, because it refuses to overwrite an existing image tag. That is intended: the workflow is a backstop for a release cut made without these scripts, not the primary mechanism. Release image tags are immutable once published.
+
+13. **Promote `:latest`**:
+
+    ```bash
+    ./Docker/promote-gl-to-ghcr.sh v<DATE>        # answer YES this time
+    ```
+
+    This is the point of no return, and the reason `:latest` was held back through steps 8 to 12. Everything before it is reversible: the tag can move, and no existing install pulls a new image until `:latest` does.
+
+14. **Verify**: GitHub Release page exists, ghcr.io shows both `:v<DATE>` and an updated `:latest`, and the console reports the new version after an upgrade.
+
+### Why the order is what it is
+
+Each step exists to keep the next one reversible.
+
+| Up to and including | Still reversible? | Why |
+|---|---|---|
+| 8, staging build | yes | GitLab CR is private and nothing pulls from it by default |
+| 9, tag on GitLab | yes | an unpublished tag can be force-moved |
+| 10, testing | yes | nothing has been published |
+| 11, ghcr `:v<DATE>` | mostly | the tag is immutable, but no install pulls a version tag by default |
+| 12, GitHub Release | no | customers can see it |
+| 13, `:latest` | **no** | every existing install pulls this |
+
+The single rule that generates most of the order: **ghcr.io is GitHub, and publishing to GitHub is publishing.** Build on GitLab, test on GitLab, promote to GitHub.
 
 ## Common scenarios
 
