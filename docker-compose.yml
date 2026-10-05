@@ -348,13 +348,18 @@ services:
       - ./config/commandbox/serverhome/WEB-INF/lucee-server/context/password.txt:/serverhome/WEB-INF/lucee-server/context/password.txt
       - ./config/certbot/conf:/etc/letsencrypt
       - ./config/ofelia:/etc/ofelia
-      - authelia_logs:/opt/hermes/logs/authelia
-      - postfix_dkim_logs:/opt/hermes/logs/postfix_dkim
-      - mail_filter_logs:/opt/hermes/logs/mail_filter
-      - dmarc_logs:/opt/hermes/logs/dmarc
-      - openarc_logs:/opt/hermes/logs/openarc
-      - ldap_logs:/opt/hermes/logs/ldap
-      - nginx_logs:/opt/hermes/logs/nginx
+      # Every log volume in the stack, so one scheduled task can rotate
+      # all of them. /servicelogs rather than /opt/hermes/logs: the latter
+      # is inside a bind mount of the repo working tree, and mail_archive.sh
+      # already uses it for mailarchive.log.
+      - authelia_logs:/servicelogs/authelia
+      - dovecot_logs:/servicelogs/dovecot
+      - postfix_dkim_logs:/servicelogs/postfix_dkim
+      - mail_filter_logs:/servicelogs/mail_filter
+      - dmarc_logs:/servicelogs/dmarc
+      - openarc_logs:/servicelogs/openarc
+      - ldap_logs:/servicelogs/ldap
+      - nginx_logs:/servicelogs/nginx
       - ./config/authelia:/etc/authelia
       - ./config/unbound/conf.d:/etc/unbound/conf.d # Unbound
       - ./config/nginx/etc/nginx:/etc/nginx

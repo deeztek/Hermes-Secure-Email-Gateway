@@ -70,9 +70,8 @@ UPDATE `ofelia_jobs` SET `description` =
   'Builds the daily DMARC aggregate reports from received mail and sends them to the reporting addresses the sending domains publish.'
   WHERE `job_name` LIKE '%hermes-dmarc-report%';
 
-UPDATE `ofelia_jobs` SET `description` =
-  'Rotates and compresses the Authelia authentication logs so they cannot grow without limit.'
-  WHERE `job_name` LIKE '%hermes-authelia-log-rotate%';
+-- No description for hermes-authelia-log-rotate: section 3 below retires that
+-- job, so setting one here would be dead work.
 
 UPDATE `ofelia_jobs` SET `description` =
   'Emails each recipient about their own newly quarantined messages, within about a minute of arrival. This is how quarantine notification works: there is no periodic digest. Disabling it means recipients are never told.'
@@ -125,51 +124,29 @@ UPDATE `ofelia_jobs` SET `schedule` = '@every 15m'
     AND `schedule` = '@every 6h';
 
 -- ---------------------------------------------------------------------
--- 3. Bound Dovecot's log files
+-- 3. One task that bounds every log volume in the stack
 --
--- Dovecot writes dovecot.log, dovecot-info.log and dovecot-debug.log and grew
--- all three forever. Nothing anywhere rotated them. On a host that had debug
--- logging switched on at some point the debug file reached 1.5 GB. A full data
--- volume defers all mail, which makes this the same class as #339 and #341.
+-- Eight volumes, and nothing rotated six of them. One had reached 20 GB and a
+-- Dovecot debug log 1.5 GB.
 --
--- Runs inside hermes_dovecot, not hermes_commandbox, because the log volume is
--- only mounted there. no_overlap because the first run on a host that has
--- never rotated may be compressing more than a gigabyte.
+-- The cause is shared rather than per-service, which is why this is one task
+-- and not eight: no Hermes image runs cron or systemd, so the
+-- /etc/logrotate.d/* files Ubuntu's own packages install inside them are
+-- present and never execute. Rotation only ever happened where something
+-- scheduled it explicitly, which was Authelia alone.
 --
--- WHERE NOT EXISTS rather than INSERT IGNORE: ofelia_jobs has no unique key on
--- job_name, so IGNORE would not dedupe and a re-run would add a second copy.
+-- Replaces hermes-authelia-log-rotate and hermes-dovecot-log-rotate. Both
+-- rotated one volume each with near-identical logic; the Dovecot one had to
+-- hardcode 30 days because it ran in a container with no MySQL client, and the
+-- Authelia one never compressed. docker-compose.yml now mounts all eight
+-- volumes into hermes_commandbox under /servicelogs, so one task reaches every
+-- one of them and can read the retention setting from the database.
 --
--- FRESH-INSTALL: covered-by config/database/hermes_install.sql
--- ---------------------------------------------------------------------
-INSERT INTO `ofelia_jobs`
-  (`job_name`, `description`, `schedule`, `command`, `container`, `type`, `active`, `no_overlap`)
-SELECT '[job-exec \"hermes-dovecot-log-rotate\"]',
-       'Rotates and compresses Dovecot''s three log files and deletes archives older than 30 days. Nothing bounded them before, so on a host that had debug logging on they grew without limit. Leave enabled: a full data volume defers all mail.',
-       '0 15 02 * * *', '/scripts/rotate_dovecot_logs.sh', 'hermes_dovecot', 'system', 1, 1
-  FROM DUAL
- WHERE NOT EXISTS (
-   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` LIKE '%hermes-dovecot-log-rotate%'
- );
-
--- ---------------------------------------------------------------------
--- 3b. Bound the remaining six service log volumes
---
--- Section 3 covered Dovecot. These are the rest: Postfix, the mail filter,
--- DMARC, OpenARC, LDAP and Nginx. The cause is the same for all of them and is
--- not per-service: no Hermes image runs cron or systemd, so the
--- /etc/logrotate.d/* files Ubuntu's packages install are never executed. Two
--- volumes were already bounded (Authelia, Dovecot) only because each got an
--- explicit job. These six never did.
---
--- Runs in hermes_commandbox rather than one job per container, because each
--- volume is mounted in exactly one service and a per-container job would mean
--- placing the script inside six images and keeping six entries in step. The
--- volumes are mounted into commandbox by docker-compose.yml for this purpose,
--- which is why this release recreates that container on upgrade.
---
--- Retention is read from parameters2.system_log_retention, the setting behind
--- System > System Logs, which already governs how long rows survive in the
--- Syslog database. One control now covers the rows and the files.
+-- Retention comes from parameters2.system_log_retention, the setting behind
+-- System > System Logs that already governs how long rows survive in the Syslog
+-- database, so one control covers the rows and the files they came from.
+-- Authelia keeps its own value, because it has a separate retention control on
+-- the Authentication Settings page that would otherwise stop doing anything.
 --
 -- WHERE NOT EXISTS rather than INSERT IGNORE: ofelia_jobs has no unique key on
 -- job_name, so IGNORE would not dedupe and a re-run would add a second copy.
@@ -179,12 +156,23 @@ SELECT '[job-exec \"hermes-dovecot-log-rotate\"]',
 INSERT INTO `ofelia_jobs`
   (`job_name`, `description`, `schedule`, `command`, `container`, `type`, `active`, `no_overlap`)
 SELECT '[job-exec \"hermes-service-log-rotate\"]',
-       'Rotates and compresses the six service log volumes that nothing else bounds: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. No Hermes image runs cron or systemd, so the logrotate files Ubuntu''s packages install are never executed and these grew without limit. Honours the System Log Retention setting. Leave enabled: a full data volume defers all mail.',
-       '0 45 02 * * *', '/opt/hermes/schedule/rotate_service_logs.sh', 'hermes_commandbox', 'system', 1, 1
+       'Rotates and compresses every service log volume in the stack: Authelia, Dovecot, Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. No Hermes image runs cron or systemd, so the logrotate configuration Ubuntu''s packages install inside them never executes and these grew without limit. Honours the System Log Retention setting, and Authelia''s own retention setting for its log. Leave enabled: a full data volume defers all mail.',
+       '0 0 02 * * *', '/opt/hermes/schedule/rotate_service_logs.sh', 'hermes_commandbox', 'system', 1, 1
   FROM DUAL
  WHERE NOT EXISTS (
    SELECT 1 FROM `ofelia_jobs` WHERE `job_name` LIKE '%hermes-service-log-rotate%'
  );
+
+-- Retire the task the above replaces. Only hermes-authelia-log-rotate can
+-- actually be present on an existing install; hermes-dovecot-log-rotate was
+-- added earlier in this same release and never shipped, so the delete is there
+-- for anyone who applied an interim copy of this file by hand.
+--
+-- The scripts are gone from the image, so leaving these rows would give Ofelia
+-- two jobs pointing at files that no longer exist.
+DELETE FROM `ofelia_jobs`
+ WHERE `job_name` LIKE '%hermes-authelia-log-rotate%'
+    OR `job_name` LIKE '%hermes-dovecot-log-rotate%';
 
 -- ---------------------------------------------------------------------
 -- 4. Version stamp -- MUST be the last statement (advances build_no so

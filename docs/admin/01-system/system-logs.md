@@ -122,22 +122,20 @@ unpacking:
 docker exec hermes_dovecot sh -c "zgrep PATTERN /logs/*.gz"
 ```
 
-Rotation is covered by two scheduled tasks, and they divide along which
-container the log volume is mounted in rather than along anything meaningful
-to an operator:
+Rotation is one scheduled task, `hermes-service-log-rotate`, covering all eight
+log volumes. Retention comes from the Log Retention setting on this page, with
+one exception: Authelia keeps its own value from
+[Authentication Settings](authentication-settings.md), because that control
+already exists and folding it into the global value would have left a dropdown
+that silently did nothing.
 
-| Task | Covers |
-|---|---|
-| `hermes-dovecot-log-rotate` | Dovecot's three log files |
-| `hermes-service-log-rotate` | Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx |
-| `hermes-authelia-log-rotate` | Authelia |
+Nextcloud is not in the task. It rotates `nextcloud.log` itself at 50MB and
+keeps one archive. MariaDB and the containers that log only to their own output
+are capped by Docker rather than rotated.
 
-Nextcloud rotates `nextcloud.log` itself at 50MB and keeps one archive, so it
-has no task. MariaDB and the containers that log only to their own output are
-capped by Docker rather than rotated.
-
-Leave all three enabled. Nothing else bounds these files, and a full Data
-volume makes Postfix defer every message with
+Leave the task enabled. Nothing else bounds these files, because no Hermes
+image runs cron and so the `logrotate` configuration inside those images never
+executes. A full Data volume makes Postfix defer every message with
 `452 4.3.1 Insufficient system storage`, which reads as a mail problem and is
 not one.
 

@@ -274,22 +274,30 @@ There is now an **Apply Schedule** button on the Scheduled Tasks page.
 
 ## Log files no longer grow forever
 
-Hermes wrote eight separate log volumes and rotated two of them. The other six
-grew without limit: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx.
-On a long-running server the Postfix log volume had reached 20 GB and one
-Dovecot log 1.5 GB.
+Hermes writes eight log volumes and rotated two of them. The other six grew
+without limit: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. On a
+long-running server the Postfix log volume had reached 20 GB and one Dovecot log
+1.5 GB.
 
 The cause is the same for all of them and is not per-service. No Hermes
 container image runs cron, so the `logrotate` configuration that the Ubuntu
 packages install inside those images is present and never executed. Rotation
-only ever happened where something scheduled it explicitly, and only two
-volumes had that.
+only ever happened where something scheduled it explicitly, and only one volume
+had that.
 
-All eight are now rotated nightly, compressed, and kept for as many days as the
-**Log Retention** period under **System > System Logs**. That setting already
-controlled how long log entries survive in the searchable database; it now
-governs the files those entries came from as well, so there is one number rather
-than two.
+All eight are now rotated nightly and compressed by a single task, replacing the
+two that each handled one volume. Retention comes from the **Log Retention**
+period under **System > System Logs**, which already controlled how long log
+entries survive in the searchable database and now governs the files those
+entries came from as well.
+
+Authelia is the one exception, deliberately. It has its own retention setting on
+the Authentication Settings page, so it keeps using that. Folding it into the
+global value would have left a control in the console that silently did nothing.
+
+Dovecot's logs gain something in the change: the task that used to rotate them
+ran in a container with no database access and so had to hardcode 30 days,
+which meant the Log Retention setting did not apply to them. It does now.
 
 Nextcloud is handled separately: it rotates its own log, and this release pins
 the ceiling at 50 MB rather than leaving it at whatever the bundled release
@@ -300,7 +308,7 @@ accumulated outside the storage tiers you sized. Both are capped now, the same
 as the other sixteen already were.
 
 The first rotation after upgrading compresses whatever has accumulated. On a
-long-running server that can take a few minutes, runs at 02:45 at low priority,
+long-running server that can take a few minutes, runs at 02:00 at low priority,
 and does not interrupt mail.
 
 ## Upgrading no longer fills the disk by itself
@@ -402,9 +410,14 @@ existing file and carried across, and a timestamped copy is kept beside it. If
 the upgrade cannot read those credentials it leaves the file alone and says so,
 in which case overrides stay inert and nothing else is affected.
 
-**The first log rotation runs at 02:15 and 02:45** the night after you upgrade.
-On a server that has been running a while this may spend a few minutes
-compressing. It runs at low priority and does not interrupt mail.
+**The first log rotation runs at 02:00** the night after you upgrade. On a
+server that has been running a while this may spend a few minutes compressing.
+It runs at low priority and does not interrupt mail.
+
+**Two scheduled tasks are replaced by one.** The separate Authelia and Dovecot
+rotation tasks are removed and a single task covering all eight log volumes
+takes their place. If you had disabled either of the old ones, that choice is
+not carried over, because the new task is not the same job.
 
 **Three containers are recreated rather than restarted.** The application
 container gains the six log volumes so one task can rotate them all, and the

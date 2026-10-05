@@ -1,68 +1,102 @@
 #!/bin/bash
 #
-# Hermes SEG - rotate the service log volumes that nothing else bounds
+# Hermes SEG - rotate every service log volume
 #
-# Every Hermes image is FROM ubuntu:24.04 with no cron and no systemd. Ubuntu's
-# packages install /etc/logrotate.d/* files, and nothing ever runs logrotate, so
-# every file-based log in every container grows forever unless something here
-# bounds it explicitly. Two already were: Authelia (rotate_authelia_logs.sh) and
-# Dovecot (rotate_dovecot_logs.sh). This covers the remaining six volumes.
+# WHY THIS EXISTS AT ALL
 #
-# A full data volume defers all mail, so this is the same class of problem as
-# the MariaDB logs (GitHub #339) and the missing disk alert (#341).
+# No Hermes container image runs cron or systemd. Every image is FROM
+# ubuntu:24.04 (or a slim/official base), so the /etc/logrotate.d/* files that
+# Ubuntu's own packages install inside those images are present and never
+# execute. A log file written to disk is therefore bounded only where something
+# schedules it explicitly, and for most of the stack nothing did. One volume
+# reached 20 GB and a Dovecot debug log 1.5 GB. A full data volume makes Postfix
+# defer every message with "452 Insufficient system storage", which reads as a
+# mail problem and is not one.
 #
-# WHY ONE SCRIPT IN hermes_commandbox rather than one per container:
-# each log volume is mounted in exactly one service, so a per-container job
-# would need this file placed inside six images and six Ofelia entries to keep
-# in step. Mounting the volumes here instead gives one script, one job and one
-# retention setting. commandbox already holds the Authelia log volume for the
-# same reason.
+# WHY ONE SCRIPT IN hermes_commandbox
 #
-# WHY NO RELOAD SIGNAL: this truncates in place rather than renaming, which is
-# logrotate's copytruncate. The file keeps its inode, so every already-open
-# handle keeps working and there is no gap to lose lines in. rsyslog and nginx
-# both open their logs O_APPEND, so writes resume at the new end of file. The
-# same reasoning is written out in rotate_dovecot_logs.sh.
+# There are eight log volumes and each is mounted at /var/log or /logs inside
+# its own service, so they cannot share a path in one container. docker-compose
+# mounts all eight into this container under /servicelogs/<name> instead, which
+# makes one job enough. The alternative, a job per container, would mean this
+# file placed inside eight images, eight Ofelia entries kept in step, and no
+# database access to read the retention setting from (which is exactly why the
+# script this replaces had to hardcode 30 days).
 #
-# Scheduled daily by Ofelia. Safe to run by hand.
+# /servicelogs rather than /opt/hermes/logs: /opt/hermes is a bind mount of the
+# repo working tree, so nesting mounts under it creates empty directories in the
+# checkout, and mail_archive.sh already writes mailarchive.log there.
+#
+# WHY NO RELOAD SIGNAL
+#
+# This copies then truncates in place, which is logrotate's copytruncate. The
+# file keeps its inode, so every already-open handle keeps working and there is
+# no gap in which lines are lost. rsyslog, nginx and Dovecot all open their logs
+# O_APPEND, so writes resume at the new end of file. That is also what lets one
+# script serve every daemon here: no per-daemon reopen signal is needed, so
+# there is nothing to get wrong per service.
+#
+# Scheduled daily by Ofelia. Safe to run by hand, and safe to run twice in a day
+# (the second run appends to the same archive rather than replacing it).
 
 set -u
 
-LOG_ROOT="/opt/hermes/logs"
+LOG_ROOT="/servicelogs"
 DATE_STAMP=$(date +%Y-%m-%d)
 
-# The six volumes. Each is one host directory on the Data tier, mounted here by
-# docker-compose.yml. A directory that is absent is skipped rather than warned
-# about, so this stays quiet on an install where a service is not deployed.
-TARGETS="postfix_dkim mail_filter dmarc openarc ldap nginx"
-
-# Retention comes from parameters2.system_log_retention, the setting behind
-# System > System Logs. The same value already governs how long rows survive in
-# the Syslog database (schedule/message_cleanup.cfm), so one control now covers
-# the rows and the files they came from.
 HERMESUSERNAME=$(</opt/hermes/creds/hermes_username)
 HERMESPASSWORD=$(</opt/hermes/creds/hermes_password)
 
-RETENTION_DAYS=$(mysql -h hermes_db_server -u "$HERMESUSERNAME" -p"$HERMESPASSWORD" hermes -sNe \
-    "SELECT value2 FROM parameters2 WHERE parameter='system_log_retention' LIMIT 1" 2>/dev/null)
-if [ -z "$RETENTION_DAYS" ] || ! [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]]; then
-    RETENTION_DAYS=30
+# Read one parameters2 value, or print nothing.
+db_value() {  # <parameter> <module>
+    mysql -h hermes_db_server -u "$HERMESUSERNAME" -p"$HERMESPASSWORD" hermes -sNe \
+        "SELECT value2 FROM parameters2 WHERE parameter='$1' AND module='$2' LIMIT 1" 2>/dev/null
+}
+
+# The global default, from System > System Logs. The same setting already
+# governs how long entries survive in the Syslog database, so one control now
+# covers the rows and the files those rows came from.
+DEFAULT_RETENTION=$(db_value 'system_log_retention' 'systemlog')
+if [ -z "$DEFAULT_RETENTION" ] || ! [[ "$DEFAULT_RETENTION" =~ ^[0-9]+$ ]]; then
+    DEFAULT_RETENTION=30
 fi
 
-echo "$(date) - service log rotation started (retention: ${RETENTION_DAYS} days)"
+# Authelia is the one exception, and it is not arbitrary: it has its own
+# retention control on the Authentication Settings page, stored separately. If
+# this used the global value for it, that control would silently stop doing
+# anything.
+AUTHELIA_RETENTION=$(db_value 'log.retention_days' 'authelia')
+if [ -z "$AUTHELIA_RETENTION" ] || ! [[ "$AUTHELIA_RETENTION" =~ ^[0-9]+$ ]]; then
+    AUTHELIA_RETENTION="$DEFAULT_RETENTION"
+fi
 
-ROTATED_COUNT=0
+# One directory per log volume, named as docker-compose.yml mounts it. A
+# directory that is absent is skipped silently, so this stays quiet on an
+# install where a service is not deployed.
+TARGETS="authelia dovecot postfix_dkim mail_filter dmarc openarc ldap nginx"
+
+retention_for() {
+    case "$1" in
+        authelia) echo "$AUTHELIA_RETENTION" ;;
+        *)        echo "$DEFAULT_RETENTION" ;;
+    esac
+}
+
+echo "$(date) - service log rotation started (retention: ${DEFAULT_RETENTION} days, authelia: ${AUTHELIA_RETENTION})"
 
 for TARGET in $TARGETS; do
     DIR="${LOG_ROOT}/${TARGET}"
     [ -d "$DIR" ] || continue
 
+    KEEP=$(retention_for "$TARGET")
+
     # maxdepth 2 because one service nests its log (clamav/clamav.log under
-    # mail_filter). Globbing *.log is also what keeps this from re-rotating its
-    # own output, since an archive is named <name>.log.<date>.gz.
+    # mail_filter). Matching *.log is also what stops this re-rotating its own
+    # output, since an archive is named <name>.log.<date>.gz.
     find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null | while read -r LOG_FILE; do
 
-        # Empty is the normal case for several of these and not a problem.
+        # Empty is the normal case for several of these (Dovecot's debug log
+        # above all) and is not a problem.
         [ -s "$LOG_FILE" ] || continue
 
         ROTATED="${LOG_FILE}.${DATE_STAMP}"
@@ -84,16 +118,16 @@ for TARGET in $TARGETS; do
         SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
         echo "$(date) - rotated ${LOG_FILE#$LOG_ROOT/} (${SIZE} bytes), compressing"
 
-        # nice because the first run on a host that has never rotated can be
+        # nice because the first run on a server that has never rotated can be
         # compressing gigabytes, and this runs on a live mail server.
         nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
             || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
 
         # Match the archive to the live log rather than leaving it root-owned.
-        # These volumes belong to different services (rsyslog as root, nginx,
-        # slapd as openldap), so the owner is read off the file instead of
-        # being hardcoded. This is the bug that had to be fixed after the
-        # Dovecot script shipped: archives were root while the logs were vmail.
+        # These volumes belong to different services (rsyslog as root, Dovecot
+        # as vmail, slapd as openldap), so the owner is read off the file
+        # instead of being hardcoded. Leaving archives root-owned while the
+        # live logs were vmail was a real bug in the script this replaces.
         if [ -f "${ROTATED}.gz" ]; then
             OWNER=$(stat -c '%u:%g' "$LOG_FILE" 2>/dev/null)
             MODE=$(stat -c '%a' "$LOG_FILE" 2>/dev/null)
@@ -103,9 +137,9 @@ for TARGET in $TARGETS; do
     done
 
     DELETED=$(find "$DIR" -maxdepth 2 -type f -name '*.log.*.gz' \
-        -mtime +"${RETENTION_DAYS}" -print -delete 2>/dev/null | wc -l)
+        -mtime +"${KEEP}" -print -delete 2>/dev/null | wc -l)
     if [ "$DELETED" -gt 0 ]; then
-        echo "$(date) - ${TARGET}: deleted ${DELETED} archive(s) older than ${RETENTION_DAYS} days"
+        echo "$(date) - ${TARGET}: deleted ${DELETED} archive(s) older than ${KEEP} days"
     fi
 done
 

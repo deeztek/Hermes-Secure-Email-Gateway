@@ -4048,7 +4048,8 @@ render_ofelia_config() {
     # onto /etc/ofelia. Nothing regenerated it at install -- the generator runs
     # only from admin action pages -- so every fresh install ran that stale
     # snapshot: four seeded jobs missing entirely (health-check-mailqueue,
-    # dmarc-report, authelia-log-rotate, fangfrisch-refresh) and
+    # dmarc-report, fangfrisch-refresh and the log rotation task, which was
+    # authelia-log-rotate at the time and is now service-log-rotate) and
     # hermes-update-check still calling the pre-#218 update_check.sh, which
     # left the dashboard on "UPDATE CHECK PENDING" permanently.
     #
