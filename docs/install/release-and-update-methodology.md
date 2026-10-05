@@ -364,7 +364,10 @@ For maintainers preparing a release:
 
    > **Do not run `scripts/git_release.sh --release` here.** That script pushes the branch and tag to *both* remotes **and creates the GitHub Release in the same run** — there is no tag-only mode. It belongs at step 12, after testing. Until then the tag lives on GitLab alone and can be force-moved freely.
 
-10. **Test the release candidate on the Test box.** Point it at the staging registry first:
+10. **Test the release candidate on the Test box.** The how, and the Test box's
+    constraints, are in
+    [release-testing-methodology.md](release-testing-methodology.md). Point it
+    at the staging registry first:
 
     ```bash
     # in Test's .env
