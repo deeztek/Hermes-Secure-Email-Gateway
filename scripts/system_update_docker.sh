@@ -440,8 +440,12 @@ nc_upgrade_if_needed() {
     docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
         config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" \
         >> "$LOG_FILE" 2>&1 || warn "    could not set tempdirectory (see $LOG_FILE)"
+    # 0 disables Nextcloud's own rotation, which is a background job that
+    # nothing on Hermes schedules (no cron entry, none in the image,
+    # background_jobs unset). rotate_service_logs.sh takes it over by explicit
+    # path. Two rotators on one file would split it unpredictably.
     docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-        config:system:set log_rotate_size --value="52428800" \
+        config:system:set log_rotate_size --value="0" \
         >> "$LOG_FILE" 2>&1 || warn "    could not set log_rotate_size (see $LOG_FILE)"
 
     # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1

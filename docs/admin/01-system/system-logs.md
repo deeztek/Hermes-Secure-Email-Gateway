@@ -129,9 +129,15 @@ one exception: Authelia keeps its own value from
 already exists and folding it into the global value would have left a dropdown
 that silently did nothing.
 
-Nextcloud is not in the task. It rotates `nextcloud.log` itself at 50MB and
-keeps one archive. MariaDB and the containers that log only to their own output
-are capped by Docker rather than rotated.
+Nextcloud is in the task too, by explicit path rather than by scanning its
+data directory. Its own rotation is switched off, because that rotation is a
+Nextcloud background job and nothing schedules Nextcloud's cron, so it
+effectively did not run: one install had 580 MB of live log and a six month old
+496 MB archive. That wider problem is tracked separately; the log itself is
+bounded here regardless.
+
+MariaDB and the containers that log only to their own output are capped by
+Docker rather than rotated.
 
 Leave the task enabled. Nothing else bounds these files, because no Hermes
 image runs cron and so the `logrotate` configuration inside those images never

@@ -4474,15 +4474,23 @@ run_phase2_db_init() {
             && log "  Set default app to Mail" \
             || log "  WARNING: Failed to set default app (Nextcloud may not be ready yet)"
 
-        # Bound nextcloud.log. Nextcloud rotates its own log once it passes
-        # log_rotate_size and keeps one archive, but the value is only a
-        # default until something sets it, and Hermes set nothing. Pinning it
-        # makes the ceiling explicit and auditable rather than inherited from
-        # whatever the bundled release happens to default to. 50 MB live plus
-        # one archive, on the Files tier.
+        # Hand nextcloud.log to the scheduled rotation task, by switching
+        # Nextcloud's own rotation off.
+        #
+        # 0 means no internal rotation. That is deliberate rather than a
+        # regression: Nextcloud's rotation is a BACKGROUND JOB, and nothing
+        # here runs Nextcloud's cron. There is no scheduler entry for it, no
+        # cron in the image, and background_jobs mode is unset, so jobs fall
+        # back to AJAX mode where one queued job fires per page load. Measured
+        # on a live server: 580 MB live, a 496 MB archive, one rotation in six
+        # months.
+        #
+        # rotate_service_logs.sh rotates it by explicit path instead, nightly,
+        # on a scheduler that does run. Leaving both enabled would have two
+        # rotators on one file splitting it unpredictably.
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
-            config:system:set log_rotate_size --value="52428800" >> "$LOG_FILE" 2>&1 \
-            && log "  Bounded nextcloud.log at 50MB + 1 archive" \
+            config:system:set log_rotate_size --value="0" >> "$LOG_FILE" 2>&1 \
+            && log "  nextcloud.log rotation handed to hermes-service-log-rotate" \
             || log "  WARNING: Failed to set log_rotate_size"
 
         # Point Nextcloud at a temp directory inside its own data volume (#338).

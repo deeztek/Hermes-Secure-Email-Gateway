@@ -299,9 +299,17 @@ Dovecot's logs gain something in the change: the task that used to rotate them
 ran in a container with no database access and so had to hardcode 30 days,
 which meant the Log Retention setting did not apply to them. It does now.
 
-Nextcloud is handled separately: it rotates its own log, and this release pins
-the ceiling at 50 MB rather than leaving it at whatever the bundled release
-happens to default to.
+Nextcloud's log is included, and it was the worst of them. Nextcloud does have
+its own rotation, so this looked like the one log already taken care of. It is a
+background job, and nothing on Hermes runs Nextcloud's cron, so it had barely
+run: one server had a 580 MB live log beside a six month old 496 MB archive,
+about a gigabyte in total. Nextcloud's internal rotation is now switched off and
+the nightly task takes it over, which also compresses and then ages out the
+archive Nextcloud left behind.
+
+Nextcloud's background jobs not running is a wider problem than its log file,
+affecting trash and version expiry among other things. That is filed separately
+and is not fixed here.
 
 Two containers were also logging their own output without any size cap, which
 accumulated outside the storage tiers you sized. Both are capped now, the same

@@ -82,6 +82,52 @@ retention_for() {
     esac
 }
 
+# Rotate one file: copy aside, compress, truncate in place. Used for the
+# per-directory scan below and for the explicit files after it.
+rotate_one() {  # <path>
+    LOG_FILE="$1"
+
+    # Empty is the normal case for several of these (Dovecot's debug log above
+    # all) and is not a problem.
+    [ -s "$LOG_FILE" ] || return 0
+
+    ROTATED="${LOG_FILE}.${DATE_STAMP}"
+
+    # Append if this already ran today, so a second run does not discard the
+    # first one's output.
+    if [ -f "${ROTATED}.gz" ]; then
+        gunzip "${ROTATED}.gz" 2>/dev/null || true
+    fi
+    if [ -f "$ROTATED" ]; then
+        cat "$LOG_FILE" >> "$ROTATED"
+    else
+        cp "$LOG_FILE" "$ROTATED"
+    fi
+
+    # Truncate in place. See the copytruncate note in the header.
+    : > "$LOG_FILE"
+
+    SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
+    echo "$(date) - rotated ${LOG_FILE} (${SIZE} bytes), compressing"
+
+    # nice because the first run on a server that has never rotated can be
+    # compressing gigabytes, and this runs on a live mail server.
+    nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
+        || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
+
+    # Match the archive to the live log rather than leaving it root-owned.
+    # These volumes belong to different services (rsyslog as root, Dovecot as
+    # vmail, slapd as openldap, Nextcloud as www-data), so the owner is read
+    # off the file instead of being hardcoded. Leaving archives root-owned
+    # while the live logs were vmail was a real bug in an earlier script.
+    if [ -f "${ROTATED}.gz" ]; then
+        OWNER=$(stat -c '%u:%g' "$LOG_FILE" 2>/dev/null)
+        MODE=$(stat -c '%a' "$LOG_FILE" 2>/dev/null)
+        [ -n "$OWNER" ] && chown "$OWNER" "${ROTATED}.gz" 2>/dev/null || true
+        [ -n "$MODE" ]  && chmod "$MODE"  "${ROTATED}.gz" 2>/dev/null || true
+    fi
+}
+
 echo "$(date) - service log rotation started (retention: ${DEFAULT_RETENTION} days, authelia: ${AUTHELIA_RETENTION})"
 
 for TARGET in $TARGETS; do
@@ -93,47 +139,8 @@ for TARGET in $TARGETS; do
     # maxdepth 2 because one service nests its log (clamav/clamav.log under
     # mail_filter). Matching *.log is also what stops this re-rotating its own
     # output, since an archive is named <name>.log.<date>.gz.
-    find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null | while read -r LOG_FILE; do
-
-        # Empty is the normal case for several of these (Dovecot's debug log
-        # above all) and is not a problem.
-        [ -s "$LOG_FILE" ] || continue
-
-        ROTATED="${LOG_FILE}.${DATE_STAMP}"
-
-        # Append if this already ran today, so a second run does not discard
-        # the first one's output.
-        if [ -f "${ROTATED}.gz" ]; then
-            gunzip "${ROTATED}.gz" 2>/dev/null || true
-        fi
-        if [ -f "$ROTATED" ]; then
-            cat "$LOG_FILE" >> "$ROTATED"
-        else
-            cp "$LOG_FILE" "$ROTATED"
-        fi
-
-        # Truncate in place. See the copytruncate note in the header.
-        : > "$LOG_FILE"
-
-        SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
-        echo "$(date) - rotated ${LOG_FILE#$LOG_ROOT/} (${SIZE} bytes), compressing"
-
-        # nice because the first run on a server that has never rotated can be
-        # compressing gigabytes, and this runs on a live mail server.
-        nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
-            || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
-
-        # Match the archive to the live log rather than leaving it root-owned.
-        # These volumes belong to different services (rsyslog as root, Dovecot
-        # as vmail, slapd as openldap), so the owner is read off the file
-        # instead of being hardcoded. Leaving archives root-owned while the
-        # live logs were vmail was a real bug in the script this replaces.
-        if [ -f "${ROTATED}.gz" ]; then
-            OWNER=$(stat -c '%u:%g' "$LOG_FILE" 2>/dev/null)
-            MODE=$(stat -c '%a' "$LOG_FILE" 2>/dev/null)
-            [ -n "$OWNER" ] && chown "$OWNER" "${ROTATED}.gz" 2>/dev/null || true
-            [ -n "$MODE" ]  && chmod "$MODE"  "${ROTATED}.gz" 2>/dev/null || true
-        fi
+    find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null | while read -r f; do
+        rotate_one "$f"
     done
 
     DELETED=$(find "$DIR" -maxdepth 2 -type f -name '*.log.*.gz' \
@@ -142,6 +149,46 @@ for TARGET in $TARGETS; do
         echo "$(date) - ${TARGET}: deleted ${DELETED} archive(s) older than ${KEEP} days"
     fi
 done
+
+# ----------------------------------------------------------------------------
+# Nextcloud, by explicit path rather than by scanning a directory.
+#
+# nextcloud.log does not live in a dedicated log volume. It sits in the
+# Nextcloud data directory, which commandbox already mounts for other reasons,
+# so no new mount is needed. It is NOT added to TARGETS above because that
+# would point the *.log scan at the whole Nextcloud data tree: slow, and it
+# would rotate any file a user happened to upload with a .log extension.
+#
+# Nextcloud does have its own size-based rotation, and relying on it was a
+# mistake. That rotation is a background job, and nothing on Hermes runs
+# Nextcloud's cron: there is no scheduler entry, no cron in the image, and
+# background_jobs mode is unset, so jobs fall back to AJAX mode where one
+# queued job fires per page load. Observed result on a live server: 580 MB
+# live, a 496 MB archive, and exactly one rotation in six months. The
+# installer therefore sets log_rotate_size to 0, handing the job to this
+# script, which runs on a scheduler that actually works.
+#
+# nextcloud.log.1 is included so the archive Nextcloud left behind is
+# compressed and then aged out, rather than sitting there forever.
+#
+# Nextcloud background jobs not running is a broader problem than logs and is
+# tracked separately.
+# ----------------------------------------------------------------------------
+NEXTCLOUD_DATA="/mnt/data/nextcloud/data"
+EXTRA_FILES="${NEXTCLOUD_DATA}/nextcloud.log ${NEXTCLOUD_DATA}/nextcloud.log.1"
+
+for f in $EXTRA_FILES; do
+    [ -f "$f" ] || continue
+    rotate_one "$f"
+done
+
+if [ -d "$NEXTCLOUD_DATA" ]; then
+    DELETED=$(find "$NEXTCLOUD_DATA" -maxdepth 1 -type f -name 'nextcloud.log*.gz' \
+        -mtime +"${DEFAULT_RETENTION}" -print -delete 2>/dev/null | wc -l)
+    if [ "$DELETED" -gt 0 ]; then
+        echo "$(date) - nextcloud: deleted ${DELETED} archive(s) older than ${DEFAULT_RETENTION} days"
+    fi
+fi
 
 echo "$(date) - service log rotation finished"
 

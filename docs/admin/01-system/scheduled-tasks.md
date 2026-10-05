@@ -102,7 +102,7 @@ enabled.
 | `hermes-fangfrisch-refresh` | Every 10 min | `hermes_mail_filter` | Refreshes third-party ClamAV signature feeds (SecuriteInfo, Sanesecurity, etc.) |
 | `hermes-refresh-network-aliases` | Daily 03:30 | `hermes_commandbox` | Re-resolves enabled SPF-backed [network aliases](network-aliases.md), applies the pages that reference any alias whose ranges moved, and emails a record of what changed. Added v260912 |
 | `hermes-directory-sync` | Every 15 min, `no-overlap` | `hermes_commandbox` | Enumerates every enabled directory connection and stages what it finds. Connections with auto-apply also get their recipients created here. Added v260918, interval shortened from 6h in v260929 |
-| `hermes-service-log-rotate` | Daily 02:00, `no-overlap` | `hermes_commandbox` | Rotates and compresses all eight service log volumes, keeping as many days as the Log Retention setting. Added v260929, replacing the separate Authelia and Dovecot tasks |
+| `hermes-service-log-rotate` | Daily 02:00, `no-overlap` | `hermes_commandbox` | Rotates and compresses all eight service log volumes plus `nextcloud.log`, keeping as many days as the Log Retention setting. Added v260929, replacing the separate Authelia and Dovecot tasks |
 
 ### Why log rotation is one task and not eight
 
@@ -135,9 +135,12 @@ Authelia keeps its own because that control already exists in the
 console. Folding it into the global value would have left a dropdown
 that silently did nothing.
 
-Nextcloud is in neither. It rotates `nextcloud.log` itself at 50MB and
-keeps one archive. Containers that log only to their own output are
-capped by Docker instead.
+Nextcloud's log is covered too, by explicit path rather than by
+scanning its data directory, which would be slow and would rotate any
+file a user uploaded with a `.log` extension. Nextcloud's own rotation
+is switched off, because it is a background job and nothing schedules
+Nextcloud's cron, so it barely ran. Containers that log only to their
+own output are capped by Docker instead.
 
 New jobs added by later features (signature-map regen for the body
 milter, the post-upgrade hook caller, etc.) appear here automatically as
