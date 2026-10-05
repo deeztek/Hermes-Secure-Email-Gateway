@@ -47,10 +47,58 @@ sleep 15
 docker exec hermes_postfix_dkim grep 'RECIPIENT' /var/log/mail.log | tail -3
 ```
 
-This traverses Postfix cleanup, the Amavis content filter, the re-injection
-port, `transport_maps`, and final delivery. The only thing it does not exercise
-is inbound `smtpd` from a remote host, which is a connection-level concern
-rather than a routing one.
+🔴 **This does NOT go through Amavis.** `sendmail` submits via the `pickup`
+service, and `master.cf` exempts it deliberately:
+
+```
+pickup    fifo  n  -  n  60  1  pickup
+        -o content_filter=
+        -o receive_override_options=no_header_body_checks
+```
+
+That is correct: locally submitted mail such as cron and bounce notifications
+should not be filtered, and exempting it prevents loops. But it means this
+method tests `cleanup`, `transport_maps` and final delivery **only**. It is the
+right tool for a routing question and the wrong one for a filtering question.
+
+### To exercise the content filter, speak SMTP to port 25
+
+`smtpd` carries no `content_filter=` override, so it picks up the global
+`content_filter` from `main.cf`. Submit from a container on the Docker network,
+which `mynetworks` already trusts:
+
+```bash
+docker exec hermes_linkguard python3 -c "
+import smtplib
+from email.message import EmailMessage
+m = EmailMessage()
+m['From'] = 'sender@domain.tld'
+m['To']   = 'RECIPIENT'
+m['Subject'] = 'content filter path test'
+m.set_content('body')
+s = smtplib.SMTP('hermes_postfix_dkim', 25)
+s.send_message(m)
+s.quit()
+print('submitted')
+"
+```
+
+Then confirm the filter actually ran, which needs **two** queue IDs:
+
+```bash
+docker exec hermes_postfix_dkim grep -E 'amavis|hermes_mail_filter' /var/log/mail.log | tail -5
+docker exec hermes_mail_filter grep -iE 'Passed|Blocked' /var/log/syslog | tail -3
+```
+
+Expect `relay=hermes_mail_filter[...]:10021, status=sent` under the original
+queue ID, then a second, different queue ID delivering onward. Amavis
+re-injects under a new ID, so **grepping the final queue ID for `amavis` finds
+nothing even when the filter ran**, which is a trap worth avoiding.
+
+A verdict line such as `Passed CLEAN` in the filter container is the positive
+confirmation. Note that Amavis may log to a facility that does not land in
+`mail.log`, so read its `syslog` rather than concluding from a missing
+`mail.log` that nothing ran.
 
 Read the `relay=` field, because that is the routing decision:
 
