@@ -1055,17 +1055,18 @@ provision_mount_dirs() {
     mkdir -p "${FILES_MOUNT}/app"                       # nextcloud volume
     mkdir -p "${FILES_MOUNT}/redis"                     # nextcloud_redis volume
 
-    # Nextcloud's temp directory (#338). Nextcloud 34 will not complete an
-    # upgrade without one, and the failure comes partway through rather than
-    # as a refusal up front. The path is inside the nextcloud volume, which is
-    # ${FILES_MOUNT}/app bound to /var/www/html in the container, so this is
-    # the host side of /var/www/html/data/nextcloudtmp.
+    # NOTE: Nextcloud's temp directory (#338) is deliberately NOT created here.
     #
-    # 33:33 is www-data in the official Nextcloud image. Created here rather
-    # than left to the container because Nextcloud will not create a
-    # tempdirectory it has been pointed at.
-    mkdir -p "${FILES_MOUNT}/app/data/nextcloudtmp"     # NC tempdirectory (#338)
-    chown 33:33 "${FILES_MOUNT}/app/data/nextcloudtmp" 2>/dev/null || true
+    # It was, briefly, and it broke every fresh install. `mkdir -p
+    # ${FILES_MOUNT}/app/data/nextcloudtmp` creates the intermediate
+    # ${FILES_MOUNT}/app/data as root, and only the leaf got chowned, so
+    # Nextcloud's own installer (running as www-data) then failed with
+    # "Cannot create or write into the data directory /var/www/html/data".
+    #
+    # Nextcloud creates and owns its data directory itself on first start. The
+    # temp directory is created inside it afterwards, by docker exec, in the
+    # post-install Nextcloud block below. That is also what
+    # system_update_docker.sh does, so the two paths agree.
 
     # Pre-create empty log-file placeholders that fail2ban globs at startup.
     # If the glob matches zero files, fail2ban exits 255. On a fresh install
@@ -4514,6 +4515,16 @@ run_phase2_db_init() {
         # Set now rather than at the release that bumps Nextcloud, so the key is
         # already in place before the upgrade that needs it. It is harmless
         # until then.
+        # Create it inside the container, now that Nextcloud is installed and
+        # owns its data directory. Not on the host in provision_mount_dirs: a
+        # root-owned /var/www/html/data stops Nextcloud installing at all.
+        # 33:33 is www-data in the official image.
+        docker exec -u root hermes_nextcloud sh -c \
+            'mkdir -p /var/www/html/data/nextcloudtmp && chown 33:33 /var/www/html/data/nextcloudtmp' \
+            >> "$LOG_FILE" 2>&1 \
+            && log "  Created /var/www/html/data/nextcloudtmp" \
+            || log "  WARNING: Failed to create nextcloudtmp"
+
         docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
             config:system:set tempdirectory --value="/var/www/html/data/nextcloudtmp" >> "$LOG_FILE" 2>&1 \
             && log "  Set tempdirectory to /var/www/html/data/nextcloudtmp" \
