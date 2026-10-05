@@ -88,7 +88,9 @@ Hermes can be deployed three ways:
 
 - **As a gateway** in front of an existing mail solution (in-house Exchange / Postfix, Google Workspace, Microsoft 365). Hermes scans, filters, encrypts, and relays mail to your backend.
 - **As a full mail server** with built-in mailbox hosting, webmail, file sync, calendars, and contacts. No external mail backend required.
-- **As a hybrid**: gateway for some domains AND mail server for others on the same install. Relay (gateway) domains and mailbox (mail server) domains coexist in a single Hermes deployment.
+- **As a hybrid**, at either of two granularities:
+  - *Per domain*: gateway for some domains AND mail server for others on the same install. Relay (gateway) domains and mailbox (mail server) domains coexist in a single deployment.
+  - *Per recipient, within one domain*: keep some recipients on an external provider and host the rest on Hermes, **on the same domain**. Mail for each address is routed independently, so an organization paying per mailbox can keep the few people who genuinely need that provider and host everyone else locally. Fifty paid seats become ten, with no change to the domain's MX, its DNS, or anything a sender sees.
 
 This Docker Edition packages the entire stack as a set of containers managed by Docker Compose, replacing the legacy bare-metal Ubuntu installer with a portable, reproducible deployment.
 
@@ -145,7 +147,9 @@ A condensed list. See [hermesseg.io/features](https://www.hermesseg.io/features/
 - Local mailbox hosting (Dovecot 2.4) with IMAPS / POP3S / Submission (587/465) / LMTP
 - Per-domain and per-mailbox quotas
 - Mailbox aliases and forwarders
-- Shared mailboxes and shared folders
+- Shared mailboxes and shared folders, with subfolders shared and subscribed automatically
+- **Per-recipient delivery on a single domain**: relay some recipients to an external provider and deliver others to a local mailbox, chosen per address. Convert a relay recipient to a hosted mailbox in place, individually or in bulk, and convert back again
+- Convert a departing user's mailbox into a shared mailbox, keeping their mail reachable instead of orphaned
 - User-defined Sieve rules
 - Vacation auto-reply with date scoping and per-address filtering
 - Mobile device autoconfiguration via signed `.mobileconfig` profiles (iOS) and CalDAV/CardDAV autodiscovery
