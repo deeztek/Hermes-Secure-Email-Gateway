@@ -130,57 +130,67 @@ rotate_one() {  # <path> [dead]
     # all) and is not a problem.
     [ -s "$LOG_FILE" ] || return 0
 
-    ROTATED="${LOG_FILE}.${DATE_STAMP}"
+    ARCHIVE="${LOG_FILE}.${DATE_STAMP}.gz"
+    PART="${LOG_FILE}.${DATE_STAMP}.part.gz"
 
-    # Same-day second run: decompress, append, recompress. You cannot append to
-    # a gzip stream, so this path needs the intermediate file. It only happens
-    # on a manual re-run, when the live log holds minutes rather than days.
-    if [ -f "${ROTATED}.gz" ]; then
-        if ! gunzip "${ROTATED}.gz" 2>/dev/null; then
-            echo "$(date) - WARNING: could not read ${ROTATED}.gz, leaving ${LOG_FILE} intact"
-            return 0
-        fi
-        if ! cat "$LOG_FILE" >> "$ROTATED"; then
-            echo "$(date) - WARNING: append failed, leaving ${LOG_FILE} intact"
-            nice -n 19 gzip -f "$ROTATED" 2>/dev/null
-            return 0
-        fi
-        SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
-        : > "$LOG_FILE"
-        echo "$(date) - rotated ${LOG_FILE} (${SIZE} bytes, appended), compressing"
-        nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
-            || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
-        _match_owner "$LOG_FILE" "${ROTATED}.gz"
-        return 0
-    fi
-
-    # First rotation today: compress STRAIGHT to the archive rather than copying
-    # first. A 10.4 GB mail.log was observed on a live server, and copy-then-gzip
-    # needs peak disk of twice the log size on the very volume that is short of
-    # space. Streaming needs the log plus the compressed copy, roughly 1.07x.
-    #
-    # The truncate is gated on gzip succeeding. Copy-then-truncate without
-    # checking would destroy the log if the copy ran out of space, which is
-    # exactly the condition this script exists to prevent.
     SIZE=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
     echo "$(date) - rotating ${LOG_FILE} (${SIZE} bytes), compressing"
 
+    # Compress to a temporary member, verify it, then APPEND it to the archive.
+    #
+    # Appending works because the gzip format is a sequence of independent
+    # members: concatenating two .gz files produces a valid .gz that
+    # decompresses to the concatenation, and gunzip, zcat and zgrep all read it
+    # transparently. So a second run in the same day costs the size of the NEW
+    # data and nothing more.
+    #
+    # This replaces a decompress-append-recompress cycle, which was wrong in a
+    # way the fixtures could not show. The assumption was that a same-day re-run
+    # only ever appends a few minutes of log. True of the live file, false of the
+    # archive: on a server with a 10.4 GB Postfix log, the second run expanded
+    # the 700 MB archive back to 10.4 GB on disk and recompressed all of it to
+    # add 13 KB. That reintroduced exactly the peak-disk problem this script
+    # exists to avoid.
+    #
+    # Also never decompresses, so there is no window where an archive is
+    # expanded and a crash leaves a huge plain-text file behind.
+    #
     # nice because the first run on a server that has never rotated can be
     # compressing gigabytes, and this runs on a live mail server.
-    if nice -n 19 gzip -c "$LOG_FILE" > "${ROTATED}.gz" 2>/dev/null; then
-        if [ -n "$DEAD" ]; then
-            # A dead archive another rotator left behind. Nothing writes to it,
-            # so truncating would leave a 0-byte file forever.
-            rm -f "$LOG_FILE"
-            echo "$(date) - archived and removed ${LOG_FILE}"
-        else
-            : > "$LOG_FILE"
-        fi
-        _match_owner "$LOG_FILE" "${ROTATED}.gz"
-    else
-        rm -f "${ROTATED}.gz"
+    if ! nice -n 19 gzip -c "$LOG_FILE" > "$PART" 2>/dev/null; then
+        rm -f "$PART"
         echo "$(date) - WARNING: compress failed for ${LOG_FILE}, left intact (check free space)"
+        return 0
     fi
+
+    # Verify before letting it near the archive, so a short write cannot append
+    # a corrupt member to an archive that was previously good.
+    if ! gzip -t "$PART" 2>/dev/null; then
+        rm -f "$PART"
+        echo "$(date) - WARNING: compressed output for ${LOG_FILE} failed its integrity check, log left intact"
+        return 0
+    fi
+
+    if ! cat "$PART" >> "$ARCHIVE"; then
+        rm -f "$PART"
+        echo "$(date) - WARNING: could not append to ${ARCHIVE}, ${LOG_FILE} left intact"
+        return 0
+    fi
+    rm -f "$PART"
+
+    # Only now is the data safely in the archive, so only now is it safe to
+    # clear the source. Truncate in place for a live log (see the copytruncate
+    # note in the header); remove outright for a dead archive another rotator
+    # left behind, since nothing writes to it and truncating would leave a
+    # 0-byte file forever.
+    if [ -n "$DEAD" ]; then
+        rm -f "$LOG_FILE"
+        echo "$(date) - archived and removed ${LOG_FILE}"
+    else
+        : > "$LOG_FILE"
+    fi
+
+    _match_owner "$LOG_FILE" "$ARCHIVE"
 }
 
 # Match the archive to the live log rather than leaving it root-owned. These
