@@ -279,10 +279,18 @@ without limit: Postfix, the mail filter, DMARC, OpenARC, LDAP and Nginx. On a
 long-running server the Postfix volume alone held two files of 10.4 GB each, and
 one Dovecot log had reached 1.5 GB.
 
-Two files of the same size because Postfix's logging is stored twice: the stock
-rsyslog configuration writes everything to `syslog` and mail separately to
-`mail.log`, so every line appears in both. Both are now rotated. Not storing it
-twice in the first place is a separate question and is not changed here.
+Two files of the same size because Postfix's logging was stored twice: the stock
+rsyslog rules write everything to `syslog` and mail separately to `mail.log`, so
+every line appeared in both.
+
+**That now stops at the source for the Postfix container.** Mail is excluded
+from its `syslog`, so the volume holds one copy rather than two and `mail.log`
+is unchanged. Nothing read that second copy: the container's own output comes
+from `mail.log`.
+
+The mail filter, DMARC, ARC and encryption containers deliberately keep theirs,
+because `syslog` is what their output reaches `docker logs` through. Theirs are
+rotated rather than deduplicated.
 
 The cause is the same for all of them and is not per-service. No Hermes
 container image runs cron, so the `logrotate` configuration that the Ubuntu
