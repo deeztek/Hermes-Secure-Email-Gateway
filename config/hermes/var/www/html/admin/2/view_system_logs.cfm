@@ -176,17 +176,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </div>
 
 <!-- LOGS NOT SHOWN HERE -->
-<div class="card card-secondary card-outline mb-4">
+<div class="card card-outline card-secondary mb-4">
   <div class="card-header">
-    <h3 class="card-title"><i class="fas fa-circle-info"></i> Logs Not Shown Here</h3>
-    <div class="card-tools">
-      <button type="button" class="btn btn-tool" data-bs-toggle="collapse"
-        data-bs-target="#logsNotShownBody" aria-expanded="false" title="Expand">
-        <i class="fas fa-plus"></i>
+    <h3 class="card-title">
+      <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggleLogsNotShown" title="Expand">
+        <i class="fas fa-chevron-down"></i>
       </button>
-    </div>
+      <i class="fas fa-circle-info"></i> Logs Not Shown Here
+    </h3>
   </div>
-  <div id="logsNotShownBody" class="collapse">
+  <div class="collapse" id="logsNotShown">
    <div class="card-body">
 
     <p>
@@ -404,6 +403,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
 $(document).ready(function() {
+    // "Logs Not Shown Here" collapsible (chevron down/up), matching the
+    // Troubleshooting Commands card on view_intrusion_prevention.cfm.
+    $('#toggleLogsNotShown').on('click', function() { $('#logsNotShown').collapse('toggle'); });
+    $('#logsNotShown').on('shown.bs.collapse', function() {
+        $('#toggleLogsNotShown').find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+        $('#toggleLogsNotShown').attr('title', 'Collapse');
+    });
+    $('#logsNotShown').on('hidden.bs.collapse', function() {
+        $('#toggleLogsNotShown').find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+        $('#toggleLogsNotShown').attr('title', 'Expand');
+    });
+
   $('#logsTable').DataTable({
     dom: 'Blfrtip',
     buttons: ['copy', 'csv', 'excel', 'pdf', 'print'],

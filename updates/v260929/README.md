@@ -330,9 +330,13 @@ Two containers were also logging their own output without any size cap, which
 accumulated outside the storage tiers you sized. Both are capped now, the same
 as the other sixteen already were.
 
-The first rotation after upgrading compresses whatever has accumulated. On a
-long-running server that can take a few minutes, runs at 02:00 at low priority,
-and does not interrupt mail.
+The first rotation after upgrading compresses whatever has accumulated, and on a
+long-running server that is more than it sounds: one had a single 10.4 GB
+Postfix log. It streams straight into the compressed archive rather than copying
+first, so it needs only the free space the archive itself takes, roughly a
+fifteenth of the log for mail logs. It runs at 02:00 at low priority and does not
+interrupt mail, and if it cannot write the archive it leaves the log alone and
+says so rather than truncating it.
 
 ## Upgrading no longer fills the disk by itself
 

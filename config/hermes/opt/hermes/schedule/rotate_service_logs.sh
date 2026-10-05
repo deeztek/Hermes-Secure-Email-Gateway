@@ -122,8 +122,9 @@ post_rotate() {  # <target>
 
 # Rotate one file: copy aside, compress, truncate in place. Used for the
 # per-directory scan below and for the explicit files after it.
-rotate_one() {  # <path>
+rotate_one() {  # <path> [dead]
     LOG_FILE="$1"
+    DEAD="${2:-}"
 
     # Empty is the normal case for several of these (Dovecot's debug log above
     # all) and is not a problem.
@@ -131,38 +132,68 @@ rotate_one() {  # <path>
 
     ROTATED="${LOG_FILE}.${DATE_STAMP}"
 
-    # Append if this already ran today, so a second run does not discard the
-    # first one's output.
+    # Same-day second run: decompress, append, recompress. You cannot append to
+    # a gzip stream, so this path needs the intermediate file. It only happens
+    # on a manual re-run, when the live log holds minutes rather than days.
     if [ -f "${ROTATED}.gz" ]; then
-        gunzip "${ROTATED}.gz" 2>/dev/null || true
-    fi
-    if [ -f "$ROTATED" ]; then
-        cat "$LOG_FILE" >> "$ROTATED"
-    else
-        cp "$LOG_FILE" "$ROTATED"
+        if ! gunzip "${ROTATED}.gz" 2>/dev/null; then
+            echo "$(date) - WARNING: could not read ${ROTATED}.gz, leaving ${LOG_FILE} intact"
+            return 0
+        fi
+        if ! cat "$LOG_FILE" >> "$ROTATED"; then
+            echo "$(date) - WARNING: append failed, leaving ${LOG_FILE} intact"
+            nice -n 19 gzip -f "$ROTATED" 2>/dev/null
+            return 0
+        fi
+        SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
+        : > "$LOG_FILE"
+        echo "$(date) - rotated ${LOG_FILE} (${SIZE} bytes, appended), compressing"
+        nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
+            || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
+        _match_owner "$LOG_FILE" "${ROTATED}.gz"
+        return 0
     fi
 
-    # Truncate in place. See the copytruncate note in the header.
-    : > "$LOG_FILE"
-
-    SIZE=$(wc -c < "$ROTATED" 2>/dev/null || echo 0)
-    echo "$(date) - rotated ${LOG_FILE} (${SIZE} bytes), compressing"
+    # First rotation today: compress STRAIGHT to the archive rather than copying
+    # first. A 10.4 GB mail.log was observed on a live server, and copy-then-gzip
+    # needs peak disk of twice the log size on the very volume that is short of
+    # space. Streaming needs the log plus the compressed copy, roughly 1.07x.
+    #
+    # The truncate is gated on gzip succeeding. Copy-then-truncate without
+    # checking would destroy the log if the copy ran out of space, which is
+    # exactly the condition this script exists to prevent.
+    SIZE=$(wc -c < "$LOG_FILE" 2>/dev/null || echo 0)
+    echo "$(date) - rotating ${LOG_FILE} (${SIZE} bytes), compressing"
 
     # nice because the first run on a server that has never rotated can be
     # compressing gigabytes, and this runs on a live mail server.
-    nice -n 19 gzip -f "$ROTATED" 2>/dev/null \
-        || echo "$(date) - WARNING: gzip failed for ${ROTATED}"
+    if nice -n 19 gzip -c "$LOG_FILE" > "${ROTATED}.gz" 2>/dev/null; then
+        if [ -n "$DEAD" ]; then
+            # A dead archive another rotator left behind. Nothing writes to it,
+            # so truncating would leave a 0-byte file forever.
+            rm -f "$LOG_FILE"
+            echo "$(date) - archived and removed ${LOG_FILE}"
+        else
+            : > "$LOG_FILE"
+        fi
+        _match_owner "$LOG_FILE" "${ROTATED}.gz"
+    else
+        rm -f "${ROTATED}.gz"
+        echo "$(date) - WARNING: compress failed for ${LOG_FILE}, left intact (check free space)"
+    fi
+}
 
-    # Match the archive to the live log rather than leaving it root-owned.
-    # These volumes belong to different services (rsyslog as root, Dovecot as
-    # vmail, slapd as openldap, Nextcloud as www-data), so the owner is read
-    # off the file instead of being hardcoded. Leaving archives root-owned
-    # while the live logs were vmail was a real bug in an earlier script.
-    if [ -f "${ROTATED}.gz" ]; then
-        OWNER=$(stat -c '%u:%g' "$LOG_FILE" 2>/dev/null)
-        MODE=$(stat -c '%a' "$LOG_FILE" 2>/dev/null)
-        [ -n "$OWNER" ] && chown "$OWNER" "${ROTATED}.gz" 2>/dev/null || true
-        [ -n "$MODE" ]  && chmod "$MODE"  "${ROTATED}.gz" 2>/dev/null || true
+# Match the archive to the live log rather than leaving it root-owned. These
+# volumes belong to different services, so the owner is read off the file
+# instead of being hardcoded: on one install Dovecot's logs turned out to be
+# ubuntu-owned, not vmail, which the old hardcoded chown got wrong.
+_match_owner() {  # <reference> <archive>
+    [ -f "$2" ] || return 0
+    if [ -e "$1" ]; then
+        OWNER=$(stat -c '%u:%g' "$1" 2>/dev/null)
+        MODE=$(stat -c '%a' "$1" 2>/dev/null)
+        [ -n "$OWNER" ] && chown "$OWNER" "$2" 2>/dev/null || true
+        [ -n "$MODE" ]  && chmod "$MODE"  "$2" 2>/dev/null || true
     fi
 }
 
@@ -174,11 +205,28 @@ for TARGET in $TARGETS; do
 
     KEEP=$(retention_for "$TARGET")
 
-    # maxdepth 2 because one service nests its log (clamav/clamav.log under
-    # mail_filter). Matching *.log is also what stops this re-rotating its own
-    # output, since an archive is named <name>.log.<date>.gz.
+    # maxdepth 2 because services nest logs (clamav/clamav.log under
+    # mail_filter, nginx/*.log under nginx). Matching *.log is also what stops
+    # this re-rotating its own output, since an archive is named
+    # <name>.log.<date>.gz.
+    #
+    # The exclusions are Debian build artifacts, not logs. Docker seeds a new
+    # named volume from the image's own /var/log, so dpkg.log, alternatives.log,
+    # bootstrap.log, apt/* and dbconfig-common/* arrive in every one of these
+    # volumes. They record what the image installed at build time and never
+    # change again, so rotating them destroys install history to save nothing
+    # and buries the real logs in output. faillog and lastlog are excluded for
+    # a different reason: they are sparse binary files, not text.
     ROTATED_ANY=0
-    for f in $(find "$DIR" -maxdepth 2 -type f -name '*.log' 2>/dev/null); do
+    for f in $(find "$DIR" -maxdepth 2 -type f -name '*.log' \
+                    -not -path '*/apt/*' \
+                    -not -path '*/dbconfig-common/*' \
+                    -not -name 'dpkg.log' \
+                    -not -name 'alternatives.log' \
+                    -not -name 'bootstrap.log' \
+                    -not -name 'faillog' \
+                    -not -name 'lastlog' \
+                    2>/dev/null); do
         if [ -s "$f" ]; then
             rotate_one "$f"
             ROTATED_ANY=1
@@ -221,12 +269,13 @@ done
 # tracked separately.
 # ----------------------------------------------------------------------------
 NEXTCLOUD_DATA="/mnt/data/nextcloud/data"
-EXTRA_FILES="${NEXTCLOUD_DATA}/nextcloud.log ${NEXTCLOUD_DATA}/nextcloud.log.1"
 
-for f in $EXTRA_FILES; do
-    [ -f "$f" ] || continue
-    rotate_one "$f"
-done
+# nextcloud.log is live. nextcloud.log.1 is a dead archive Nextcloud left
+# behind before its internal rotation was switched off, so it is compressed and
+# then REMOVED rather than truncated: nothing writes to it, and truncating would
+# leave a 0-byte file sitting there forever.
+rotate_one "${NEXTCLOUD_DATA}/nextcloud.log"
+rotate_one "${NEXTCLOUD_DATA}/nextcloud.log.1" dead
 
 if [ -d "$NEXTCLOUD_DATA" ]; then
     DELETED=$(find "$NEXTCLOUD_DATA" -maxdepth 1 -type f -name 'nextcloud.log*.gz' \
