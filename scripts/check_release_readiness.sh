@@ -192,8 +192,33 @@ else
     fi
 fi
 
-# ---------------------------------------------------------------- 9. tag
-echo "${BOLD}9. Tag${NC}"
+# ---------------------------------------------------------------- 9. exec bits
+# A script committed 100644 is not executable after `git reset --hard`, so
+# anything that execs it directly fails with "permission denied".
+#
+# This hid on fresh installs for an entire release cycle, because
+# install_hermes_docker.sh runs ensure_scripts_executable(), a defensive
+# chmod +x over every .sh in the repo. system_update_docker.sh has no
+# equivalent, so the same file worked on a fresh install and failed on an
+# upgrade. v260929 shipped rotate_service_logs.sh at 644 and only the upgrade
+# surfaced it.
+#
+# Entrypoints are excluded: their own Dockerfile chmods them at build time, so
+# their committed mode is irrelevant.
+echo "${BOLD}9. Script exec bits${NC}"
+non_exec="$(git ls-files -s '*.sh' 2>/dev/null \
+            | awk '$1=="100644"{print $4}' \
+            | grep -v '/entrypoints/' || true)"
+if [[ -z "$non_exec" ]]; then
+    pass "every tracked .sh outside entrypoints is committed executable"
+else
+    fail "$(echo "$non_exec" | wc -l | tr -d ' ') tracked .sh committed 100644"
+    echo "$non_exec" | sed 's/^/        /'
+    echo "        Fix: git update-index --chmod=+x <file>"
+fi
+
+# ---------------------------------------------------------------- 10. tag
+echo "${BOLD}10. Tag${NC}"
 if git rev-parse "$VERSION" >/dev/null 2>&1; then
     warn "$VERSION already exists locally. Fine at step 9+, wrong at step 1"
 else
