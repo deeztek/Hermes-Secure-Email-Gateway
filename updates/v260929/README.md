@@ -128,11 +128,28 @@ pointed at the provider and hosts the other forty here. Forty seats.
 
 ### What is kept
 
-Their existing login still works. Nothing about how they authenticate changes:
-if they sign in against Microsoft 365 or Google, they carry on doing that and
-collect their mail from here with the same password. If they have a local
-password, they keep it. **No passwords are reset and nobody has to be told
-anything.**
+**No passwords are reset.** The conversion changes the account's role rather
+than recreating it, so whatever credential the recipient already had still
+works. Converting forty people does not mean resetting forty passwords.
+
+If the recipient authenticates against an upstream directory, that keeps
+working too, for the same reason: the attributes that drive it are left
+untouched and only group membership changes. Worth being precise about what
+that covers, because it is narrower than it sounds.
+
+- It is a **Pro** feature, and it is an **LDAP** bind. Google Workspace via
+  Secure LDAP, which needs Business Plus or above and is not available on
+  Business Starter or Business Standard, or an Active Directory over LDAPS.
+  **Microsoft 365 is not an option here**: it has no LDAP endpoint, and the
+  Graph connector provisions recipients rather than authenticating them.
+- It is the credential path for **web sign-in only**: the user portal,
+  Nextcloud and the admin console. Mail clients and DAV authenticate against
+  app passwords issued by Hermes, both before and after a conversion.
+
+**People do need to be told something**, just not about passwords. Their mail
+now arrives here rather than at the provider, so their mail client has to point
+at this server. That is the point of the move, and it is the one thing a
+conversion cannot do for them.
 
 Their spam policy, encryption settings, signing and MFA requirement all carry
 over. Their name comes from what the directory told Hermes when the recipient
