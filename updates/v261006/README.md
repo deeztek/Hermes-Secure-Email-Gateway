@@ -16,3 +16,12 @@ Take a backup or snapshot first. No manual steps.
 
 The upgrade edits the web server configuration in place and keeps a copy of
 the original under `config/nginx/etc/nginx/`.
+
+## Legacy (non-Docker) installations
+
+Download `hermes-legacy-security-patch.sh` from this release and run it once
+as root:
+
+```bash
+sudo bash hermes-legacy-security-patch.sh
+```

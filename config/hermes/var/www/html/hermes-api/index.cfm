@@ -24,7 +24,7 @@
 <cfset theUrl = Trim(reqHeaders["X-Original-URL"])>
 
 <!--- Allowed targets only --->
-<cfif NOT REFind("^/[A-Za-z0-9/_.-]+\.cfm(\?[A-Za-z0-9._~%&=+@:,-]*)?$", theUrl) OR NOT ListFind(allowedTargets, ListFirst(theUrl, "?"))>
+<cfif NOT REFind("^/[A-Za-z0-9/_.-]+\.cfm(\?[A-Za-z0-9._~%&=+@:,*-]*)?$", theUrl) OR NOT ListFind(allowedTargets, ListFirst(theUrl, "?"))>
     <cfoutput>Invalid Request: X-Original-URL is not permitted</cfoutput>
     <cfabort>
 </cfif>
