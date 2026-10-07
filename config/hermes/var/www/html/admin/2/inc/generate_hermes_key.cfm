@@ -17,7 +17,8 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
  <cfset authkey=generateSecretKey("AES", 256)>
  <cffile action = "write"
  file = "/opt/hermes/keys/hermes.key"
- output = "#authkey#">
+ output = "#authkey#"
+ mode = "600">
  
  <!-- READ SECRET KEY -->
  <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">

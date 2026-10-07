@@ -1806,7 +1806,7 @@ generate_secrets() {
     # silently orphan every encrypted credential in the database.
     if [[ ! -s "${SECRETS_DIR}/hermes.key" ]]; then
         openssl rand -base64 32 > "${SECRETS_DIR}/hermes.key"
-        chmod 644 "${SECRETS_DIR}/hermes.key"
+        chmod 600 "${SECRETS_DIR}/hermes.key"
         log "  + hermes.key (AES-256, credential encryption)"
     else
         log "  = hermes.key (kept)"

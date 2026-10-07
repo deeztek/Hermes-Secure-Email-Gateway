@@ -92,7 +92,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
        which populates it with a fresh AES-256 key. This keeps the install
        script out of the hermes-key business entirely. --->
 <cfif NOT FileExists("/opt/hermes/keys/hermes.key")>
-  <cffile action="write" file="/opt/hermes/keys/hermes.key" output="" addnewline="no">
+  <cffile action="write" file="/opt/hermes/keys/hermes.key" output="" addnewline="no" mode="600">
 </cfif>
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
 
