@@ -30,7 +30,7 @@
     </cfquery>
 
 <cfquery name="getuserdetails" datasource="hermes">
-    select name, quota from mailboxes where username = '#url.user#'
+    select name, quota from mailboxes where username = <cfqueryparam value="#url.user#" cfsqltype="cf_sql_varchar">
     </cfquery>
    
 <cfset mailboxsize = #getuserdetails.quota#/1024/1024/1024>

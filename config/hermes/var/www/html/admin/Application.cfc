@@ -140,7 +140,9 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
         <CFQUERY NAME="checktoken" DATASOURCE="hermes">
                SELECT token, name, ip, system, active, verify
                FROM api_tokens
-               WHERE token like binary '#theToken#' and verify like binary '#VerifyToken#'
+               WHERE BINARY token = <cfqueryparam value="#theToken#" cfsqltype="cf_sql_varchar">
+               AND BINARY verify = <cfqueryparam value="#VerifyToken#" cfsqltype="cf_sql_varchar">
+               AND active = 1
                </CFQUERY>
         
                <cfif #checktoken.recordcount# EQ 1>
@@ -148,7 +150,8 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
                <!--- DELETE VERIFY TOKEN  --->
                <CFQUERY NAME="deleteverify" DATASOURCE="hermes">
                update api_tokens set verify = ''
-               WHERE token like binary '#theToken#' and verify like binary '#VerifyToken#'
+               WHERE BINARY token = <cfqueryparam value="#theToken#" cfsqltype="cf_sql_varchar">
+               AND BINARY verify = <cfqueryparam value="#VerifyToken#" cfsqltype="cf_sql_varchar">
                </CFQUERY>
                
                       
