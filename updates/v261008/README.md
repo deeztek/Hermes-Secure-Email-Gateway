@@ -1,17 +1,21 @@
 # Hermes SEG v261008
 
-Fixes and hardening. Upgrade recommended.
+## Synopsis
 
-- **Intrusion Prevention now blocks banned addresses on hosts using nftables.**
-  On those hosts, bans were not being applied.
+A fix release. Intrusion Prevention now blocks banned addresses on hosts that
+use nftables, and quota warnings, ban logging and the breached-password check
+work on fresh installations. Upgrade recommended.
+
+## Bug fixes
+
+- **Intrusion Prevention did not block banned addresses on hosts using
+  nftables.** Bans were neither applied nor recorded.
 - **Quota warnings, ban logging and the user portal's breached-password check
-  work on fresh installations.** Internal notifications no longer depend on API
-  tokens, which fresh installations never had (#349).
-- **Releasing and downloading quarantined messages from the user portal works.**
-- Further hardening in the user portal and password reset.
-
-The breached-password check on portal password changes now runs whenever the
-user leaves it enabled. Previously it was silently skipped on most installations.
+  did not work on fresh installations.** They depended on API tokens that fresh
+  installations never had. They no longer need them (#349).
+- **Releasing a quarantined message from the user portal failed.**
+- **Downloading a message from the user portal left the page loading.**
+- Hardening in the user portal and password reset.
 
 ## Upgrading
 
@@ -22,5 +26,7 @@ sudo ./scripts/system_update_docker.sh v261008
 
 Take a backup or snapshot first. No manual steps.
 
-The upgrade recreates the mail server and Intrusion Prevention containers. Mail
-clients reconnect on their own.
+- The upgrade recreates the mail server and Intrusion Prevention containers.
+  Mail clients reconnect on their own.
+- The breached-password check on portal password changes now runs whenever the
+  user leaves it enabled. It was previously skipped on most installations.
