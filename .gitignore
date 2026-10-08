@@ -350,5 +350,3 @@ config/hermes/opt/hermes/sa-bayes/*
 config/mail_filter/sa-bayes/*
 !config/mail_filter/sa-bayes/.gitkeep
 
-# Local regression tests: never committed (see docs/internal/release-testing-runbook.md)
-/tests/
