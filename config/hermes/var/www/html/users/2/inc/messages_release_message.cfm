@@ -94,6 +94,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
             output="docker exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getemail.secret_id# #getrec.email# 2>&1">
 
+        <cfcatch type="any">
+        <cfset m="Messages Release Message: There was an error writing release script">
+        <cfinclude template="error.cfm">
+        <cfabort>
+        </cfcatch>
+        </cftry>
+
             <cftry>
 
                 <cfexecute name="/bin/chmod"
