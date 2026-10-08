@@ -379,7 +379,7 @@ document.addEventListener('click', function(e) {
   });
 });
 
-// Track if a no-preloader form was just submitted, so the beforeunload
+// Track if a no-preloader form or link was just used, so the beforeunload
 // handler below skips re-showing the spinner.
 var _skipPreloader = false;
 document.addEventListener('submit', function(e) {
@@ -387,6 +387,10 @@ document.addEventListener('submit', function(e) {
   if (form && form.classList && form.classList.contains('no-preloader')) {
     _skipPreloader = true;
   }
+}, true);
+document.addEventListener('click', function(e) {
+  var link = e.target.closest && e.target.closest('a.no-preloader');
+  if (link) { _skipPreloader = true; }
 }, true);
 
 // Show preloader on page unload (browser navigation)
