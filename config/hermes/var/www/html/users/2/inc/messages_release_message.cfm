@@ -70,11 +70,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
 <cfquery name="getmsg" datasource="hermes">
-    select quar_loc, subject from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.mail_id#"> and secret_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.secret_id#">
+    select quar_loc, subject from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#"> and secret_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.secret_id)#">
     </cfquery>
     
     <cfquery name="getrid" datasource="hermes">
-    select rid from msgrcpt where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.mail_id#">
+    select rid from msgrcpt where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#">
     </cfquery>
     
     <cfquery name="getrec" datasource="hermes">

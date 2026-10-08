@@ -2054,7 +2054,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
             <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#htmlEditFormat(from_addr)#</td>
 
             <cfquery name="gettoaddr" datasource="hermes">
-              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#mail_id#">
+              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(mail_id)#">
               </cfquery>
 
 <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#gettoaddr.toAddress#</td>
