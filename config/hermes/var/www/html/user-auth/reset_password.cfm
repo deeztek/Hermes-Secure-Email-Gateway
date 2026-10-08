@@ -34,7 +34,7 @@ URL Parameters:
     <title>Hermes SEG | Reset Password</title>
     <cfinclude template="./inc/html_head.cfm" />
 
-    <!--- HIBP Password Check Script --->
+    <!--- Client-side form validation --->
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             var form = document.querySelector('form');
@@ -73,41 +73,12 @@ URL Parameters:
                         return false;
                     }
 
-                    // Check HIBP
-                    e.preventDefault();
-                    submitBtn.disabled = true;
-                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
-
-                    // Use fetch to check HIBP via our API endpoint
-                    fetch('/admin/2/inc/check_hibp.cfm?type=api&password=' + encodeURIComponent(password))
-                        .then(function(response) { return response.text(); })
-                        .then(function(result) {
-                            result = result.trim();
-                            if (result === 'Hash Found') {
-                                if (hibpResult) {
-                                    hibpResult.className = 'alert alert-danger mt-3';
-                                    hibpResult.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> This password has appeared in a data breach. Please choose a different password.';
-                                    hibpResult.style.display = 'block';
-                                }
-                                submitBtn.disabled = false;
-                                submitBtn.innerHTML = 'Reset Password';
-                            } else if (result === 'Hash Not Found') {
-                                // Password is safe, submit the form
-                                form.removeEventListener('submit', arguments.callee);
-                                form.submit();
-                            } else {
-                                // HIBP unreachable - allow submission anyway
-                                form.removeEventListener('submit', arguments.callee);
-                                form.submit();
-                            }
-                        })
-                        .catch(function() {
-                            // Error - allow submission anyway
-                            form.removeEventListener('submit', arguments.callee);
-                            form.submit();
-                        });
-
-                    return false;
+                    // The breached-password check runs on the server.
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
+                    }
+                    return true;
                 });
             }
         });
@@ -153,7 +124,7 @@ URL Parameters:
         <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
     </cfif>
 
-    <!--- HIBP CHECK (server-side defense in depth) --->
+    <!--- HIBP CHECK (k-anonymity: only the first 5 hash characters leave the server) --->
     <cftry>
         <cfset theHash = hash(form.new_password, "SHA", "UTF-8")>
         <cfset leftHash = left(theHash, 5)>
@@ -168,7 +139,7 @@ URL Parameters:
                 <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
             </cfif>
         </cfif>
-        <!--- If HIBP is unreachable, continue anyway - JavaScript should have warned the user --->
+        <!--- If HIBP is unreachable, continue anyway --->
     <cfcatch type="any">
         <!--- HIBP check failed, continue anyway --->
     </cfcatch>
