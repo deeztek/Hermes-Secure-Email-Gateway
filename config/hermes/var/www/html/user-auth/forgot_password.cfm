@@ -254,7 +254,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfquery name="getUserSettings" datasource="hermes">
             SELECT secondary_email, secondary_email_verified
             FROM user_settings
-            WHERE email = '#userEmail#'
+            WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">
         </cfquery>
 
         <cfif getUserSettings.recordcount EQ 1 AND getUserSettings.secondary_email NEQ "" AND getUserSettings.secondary_email_verified EQ 1>

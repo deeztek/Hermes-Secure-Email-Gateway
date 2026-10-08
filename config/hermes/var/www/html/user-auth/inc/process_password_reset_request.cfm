@@ -35,7 +35,7 @@ Requires:
 <cfquery name="checkRecentRequest" datasource="hermes">
     SELECT id, requested_at
     FROM password_reset_requests
-    WHERE email = '#userEmail#'
+    WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">
     AND status = 'pending'
     AND requested_at > DATE_SUB(NOW(), INTERVAL 15 MINUTE)
     ORDER BY requested_at DESC
@@ -67,11 +67,11 @@ Requires:
     INSERT INTO password_reset_requests
     (email, ldap_username, user_type, token, notification_method, status, expires_at)
     VALUES
-    ('#userEmail#', '#ldapUsername#', '#userType#', '#resetToken#', '#notificationMethod#', 'pending',
+    (<cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">, <cfqueryparam cfsqltype="cf_sql_varchar" value="#ldapUsername#">, <cfqueryparam cfsqltype="cf_sql_varchar" value="#userType#">, <cfqueryparam cfsqltype="cf_sql_varchar" value="#resetToken#">, <cfqueryparam cfsqltype="cf_sql_varchar" value="#notificationMethod#">, 'pending',
     <cfif notificationMethod EQ "admin">
         NULL
     <cfelse>
-        '#expiresAtFormatted#'
+        <cfqueryparam cfsqltype="cf_sql_varchar" value="#expiresAtFormatted#">
     </cfif>)
 </cfquery>
 
@@ -132,7 +132,7 @@ This is an automated message from Hermes SEG.
             <cfquery datasource="hermes">
                 UPDATE password_reset_requests
                 SET status = 'failed'
-                WHERE token = '#resetToken#'
+                WHERE token = <cfqueryparam cfsqltype="cf_sql_varchar" value="#resetToken#">
             </cfquery>
             <cfset session.reason = 6>
             <cflocation url="forgot_password.cfm" addtoken="no">
