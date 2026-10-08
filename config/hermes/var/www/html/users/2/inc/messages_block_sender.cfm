@@ -47,7 +47,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
 <cfquery name="getrid" datasource="hermes">
-    SELECT rid from msgrcpt where mail_id like binary '#getemail.mail_id#'
+    SELECT rid from msgrcpt where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.mail_id#">
     </cfquery>
 
     <cfquery name="gettoaddr" datasource="hermes">
@@ -55,7 +55,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
 
     <cfquery name="getrecipientid" datasource="hermes">
-    select id, recipient from recipients where recipient = '#gettoaddr.toAddress#'
+    select id, recipient from recipients where recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#gettoaddr.toAddress#">
     </cfquery>
 
 
@@ -64,23 +64,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset recipient = #getrecipientid.id#>
 
     <cfquery name="getsenderid" datasource="hermes">
-        SELECT sid from msgs where mail_id like binary '#getemail.mail_id#' and secret_id like binary '#getemail.secret_id#'
+        SELECT sid from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.mail_id#"> and secret_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#getemail.secret_id#">
         </cfquery>
 
         <cfquery name="getsenderemail" datasource="hermes">
-        SELECT email from maddr where id='#getsenderid.sid#'
+        SELECT email from maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#getsenderid.sid#">
         </cfquery>
 
         <cfset sender="#getsenderemail.email#">
 
         <!--- Resolve or create mailaddr entry for sender --->
         <cfquery name="checksenderemail" datasource="hermes">
-        select id from mailaddr where email='#sender#'
+        select id from mailaddr where email=<cfqueryparam cfsqltype="cf_sql_varchar" value="#sender#">
         </cfquery>
 
         <cfif checksenderemail.recordcount LT 1>
           <cfquery name="insertsender" datasource="hermes" result="stSender">
-          insert into mailaddr (email) values ('#sender#')
+          insert into mailaddr (email) values (<cfqueryparam cfsqltype="cf_sql_varchar" value="#sender#">)
           </cfquery>
           <cfset senderMailaddrId = stSender.GENERATED_KEY>
         <cfelse>

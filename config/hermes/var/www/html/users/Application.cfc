@@ -104,7 +104,7 @@ the url: https://#ConsoleHost#</cfoutput>
 
 
   <cfquery name="getid" datasource="hermes">
-  select id from maddr where email='#session.email#'
+  select id from maddr where email=<cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
   </cfquery>
 
 <cfif #getid.recordcount# LT 1>
@@ -118,7 +118,7 @@ the url: https://#ConsoleHost#</cfoutput>
 
   <cfquery name="getusersettings" datasource="hermes">
   select train_bayes, download_msg, secondary_email, secondary_email_verified
-  from user_settings where email='#session.email#'
+  from user_settings where email=<cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
   </cfquery>
 
 <cfif #getusersettings.recordcount# LT 1>

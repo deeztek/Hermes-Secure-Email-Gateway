@@ -729,7 +729,7 @@ a, a:hover{
             FROM msgs
             INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
             INNER JOIN maddr ON msgrcpt.rid = maddr.id
-            WHERE msgs.time_iso BETWEEN '#startdate#' AND '#enddate#'
+            WHERE msgs.time_iso BETWEEN <cfqueryparam cfsqltype="cf_sql_varchar" value="#startdate#"> AND <cfqueryparam cfsqltype="cf_sql_varchar" value="#enddate#">
             AND (
                 <!--- Messages addressed directly to this user --->
                 msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
@@ -750,7 +750,7 @@ a, a:hover{
                 )
             )
             ORDER BY msgs.time_iso DESC
-            LIMIT #limit#
+            LIMIT <cfqueryparam cfsqltype="cf_sql_integer" value="#limit#">
         </cfquery>
     <cfelse>
         <!--- Normal query - user is not a catch-all recipient --->
@@ -760,10 +760,10 @@ a, a:hover{
                    msgs.archive, msgs.client_addr
             FROM msgs
             INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-            WHERE msgs.time_iso BETWEEN '#startdate#' AND '#enddate#'
+            WHERE msgs.time_iso BETWEEN <cfqueryparam cfsqltype="cf_sql_varchar" value="#startdate#"> AND <cfqueryparam cfsqltype="cf_sql_varchar" value="#enddate#">
             AND msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
             ORDER BY msgs.time_iso DESC
-            LIMIT #limit#
+            LIMIT <cfqueryparam cfsqltype="cf_sql_integer" value="#limit#">
         </cfquery>
     </cfif>
 
@@ -1408,7 +1408,7 @@ a, a:hover{
        <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
         <cfquery name="getemail" datasource="hermes">
-      select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+      select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
         </cfquery>
 
         <cfif #getemail.recordcount# GTE 1>
@@ -1478,7 +1478,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
- select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1549,7 +1549,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
- select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1622,7 +1622,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
- select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1717,7 +1717,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+  select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1813,7 +1813,7 @@ a, a:hover{
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = '#session.owner#'
+select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -2046,7 +2046,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
             <td>#client_addr#</td>
 
             <cfquery name="getfromaddr" datasource="hermes">
-              SELECT email as fromAddress FROM maddr where id='#sid#'
+              SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#sid#">
               </cfquery>
 
             <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#getfromaddr.fromAddress#</td>
@@ -2054,7 +2054,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.secret_id from msgs INNE
             <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#htmlEditFormat(from_addr)#</td>
 
             <cfquery name="gettoaddr" datasource="hermes">
-              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id='#mail_id#'
+              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#mail_id#">
               </cfquery>
 
 <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#gettoaddr.toAddress#</td>

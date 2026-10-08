@@ -285,11 +285,11 @@ SELECT * FROM msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_var
 
 
 <cfquery name="getsid" datasource="hermes">
-select sid from msgs where mail_id = '#mailid#'
+select sid from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfquery name="getfromaddr" datasource="hermes">
-SELECT email as fromAddress FROM maddr where id='#getsid.sid#'
+SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#getsid.sid#">
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="hermes">

@@ -127,7 +127,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cfquery name="getreportsettings" datasource="hermes">
-select report_enabled from user_settings where email = '#session.email#'
+select report_enabled from user_settings where email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
 </cfquery>
 
 <cfparam name = "report_enabled" default = "#getreportsettings.report_enabled#">
