@@ -11,7 +11,7 @@ schedule that triggers the daily check).
 This page tells an admin **whether a new Hermes release is available
 and how to apply it**. It is intentionally thin: every detail of how
 upgrades actually work — the artifact taxonomy, the orchestrator's
-five phases, the idempotency rules, the release-cut procedure — lives
+five phases, the idempotency rules — lives
 in [Release and Update Methodology](../../install/release-and-update-methodology.md),
 which is the canonical reference. This page documents the **admin
 surface** that sits on top of that methodology.
@@ -232,10 +232,9 @@ the **`build_no`** row in `system_settings`:
 
 A successful Phase 3 ends with `build_no` matching the target tag.
 If after an orchestrator run those two disagree, something in Phase
-3 silently no-op'd a stamp-advance — inspect the log. See [Release
-and Update Methodology § The release-cut procedure](../../install/release-and-update-methodology.md#the-release-cut-procedure-developer-side)
-for the exact `UPDATE system_settings ...` block every release's
-`schema_updates.sql` ends with.
+3 silently no-op'd a stamp-advance — inspect the log. Every release's
+`schema_updates.sql` ends with the `UPDATE system_settings ...` statement
+that sets `build_no`.
 
 ## Skipping releases
 

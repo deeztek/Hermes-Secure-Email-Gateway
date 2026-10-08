@@ -4,7 +4,7 @@
 #
 # WHY THIS EXISTS
 #
-# docs/install/release-and-update-methodology.md has a 14-step release
+# docs/internal/release-cut-procedure.md has a 14-step release
 # procedure. The steps that are easy to skip are the ones no human notices:
 # the baseline build_no floor sat three releases stale (v260723 through
 # v260918) even though step 3 explicitly says to bump it, because nothing
@@ -228,7 +228,7 @@ fi
 echo ""
 if (( FAILED > 0 )); then
     echo "${RED}${BOLD}${FAILED} check(s) FAILED${NC}${WARNED:+, ${WARNED} warning(s)}"
-    echo "Fix these before step 8. See docs/install/release-and-update-methodology.md"
+    echo "Fix these before step 8. See docs/internal/release-cut-procedure.md"
     echo ""
     exit 1
 fi
