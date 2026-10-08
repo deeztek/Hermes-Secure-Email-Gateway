@@ -27,7 +27,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfif url.mid is not "">
 
 <cfquery name="checkq" datasource="hermes">
-select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
+select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_integer" value="#session.owner#">
 </cfquery>
 
 <cfif #checkq.recordcount# GTE 1>
@@ -62,7 +62,7 @@ select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc f
 
 
 <cfquery name="checkq" datasource="hermes">
-select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.owner#">
+select msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc from msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#"> and msgrcpt.rid = <cfqueryparam cfsqltype="cf_sql_integer" value="#session.owner#">
 </cfquery>
 
 <cfif #checkq.archive# is "N">

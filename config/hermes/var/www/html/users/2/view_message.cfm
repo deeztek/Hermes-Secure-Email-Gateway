@@ -289,7 +289,7 @@ select sid from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" va
 </cfquery>
 
 <cfquery name="getfromaddr" datasource="hermes">
-SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#getsid.sid#">
+SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_integer" value="#getsid.sid#">
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="hermes">

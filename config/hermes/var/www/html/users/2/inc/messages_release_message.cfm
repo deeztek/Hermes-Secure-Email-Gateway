@@ -78,7 +78,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfquery>
     
     <cfquery name="getrec" datasource="hermes">
-    select email from maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#getrid.rid#">
+    select email from maddr where id=<cfqueryparam cfsqltype="cf_sql_integer" value="#getrid.rid#">
     </cfquery>
     
     <cfif #getmsg.recordcount# GTE 1>

@@ -68,7 +68,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfquery>
 
         <cfquery name="getsenderemail" datasource="hermes">
-        SELECT email from maddr where id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#getsenderid.sid#">
+        SELECT email from maddr where id=<cfqueryparam cfsqltype="cf_sql_integer" value="#getsenderid.sid#">
         </cfquery>
 
         <cfset sender="#getsenderemail.email#">
