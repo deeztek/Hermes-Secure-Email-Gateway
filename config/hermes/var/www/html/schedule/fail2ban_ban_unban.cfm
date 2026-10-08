@@ -17,7 +17,7 @@
 <cfif StructKeyExists(url, "action") AND StructKeyExists(url, "ip") AND StructKeyExists(url, "type") AND StructKeyExists(url, "source")>
 
     <!--- Get IP Address Validation Regex --->
-    <cfinclude template="validate_ip_address.cfm">
+    <cfinclude template="/admin/2/inc/validate_ip_address.cfm">
 
     <cfif REFind(pattern, url.ip) GT 0 AND (url.action is "BAN" OR url.action is "UNBAN") AND (url.type is "AUTOMATIC" OR url.type is "MANUAL") AND (url.source is "MAILSERVER" OR url.source is "SSO" OR url.source is "ADMIN")>
 

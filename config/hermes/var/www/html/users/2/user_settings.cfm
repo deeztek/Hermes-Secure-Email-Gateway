@@ -209,36 +209,25 @@ $(document).ready(function() {
         <!--- STEP 3: CHECK AGAINST HAVEIBEENPWNED (if enabled) --->
         <cfif pwdStep EQ 2>
             <cfif form.hibp EQ "YES">
-                <cfinclude template="./inc/get_system_token.cfm">
+                <cfhttp method="GET" charset="utf-8" throwonerror="false" url="http://127.0.0.1:8888/schedule/check_hibp.cfm">
+                    <cfhttpparam type="url" name="type" value="api">
+                    <cfhttpparam type="url" name="password" value="#Trim(form.newpassword)#">
+                </cfhttp>
 
-                <cfif getsystoken.recordcount EQ 1 AND getsystoken.token NEQ "">
-                    <cfset THETOKEN = getsystoken.token>
-                    <cfset urlencodedpassword = URLEncodedFormat(Trim(form.newpassword))>
-
-                    <cfhttp method="POST" charset="utf-8" throwonerror="false" url="http://127.0.0.1:8888/hermes-api/">
-                        <cfhttpparam name="accept" type="header" value="accept: */*">
-                        <cfhttpparam name="X-Original-URL" type="header" value="/admin/2/inc/check_hibp.cfm?type=api&password=#urlencodedpassword#">
-                        <cfhttpparam name="X-Token" type="header" value="#THETOKEN#">
-                    </cfhttp>
-
-                    <cfif cfhttp.fileContent contains "Hash Not Found">
-                        <cfset pwdStep = 3>
-                    <cfelseif cfhttp.fileContent contains "Hash Found">
-                        <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>The New Password you are attempting to use has previously appeared in a data breach. Please use another password. Password was checked by <a href='https://haveibeenpwned.com/Passwords' target='_blank'>haveibeenpwned.com</a>">
-                        <cfset session.pwdMessageType = "danger">
-                        <cflocation url="user_settings.cfm" addtoken="no">
-                    <cfelseif cfhttp.fileContent contains "Hibp Unreachable">
-                        <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>There was a problem checking your password against haveibeenpwned.com. Please set the <strong>Check Password Against haveibeenpwned.com</strong> field to NO and try again">
-                        <cfset session.pwdMessageType = "danger">
-                        <cflocation url="user_settings.cfm" addtoken="no">
-                    <cfelse>
-                        <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>There was a problem checking your password against haveibeenpwned.com. Please set the <strong>Check Password Against haveibeenpwned.com</strong> field to NO and try again">
-                        <cfset session.pwdMessageType = "danger">
-                        <cflocation url="user_settings.cfm" addtoken="no">
-                    </cfif>
-                <cfelse>
-                    <!--- Token not found, skip HIBP check --->
+                <cfif cfhttp.fileContent contains "Hash Not Found">
                     <cfset pwdStep = 3>
+                <cfelseif cfhttp.fileContent contains "Hash Found">
+                    <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>The New Password you are attempting to use has previously appeared in a data breach. Please use another password. Password was checked by <a href='https://haveibeenpwned.com/Passwords' target='_blank'>haveibeenpwned.com</a>">
+                    <cfset session.pwdMessageType = "danger">
+                    <cflocation url="user_settings.cfm" addtoken="no">
+                <cfelseif cfhttp.fileContent contains "Hibp Unreachable">
+                    <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>There was a problem checking your password against haveibeenpwned.com. Please set the <strong>Check Password Against haveibeenpwned.com</strong> field to NO and try again">
+                    <cfset session.pwdMessageType = "danger">
+                    <cflocation url="user_settings.cfm" addtoken="no">
+                <cfelse>
+                    <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>There was a problem checking your password against haveibeenpwned.com. Please set the <strong>Check Password Against haveibeenpwned.com</strong> field to NO and try again">
+                    <cfset session.pwdMessageType = "danger">
+                    <cflocation url="user_settings.cfm" addtoken="no">
                 </cfif>
             <cfelse>
                 <!--- HIBP check disabled --->

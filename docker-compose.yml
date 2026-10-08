@@ -685,6 +685,7 @@ services:
       - PUID=1000
       - PGID=1000
       - TZ=${TIMEZONE}
+      - HERMES_COMMANDBOX_IP=${IPV4SUBNET}.113
       - VERBOSITY=-vv #optional
     volumes:
       - ./config/fail2ban/config:/config
@@ -822,8 +823,6 @@ services:
       - ./config/hermes/opt/hermes/ssl:/opt/hermes/ssl
       - /opt/hermes/keys/ecprivkey.pem:/keys/ecprivkey.pem
       - /opt/hermes/keys/ecpubkey.pem:/keys/ecpubkey.pem
-      - /opt/hermes/creds/hermes_username:/opt/hermes/creds/hermes_username
-      - /opt/hermes/creds/hermes_password:/opt/hermes/creds/hermes_password
       - dovecot_mail:/srv/mail
       - dovecot_sieve:/srv/sieve
       - dovecot_logs:/logs

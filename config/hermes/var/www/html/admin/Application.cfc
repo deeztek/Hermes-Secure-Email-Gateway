@@ -106,83 +106,6 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
     <!--- IsStruct( reqData ) --->
     </cfif>
 
-     <!--- ATTEMPT TO CHECK FOR TOKEN STARTS HERE --->
-
-     <!--- CHECK FOR X-TOKEN HEADER --->
-
-       <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Token" )>
-
-       <cfset theToken = getHttpRequestData().headers["X-Token"]>
- 
-       <cfif #theToken# is "">
- 
-        <cfset m="Appplication.cfc: There was an error verifying token session. X-Token is blank">
-        <cfinclude template="/admin/2/inc/error.cfm">
-        <cfabort>     
- 
-       <cfelse>
- 
-         <!--- CHECK FOR X-VERIFY-TOKEN HEADER --->
-        <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Verify-Token" )>
- 
-        <cfset VerifyToken = getHttpRequestData().headers["X-Verify-Token"]>
- 
-        <cfif #VerifyToken# is "">
- 
-               
-        <cfset m="Appplication.cfc: There was an error verifying token session. X-Verify-Token is blank">
-        <cfinclude template="/admin/2/inc/error.cfm">
-        <cfabort>   
- 
-        <cfelse>
- 
-               
-        <CFQUERY NAME="checktoken" DATASOURCE="hermes">
-               SELECT token, name, ip, system, active, verify
-               FROM api_tokens
-               WHERE BINARY token = <cfqueryparam value="#theToken#" cfsqltype="cf_sql_varchar">
-               AND BINARY verify = <cfqueryparam value="#VerifyToken#" cfsqltype="cf_sql_varchar">
-               AND active = 1
-               </CFQUERY>
-        
-               <cfif #checktoken.recordcount# EQ 1>
- 
-               <!--- DELETE VERIFY TOKEN  --->
-               <CFQUERY NAME="deleteverify" DATASOURCE="hermes">
-               update api_tokens set verify = ''
-               WHERE BINARY token = <cfqueryparam value="#theToken#" cfsqltype="cf_sql_varchar">
-               AND BINARY verify = <cfqueryparam value="#VerifyToken#" cfsqltype="cf_sql_varchar">
-               </CFQUERY>
-               
-                      
-               <!--- PROCESS TOKEN REQUEST --->      
-               <cfinclude template="/admin/2/inc/setsession.cfm">     
-   
-               <cfelse>
-        
-               <cfset m="Appplication.cfc: There was an error verifying token session. checktoken.recordcount NEQ 1">
-               <cfinclude template="/admin/2/inc/error.cfm">
-               <cfabort>     
-               
-               <!--- /CFIF #checktoken.recordcount# --->
-               </cfif>
- 
-      
-        <!--- /CFIF  #VerifyToken# is "" --->
-        </cfif>
- 
-        <!--- /CFIF IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Verify-Token" --->
-        </cfif>
- 
-             
-        <!--- /CFIF  #theToken# is "" --->
-        </cfif>
-
-
-     <!--- ATTEMPT TO CHECK FOR TOKEN ENDS HERE --->
-
-       <!--- IF X-Token Header does NOT exist check for remote-user and cookie headers --->
-       <cfelse>
 
        <cfset session.theUser = getHttpRequestData().headers["remote-user"]>  
 
@@ -271,8 +194,6 @@ the url: https://#ConsoleHost#</cfoutput>
        <!--- /CFIF session.theUser is not "" --->
       </cfif>
 
-       <!--- /CFIF IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "X-Token" --->
-       </cfif>
 
 <!--- CHECK IF WIZARD HAS BEEN RAN FUNCTIONALITY HAS BEEN MOVED TO INDEX.CFM AS OF BUILD 220410 --->
 <!---       
