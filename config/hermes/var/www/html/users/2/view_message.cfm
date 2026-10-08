@@ -343,7 +343,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
     <cfif #session.download_msg# is "1">
 
     <cfoutput>
-      <a href="./inc/download_message.cfm?mid=#URLEncodedFormat(Trim(mailid))#" target="downloadFrame" title="Download Message" class="btn btn-secondary btn-lg" role="button"><i class="fas fa-download"></i></a>
+      <a href="./inc/download_message.cfm?mid=#URLEncodedFormat(Trim(mailid))#" title="Download Message" class="btn btn-secondary btn-lg no-preloader" role="button"><i class="fas fa-download"></i></a>
     </cfoutput>
 
     &nbsp;&nbsp;
@@ -444,7 +444,6 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
 
 </wrapper>
 
-<iframe name="downloadFrame" style="display:none;"></iframe>
 </body>
 
 <!--- SCRIPT TO PRINT PAGE --->

@@ -350,6 +350,7 @@ document.addEventListener('click', function(e) {
       !href.startsWith('#') &&
       !href.startsWith('javascript:') &&
       !link.getAttribute('target') &&
+      !link.classList.contains('no-preloader') &&
       !link.getAttribute('data-bs-toggle') &&
       !href.startsWith('http://') &&
       !href.startsWith('https://')) {
