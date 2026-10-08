@@ -9,17 +9,16 @@ IPTABLES_BACKEND=""
 
 echo "=== Detecting iptables backend ==="
 
-# Check for "legacy tables" warning which indicates
-# the system is using legacy backend but we're querying with nft
-# The full message is: "Warning: iptables-legacy tables present, use iptables-legacy to see them"
-# We match on "legacy tables" to catch any variations
-NFT_HAS_LEGACY_WARNING=$(iptables-nft -L DOCKER -n 2>&1 | grep -ci "legacy tables")
-
-if [ "$NFT_HAS_LEGACY_WARNING" -gt 0 ]; then
-    # nft command shows warning about legacy tables - use legacy
+# The bans go into DOCKER-USER, so use whichever backend holds Docker's
+# DOCKER-USER chain. Do not go by the "iptables-legacy tables present"
+# warning: leftover legacy rules trigger it on hosts where Docker uses nft.
+if iptables-nft -L DOCKER-USER -n 2>/dev/null | grep -q "^Chain DOCKER-USER"; then
+    IPTABLES_BACKEND="iptables-nft"
+    echo "Detected iptables-nft backend (DOCKER-USER chain found)"
+elif iptables-legacy -L DOCKER-USER -n 2>/dev/null | grep -q "^Chain DOCKER-USER"; then
     IPTABLES_BACKEND="iptables-legacy"
-    echo "Detected iptables-legacy backend (nft showed legacy warning)"
-# Check if iptables-legacy has Docker rules (DOCKER chain) without warnings
+    echo "Detected iptables-legacy backend (DOCKER-USER chain found)"
+# Check if iptables-legacy has Docker rules (DOCKER chain)
 elif iptables-legacy -L DOCKER -n 2>&1 | grep -q "^Chain DOCKER"; then
     IPTABLES_BACKEND="iptables-legacy"
     echo "Detected iptables-legacy backend (Docker chain found)"
