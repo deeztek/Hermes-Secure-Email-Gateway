@@ -88,12 +88,18 @@ additive and never rewrites operator data.
 
 ## 2. Log in and sanity-check
 
-Several pages below write a configuration file only when something on them is
-saved, and the migration does not write those files. Where a step says to save
-a page, use its **Apply** / **Save** button if it has one. Otherwise edit any
-one entry and save it unchanged, or, if the page has no entries, add a
-temporary entry and then delete it. Any of these rewrites the whole file from
-the restored database.
+> ### ⚠️ Some migrated settings are NOT applied until you save their page
+>
+> Several pages write a configuration file only when something on them is
+> saved, and the migration does not write those files. Until you do, the
+> settings are **silently ignored**: mail for relay domains loops back to this
+> gateway and defers, and allow/block lists let blocked senders through. No
+> error tells you.
+>
+> Where a step says to save a page, use its **Apply** / **Save** button if it
+> has one. Otherwise edit any one entry and save it unchanged, or, if the page
+> has no entries, add a temporary entry and then delete it. Any of these
+> rewrites the whole file from the restored database.
 
 1. Log into the admin console (see step 6 if all admins show as one-factor).
 2. Sidebar → **Email Relay → Domains** and **Email Relay → Relay Recipients**:
@@ -170,8 +176,17 @@ One needs a deliberate choice:
 
 ## 6. Reconfigure admin two-factor authentication
 
-Every migrated admin is in the **one-factor** group; legacy TOTP / WebAuthn
-devices were not carried over (Authelia moved SQLite → MySQL).
+> ### ⚠️ Every migrated admin is password-only, even if the UI says Two Factor
+>
+> All migrated admins are in the **one-factor** group, and legacy TOTP /
+> WebAuthn devices were not carried over (Authelia moved SQLite → MySQL). The
+> **Access Control** shown in System Users is the legacy setting, not what is
+> enforced. Review **every** admin account.
+>
+> **Do not switch anyone to two-factor before outbound mail works (step 11).**
+> Enrollment e-mails a verification code; an admin who cannot receive it is
+> locked out of the console. Keep at least one admin on **One Factor** until
+> another has enrolled successfully.
 
 1. Verify each admin can log in with their **existing (legacy) password**.
 2. Sidebar → **System → System Users**. The **Access Control** shown for a migrated admin
@@ -208,9 +223,6 @@ devices were not carried over (Authelia moved SQLite → MySQL).
 4. Admins who should stay password-only need no group change. Do step 3.1 only
    if you want to clear the warning.
 
-**Important:** review every admin account. All are password-only until you do
-this.
-
 ## 7. Reactivate the Pro license (Pro editions)
 
 The Pro license is bound to the server's hardware UUID, which changed on the new
@@ -236,8 +248,9 @@ they keep serving, but three things need fixing:
 Certificates are assigned on three separate pages, one per service (see 8.2,
 step 1).
 
-> **Before you touch Console Settings: make sure the console address reaches
-> this host.** Saving Console Settings restarts the web server and sends your
+> ### ⚠️ Before you touch Console Settings, make sure the console address reaches this host
+>
+> Saving Console Settings restarts the web server and sends your
 > browser back to the console address. Login sessions are tied to that
 > address, so you must be browsing the console *at* it. If the address is a
 > name (FQDN) that still resolves to the **legacy** server, you will end up on
@@ -385,8 +398,15 @@ convenient — it needs no gateway downtime.
 (two-factor), which needs outbound mail and comes right after this step.**
 
 While migrating, outbound has been held so the box could not mail real
-recipients (see the notice at the top). Now release it — deliberately, after
+recipients (see the notice at the top). Now release it, deliberately, after
 reviewing what's queued.
+
+> ### ⚠️ Delete the stale quarantine notifications BEFORE you resume
+>
+> The queue holds a large batch of quarantine notifications generated from the
+> restored quarantine. Resuming sends everything in the queue at once, so
+> anything you do not delete goes to **real recipients** and cannot be
+> recalled.
 
 1. Sidebar → **System → Mail Queue**. At the top, the **Outbound Delivery** card shows
    **PAUSED**.
