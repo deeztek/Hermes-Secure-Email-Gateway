@@ -236,6 +236,28 @@ they keep serving, but three things need fixing:
 Certificates are assigned on three separate pages, one per service (see 8.2,
 step 1).
 
+> **Before you touch Console Settings: make sure the console address reaches
+> this host.** Saving Console Settings restarts the web server and sends your
+> browser back to the console address. Login sessions are tied to that
+> address, so you must be browsing the console *at* it. If the address is a
+> name (FQDN) that still resolves to the **legacy** server, you will end up on
+> the old box or be unable to log back in.
+>
+> Sidebar → **System → Console Settings** shows the address in **Console
+> Address (IP or FQDN)**. If it is a name, check where it resolves. In the
+> command below, replace `<console-address>` with that name (for example
+> `console.example.com`). Run it on the computer you are browsing from:
+>
+> ```bash
+> nslookup <console-address>
+> ```
+>
+> The address it prints must be this Docker host's IP (on the Docker host,
+> `hostname -I` lists it). If it still shows the legacy server's IP, either
+> update DNS first or, for testing, add a line to your computer's hosts file
+> mapping the name to the new host's IP. Then open the console using that
+> name, not the IP, before continuing.
+
 ### 8.1 Restore the system self-signed certificate
 
 Point the legacy self-signed row at the Docker bootstrap certificate files,
@@ -326,7 +348,11 @@ should all point at the imported certificate.
 
 ### 8.4 Verify
 
-1. The console loads over HTTPS without a certificate warning.
+1. Open the console at its console address. With a Let's Encrypt or other
+   CA-signed certificate it loads without a certificate warning. That only
+   holds when the console address is a name (FQDN) included in the
+   certificate. If the console address is an IP address, or you browse to the
+   IP, the browser warns regardless of the certificate.
 2. SMTP presents the full chain (expect 2 or more):
 
    ```bash
