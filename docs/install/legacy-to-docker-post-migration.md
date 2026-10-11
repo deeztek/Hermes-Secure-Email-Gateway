@@ -152,10 +152,32 @@ Every migrated admin is in the **one-factor** group; legacy TOTP / WebAuthn
 devices were not carried over (Authelia moved SQLite → MySQL).
 
 1. Verify each admin can log in with their **existing (legacy) password**.
-2. Sidebar → **System Users** — move each admin who should use 2FA to the
-   **two_factor** group; have them re-enroll an authenticator on next login.
+2. Sidebar → **System Users**. The **Access Control** shown for a migrated admin
+   is the legacy setting, **not** what is enforced. An admin showing **Two
+   Factor** is still password-only. Editing a migrated admin also shows a
+   "not yet synchronized to LDAP" warning; the account is already in LDAP, and
+   the steps below clear it.
+3. For each admin who should use two-factor, do **two separate saves**:
+   1. Edit the user. Set **Set User Password** to **YES**, enter a password,
+      set **Access Control** to **One Factor**, and **Save**.
+   2. Edit the user again. Set **Access Control** to **Two Factor** and
+      **Save** (no password this time).
 
-**Important:** review every admin account — all are password-only until you do
+   A single save with **Two Factor** already selected changes nothing, and a
+   save without a password on a not-yet-synchronized account does not change
+   groups either. Confirm the result:
+
+   ```bash
+   docker exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -LLL \
+     -b ou=groups,dc=hermes,dc=local "(member=cn=<username>,ou=users,dc=hermes,dc=local)" cn
+   ```
+
+   It should list `admins` and `two_factor`. The admin enrolls an
+   authenticator on their next login.
+4. Admins who should stay password-only need no group change. Do step 3.1 only
+   if you want to clear the warning.
+
+**Important:** review every admin account. All are password-only until you do
 this.
 
 ## 7. Reactivate the Pro license (Pro editions)
