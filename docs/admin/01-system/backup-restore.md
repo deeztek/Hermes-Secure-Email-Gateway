@@ -46,8 +46,10 @@ Hot mode is the daily backup. **Cold mode (`--cold`) is the escape hatch for use
 
 ### Backup quick start
 
+Commands below assume Hermes was cloned to `/opt/Hermes-Secure-Email-Gateway` (the folder `git clone` creates under `/opt`). If you cloned it somewhere else, use that path instead.
+
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B system --yes
 ```
 
 The script creates a **backup directory** at `/mnt/backups/hermes-backup-<scope>-<build_no>-<UTC-timestamp>/` (e.g. `hermes-backup-all-v260609-20260609T183616Z/`). It is written under a `.staging-…` name and **atomic-renamed** into place only on success. **There is no outer tarball** — the per-tier archives sit directly in the directory, so the restore verifies and stream-extracts each one in place without unpacking a wrapper first (no ~2× scratch space). Read `manifest.json` directly to inspect a backup before restoring.
@@ -93,9 +95,9 @@ For nightly automated backups, use **host cron** on the Docker host. `system_bac
 
 ```cron
 # m h dom mon dow user  command
-0 3 * * *      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system    --yes >> /var/log/hermes-backup.log 2>&1
-0 4 * * 0      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B vmail     --yes >> /var/log/hermes-backup.log 2>&1
-0 5 1 * *      root  /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all       --yes >> /var/log/hermes-backup.log 2>&1
+0 3 * * *      root  /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B system    --yes >> /var/log/hermes-backup.log 2>&1
+0 4 * * 0      root  /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B vmail     --yes >> /var/log/hermes-backup.log 2>&1
+0 5 1 * *      root  /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B all       --yes >> /var/log/hermes-backup.log 2>&1
 ```
 
 A typical cadence:
@@ -116,11 +118,11 @@ Use `--notify-email=ADDR` to receive an email on backup completion. By default e
 
 ```bash
 # Email on failure only (typical)
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes \
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B system --yes \
   --notify-email=admin@example.com
 
 # Email on both failure AND success
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B all --yes \
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B all --yes \
   --notify-email=admin@example.com --notify-on-success
 ```
 
@@ -136,7 +138,7 @@ Failure bodies include the timestamp, scope, mode, reason, log file path, and th
 **Verify the path before wiring into cron** — `--test-notify` sends one `[TEST] [SUCCESS]` sample and one `[TEST] [FAILURE]` sample to the address you give, then exits without running a backup:
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh --test-notify \
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh --test-notify \
   --notify-email=admin@example.com
 ```
 
@@ -174,7 +176,7 @@ If the backup fails, the `--notify-email` sends the failure email (assuming Post
 `system_backup.sh` writes to the local `-P` path only. Off-site copy is left to your existing tooling — `rclone`, `rsync` to remote storage, `aws s3 cp`, `restic`, whatever you already use. Typical pattern:
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B system --yes \
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_backup.sh -P /mnt/backups -B system --yes \
   && rclone sync /mnt/backups remote:hermes-backups/
 ```
 
@@ -183,7 +185,7 @@ sudo /opt/hermes-seg-docker-gl/scripts/system_backup.sh -P /mnt/backups -B syste
 ### Restore quick start
 
 ```bash
-sudo /opt/hermes-seg-docker-gl/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-v260609-20260601T103000Z
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_restore.sh -F /mnt/backups/hermes-backup-system-v260609-20260601T103000Z
 ```
 
 `-F` takes the backup **directory** (not a tarball).

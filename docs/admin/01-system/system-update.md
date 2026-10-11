@@ -157,10 +157,10 @@ also [System Status § System Info card](system-status.md#system-info-card).
 
 The page is currently a notice that delegates to the docs. To
 actually apply an update, SSH to the Docker host and run the
-orchestrator:
+orchestrator. Commands below assume Hermes was cloned to `/opt/Hermes-Secure-Email-Gateway` (the folder `git clone` creates under `/opt`). If you cloned it somewhere else, use that path instead.
 
 ```
-cd /opt/hermes-seg-docker-gl
+cd /opt/Hermes-Secure-Email-Gateway
 ./scripts/system_update_docker.sh                 # apply latest
 ./scripts/system_update_docker.sh v260601         # apply a specific tag
 ./scripts/system_update_docker.sh --dry-run       # show what would run, change nothing

@@ -30,8 +30,10 @@ The restored `.env`, `parameters2` rows, nginx vhost, Authelia cookie domain, an
 Postfix hostname all reference host A. Until you rewire them, the console is
 **unreachable** at host B's address.
 
+Commands below assume Hermes was cloned to `/opt/Hermes-Secure-Email-Gateway` (the folder `git clone` creates under `/opt`). If you cloned it somewhere else, use that path instead.
+
 ```bash
-sudo /opt/hermes-seg/scripts/system_rehost.sh
+sudo /opt/Hermes-Secure-Email-Gateway/scripts/system_rehost.sh
 ```
 
 It auto-detects this host's IP/hostname (pass `--to-hostname=` / `--to-ip=` to
@@ -104,7 +106,7 @@ After either path, run the smoke test to confirm container health, per-service D
 authentication, and the mail chain:
 
 ```bash
-bash /opt/hermes-seg/scripts/hermes_smoke_test.sh
+bash /opt/Hermes-Secure-Email-Gateway/scripts/hermes_smoke_test.sh
 ```
 
 A `WARN` on `smtpd_milters is empty` after a cross-host restore is the symptom that

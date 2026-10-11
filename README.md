@@ -316,8 +316,10 @@ Hermes SEG ships a single-command update orchestrator that handles git pull, ima
 
 ### Update to the latest release
 
+Run this from the folder you cloned Hermes into (`/opt/Hermes-Secure-Email-Gateway` in this example; use your own path if you cloned elsewhere):
+
 ```bash
-cd /opt/hermes-seg-docker-gl
+cd /opt/Hermes-Secure-Email-Gateway
 sudo ./scripts/system_update_docker.sh
 ```
 

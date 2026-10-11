@@ -132,7 +132,7 @@ additive and never rewrites operator data.
 
 If you saved a settings page before running the command above, run the
 command above first, then the recovery for your symptom. Run these from your
-Hermes install directory (`/opt/hermes-seg` if you followed the migration
+Hermes install directory (`/opt/Hermes-Secure-Email-Gateway` if you followed the migration
 guide; replace it with your path if you cloned elsewhere).
 
 **HTTP 403 on every console page (Console Firewall):** remove the firewall
@@ -140,7 +140,7 @@ rules from the live web server configuration and reload it. The first command
 keeps a backup copy.
 
 ```bash
-cd /opt/hermes-seg
+cd /opt/Hermes-Secure-Email-Gateway
 cp config/nginx/etc/nginx/sites-available/hermes-ssl.conf config/nginx/etc/nginx/sites-available/hermes-ssl.conf.pre-fw-fix
 sed -i -E '/^\s*allow [0-9a-fA-F.:\/]+;$/d; /^\s*deny all;$/d' config/nginx/etc/nginx/sites-available/hermes-ssl.conf
 docker exec hermes_nginx nginx -t && docker exec hermes_nginx nginx -s reload
@@ -151,7 +151,7 @@ docker exec hermes_nginx nginx -t && docker exec hermes_nginx nginx -s reload
 configuration and restart the service. The first command keeps a backup copy.
 
 ```bash
-cd /opt/hermes-seg
+cd /opt/Hermes-Secure-Email-Gateway
 cp config/authelia/configuration.yml config/authelia/configuration.yml.pre-duo-fix
 sed -i '/^duo_api:/,/^[a-z]/ s/^  disable: false/  disable: true/' config/authelia/configuration.yml
 docker restart hermes_authelia
@@ -373,14 +373,14 @@ after renewing and to place its challenge files in `/var/www/html`. Neither
 works inside Docker's certbot container, so renewal fails. On Docker the
 renewal job restarts the services itself, so the hooks are simply removed.
 
-Run these from your Hermes install directory (`/opt/hermes-seg` if you
+Run these from your Hermes install directory (`/opt/Hermes-Secure-Email-Gateway` if you
 followed the migration guide; replace it with your path if you cloned
 elsewhere).
 
 1. Find the certificate's renewal file:
 
    ```bash
-   cd /opt/hermes-seg
+   cd /opt/Hermes-Secure-Email-Gateway
    ls config/certbot/conf/renewal/
    ```
 
@@ -540,12 +540,12 @@ Do this only once everything above checks out and mail is flowing, so that if an
 upgrade turns something up you know it was the upgrade rather than the
 migration.
 
-Run this from your Hermes install directory. `/opt/hermes-seg` is the path the
+Run this from your Hermes install directory. `/opt/Hermes-Secure-Email-Gateway` is the path the
 migration guide uses; if you cloned the repository somewhere else, replace it
 with that path.
 
 ```bash
-cd /opt/hermes-seg
+cd /opt/Hermes-Secure-Email-Gateway
 sudo ./scripts/system_update_docker.sh
 ```
 

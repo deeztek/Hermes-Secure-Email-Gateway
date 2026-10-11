@@ -136,7 +136,7 @@ Below the Webmail Settings card sits a second card that controls the local-admin
 
 1. Click **Enter Maintenance Mode**. The card status flips to yellow, mailbox-user SSO goes offline, and a success banner appears at the top of the page.
 2. Click the **Open Nextcloud** button that appears below the toggle &mdash; it opens `https://<console-host>/nc/` in a new tab (`target="_blank"`) so the Hermes admin tab stays put for step 7.
-3. In the Nextcloud tab, log in as the NC local admin. Username is shown on the card; password is also in `/opt/hermes-seg-container-gl/INSTALL_SUMMARY.txt` on the host.
+3. In the Nextcloud tab, log in as the NC local admin. Username is shown on the card; password is also in `INSTALL_SUMMARY.txt` in the Hermes install folder on the host (for example `/opt/Hermes-Secure-Email-Gateway/INSTALL_SUMMARY.txt`).
 4. On first login Nextcloud prompts for TOTP enrollment via its own UI &mdash; scan the QR code with any TOTP authenticator app.
 5. **First login only &mdash; generate backup codes immediately**. Click your avatar (top-right) &rarr; **Personal settings** &rarr; **Security**, scroll to **Two-Factor backup codes**, click **Generate backup codes**. Save the 10 single-use codes somewhere safe (password manager, printed copy in a safe, etc.). These codes are the ONLY recovery path if you lose your TOTP authenticator &mdash; without them, recovery requires shell access. Done once per admin; codes persist across sessions until used.
 6. Do your admin work in Nextcloud.

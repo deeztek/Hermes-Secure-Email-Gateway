@@ -82,11 +82,16 @@ a small gateway they can share one disk.
 
 ```bash
 sudo -i
-git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git /opt/hermes-seg
-cd /opt/hermes-seg
+git clone https://github.com/deeztek/Hermes-Secure-Email-Gateway.git /opt/Hermes-Secure-Email-Gateway
+cd /opt/Hermes-Secure-Email-Gateway
 git checkout v260912
 ./scripts/install_hermes_docker.sh
 ```
+
+This installs into `/opt/Hermes-Secure-Email-Gateway`, the same folder name a
+plain `git clone` creates, and the rest of the migration documents use that
+path. If you choose a different folder, substitute it wherever they say
+`/opt/Hermes-Secure-Email-Gateway`.
 
 The `git checkout v260912` is the important line. Without it you get the latest
 release, which cannot migrate.
@@ -108,7 +113,7 @@ The migration restores **into** a running stack, so this step is not optional.
 Copy the system backup onto the host, then:
 
 ```bash
-cd /opt/hermes-seg
+cd /opt/Hermes-Secure-Email-Gateway
 ./scripts/migrate_legacy_to_docker.sh
 ```
 

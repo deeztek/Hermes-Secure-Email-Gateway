@@ -163,8 +163,10 @@ This script (target: [#221](https://github.com/deeztek/Hermes-Secure-Email-Gatew
 
 ### Phase 1 — Pull new code
 
+Commands below assume Hermes was cloned to `/opt/Hermes-Secure-Email-Gateway` (the folder `git clone` creates under `/opt`). If you cloned it somewhere else, use that path instead.
+
 ```bash
-cd /opt/hermes-seg-docker-gl
+cd /opt/Hermes-Secure-Email-Gateway
 git fetch --tags
 git checkout <target-tag>
 ```
@@ -259,7 +261,7 @@ For the period BEFORE `system_update_docker.sh` ships (#221), updates are manual
 ### Today (pre-#221)
 
 ```bash
-cd /opt/hermes-seg-docker-gl
+cd /opt/Hermes-Secure-Email-Gateway
 git fetch --tags
 git checkout <new-tag>                                   # or: git reset --hard origin/main
 docker compose pull
@@ -275,7 +277,7 @@ docker exec hermes_commandbox occ upgrade                # if NCVERSION bumped
 ### After #221
 
 ```bash
-cd /opt/hermes-seg-docker-gl
+cd /opt/Hermes-Secure-Email-Gateway
 ./scripts/system_update_docker.sh           # latest release
 ./scripts/system_update_docker.sh v260601   # specific tag
 ```
