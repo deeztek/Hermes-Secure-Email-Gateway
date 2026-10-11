@@ -20,10 +20,11 @@ Docker-managed service configs. This checklist covers what remains.
 >
 > The migration deliberately brings the gateway up with **all outbound delivery
 > held**. A freshly migrated box has the restored quarantine and its
-> notification schedule live — left alone, it will blast **stale quarantine
-> notifications to every real recipient** in the restored data (this is not
-> hypothetical; it will happen). So nothing leaves the box: outgoing mail parks
-> in the queue.
+> notification schedule live. The migration marks restored quarantine as
+> already notified, so this should not happen, but if anything slipped through
+> it would send **stale quarantine notifications to real recipients** in the
+> restored data. The hold is the safety net: nothing leaves the box, and
+> outgoing mail parks in the queue until you have reviewed it.
 >
 > Work through this checklist, then **[release outbound](#11-release-outbound-delivery)**
 > after you've reviewed the queue and deleted anything you don't want sent.
@@ -401,19 +402,20 @@ While migrating, outbound has been held so the box could not mail real
 recipients (see the notice at the top). Now release it, deliberately, after
 reviewing what's queued.
 
-> ### ⚠️ Delete the stale quarantine notifications BEFORE you resume
+> ### ⚠️ Review the queue and delete anything stale BEFORE you resume
 >
-> The queue holds a large batch of quarantine notifications generated from the
-> restored quarantine. Resuming sends everything in the queue at once, so
+> The queue **may** hold quarantine notifications generated from the restored
+> quarantine. The migration prevents this, so normally there are few or none,
+> but check anyway. Resuming sends everything in the queue at once, so
 > anything you do not delete goes to **real recipients** and cannot be
 > recalled.
 
 1. Sidebar → **System → Mail Queue**. At the top, the **Outbound Delivery** card shows
    **PAUSED**.
-2. **Review the queued mail.** Expect a large batch of quarantine-notification
-   messages (`from postmaster@…`) generated from the restored quarantine.
-   **Select and delete** those — they are stale and should not go out. Keep any
-   genuine mail you want delivered.
+2. **Review the queued mail.** Look for quarantine-notification messages
+   (`from postmaster@…`) generated from the restored quarantine. There should
+   be few or none. If there are any, **select and delete** them: they are
+   stale and should not go out. Keep any genuine mail you want delivered.
 3. Click **Resume Outbound Delivery**. This clears the hold and flushes the
    queue; the **Outbound Delivery** card flips to **ACTIVE**.
 4. Confirm the outbound test from step 10 now delivers, and watch the mail log
