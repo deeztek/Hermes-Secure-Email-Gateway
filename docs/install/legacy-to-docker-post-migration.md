@@ -102,13 +102,17 @@ the restored database.
    changing anything. This writes the delivery route for **every** domain from
    the restored database. Skip it and Postfix has no route, falls back to each
    domain's public MX (usually this gateway itself), and mail defers with
-   `Connection timed out`. Confirm with:
+   `Connection timed out`. Confirm by replacing `<your-domain>` with one of
+   the relay domains listed on that page, spelled exactly as shown:
 
    ```bash
    docker exec hermes_postfix_dkim postmap -q <your-domain> hash:/etc/postfix/transport
    ```
 
-   It should print the domain's next-hop server. The same save also writes the
+   It should print that domain's next-hop server, for example
+   `smtp:[mail.example.com]:25`. No output means a typo in the domain or a
+   route that was not written. `cat config/postfix-dkim/etc/postfix/transport`
+   (from the install directory) lists every route. The same save also writes the
    per-domain TLS policy and smarthost credentials.
 4. Sidebar → **Content Checks → Global Sender Rules** and **Content Checks →
    Network Block/Allow**: on each page, open any one entry and click **Save**
