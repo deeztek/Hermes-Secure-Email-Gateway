@@ -279,21 +279,50 @@ the migrated certificate for now and do this right after cutover.
 3. Request an ACME certificate with **Staging (Testing)** selected. When it
    succeeds, delete the staging certificate.
 4. Request the same certificate again with **Production** selected.
-5. Assign the new certificate to Console, SMTP and Webmail exactly as in
-   step 1, choosing the new Let's Encrypt certificate instead of **System
-   Bootstrap Certificate**. Assign it to Mailbox SAN as well if you use it.
+5. Assign the new Let's Encrypt certificate to each service:
+   1. **Console:** Sidebar → **System → Console Settings**. In **Console
+      Certificate**, choose the new certificate, then click **Apply
+      Settings**. Nginx restarts; reload the page and the browser warning is
+      gone.
+   2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
+      Certificate**, choose the new certificate, then click **Save & Apply
+      Settings**.
+   3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
+      Certificate**, choose the new certificate, then click **Save
+      Settings**.
+
+   Assign it to Mailbox SAN as well if you use it. On **System → System
+   Certificates**, the Console, SMTP and Webmail columns should now all point
+   at the new certificate.
+
+If you request more than one Let's Encrypt certificate (for example a separate
+name for webmail), repeat steps 3 to 5 for each one, assigning each
+certificate to the service that uses its name.
 
 A certificate requested on this host renews automatically. A migrated one may
 not, because its renewal configuration was written for the legacy server.
 
 ### 8.3 Imported certificate (no Let's Encrypt)
 
-Reassign the imported certificate to Console, SMTP and Webmail exactly as in
-8.2 step 1, choosing the imported certificate instead of **System Bootstrap
-Certificate**. Save each page even if it already shows the imported
-certificate as selected. Saving SMTP TLS Settings also makes
-Postfix send the full certificate chain instead of only the server
-certificate.
+Go to each of the three pages below, choose the imported certificate, and
+save. Do this on every page **even if the imported certificate already shows
+as selected**: the save is what rewrites the service's configuration. Webmail
+is new, so it has never had a certificate assigned.
+
+1. **Console:** Sidebar → **System → Console Settings**. In **Console
+   Certificate**, choose the imported certificate, then click **Apply
+   Settings**. Nginx restarts, and the console is unavailable for a few
+   seconds.
+2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
+   Certificate**, choose the imported certificate, then click **Save & Apply
+   Settings**. This also makes Postfix send the full certificate chain
+   instead of only the server certificate.
+3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
+   Certificate**, choose the imported certificate, then click **Save
+   Settings**. The mail server restarts.
+
+On **System → System Certificates**, the Console, SMTP and Webmail columns
+should all point at the imported certificate.
 
 ### 8.4 Verify
 
