@@ -89,6 +89,77 @@ additive and never rewrites operator data.
 
 ## 2. Log in and sanity-check
 
+> ### ⚠️ Before you log in: disable the legacy Console Firewall and Duo from the command line
+>
+> Two legacy settings come across in the database but stay dormant at first.
+> They take effect the first time you save a settings page in the console
+> (for example Console Settings or Authentication Settings), and either one
+> then locks you out:
+>
+> - **Console Firewall.** If legacy had it enabled, the console starts
+>   refusing every address not on the legacy allow-list (HTTP 403). Your
+>   workstation is probably not on it. The firewall cannot be changed in the
+>   console until the Pro license is reactivated (step 7), so there is no way
+>   back from the UI.
+> - **Duo.** If legacy used Duo, the Duo keys did not come across. The first
+>   save re-enables Duo without keys, the authentication service refuses to
+>   start, and the console returns a 500 error.
+>
+> Disable both before you do anything else in the console. This is safe to
+> run whether or not legacy used them:
+>
+> ```bash
+> docker exec hermes_db_server mariadb -u root hermes -e "UPDATE parameters2 SET value2='disabled' WHERE parameter='firewall_status' AND module='firewall'; UPDATE parameters2 SET value2='true' WHERE module='authelia' AND parameter='duo.disable';"
+> ```
+>
+> Confirm it printed nothing (no error), then check:
+>
+> ```bash
+> docker exec hermes_db_server mariadb -u root hermes -e "SELECT parameter, value2 FROM parameters2 WHERE parameter IN ('firewall_status','duo.disable');"
+> ```
+>
+> Expect `firewall_status | disabled` and `duo.disable | true`. Turn them
+> back on later, from the console:
+>
+> - **Console Firewall** (Sidebar → **System → Console Firewall**): after
+>   the license is reactivated in step 7. Add the address you browse from
+>   **before** enabling it, and remove legacy entries that no longer apply.
+> - **Duo** (Sidebar → **System → Authentication Settings**): enter the Duo
+>   **Integration Key** and **Secret Key** (from the Duo Admin Panel), then
+>   enable Duo in the same save.
+
+#### Already locked out?
+
+If you saved a settings page before running the command above, run the
+command above first, then the recovery for your symptom. Run these from your
+Hermes install directory (`/opt/hermes-seg` if you followed the migration
+guide; replace it with your path if you cloned elsewhere).
+
+**HTTP 403 on every console page (Console Firewall):** remove the firewall
+rules from the live web server configuration and reload it. The first command
+keeps a backup copy.
+
+```bash
+cd /opt/hermes-seg
+cp config/nginx/etc/nginx/sites-available/hermes-ssl.conf config/nginx/etc/nginx/sites-available/hermes-ssl.conf.pre-fw-fix
+sed -i -E '/^\s*allow [0-9a-fA-F.:\/]+;$/d; /^\s*deny all;$/d' config/nginx/etc/nginx/sites-available/hermes-ssl.conf
+docker exec hermes_nginx nginx -t && docker exec hermes_nginx nginx -s reload
+```
+
+**HTTP 500, and `docker logs hermes_authelia` shows `duo_api: option
+'integration_key' is required`:** switch Duo off in the live authentication
+configuration and restart the service. The first command keeps a backup copy.
+
+```bash
+cd /opt/hermes-seg
+cp config/authelia/configuration.yml config/authelia/configuration.yml.pre-duo-fix
+sed -i '/^duo_api:/,/^[a-z]/ s/^  disable: false/  disable: true/' config/authelia/configuration.yml
+docker restart hermes_authelia
+```
+
+Then reload the console. If the browser still shows an error, open it in a
+private window so an old login session is not reused.
+
 > ### ⚠️ Some migrated settings are NOT applied until you save their page
 >
 > Several pages write a configuration file only when something on them is
@@ -234,6 +305,10 @@ Docker host, so it shows **invalid / pending**.
 3. Reactivate, then log out and back in to re-validate.
 
 **Important:** until reactivated, the system runs as Community Edition.
+
+Once the license is active, you can re-enable the **Console Firewall** you
+disabled in step 2 (Sidebar → **System → Console Firewall**). Add the address
+you browse from **before** you enable it.
 
 ## 8. Re-establish TLS certificates
 
