@@ -157,7 +157,14 @@ devices were not carried over (Authelia moved SQLite → MySQL).
    Factor** is still password-only. Editing a migrated admin also shows a
    "not yet synchronized to LDAP" warning; the account is already in LDAP, and
    the steps below clear it.
-3. For each admin who should use two-factor, do **two separate saves**:
+3. **Wait until outbound mail works.** Enrolling an authenticator sends the
+   admin a verification code by e-mail. Outbound is held until step 11, so a
+   two-factor admin who cannot receive that e-mail cannot enroll and is locked
+   out of the console. Do this step only after step 11, once a test message
+   has reached that admin's address. Keep at least one admin on **One Factor**
+   until another admin has enrolled successfully.
+
+   For each admin who should use two-factor, do **two separate saves**:
    1. Edit the user. Set **Set User Password** to **YES**, enter a password,
       set **Access Control** to **One Factor**, and **Save**.
    2. Edit the user again. Set **Access Control** to **Two Factor** and
@@ -239,6 +246,8 @@ reviewing what's queued.
 > The **Outbound Delivery** control (Mail Queue page) is a permanent pause/resume
 > switch — useful for maintenance windows too. Pausing holds all outgoing mail
 > in the queue without affecting inbound or filtering.
+
+5. With mail flowing, go back and finish **step 6.3** (two-factor for admins).
 
 ---
 
