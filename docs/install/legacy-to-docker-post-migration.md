@@ -89,8 +89,9 @@ additive and never rewrites operator data.
 ## 2. Log in and sanity-check
 
 1. Log into the admin console (see step 6 if all admins show as one-factor).
-2. Sidebar → **Domains** and **Relay Recipients** — confirm the migrated data.
-3. Sidebar → **Domains**: open any one relay domain and click **Save** without
+2. Sidebar → **Email Relay → Domains** and **Email Relay → Relay Recipients**:
+   confirm the migrated data.
+3. Sidebar → **Email Relay → Domains**: open any one relay domain and click **Save** without
    changing anything. This writes the delivery route for **every** domain from
    the restored database. Skip it and Postfix has no route, falls back to each
    domain's public MX (usually this gateway itself), and mail defers with
@@ -107,8 +108,8 @@ additive and never rewrites operator data.
    changing anything. Skip it and the migrated allow/block entries are ignored:
    blocked senders and networks get through and nothing reports it. Skip a page
    only if it has no entries. Upgrading in step 12 does **not** do this for you.
-5. Sidebar → **System Status** — confirm all containers are healthy.
-6. Sidebar → **System Settings**. Confirm the **postmaster address** and
+5. Sidebar → **System → System Status**: confirm all containers are healthy.
+6. Sidebar → **System → System Settings**. Confirm the **postmaster address** and
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
    are where system alerts and scheduled-job failure notifications go; a
    placeholder means those are never delivered and nothing tells you.
@@ -140,14 +141,20 @@ One needs a deliberate choice:
   enabled, note that it answers only for querying IPs registered with them. On
   an unregistered host it can score mail it should not. The migration leaves it
   enabled and flags it; disable it unless this host's IP is registered.
+- Whether or not you changed anything, click **Apply** in the page toolbar.
+  This regenerates the Postfix block-list configuration from the restored
+  database.
 
 ## 5. Verify Relay Networks (mynetworks)
 
-1. Sidebar → **Relay Networks** — confirm the customer's allowed sending networks
-   carried over **and** the Docker subnet is present; **Save & Apply** if you
-   change anything.
-2. Sidebar → **Relay Host** — verify the upstream smarthost and credentials;
-   re-enter the relay password if the field is blank.
+1. Sidebar → **Email Relay → Relay Networks**: confirm the customer's allowed
+   sending networks carried over **and** the Docker subnet is present. Then
+   click **Apply Settings**, even if you changed nothing, so the relay network
+   lists are regenerated from the restored database.
+2. Sidebar → **Email Relay → Relay Host**: verify the upstream smarthost and
+   credentials; re-enter the relay password if the field is blank. Then click
+   **Save Settings**, even if you changed nothing, so the smarthost credentials
+   file is rewritten.
 
 ## 6. Reconfigure admin two-factor authentication
 
@@ -155,7 +162,7 @@ Every migrated admin is in the **one-factor** group; legacy TOTP / WebAuthn
 devices were not carried over (Authelia moved SQLite → MySQL).
 
 1. Verify each admin can log in with their **existing (legacy) password**.
-2. Sidebar → **System Users**. The **Access Control** shown for a migrated admin
+2. Sidebar → **System → System Users**. The **Access Control** shown for a migrated admin
    is the legacy setting, **not** what is enforced. An admin showing **Two
    Factor** is still password-only. Editing a migrated admin also shows a
    "not yet synchronized to LDAP" warning; the account is already in LDAP, and
@@ -205,7 +212,7 @@ Docker host, so it shows **invalid / pending**.
 
 The Let's Encrypt certificates were copied to the Docker cert path.
 
-1. Sidebar → **System Certificates** — confirm the console and mail certificates
+1. Sidebar → **System → System Certificates**: confirm the console and mail certificates
    are present and selected (not the `bootstrap_hermes.pem` placeholder).
 2. Confirm HTTPS (console) and SMTP STARTTLS work.
 
@@ -236,7 +243,7 @@ While migrating, outbound has been held so the box could not mail real
 recipients (see the notice at the top). Now release it — deliberately, after
 reviewing what's queued.
 
-1. Sidebar → **Mail Queue**. At the top, the **Outbound Delivery** card shows
+1. Sidebar → **System → Mail Queue**. At the top, the **Outbound Delivery** card shows
    **PAUSED**.
 2. **Review the queued mail.** Expect a large batch of quarantine-notification
    messages (`from postmaster@…`) generated from the restored quarantine.
