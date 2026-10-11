@@ -233,13 +233,8 @@ they keep serving, but three things need fixing:
 - The legacy Let's Encrypt renewal configuration may not renew on Docker.
 - **Webmail** is new and has no certificate assigned.
 
-Certificates are assigned in three places:
-
-| Service | Where |
-|---|---|
-| Console | Sidebar → **System → Console Settings** → **Console Certificate** |
-| SMTP | Sidebar → **System → SMTP TLS Settings** → **SMTP TLS Certificate** |
-| Webmail | Sidebar → **Email Server → Settings** → **Mail Server Certificate** |
+Certificates are assigned on three separate pages, one per service (see 8.2,
+step 1).
 
 ### 8.1 Restore the system self-signed certificate
 
@@ -261,23 +256,42 @@ Requires the certificate's DNS name to resolve to **this** host and TCP 80/443
 to be open from the Internet. If DNS still points at the legacy server, keep
 the migrated certificate for now and do this right after cutover.
 
-1. Assign **System Bootstrap Certificate** to Console, SMTP and Webmail.
+1. Assign **System Bootstrap Certificate** to each service. Each certificate
+   field is a picker: click it and choose the certificate, or type part of its
+   name to search.
+   1. **Console:** Sidebar → **System → Console Settings**. In **Console
+      Certificate**, choose **System Bootstrap Certificate**, then click
+      **Apply Settings**. Nginx restarts, and the console is unavailable for a
+      few seconds. Your browser will warn about the self-signed certificate
+      until step 5; accept it to continue.
+   2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
+      Certificate**, choose **System Bootstrap Certificate**, then click
+      **Save & Apply Settings**.
+   3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
+      Certificate**, choose **System Bootstrap Certificate**, then click
+      **Save Settings**. The mail server restarts.
+
+   On **System → System Certificates**, the Console, SMTP and Webmail columns
+   should now all point at **System Bootstrap Certificate**.
 2. Sidebar → **System → System Certificates**: delete the migrated Let's
    Encrypt certificate. Deletion is refused while it is assigned, which is why
    step 1 comes first.
 3. Request an ACME certificate with **Staging (Testing)** selected. When it
    succeeds, delete the staging certificate.
 4. Request the same certificate again with **Production** selected.
-5. Assign the new certificate to Console, SMTP and Webmail (and Mailbox SAN if
-   you use it).
+5. Assign the new certificate to Console, SMTP and Webmail exactly as in
+   step 1, choosing the new Let's Encrypt certificate instead of **System
+   Bootstrap Certificate**. Assign it to Mailbox SAN as well if you use it.
 
 A certificate requested on this host renews automatically. A migrated one may
 not, because its renewal configuration was written for the legacy server.
 
 ### 8.3 Imported certificate (no Let's Encrypt)
 
-Reassign the imported certificate to Console, SMTP and Webmail, saving each
-page even if it already shows as selected. Saving SMTP TLS Settings also makes
+Reassign the imported certificate to Console, SMTP and Webmail exactly as in
+8.2 step 1, choosing the imported certificate instead of **System Bootstrap
+Certificate**. Save each page even if it already shows the imported
+certificate as selected. Saving SMTP TLS Settings also makes
 Postfix send the full certificate chain instead of only the server
 certificate.
 
