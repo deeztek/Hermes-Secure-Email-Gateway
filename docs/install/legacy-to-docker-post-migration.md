@@ -194,7 +194,9 @@ devices were not carried over (Authelia moved SQLite → MySQL).
 
    A single save with **Two Factor** already selected changes nothing, and a
    save without a password on a not-yet-synchronized account does not change
-   groups either. Confirm the result:
+   groups either. Confirm the result. Replace `<username>` with the admin's
+   username exactly as it appears in **System Users** (for example, if the
+   user is `jsmith`, the filter reads `member=cn=jsmith,ou=users,...`):
 
    ```bash
    docker exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -LLL \
@@ -291,7 +293,9 @@ certificate.
 ## 9. Email archive (deferred)
 
 Message History **metadata** is restored, but message **bodies** live in the
-separate archive backup (`hermes-archive-<build>-…tar.gz`). Restore it when
+separate archive backup (`hermes-archive-<build>-<date>.tar.gz`, where
+`<build>` and `<date>` are the legacy build number and backup date in the
+actual file name). Restore it when
 convenient — it needs no gateway downtime.
 
 - Sidebar → **Content Checks → Message History** — entries appear; bodies are
@@ -343,6 +347,10 @@ forward.
 Do this only once everything above checks out and mail is flowing, so that if an
 upgrade turns something up you know it was the upgrade rather than the
 migration.
+
+Run this from your Hermes install directory. `/opt/hermes-seg` is the path the
+migration guide uses; if you cloned the repository somewhere else, replace it
+with that path.
 
 ```bash
 cd /opt/hermes-seg

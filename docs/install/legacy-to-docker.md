@@ -54,7 +54,9 @@ It produces two files:
 | `hermes-system-<build>-<date>.tar.gz` | Databases, configuration, keys, certificates |
 | `hermes-archive-<build>-<date>.tar.gz` | Quarantined message bodies |
 
-Only the **system** backup is needed to migrate. The archive is restored later,
+`<build>` and `<date>` stand for the legacy build number and the backup date;
+the real file names contain the actual values. Only the **system** backup is
+needed to migrate. The archive is restored later,
 separately, and needs no downtime.
 
 Copy both somewhere the new host can reach.
@@ -126,7 +128,9 @@ What it does, roughly in order:
 It will ask whether to run host rewiring. Say yes.
 
 > **Outbound mail is held from this point on.** That is deliberate, not a fault.
-> You release it as the final step of the checklist, after reviewing the queue.
+> You release it near the end of the checklist (step 11), after reviewing the
+> queue. Enabling two-factor for admins (step 6.3) has to wait until after
+> that, because enrollment sends a verification code by e-mail.
 
 ## 5. Verify it
 
