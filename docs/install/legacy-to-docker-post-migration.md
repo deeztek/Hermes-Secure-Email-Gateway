@@ -47,6 +47,10 @@ Settings Postfix reads through **MySQL maps** — **Domains**, **Relay
 Recipients**, **Virtual Recipients**, sender/recipient rules — are live directly
 from the restored database and need no action.
 
+The one exception is **domain transports** (the server each domain's mail is
+delivered to). On v260912 Postfix reads them from a file that only the Domains
+page writes, and the migration does not write it. See step 2.
+
 > **If you skipped host rewiring** during the migration, run it now:
 > `sudo scripts/system_rehost.sh --force` (auto-detects this host's IP/hostname;
 > override with `--to-hostname=` / `--to-ip=` if needed).
@@ -80,8 +84,20 @@ additive and never rewrites operator data.
 
 1. Log into the admin console (see step 6 if all admins show as one-factor).
 2. Sidebar → **Domains** and **Relay Recipients** — confirm the migrated data.
-3. Sidebar → **System Status** — confirm all containers are healthy.
-4. Sidebar → **System Settings**. Confirm the **postmaster address** and
+3. Sidebar → **Domains**: open any one relay domain and click **Save** without
+   changing anything. This writes the delivery route for **every** domain from
+   the restored database. Skip it and Postfix has no route, falls back to each
+   domain's public MX (usually this gateway itself), and mail defers with
+   `Connection timed out`. Confirm with:
+
+   ```bash
+   docker exec hermes_postfix_dkim postmap -q <your-domain> hash:/etc/postfix/transport
+   ```
+
+   It should print the domain's next-hop server. From v260929 on, routes are
+   read from the database, so the upgrade in step 12 makes this permanent.
+4. Sidebar → **System Status** — confirm all containers are healthy.
+5. Sidebar → **System Settings**. Confirm the **postmaster address** and
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
    are where system alerts and scheduled-job failure notifications go; a
    placeholder means those are never delivered and nothing tells you.
