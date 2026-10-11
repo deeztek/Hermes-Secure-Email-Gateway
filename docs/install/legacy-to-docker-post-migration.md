@@ -88,6 +88,13 @@ additive and never rewrites operator data.
 
 ## 2. Log in and sanity-check
 
+Several pages below write a configuration file only when something on them is
+saved, and the migration does not write those files. Where a step says to save
+a page, use its **Apply** / **Save** button if it has one. Otherwise edit any
+one entry and save it unchanged, or, if the page has no entries, add a
+temporary entry and then delete it. Any of these rewrites the whole file from
+the restored database.
+
 1. Log into the admin console (see step 6 if all admins show as one-factor).
 2. Sidebar → **Email Relay → Domains** and **Email Relay → Relay Recipients**:
    confirm the migrated data.
@@ -103,11 +110,12 @@ additive and never rewrites operator data.
 
    It should print the domain's next-hop server. The same save also writes the
    per-domain TLS policy and smarthost credentials.
-4. Sidebar → **Content Checks** → **Global Sender Rules** and **Network
-   Block/Allow**: on each page, open any one entry and click **Save** without
-   changing anything. Skip it and the migrated allow/block entries are ignored:
-   blocked senders and networks get through and nothing reports it. Skip a page
-   only if it has no entries. Upgrading in step 12 does **not** do this for you.
+4. Sidebar → **Content Checks → Global Sender Rules** and **Content Checks →
+   Network Block/Allow**: on each page, open any one entry and click **Save**
+   without changing anything. If a page has no entries, add a temporary entry
+   and then delete it. Skip this and the migrated allow/block entries are
+   ignored: blocked senders and networks get through and nothing reports it.
+   Upgrading in step 12 does **not** do this for you.
 5. Sidebar → **System → System Status**: confirm all containers are healthy.
 6. Sidebar → **System → System Settings**. Confirm the **postmaster address** and
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
