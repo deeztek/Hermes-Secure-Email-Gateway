@@ -47,9 +47,12 @@ Settings Postfix reads through **MySQL maps** — **Domains**, **Relay
 Recipients**, **Virtual Recipients**, sender/recipient rules — are live directly
 from the restored database and need no action.
 
-The one exception is **domain transports** (the server each domain's mail is
-delivered to). On v260912 Postfix reads them from a file that only the Domains
-page writes, and the migration does not write it. See step 2.
+The exceptions are lookup files that only an admin page writes, which the
+migration leaves empty: **domain transports** (the server each domain's mail is
+delivered to), per-domain **TLS policy** and **smarthost credentials**, the
+**Global Sender Rules** allow/block list, and the **Network Block/Allow** list.
+Until each page is saved once, those settings are silently not applied. See
+step 2.
 
 > **If you skipped host rewiring** during the migration, run it now:
 > `sudo scripts/system_rehost.sh --force` (auto-detects this host's IP/hostname;
@@ -94,10 +97,15 @@ additive and never rewrites operator data.
    docker exec hermes_postfix_dkim postmap -q <your-domain> hash:/etc/postfix/transport
    ```
 
-   It should print the domain's next-hop server. From v260929 on, routes are
-   read from the database, so the upgrade in step 12 makes this permanent.
-4. Sidebar → **System Status** — confirm all containers are healthy.
-5. Sidebar → **System Settings**. Confirm the **postmaster address** and
+   It should print the domain's next-hop server. The same save also writes the
+   per-domain TLS policy and smarthost credentials.
+4. Sidebar → **Content Checks** → **Global Sender Rules** and **Network
+   Block/Allow**: on each page, open any one entry and click **Save** without
+   changing anything. Skip it and the migrated allow/block entries are ignored:
+   blocked senders and networks get through and nothing reports it. Skip a page
+   only if it has no entries. Upgrading in step 12 does **not** do this for you.
+5. Sidebar → **System Status** — confirm all containers are healthy.
+6. Sidebar → **System Settings**. Confirm the **postmaster address** and
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
    are where system alerts and scheduled-job failure notifications go; a
    placeholder means those are never delivered and nothing tells you.
