@@ -25,8 +25,11 @@ Docker-managed service configs. This checklist covers what remains.
 > hypothetical; it will happen). So nothing leaves the box: outgoing mail parks
 > in the queue.
 >
-> Work through this checklist, then **[release outbound as the very last step](#11-release-outbound-delivery)**
-> — after you've reviewed the queue and deleted anything you don't want sent.
+> Work through this checklist, then **[release outbound](#11-release-outbound-delivery)**
+> after you've reviewed the queue and deleted anything you don't want sent.
+> Two things must wait until outbound is released: enabling **two-factor** for
+> admins (step 6.3, because enrollment e-mails a verification code) and the
+> upgrade (step 12).
 > Inbound mail and filtering run normally the whole time; only egress is held.
 
 ---
@@ -226,7 +229,8 @@ convenient — it needs no gateway downtime.
 
 ## 11. Release outbound delivery
 
-**This is the last step. Do it only after everything above checks out.**
+**Do this only after everything above checks out, except step 6.3
+(two-factor), which needs outbound mail and comes right after this step.**
 
 While migrating, outbound has been held so the box could not mail real
 recipients (see the notice at the top). Now release it — deliberately, after
