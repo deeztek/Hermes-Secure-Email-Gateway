@@ -220,13 +220,73 @@ Docker host, so it shows **invalid / pending**.
 
 **Important:** until reactivated, the system runs as Community Edition.
 
-## 8. Verify TLS certificates
+## 8. Re-establish TLS certificates
 
-The Let's Encrypt certificates were copied to the Docker cert path.
+The migration copies the legacy certificates (Let's Encrypt and imported) and
+they keep serving, but three things need fixing:
 
-1. Sidebar → **System → System Certificates**: confirm the console and mail certificates
-   are present and selected (not the `bootstrap_hermes.pem` placeholder).
-2. Confirm HTTPS (console) and SMTP STARTTLS work.
+- The legacy self-signed certificate row points at Ubuntu files that do not
+  exist in Docker. It shows **Pending** on the certificates page, and
+  assigning it to the console would stop nginx from starting.
+- The legacy Let's Encrypt renewal configuration may not renew on Docker.
+- **Webmail** is new and has no certificate assigned.
+
+Certificates are assigned in three places:
+
+| Service | Where |
+|---|---|
+| Console | Sidebar → **System → Console Settings** → **Console Certificate** |
+| SMTP | Sidebar → **System → SMTP TLS Settings** → **SMTP TLS Certificate** |
+| Webmail | Sidebar → **Email Server → Settings** → **Mail Server Certificate** |
+
+### 8.1 Restore the system self-signed certificate
+
+Point the legacy self-signed row at the Docker bootstrap certificate files,
+which the Docker install already created:
+
+```bash
+docker exec hermes_db_server mariadb -u root hermes -e "UPDATE system_certificates SET file_name='bootstrap', friendly_name='System Bootstrap Certificate', \`system\`=1 WHERE file_name='ssl-cert-snakeoil';"
+```
+
+Sidebar → **System → System Certificates**: the row must now read **System
+Bootstrap Certificate** with a grey **SYSTEM** badge next to the name, and show
+real details (subject `CN=localhost`) instead of **Pending**. Do not continue
+until it does.
+
+### 8.2 Let's Encrypt: request a fresh certificate (recommended)
+
+Requires the certificate's DNS name to resolve to **this** host and TCP 80/443
+to be open from the Internet. If DNS still points at the legacy server, keep
+the migrated certificate for now and do this right after cutover.
+
+1. Assign **System Bootstrap Certificate** to Console, SMTP and Webmail.
+2. Sidebar → **System → System Certificates**: delete the migrated Let's
+   Encrypt certificate. Deletion is refused while it is assigned, which is why
+   step 1 comes first.
+3. Request an ACME certificate with **Staging (Testing)** selected. When it
+   succeeds, delete the staging certificate.
+4. Request the same certificate again with **Production** selected.
+5. Assign the new certificate to Console, SMTP and Webmail (and Mailbox SAN if
+   you use it).
+
+A certificate requested on this host renews automatically. A migrated one may
+not, because its renewal configuration was written for the legacy server.
+
+### 8.3 Imported certificate (no Let's Encrypt)
+
+Reassign the imported certificate to Console, SMTP and Webmail, saving each
+page even if it already shows as selected. Saving SMTP TLS Settings also makes
+Postfix send the full certificate chain instead of only the server
+certificate.
+
+### 8.4 Verify
+
+1. The console loads over HTTPS without a certificate warning.
+2. SMTP presents the full chain (expect 2 or more):
+
+   ```bash
+   openssl s_client -starttls smtp -connect localhost:25 -showcerts </dev/null 2>/dev/null | grep -c 'BEGIN CERT'
+   ```
 
 ## 9. Email archive (deferred)
 
