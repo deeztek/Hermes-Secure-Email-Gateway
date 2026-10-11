@@ -136,7 +136,7 @@ the operator's decision.
 
 One needs a deliberate choice:
 
-- Sidebar → **System → RBL Configuration**. If **`b.barracudacentral.org`** is
+- Sidebar → **Content Checks → RBL Configuration**. If **`b.barracudacentral.org`** is
   enabled, note that it answers only for querying IPs registered with them. On
   an unregistered host it can score mail it should not. The migration leaves it
   enabled and flags it; disable it unless this host's IP is registered.
