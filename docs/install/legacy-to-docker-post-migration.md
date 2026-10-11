@@ -312,17 +312,17 @@ you browse from **before** you enable it.
 
 ## 8. Re-establish TLS certificates
 
-The migration copies the legacy certificates (Let's Encrypt and imported) and
-they keep serving, but three things need fixing:
+The migration copies the legacy certificates and they keep serving. Keep
+using them: an **imported** (third-party) certificate needs nothing beyond
+reassignment, and a **Let's Encrypt** certificate needs its renewal settings
+adapted to Docker. Three things to fix:
 
 - The legacy self-signed certificate row points at Ubuntu files that do not
-  exist in Docker. It shows **Pending** on the certificates page, and
-  assigning it to the console would stop nginx from starting.
-- The legacy Let's Encrypt renewal configuration may not renew on Docker.
-- **Webmail** is new and has no certificate assigned.
-
-Certificates are assigned on three separate pages, one per service (see 8.2,
-step 1).
+  exist in Docker, and shows **Pending** on the certificates page (8.1).
+- A Let's Encrypt certificate's renewal settings still call the legacy
+  server's tools, so it will not renew on Docker until they are adapted (8.2).
+- Every service needs the certificate assigned again, including **Webmail**,
+  which is new and has none (8.3).
 
 > ### ⚠️ Before you touch Console Settings, make sure the console address reaches this host
 >
@@ -361,84 +361,105 @@ Bootstrap Certificate** with a grey **SYSTEM** badge next to the name, and show
 real details (subject `CN=localhost`) instead of **Pending**. Do not continue
 until it does.
 
-### 8.2 Let's Encrypt: request a fresh certificate (recommended)
+This only makes the row correct. **Do not assign it to any service**: it is a
+placeholder that no browser or mail server trusts, and SMTP TLS refuses it.
 
-Requires the certificate's DNS name to resolve to **this** host and TCP 80/443
-to be open from the Internet. If DNS still points at the legacy server, keep
-the migrated certificate for now and do this right after cutover.
+### 8.2 Let's Encrypt: make the certificate renew on Docker
 
-1. Assign **System Bootstrap Certificate** to each service. Each certificate
-   field is a picker: click it and choose the certificate, or type part of its
-   name to search.
-   1. **Console:** Sidebar → **System → Console Settings**. In **Console
-      Certificate**, choose **System Bootstrap Certificate**. In the same
-      save, set **HTTP Strict Transport Security (HSTS)** to **Disable**: a
-      legacy install usually had it enabled, and Hermes refuses to save the
-      self-signed certificate with HSTS on, so otherwise nothing is saved.
-      Then click **Apply Settings**. Nginx restarts, and the console is
-      unavailable for a few seconds. Your browser will warn about the
-      self-signed certificate until step 5; accept it to continue.
-   2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
-      Certificate**, choose **System Bootstrap Certificate**, then click
-      **Save & Apply Settings**.
-   3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
-      Certificate**, choose **System Bootstrap Certificate**, then click
-      **Save Settings**. The mail server restarts.
+Skip this if you have no Let's Encrypt certificate.
 
-   On **System → System Certificates**, the Console, SMTP and Webmail columns
-   should now all point at **System Bootstrap Certificate**.
-2. Sidebar → **System → System Certificates**: delete the migrated Let's
-   Encrypt certificate. Deletion is refused while it is assigned, which is why
-   step 1 comes first.
-3. Request an ACME certificate with **Staging (Testing)** selected. When it
-   succeeds, delete the staging certificate.
-4. Request the same certificate again with **Production** selected.
-5. Assign the new Let's Encrypt certificate to each service:
-   1. **Console:** Sidebar → **System → Console Settings**. In **Console
-      Certificate**, choose the new certificate, then click **Apply
-      Settings**. Nginx restarts; reload the page and the browser warning is
-      gone. Once the console loads at its address without any warning, you
-      can set **HTTP Strict Transport Security (HSTS)** back to **Enable** and
-      click **Apply Settings** again.
-   2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
-      Certificate**, choose the new certificate, then click **Save & Apply
-      Settings**.
-   3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
-      Certificate**, choose the new certificate, then click **Save
-      Settings**.
+The legacy renewal settings tell certbot to reload services with `systemctl`
+after renewing and to place its challenge files in `/var/www/html`. Neither
+works inside Docker's certbot container, so renewal fails. On Docker the
+renewal job restarts the services itself, so the hooks are simply removed.
 
-   Assign it to Mailbox SAN as well if you use it. On **System → System
-   Certificates**, the Console, SMTP and Webmail columns should now all point
-   at the new certificate.
+Run these from your Hermes install directory (`/opt/hermes-seg` if you
+followed the migration guide; replace it with your path if you cloned
+elsewhere).
 
-If you request more than one Let's Encrypt certificate (for example a separate
-name for webmail), repeat steps 3 to 5 for each one, assigning each
-certificate to the service that uses its name.
+1. Find the certificate's renewal file:
 
-A certificate requested on this host renews automatically. A migrated one may
-not, because its renewal configuration was written for the legacy server.
+   ```bash
+   cd /opt/hermes-seg
+   ls config/certbot/conf/renewal/
+   ```
 
-### 8.3 Imported certificate (no Let's Encrypt)
+   It lists one `<cert-name>.conf` per Let's Encrypt certificate, where
+   `<cert-name>` is the certificate's domain, for example
+   `mail.example.com.conf`. Use that name in the next step.
 
-Go to each of the three pages below, choose the imported certificate, and
-save. Do this on every page **even if the imported certificate already shows
-as selected**: the save is what rewrites the service's configuration. Webmail
-is new, so it has never had a certificate assigned.
+2. Back up both settings files, remove the legacy hooks, and point the
+   challenge directory at the container's path. Replace `<cert-name>` with
+   the name from step 1 (for example `mail.example.com`); repeat the
+   `renewal/` lines for each certificate if there is more than one:
+
+   ```bash
+   cp config/certbot/conf/cli.ini config/certbot/conf/cli.ini.pre-docker
+   sed -i -E '/^(deploy-hook|renew-hook|pre-hook|post-hook) *=/d' config/certbot/conf/cli.ini
+
+   cp config/certbot/conf/renewal/<cert-name>.conf config/certbot/conf/renewal/<cert-name>.conf.pre-docker
+   sed -i -E '/^(deploy_hook|renew_hook|pre_hook|post_hook) *=/d; s#= /var/www/html(,?)$#= /var/www/certbot\1#' config/certbot/conf/renewal/<cert-name>.conf
+   ```
+
+   Check the result. No line may mention `hook` or `systemctl`, and every
+   path must read `/var/www/certbot`:
+
+   ```bash
+   grep -n -E "hook|systemctl|/var/www" config/certbot/conf/cli.ini config/certbot/conf/renewal/<cert-name>.conf
+   ```
+
+   To undo, copy the `.pre-docker` files back.
+
+3. Test renewal. This is a dry run against the Let's Encrypt test service and
+   changes nothing:
+
+   ```bash
+   docker run --rm --network host --dns 8.8.8.8 --dns 8.8.4.4 -v $PWD/config/hermes/var/www/html:/var/www/certbot -v $PWD/config/certbot/conf:/etc/letsencrypt certbot/certbot:latest renew --dry-run --webroot --webroot-path /var/www/certbot
+   ```
+
+   Success reads `Congratulations, all simulated renewals succeeded`.
+
+   This can only pass once the certificate's DNS name resolves to **this**
+   host and TCP 80 is reachable from the Internet. Before cutover, while DNS
+   still points at the legacy server, it fails at the challenge stage, after
+   a wait of a minute or more (Ctrl+C is safe). A typical pre-cutover failure:
+
+   ```text
+   Detail: <legacy-ip>: Invalid response from https://<cert-name>/.well-known/acme-challenge/...: 404
+   ```
+
+   `<legacy-ip>` is wherever the name currently resolves; when it is the
+   legacy server's address, the failure is expected. Run the test again right
+   after cutover. Either way the summary should read `0 parse failure(s)`. A
+   failure that mentions `hook`, `systemctl` or a parse error means step 2 did
+   not take.
+
+### 8.3 Assign the certificate to every service
+
+Do this for your Let's Encrypt or imported certificate. Go to each of the
+three pages below, choose the certificate, and save. Do it on every page
+**even if the certificate already shows as selected**: the save is what
+rewrites the service's configuration, and Webmail has never had a certificate.
+Each certificate field is a picker: click it and choose the certificate, or
+type part of its name to search.
 
 1. **Console:** Sidebar → **System → Console Settings**. In **Console
-   Certificate**, choose the imported certificate, then click **Apply
-   Settings**. Nginx restarts, and the console is unavailable for a few
-   seconds.
+   Certificate**, choose the certificate, then click **Apply Settings**.
+   Nginx restarts, and the console is unavailable for a few seconds.
 2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
-   Certificate**, choose the imported certificate, then click **Save & Apply
+   Certificate**, choose the certificate, then click **Save & Apply
    Settings**. This also makes Postfix send the full certificate chain
    instead of only the server certificate.
 3. **Webmail:** Sidebar → **Email Server → Settings**. In **Mail Server
-   Certificate**, choose the imported certificate, then click **Save
-   Settings**. The mail server restarts.
+   Certificate**, choose the certificate, then click **Save Settings**. The
+   mail server restarts.
 
-On **System → System Certificates**, the Console, SMTP and Webmail columns
-should all point at the imported certificate.
+Assign it to Mailbox SAN as well if you use it. On **System → System
+Certificates**, the Console, SMTP and Webmail columns should all point at the
+certificate.
+
+If you have more than one certificate (for example a separate name for
+webmail), assign each to the service that uses its name.
 
 ### 8.4 Verify
 
