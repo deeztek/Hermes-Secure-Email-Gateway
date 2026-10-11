@@ -296,10 +296,13 @@ the migrated certificate for now and do this right after cutover.
    field is a picker: click it and choose the certificate, or type part of its
    name to search.
    1. **Console:** Sidebar → **System → Console Settings**. In **Console
-      Certificate**, choose **System Bootstrap Certificate**, then click
-      **Apply Settings**. Nginx restarts, and the console is unavailable for a
-      few seconds. Your browser will warn about the self-signed certificate
-      until step 5; accept it to continue.
+      Certificate**, choose **System Bootstrap Certificate**. In the same
+      save, set **HTTP Strict Transport Security (HSTS)** to **Disable**: a
+      legacy install usually had it enabled, and Hermes refuses to save the
+      self-signed certificate with HSTS on, so otherwise nothing is saved.
+      Then click **Apply Settings**. Nginx restarts, and the console is
+      unavailable for a few seconds. Your browser will warn about the
+      self-signed certificate until step 5; accept it to continue.
    2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
       Certificate**, choose **System Bootstrap Certificate**, then click
       **Save & Apply Settings**.
@@ -319,7 +322,9 @@ the migrated certificate for now and do this right after cutover.
    1. **Console:** Sidebar → **System → Console Settings**. In **Console
       Certificate**, choose the new certificate, then click **Apply
       Settings**. Nginx restarts; reload the page and the browser warning is
-      gone.
+      gone. Once the console loads at its address without any warning, you
+      can set **HTTP Strict Transport Security (HSTS)** back to **Enable** and
+      click **Apply Settings** again.
    2. **SMTP:** Sidebar → **System → SMTP TLS Settings**. In **SMTP TLS
       Certificate**, choose the new certificate, then click **Save & Apply
       Settings**.
