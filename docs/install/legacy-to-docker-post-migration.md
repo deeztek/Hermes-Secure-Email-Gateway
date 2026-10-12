@@ -291,6 +291,15 @@ page.
 6. **Content Checks → Antivirus Settings** → **Save & Apply Settings.**
    Applies your antivirus settings and bypass list, which are otherwise
    still install defaults. Upgrading does not do it for you.
+
+   On v260912 this save fails with **"There was an error copying
+   /var/lib/clamav/local.ign2"** when that file has never existed, which is
+   the case on a new Docker host. Create it empty (an empty file changes
+   nothing), then save again:
+
+   ```bash
+   docker exec hermes_mail_filter sh -c 'touch /var/lib/clamav/local.ign2 && chown clamav:clamav /var/lib/clamav/local.ign2'
+   ```
 7. **System → DNS Resolver: check before you apply.** The database restore
    replaced the DNS forwarders you entered during install with defaults.
    Check the forwarder list on this page is what you want **before** clicking
