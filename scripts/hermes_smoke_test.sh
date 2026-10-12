@@ -143,7 +143,7 @@ db_query_db() {
 # ============================================================
 section "Tier 1 — Container health"
 
-# Canonical 18-container list per docker-compose.yml. OpenDKIM lives
+# Canonical 19-container list per docker-compose.yml. OpenDKIM lives
 # inside hermes_postfix_dkim and OpenDMARC's milter lives inside
 # hermes_dmarc -- no separate hermes_opendkim/hermes_opendmarc.
 CONTAINERS=(
@@ -159,6 +159,7 @@ CONTAINERS=(
     hermes_openarc
     hermes_mail_filter
     hermes_body_milter
+    hermes_linkguard
     hermes_ciphermail
     hermes_fail2ban
     hermes_nextcloud_redis
