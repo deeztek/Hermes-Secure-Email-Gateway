@@ -57,6 +57,21 @@ re-request).
   <cflocation url="view_mailbox_domains.cfm" addtoken="no">
 </cfif>
 
+<!--- Block deletion if aliases exist for this domain (#320). Aliases are not
+     cleaned up with the domain, and the alias lookup matches on address alone,
+     so leftovers would silently come back to life if the domain were added
+     again. Matched by domain_id, and by address for rows that predate it. --->
+<cfquery name="checkAliases" datasource="hermes">
+  SELECT COUNT(DISTINCT alias_address) AS cnt FROM mailbox_aliases
+  WHERE domain_id = <cfqueryparam cfsqltype="cf_sql_integer" value="#getDomainRow.id#">
+     OR alias_address LIKE <cfqueryparam cfsqltype="cf_sql_varchar" value="%@#theDomain#">
+</cfquery>
+<cfif checkAliases.cnt GT 0>
+  <cfset session.m = 18>
+  <cfset session.m_detail = checkAliases.cnt>
+  <cflocation url="view_mailbox_domains.cfm" addtoken="no">
+</cfif>
+
 <!--- Capture the cert id before deleting mailbox_domains row --->
 <cfquery name="getMbxCert" datasource="hermes">
   SELECT mailbox_certificate

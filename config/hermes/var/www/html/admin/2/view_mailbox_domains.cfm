@@ -239,6 +239,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
   <cfset session.m_detail = "">
 </cfif>
+<cfif m is "18">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Cannot Delete</h4>
+    <cfoutput>This domain has <strong><cfif StructKeyExists(session, "m_detail")>#session.m_detail#<cfelse>existing</cfif></strong> alias(es). Delete all aliases under this domain first in <a href="view_mailbox_aliases.cfm">Email Server &gt; Aliases</a>.</cfoutput>
+  </div>
+  <cfset session.m_detail = "">
+</cfif>
 <cfif m is "20">
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
