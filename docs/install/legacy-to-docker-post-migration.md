@@ -210,11 +210,36 @@ private window so an old login session is not reused.
 config from the database; their `TrustedHosts` lists must carry the Docker
 subnet. The DKIM signing keys are already migrated (`opt/hermes/dkim/keys`).
 
-All three live under the **Content Checks** section of the sidebar.
+The DKIM, SPF and DMARC settings pages are under **Content Checks** in the
+sidebar; the per-domain DKIM signing form is on the **Email Relay → Domains**
+page.
 
-1. **Content Checks → DKIM Settings** → **Save & Apply Settings** — regenerates
-   OpenDKIM KeyTable / SigningTable / TrustedHosts referencing the migrated keys.
-   Confirm each domain's published DNS TXT record still matches.
+1. **DKIM signing tables.** The migrated keys are in place, but OpenDKIM's
+   list of which domains to sign with which key is empty until it is
+   rebuilt, so **no outbound mail is DKIM-signed**. **DKIM Settings** does not
+   rebuild it; the per-domain signing form does, for every domain at once:
+
+   1. Sidebar → **Email Relay → Domains**. On any one domain that signs DKIM,
+      click the **DKIM Keys** button (lock icon).
+   2. In the signing form, check that **Enable DKIM Sign** shows **YES** and
+      **DKIM Selector** shows the selector in that domain's DNS record, then
+      click **Submit** without changing anything. Do not generate or import a
+      key: the migrated keys already match your published DNS records.
+
+   Confirm the tables now list your domains. Replace `<domain>` with one of
+   your signing domains (for example `example.com`):
+
+   ```bash
+   docker exec hermes_postfix_dkim sh -c 'grep -i "<domain>" /opt/hermes/dkim/SigningTable /opt/hermes/dkim/KeyTable'
+   ```
+
+   Expect one line from each file, with the `KeyTable` line naming a key file
+   under `/opt/hermes/dkim/keys/`.
+
+2. **Content Checks → DKIM Settings** → **Save & Apply Settings**. This
+   writes the OpenDKIM settings (canonicalization, actions, algorithm). If the
+   page lists trusted hosts, also edit one and save it unchanged, which
+   rewrites that list.
 
    This save restarts the mail container and then reloads Postfix
    straight away, before Postfix is back up. It can therefore end on an
@@ -229,8 +254,8 @@ All three live under the **Content Checks** section of the sidebar.
    The first command must report `the Postfix mail system is running`. If it
    does not, wait a few more seconds and run it again. Saving the page again
    does not help: it repeats the same restart.
-2. **Content Checks → SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
-3. **Content Checks → DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
+3. **Content Checks → SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
+4. **Content Checks → DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
 
 ## 4. Review the DNSBL list
 
