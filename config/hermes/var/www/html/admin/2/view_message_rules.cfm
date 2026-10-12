@@ -158,7 +158,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
   <!--- Insert the rule --->
-  <cfquery datasource="hermes">
+  <cfquery datasource="hermes" result="insertedRule">
     INSERT INTO message_rules (rule_name, rule_type, rule_desc, header, regex, score, applied)
     VALUES (
       <cfqueryparam value="#rule_name#" cfsqltype="cf_sql_varchar">,
@@ -171,8 +171,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     )
   </cfquery>
 
-  <!--- Apply immediately --->
-  <cfinclude template="./inc/apply_message_rules.cfm">
+  <!--- Apply immediately. If SpamAssassin rejects the result, remove the rule
+       again: a rejected rule left in the table is written into every later
+       rebuild, so every save after it would fail until it was deleted. --->
+  <cfset ruleApplyError = "">
+  <cfset request.generateQuiet = true>
+  <cftry>
+    <cfinclude template="./inc/apply_message_rules.cfm">
+    <cfcatch type="any">
+      <cfset ruleApplyError = cfcatch.message>
+    </cfcatch>
+  </cftry>
+  <cfset request.generateQuiet = false>
+  <cfif ruleApplyError is not "">
+    <cfquery datasource="hermes">
+      DELETE FROM message_rules
+      WHERE id = <cfqueryparam value="#insertedRule.generatedKey#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfset session.m_rules = 19>
+    <cfset session.m_rules_detail = Trim(REReplace(ruleApplyError, "^.*?previous file restored\.\s*", ""))>
+    <cflocation url="view_message_rules.cfm" addtoken="no">
+  </cfif>
   <cfset session.m_rules = 1>
   <cflocation url="view_message_rules.cfm" addtoken="no">
 </cfif>
@@ -266,6 +285,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfset edit_regex = "~ " & edit_regex>
     </cfif>
 
+    <!--- Previous values, to restore if SpamAssassin rejects the edit. --->
+    <cfquery name="previousRule" datasource="hermes">
+      SELECT rule_type, rule_desc, header, regex, score
+      FROM message_rules
+      WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+    </cfquery>
+
     <cfquery datasource="hermes">
       UPDATE message_rules
       SET rule_type = <cfqueryparam value="#edit_rule_type#" cfsqltype="cf_sql_varchar">,
@@ -277,8 +303,33 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
     </cfquery>
 
-    <!--- Apply immediately --->
-    <cfinclude template="./inc/apply_message_rules.cfm">
+    <!--- Apply immediately; put the previous values back if rejected. --->
+    <cfset ruleApplyError = "">
+    <cfset request.generateQuiet = true>
+    <cftry>
+      <cfinclude template="./inc/apply_message_rules.cfm">
+      <cfcatch type="any">
+        <cfset ruleApplyError = cfcatch.message>
+      </cfcatch>
+    </cftry>
+    <cfset request.generateQuiet = false>
+    <cfif ruleApplyError is not "">
+      <cfif previousRule.recordcount EQ 1>
+        <cfquery datasource="hermes">
+          UPDATE message_rules
+          SET rule_type = <cfqueryparam value="#previousRule.rule_type#" cfsqltype="cf_sql_varchar">,
+              rule_desc = <cfqueryparam value="#previousRule.rule_desc#" cfsqltype="cf_sql_varchar">,
+              header = <cfqueryparam value="#previousRule.header#" cfsqltype="cf_sql_varchar">,
+              regex = <cfqueryparam value="#previousRule.regex#" cfsqltype="cf_sql_varchar">,
+              score = <cfqueryparam value="#previousRule.score#" cfsqltype="cf_sql_varchar">,
+              applied = '1'
+          WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+        </cfquery>
+      </cfif>
+      <cfset session.m_rules = 20>
+      <cfset session.m_rules_detail = Trim(REReplace(ruleApplyError, "^.*?previous file restored\.\s*", ""))>
+      <cflocation url="view_message_rules.cfm" addtoken="no">
+    </cfif>
     <cfset session.m_rules = 3>
   </cfif>
   <cflocation url="view_message_rules.cfm" addtoken="no">
@@ -310,6 +361,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-check"></i> Rule Updated</h4>
     <p>Rule updated, SpamAssassin configuration validated and reloaded.</p>
+  </div>
+</cfif>
+<cfif m is 19 OR m is 20>
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> SpamAssassin Rejected the Rule</h4>
+    <p><cfif m is 19>The rule was not added.<cfelse>The rule was not changed; its previous version is still in effect.</cfif>
+       Your other rules are unaffected. SpamAssassin reported:</p>
+    <cfoutput><pre class="mb-0 small" style="white-space: pre-wrap;">#encodeForHTML(StructKeyExists(session, "m_rules_detail") ? session.m_rules_detail : "")#</pre></cfoutput>
   </div>
 </cfif>
 <cfif m is 10>

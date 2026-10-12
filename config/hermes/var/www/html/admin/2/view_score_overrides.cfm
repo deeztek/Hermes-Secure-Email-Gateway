@@ -79,7 +79,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   "10": {type:"danger",  msg:"You must select at least one entry before clicking Delete"},
   "11": {type:"danger",  msg:"An error occurred while applying settings"},
   "12": {type:"danger",  msg:"This rule is system-managed and cannot be edited or deleted (defines a Hermes architectural decision)"},
-  "13": {type:"danger",  msg:"Score overrides for DKIM_*, ADSP, and SPF_* rules have no effect because the underlying SpamAssassin plugins are disabled in Hermes. See the warning callout for details and the authoritative verifier for each protocol."}
+  "13": {type:"danger",  msg:"Score overrides for DKIM_*, ADSP, and SPF_* rules have no effect because the underlying SpamAssassin plugins are disabled in Hermes. See the warning callout for details and the authoritative verifier for each protocol."},
+  "14": {type:"danger",  msg:"SpamAssassin rejected this override, so it was not added. Your other settings are unaffected."},
+  "15": {type:"danger",  msg:"SpamAssassin rejected this change, so the override keeps its previous value. Your other settings are unaffected."}
 }>
 
 <cfif structKeyExists(alerts, toString(m))>
@@ -90,6 +92,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfif a.type is "success"><h4><i class="icon fa fa-check"></i> Success</h4>
     <cfelse><h4><i class="icon fa fa-ban"></i> Error</h4></cfif>
     #a.msg#
+    <cfif (m is 14 OR m is 15) AND StructKeyExists(session, "m_detail") AND session.m_detail is not "">
+      <p class="mt-2 mb-1">SpamAssassin reported:</p>
+      <pre class="mb-0 small" style="white-space: pre-wrap;">#encodeForHTML(session.m_detail)#</pre>
+    </cfif>
   </div>
   </cfoutput>
 </cfif>
@@ -139,7 +145,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
   <!--- Insert --->
-  <cfquery datasource="hermes">
+  <cfquery datasource="hermes" result="insertedOverride">
     INSERT INTO spam_settings (parameter, value, description, spamfilter, active, applied)
     VALUES (
       <cfqueryparam value="#trim(form.parameter)#" cfsqltype="cf_sql_varchar">,
@@ -149,7 +155,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     )
   </cfquery>
 
-  <!--- Apply immediately --->
+  <!--- Apply immediately. generateQuiet makes the SpamAssassin generator throw
+       on a rejected configuration instead of rendering its error page, so a
+       rejection lands here and the override is removed again; left in the
+       table it would break every later save. --->
+  <cfset request.generateQuiet = true>
   <cftry>
     <cfinclude template="./inc/update_spamassassin_config_files.cfm">
     <cfinclude template="./inc/update_amavis_config_files.cfm">
@@ -157,9 +167,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfinclude template="./inc/restart_spamassassin.cfm">
     <cfset session.m = 1>
   <cfcatch type="any">
-    <cfset session.m = 11>
+    <cfif FindNoCase("spamassassin --lint rejected", cfcatch.message)>
+      <cfquery datasource="hermes">
+        DELETE FROM spam_settings
+        WHERE id = <cfqueryparam value="#insertedOverride.generatedKey#" cfsqltype="cf_sql_integer">
+          AND spamfilter = '1'
+      </cfquery>
+      <cfset session.m = 14>
+      <cfset session.m_detail = Trim(REReplace(cfcatch.message, "^.*?previous file restored\.\s*", ""))>
+    <cfelse>
+      <cfset session.m = 11>
+    </cfif>
   </cfcatch>
   </cftry>
+  <cfset request.generateQuiet = false>
   <cflocation url="view_score_overrides.cfm" addtoken="no">
 
 <cfelseif action is "edit">
@@ -190,6 +211,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cflocation url="view_score_overrides.cfm" addtoken="no">
     </cfif>
 
+    <!--- Previous values, to restore if SpamAssassin rejects the edit. --->
+    <cfquery name="previousOverride" datasource="hermes">
+      SELECT value, description FROM spam_settings
+      WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+        AND spamfilter = '1'
+    </cfquery>
+
     <cfquery datasource="hermes">
       UPDATE spam_settings
       SET value = <cfqueryparam value="#trim(form.edit_value)#" cfsqltype="cf_sql_varchar">,
@@ -200,7 +228,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         AND system_managed = 0
     </cfquery>
 
-    <!--- Apply immediately --->
+    <!--- Apply immediately; put the previous values back if rejected. --->
+    <cfset request.generateQuiet = true>
     <cftry>
       <cfinclude template="./inc/update_spamassassin_config_files.cfm">
       <cfinclude template="./inc/update_amavis_config_files.cfm">
@@ -208,9 +237,22 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfinclude template="./inc/restart_spamassassin.cfm">
       <cfset session.m = 7>
     <cfcatch type="any">
-      <cfset session.m = 11>
+      <cfif FindNoCase("spamassassin --lint rejected", cfcatch.message) AND previousOverride.recordcount EQ 1>
+        <cfquery datasource="hermes">
+          UPDATE spam_settings
+          SET value = <cfqueryparam value="#previousOverride.value#" cfsqltype="cf_sql_varchar">,
+              description = <cfqueryparam value="#previousOverride.description#" cfsqltype="cf_sql_varchar">
+          WHERE id = <cfqueryparam value="#form.edit_id#" cfsqltype="cf_sql_integer">
+            AND spamfilter = '1'
+        </cfquery>
+        <cfset session.m = 15>
+        <cfset session.m_detail = Trim(REReplace(cfcatch.message, "^.*?previous file restored\.\s*", ""))>
+      <cfelse>
+        <cfset session.m = 11>
+      </cfif>
     </cfcatch>
     </cftry>
+    <cfset request.generateQuiet = false>
   </cfif>
   <cflocation url="view_score_overrides.cfm" addtoken="no">
 
