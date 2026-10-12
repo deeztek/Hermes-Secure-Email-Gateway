@@ -270,8 +270,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cffile action="copy" source = "/etc/spamassassin/local.cf" destination = "/etc/spamassassin/local.cf.HERMES.BACKUP">
   </cfif>
 
-  <!--- Move /opt/hermes/tmp/#customtrans3#local.cf.HERMES to /etc/spamassassin/local.cf --->
-  <cffile action="move" source = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES" destination = "/etc/spamassassin/local.cf">
+  <!--- Install the new local.cf by writing INTO the existing file, not by
+       moving a new one over it. hermes_mail_filter bind-mounts local.cf as a
+       single FILE, which stays attached to the original inode: after a move
+       it kept serving the previous contents until the container restarted,
+       so the lint below (and the one in restart_spamassassin.cfm) checked
+       the old file, not the new one. A write truncates the same inode, so
+       both containers see the new contents immediately. --->
+  <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="saNewConfig">
+  <cffile charset="utf-8" action="write" file="/etc/spamassassin/local.cf" output="#saNewConfig#" addnewline="no">
+  <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES">
 
   <!--- VALIDATE THE NEW local.cf, AND PUT THE PREVIOUS ONE BACK IF IT FAILS.
 
@@ -303,7 +311,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfif NOT FindNoCase("HERMES_LINT_EXIT=0", saLintOutput)>
     <cfset saLintReport = Trim(REReplace(saLintOutput, "HERMES_LINT_EXIT=[0-9]+", "", "ALL"))>
     <cfif FileExists("/etc/spamassassin/local.cf.HERMES.BACKUP")>
-      <cffile action="copy" source="/etc/spamassassin/local.cf.HERMES.BACKUP" destination="/etc/spamassassin/local.cf">
+      <!--- Write into the same file for the same bind-mount reason. --->
+      <cffile charset="utf-8" action="read" file="/etc/spamassassin/local.cf.HERMES.BACKUP" variable="saPrevConfig">
+      <cffile charset="utf-8" action="write" file="/etc/spamassassin/local.cf" output="#saPrevConfig#" addnewline="no">
     </cfif>
     <cflog file="hermes" type="error"
            text="update_spamassassin_config_files: spamassassin --lint rejected the new local.cf; previous file restored. #saLintReport#">
