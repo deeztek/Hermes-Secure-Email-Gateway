@@ -19,7 +19,6 @@ History. Upgrade recommended for every install, not only migrated ones.
 - **The dashboard's shorter Messages Processed periods showed the wrong
   time window,** several hours in the past depending on the server's time
   zone, so recent mail often appeared as none (#355).
-
 - **Messages with an emoji in the subject or sender name were missing from
   Message History.** The mail was delivered, but its record could not be
   stored. The upgrade converts two columns of the message log; see Upgrading
