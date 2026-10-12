@@ -106,4 +106,44 @@ timeout = "240">
 </cfcatch>
 </cftry>
 
+<!--- WAIT FOR POSTFIX TO COME BACK UP.
+
+     `docker container restart` returns as soon as the container process is
+     running, but the entrypoint takes a few more seconds to start Postfix.
+     Callers that go straight on to generate_postfix_configuration.cfm (the
+     DKIM Settings save) ran its closing `postfix reload` in that window,
+     which fails with "the Postfix mail system is not running": the settings
+     were saved but the new main.cf was never loaded. 9c98df65 made that
+     failure report cleanly; this removes the cause.
+
+     Waiting here rather than reordering the caller: dkim_set_settings.cfm
+     toggles the :8891 milter rows BEFORE restarting, so the generator must
+     run after it. `postfix status` exits non-zero until the master is up,
+     which cfexecute raises, hence the cftry per attempt. Bounded at 30
+     seconds; if Postfix is still down after that, carry on and let the
+     generator report it as before. --->
+<cfset postfixUp = false>
+<cfloop from="1" to="30" index="postfixWait">
+  <cftry>
+    <cfexecute name="/usr/local/bin/docker"
+      arguments="exec hermes_postfix_dkim /usr/sbin/postfix status"
+      timeout="10"
+      variable="postfixStatusOutput"
+      errorVariable="postfixStatusError" />
+    <cfset postfixUp = true>
+    <cfcatch type="any"></cfcatch>
+  </cftry>
+  <cfif postfixUp>
+    <cfbreak>
+  </cfif>
+  <cfscript>
+    thread = CreateObject("java", "java.lang.Thread");
+    thread.sleep(1000);
+  </cfscript>
+</cfloop>
+<cfif NOT postfixUp>
+  <cflog file="hermes" type="warning"
+         text="restart_opendkim: Postfix was not running 30 seconds after restarting hermes_postfix_dkim">
+</cfif>
+
       
