@@ -31,6 +31,20 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 </cfscript>
 
 
+<!--- Rebuild mailbox_sans before validating it (#319). Rows are otherwise
+     only created when an admin saves a mailbox domain or SAN prefix, so any
+     row an upgrade's reconcile removed (v260815) was never recreated and its
+     name was silently never put on a certificate. sync_mailbox_sans.cfm is
+     idempotent: it adds missing (prefix x mailbox domain) rows and removes
+     stale ones. A failure here is logged and validation carries on with the
+     rows that exist. --->
+<cftry>
+  <cfinclude template="../admin/2/inc/sync_mailbox_sans.cfm">
+  <cfcatch type="any">
+    <cflog file="hermes" type="error" text="acme_validate_ip: SAN sync failed, validating existing rows: #cfcatch.message#">
+  </cfcatch>
+</cftry>
+
   <cfquery name="getsubdomains" datasource="hermes">
 select id, certificate, mailbox_domain, subdomain, ip from mailbox_sans
   </cfquery>
