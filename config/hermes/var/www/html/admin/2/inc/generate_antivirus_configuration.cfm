@@ -166,6 +166,11 @@ select parameter, value2 from parameters2 where active = '1' and module='clamav'
   </cftry>
 
 <!--- BACKUP /var/lib/clamav/local.ign2 --->
+<!--- Only if it exists. Nothing but this generator ever creates local.ign2,
+     and it does so after this step, so on an install where the file had
+     never existed the unconditional cp failed and every save aborted here,
+     before the file could be written (#352). --->
+<cfif FileExists("/var/lib/clamav/local.ign2")>
 <cftry>
        
     <cfexecute name = "/bin/cp"
@@ -181,6 +186,7 @@ select parameter, value2 from parameters2 where active = '1' and module='clamav'
 
       </cfcatch>
       </cftry>
+</cfif>
 
 <!--- MOVE /opt/hermes/tmp/#customtrans3#_local.ign2 TO /var/lib/clamav/local.ign2 --->
 
