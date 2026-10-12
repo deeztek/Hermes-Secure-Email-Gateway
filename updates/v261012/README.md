@@ -6,7 +6,19 @@ A fix release found while migrating a production legacy gateway to Docker.
 Several admin pages could not save, and some mail was missing from Message
 History. Upgrade recommended for every install, not only migrated ones.
 
+## New features
+
+- **Messages Processed chart on the dashboard.** It is now a line chart with
+  one line per message type, adds **Past 7 Days** and **Past 30 Days**, and
+  counts every message in the period. It previously sampled at most the
+  newest 10,000, so busy gateways saw `10,000+` and skewed proportions
+  (#355).
+
 ## Bug fixes
+
+- **The dashboard's shorter Messages Processed periods showed the wrong
+  time window,** several hours in the past depending on the server's time
+  zone, so recent mail often appeared as none (#355).
 
 - **Messages with an emoji in the subject or sender name were missing from
   Message History.** The mail was delivered, but its record could not be
