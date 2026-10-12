@@ -25,6 +25,7 @@
 #   ./scripts/system_update_docker.sh --dry-run          # show what would happen, do nothing
 #   ./scripts/system_update_docker.sh --skip-git         # don't touch git (containers + artifacts only)
 #   ./scripts/system_update_docker.sh --skip-compose     # don't touch docker images (git + artifacts only)
+#   ./scripts/system_update_docker.sh --no-prune         # keep superseded images (skip phase 6)
 #
 # Remotes:
 #   Default --remote=origin -- which is github for real customer installs.
@@ -124,6 +125,7 @@ LOG_FILE="${LOG_DIR}/hermes_update_$(date +%Y%m%d_%H%M%S).log"
 TARGET_TAG=""
 DRY_RUN=0
 SKIP_GIT=0
+NO_PRUNE=0
 SKIP_COMPOSE=0
 ASSUME_YES=0
 # REMOTE: which git remote to fetch from + use for auto-detecting latest tag.
@@ -169,6 +171,7 @@ while [[ $# -gt 0 ]]; do
         --dry-run)      DRY_RUN=1; shift ;;
         --skip-git)     SKIP_GIT=1; shift ;;
         --skip-compose) SKIP_COMPOSE=1; shift ;;
+        --no-prune)     NO_PRUNE=1; shift ;;
         --yes|-y)       ASSUME_YES=1; shift ;;
         --remote=*)     REMOTE="${1#*=}"; shift ;;
         --image-registry=*) IMAGE_REGISTRY_OVERRIDE="${1#*=}"; shift ;;
@@ -1197,6 +1200,13 @@ phase6_prune_images() {
     header "Phase 6 — Reclaim disk from superseded images (#340)"
 
     local KEEP_RELEASES=2
+
+    # Escape hatch (#340): an operator holding images for a manual rollback,
+    # or a host where image removal misbehaves, can skip this phase entirely.
+    if (( NO_PRUNE )); then
+        log "Skipping image cleanup (--no-prune). Superseded images are kept."
+        return 0
+    fi
 
     if (( DRY_RUN )); then
         echo -e "${CYAN}[dry-run]${NC} docker image prune -f" | tee -a "$LOG_FILE"
