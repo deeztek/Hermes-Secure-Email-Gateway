@@ -3308,7 +3308,8 @@ CREATE TABLE IF NOT EXISTS `msgs` (
   KEY `msgs_idx_sid` (`sid`) USING BTREE,
   KEY `msgs_idx_mess_id` (`message_id`) USING BTREE,
   KEY `msgs_idx_time_num` (`time_num`) USING BTREE,
-  KEY `idx_msgs_time_iso` (`time_iso`)
+  KEY `idx_msgs_time_iso` (`time_iso`),
+  KEY `idx_msgs_time_content` (`time_num`,`content`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb3 COLLATE=utf8mb3_general_ci;
 
 -- -------- msgrcpt (amavis recipient log) --------

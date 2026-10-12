@@ -6,7 +6,8 @@
 -- NOT run on fresh installs (those get the current schema from
 -- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
 --
--- Contents: msgs.from_addr / msgs.subject to utf8mb4 (#353), version stamp.
+-- Contents: msgs.from_addr / msgs.subject to utf8mb4 (#353), msgs chart
+-- index, version stamp.
 -- ---------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------
@@ -27,7 +28,17 @@ ALTER TABLE msgs
   ALGORITHM=COPY, LOCK=NONE;
 
 -- ---------------------------------------------------------------------
--- 2. Version stamp -- MUST be the last statement (advances build_no so
+-- 2. Index for the dashboard Messages Processed chart
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql  msgs DDL carries idx_msgs_time_content
+--
+-- The chart now counts every message per time bucket and type for up to
+-- 30 days (it used to sample the newest 10,000). (time_num, content) lets
+-- that GROUP BY be answered from the index alone. Built online.
+-- ---------------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_msgs_time_content ON msgs (time_num, content) ALGORITHM=INPLACE LOCK=NONE;
+
+-- ---------------------------------------------------------------------
+-- 3. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- ---------------------------------------------------------------------

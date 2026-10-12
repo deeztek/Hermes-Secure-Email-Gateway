@@ -309,6 +309,8 @@ select property, value from encryption_settings where property='user.systemMailS
         <option value="8">Past 8 Hours</option>
         <option value="12">Past 12 Hours</option>
         <option value="24" selected>Past 24 Hours</option>
+        <option value="168">Past 7 Days</option>
+        <option value="720">Past 30 Days</option>
       </select>
     </div>
   </div>
@@ -701,7 +703,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function refreshMessageStats(period) {
     if (period) currentPeriod = period;
 
-    fetch('/admin/2/api/get_message_stats.cfm?period=' + currentPeriod + '&_=' + Date.now())
+    fetch('/admin/2/api/get_message_stats.cfm?period=' + currentPeriod + '&tz=' + new Date().getTimezoneOffset() + '&_=' + Date.now())
       .then(function(response) { return response.json(); })
       .then(function(data) {
         if (data.success) {
@@ -733,7 +735,32 @@ document.addEventListener('DOMContentLoaded', function() {
       });
   }
 
-  // Function to create/update the chart
+  // Function to create/update the chart.
+  // Multi-series line chart: one line per message type over time. Clean is
+  // usually 10-100x every other type, so it gets its own right-hand axis;
+  // on a shared axis it would flatten spam and virus spikes into the floor.
+  // The counts table beside the chart is the legend (same colours).
+  var messageSeriesDefs = [
+    { key: 'clean',     label: 'Clean',      color: '#28a745', axis: 'yClean' },
+    { key: 'spam',      label: 'Spam',       color: '#ffc107', axis: 'y' },
+    { key: 'virus',     label: 'Virus',      color: '#dc3545', axis: 'y' },
+    { key: 'banned',    label: 'Banned',     color: '#6c757d', axis: 'y' },
+    { key: 'badHeader', label: 'Bad Header', color: '#343a40', axis: 'y' },
+    { key: 'other',     label: 'Other',      color: '#17a2b8', axis: 'y' }
+  ];
+
+  function formatBucketLabel(unixSeconds, bucketSeconds) {
+    var d = new Date(unixSeconds * 1000);
+    if (bucketSeconds >= 86400) {
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+    if (bucketSeconds >= 21600) {
+      return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  }
+
   function updateMessageChart(data) {
     var canvas = document.getElementById('messageStatsChart');
     if (!canvas) return;
@@ -744,41 +771,58 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
-    var ctx = canvas.getContext('2d');
+    var buckets = data.buckets || [];
+    var series = data.series || {};
+    var labels = buckets.map(function(t) { return formatBucketLabel(t, data.bucketSeconds); });
 
     var chartData = {
-      labels: ['Clean', 'Spam', 'Virus', 'Banned', 'Bad Header', 'Other'],
-      datasets: [{
-        data: [data.clean, data.spam, data.virus, data.banned, data.badHeader, data.other],
-        backgroundColor: [
-          '#28a745', // Green - Clean
-          '#ffc107', // Yellow - Spam
-          '#dc3545', // Red - Virus
-          '#6c757d', // Gray - Banned
-          '#343a40', // Dark - Bad Header
-          '#17a2b8'  // Cyan - Other
-        ],
-        borderWidth: 0
-      }]
+      labels: labels,
+      datasets: messageSeriesDefs.map(function(def) {
+        return {
+          label: def.label,
+          data: series[def.key] || [],
+          borderColor: def.color,
+          backgroundColor: def.color,
+          yAxisID: def.axis,
+          borderWidth: def.key === 'clean' ? 2.5 : 2,
+          pointRadius: buckets.length > 24 ? 0 : 2,
+          pointHoverRadius: 4,
+          tension: 0.25,
+          fill: false
+        };
+      })
     };
 
     var chartOptions = {
       responsive: true,
       maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
       plugins: {
-        legend: {
-          display: false
-        },
+        legend: { display: false },
         tooltip: {
           callbacks: {
             label: function(context) {
-              var label = context.label || '';
-              var value = context.raw || 0;
-              var total = data.total || 1;
-              var percentage = ((value / total) * 100).toFixed(1);
-              return label + ': ' + value.toLocaleString() + ' (' + percentage + '%)';
+              return context.dataset.label + ': ' + (context.raw || 0).toLocaleString();
             }
           }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { autoSkip: true, maxTicksLimit: 8, maxRotation: 0 }
+        },
+        y: {
+          position: 'left',
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          title: { display: true, text: 'Spam / Virus / Other' }
+        },
+        yClean: {
+          position: 'right',
+          beginAtZero: true,
+          ticks: { precision: 0, color: '#28a745' },
+          title: { display: true, text: 'Clean', color: '#28a745' },
+          grid: { drawOnChartArea: false }
         }
       }
     };
@@ -786,11 +830,12 @@ document.addEventListener('DOMContentLoaded', function() {
     if (messageStatsChart) {
       // Update existing chart
       messageStatsChart.data = chartData;
+      messageStatsChart.options = chartOptions;
       messageStatsChart.update();
     } else {
       // Create new chart
-      messageStatsChart = new Chart(ctx, {
-        type: 'doughnut',
+      messageStatsChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
         data: chartData,
         options: chartOptions
       });

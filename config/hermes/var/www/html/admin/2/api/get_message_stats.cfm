@@ -17,100 +17,146 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     along with Hermes Secure Email Gateway Community Edition.  If not, see <https://www.gnu.org/licenses/agpl.html>.
 --->
 
-<!--- AJAX endpoint for message statistics - returns JSON --->
+<!--- AJAX endpoint for the dashboard Messages Processed chart - returns JSON.
+
+     Returns, for the chosen period, a count per time bucket and per message
+     type (one series per Amavis content code) plus totals for the period.
+
+     Every message is counted. This used to sample the newest 10,000 in the
+     period, which already undercounted "Past 24 Hours" on a busy gateway and
+     cannot support 7 or 30 days. The GROUP BY runs on
+     idx_msgs_time_content (time_num, content), so it is answered from the
+     index without reading table rows.
+
+     Buckets are aligned to the BROWSER's time zone (url.tz, minutes, as
+     returned by JavaScript's getTimezoneOffset), so daily points start at the
+     viewer's local midnight rather than UTC's.
+
+     The dashboard polls every 60 seconds. The window end is rounded up to a
+     bucket boundary, which keeps the query parameters identical between polls
+     inside one bucket, so cachedwithin can serve repeats: a 30-day view hits
+     the database at most every 5 minutes however many dashboards are open. --->
+
 <cfcontent type="application/json">
 <cfheader name="Cache-Control" value="no-cache, no-store, must-revalidate">
 
 <cftry>
 
-<!--- Get time period from URL parameter (default: 24 hours) --->
 <cfparam name="url.period" default="24">
+<cfparam name="url.tz" default="0">
 
-<!--- Validate period parameter --->
-<cfset validPeriods = "0.25,1,8,12,24">
-<cfif NOT listFind(validPeriods, url.period)>
-    <cfset url.period = 24>
+<!--- Period (hours) -> bucket size (seconds). Each gives 12 to 32 points. --->
+<cfset bucketFor = {
+    "0.25": 60,
+    "1":    300,
+    "8":    900,
+    "12":   1800,
+    "24":   3600,
+    "168":  21600,
+    "720":  86400
+}>
+<cfset labelFor = {
+    "0.25": "Past 15 Minutes",
+    "1":    "Past Hour",
+    "8":    "Past 8 Hours",
+    "12":   "Past 12 Hours",
+    "24":   "Past 24 Hours",
+    "168":  "Past 7 Days",
+    "720":  "Past 30 Days"
+}>
+<cfif NOT StructKeyExists(bucketFor, url.period)>
+    <cfset url.period = "24">
 </cfif>
+<cfset bucketSeconds = bucketFor[url.period]>
 
-<!--- Calculate date range based on period --->
-<cfset periodEnd = now()>
-<cfset periodStart = dateAdd("h", -url.period, periodEnd)>
+<!--- Browser offset in minutes, valid range -840..840 (UTC+14..UTC-14). --->
+<cfif NOT IsValid("integer", url.tz) OR Abs(url.tz) GT 840>
+    <cfset url.tz = 0>
+</cfif>
+<!--- getTimezoneOffset() is UTC minus local, so local = utc - tz*60. --->
+<cfset tzShift = -1 * url.tz * 60>
 
-<!--- Convert to Unix timestamps for indexed time_num column --->
-<cfset periodStartUnix = dateDiff("s", createDateTime(1970,1,1,0,0,0), periodStart)>
-<cfset periodEndUnix = dateDiff("s", createDateTime(1970,1,1,0,0,0), periodEnd)>
+<!--- Real Unix time. dateDiff from createDateTime(1970,...) measures from
+     1970 in the server's local zone, which is off by the UTC offset. --->
+<cfset nowUnix = Int(CreateObject("java", "java.lang.System").currentTimeMillis() / 1000)>
 
-<!--- Format period label for response --->
-<cfswitch expression="#url.period#">
-    <cfcase value="0.25">
-        <cfset periodLabel = "Past 15 Minutes">
-    </cfcase>
-    <cfcase value="1">
-        <cfset periodLabel = "Past Hour">
-    </cfcase>
-    <cfcase value="8">
-        <cfset periodLabel = "Past 8 Hours">
-    </cfcase>
-    <cfcase value="12">
-        <cfset periodLabel = "Past 12 Hours">
-    </cfcase>
-    <cfdefaultcase>
-        <cfset periodLabel = "Past 24 Hours">
-    </cfdefaultcase>
-</cfswitch>
+<!--- Window: N whole buckets, the last one containing "now". --->
+<cfset bucketCount = Int(url.period * 3600 / bucketSeconds)>
+<cfset lastBucketKey = Int((nowUnix + tzShift) / bucketSeconds)>
+<cfset firstBucketKey = lastBucketKey - bucketCount + 1>
+<cfset windowStart = firstBucketKey * bucketSeconds - tzShift>
+<cfset windowEnd = (lastBucketKey + 1) * bucketSeconds - tzShift>
 
-<!--- Get message counts from most recent 10,000 messages in the time period --->
-<!--- Uses Amavis content codes: C=clean, S=spam, V=virus, B=banned, H=bad header, ?/NULL/other=unknown --->
-<!--- Uses time_num (Unix timestamp) which is indexed for better performance --->
-<cfset maxMessages = 10000>
-<cfquery name="getStats" datasource="hermes">
+<cfset cacheSeconds = Min(bucketSeconds, 300)>
+
+<cfquery name="getBuckets" datasource="hermes" cachedwithin="#CreateTimeSpan(0, 0, 0, cacheSeconds)#">
     SELECT
-        COUNT(*) as total,
-        SUM(CASE WHEN content = 'C' THEN 1 ELSE 0 END) as clean,
-        SUM(CASE WHEN content = 'S' THEN 1 ELSE 0 END) as spam,
-        SUM(CASE WHEN content = 'V' THEN 1 ELSE 0 END) as virus,
-        SUM(CASE WHEN content = 'B' THEN 1 ELSE 0 END) as banned,
-        SUM(CASE WHEN content = 'H' THEN 1 ELSE 0 END) as badHeader,
-        SUM(CASE WHEN content IS NULL OR content = '' OR content NOT IN ('C','S','V','B','H') THEN 1 ELSE 0 END) as other
-    FROM (
-        SELECT content
-        FROM msgs
-        WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#periodStartUnix#">
-          AND time_num < <cfqueryparam cfsqltype="cf_sql_integer" value="#periodEndUnix#">
-        ORDER BY time_num DESC
-        LIMIT #maxMessages#
-    ) as recent_msgs
+        FLOOR((time_num + <cfqueryparam cfsqltype="cf_sql_integer" value="#tzShift#">) / <cfqueryparam cfsqltype="cf_sql_integer" value="#bucketSeconds#">) AS bucket_key,
+        content,
+        COUNT(*) AS n
+    FROM msgs
+    WHERE time_num >= <cfqueryparam cfsqltype="cf_sql_integer" value="#windowStart#">
+      AND time_num <  <cfqueryparam cfsqltype="cf_sql_integer" value="#windowEnd#">
+    GROUP BY bucket_key, content
 </cfquery>
 
-<!--- Build response structure --->
-<cfif getStats.total GTE maxMessages>
-    <cfset isLimited = true>
-<cfelse>
-    <cfset isLimited = false>
-</cfif>
+<!--- Zero-filled series, one slot per bucket. --->
+<cfset seriesNames = ["clean", "spam", "virus", "banned", "badHeader", "other"]>
+<cfset codeToSeries = { "C": "clean", "S": "spam", "V": "virus", "B": "banned", "H": "badHeader" }>
+<cfset series = {}>
+<cfset totals = {}>
+<cfloop array="#seriesNames#" index="name">
+    <cfset series[name] = []>
+    <cfset ArraySet(series[name], 1, bucketCount, 0)>
+    <cfset totals[name] = 0>
+</cfloop>
+
+<cfloop query="getBuckets">
+    <cfset slot = getBuckets.bucket_key - firstBucketKey + 1>
+    <cfif slot GTE 1 AND slot LE bucketCount>
+        <cfset code = UCase(Trim(getBuckets.content))>
+        <cfset name = StructKeyExists(codeToSeries, code) ? codeToSeries[code] : "other">
+        <cfset series[name][slot] = series[name][slot] + getBuckets.n>
+        <cfset totals[name] = totals[name] + getBuckets.n>
+    </cfif>
+</cfloop>
+
+<!--- Bucket start times as Unix seconds; the browser formats them locally. --->
+<cfset bucketStarts = []>
+<cfloop from="0" to="#bucketCount - 1#" index="i">
+    <cfset ArrayAppend(bucketStarts, (firstBucketKey + i) * bucketSeconds - tzShift)>
+</cfloop>
+
+<cfset grandTotal = 0>
+<cfloop array="#seriesNames#" index="name">
+    <cfset grandTotal = grandTotal + totals[name]>
+</cfloop>
+
 <cfset response = {
     "success": true,
     "period": url.period,
-    "periodLabel": periodLabel,
-    "startTime": dateTimeFormat(periodStart, "yyyy-mm-dd HH:nn:ss"),
-    "endTime": dateTimeFormat(periodEnd, "yyyy-mm-dd HH:nn:ss"),
-    "total": getStats.total,
-    "clean": getStats.clean,
-    "spam": getStats.spam,
-    "virus": getStats.virus,
-    "banned": getStats.banned,
-    "badHeader": getStats.badHeader,
-    "other": getStats.other,
-    "limited": isLimited,
-    "maxMessages": maxMessages
+    "periodLabel": labelFor[url.period],
+    "bucketSeconds": bucketSeconds,
+    "buckets": bucketStarts,
+    "series": series,
+    "total": grandTotal,
+    "clean": totals.clean,
+    "spam": totals.spam,
+    "virus": totals.virus,
+    "banned": totals.banned,
+    "badHeader": totals.badHeader,
+    "other": totals.other,
+    "limited": false
 }>
 
 <cfcatch type="any">
+    <cflog file="hermes" type="error" text="get_message_stats.cfm: #cfcatch.message# #cfcatch.detail#">
     <cfset response = {
         "success": false,
-        "error": cfcatch.message
+        "error": "Message statistics are temporarily unavailable."
     }>
 </cfcatch>
+
 </cftry>
 
 <cfoutput>#serializeJSON(response)#</cfoutput>
