@@ -9,7 +9,7 @@ History. Upgrade recommended for every install, not only migrated ones.
 ## New features
 
 - **Messages Processed chart on the dashboard.** It is now a line chart with
-  one line per message type, adds **Past 7 Days** and **Past 30 Days**, and
+  one line per message type, adds **Past 7, 14, 21 and 30 Days**, and
   counts every message in the period. It previously sampled at most the
   newest 10,000, so busy gateways saw `10,000+` and skewed proportions
   (#355).

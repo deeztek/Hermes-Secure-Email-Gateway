@@ -53,6 +53,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     "12":   1800,
     "24":   3600,
     "168":  21600,
+    "336":  43200,
+    "504":  86400,
     "720":  86400
 }>
 <cfset labelFor = {
@@ -62,6 +64,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     "12":   "Past 12 Hours",
     "24":   "Past 24 Hours",
     "168":  "Past 7 Days",
+    "336":  "Past 14 Days",
+    "504":  "Past 21 Days",
     "720":  "Past 30 Days"
 }>
 <cfif NOT StructKeyExists(bucketFor, url.period)>

@@ -310,6 +310,8 @@ select property, value from encryption_settings where property='user.systemMailS
         <option value="12">Past 12 Hours</option>
         <option value="24" selected>Past 24 Hours</option>
         <option value="168">Past 7 Days</option>
+        <option value="336">Past 14 Days</option>
+        <option value="504">Past 21 Days</option>
         <option value="720">Past 30 Days</option>
       </select>
     </div>
