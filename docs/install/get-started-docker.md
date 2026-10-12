@@ -436,6 +436,26 @@ which source IPs can reach the admin console at all.
 On Community there is nothing to configure here and nothing missing. The protection is
 already running.
 
+#### Whitelist your own addresses before someone locks you out
+
+Fail2ban bans by source address. Behind NAT, one person mistyping their webmail
+password a few times can ban your whole office's public address, which cuts
+**everyone** there off from every service on this host, the admin console
+included.
+
+Before handing the gateway over, add the addresses you manage it from (office
+public IPs, VPN ranges): **System → IPS → IP Whitelist (Never Ban) → Add
+IP/CIDR**, then click **Apply Settings**. The whitelist page is part of Pro.
+
+If an address is already banned, on any edition, unban it from the Docker host.
+The first command lists what is banned; in the second, replace `<address>` with
+the banned address it shows (for example `192.0.2.10`):
+
+```bash
+docker exec hermes_fail2ban fail2ban-client banned
+docker exec hermes_fail2ban fail2ban-client unban <address>
+```
+
 ## Things that look broken but aren't
 
 A fresh install leaves several things deliberately empty. If you go looking under the hood before configuring anything, these are the ones that reliably cause alarm.
