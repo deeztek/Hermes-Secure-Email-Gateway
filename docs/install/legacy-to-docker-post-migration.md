@@ -165,8 +165,9 @@ private window so an old login session is not reused.
 > Several pages write a configuration file only when something on them is
 > saved, and the migration does not write those files. Until you do, the
 > settings are **silently ignored**: mail for relay domains loops back to this
-> gateway and defers, and allow/block lists let blocked senders through. No
-> error tells you.
+> gateway and defers, allow/block lists let blocked senders through, and
+> outbound mail from your internal servers can be rejected by DMARC (step 3).
+> No error tells you.
 >
 > Where a step says to save a page, use its **Apply** / **Save** button if it
 > has one. Otherwise edit any one entry and save it unchanged, or, if the page
@@ -236,10 +237,21 @@ page.
    Expect one line from each file, with the `KeyTable` line naming a key file
    under `/opt/hermes/dkim/keys/`.
 
-2. **Content Checks → DKIM Settings** → **Save & Apply Settings**. This
-   writes the OpenDKIM settings (canonicalization, actions, algorithm). If the
-   page lists trusted hosts, also edit one and save it unchanged, which
-   rewrites that list.
+2. **Content Checks → DKIM Settings → Trusted Hosts:** edit any one entry
+   and save it unchanged. This writes the list of your own servers (internal
+   mail servers, relay sources) that DKIM signs for and that DMARC does not
+   check. Until you do, the list holds only the install defaults, so outbound
+   mail relayed through Hermes from your internal servers is DMARC-checked as
+   if it came from the Internet and is **rejected** ("5.7.1 rejected by DMARC
+   policy") for any sender domain that publishes `p=reject`. Confirm the
+   list now contains your networks:
+
+   ```bash
+   docker exec hermes_postfix_dkim cat /opt/hermes/dkim/TrustedHosts
+   ```
+
+   Then, on the same page, click **Save & Apply Settings**. This writes the
+   OpenDKIM settings (canonicalization, actions, algorithm).
 
    This save restarts the mail container and then reloads Postfix
    straight away, before Postfix is back up. It can therefore end on an
