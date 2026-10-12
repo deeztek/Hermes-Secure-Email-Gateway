@@ -5016,6 +5016,28 @@ case "${1:-}" in
         echo "  docker compose down && docker compose up -d"
         echo ""
         ;;
+    --provision-dirs)
+        # Non-interactive storage layout for an EXISTING install (#348).
+        # Called by system_update_docker.sh before `docker compose up`, so a
+        # release that adds a bind-mounted volume finds its source directory
+        # already there instead of failing with "bind source path does not
+        # exist". Same idempotent mkdir/chown as a fresh install.
+        touch "$LOG_FILE"
+        if ! load_config; then
+            warn "No ${CONFIG_FILE}; storage directories not provisioned."
+            exit 3
+        fi
+        # A config written before a tier existed (ARCHIVE_MOUNT arrived in
+        # #260) lacks that variable. Fall back to the value docker compose
+        # itself substitutes, from .env.
+        for _tier in DATA_MOUNT ARCHIVE_MOUNT VMAIL_MOUNT FILES_MOUNT; do
+            if [[ -z "${!_tier:-}" ]]; then
+                _val=$(grep -E "^${_tier}=" "${HERMES_ROOT}/.env" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"')
+                [[ -n "$_val" ]] && printf -v "$_tier" '%s' "$_val"
+            fi
+        done
+        provision_mount_dirs
+        ;;
     --generate-override)
         # Regenerate docker-compose.override.yml from saved config
         touch "$LOG_FILE"
@@ -5131,6 +5153,8 @@ case "${1:-}" in
         echo ""
         echo "Configuration:"
         echo "  --configure-storage  Configure storage mount points"
+        echo "  --provision-dirs     Create any missing storage directories from the saved"
+        echo "                       configuration (non-interactive; used by upgrades)"
         echo "  --generate-override  Regenerate docker-compose.override.yml"
         echo "  --generate-secrets   Generate secrets only"
         echo "  --show-config        Display current configuration"

@@ -867,6 +867,19 @@ phase2_update_containers() {
         fi
     done <<< "$pending"
 
+    # Create storage directories for any volume this release adds (#348).
+    # Bind-mounted volumes need their source directory to exist, and only the
+    # installer used to create them, so the first release adding one would
+    # fail at `up` below. Runs the NEW installer: phase 1 already checked out
+    # the target release. Non-fatal: an install without a saved config is
+    # warned about and the upgrade continues as before.
+    log "Provisioning storage directories (creates any new volume's directory)..."
+    if (( DRY_RUN )); then
+        echo -e "    ${CYAN}[dry-run]${NC} bash scripts/install_hermes_docker.sh --provision-dirs"
+    elif ! bash "${HERMES_ROOT}/scripts/install_hermes_docker.sh" --provision-dirs >> "$LOG_FILE" 2>&1; then
+        warn "  Storage directory provisioning did not complete (see $LOG_FILE). If 'docker compose up' fails with 'bind source path does not exist', run: sudo ./scripts/install_hermes_docker.sh --provision-dirs"
+    fi
+
     log "docker compose pull (--quiet, suppresses per-layer progress)..."
     run docker compose pull --quiet
 
