@@ -264,12 +264,16 @@ them, which stops postscreen counting an unrelated answer as a listing. It does
 **not** remove or disable any list, because which lists a gateway should use is
 the operator's decision.
 
-One needs a deliberate choice:
+Sidebar → **Content Checks → RBL Configuration**, then:
 
-- Sidebar → **Content Checks → RBL Configuration**. If **`b.barracudacentral.org`** is
-  enabled, note that it answers only for querying IPs registered with them. On
-  an unregistered host it can score mail it should not. The migration leaves it
-  enabled and flags it; disable it unless this host's IP is registered.
+- **Delete every SORBS entry** (any host ending in `sorbs.net`, such as
+  `dnsbl.sorbs.net` or `zombie.dnsbl.sorbs.net`). SORBS was shut down in June
+  2024 and its lists are empty, so these entries cost a DNS lookup on every
+  connection and add no protection. Legacy installs commonly carry them.
+- If **`b.barracudacentral.org`** is enabled, note that it answers only for
+  querying IPs registered with them. On an unregistered host it can score mail
+  it should not. The migration leaves it enabled and flags it; disable it
+  unless this host's IP is registered.
 - Whether or not you changed anything, click **Apply** in the page toolbar.
   This regenerates the Postfix block-list configuration from the restored
   database.
