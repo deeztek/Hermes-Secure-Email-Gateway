@@ -21,6 +21,20 @@ check $w/inc/generate_antivirus_configuration.cfm 'FileExists("/var/lib/clamav/l
     "Antivirus save tolerates a missing local.ign2 (#352)"
 check $w/api/get_message_stats.cfm '"720"' \
     "Messages Processed offers 30 days (#355)"
+check scripts/install_hermes_docker.sh "--provision-dirs)" \
+    "installer has non-interactive --provision-dirs (#348)"
+check scripts/system_update_docker.sh "install_hermes_docker.sh\" --provision-dirs" \
+    "upgrade provisions storage directories before compose up (#348)"
+check config/hermes/var/www/html/schedule/acme_validate_ip.cfm "sync_mailbox_sans.cfm" \
+    "scheduled SAN validation rebuilds mailbox_sans first (#319)"
+check $w/inc/mailbox_domain_delete_action.cfm "checkAliases" \
+    "mailbox domain delete refuses while aliases exist (#320)"
+check config/hermes/opt/hermes/conf_files/main.cf.HERMES "smtpd_relay_before_recipient_restrictions = no" \
+    "relay-before-recipient set explicitly (#318)"
+check scripts/hermes_smoke_test.sh "hermes_linkguard" \
+    "smoke test covers hermes_linkguard (#281)"
+check scripts/system_update_docker.sh "--no-prune)" \
+    "updater accepts --no-prune (#340)"
 check scripts/migrate_legacy_to_docker.sh 'MODE" != "archive"' \
     "archive-only migration restore exempt from the release guard (#354)"
 

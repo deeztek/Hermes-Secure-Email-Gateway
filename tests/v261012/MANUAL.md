@@ -10,3 +10,8 @@
 | `docker exec hermes_mail_filter mv /var/lib/clamav/local.ign2 /var/lib/clamav/local.ign2.test`, then **Antivirus Settings → Save & Apply** | Saves and recreates `local.ign2`; then remove `local.ign2.test` (#352) |
 | **Dashboard → Messages Processed:** every range from 15 minutes to 30 days | Shows current traffic; one line per type, Clean on the right axis (#355) |
 | During the upgrade, send a test message | Delivered while the `msgs` table rebuilds (#353) |
+| **Email Server → Domains:** delete a mailbox domain that has no mailboxes or recipients but has an alias | Refused: "This domain has N alias(es)" (#320) |
+| Send to an internal-only (Reachable By) address from outside, then `docker logs --since 5m hermes_postfix_dkim 2>&1 \| grep -c "backwards-compatible default"` | The rejection is logged; the count is `0` (#318) |
+| Upgrade log (`install-logs/`): the `Provisioning storage directories` step | Ran without a warning (#348) |
+| `sudo bash scripts/hermes_smoke_test.sh` | Lists 19 containers including `hermes_linkguard` (#281) |
+| `sudo ./scripts/system_update_docker.sh --dry-run --no-prune` | Phase 6 reports it is skipping image cleanup (#340) |

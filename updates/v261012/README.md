@@ -41,6 +41,21 @@ History. Upgrade recommended for every install, not only migrated ones.
   configuration until reloaded (#351).
 - **Legacy migration:** the email archive can now be restored after
   upgrading past v260912 (#354).
+- **Upgrades now create storage directories for new volumes.** Previously
+  only a fresh install did, so the first release to add a volume would have
+  failed to start its containers (#348).
+- **Mailbox domain names were silently left off certificates** after an
+  earlier upgrade's cleanup removed them. The scheduled certificate check now
+  rebuilds that list before it runs (#319).
+- **Deleting a mailbox domain is refused while it still has aliases.**
+  Leftover aliases came back to life if the domain was added again (#320).
+- **Postfix no longer logs a "backwards-compatible default setting" notice**
+  on every rejected recipient (#318).
+- **The smoke test checks all 19 containers,** including Link Guard (#281).
+- **`system_update_docker.sh --no-prune`** keeps superseded images instead of
+  removing them after the upgrade (#340).
+- The install guide explains how to whitelist your own addresses in IPS and
+  how to unban an address (#312).
 
 ## Upgrading
 
