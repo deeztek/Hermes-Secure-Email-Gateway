@@ -25,7 +25,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 </cfif>
 
 <cfif NOT allowCertDownload>
-  <cfset m = "Certificate downloads are disabled. Enable ALLOW_CERT_DOWNLOAD in /opt/hermes/config/security.conf">
+  <cfset m = "Certificate downloads are disabled. Enable ALLOW_CERT_DOWNLOAD in config/hermes/opt/hermes/config/security.conf (in the Hermes install directory on the Docker host)">
   <cfinclude template="error.cfm">
   <cfabort>
 </cfif>

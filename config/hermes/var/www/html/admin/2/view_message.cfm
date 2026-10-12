@@ -405,7 +405,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           <cfelse>
             <div class="alert alert-info mb-0">
-              <i class="fas fa-lock me-1"></i> Message body content is hidden. To enable, set <code>ALLOW_MESSAGE_CONTENT=yes</code> in <code>/opt/hermes/config/security.conf</code>.
+              <i class="fas fa-lock me-1"></i> Message body content is hidden. To enable, set <code>ALLOW_MESSAGE_CONTENT=yes</code> in <code>config/hermes/opt/hermes/config/security.conf</code> in the Hermes install directory on the Docker host.
             </div>
           </cfif>
         </div>

@@ -159,7 +159,7 @@ alert ("No messages were found for the selected date range").
 
 Clicking the magnifier opens the per-message detail page. What that
 page can show is gated by two install-time toggles in
-`/opt/hermes/config/security.conf`:
+`config/hermes/opt/hermes/config/security.conf`:
 
 | Toggle | Default | Effect |
 | --- | --- | --- |

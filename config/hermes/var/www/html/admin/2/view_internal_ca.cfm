@@ -947,7 +947,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 <cfif m is 45>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-    <h4><i class="icon fa fa-ban"></i> Access Denied</h4><p>CA file downloads are disabled. Set <code>ALLOW_CA_DOWNLOAD=yes</code> in <code>/opt/hermes/config/security.conf</code> to enable.</p></div>
+    <h4><i class="icon fa fa-ban"></i> Access Denied</h4><p>CA file downloads are disabled. Set <code>ALLOW_CA_DOWNLOAD=yes</code> in <code>config/hermes/opt/hermes/config/security.conf</code> in the Hermes install directory on the Docker host to enable.</p></div>
 </cfif>
 <cfif m is 46>
   <div class="alert alert-danger alert-dismissible"><button type="button" class="btn-close" data-bs-dismiss="alert"></button>

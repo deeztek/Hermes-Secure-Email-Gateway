@@ -310,7 +310,7 @@ page is a sensitive operation). To enable, set
 ALLOW_CERT_DOWNLOAD=yes
 ```
 
-in `/opt/hermes/config/security.conf` on the host filesystem. The page
+in `config/hermes/opt/hermes/config/security.conf` in the Hermes install directory on the Docker host. The page
 reads this file on every load (cached in the local request). When the
 toggle is off, the buttons render disabled with a tooltip telling the
 admin where to set the flag.
@@ -358,7 +358,7 @@ resolve to this server?" at a glance.
 | `/opt/hermes/ssl/` | `hermes_commandbox` (bind-mounted) | Imported cert files |
 | `/etc/letsencrypt/live/<domain>/` | `hermes_commandbox` (bind-mounted from `config/certbot/conf/`) | ACME cert files |
 | `/opt/hermes/tmp/<token>_csr_key.rar` | `hermes_commandbox` | Pending CSR bundle |
-| `/opt/hermes/config/security.conf` | host filesystem | `ALLOW_CERT_DOWNLOAD` toggle |
+| `config/hermes/opt/hermes/config/security.conf` | host filesystem | `ALLOW_CERT_DOWNLOAD` toggle |
 | `system_certificates` table | `hermes_db_server` (`hermes` DB) | The canonical store |
 | `certbot/certbot:latest` image | docker.io | Pulled on demand; ephemeral per request |
 

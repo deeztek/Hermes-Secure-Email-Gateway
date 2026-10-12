@@ -181,7 +181,7 @@ operation. To enable, set
 ALLOW_CA_DOWNLOAD=yes
 ```
 
-in `/opt/hermes/config/security.conf` on the host filesystem. This is
+in `config/hermes/opt/hermes/config/security.conf` in the Hermes install directory on the Docker host. This is
 the same toggle pattern used by [System Certificates](../01-system/system-certificates.md#certificate-downloads-gated)
 (`ALLOW_CERT_DOWNLOAD`) — read on every page load, surfaced as a
 disabled-button + tooltip when off. When enabled, downloads stream
@@ -214,7 +214,7 @@ matches the bytes the recipient sees.
 | Trust store | `cm_certificates` + `cm_ctl` + `cm_ctl_cm_name_values` in `djigzo` DB (`hermes_db_server`) | CipherMail's view of the root CA |
 | Engine | `hermes_ciphermail` (Java; CipherMail Community 5.x branded `djigzo`) | Signing / encryption / decryption engine; reached via `docker exec -i hermes_ciphermail /usr/bin/java -cp '/usr/share/djigzo/lib/*' mitm.application.djigzo.tools.CertStore` |
 | Recipient certs | `recipient_certificates` + `external_recipient_certificates` in `hermes` DB | One-row-per-user, joined to a CA via `ca_id` |
-| Security toggle | `/opt/hermes/config/security.conf` on host | `ALLOW_CA_DOWNLOAD=yes` to expose cert/key download buttons |
+| Security toggle | `config/hermes/opt/hermes/config/security.conf` in the install directory on the Docker host | `ALLOW_CA_DOWNLOAD=yes` to expose cert/key download buttons |
 
 Every CipherMail interaction is **temp-script + docker exec** rather
 than direct invocation — the `hermes_commandbox` container has no JVM
