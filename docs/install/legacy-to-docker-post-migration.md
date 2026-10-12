@@ -571,11 +571,52 @@ webmail), assign each to the service that uses its name.
 Message History **metadata** is restored, but message **bodies** live in the
 separate archive backup (`hermes-archive-<build>-<date>.tar.gz`, where
 `<build>` and `<date>` are the legacy build number and backup date in the
-actual file name). Restore it when
-convenient — it needs no gateway downtime.
+actual file name). Restoring it only unpacks files onto the Archive tier; it
+changes no database or configuration and needs no downtime.
 
-- Sidebar → **Content Checks → Message History** — entries appear; bodies are
-  viewable only after the archive is restored.
+**Do this before the upgrade in step 12.** If the legacy server kept
+receiving mail after you took the system backup, take a fresh archive backup
+from it once it has stopped, so the archive is complete.
+
+Run from your Hermes install directory (`/opt/Hermes-Secure-Email-Gateway`
+if you followed the migration guide; replace it with your path if you cloned
+elsewhere). In the commands below, replace `<archive-file>` with the path to
+the archive backup on this host (for example
+`/root/hermes-archive-240815-10-12-2026-0800.tar.gz`). The first command reads
+the Archive tier you chose at install; pass it with `-A` so the files land
+there:
+
+```bash
+cd /opt/Hermes-Secure-Email-Gateway
+ARCHIVE_MOUNT=$(grep '^ARCHIVE_MOUNT=' .env | cut -d= -f2 | tr -d '"'); echo "$ARCHIVE_MOUNT"
+sudo ./scripts/migrate_legacy_to_docker.sh --archive-only --archive <archive-file> -A "$ARCHIVE_MOUNT"
+```
+
+Then Sidebar → **Content Checks → Message History**: open an older entry and
+its message body is now viewable.
+
+#### Already upgraded (step 12) before restoring the archive?
+
+The migration script refuses to run on a release newer than v260912, and on
+some releases that includes archive-only runs. Do the same steps by hand
+instead. Check there is room first (about 1.3 times the archive's size):
+
+```bash
+cd /opt/Hermes-Secure-Email-Gateway
+ARCHIVE_MOUNT=$(grep '^ARCHIVE_MOUNT=' .env | cut -d= -f2 | tr -d '"'); echo "$ARCHIVE_MOUNT"
+ls -lh <archive-file>; df -h "$ARCHIVE_MOUNT" | tail -1
+```
+
+Extract only the quarantine, then hand it to the mail filter's amavis user
+(the files arrive with the legacy owner, which amavis cannot write to):
+
+```bash
+tar -xzf <archive-file> -C "$ARCHIVE_MOUNT" --strip-components=2 mnt/data/amavis
+chown -R "$(docker exec hermes_mail_filter id -u amavis):$(docker exec hermes_mail_filter id -g amavis)" "$ARCHIVE_MOUNT/amavis"
+```
+
+This merges with quarantine files created since cutover; their names are
+unique message IDs, so nothing is overwritten.
 
 ## 10. Final end-to-end test
 
