@@ -220,6 +220,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- ===================== --->
 <cfif action is "edit_rule">
   <cfif StructKeyExists(form, "edit_id") AND IsNumeric(form.edit_id)>
+    <!--- The edit modal disables the Header field for body rules, and a
+         disabled field is not posted. Same guard as form.header in add_rule. --->
+    <cfparam name="form.edit_header" default="">
     <cfset edit_rule_type = trim(form.edit_rule_type)>
     <cfset edit_header = trim(form.edit_header)>
     <cfset edit_regex = trim(form.edit_regex)>

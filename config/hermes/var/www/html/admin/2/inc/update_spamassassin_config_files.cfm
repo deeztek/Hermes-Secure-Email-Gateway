@@ -51,96 +51,96 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     <!--- EDIT /ETC/SPAMASASSIN/LOCAL.CF BELOW --->
     
-    <cffile action="read" file="/opt/hermes/conf_files/local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/conf_files/local.cf.HERMES" variable="safile">
     
     <cfif #get_use_dcc.value# is "1">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-DCC","use_dcc 1","ALL")#">
     
     <cfelseif #get_use_dcc.value# is "0">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-DCC","use_dcc 0","ALL")#">
 
 
     </cfif>
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
     <cfif #get_use_pyzor.value# is "1">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-PYZOR","use_pyzor 1","ALL")#">
     
     <cfelseif #get_use_pyzor.value# is "0">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-PYZOR","use_pyzor 0","ALL")#">
 
     </cfif>
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
     <cfif #get_use_razor2.value# is "1">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-RAZOR2","use_razor2 1","ALL")#">
     
     <cfelseif #get_use_razor2.value# is "0">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-RAZOR2","use_razor2 0","ALL")#">
 
     </cfif>
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
     <cfif #get_use_bayes.value# is "1">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-BAYES","use_bayes 1","ALL")#">
     
     <cfelseif #get_use_bayes.value# is "0">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","USE-BAYES","use_bayes 0","ALL")#">
 
     </cfif>
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
     <cfif #get_bayes_auto_learn.value# is "1">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","BAYES-AUTO-LEARN","bayes_auto_learn 1","ALL")#">
     
     <cfelseif #get_bayes_auto_learn.value# is "0">
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","BAYES-AUTO-LEARN","bayes_auto_learn 0","ALL")#">
 
     </cfif>
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","BAYESAUTOLEARN-SPAM","bayes_auto_learn_threshold_spam #get_bayes_auto_learn_threshold_spam.value#","ALL")#">
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","BAYESAUTOLEARN-HAM","bayes_auto_learn_threshold_nonspam #get_bayes_auto_learn_threshold_nonspam.value#","ALL")#">
     
@@ -152,14 +152,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif #gettests.recordcount# GTE 1>
 
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#_sa_tests"
         output = ""
         addNewLine = "no">
 
     <cfloop query="gettests">
 
-    <cffile action = "append"
+    <cffile charset="utf-8" action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_sa_tests"
         output = "score #parameter# #value#"
         addNewLine = "yes">
@@ -167,11 +167,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfloop>
     
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_sa_tests" variable="theTests">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#_sa_tests" variable="theTests">
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","##CUSTOM-TESTS","#theTests#","ALL")#">
     
@@ -193,7 +193,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     
     <cfif #getmessagerules.recordcount# GTE 1>
     
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#_message_rules"
         output = ""
         addNewLine = "no">
@@ -204,14 +204,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif #rule_desc# is not "">
 
-    <cffile action = "append"
+    <cffile charset="utf-8" action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_message_rules"
         output = "#rule_type# #rule_name# #regex##chr(10)#score #rule_name# #score##chr(10)#describe #rule_name# #rule_desc##chr(10)#"
         addNewLine = "yes">
 
     <cfelseif #rule_desc# is "">
 
-    <cffile action = "append"
+    <cffile charset="utf-8" action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_message_rules"
         output = "#rule_type# #rule_name# #regex##chr(10)#score #rule_name# #score##chr(10)#"
         addNewLine = "yes">
@@ -223,14 +223,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
     <cfif #rule_desc# is not "">
 
-    <cffile action = "append"
+    <cffile charset="utf-8" action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_message_rules"
         output = "#rule_type# #rule_name# #header# =#regex##chr(10)#score #rule_name# #score##chr(10)#describe #rule_name# #rule_desc##chr(10)#"
         addNewLine = "yes">
 
     <cfelseif #rule_desc# is "">
 
-    <cffile action = "append"
+    <cffile charset="utf-8" action = "append"
         file = "/opt/hermes/tmp/#customtrans3#_message_rules"
         output = "#rule_type# #rule_name# #header# =#regex##chr(10)#score #rule_name# #score##chr(10)#"
         addNewLine = "yes">
@@ -244,11 +244,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfloop>
     
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#_message_rules" variable="theRules">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#_message_rules" variable="theRules">
     
-    <cffile action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
+    <cffile charset="utf-8" action="read" file="/opt/hermes/tmp/#customtrans3#local.cf.HERMES" variable="safile">
     
-    <cffile action = "write"
+    <cffile charset="utf-8" action = "write"
         file = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES"
         output = "#REReplace("#safile#","##CUSTOM-MESSAGE-RULES","#theRules#","ALL")#">
     
@@ -272,6 +272,49 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
   <!--- Move /opt/hermes/tmp/#customtrans3#local.cf.HERMES to /etc/spamassassin/local.cf --->
   <cffile action="move" source = "/opt/hermes/tmp/#customtrans3#local.cf.HERMES" destination = "/etc/spamassassin/local.cf">
+
+  <!--- VALIDATE THE NEW local.cf, AND PUT THE PREVIOUS ONE BACK IF IT FAILS.
+
+       The file is moved into place first because lint reads
+       /etc/spamassassin from inside hermes_mail_filter. Before this, a bad
+       rule (a legacy DCC line, a regex corrupted by encoding) stayed live:
+       restart_spamassassin.cfm's lint aborted the save AFTER the swap, and
+       apply_message_rules.cfm ignored lint entirely. Now a rejected file is
+       replaced by the backup taken above, the working configuration stays,
+       and the operator sees SpamAssassin's own reasons.
+
+       Run through a script so stderr (where lint reports) is captured and
+       the exit code read explicitly, rather than cfexecute throwing on any
+       stderr output. --->
+  <cfset saLintScript = "/opt/hermes/tmp/#customtrans3#_sa_validate.sh">
+  <cffile action="write" file="#saLintScript#"
+          output="docker exec hermes_mail_filter /usr/bin/spamassassin --lint 2>&1#chr(10)#echo HERMES_LINT_EXIT=$?#chr(10)#exit 0">
+  <cfset saLintOutput = "">
+  <cftry>
+    <cfexecute name="/bin/bash" arguments="#saLintScript#" variable="saLintOutput" timeout="240" />
+    <cfcatch type="any">
+      <cfset saLintOutput = "lint could not be run: #cfcatch.message#">
+    </cfcatch>
+  </cftry>
+  <cfif FileExists(saLintScript)>
+    <cffile action="delete" file="#saLintScript#">
+  </cfif>
+
+  <cfif NOT FindNoCase("HERMES_LINT_EXIT=0", saLintOutput)>
+    <cfset saLintReport = Trim(REReplace(saLintOutput, "HERMES_LINT_EXIT=[0-9]+", "", "ALL"))>
+    <cfif FileExists("/etc/spamassassin/local.cf.HERMES.BACKUP")>
+      <cffile action="copy" source="/etc/spamassassin/local.cf.HERMES.BACKUP" destination="/etc/spamassassin/local.cf">
+    </cfif>
+    <cflog file="hermes" type="error"
+           text="update_spamassassin_config_files: spamassassin --lint rejected the new local.cf; previous file restored. #saLintReport#">
+    <cfif StructKeyExists(request, "generateQuiet") AND request.generateQuiet>
+      <cfthrow message="update_spamassassin_config_files: spamassassin --lint rejected the new local.cf; previous file restored. #saLintReport#">
+    <cfelse>
+      <cfset m="Update SpamAssassin Configuration: SpamAssassin rejected the new configuration, so the previous one was kept and nothing was applied. Fix the setting or rule it names and save again. SpamAssassin reported: #encodeForHTML(saLintReport)#">
+      <cfinclude template="error.cfm">
+      <cfabort>
+    </cfif>
+  </cfif>
 
   <cfquery name="updateparams" datasource="hermes">
     update spam_settings set applied='1' where applied = '2' and spamfilter = '1'

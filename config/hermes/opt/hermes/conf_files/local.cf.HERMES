@@ -83,8 +83,13 @@ ifplugin Mail::SpamAssassin::Plugin::Shortcircuit
 endif # Mail::SpamAssassin::Plugin::Shortcircuit
 
 #dcc
+# Guarded: the published mail_filter image does not load the DCC plugin
+# (opt-in WITH_DCC build, #292). Unguarded, these lines fail spamassassin
+# --lint and abort every Antispam Settings save.
+ifplugin Mail::SpamAssassin::Plugin::DCC
 USE-DCC
 dcc_path /usr/local/bin/dccproc
+endif # Mail::SpamAssassin::Plugin::DCC
 
 #pyzor
 USE-PYZOR
