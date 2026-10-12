@@ -215,6 +215,20 @@ All three live under the **Content Checks** section of the sidebar.
 1. **Content Checks → DKIM Settings** → **Save & Apply Settings** — regenerates
    OpenDKIM KeyTable / SigningTable / TrustedHosts referencing the migrated keys.
    Confirm each domain's published DNS TXT record still matches.
+
+   This save restarts the mail container and then reloads Postfix
+   straight away, before Postfix is back up. It can therefore end on an
+   error page reading **"the Postfix mail system is not running"**. The DKIM
+   settings are saved, but Postfix is still running its old configuration.
+   Wait about 10 seconds, then load it from the Docker host:
+
+   ```bash
+   docker exec hermes_postfix_dkim postfix status && docker exec hermes_postfix_dkim postfix reload
+   ```
+
+   The first command must report `the Postfix mail system is running`. If it
+   does not, wait a few more seconds and run it again. Saving the page again
+   does not help: it repeats the same restart.
 2. **Content Checks → SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
 3. **Content Checks → DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
 
