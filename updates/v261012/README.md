@@ -40,7 +40,8 @@ History. Upgrade recommended for every install, not only migrated ones.
   running".** The settings were saved, but Postfix kept its previous
   configuration until reloaded (#351).
 - **Legacy migration:** the email archive can now be restored after
-  upgrading past v260912 (#354).
+  upgrading past v260912, and restoring it no longer holds up incoming mail
+  while it extracts (#354).
 - **Upgrades now create storage directories for new volumes.** Previously
   only a fresh install did, so the first release to add a volume would have
   failed to start its containers (#348).
