@@ -19,10 +19,11 @@ History. Upgrade recommended for every install, not only migrated ones.
 - **The dashboard's shorter Messages Processed periods showed the wrong
   time window,** several hours in the past depending on the server's time
   zone, so recent mail often appeared as none (#355).
-- **Mail from a Global Sender Rules "Allow" sender was deferred** instead of
-  skipping the filters: allow entries pointed at an address that only existed
-  on the legacy single-server install. The upgrade corrects existing entries
-  and the live Postfix map. Entries migrated from legacy were also hidden and
+- **Global Sender Rules "Allow" entries pointed at an address that only
+  existed on the legacy single-server install,** so mail from an allowed
+  sender could be deferred (and retried by the sender) instead of skipping the
+  filters. Only installs with Allow entries are affected. The upgrade
+  corrects existing entries and the live Postfix map. Entries migrated from legacy were also hidden and
   not applied; the upgrade activates them, and on a migrated install you then
   add and delete a temporary **Block** entry under Global Sender Rules once to
   write them out (#358).
