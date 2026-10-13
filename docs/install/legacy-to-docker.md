@@ -57,7 +57,7 @@ It produces two files:
 `<build>` and `<date>` stand for the legacy build number and the backup date;
 the real file names contain the actual values. Only the **system** backup is
 needed to migrate. The archive is restored later,
-separately, and needs no downtime.
+separately, and mail keeps flowing while it runs (see the checklist, step 9).
 
 Copy both somewhere the new host can reach.
 

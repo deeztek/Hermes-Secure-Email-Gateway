@@ -169,9 +169,17 @@ restore_email_archive() {
     log "Extracting quarantine to ${dest} (large archives take a while)..."
     # Extract only the mnt/data/amavis subtree, stripping mnt/data/ so it lands
     # directly at ${ARCHIVE_MOUNT}/amavis.
-    if ! tar -xzf "$archive_file" -C "${ARCHIVE_MOUNT}" --strip-components=2 mnt/data/amavis >> "$LOG_FILE" 2>&1; then
+    #
+    # --no-same-owner / --no-overwrite-dir: extracting into the LIVE quarantine.
+    # Without them, tar (as root) re-applies the legacy owner and mode to the
+    # existing amavis/ directories it writes into, so until the chown below
+    # amavis cannot write its quarantine and every incoming message is deferred
+    # for the whole extraction (observed on a production migration). With them,
+    # existing directories keep their owner and mode, and files arrive owned by
+    # root until the chown below hands them to amavis.
+    if ! tar -xzf "$archive_file" -C "${ARCHIVE_MOUNT}" --strip-components=2 --no-same-owner --no-overwrite-dir mnt/data/amavis >> "$LOG_FILE" 2>&1; then
         warn "  targeted extract failed; retrying with a full extract to ${ARCHIVE_MOUNT}"
-        tar -xzf "$archive_file" -C "${ARCHIVE_MOUNT}" >> "$LOG_FILE" 2>&1 \
+        tar -xzf "$archive_file" -C "${ARCHIVE_MOUNT}" --no-same-owner --no-overwrite-dir >> "$LOG_FILE" 2>&1 \
             || { warn "  archive extraction reported errors -- check ${LOG_FILE}."; return 1; }
     fi
 

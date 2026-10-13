@@ -583,52 +583,51 @@ webmail), assign each to the service that uses its name.
 Message History **metadata** is restored, but message **bodies** live in the
 separate archive backup (`hermes-archive-<build>-<date>.tar.gz`, where
 `<build>` and `<date>` are the legacy build number and backup date in the
-actual file name). Restoring it only unpacks files onto the Archive tier; it
-changes no database or configuration and needs no downtime.
+actual file name). Restoring it only unpacks files onto the Archive tier and
+changes no database or configuration. Done as below, mail keeps flowing
+throughout.
 
-**Do this before the upgrade in step 12.** If the legacy server kept
-receiving mail after you took the system backup, take a fresh archive backup
-from it once it has stopped, so the archive is complete.
+If the legacy server kept receiving mail after you took the system backup,
+take a fresh archive backup from it once it has stopped, so the archive is
+complete. The backup does not need copying: mount the share that holds it on
+this host and point at it directly.
+
+Use these commands rather than the migration script's `--archive-only` mode,
+on any release. The v260912 script extracts in a way that leaves the live
+quarantine unwritable until it finishes, so **incoming mail queues for the
+whole extraction**; the commands below avoid that.
 
 Run from your Hermes install directory (`/opt/Hermes-Secure-Email-Gateway`
 if you followed the migration guide; replace it with your path if you cloned
-elsewhere). In the commands below, replace `<archive-file>` with the path to
-the archive backup on this host (for example
-`/root/hermes-archive-240815-10-12-2026-0800.tar.gz`). The first command reads
-the Archive tier you chose at install; pass it with `-A` so the files land
-there:
+elsewhere). Edit only the first line: set it to the archive backup's path on
+the mounted share. Then paste the rest unchanged, in the same shell session:
 
 ```bash
+ARCHIVE_FILE=/mnt/backups/hermes-archive-240815-MM-DD-YYYY-HHMM.tar.gz   # <- edit this line only
 cd /opt/Hermes-Secure-Email-Gateway
 ARCHIVE_MOUNT=$(grep '^ARCHIVE_MOUNT=' .env | cut -d= -f2 | tr -d '"'); echo "$ARCHIVE_MOUNT"
-sudo ./scripts/migrate_legacy_to_docker.sh --archive-only --archive <archive-file> -A "$ARCHIVE_MOUNT"
+ls -lh "$ARCHIVE_FILE"; df -h "$ARCHIVE_MOUNT" | tail -1
 ```
 
-Then Sidebar → **Content Checks → Message History**: open an older entry and
-its message body is now viewable.
-
-#### Already upgraded (step 12) before restoring the archive?
-
-The migration script refuses to run on a release newer than v260912, and on
-some releases that includes archive-only runs. Do the same steps by hand
-instead. Check there is room first (about 1.3 times the archive's size):
+Continue only if the free space shown is comfortably more than about 1.3
+times the archive's size. Then extract the quarantine and hand it to the mail
+filter's amavis user:
 
 ```bash
-cd /opt/Hermes-Secure-Email-Gateway
-ARCHIVE_MOUNT=$(grep '^ARCHIVE_MOUNT=' .env | cut -d= -f2 | tr -d '"'); echo "$ARCHIVE_MOUNT"
-ls -lh <archive-file>; df -h "$ARCHIVE_MOUNT" | tail -1
-```
-
-Extract only the quarantine, then hand it to the mail filter's amavis user
-(the files arrive with the legacy owner, which amavis cannot write to):
-
-```bash
-tar -xzf <archive-file> -C "$ARCHIVE_MOUNT" --strip-components=2 mnt/data/amavis
+tar -xzf "$ARCHIVE_FILE" -C "$ARCHIVE_MOUNT" --strip-components=2 --no-same-owner --no-overwrite-dir mnt/data/amavis
 chown -R "$(docker exec hermes_mail_filter id -u amavis):$(docker exec hermes_mail_filter id -g amavis)" "$ARCHIVE_MOUNT/amavis"
+ls -ld "$ARCHIVE_MOUNT/amavis"
 ```
 
-This merges with quarantine files created since cutover; their names are
-unique message IDs, so nothing is overwritten.
+`tar` prints nothing while it works, and a large archive takes a while.
+`mnt/data/amavis` is the folder's name **inside the backup**, not a path on
+this host; the files land in `$ARCHIVE_MOUNT/amavis`. `--no-same-owner` and
+`--no-overwrite-dir` keep the live quarantine folders writable during the
+extraction. Files merge with the quarantine created since cutover; their names
+are unique message IDs, so nothing is overwritten.
+
+Then Sidebar → **Content Checks → Message History**: open an entry from
+before cutover and its message body is now viewable.
 
 ## 10. Final end-to-end test
 
