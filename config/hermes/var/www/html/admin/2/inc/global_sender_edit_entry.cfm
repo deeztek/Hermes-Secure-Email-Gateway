@@ -8,7 +8,7 @@ Expects: form.edit_id (integer), form.edit_sender (new sender value), form.edit_
   <!--- Update the transport based on type --->
   <cfset newTransport = "">
   <cfif form.edit_type is "allow">
-    <cfset newTransport = "FILTER amavis:[127.0.0.1]:10030">
+    <cfset newTransport = "FILTER amavis:[hermes_mail_filter]:10030">
   </cfif>
 
   <!--- Auto-prepend @ for bare domains --->

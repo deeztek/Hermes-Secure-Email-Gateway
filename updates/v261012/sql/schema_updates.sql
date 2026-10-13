@@ -7,7 +7,7 @@
 -- hermes_install.sql). DBeaver-friendly: plain SQL, no PREPARE/DELIMITER.
 --
 -- Contents: msgs.from_addr / msgs.subject to utf8mb4 (#353), msgs chart
--- index, version stamp.
+-- index, Global Sender Rules transport + legacy action (#358), version stamp.
 -- ---------------------------------------------------------------------
 
 -- ---------------------------------------------------------------------
@@ -38,7 +38,28 @@ ALTER TABLE msgs
 CREATE INDEX IF NOT EXISTS idx_msgs_time_content ON msgs (time_num, content) ALGORITHM=INPLACE LOCK=NONE;
 
 -- ---------------------------------------------------------------------
--- 3. Version stamp -- MUST be the last statement (advances build_no so
+-- 3. Global Sender Rules: route allow entries to the mail filter, and
+--    activate rows migrated from legacy (#358)
+-- FRESH-INSTALL: covered-by config/hermes/var/www/html/admin/2/inc/global_sender_add_entries.cfm  new rows are written with the corrected transport; a fresh install has no rows
+--
+-- Allow entries are written to Postfix's check_sender_access map as
+-- "FILTER amavis:[host]:10030". The pages stored [127.0.0.1], the legacy
+-- single-server address: inside hermes_postfix_dkim nothing listens there, so
+-- mail from an allowed sender was deferred instead of bypassing the filters.
+-- Legacy also stored action 'add', which the Docker pages never display or
+-- apply. Both statements are idempotent. The live map file is repaired by
+-- updates/v261012/scripts/10-fix-sender-bypass-transport.sh.
+-- ---------------------------------------------------------------------
+UPDATE amavis_sender_bypass
+   SET transport = 'FILTER amavis:[hermes_mail_filter]:10030'
+ WHERE transport LIKE '%[127.0.0.1]:10030%';
+
+UPDATE amavis_sender_bypass
+   SET action = 'NONE'
+ WHERE action IN ('add', 'ADD');
+
+-- ---------------------------------------------------------------------
+-- 4. Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install
 -- ---------------------------------------------------------------------

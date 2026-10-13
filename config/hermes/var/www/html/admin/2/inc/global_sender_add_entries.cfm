@@ -80,7 +80,7 @@ Expects: form.entries (newline-delimited list), form.entry_type (block/allow)
     INSERT INTO amavis_sender_bypass (sender, transport, action, type, applied)
     VALUES (
       <cfqueryparam value="#line#" cfsqltype="cf_sql_varchar">,
-      <cfqueryparam value="FILTER amavis:[127.0.0.1]:10030" cfsqltype="cf_sql_varchar">,
+      <cfqueryparam value="FILTER amavis:[hermes_mail_filter]:10030" cfsqltype="cf_sql_varchar">,
       'NONE',
       <cfqueryparam value="#entryType#" cfsqltype="cf_sql_varchar">,
       '1'

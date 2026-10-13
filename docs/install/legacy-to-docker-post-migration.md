@@ -193,12 +193,32 @@ private window so an old login session is not reused.
    route that was not written. `cat config/postfix-dkim/etc/postfix/transport`
    (from the install directory) lists every route. The same save also writes the
    per-domain TLS policy and smarthost credentials.
-4. Sidebar → **Content Checks → Global Sender Rules** and **Content Checks →
-   Network Block/Allow**: on each page, open any one entry and click **Save**
-   without changing anything. If a page has no entries, add a temporary entry
-   and then delete it. Skip this and the migrated allow/block entries are
-   ignored: blocked senders and networks get through and nothing reports it.
-   Upgrading in step 12 does **not** do this for you.
+4. **Global Sender Rules** needs a database fix first. Migrated entries are
+   stored in a form the v260912 page neither shows nor applies (the page looks
+   **empty**, yet adding an address reports "already exists"), and allow
+   entries carry an address that only worked on the legacy server. Run this
+   on the Docker host:
+
+   ```bash
+   docker exec hermes_db_server mariadb -u root hermes -e "UPDATE amavis_sender_bypass SET action='NONE', transport='FILTER amavis:[hermes_mail_filter]:10030' WHERE action IN ('add','ADD') OR transport LIKE '%[127.0.0.1]:10030%';"
+   ```
+
+   Then Sidebar → **Content Checks → Global Sender Rules**: your entries are
+   now listed. To write them out, add a temporary entry such as
+   `nobody@example.invalid` with **Action** set to **Block**, then delete it.
+   Use **Block**, not Allow: on v260912 a new Allow entry is still written
+   with the legacy address. Confirm no entry routes to the legacy address
+   (expect `0`):
+
+   ```bash
+   docker exec hermes_postfix_dkim grep -c "127.0.0.1" /etc/postfix/amavis_senderbypass
+   ```
+
+   Then Sidebar → **Content Checks → Network Block/Allow**: open any one entry
+   and click **Save** without changing anything (if it has no entries, add a
+   temporary one and delete it). Skip these and the migrated allow/block
+   entries are ignored: blocked senders and networks get through and nothing
+   reports it.
 5. Sidebar → **System → System Status**: confirm all containers are healthy.
 6. Sidebar → **System → System Settings**. Confirm the **postmaster address** and
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
