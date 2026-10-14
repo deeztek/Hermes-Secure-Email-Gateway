@@ -2016,7 +2016,10 @@ modal markup don't need a rename cascade.)
      <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
   <script>
     // Column filters (#359). Exact-match regexes against the cell text.
-    (function() {
+    // Must be a ready handler: the table is initialised (with its options) in
+    // the head's ready handler, and calling DataTable() before that creates a
+    // default instance and makes the real one fail with "Cannot reinitialise".
+    $(function() {
       var t = $('#sortTable').DataTable();
       // stateSave can restore column searches the drop-downs would not show,
       // which would look like missing recipients: start unfiltered.
@@ -2048,7 +2051,7 @@ modal markup don't need a rename cascade.)
         $('.rcpt-filter').val('');
         t.columns().search('').draw();
       });
-    })();
+    });
 
     $('#selectAll').click(function() {
       if(this.checked) {
