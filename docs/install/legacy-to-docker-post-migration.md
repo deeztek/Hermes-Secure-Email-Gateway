@@ -704,10 +704,10 @@ reviewing what's queued.
    password reset cannot find them. Sidebar → **Email Relay → Relay
    Recipients → Provision Portal Accounts** creates them. Tick **Send the
    welcome email** to tell each user how to set a password, and add your own
-   announcement in **Additional message** if you like. This button arrives in
-   the release after v260912: do it after the upgrade in step 12. Do not send
-   users a password-reset announcement of your own before their accounts
-   exist.
+   announcement in **Additional message** if you like. The button is in the
+   first release after v261012, so do this after upgrading to it (step 12).
+   Do not send users a password-reset announcement of your own before their
+   accounts exist.
 
 ---
 
