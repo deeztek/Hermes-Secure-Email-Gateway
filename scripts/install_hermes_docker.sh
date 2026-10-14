@@ -1855,6 +1855,10 @@ generate_secrets() {
     # Nextcloud admin account (human-typed for first login)
     _ensure_secret "${CREDS_DIR}/nextcloud_admin_username" "$(generate_random_username)"
     _ensure_secret "${CREDS_DIR}/nextcloud_admin_password" "$(generate_typeable_password)"
+    # CipherMail admin console (#306). The deb install that normally creates
+    # CipherMail's admin account never reaches the Hermes database, so a
+    # fresh install had none; seed_ciphermail_admin() creates it with this.
+    _ensure_secret "${CREDS_DIR}/ciphermail_admin_password" "$(generate_typeable_password)"
 
     # Nextcloud Redis (crypto secret)
     _ensure_secret "${CREDS_DIR}/nextcloud_redis_password" "$(generate_hex 32)"
@@ -3525,6 +3529,63 @@ register_bootstrap_cert_in_db() {
 # CONFIGURE CIPHERMAIL USER PORTAL URL
 # ============================================================================
 
+seed_ciphermail_admin() {
+    # Creates CipherMail's admin console account (#306).
+    #
+    # On a normal Debian install, CipherMail's package creates this account.
+    # In the Docker image the package is installed without a database, and
+    # Hermes imports only the djigzo schema, so a fresh install had NO admin
+    # account and the console at /ciphermail could not be logged into at all
+    # (the documented admin/admin never existed). Verified on a clean v261009.
+    #
+    # CipherMail creates its roles (cm_authority) itself on first start, so
+    # this runs after the container is up. The password is stored with
+    # encoding 0 (plain), which CipherMail accepts; changing it in the console
+    # stores it hashed. Idempotent: does nothing if any admin account exists,
+    # so a migrated or hand-fixed install keeps its own.
+    header "Creating CipherMail Admin Account"
+
+    local pass admins roles attempts=0
+    pass=$(cat "${CREDS_DIR}/ciphermail_admin_password" 2>/dev/null | tr -d '[:space:]')
+    if [[ -z "$pass" ]]; then
+        warn "No ${CREDS_DIR}/ciphermail_admin_password -- skipping CipherMail admin account"
+        return 0
+    fi
+
+    admins=$(docker exec hermes_db_server mysql -u root -N -s djigzo -e \
+        "SELECT COUNT(*) FROM cm_admin;" 2>>"$LOG_FILE" || echo "")
+    if [[ "$admins" =~ ^[0-9]+$ ]] && (( admins > 0 )); then
+        log "  = CipherMail already has ${admins} admin account(s); leaving them alone"
+        return 0
+    fi
+
+    # Roles appear once CipherMail has finished its first start.
+    while (( attempts < 24 )); do
+        roles=$(docker exec hermes_db_server mysql -u root -N -s djigzo -e \
+            "SELECT COUNT(*) FROM cm_authority WHERE cm_role IN ('ROLE_LOGIN','ROLE_ADMIN');" 2>>"$LOG_FILE" || echo 0)
+        [[ "$roles" == "2" ]] && break
+        attempts=$((attempts + 1))
+        sleep 5
+    done
+    if [[ "$roles" != "2" ]]; then
+        warn "CipherMail roles not present after 2 minutes -- admin account not created."
+        warn "  Re-run './install_hermes_docker.sh --init-db' once hermes_ciphermail is up."
+        return 0
+    fi
+
+    if docker exec hermes_db_server mysql -u root djigzo -e "
+        INSERT INTO cm_admin (cm_built_in, cm_enabled, cm_password, cm_password_encoding, cm_salt, cm_username)
+            VALUES (false, true, '${pass}', 0, '', 'admin');
+        INSERT INTO cm_admin_cm_authorities (cm_admin, cm_authorities) VALUES
+            ((SELECT cm_id FROM cm_admin WHERE cm_username='admin'), (SELECT cm_id FROM cm_authority WHERE cm_role='ROLE_LOGIN')),
+            ((SELECT cm_id FROM cm_admin WHERE cm_username='admin'), (SELECT cm_id FROM cm_authority WHERE cm_role='ROLE_ADMIN'));
+    " >>"$LOG_FILE" 2>&1; then
+        log "  + CipherMail admin account 'admin' created (password in ${CREDS_DIR}/ciphermail_admin_password)"
+    else
+        warn "Could not create the CipherMail admin account -- see ${LOG_FILE}"
+    fi
+}
+
 configure_ciphermail_portal_url() {
     # Sets Ciphermail's user.portal.baseURL global property so:
     #   1. The admin UI's "CipherMail" link resolves (without this property,
@@ -3663,6 +3724,14 @@ Service password:   $(cat "${CREDS_DIR}/ldap_service_password" 2>/dev/null || ec
                      to LDAP when searching for users during login.
                      NOT for human login.)
 
+CIPHERMAIL CONSOLE
+------------------
+URL:                https://${ip}/ciphermail
+Admin user:         admin
+Admin password:     $(cat "${CREDS_DIR}/ciphermail_admin_password" 2>/dev/null || echo "?")
+                    (CipherMail's own administrator account, separate from
+                     the Hermes login. Change it after the first sign-in.)
+
 NEXTCLOUD
 ---------
 Local admin user:   $(cat "${CREDS_DIR}/nextcloud_admin_username" 2>/dev/null || echo "?")
@@ -3787,6 +3856,17 @@ EOF
         echo ""
         echo -e "    Use only when entering Nextcloud Maintenance Mode via"
         echo -e "    ${BOLD}Email Server > Settings > Nextcloud Maintenance Mode${NC} card."
+        echo ""
+    fi
+    local cm_admin_pass
+    cm_admin_pass=$(cat "${CREDS_DIR}/ciphermail_admin_password" 2>/dev/null | tr -d '[:space:]')
+    if [[ -n "$cm_admin_pass" ]]; then
+        echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
+        echo -e "  ${YELLOW}|${NC} ${BOLD}CIPHERMAIL CONSOLE${NC} -- /ciphermail, its own admin account          ${YELLOW}|${NC}"
+        echo -e "  ${YELLOW}+----------------------------------------------------------------------+${NC}"
+        echo -e "    Admin username:  ${BOLD}admin${NC}"
+        echo -e "    Admin password:  ${BOLD}${RED}${cm_admin_pass}${NC}     ${YELLOW}<-- COPY ME${NC}"
+        echo -e "    Change it after your first sign-in."
         echo ""
     fi
     echo -e "  ${GREEN}+----------------------------------------------------------------------+${NC}"
@@ -4395,6 +4475,9 @@ run_phase2_db_init() {
         configure_ciphermail_portal_url
         state_mark_done "07c-ciphermail-portal-configured"
     fi
+
+    # Not state-guarded: idempotent (skips if any admin exists) and fast.
+    seed_ciphermail_admin
 
     if state_is_done "08-authelia-configured"; then
         log "Skip: Authelia already configured"

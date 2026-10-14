@@ -50,6 +50,14 @@ History. Upgrade recommended for every install, not only migrated ones.
 - **Legacy migration:** the email archive can now be restored after
   upgrading past v260912, and restoring it no longer holds up incoming mail
   while it extracts (#354).
+- **The CipherMail console could not be logged into on a fresh install.**
+  The installer never created CipherMail's admin account, so the documented
+  `admin` / `admin` did not exist. New installs now create `admin` with a
+  random password, shown at the end of the install and in
+  `INSTALL_SUMMARY.txt`. The upgrade creates the account on installs that
+  have none and saves its password to
+  `config/hermes/opt/hermes/creds/ciphermail_admin_password`; installs that
+  already have a CipherMail admin are left alone (#306).
 - **Upgrades now create storage directories for new volumes.** Previously
   only a fresh install did, so the first release to add a volume would have
   failed to start its containers (#348).

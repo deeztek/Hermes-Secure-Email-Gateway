@@ -94,22 +94,21 @@ which in practice means before Step 2 gives it a public FQDN.
 
 **Page**: the CipherMail console at `/ciphermail`
 
-CipherMail has its **own** administrator account, separate from the Hermes login, and
-it ships with CipherMail's stock credentials:
+CipherMail has its **own** administrator account, separate from the Hermes login. The
+installer creates it with a random password:
 
 | Username | Password |
 | --- | --- |
-| `admin` | `admin` |
+| `admin` | shown at the end of the install, and in `INSTALL_SUMMARY.txt` under **CIPHERMAIL CONSOLE** |
 
-**This is the only stock credential anywhere in Hermes.** Every other account the
-install creates, the Hermes admin included, plus the Nextcloud local admin and every
-service account, gets a randomly generated password.
+The password is also kept in `config/hermes/opt/hermes/creds/ciphermail_admin_password`
+in the Hermes install directory. Authelia gates the `/ciphermail` path, so the console is
+not reachable from the internet, but nothing in Hermes manages this account afterwards.
+Sign in and change the password to one of your own.
 
-Two things are true at once here. Authelia gates the `/ciphermail` path, so this is
-not reachable from the internet. And nothing in Hermes manages this account, so no
-dashboard nudge will ever fire and nothing else will prompt you. Neither is a reason
-to leave a stock credential on an admin interface. Sign in with `admin` / `admin` and
-change it while you are thinking about it.
+**Installed before v261012?** Those installs created no CipherMail admin account at all,
+so no login worked (the `admin` / `admin` this guide used to give never existed).
+Upgrading to v261012 creates the account and saves its password to the file above.
 
 ---
 
@@ -512,7 +511,7 @@ Each banner links directly to the page where you'd fix the underlying condition 
 5. If you set up Pro features, verify `session.edition` reads "Pro" in the top-right corner of any admin page.
 6. **Confirm the security items from Step 0 actually stuck**, since none of them nudge you:
    - Signing out and back in prompts for your second factor
-   - `admin` / `admin` no longer works at `/ciphermail`
+   - You can sign in at `/ciphermail` with the password you set, not the generated one
    - The admin account's e-mail address is one you read
 7. **Confirm a backup has run** and that its notification reached you, not just that cron is installed.
 

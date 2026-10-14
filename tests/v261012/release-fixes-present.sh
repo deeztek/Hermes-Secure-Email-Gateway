@@ -39,6 +39,8 @@ check $w/inc/global_sender_add_entries.cfm "amavis:\[hermes_mail_filter\]:10030"
     "new allow entries route to the mail filter (#358)"
 check $w/inc/global_sender_edit_entry.cfm "amavis:\[hermes_mail_filter\]:10030" \
     "edited allow entries route to the mail filter (#358)"
+check scripts/install_hermes_docker.sh "^seed_ciphermail_admin()" \
+    "installer creates the CipherMail admin account (#306)"
 check scripts/migrate_legacy_to_docker.sh 'MODE" != "archive"' \
     "archive-only migration restore exempt from the release guard (#354)"
 
