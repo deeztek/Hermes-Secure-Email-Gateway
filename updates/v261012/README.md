@@ -83,6 +83,19 @@ sudo ./scripts/system_update_docker.sh v261012
 
 Take a backup or snapshot first. No manual steps.
 
+If your install had no CipherMail admin account, the upgrade creates one and
+prints a line saying so. To see its password, run this from your Hermes
+install directory (for example `/opt/Hermes-Secure-Email-Gateway`):
+
+```bash
+sudo cat config/hermes/opt/hermes/creds/ciphermail_admin_password; echo
+```
+
+Sign in at `https://<console-address>/ciphermail`, replacing
+`<console-address>` with your Hermes console's address, as `admin` with that
+password, and change it. If the file does not exist, your install already had
+a CipherMail admin account and the upgrade left it unchanged.
+
 The upgrade rebuilds the message log table to fix #353. It runs online and
 mail keeps flowing, but on a large install it can take a few minutes and
 needs free space on the data disk roughly equal to the table's size. To see
