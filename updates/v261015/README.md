@@ -25,6 +25,12 @@ recommended for all installs.
   and Status to its existing Domain and Delivery filters. Reset filters clears
   them all (#359).
 
+- **Certificate and keyring generation failures say which recipient and
+  why.** The Generation Failures banner on Relay Recipients now lists each
+  failed recipient with its error, the same banner appears on Mailboxes, the
+  affected rows show a red **Failed** badge (the error is in its tooltip), and
+  failures can be dismissed without retrying (#364).
+
 ## Bug fixes
 
 - **Legitimate mail from domains with a strict DMARC policy was tagged as

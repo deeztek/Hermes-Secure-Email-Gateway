@@ -355,21 +355,8 @@ a, a:hover{
     <cfset action = form.action>
     </cfif></cfif>
 
-    <!--- RESET FAILED CERT QUEUE JOBS --->
-    <cfif action EQ "reset_failed_queue">
-        <cftry>
-            <cfquery datasource="hermes">
-                UPDATE cert_generation_queue
-                SET status = 'pending', error_message = NULL, started_at = NULL
-                WHERE status = 'failed'
-            </cfquery>
-            <cfset session.queueMessage = "reset_success">
-        <cfcatch type="any">
-            <cfset session.queueMessage = "reset_error">
-        </cfcatch>
-        </cftry>
-        <cflocation url="view_internal_recipients.cfm" addtoken="no">
-    </cfif>
+    <!--- RETRY / DISMISS FAILED CERT QUEUE JOBS (#364) --->
+    <cfinclude template="./inc/cert_queue_failures_action.cfm">
 
         <!--- ERROR MESSAGES START HERE --->
 
@@ -561,23 +548,7 @@ a, a:hover{
     <cfset StructDelete(session, "portalAccountsResult")>
 </cfif>
 
-<!--- QUEUE RESET MESSAGES --->
-<cfif StructKeyExists(session, "queueMessage")>
-    <cfif session.queueMessage EQ "reset_success">
-        <div class="alert alert-success alert-dismissible">
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            <h5><i class="icon fa fa-check"></i> Queue Reset</h5>
-            Failed jobs have been reset to pending. They will be retried on the next processing cycle.
-        </div>
-    <cfelseif session.queueMessage EQ "reset_error">
-        <div class="alert alert-danger alert-dismissible">
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            <h5><i class="icon fa fa-ban"></i> Error</h5>
-            Failed to reset queue jobs. Please try again.
-        </div>
-    </cfif>
-    <cfset StructDelete(session, "queueMessage")>
-</cfif>
+
 
         <!--- CERT/KEYRING QUEUE STATUS BANNER --->
         <cfquery name="getPendingQueue" datasource="hermes">
@@ -601,22 +572,8 @@ a, a:hover{
           </div>
         </cfif>
 
-        <cfif getPendingQueue.failed GT 0>
-          <div class="alert alert-warning">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <h5><i class="icon fas fa-exclamation-triangle"></i> Generation Failures</h5>
-                <cfoutput>#getPendingQueue.failed# certificate(s)/keyring(s) failed to generate.</cfoutput>
-              </div>
-              <form method="post" action="" class="ms-3">
-                <input type="hidden" name="action" value="reset_failed_queue">
-                <button type="submit" class="btn btn-sm btn-outline-dark" onclick="return confirm('Reset all failed jobs to pending? They will be retried on the next processing cycle.')">
-                  <i class="fas fa-redo me-1"></i>Retry Failed Jobs
-                </button>
-              </form>
-            </div>
-          </div>
-        </cfif>
+        <!--- Failed jobs: banner naming each recipient, and failedJobMap for the rows (#364) --->
+        <cfinclude template="./inc/cert_queue_failures.cfm">
 
         <!--- ERROR MESSAGES END HERE --->
 
@@ -1948,8 +1905,8 @@ modal markup don't need a rename cascade.)
             <td><cfif smime_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif pgp_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
             <td><cfif digital_sign EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
-            <td><cfif cert EQ "YES"><span class="badge bg-success"><i class="fas fa-certificate me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
-            <td><cfif keystore EQ "YES"><span class="badge bg-success"><i class="fas fa-key me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
+            <td><cfif cert EQ "YES"><span class="badge bg-success"><i class="fas fa-certificate me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif StructKeyExists(failedJobMap, LCase(recipient)) AND StructKeyExists(failedJobMap[LCase(recipient)], "smime")><br><span class="badge bg-danger" title="#EncodeForHTMLAttribute(failedJobMap[LCase(recipient)].smime)#">Failed</span></cfif></td>
+            <td><cfif keystore EQ "YES"><span class="badge bg-success"><i class="fas fa-key me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif StructKeyExists(failedJobMap, LCase(recipient)) AND StructKeyExists(failedJobMap[LCase(recipient)], "pgp")><br><span class="badge bg-danger" title="#EncodeForHTMLAttribute(failedJobMap[LCase(recipient)].pgp)#">Failed</span></cfif></td>
           </tr>
         </cfoutput>
 

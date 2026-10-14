@@ -66,6 +66,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset action = form.action>
 </cfif>
 
+<!--- RETRY / DISMISS FAILED CERT QUEUE JOBS (#364) --->
+<cfinclude template="./inc/cert_queue_failures_action.cfm">
+
 <!--- ACTION HANDLERS --->
 <cfif action is "edit_mailbox">
   <cfinclude template="./inc/edit_mailbox_action.cfm">
@@ -437,6 +440,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     ORDER BY d.domain ASC
 </cfquery>
 
+<!--- Failed jobs: banner naming each mailbox, and failedJobMap for the rows (#364) --->
+<cfinclude template="./inc/cert_queue_failures.cfm">
+
 <!--- ADD MAILBOX BUTTON + DOMAIN FILTER --->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <a href="add_mailbox.cfm" class="btn btn-primary"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Mailbox</a>
@@ -755,8 +761,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <td><cfif smime_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
           <td><cfif pgp_enabled EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
           <td><cfif digital_sign EQ "YES"><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
-          <td><cfif cert EQ "YES"><span class="badge bg-success"><i class="fas fa-certificate me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif hasPendingJobs AND smime_enabled EQ "YES"><br><span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin"></i></span></cfif></td>
-          <td><cfif keystore EQ "YES"><span class="badge bg-success"><i class="fas fa-key me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif hasPendingJobs AND pgp_enabled EQ "YES"><br><span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin"></i></span></cfif></td>
+          <td><cfif cert EQ "YES"><span class="badge bg-success"><i class="fas fa-certificate me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif hasPendingJobs AND smime_enabled EQ "YES"><br><span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin"></i></span></cfif><cfif StructKeyExists(failedJobMap, LCase(username)) AND StructKeyExists(failedJobMap[LCase(username)], "smime")><br><span class="badge bg-danger" title="#EncodeForHTMLAttribute(failedJobMap[LCase(username)].smime)#">Failed</span></cfif></td>
+          <td><cfif keystore EQ "YES"><span class="badge bg-success"><i class="fas fa-key me-1"></i>YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif><cfif hasPendingJobs AND pgp_enabled EQ "YES"><br><span class="badge bg-warning text-dark"><i class="fas fa-spinner fa-spin"></i></span></cfif><cfif StructKeyExists(failedJobMap, LCase(username)) AND StructKeyExists(failedJobMap[LCase(username)], "pgp")><br><span class="badge bg-danger" title="#EncodeForHTMLAttribute(failedJobMap[LCase(username)].pgp)#">Failed</span></cfif></td>
           <td><cfif mb_nextcloud EQ 1><span class="badge bg-success">YES</span><cfelse><span class="badge bg-secondary">NO</span></cfif></td>
           <td><cfif active EQ 1><span class="badge bg-success">Active</span><cfelse><span class="badge bg-danger">Inactive</span></cfif></td>
         </tr>
