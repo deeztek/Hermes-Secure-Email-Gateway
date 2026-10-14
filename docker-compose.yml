@@ -547,6 +547,7 @@ services:
       - ./config/mail_filter/etc/spamassassin/local.cf:/etc/spamassassin/local.cf
       - ./config/mail_filter/etc/spamassassin/init.pre:/etc/spamassassin/init.pre   # #234 - SPF plugin disabled (postfix-policyd-spf-python is the authoritative verifier)
       - ./config/mail_filter/etc/spamassassin/v312.pre:/etc/spamassassin/v312.pre   # #234 - DKIM plugin disabled (OpenDKIM at :25 is the authoritative verifier)
+      - ./config/mail_filter/etc/spamassassin/v400.pre:/etc/spamassassin/v400.pre   # SpamAssassin DMARC plugin disabled (needs the SPF/DKIM plugins #234 disables; OpenDMARC is the authoritative verifier)
       - ./config/mail_filter/sa-bayes:/sa-bayes
       - ./config/mail_filter/etc/clamav/clamd.conf:/etc/clamav/clamd.conf
       - ./config/mail_filter/etc/fangfrisch/fangfrisch.conf:/etc/fangfrisch/fangfrisch.conf
