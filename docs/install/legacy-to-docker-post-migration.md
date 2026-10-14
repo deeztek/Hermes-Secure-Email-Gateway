@@ -295,6 +295,12 @@ page.
    One save applies all of them; upgrading does not do it for you. On v260912
    that save fails unless you prepare two things first.
 
+   Before saving, open **Antispam → Score Overrides** and delete any override
+   for `DMARC_REJECT` or `DMARC_QUAR`. Those rules never ran on the legacy
+   version, so the overrides had no effect there. Here they make legitimate
+   mail from banks and other senders with a strict DMARC policy score as spam
+   until you upgrade to v261015 or later (step 12), which turns the rules off.
+
    1. **Fix the configuration template.** It mentions DCC, which the Docker
       image does not include, so SpamAssassin rejects the result ("Validate
       Spamassassin: There was an error running /usr/bin/spamassassin --lint").
@@ -766,6 +772,11 @@ sudo ./scripts/system_update_docker.sh
 With no version argument it resolves the latest release and applies every
 release directory between here and there, in order. Take a hypervisor snapshot
 first, as with any upgrade.
+
+After the upgrade, open **Content Checks → DMARC Settings** and click **Save &
+Apply Settings** once. The upgrade puts OpenDMARC's configuration back to its
+defaults (Reject Failures on, Failure Reports and Hold Quarantined off) while
+the page keeps showing your settings, so saving applies them again.
 
 Nothing about this is migration-specific any more. The gateway reports
 `build_no = v260912`, so the update orchestrator treats it exactly like a
