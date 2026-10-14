@@ -741,15 +741,6 @@ reviewing what's queued.
 > in the queue without affecting inbound or filtering.
 
 5. With mail flowing, go back and finish **step 6.3** (two-factor for admins).
-6. **Give your users portal accounts.** The migration restores relay
-   recipients without the user-portal accounts they sign in with, so a
-   password reset cannot find them. Sidebar → **Email Relay → Relay
-   Recipients** shows a banner with how many have no account; its **Provision
-   them** button creates them. Tick **Send the welcome email** to tell each user how to set a password, and add your own
-   announcement in **Additional message** if you like. The button is in the
-   first release after v261012, so do this after upgrading to it (step 12).
-   Do not send users a password-reset announcement of your own before their
-   accounts exist.
 
 ---
 
@@ -781,3 +772,26 @@ Nothing about this is migration-specific any more. The gateway reports
 gateway that had been installed at v260912 and never migrated at all. That is
 the point of the version stamp, and the reason migration can end at this
 release.
+
+### 12.1 After upgrading: give relay recipients portal accounts
+
+The migration restores your relay recipients but not the user-portal accounts
+they sign in with, so a recipient asking for a password reset is not found.
+The tool that creates them arrived in **v261015**; the upgrade above brings
+you to that release or later. The same upgrade also fixes adding a relay
+recipient, which fails on a migrated install before it with
+`Field 'id' doesn't have a default value`.
+
+1. Sidebar → **Email Relay → Relay Recipients**. A banner shows how many
+   recipients have no portal account, and the **Portal Account** column shows
+   **No** for each of them.
+2. Click **Provision them** in the banner. It creates an account for every
+   recipient that has none and leaves existing accounts alone, so it is safe
+   to run again.
+3. To tell your users, tick **Send the welcome email** before confirming. Each
+   new account is sent an email explaining how to set a password; add your own
+   announcement in **Additional message** if you like. Leave it unticked to
+   create the accounts silently and tell users yourself.
+
+Do not send users a password-reset announcement of your own before their
+accounts exist; until then the reset cannot find them.
