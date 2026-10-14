@@ -1816,6 +1816,12 @@ modal markup don't need a rename cascade.)
       <!--- COLUMN FILTERS (#359). Values match what each cell displays. --->
       <div class="row g-2 align-items-end mb-3" id="recipientFilters">
         <div class="col-auto">
+          <label class="form-label small mb-0" for="fltDomain">Domain</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltDomain" data-col="3">
+            <option value="">All Domains</option>
+          </select>
+        </div>
+        <div class="col-auto">
           <label class="form-label small mb-0" for="fltPortal">Portal Account</label>
           <select class="form-select form-select-sm rcpt-filter" id="fltPortal" data-col="5">
             <option value="">All</option><option value="^\s*Yes\s*$">Yes</option><option value="^\s*No\s*$">No</option>
@@ -2022,6 +2028,18 @@ modal markup don't need a rename cascade.)
           var esc = txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
           $('#fltPolicy').append($('<option>').val('^\\s*' + esc + '\\s*$').text(txt));
         }
+      });
+      // Domain options from the Recipient column; catch-all @domain entries
+      // count towards their domain too.
+      var domains = {};
+      t.column(3).data().each(function(v) {
+        var txt = $('<div>').html(v).text().trim().toLowerCase();
+        var at = txt.lastIndexOf('@');
+        if (at >= 0 && at < txt.length - 1) { domains[txt.slice(at + 1)] = true; }
+      });
+      Object.keys(domains).sort().forEach(function(d) {
+        var esc = d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        $('#fltDomain').append($('<option>').val('@' + esc + '\\s*$').text(d));
       });
       $('.rcpt-filter').on('change', function() {
         t.column($(this).data('col')).search(this.value, true, false).draw();

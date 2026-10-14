@@ -496,6 +496,50 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-envelope me-2"></i>Mailboxes (<cfoutput>#getMailboxes.recordcount#</cfoutput>)</h3>
   </div>
   <div class="card-body">
+    <!--- COLUMN FILTERS (#359). Values are regexes matched against what each
+         cell displays; same scheme as Relay Recipients. Domain and Delivery
+         stay in the bar above. --->
+    <div class="row g-2 align-items-end mb-3" id="mailboxFilters">
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="fltAuth">Auth</label>
+        <select class="form-select form-select-sm mb-filter" id="fltAuth" data-col="9">
+          <option value="">All</option><option value="^\s*LOCAL">Local</option><option value="^\s*REMOTE">Remote</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="flt2fa">2FA</label>
+        <select class="form-select form-select-sm mb-filter" id="flt2fa" data-col="10">
+          <option value="">All</option><option value="Enrolled">Enrolled</option><option value="Required">Required</option><option value="^\s*None\s*$">None</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="fltPolicy">Policy</label>
+        <select class="form-select form-select-sm mb-filter" id="fltPolicy" data-col="11">
+          <option value="">All</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="fltNotify">Notifications</label>
+        <select class="form-select form-select-sm mb-filter" id="fltNotify" data-col="12">
+          <option value="">All</option><option value="^\s*YES\s*$">Yes</option><option value="^\s*NO\s*$">No</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="fltNextcloud">Nextcloud</label>
+        <select class="form-select form-select-sm mb-filter" id="fltNextcloud" data-col="21">
+          <option value="">All</option><option value="^\s*YES\s*$">Yes</option><option value="^\s*NO\s*$">No</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="fltStatus">Status</label>
+        <select class="form-select form-select-sm mb-filter" id="fltStatus" data-col="22">
+          <option value="">All</option><option value="^\s*Active\s*$">Active</option><option value="^\s*Inactive\s*$">Inactive</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="fltReset">Reset filters</button>
+      </div>
+    </div>
     <div class="table-responsive">
     <table id="mailboxesTable" class="table table-bordered table-striped" style="width:100%">
       <thead>
@@ -1386,6 +1430,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       var match = false;
       $sel.find('option').each(function () { if (this.value === val) { match = true; } });
       if (match) { $sel.val(val); } else { table.column(colIdx).search('').draw(); }
+    });
+
+    // Column filters row (#359). Option values are the regexes themselves, so
+    // a restored search is matched against them verbatim.
+    table.column(11).data().unique().sort().each(function (v) {
+      var txt = $('<div>').html(v).text().trim();
+      if (txt.length) {
+        var esc = txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        $('#fltPolicy').append($('<option>').val('^\\s*' + esc + '\\s*$').text(txt));
+      }
+    });
+    $('.mb-filter').each(function () {
+      var $sel = $(this), colIdx = $sel.data('col'), term = table.column(colIdx).search();
+      if (!term) { return; }
+      var match = false;
+      $sel.find('option').each(function () { if (this.value === term) { match = true; } });
+      if (match) { $sel.val(term); } else { table.column(colIdx).search('').draw(); }
+    });
+    $('.mb-filter').on('change', function () {
+      table.column($(this).data('col')).search(this.value, true, false).draw();
+    });
+    $('#fltReset').on('click', function () {
+      $('.mb-filter, #domainFilter, #deliveryFilter').val('');
+      table.columns().search('').draw();
     });
 
     // The button says what it will do, because the two outcomes are not
