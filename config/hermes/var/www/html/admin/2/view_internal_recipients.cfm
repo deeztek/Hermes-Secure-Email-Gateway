@@ -73,15 +73,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   // Portal accounts and welcome email (#359)
   $(document).ready(function() {
     function openProvisionDialog(ids) {
-      $("#provisionSelectedCount").text(ids.length);
       $("#provisionportalid").html('<input type="hidden" name="recipient_id" value="' + ids.join(',') + '">');
       $("#provisionSendWelcome").prop('checked', false);
       if (ids.length > 0) {
-        $("#provisionScopeSelected").prop('disabled', false).prop('checked', true);
+        $("#provisionScope").val('selected');
+        $("#provisionScopeText").html('Creates portal accounts for the <strong>' + ids.length + '</strong> recipient(s) you selected.');
       } else {
-        $("#provisionScopeSelected").prop('disabled', true).prop('checked', false);
-        $("#provisionScopeMissing").prop('checked', true);
+        $("#provisionScope").val('missing');
+        $("#provisionScopeText").html('Creates portal accounts for all <strong>' + $("#provisionMissingCount").text() + '</strong> recipient(s) without one.');
       }
+      $("#provisionCount").val(ids.length > 0 ? ids.length : $("#provisionMissingCount").text());
       $('#provisionportal_modal').modal('show');
     }
     // Toolbar button: acts on the selection, like every other button here.
@@ -99,16 +100,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       openProvisionDialog([]);
     });
     $("#provisionPortalForm").on('submit', function(e) {
-      var scopeSelected = $("#provisionScopeSelected").is(':checked');
-      var n = scopeSelected ? $("#provisionSelectedCount").text() : $("#provisionMissingCount").text();
-      if (!scopeSelected && parseInt(n, 10) === 0) {
+      var missingMode = $("#provisionScope").val() === 'missing';
+      var n = $("#provisionCount").val();
+      if (missingMode && parseInt(n, 10) === 0) {
         alert('Every recipient already has a portal account.');
         e.preventDefault();
         return false;
       }
       if ($("#provisionSendWelcome").is(':checked')) {
-        var what = scopeSelected ? n + ' selected recipient(s) that do not have an account yet'
-                                 : 'up to ' + n + ' recipient(s) without an account';
+        var what = missingMode ? 'up to ' + n + ' recipient(s) without an account'
+                               : 'the selected recipient(s) that do not have an account yet';
         if (!confirm('Send the welcome email to ' + what + '?')) {
           e.preventDefault();
           return false;
@@ -1063,6 +1064,7 @@ a, a:hover{
         <form name="provision_portal" method="post" action="" id="provisionPortalForm">
           <input type="hidden" name="action" value="provisionaccounts">
           <div id="provisionportalid"></div>
+          <input type="hidden" id="provisionCount" value="0">
           <div class="modal-header">
             <h4 class="modal-title" id="provisionPortalLabel">Provision Portal Accounts</h4>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
@@ -1070,20 +1072,9 @@ a, a:hover{
           <div class="modal-body">
             <p>Creates the user-portal account a recipient signs in with, for recipients that do not have one.
                Recipients that already have an account are never changed or emailed.</p>
-            <p class="mb-1"><strong>Which recipients</strong></p>
-            <div class="form-check">
-              <input class="form-check-input" type="radio" name="scope" id="provisionScopeSelected" value="selected">
-              <label class="form-check-label" for="provisionScopeSelected">
-                The recipients I selected (<strong><span id="provisionSelectedCount">0</span></strong>)
-              </label>
-            </div>
-            <div class="form-check mb-3">
-              <input class="form-check-input" type="radio" name="scope" id="provisionScopeMissing" value="missing">
-              <label class="form-check-label" for="provisionScopeMissing">
-                <cfoutput>All recipients without a portal account (<strong><span id="provisionMissingCount">#portalMissingCount#</span></strong>),
-                for example after a legacy migration</cfoutput>
-              </label>
-            </div>
+            <input type="hidden" name="scope" id="provisionScope" value="selected">
+            <cfoutput><span id="provisionMissingCount" class="d-none">#portalMissingCount#</span></cfoutput>
+            <p class="mb-3" id="provisionScopeText"></p>
             <div class="form-check mb-3">
               <input class="form-check-input" type="checkbox" name="send_welcome" id="provisionSendWelcome" value="1">
               <label class="form-check-label" for="provisionSendWelcome">
