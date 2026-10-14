@@ -793,5 +793,7 @@ recipient, which fails on a migrated install before it with
    announcement in **Additional message** if you like. Leave it unticked to
    create the accounts silently and tell users yourself.
 
-Do not send users a password-reset announcement of your own before their
-accounts exist; until then the reset cannot find them.
+> ### ⚠️ Do not announce password resets before the accounts exist
+>
+> Do not send users a password-reset announcement of your own before their
+> accounts exist; until then the reset cannot find them.
