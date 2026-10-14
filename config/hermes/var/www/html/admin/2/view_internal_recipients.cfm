@@ -1821,6 +1821,7 @@ modal markup don't need a rename cascade.)
             <th>PGP</th>
             <th>Recipient</th>
             <th>Auth</th>
+            <th>Portal Account</th>
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
@@ -1867,6 +1868,8 @@ modal markup don't need a rename cascade.)
                 <small class="text-muted ms-1">N/A</small>
               </cfif>
             </td>
+            <!--- Portal account (#359): member of cn=relays. "?" if the LDAP lookup failed. --->
+            <td><cfif NOT Len(portalRelayMembers)><span class="badge bg-secondary" title="Could not read the portal account list">?</span><cfelseif Find("member: cn=" & LCase(recipient) & ",ou=users,", portalMembersLC)><span class="badge bg-success">Yes</span><cfelse><span class="badge bg-secondary" title="No user-portal account: use Provision Portal Accounts">No</span></cfif></td>
             <td><cfif Len(Trim(backend_server)) GT 0><span class="text-primary" title="#backend_server#:#backend_port#">#backend_server#</span><cfelse><span class="text-muted">(domain default)</span></cfif></td>
             <td><!--- 2FA column: two orthogonal states, two independent pills.
                   "Enrolled" reads cn=two_factor LDAP membership (user has
@@ -1909,6 +1912,7 @@ modal markup don't need a rename cascade.)
             <th>PGP</th>
             <th>Recipient</th>
             <th>Auth</th>
+            <th>Portal Account</th>
             <th>Backend</th>
             <th>2FA</th>
             <th>Policy</th>
