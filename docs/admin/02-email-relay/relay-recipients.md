@@ -187,7 +187,7 @@ in the result — avoids N+1 LDAP roundtrips.
 | **Edit Encryption** | Opens the Edit Encryption modal | At least one row |
 | **Edit Backend** | Navigates to `edit_internal_recipient_backend.cfm?ids=…` | At least one row |
 | **Reset 2FA Devices** | Opens the Reset 2FA Devices modal | At least one row |
-| **Provision Portal Accounts** | Creates missing user-portal accounts; see [below](#portal-accounts-and-welcome-email) | None |
+| **Provision Portal Accounts** | Creates missing user-portal accounts; see [below](#portal-accounts-and-welcome-email) | Selected rows, or all recipients without an account |
 | **Send Welcome Email** | Sends the welcome email to the selected recipients | At least one row |
 | **Delete** | Opens the delete-confirm modal | At least one row |
 
@@ -205,11 +205,13 @@ Recipients that arrive any other way, for example restored by a legacy
 migration, have **no portal account**: the password reset cannot find them and
 they can never sign in. Two buttons cover this:
 
-- **Provision Portal Accounts** creates an account for every relay recipient
-  that lacks one (catch-all `@domain` entries are skipped), using the same
-  steps as adding a recipient. Recipients that already have an account are not
-  touched, so it is safe to run again. Tick **Send the welcome email** to email
-  each newly created account.
+- **Provision Portal Accounts** creates missing accounts, using the same steps
+  as adding a recipient. The dialog asks which recipients: **the ones you
+  selected**, or **all recipients without a portal account** (catch-all
+  `@domain` entries are skipped), and shows how many each choice covers.
+  Recipients that already have an account are never touched or emailed, so it
+  is safe to run again. **Send the welcome email** is off by default; tick it
+  to email each account created, and confirm when asked.
 - **Send Welcome Email** sends the welcome email to the recipients you select,
   for example someone who lost theirs. It creates nothing.
 

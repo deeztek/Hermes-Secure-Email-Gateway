@@ -73,7 +73,37 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   // Portal accounts and welcome email (#359)
   $(document).ready(function() {
     $("#provisionportal").click(function() {
+      var ids = [];
+      $.each($("input[name='id']:checked"), function() { ids.push($(this).val()); });
+      $("#provisionSelectedCount").text(ids.length);
+      $("#provisionportalid").html('<input type="hidden" name="recipient_id" value="' + ids.join(',') + '">');
+      $("#provisionSendWelcome").prop('checked', false);
+      if (ids.length > 0) {
+        $("#provisionScopeSelected").prop('disabled', false).prop('checked', true);
+      } else {
+        $("#provisionScopeSelected").prop('disabled', true).prop('checked', false);
+        $("#provisionScopeMissing").prop('checked', true);
+      }
       $('#provisionportal_modal').modal('show');
+    });
+    $("#provisionPortalForm").on('submit', function(e) {
+      var scopeSelected = $("#provisionScopeSelected").is(':checked');
+      var n = scopeSelected ? $("#provisionSelectedCount").text() : $("#provisionMissingCount").text();
+      if (!scopeSelected && parseInt(n, 10) === 0) {
+        alert('Every recipient already has a portal account.');
+        e.preventDefault();
+        return false;
+      }
+      if ($("#provisionSendWelcome").is(':checked')) {
+        var what = scopeSelected ? n + ' selected recipient(s) that do not have an account yet'
+                                 : 'up to ' + n + ' recipient(s) without an account';
+        if (!confirm('Send the welcome email to ' + what + '?')) {
+          e.preventDefault();
+          return false;
+        }
+      }
+      $("#provisionSubmit").prop('disabled', true).text('Working, please wait...');
+      return true;
     });
     $("#resendwelcome").click(function() {
       var ids = [];
@@ -971,34 +1001,73 @@ a, a:hover{
   <!--- RESET 2FA DEVICES MODAL HTML ENDS HERE --->
 
   <!--- PROVISION PORTAL ACCOUNTS MODAL (#359) --->
+  <!--- How many relay recipients have no portal account (cn=relays member).
+       ldif-wrap=no keeps long member DNs on one line so the match is exact. --->
+  <cfset portalRelayMembers = "">
+  <cftry>
+      <cfexecute name="/usr/local/bin/docker"
+          arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -o ldif-wrap=no -b 'cn=relays,ou=groups,dc=hermes,dc=local' -LLL member"
+          variable="portalRelayMembers"
+          errorVariable="portalLdapError"
+          timeout="30">
+      </cfexecute>
+  <cfcatch type="any">
+      <cfset portalRelayMembers = "">
+  </cfcatch>
+  </cftry>
+  <cfquery name="portalAllRecipients" datasource="hermes">
+      SELECT recipient FROM recipients WHERE recipient NOT LIKE '@%'
+  </cfquery>
+  <cfset portalMembersLC = LCase(portalRelayMembers)>
+  <cfset portalMissingCount = 0>
+  <cfloop query="portalAllRecipients">
+      <cfif NOT Find("member: cn=" & LCase(portalAllRecipients.recipient) & ",ou=users,", portalMembersLC)>
+          <cfset portalMissingCount = portalMissingCount + 1>
+      </cfif>
+  </cfloop>
+
   <div class="modal fade" id="provisionportal_modal" tabindex="-1" role="dialog" aria-labelledby="provisionPortalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
-        <form name="provision_portal" method="post" action="">
+        <form name="provision_portal" method="post" action="" id="provisionPortalForm">
           <input type="hidden" name="action" value="provisionaccounts">
+          <div id="provisionportalid"></div>
           <div class="modal-header">
             <h4 class="modal-title" id="provisionPortalLabel">Provision Portal Accounts</h4>
             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <p>Creates a user-portal account for <strong>every relay recipient that does not have one</strong>,
-               for example recipients restored by a legacy migration. Recipients that already have an account
-               are left unchanged. Safe to run again.</p>
+            <p>Creates the user-portal account a recipient signs in with, for recipients that do not have one.
+               Recipients that already have an account are never changed or emailed.</p>
+            <p class="mb-1"><strong>Which recipients</strong></p>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="scope" id="provisionScopeSelected" value="selected">
+              <label class="form-check-label" for="provisionScopeSelected">
+                The recipients I selected (<strong><span id="provisionSelectedCount">0</span></strong>)
+              </label>
+            </div>
             <div class="form-check mb-3">
-              <input class="form-check-input" type="checkbox" name="send_welcome" id="provisionSendWelcome" value="1" checked>
+              <input class="form-check-input" type="radio" name="scope" id="provisionScopeMissing" value="missing">
+              <label class="form-check-label" for="provisionScopeMissing">
+                <cfoutput>All recipients without a portal account (<strong><span id="provisionMissingCount">#portalMissingCount#</span></strong>),
+                for example after a legacy migration</cfoutput>
+              </label>
+            </div>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" name="send_welcome" id="provisionSendWelcome" value="1">
               <label class="form-check-label" for="provisionSendWelcome">
-                <strong>Send the welcome email</strong> to each newly created account (username and how to set a password)
+                <strong>Send the welcome email</strong> to each account created (username and how to set a password)
               </label>
             </div>
             <label for="provisionWelcomeMessage" class="form-label"><strong>Additional message</strong> (optional, plain text)</label>
             <textarea class="form-control" name="welcome_message" id="provisionWelcomeMessage" rows="6" maxlength="4000"
                       placeholder="For example: what has changed, new protections, who to contact."></textarea>
             <small class="text-muted">Added to the welcome email above the sign-in instructions. Line breaks are kept.</small>
-            <p class="mt-3 mb-0 small text-muted">Large recipient lists take a while; keep this page open until it finishes.</p>
+            <p class="mt-3 mb-0 small text-muted">Large lists take a while; keep this page open until it finishes.</p>
           </div>
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Working, please wait...';this.form.submit();">Provision Accounts</button>
+            <button type="submit" class="btn btn-primary" id="provisionSubmit">Provision Accounts</button>
           </div>
         </form>
       </div>

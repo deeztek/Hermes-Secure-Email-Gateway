@@ -20,8 +20,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- RELAY RECIPIENT PORTAL ACCOUNTS: PROVISION AND WELCOME EMAIL (#359)
 
      Requires portalMode to be set by the caller:
-       "provision"  every relay recipient (catch-all @domain entries
-                    excluded) gets a user-portal account if it has none.
+       "provision"  the selected recipients (form.recipient_id), or with
+                    form.scope = "missing" every relay recipient (catch-all
+                    @domain entries excluded), get a user-portal account if
+                    they have none.
                     With form.send_welcome = 1, each NEWLY created account
                     is sent the welcome email. Existing accounts are left
                     alone and not emailed, so this is safe to run again.
@@ -48,7 +50,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfset portalSendWelcome = (portalMode EQ "resend")
        OR (StructKeyExists(form, "send_welcome") AND form.send_welcome EQ "1")>
 
-<cfif portalMode EQ "resend">
+<!--- Provision acts on the selected rows unless the admin chose "all
+     recipients without a portal account" (form.scope = "missing"). --->
+<cfparam name="form.scope" default="selected">
+<cfset portalUseSelection = (portalMode EQ "resend") OR (form.scope NEQ "missing")>
+
+<cfif portalUseSelection>
     <cfset portalIds = "">
     <cfif StructKeyExists(form, "recipient_id")>
         <cfloop list="#form.recipient_id#" index="pid">
