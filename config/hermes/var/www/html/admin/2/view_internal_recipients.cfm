@@ -72,9 +72,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <script>
   // Portal accounts and welcome email (#359)
   $(document).ready(function() {
-    $("#provisionportal").click(function() {
-      var ids = [];
-      $.each($("input[name='id']:checked"), function() { ids.push($(this).val()); });
+    function openProvisionDialog(ids) {
       $("#provisionSelectedCount").text(ids.length);
       $("#provisionportalid").html('<input type="hidden" name="recipient_id" value="' + ids.join(',') + '">');
       $("#provisionSendWelcome").prop('checked', false);
@@ -85,6 +83,20 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         $("#provisionScopeMissing").prop('checked', true);
       }
       $('#provisionportal_modal').modal('show');
+    }
+    // Toolbar button: acts on the selection, like every other button here.
+    $("#provisionportal").click(function() {
+      var ids = [];
+      $.each($("input[name='id']:checked"), function() { ids.push($(this).val()); });
+      if (ids.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+      }
+      openProvisionDialog(ids);
+    });
+    // Banner button: all recipients without a portal account.
+    $("#provisionMissingBtn").click(function() {
+      openProvisionDialog([]);
     });
     $("#provisionPortalForm").on('submit', function(e) {
       var scopeSelected = $("#provisionScopeSelected").is(':checked');
@@ -478,6 +490,50 @@ a, a:hover{
         </div>
     </cfif>
     <cfset StructDelete(session, "backendMessage")>
+</cfif>
+
+  <!--- How many relay recipients have no portal account (cn=relays member).
+       ldif-wrap=no keeps long member DNs on one line so the match is exact. --->
+  <cfset portalRelayMembers = "">
+  <cftry>
+      <cfexecute name="/usr/local/bin/docker"
+          arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -o ldif-wrap=no -b 'cn=relays,ou=groups,dc=hermes,dc=local' -LLL member"
+          variable="portalRelayMembers"
+          errorVariable="portalLdapError"
+          timeout="30">
+      </cfexecute>
+  <cfcatch type="any">
+      <cfset portalRelayMembers = "">
+  </cfcatch>
+  </cftry>
+  <cfquery name="portalAllRecipients" datasource="hermes">
+      SELECT recipient FROM recipients WHERE recipient NOT LIKE '@%'
+  </cfquery>
+  <cfset portalMembersLC = LCase(portalRelayMembers)>
+  <cfset portalMissingCount = 0>
+  <cfloop query="portalAllRecipients">
+      <cfif NOT Find("member: cn=" & LCase(portalAllRecipients.recipient) & ",ou=users,", portalMembersLC)>
+          <cfset portalMissingCount = portalMissingCount + 1>
+      </cfif>
+  </cfloop>
+
+
+<!--- RECIPIENTS WITHOUT A PORTAL ACCOUNT BANNER (#359). Shown only when some
+     relay recipients cannot sign in to the user portal, typically after a
+     legacy migration, which restores recipients without their accounts. --->
+<cfif portalMissingCount GT 0>
+    <div class="alert alert-warning">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <h5 class="mb-1"><i class="icon fas fa-user-slash"></i> Recipients without a portal account</h5>
+                <cfoutput><strong>#portalMissingCount#</strong> relay recipient<cfif portalMissingCount NEQ 1>s have<cfelse> has</cfif>
+                no user-portal account and cannot sign in to the user portal or reset a password.</cfoutput>
+            </div>
+            <button type="button" class="btn btn-sm btn-dark" id="provisionMissingBtn">
+                <i class="fas fa-user-check me-1"></i>Provision them
+            </button>
+        </div>
+    </div>
 </cfif>
 
 <!--- PORTAL ACCOUNTS / WELCOME EMAIL RESULT (#359) --->
@@ -1001,31 +1057,6 @@ a, a:hover{
   <!--- RESET 2FA DEVICES MODAL HTML ENDS HERE --->
 
   <!--- PROVISION PORTAL ACCOUNTS MODAL (#359) --->
-  <!--- How many relay recipients have no portal account (cn=relays member).
-       ldif-wrap=no keeps long member DNs on one line so the match is exact. --->
-  <cfset portalRelayMembers = "">
-  <cftry>
-      <cfexecute name="/usr/local/bin/docker"
-          arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -o ldif-wrap=no -b 'cn=relays,ou=groups,dc=hermes,dc=local' -LLL member"
-          variable="portalRelayMembers"
-          errorVariable="portalLdapError"
-          timeout="30">
-      </cfexecute>
-  <cfcatch type="any">
-      <cfset portalRelayMembers = "">
-  </cfcatch>
-  </cftry>
-  <cfquery name="portalAllRecipients" datasource="hermes">
-      SELECT recipient FROM recipients WHERE recipient NOT LIKE '@%'
-  </cfquery>
-  <cfset portalMembersLC = LCase(portalRelayMembers)>
-  <cfset portalMissingCount = 0>
-  <cfloop query="portalAllRecipients">
-      <cfif NOT Find("member: cn=" & LCase(portalAllRecipients.recipient) & ",ou=users,", portalMembersLC)>
-          <cfset portalMissingCount = portalMissingCount + 1>
-      </cfif>
-  </cfloop>
-
   <div class="modal fade" id="provisionportal_modal" tabindex="-1" role="dialog" aria-labelledby="provisionPortalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
