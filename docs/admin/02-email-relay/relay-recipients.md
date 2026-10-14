@@ -187,11 +187,47 @@ in the result — avoids N+1 LDAP roundtrips.
 | **Edit Encryption** | Opens the Edit Encryption modal | At least one row |
 | **Edit Backend** | Navigates to `edit_internal_recipient_backend.cfm?ids=…` | At least one row |
 | **Reset 2FA Devices** | Opens the Reset 2FA Devices modal | At least one row |
+| **Provision Portal Accounts** | Creates missing user-portal accounts; see [below](#portal-accounts-and-welcome-email) | None |
+| **Send Welcome Email** | Sends the welcome email to the selected recipients | At least one row |
 | **Delete** | Opens the delete-confirm modal | At least one row |
 
 Selecting zero rows and clicking any of the edit/delete buttons
 surfaces an alert (`Please select at least one recipient`) instead of
 opening the modal.
+
+## Portal accounts and welcome email
+
+A relay recipient signs in to the user portal (`https://<console-address>/users/`)
+with their email address. Their portal account is created when you add the
+recipient here, together with a welcome email explaining how to set a password.
+
+Recipients that arrive any other way, for example restored by a legacy
+migration, have **no portal account**: the password reset cannot find them and
+they can never sign in. Two buttons cover this:
+
+- **Provision Portal Accounts** creates an account for every relay recipient
+  that lacks one (catch-all `@domain` entries are skipped), using the same
+  steps as adding a recipient. Recipients that already have an account are not
+  touched, so it is safe to run again. Tick **Send the welcome email** to email
+  each newly created account.
+- **Send Welcome Email** sends the welcome email to the recipients you select,
+  for example someone who lost theirs. It creates nothing.
+
+Both accept an optional **Additional message** in plain text, added to the
+email above the sign-in instructions (line breaks are kept; formatting is not).
+Use it for an announcement such as what has changed or who to contact.
+
+When it finishes, the page reports how many accounts were created, already
+existed, were emailed and failed, and lists any failed addresses; details are
+in the `hermes` log. Large lists take a while, so keep the page open.
+
+To check how many recipients have a portal account, compare these two numbers
+on the Docker host:
+
+```bash
+docker exec hermes_db_server mariadb -u root hermes -N -e "SELECT COUNT(*) FROM recipients WHERE recipient NOT LIKE '@%';"
+docker exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -LLL -b cn=relays,ou=groups,dc=hermes,dc=local member 2>/dev/null | grep -c '^member:'
+```
 
 ## Edit Options modal — AJAX pre-fill vs bulk-edit warning
 

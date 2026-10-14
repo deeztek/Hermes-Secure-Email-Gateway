@@ -69,6 +69,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   
   </script>
 
+<script>
+  // Portal accounts and welcome email (#359)
+  $(document).ready(function() {
+    $("#provisionportal").click(function() {
+      $('#provisionportal_modal').modal('show');
+    });
+    $("#resendwelcome").click(function() {
+      var ids = [];
+      $.each($("input[name='id']:checked"), function() { ids.push($(this).val()); });
+      if (ids.length === 0) {
+        alert('Please select at least one recipient');
+        return;
+      }
+      $("#resendwelcomecount").text(ids.length);
+      $("#resendwelcomeid").html('<input type="hidden" name="recipient_id" value="' + ids.join(',') + '">');
+      $('#resendwelcome_modal').modal('show');
+    });
+  });
+</script>
+
 <!---
 <script>
 
@@ -428,6 +448,30 @@ a, a:hover{
         </div>
     </cfif>
     <cfset StructDelete(session, "backendMessage")>
+</cfif>
+
+<!--- PORTAL ACCOUNTS / WELCOME EMAIL RESULT (#359) --->
+<cfif StructKeyExists(session, "portalAccountsResult")>
+    <cfset par = session.portalAccountsResult>
+    <div class="alert <cfif par.failed GT 0>alert-warning<cfelse>alert-success</cfif> alert-dismissible">
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        <cfoutput>
+        <cfif par.mode EQ "provision">
+            <h5><i class="icon fas fa-user-check"></i> Provision Portal Accounts</h5>
+            Checked <strong>#par.total#</strong> recipient(s): <strong>#par.created#</strong> account(s) created,
+            <strong>#par.existed#</strong> already had one, <strong>#par.emailed#</strong> welcome email(s) sent,
+            <strong>#par.failed#</strong> failed.
+        <cfelse>
+            <h5><i class="icon fas fa-envelope"></i> Send Welcome Email</h5>
+            <strong>#par.emailed#</strong> of <strong>#par.total#</strong> welcome email(s) sent,
+            <strong>#par.failed#</strong> failed.
+        </cfif>
+        <cfif par.failed GT 0>
+            <p class="mb-0 mt-2"><small><strong>Failed:</strong> #EncodeForHTML(par.failedList)#. Details are in the hermes log.</small></p>
+        </cfif>
+        </cfoutput>
+    </div>
+    <cfset StructDelete(session, "portalAccountsResult")>
 </cfif>
 
 <!--- QUEUE RESET MESSAGES --->
@@ -926,8 +970,78 @@ a, a:hover{
   </div>
   <!--- RESET 2FA DEVICES MODAL HTML ENDS HERE --->
 
+  <!--- PROVISION PORTAL ACCOUNTS MODAL (#359) --->
+  <div class="modal fade" id="provisionportal_modal" tabindex="-1" role="dialog" aria-labelledby="provisionPortalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form name="provision_portal" method="post" action="">
+          <input type="hidden" name="action" value="provisionaccounts">
+          <div class="modal-header">
+            <h4 class="modal-title" id="provisionPortalLabel">Provision Portal Accounts</h4>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Creates a user-portal account for <strong>every relay recipient that does not have one</strong>,
+               for example recipients restored by a legacy migration. Recipients that already have an account
+               are left unchanged. Safe to run again.</p>
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" name="send_welcome" id="provisionSendWelcome" value="1" checked>
+              <label class="form-check-label" for="provisionSendWelcome">
+                <strong>Send the welcome email</strong> to each newly created account (username and how to set a password)
+              </label>
+            </div>
+            <label for="provisionWelcomeMessage" class="form-label"><strong>Additional message</strong> (optional, plain text)</label>
+            <textarea class="form-control" name="welcome_message" id="provisionWelcomeMessage" rows="6" maxlength="4000"
+                      placeholder="For example: what has changed, new protections, who to contact."></textarea>
+            <small class="text-muted">Added to the welcome email above the sign-in instructions. Line breaks are kept.</small>
+            <p class="mt-3 mb-0 small text-muted">Large recipient lists take a while; keep this page open until it finishes.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Working, please wait...';this.form.submit();">Provision Accounts</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
 
-      <cfif #action# is "deleterecipient">
+  <!--- SEND WELCOME EMAIL MODAL (#359) --->
+  <div class="modal fade" id="resendwelcome_modal" tabindex="-1" role="dialog" aria-labelledby="resendWelcomeLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <form name="resend_welcome" method="post" action="">
+          <input type="hidden" name="action" value="resendwelcome">
+          <div id="resendwelcomeid"></div>
+          <div class="modal-header">
+            <h4 class="modal-title" id="resendWelcomeLabel">Send Welcome Email</h4>
+            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <p>Sends the welcome email (username and how to set a password) to the
+               <strong><span id="resendwelcomecount">0</span></strong> selected recipient(s). No account is created
+               or changed. Recipients without a portal account cannot sign in until you run
+               <strong>Provision Portal Accounts</strong>.</p>
+            <label for="resendWelcomeMessage" class="form-label"><strong>Additional message</strong> (optional, plain text)</label>
+            <textarea class="form-control" name="welcome_message" id="resendWelcomeMessage" rows="6" maxlength="4000"></textarea>
+            <small class="text-muted">Added to the welcome email above the sign-in instructions. Line breaks are kept.</small>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary" onclick="this.disabled=true;this.innerHTML='Sending, please wait...';this.form.submit();">Send</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+
+      <cfif #action# is "provisionaccounts" OR #action# is "resendwelcome">
+
+        <cfset portalMode = (action is "provisionaccounts") ? "provision" : "resend">
+        <cfinclude template="./inc/recipient_portal_accounts_action.cfm">
+        <cflocation url="view_internal_recipients.cfm" addtoken="no">
+
+      <cfelseif #action# is "deleterecipient">
 
         <cfif NOT StructKeyExists(form, "recipient_id")>
 
@@ -1574,6 +1688,8 @@ modal markup don't need a rename cascade.)
             <button type="button" id="editencryption" class="btn btn-primary"><i class="fas fa-lock me-1"></i>Edit Encryption</button>
             <button type="button" id="editbackend" class="btn btn-primary"><i class="fas fa-server me-1"></i>Edit Backend</button>
             <button type="button" id="editaccesscontrol" class="btn btn-primary"><i class="fas fa-mobile-alt me-1"></i>Reset 2FA Devices</button>
+            <button type="button" id="provisionportal" class="btn btn-primary"><i class="fas fa-user-check me-1"></i>Provision Portal Accounts</button>
+            <button type="button" id="resendwelcome" class="btn btn-primary"><i class="fas fa-envelope me-1"></i>Send Welcome Email</button>
             <button type="button" id="delete" class="btn btn-danger"><i class="fas fa-trash-alt me-1"></i>Delete</button>
         </div>
 

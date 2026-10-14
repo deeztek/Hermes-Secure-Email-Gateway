@@ -49,6 +49,20 @@ Requires the following variables to be set before including:
 <cfset loginUrl = "https://#consoleHost#/users">
 
 <!--- SEND WELCOME EMAIL --->
+<!--- Optional admin message (#359), set by recipient_portal_accounts_action.cfm.
+     Plain text: every line is HTML-encoded and line breaks are kept, so
+     nothing typed into the message can alter the email. Empty for every
+     other caller. --->
+<cfparam name="welcomeExtraMessage" default="">
+<cfset welcomeExtraHtml = "">
+<cfif Len(Trim(welcomeExtraMessage))>
+    <cfset welcomeExtraLines = ListToArray(Replace(welcomeExtraMessage, Chr(13), "", "ALL"), Chr(10), true)>
+    <cfloop from="1" to="#ArrayLen(welcomeExtraLines)#" index="wli">
+        <cfset welcomeExtraLines[wli] = EncodeForHTML(welcomeExtraLines[wli])>
+    </cfloop>
+    <cfset welcomeExtraHtml = ArrayToList(welcomeExtraLines, "<br>")>
+</cfif>
+
 <cfmail from="#getPostmaster.value#" to="#recipientEmail#" server="hermes_postfix_dkim" port="10026" subject="[Hermes SEG] Welcome - Account Created" type="html">
 <div align="center" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
 <b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
@@ -57,6 +71,10 @@ Requires the following variables to be set before including:
 <h2 style="color: ##333;">Welcome to Hermes SEG</h2>
 
 <p>Hello <strong>#recipientName#</strong>,</p>
+
+<cfif Len(welcomeExtraHtml)>
+<div style="background-color: ##f8f9fa; border-left: 4px solid ##0d6efd; padding: 12px 16px; margin: 16px 0;">#welcomeExtraHtml#</div>
+</cfif>
 
 <p>Your email address <strong>#recipientEmail#</strong> is now protected by Hermes SEG. Incoming mail passes through quarantine and delivery rules before reaching your regular mailbox.</p>
 

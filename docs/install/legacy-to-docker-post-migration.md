@@ -699,6 +699,15 @@ reviewing what's queued.
 > in the queue without affecting inbound or filtering.
 
 5. With mail flowing, go back and finish **step 6.3** (two-factor for admins).
+6. **Give your users portal accounts.** The migration restores relay
+   recipients without the user-portal accounts they sign in with, so a
+   password reset cannot find them. Sidebar → **Email Relay → Relay
+   Recipients → Provision Portal Accounts** creates them. Tick **Send the
+   welcome email** to tell each user how to set a password, and add your own
+   announcement in **Additional message** if you like. This button arrives in
+   the release after v260912: do it after the upgrade in step 12. Do not send
+   users a password-reset announcement of your own before their accounts
+   exist.
 
 ---
 
