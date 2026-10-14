@@ -1813,6 +1813,49 @@ modal markup don't need a rename cascade.)
     <cfif #getrecipients.recordcount# GTE 1>
 
         <div class="table-responsive">
+      <!--- COLUMN FILTERS (#359). Values match what each cell displays. --->
+      <div class="row g-2 align-items-end mb-3" id="recipientFilters">
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="fltPortal">Portal Account</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltPortal" data-col="5">
+            <option value="">All</option><option value="^\s*Yes\s*$">Yes</option><option value="^\s*No\s*$">No</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="fltAuth">Auth</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltAuth" data-col="4">
+            <option value="">All</option><option value="^\s*LOCAL">Local</option><option value="^\s*REMOTE">Remote</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="flt2fa">2FA</label>
+          <select class="form-select form-select-sm rcpt-filter" id="flt2fa" data-col="7">
+            <option value="">All</option><option value="Enrolled">Enrolled</option><option value="Required">Required</option><option value="^\s*None\s*$">None</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="fltBackend">Backend</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltBackend" data-col="6">
+            <option value="">All</option><option value="^\s*\(domain default\)\s*$">Domain default</option><option value="^(?!\s*\(domain default\))">Custom</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="fltPolicy">Policy</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltPolicy" data-col="8">
+            <option value="">All</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <label class="form-label small mb-0" for="fltNotify">Quarantine Notifications</label>
+          <select class="form-select form-select-sm rcpt-filter" id="fltNotify" data-col="9">
+            <option value="">All</option><option value="^\s*YES\s*$">Yes</option><option value="^\s*NO\s*$">No</option>
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="fltReset">Reset filters</button>
+        </div>
+      </div>
+
       <table class="table table-striped"  id="sortTable" style="width:100%">
         <thead>
           <tr>
@@ -1966,6 +2009,29 @@ modal markup don't need a rename cascade.)
   <!--- SCRIPT TO CHECK/UNCHECK ALL CHECKBOXES ON THE PAGE STARTS HERE --->
      <!--- THIS SCRIPT WILL NOT WORK IF PLACED IN THE <HEAD></HEAD> SECTION  --->
   <script>
+    // Column filters (#359). Exact-match regexes against the cell text.
+    (function() {
+      var t = $('#sortTable').DataTable();
+      // stateSave can restore column searches the drop-downs would not show,
+      // which would look like missing recipients: start unfiltered.
+      t.columns().search('').draw();
+      var policies = t.column(8).data().unique().sort();
+      policies.each(function(v) {
+        var txt = $('<div>').html(v).text().trim();
+        if (txt.length) {
+          var esc = txt.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          $('#fltPolicy').append($('<option>').val('^\\s*' + esc + '\\s*$').text(txt));
+        }
+      });
+      $('.rcpt-filter').on('change', function() {
+        t.column($(this).data('col')).search(this.value, true, false).draw();
+      });
+      $('#fltReset').on('click', function() {
+        $('.rcpt-filter').val('');
+        t.columns().search('').draw();
+      });
+    })();
+
     $('#selectAll').click(function() {
       if(this.checked) {
           $(':checkbox').each(function() {
