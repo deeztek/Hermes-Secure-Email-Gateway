@@ -288,50 +288,58 @@ page.
    does not help: it repeats the same restart.
 3. **Content Checks → SPF Settings** → **Save & Apply Settings** — regenerates policyd-spf.
 4. **Content Checks → DMARC Settings** → **Save & Apply Settings** — regenerates OpenDMARC.
-5. **Content Checks → Antispam Settings** → **Save & Apply Settings.** The
-   migration leaves the spam filter on install defaults: the spam subject
-   tag, what happens to spam and virus mail, and **all banned-file rules**
-   (File Rules, Extensions, Expressions), plus your score overrides and
-   message rules, are in the database but not in effect. This one save
-   applies all of them. Upgrading does not do it for you.
+5. **Antispam Settings.** The migration leaves the spam filter on install
+   defaults: the spam subject tag, what happens to spam and virus mail, and
+   **all banned-file rules** (File Rules, Extensions, Expressions), plus your
+   score overrides and message rules, are in the database but not in effect.
+   One save applies all of them; upgrading does not do it for you. On v260912
+   that save fails unless you prepare two things first.
 
-   On v260912 this save fails with **"Validate Spamassassin: There was an
-   error running /usr/bin/spamassassin --lint"**, because the configuration
-   template mentions DCC, which the Docker image does not include. Fix the
-   template once on the Docker host, then save again. Run from your Hermes
-   install directory (`/opt/Hermes-Secure-Email-Gateway` if you followed the
-   migration guide; replace it with your path if you cloned elsewhere):
+   1. **Fix the configuration template.** It mentions DCC, which the Docker
+      image does not include, so SpamAssassin rejects the result ("Validate
+      Spamassassin: There was an error running /usr/bin/spamassassin --lint").
+      Run from your Hermes install directory
+      (`/opt/Hermes-Secure-Email-Gateway` if you followed the migration guide;
+      replace it with your path if you cloned elsewhere):
 
-   ```bash
-   cd /opt/Hermes-Secure-Email-Gateway
-   cp config/hermes/opt/hermes/conf_files/local.cf.HERMES config/hermes/opt/hermes/conf_files/local.cf.HERMES.pre-dcc
-   sed -i 's|^USE-DCC$|ifplugin Mail::SpamAssassin::Plugin::DCC\nUSE-DCC|; s|^\(dcc_path .*\)$|\1\nendif|' config/hermes/opt/hermes/conf_files/local.cf.HERMES
-   ```
+      ```bash
+      cd /opt/Hermes-Secure-Email-Gateway
+      cp config/hermes/opt/hermes/conf_files/local.cf.HERMES config/hermes/opt/hermes/conf_files/local.cf.HERMES.pre-dcc
+      sed -i 's|^USE-DCC$|ifplugin Mail::SpamAssassin::Plugin::DCC\nUSE-DCC|; s|^\(dcc_path .*\)$|\1\nendif|' config/hermes/opt/hermes/conf_files/local.cf.HERMES
+      ```
 
-   After saving, check the result; no output means SpamAssassin accepted it:
+   2. **Find message rules with non-ASCII characters.** v260912 writes those
+      characters as `?`, which also makes SpamAssassin reject the
+      configuration. This lists any such rules (no output means none):
 
-   ```bash
-   docker exec hermes_mail_filter spamassassin --lint
-   ```
+      ```bash
+      docker exec hermes_db_server mariadb -u root hermes -e "SELECT id, rule_name FROM message_rules WHERE CONVERT(regex USING utf8mb4) <> CONVERT(CONVERT(regex USING ascii) USING utf8mb4) OR CONVERT(header USING utf8mb4) <> CONVERT(CONVERT(header USING ascii) USING utf8mb4);"
+      ```
 
-   If it reports an `invalid regexp` for one of your message rules, the rule
-   contains non-ASCII characters, which v260912 writes as `?`. Delete that
-   rule under **Content Checks → Message Rules** (note its settings first)
-   and save Antispam Settings again; re-add it after upgrading. On v260912,
-   **editing** a body-type message rule fails with `key [EDIT_HEADER]
-   doesn't exist`; delete and re-add it instead.
-6. **Content Checks → Antivirus Settings** → **Save & Apply Settings.**
-   Applies your antivirus settings and bypass list, which are otherwise
-   still install defaults. Upgrading does not do it for you.
+      For each one listed, note its settings, then delete it under
+      **Content Checks → Message Rules**. Re-add it after upgrading. (On
+      v260912, *editing* a body-type rule fails with `key [EDIT_HEADER]
+      doesn't exist`, so delete rather than edit.)
 
-   On v260912 this save fails with **"There was an error copying
-   /var/lib/clamav/local.ign2"** when that file has never existed, which is
-   the case on a new Docker host. Create it empty (an empty file changes
-   nothing), then save again:
+   3. Now **Content Checks → Antispam Settings → Save & Apply Settings.**
+      Check the result; no output means SpamAssassin accepted it:
+
+      ```bash
+      docker exec hermes_mail_filter spamassassin --lint
+      ```
+
+6. **Antivirus Settings.** Applies your antivirus settings and bypass list,
+   which are otherwise still install defaults; upgrading does not do it for
+   you. On v260912 the save fails ("There was an error copying
+   /var/lib/clamav/local.ign2") when that file has never existed, which is the
+   case on a new Docker host. Create it empty first (an empty file changes
+   nothing):
 
    ```bash
    docker exec hermes_mail_filter sh -c 'touch /var/lib/clamav/local.ign2 && chown clamav:clamav /var/lib/clamav/local.ign2'
    ```
+
+   Then **Content Checks → Antivirus Settings → Save & Apply Settings.**
 7. **System → DNS Resolver: check before you apply.** The database restore
    replaced the DNS forwarders you entered during install with defaults.
    Check the forwarder list on this page is what you want **before** clicking
