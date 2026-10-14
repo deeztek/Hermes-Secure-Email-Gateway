@@ -606,6 +606,48 @@ webmail), assign each to the service that uses its name.
    openssl s_client -starttls smtp -connect localhost:25 -showcerts </dev/null 2>/dev/null | grep -c 'BEGIN CERT'
    ```
 
+### 8.5 Restore S/MIME certificate authorities
+
+The migration restores your internal certificate authorities' records but not
+their files: each CA's root key and certificate, its serial number and index,
+and every certificate it has issued. Until they are restored, enabling S/MIME
+for a recipient creates no certificate, and **Create Certificate** fails with
+`source file [/opt/hermes/CA/<ca-name>/root_ca/serial] is not a file`.
+Certificates imported from an external CA (`.p12` / `.pfx` files) are missing
+in the same way.
+
+Both folders are in the legacy system backup, the
+`hermes-system-<build>-<date>.tar.gz` file you gave the migration. Run from
+your Hermes install directory (`/opt/Hermes-Secure-Email-Gateway` if you
+followed the migration guide). Edit only the first line: set it to that
+backup's path, for example `/mnt/backups/hermes-system-240815-10-11-2026-0724.tar.gz`.
+
+```bash
+B=/mnt/backups/hermes-system-240815-MM-DD-YYYY-HHMM.tar.gz   # <- edit this line only
+cd /opt/Hermes-Secure-Email-Gateway
+tar -tzf "$B" | grep -E '^opt/hermes/(CA|HermesExternalCACerts)/' | head
+```
+
+If that lists files, restore them. Existing files are never overwritten, and
+the temporary copy is deleted because it holds the CAs' private keys:
+
+```bash
+mkdir -p /tmp/legacy-opt
+tar -xzf "$B" -C /tmp/legacy-opt opt/hermes/CA opt/hermes/HermesExternalCACerts
+mkdir -p config/hermes/opt/hermes/CA config/hermes/opt/hermes/HermesExternalCACerts
+cp -an /tmp/legacy-opt/opt/hermes/CA/. config/hermes/opt/hermes/CA/
+cp -an /tmp/legacy-opt/opt/hermes/HermesExternalCACerts/. config/hermes/opt/hermes/HermesExternalCACerts/
+rm -rf /tmp/legacy-opt
+ls config/hermes/opt/hermes/CA/
+```
+
+The last command lists one folder per CA. If the backup has no
+`HermesExternalCACerts` folder, `tar` reports it as not found; that is fine.
+`cp` may warn that `-n` is non-portable; that is also fine.
+
+Then open a recipient that has S/MIME enabled and use **Create Certificate**.
+It now succeeds, and existing certificates can be downloaded and sent again.
+
 ## 9. Email archive (deferred)
 
 Message History **metadata** is restored, but message **bodies** live in the
