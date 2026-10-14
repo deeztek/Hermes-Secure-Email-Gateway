@@ -43,6 +43,14 @@ recommended for all installs.
   twice; it now does each once, so saves are about twice as fast and incoming
   mail is paused once instead of twice.
 
+### Installs migrated from legacy
+
+- **Adding a relay recipient or a mailbox failed** with "Field 'id' doesn't
+  have a default value". A column left over from the legacy database blocked
+  the new recipient's settings from being saved. The upgrade removes it. A
+  recipient whose add failed this way was only partly created: delete it and
+  add it again after upgrading (#362).
+
 ## Upgrading
 
 **Upgrade.** Run from your Hermes install directory
