@@ -98,7 +98,6 @@ then immediately updates Amavis/SpamAssassin config and restarts services.
     <cfinclude template="update_amavis_config_files.cfm">
     <cfinclude template="update_spamassassin_config_files.cfm">
     <cfinclude template="restart_amavis.cfm">
-    <cfinclude template="restart_spamassassin.cfm">
 
     <cfset session.m = 1>
 

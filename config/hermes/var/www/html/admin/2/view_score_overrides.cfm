@@ -164,7 +164,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfinclude template="./inc/update_spamassassin_config_files.cfm">
     <cfinclude template="./inc/update_amavis_config_files.cfm">
     <cfinclude template="./inc/restart_amavis.cfm">
-    <cfinclude template="./inc/restart_spamassassin.cfm">
     <cfset session.m = 1>
   <cfcatch type="any">
     <cfif FindNoCase("spamassassin --lint rejected", cfcatch.message)>
@@ -234,7 +233,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfinclude template="./inc/update_spamassassin_config_files.cfm">
       <cfinclude template="./inc/update_amavis_config_files.cfm">
       <cfinclude template="./inc/restart_amavis.cfm">
-      <cfinclude template="./inc/restart_spamassassin.cfm">
       <cfset session.m = 7>
     <cfcatch type="any">
       <cfif FindNoCase("spamassassin --lint rejected", cfcatch.message) AND previousOverride.recordcount EQ 1>
@@ -281,7 +279,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfinclude template="./inc/update_spamassassin_config_files.cfm">
     <cfinclude template="./inc/update_amavis_config_files.cfm">
     <cfinclude template="./inc/restart_amavis.cfm">
-    <cfinclude template="./inc/restart_spamassassin.cfm">
     <cfset session.m = 8>
   <cfcatch type="any">
     <cfset session.m = 11>
@@ -293,7 +290,6 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfinclude template="./inc/update_spamassassin_config_files.cfm">
     <cfinclude template="./inc/update_amavis_config_files.cfm">
     <cfinclude template="./inc/restart_amavis.cfm">
-    <cfinclude template="./inc/restart_spamassassin.cfm">
     <cfset session.m = 9>
   <cfcatch type="any">
     <cfset session.m = 11>
