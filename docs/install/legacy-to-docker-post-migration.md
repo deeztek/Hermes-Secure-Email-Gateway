@@ -782,12 +782,18 @@ you to that release or later. The same upgrade also fixes adding a relay
 recipient, which fails on a migrated install before it with
 `Field 'id' doesn't have a default value`.
 
-1. Sidebar → **Email Relay → Relay Recipients**. A banner shows how many
-   recipients have no portal account, and the **Portal Account** column shows
-   **No** for each of them.
-2. Click **Provision them** in the banner. It creates an account for every
-   recipient that has none and leaves existing accounts alone, so it is safe
-   to run again.
+1. Sidebar → **Email Relay → Relay Recipients**. A yellow banner,
+   **Recipients without a portal account**, shows how many recipients have
+   none, and the **Portal Account** column shows **No** for each of them.
+2. Click **Provision them** in that banner. It creates an account for every
+   recipient that has none, with nothing to select, and leaves existing
+   accounts alone, so it is safe to run again.
+
+   To do only some recipients instead, use the toolbar button **Provision
+   Portal Accounts**, which acts on the ticked recipients: set the **Portal
+   Account** filter to **No**, set the page length to **Show all** (the
+   select-all box ticks only the rows on the current page), tick the
+   recipients, then click the button.
 3. To tell your users, tick **Send the welcome email** before confirming. Each
    new account is sent an email explaining how to set a password; add your own
    announcement in **Additional message** if you like. Leave it unticked to
