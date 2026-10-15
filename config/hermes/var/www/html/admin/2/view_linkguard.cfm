@@ -329,6 +329,38 @@ only the in-stack container.
             <cflocation url="view_linkguard.cfm" addtoken="false">
         </cfcase>
 
+        <!--- "Decode a link": where a rewritten /lg/ link really goes. Read-only
+             and fetch-free in the engine (no verdict, no page load); the result
+             card offers "Check this URL" for the verdict. --->
+        <cfcase value="decode_link">
+            <cfset session.lgDecodeIn = Trim(form.decode_link)>
+            <cfset StructDelete(session, "lgDecode")>
+            <cfset StructDelete(session, "lgDecodeErr")>
+            <cfif Len(Trim(form.decode_link))>
+                <cftry>
+                    <cfif FileExists("/opt/hermes/keys/linkguard_api_key")>
+                        <cfset lgApiD = Trim(FileRead("/opt/hermes/keys/linkguard_api_key"))>
+                        <cfhttp method="POST" url="http://hermes_linkguard:8895/api/decode" timeout="10" throwonerror="false" result="dcr">
+                            <cfhttpparam type="header" name="Authorization" value="Bearer #lgApiD#">
+                            <cfhttpparam type="header" name="Content-Type" value="application/json">
+                            <cfhttpparam type="body" value='{"link":#SerializeJSON(Trim(form.decode_link))#}'>
+                        </cfhttp>
+                        <cfif IsDefined("dcr.statuscode") AND Left(dcr.statuscode,3) EQ "200">
+                            <cfset session.lgDecode = DeserializeJSON(dcr.filecontent)>
+                        <cfelseif IsDefined("dcr.statuscode") AND Left(dcr.statuscode,3) EQ "404">
+                            <cfset session.lgDecodeErr = "This Link Guard engine is too old to decode links; it arrives with the next release.">
+                        <cfelse>
+                            <cfset session.lgDecodeErr = "Engine not reachable (HTTP " & (IsDefined("dcr.statuscode") ? dcr.statuscode : "?") & ").">
+                        </cfif>
+                    <cfelse>
+                        <cfset session.lgDecodeErr = "Engine API key not found yet -- save Link Guard settings once to initialize it.">
+                    </cfif>
+                <cfcatch type="any"><cfset session.lgDecodeErr = "Decode failed: " & cfcatch.message></cfcatch>
+                </cftry>
+            </cfif>
+            <cflocation url="view_linkguard.cfm" addtoken="false">
+        </cfcase>
+
         <!--- Manual FULL cache flush (power-user). Clears the ENTIRE verdict cache
              in the engine (incl. feed / GSB / VirusTotal-derived) -- forces a
              complete re-evaluation on next click. Distinct from the automatic
@@ -489,6 +521,11 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset lgCheckUrl = StructKeyExists(session,"lgCheckUrl") ? session.lgCheckUrl : "">
 <cfset lgCheckErr = StructKeyExists(session,"lgCheckErr") ? session.lgCheckErr : "">
 <cfset StructDelete(session,"lgCheck")><cfset StructDelete(session,"lgCheckUrl")><cfset StructDelete(session,"lgCheckErr")>
+<!--- one-shot "Decode a link" result (set by the decode_link action), read + cleared --->
+<cfset lgDecode   = (StructKeyExists(session,"lgDecode") AND IsStruct(session.lgDecode)) ? session.lgDecode : "">
+<cfset lgDecodeIn = StructKeyExists(session,"lgDecodeIn") ? session.lgDecodeIn : "">
+<cfset lgDecodeErr = StructKeyExists(session,"lgDecodeErr") ? session.lgDecodeErr : "">
+<cfset StructDelete(session,"lgDecode")><cfset StructDelete(session,"lgDecodeIn")><cfset StructDelete(session,"lgDecodeErr")>
 
 <!--- render helpers for the Check + Activity views --->
 <cfset srcLabel = { "admin":"Admin rule", "local":"Local feed (URLhaus / OpenPhish)", "heuristic":"Structural heuristic", "gsb":"Google Safe Browsing", "vt":"VirusTotal", "none":"Default (no source flagged it)", "scheme":"Unsupported address type", "redirect":"Redirect destination", "combined":"Combined weak signals" }>
@@ -776,13 +813,51 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
   </div>
 </div>
 
+<!--- ===== Decode a link ===== --->
+<div class="card card-info card-outline mb-4">
+  <div class="card-header"><h3 class="card-title"><i class="fas fa-unlock-alt me-2"></i>Decode a link</h3></div>
+  <form method="post" action="view_linkguard.cfm">
+    <input type="hidden" name="lg_action" value="decode_link">
+    <div class="card-body">
+      <p class="text-muted">Paste a protected link from an email (it contains <code>/lg/?t=</code>), even one wrapped by another scanner, to see the original address it leads to. This only looks the link up: nothing is fetched and nothing is changed. Expired links can still be decoded.</p>
+      <div class="input-group">
+        <input type="text" class="form-control" name="decode_link" placeholder="https://.../lg/?t=..." value="#HTMLEditFormat(lgDecodeIn)#">
+        <button type="submit" class="btn btn-primary"><i class="fas fa-unlock-alt me-1"></i>Decode</button>
+      </div>
+      <cfif IsStruct(lgDecode) AND StructKeyExists(lgDecode,"found") AND lgDecode.found>
+        <cfset dcExp = Val(sval(lgDecode,'expiry'))>
+        <table class="table table-sm table-bordered mt-3 mb-2" style="max-width:820px">
+          <tr><th style="width:180px">Original link</th><td style="word-break:break-all"><code>#HTMLEditFormat(sval(lgDecode,'original_url'))#</code></td></tr>
+          <tr><th>Host</th><td><code>#HTMLEditFormat(sval(lgDecode,'host'))#</code></td></tr>
+          <cfif Len(sval(lgDecode,'recipient_domain'))><tr><th>Recipient domain</th><td>#HTMLEditFormat(sval(lgDecode,'recipient_domain'))#</td></tr></cfif>
+          <cfif dcExp GT 0>
+            <tr><th>Link expires</th><td>#DateTimeFormat(DateConvert("utc2Local", DateAdd("s", dcExp, CreateDateTime(1970,1,1,0,0,0))), "yyyy-mm-dd HH:nn")#<cfif StructKeyExists(lgDecode,"expired") AND lgDecode.expired> <span class="badge bg-secondary">expired</span></cfif></td></tr>
+          </cfif>
+        </table>
+      <cfelseif IsStruct(lgDecode) AND StructKeyExists(lgDecode,"error")>
+        <div class="alert alert-warning mt-3 mb-0">#HTMLEditFormat(lgDecode.error)#</div>
+      <cfelseif Len(lgDecodeErr)>
+        <div class="alert alert-warning mt-3 mb-0">#HTMLEditFormat(lgDecodeErr)#</div>
+      </cfif>
+    </div>
+  </form>
+  <cfif IsStruct(lgDecode) AND StructKeyExists(lgDecode,"found") AND lgDecode.found>
+    <form method="post" action="view_linkguard.cfm" class="px-3 pb-3">
+      <input type="hidden" name="lg_action" value="check_url">
+      <input type="hidden" name="check_url" value="#HTMLEditFormat(sval(lgDecode,'original_url'))#">
+      <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-search me-1"></i>Check this URL</button>
+      <small class="text-muted ms-2">Runs the full verdict, which may load the page.</small>
+    </form>
+  </cfif>
+</div>
+
 <!--- ===== Check a URL (diagnostic) ===== --->
 <div class="card card-info card-outline mb-4">
   <div class="card-header"><h3 class="card-title"><i class="fas fa-search me-2"></i>Check a URL</h3></div>
   <form method="post" action="view_linkguard.cfm">
     <input type="hidden" name="lg_action" value="check_url">
     <div class="card-body">
-      <p class="text-muted">See how Link Guard would treat a link right now &mdash; the verdict, which layer decided it, and the resolved host. This checks the URL exactly as written; it does <strong>not</strong> follow redirects, and it does not change the verdict cache.</p>
+      <p class="text-muted">See how Link Guard would treat a link right now &mdash; the verdict, which layer decided it, and the resolved host. It runs the same checks a click does, including following redirects when <strong>Follow redirects</strong> is on (which may load the page), but it does not change the verdict cache or log a click.</p>
       <div class="input-group">
         <input type="text" class="form-control" name="check_url" placeholder="https://example.com/path" value="#HTMLEditFormat(lgCheckUrl)#">
         <button type="submit" class="btn btn-primary"><i class="fas fa-search me-1"></i>Check</button>
