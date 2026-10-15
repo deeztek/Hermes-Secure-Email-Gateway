@@ -171,7 +171,19 @@ git fetch --tags
 git checkout <target-tag>
 ```
 
-The target tag is either passed as an argument (`./system_update_docker.sh v260601`) or auto-resolved by polling GitHub Releases API for `releases/latest`. If the working tree is dirty, the script refuses to continue.
+The target tag is either passed as an argument (`./system_update_docker.sh v260601`) or auto-resolved by polling GitHub Releases API for `releases/latest`.
+
+Tracked files that differ from git do not block the upgrade. The checkout is forced (`git checkout -f`), and everything it discards is first saved as `install-logs/hermes_update_<timestamp>_discarded-tracked-drift.patch`.
+
+Some tracked files are written by admin pages or services (DNS Resolver overrides, DMARC, banners and disclaimers, IPS, antispam, antivirus, malware feeds, ARC, DKIM/SPF, Dovecot, Ofelia, `security.conf`, LDAP's `slapd.d`). The orchestrator re-runs itself from the new release and puts those back from the patch before any container restarts ([#361](https://github.com/deeztek/Hermes-Secure-Email-Gateway/issues/361)):
+
+| The release... | Result |
+| --- | --- |
+| did not change the file | the install's version is restored |
+| changed other lines | both are kept |
+| changed the same lines | the release version is kept, and the upgrade log names the page to save again |
+
+The list of admin-owned paths is in `scripts/lib/restore_runtime_config.sh`. Anything not on it, code and templates included, always takes the release version.
 
 ### Phase 2 — Update containers
 
