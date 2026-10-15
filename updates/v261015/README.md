@@ -31,6 +31,11 @@ recommended for all installs.
   affected rows show a red **Failed** badge (the error is in its tooltip), and
   failures can be dismissed without retrying (#364).
 
+- **`scripts/audit_legacy_migration.sh`** checks an install migrated from
+  legacy against the legacy system backup and reports what did not come
+  across: files, cron jobs, tables, rows and incompatible columns. It changes
+  nothing. Run it with `-B <legacy hermes-system backup>`.
+
 ## Bug fixes
 
 - **Legitimate mail from domains with a strict DMARC policy was tagged as
