@@ -612,17 +612,18 @@ webmail), assign each to the service that uses its name.
    openssl s_client -starttls smtp -connect localhost:25 -showcerts </dev/null 2>/dev/null | grep -c 'BEGIN CERT'
    ```
 
-### 8.5 Restore S/MIME certificate authorities
+### 8.5 Restore S/MIME certificate authorities and PGP keyrings
 
-The migration restores your internal certificate authorities' records but not
-their files: each CA's root key and certificate, its serial number and index,
-and every certificate it has issued. Until they are restored, enabling S/MIME
-for a recipient creates no certificate, and **Create Certificate** fails with
-`source file [/opt/hermes/CA/<ca-name>/root_ca/serial] is not a file`.
-Certificates imported from an external CA (`.p12` / `.pfx` files) are missing
-in the same way.
+The migration restores the database records for your encryption keys but not
+the files they live in:
 
-Both folders are in the legacy system backup, the
+| Folder | Holds | Until restored |
+| --- | --- | --- |
+| `CA/` | each internal certificate authority's root key and certificate, serial number, index, and every certificate it issued | enabling S/MIME creates no certificate, and **Create Certificate** fails with `source file [/opt/hermes/CA/<ca-name>/root_ca/serial] is not a file` |
+| `HermesExternalCACerts/` | certificates imported from an external CA (`.p12` / `.pfx`) | they cannot be downloaded or sent |
+| `.gnupg/` | the PGP keyrings | PGP keys cannot be exported, published or deleted |
+
+All three are in the legacy system backup, the
 `hermes-system-<build>-<date>.tar.gz` file you gave the migration. Run from
 your Hermes install directory (`/opt/Hermes-Secure-Email-Gateway` if you
 followed the migration guide). Edit only the first line: set it to that
@@ -631,28 +632,51 @@ backup's path, for example `/mnt/backups/hermes-system-240815-10-11-2026-0724.ta
 ```bash
 B=/mnt/backups/hermes-system-240815-MM-DD-YYYY-HHMM.tar.gz   # <- edit this line only
 cd /opt/Hermes-Secure-Email-Gateway
-tar -tzf "$B" | grep -E '^opt/hermes/(CA|HermesExternalCACerts)/' | head
+tar -tzf "$B" | grep -E '^opt/hermes/(CA|HermesExternalCACerts|\.gnupg)/' | cut -d/ -f1-3 | sort -u
 ```
 
-If that lists files, restore them. Existing files are never overwritten, and
-the temporary copy is deleted because it holds the CAs' private keys:
+Restore whichever of them that lists. Existing files are never overwritten,
+and the temporary copy is deleted because it holds private keys:
 
 ```bash
 mkdir -p /tmp/legacy-opt
-tar -xzf "$B" -C /tmp/legacy-opt opt/hermes/CA opt/hermes/HermesExternalCACerts
-mkdir -p config/hermes/opt/hermes/CA config/hermes/opt/hermes/HermesExternalCACerts
-cp -an /tmp/legacy-opt/opt/hermes/CA/. config/hermes/opt/hermes/CA/
-cp -an /tmp/legacy-opt/opt/hermes/HermesExternalCACerts/. config/hermes/opt/hermes/HermesExternalCACerts/
+tar -xzf "$B" -C /tmp/legacy-opt opt/hermes/CA opt/hermes/HermesExternalCACerts opt/hermes/.gnupg
+for d in CA HermesExternalCACerts .gnupg; do
+  [ -d "/tmp/legacy-opt/opt/hermes/$d" ] || continue
+  mkdir -p "config/hermes/opt/hermes/$d"
+  cp -an "/tmp/legacy-opt/opt/hermes/$d/." "config/hermes/opt/hermes/$d/"
+done
+chmod 700 config/hermes/opt/hermes/.gnupg 2>/dev/null
 rm -rf /tmp/legacy-opt
 ls config/hermes/opt/hermes/CA/
+docker exec hermes_commandbox gpg --homedir /opt/hermes/.gnupg --list-keys 2>&1 | head
 ```
 
-The last command lists one folder per CA. If the backup has no
-`HermesExternalCACerts` folder, `tar` reports it as not found; that is fine.
-`cp` may warn that `-n` is non-portable; that is also fine.
+`tar` reports any folder the backup does not have as not found; that is fine.
+`cp` may warn that `-n` is non-portable; that is also fine. The last two
+commands list one folder per certificate authority and your PGP keys.
 
 Then open a recipient that has S/MIME enabled and use **Create Certificate**.
 It now succeeds, and existing certificates can be downloaded and sent again.
+
+### 8.6 Optional: keep the trained spam filter
+
+The spam filter learns from your mail over time (its Bayes database). The
+migration does not carry that training over, so the gateway starts learning
+from scratch. That is a reasonable choice, and it improves on its own within
+weeks. To keep the legacy training instead, restore it; this stops the mail
+filter for about a minute, during which incoming mail waits in the queue:
+
+```bash
+docker stop hermes_mail_filter
+cd config/hermes/opt/hermes/sa-bayes
+tar -xzf "$B" --strip-components=3 opt/hermes/sa-bayes/bayes_toks opt/hermes/sa-bayes/bayes_seen opt/hermes/sa-bayes/bayes_journal
+chown --reference=. bayes_*; chmod 666 bayes_*
+cd /opt/Hermes-Secure-Email-Gateway && docker start hermes_mail_filter
+sleep 30; docker exec -u amavis hermes_mail_filter sa-learn --dump magic | head -8
+```
+
+The last command shows the learned spam and ham counts (`nspam`, `nham`).
 
 ## 9. Email archive (deferred)
 
@@ -814,3 +838,11 @@ recipient, which fails on a migrated install before it with
 >
 > Do not send users a password-reset announcement of your own before their
 > accounts exist; until then the reset cannot find them.
+
+## 13. Schedule backups
+
+The legacy server's backup schedule does not carry over, and a migrated
+gateway has none until you set one up. Use `scripts/system_backup.sh` from
+host cron (see **System → Backup/Restore** in the Administrator Guide for the
+schedule, retention and failure alerts), a backup of the whole virtual
+machine, or both.
