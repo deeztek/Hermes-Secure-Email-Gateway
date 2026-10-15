@@ -443,58 +443,36 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <!--- Failed jobs: banner naming each mailbox, and failedJobMap for the rows (#364) --->
 <cfinclude template="./inc/cert_queue_failures.cfm">
 
-<!--- ADD MAILBOX BUTTON + DOMAIN FILTER --->
+<!--- ADD MAILBOX BUTTON --->
 <div class="d-flex justify-content-between align-items-center mb-3">
   <a href="add_mailbox.cfm" class="btn btn-primary"><i class="fa fa-plus fa-lg"></i>&nbsp;&nbsp;Add Mailbox</a>
-  <cfif getFilterDomains.recordcount GTE 1>
-  <div class="d-flex align-items-center gap-2">
-    <label class="mb-0"><strong>Filter by Domain:</strong></label>
-    <select class="form-control form-control-sm" id="domainFilter" style="width:auto;">
-      <option value="">All Domains</option>
-      <cfoutput query="getFilterDomains">
-        <option value="#HTMLEditFormat(domain)#">#HTMLEditFormat(domain)#</option>
-      </cfoutput>
-    </select>
-    <!--- Only the states that actually occur. Offering "Unknown (no recipient
-         record)" on an installation that has none is a filter that can only
-         ever return nothing, and two of these five are states you would hope
-         never to see. Tallied from the same delivery_state the rows use, so
-         the list cannot drift from the table. --->
-    <cfset deliveryStatesPresent = {}>
-    <cfloop query="getMailboxes">
-        <cfset deliveryStatesPresent[getMailboxes.delivery_state] = true>
-    </cfloop>
-    <!--- One option per state, no collapsing. An earlier version folded
-         "delivered here because the domain does" and "kept here by its own
-         override" into a single Local option, which is precisely the
-         distinction worth filtering on: the second is a converted recipient on
-         a hybrid domain, sitting among ordinary mailboxes. Folding them also
-         meant a host with only those two states offered one option, so the
-         filter hid itself.
-
-         A filter offering one option filters nothing, so it still hides when
-         every mailbox is in the same state, which on a plain mailbox domain
-         they all are. --->
-    <cfset showKept     = StructKeyExists(deliveryStatesPresent, "local_override")>
-    <cfset showLocal    = StructKeyExists(deliveryStatesPresent, "local_domain")>
-    <cfset showRouted   = StructKeyExists(deliveryStatesPresent, "routed")>
-    <cfset showStranded = StructKeyExists(deliveryStatesPresent, "not_delivered")>
-    <cfset showUnknown  = StructKeyExists(deliveryStatesPresent, "unknown")>
-
-    <cfif StructCount(deliveryStatesPresent) GT 1>
-    <label class="mb-0 ms-3"><strong>Delivery:</strong></label>
-    <select class="form-control form-control-sm" id="deliveryFilter" style="width:auto;">
-      <option value="">All</option>
-      <cfif showLocal><option value="Local">Local</option></cfif>
-      <cfif showKept><option value="Kept">Kept here (converted)</option></cfif>
-      <cfif showRouted><option value="Routed">Routed elsewhere</option></cfif>
-      <cfif showStranded><option value="Elsewhere">Not delivered here (needs attention)</option></cfif>
-      <cfif showUnknown><option value="Unknown">Unknown (no recipient record)</option></cfif>
-    </select>
-    </cfif>
-  </div>
-  </cfif>
 </div>
+
+<!--- Only the states that actually occur. Offering "Unknown (no recipient
+     record)" on an installation that has none is a filter that can only
+     ever return nothing, and two of these five are states you would hope
+     never to see. Tallied from the same delivery_state the rows use, so
+     the list cannot drift from the table. --->
+<cfset deliveryStatesPresent = {}>
+<cfloop query="getMailboxes">
+    <cfset deliveryStatesPresent[getMailboxes.delivery_state] = true>
+</cfloop>
+<!--- One option per state, no collapsing. An earlier version folded
+     "delivered here because the domain does" and "kept here by its own
+     override" into a single Local option, which is precisely the
+     distinction worth filtering on: the second is a converted recipient on
+     a hybrid domain, sitting among ordinary mailboxes. Folding them also
+     meant a host with only those two states offered one option, so the
+     filter hid itself.
+
+     A filter offering one option filters nothing, so it still hides when
+     every mailbox is in the same state, which on a plain mailbox domain
+     they all are. --->
+<cfset showKept     = StructKeyExists(deliveryStatesPresent, "local_override")>
+<cfset showLocal    = StructKeyExists(deliveryStatesPresent, "local_domain")>
+<cfset showRouted   = StructKeyExists(deliveryStatesPresent, "routed")>
+<cfset showStranded = StructKeyExists(deliveryStatesPresent, "not_delivered")>
+<cfset showUnknown  = StructKeyExists(deliveryStatesPresent, "unknown")>
 
 <!--- MAILBOXES DATATABLE --->
 <div class="card">
@@ -502,10 +480,35 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <h3 class="card-title"><i class="fas fa-envelope me-2"></i>Mailboxes (<cfoutput>#getMailboxes.recordcount#</cfoutput>)</h3>
   </div>
   <div class="card-body">
-    <!--- COLUMN FILTERS (#359). Values are regexes matched against what each
-         cell displays; same scheme as Relay Recipients. Domain and Delivery
-         stay in the bar above. --->
+    <!--- COLUMN FILTERS (#359). One row, laid out like Relay Recipients.
+         Domain and Delivery match exact values (their handlers are with the
+         DataTable init); the rest are regexes against what each cell
+         displays. --->
     <div class="row g-2 align-items-end mb-3" id="mailboxFilters">
+      <cfif getFilterDomains.recordcount GTE 1>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="domainFilter">Domain</label>
+        <select class="form-select form-select-sm" id="domainFilter">
+          <option value="">All Domains</option>
+          <cfoutput query="getFilterDomains">
+            <option value="#HTMLEditFormat(domain)#">#HTMLEditFormat(domain)#</option>
+          </cfoutput>
+        </select>
+      </div>
+      </cfif>
+      <cfif StructCount(deliveryStatesPresent) GT 1>
+      <div class="col-auto">
+        <label class="form-label small mb-0" for="deliveryFilter">Delivery</label>
+        <select class="form-select form-select-sm" id="deliveryFilter">
+          <option value="">All</option>
+          <cfif showLocal><option value="Local">Local</option></cfif>
+          <cfif showKept><option value="Kept">Kept here (converted)</option></cfif>
+          <cfif showRouted><option value="Routed">Routed elsewhere</option></cfif>
+          <cfif showStranded><option value="Elsewhere">Not delivered here (needs attention)</option></cfif>
+          <cfif showUnknown><option value="Unknown">Unknown (no recipient record)</option></cfif>
+        </select>
+      </div>
+      </cfif>
       <div class="col-auto">
         <label class="form-label small mb-0" for="fltAuth">Auth</label>
         <select class="form-select form-select-sm mb-filter" id="fltAuth" data-col="9">
