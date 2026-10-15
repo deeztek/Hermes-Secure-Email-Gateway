@@ -80,8 +80,13 @@ echo "Legacy backup:     $BACKUP"
 # ---------------------------------------------------------------- listing
 echo
 echo "Listing the backup (one pass over the whole file)..."
-tar -tzf "$BACKUP" > "$WORK/list" 2>/dev/null || { echo "ERROR: cannot read $BACKUP" >&2; exit 2; }
-sed -i 's#^\./##' "$WORK/list"
+# Verbose listing: size in field 3, name from field 6 (names may contain
+# spaces; symlinks end in " -> target", which is dropped).
+tar -tvzf "$BACKUP" 2>/dev/null \
+    | awk '{ size = $3; $1 = $2 = $3 = $4 = $5 = ""; sub(/^ +/, ""); sub(/ -> .*$/, ""); print size "\t" $0 }' \
+    | sed 's#\t\./#\t#' > "$WORK/sized" || true
+[[ -s "$WORK/sized" ]] || { echo "ERROR: cannot read $BACKUP" >&2; exit 2; }
+cut -f2- "$WORK/sized" > "$WORK/list"
 
 # ---------------------------------------------------------------- 1. files
 section "1. Files present in the legacy backup but missing here"
@@ -106,7 +111,18 @@ while IFS='|' read -r legacy docker_rel; do
     : > "$WORK/f_missing"
     while IFS= read -r f; do
         rel="${f#"$legacy"}"
-        [[ -e "$HERMES_ROOT/$docker_rel$rel" ]] || echo "$rel" >> "$WORK/f_missing"
+        target="$HERMES_ROOT/$docker_rel$rel"
+        if [[ ! -e "$target" ]]; then
+            echo "$rel" >> "$WORK/f_missing"
+        else
+            # Present by name but much smaller: likely recreated empty rather
+            # than migrated (a Bayes database is the typical case).
+            lsize=$(awk -F'\t' -v n="$f" '$2 == n { print $1; exit }' "$WORK/sized")
+            dsize=$(stat -c %s "$target" 2>/dev/null || echo 0)
+            if [[ -f "$target" && "${lsize:-0}" -gt 65536 && $((dsize * 2)) -lt "${lsize:-0}" ]]; then
+                finding "/$f is here but much smaller ($dsize bytes, legacy $lsize): recreated rather than migrated?"
+            fi
+        fi
     done < "$WORK/f_legacy"
     if [[ -s "$WORK/f_missing" ]]; then
         any_files=1
