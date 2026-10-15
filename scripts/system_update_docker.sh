@@ -619,10 +619,14 @@ preflight() {
     if ! git diff --quiet || ! git diff --cached --quiet; then
         local drift_patch="${LOG_FILE%.log}_discarded-tracked-drift.patch"
         git diff HEAD > "$drift_patch" 2>/dev/null || true
+        # Handed to the re-exec'd orchestrator, which restores the admin-owned
+        # part after the checkout (#361).
+        export HERMES_DRIFT_PATCH="$drift_patch"
         warn "Tracked files differ from git -- expected runtime/restore drift, NOT a blocker."
         warn "A recovery patch of the changes Phase 1 will discard was saved to:"
         warn "  ${drift_patch}"
         warn "Untracked files (keys, .env, .hermes_install_config, restored data) are left untouched."
+        warn "Admin-owned settings in that drift (DNS, DMARC, banners, IPS, antispam, ...) are restored after the checkout."
     else
         log "Working tree clean ✓"
     fi
@@ -711,6 +715,46 @@ phase1_pull_code() {
     run git checkout -f --quiet "$TARGET_TAG"
 
     log "Phase 1 complete."
+}
+
+# ---------------------------------------------------------------------------
+# Keep admin-owned config across the checkout (#361)
+# ---------------------------------------------------------------------------
+# Phase 1's `git checkout -f` puts every tracked file back to the release,
+# including files admin pages write (DNS overrides, DMARC, banners, IPS,
+# antispam, antivirus, ...), which then stayed at the defaults until each page
+# was saved again. The preflight saved what the checkout discarded; restore the
+# admin-owned part of it before any container is recreated or restarted.
+# Logic and the list of admin-owned paths: scripts/lib/restore_runtime_config.sh
+restore_admin_config() {
+    # Only right after this run's checkout: --skip-git means the operator
+    # handled git, and a dry run changed nothing.
+    if (( SKIP_GIT || DRY_RUN )) || [[ "${HERMES_UPDATE_REEXEC:-0}" != "1" ]]; then
+        return 0
+    fi
+    header "Restore admin-owned settings (#361)"
+
+    local patch="${HERMES_DRIFT_PATCH:-}"
+    if [[ -z "$patch" || ! -f "$patch" ]]; then
+        # An orchestrator older than this one did the checkout and did not
+        # pass the path: take the patch its preflight just wrote.
+        patch="$(find "$LOG_DIR" -maxdepth 1 -name '*_discarded-tracked-drift.patch' -mmin -30 \
+                    -printf '%T@ %p\n' 2>/dev/null | sort -rn | head -1 | cut -d' ' -f2-)"
+    fi
+    if [[ -z "$patch" || ! -f "$patch" ]]; then
+        log "No tracked drift was discarded by this upgrade; nothing to restore."
+        return 0
+    fi
+    log "Drift patch: ${patch}"
+
+    local lib="${SCRIPT_DIR}/lib/restore_runtime_config.sh"
+    if [[ ! -f "$lib" ]]; then
+        warn "Missing ${lib}; admin-owned settings were NOT restored. Re-save the affected pages."
+        return 0
+    fi
+    # shellcheck source=lib/restore_runtime_config.sh
+    source "$lib"
+    restore_runtime_config "$HERMES_ROOT" "$patch" log warn
 }
 
 # ---------------------------------------------------------------------------
@@ -1310,6 +1354,7 @@ main() {
     # Second incarnation (or --skip-git). phase1_pull_code is idempotent --
     # if already at target tag it's a no-op. Safe to call again here.
     phase1_pull_code
+    restore_admin_config
     phase2_update_containers
     phase3_apply_release_artifacts
     phase4_finalize
