@@ -365,6 +365,30 @@ only the in-stack container.
              in the engine (incl. feed / GSB / VirusTotal-derived) -- forces a
              complete re-evaluation on next click. Distinct from the automatic
              scoped purge that runs on every config change. --->
+        <!--- Pull URLhaus / OpenPhish now instead of waiting for the next
+             feed_refresh_minutes cycle. The engine refreshes in the background
+             and answers 202 at once; counts update on a reload a minute later. --->
+        <cfcase value="refresh_feeds">
+            <cftry>
+                <cfif FileExists("/opt/hermes/keys/linkguard_api_key")>
+                    <cfset lgApiFR = Trim(FileRead("/opt/hermes/keys/linkguard_api_key"))>
+                    <cfhttp method="POST" url="http://hermes_linkguard:8895/api/feed-refresh" timeout="10" throwonerror="false" result="frr">
+                        <cfhttpparam type="header" name="Authorization" value="Bearer #lgApiFR#">
+                    </cfhttp>
+                    <cfif IsDefined("frr.statuscode") AND ListFind("200,202", Left(frr.statuscode,3))>
+                        <cfset session.alerttype = "success"><cfset session.alertmsg = "Feed refresh started. Reload this page in a minute to see the new entry counts.">
+                    <cfelse>
+                        <cfset session.alerttype = "danger"><cfset session.alertmsg = "Feed refresh failed (engine HTTP " & (IsDefined("frr.statuscode") ? frr.statuscode : "?") & ").">
+                    </cfif>
+                <cfelse>
+                    <cfset session.alerttype = "danger"><cfset session.alertmsg = "Engine API key not found yet -- save Link Guard settings once to initialize it.">
+                </cfif>
+                <cfcatch type="any"><cfset session.alerttype = "danger"><cfset session.alertmsg = "Feed refresh failed: " & cfcatch.message></cfcatch>
+            </cftry>
+            <cfset session.m = 1>
+            <cflocation url="view_linkguard.cfm" addtoken="false">
+        </cfcase>
+
         <cfcase value="clear_cache">
             <cftry>
                 <cfif FileExists("/opt/hermes/keys/linkguard_api_key")>
@@ -655,7 +679,13 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <div class="card card-secondary card-outline mb-4">
   <div class="card-header"><h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Reputation sources</h3></div>
   <div class="card-body">
-    <p class="text-muted">Checked at click time, on top of the structural heuristics, with results cached. Free feeds need no key; the two API providers offer free tiers and only run once you add a key and enable them.</p>
+    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+      <p class="text-muted mb-0">Checked at click time, on top of the structural heuristics, with results cached. Free feeds need no key; the two API providers offer free tiers and only run once you add a key and enable them. Free feeds refresh on the <strong>Feed refresh (min)</strong> interval.</p>
+      <form method="post" action="view_linkguard.cfm" class="flex-shrink-0">
+        <input type="hidden" name="lg_action" value="refresh_feeds">
+        <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-sync-alt me-1"></i>Refresh feeds now</button>
+      </form>
+    </div>
     <table class="table table-bordered table-hover align-middle">
       <thead><tr><th style="width:90px">Enabled</th><th>Source</th><th>Type</th><th>Status</th><th>Limits</th><th class="text-end">API key</th></tr></thead>
       <tbody>
