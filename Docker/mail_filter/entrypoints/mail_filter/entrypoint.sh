@@ -7,7 +7,19 @@ chown -R amavis:amavis /var/lib/amavis
 chown -R amavis:amavis /mnt/data/amavis
 
 echo "Settings Persmissions on SpamAssassin Directories"
-chown -R amavis:amavis /sa-bayes
+# The Bayes database lives in /opt/hermes/sa-bayes (bayes_path in local.cf);
+# /sa-bayes is an older, unused mount. amavis owns it because amavis scans
+# and learns. Debian's daily spamassassin-maint (enabled below, CRON=1) runs
+# as debian-spamd and merges the Bayes journal, which renames and removes
+# files and so needs write on the DIRECTORY: give the amavis group write,
+# setgid so new files keep the group, and put debian-spamd in that group
+# (#357; before this it logged "cannot write to .../bayes_journal").
+mkdir -p /opt/hermes/sa-bayes
+chown -R amavis:amavis /opt/hermes/sa-bayes
+chmod 2775 /opt/hermes/sa-bayes
+if id debian-spamd >/dev/null 2>&1; then
+    usermod -a -G amavis debian-spamd
+fi
 
 echo "Setting Permissions on ClamAV Directory"
 chown -R clamav /var/lib/clamav
