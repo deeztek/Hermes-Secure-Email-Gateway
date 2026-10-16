@@ -2,4 +2,4 @@
 ### Changes are preserved
 
 $ModLoad ommysql
-syslog:ommysql:hermes_db_server,Syslog,__SYSLOG_USER__,__SYSLOG_PASS__
+*.* :ommysql:hermes_db_server,Syslog,__SYSLOG_USER__,__SYSLOG_PASS__
