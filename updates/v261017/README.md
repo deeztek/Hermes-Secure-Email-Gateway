@@ -44,6 +44,14 @@ goes. Upgrade recommended for all installs.
 - **The LDAP health check wrote about 60,000 log lines a day** into the
   System Logs database. It now runs every minute instead of every 10 seconds,
   without slowing startup (#367).
+- **The mail filter's daily maintenance logged "cannot write to
+  .../bayes_journal: Permission denied".** Spam filtering and learning were
+  not affected; the maintenance job can now do its part (#357).
+- **The Dovecot container replayed old log lines at every start,** so errors
+  from days earlier appeared in `docker logs` as if they had just happened
+  (#315).
+- **OpenDMARC and the mail filter logged an rsyslog parsing warning at
+  startup.** Their log lines were reaching System Logs regardless (#365).
 - **Link Guard's Check a URL said it does not follow redirects.** It does,
   when Follow redirects is on; the text is corrected.
 - The unused quarantine digest pages, replaced by real-time quarantine
