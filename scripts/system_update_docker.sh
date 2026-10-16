@@ -718,6 +718,24 @@ phase1_pull_code() {
 }
 
 # ---------------------------------------------------------------------------
+# Docker Engine floor (#367)
+# ---------------------------------------------------------------------------
+# docker-compose.yml uses healthcheck start_interval, which Engine < 25 does not
+# understand: `compose up` would fail with the stack half updated. Checked after
+# the checkout (this is the release's own requirement) and before any container
+# is touched, so an old engine stops the upgrade cleanly; build_no is not
+# advanced, so re-running after upgrading Docker continues it.
+require_docker_engine() {
+    local ver major
+    ver="$(docker version --format '{{.Server.Version}}' 2>/dev/null)"
+    major="${ver%%.*}"
+    if [[ "$major" =~ ^[0-9]+$ ]] && (( major < 25 )); then
+        fatal "Docker Engine ${ver} is too old: this release needs 25.0 or newer. No container was changed. Upgrade Docker, then run this update again."
+    fi
+    log "Docker Engine ${ver:-unknown} ✓"
+}
+
+# ---------------------------------------------------------------------------
 # Keep admin-owned config across the checkout (#361)
 # ---------------------------------------------------------------------------
 # Phase 1's `git checkout -f` puts every tracked file back to the release,
@@ -1355,6 +1373,7 @@ main() {
     # if already at target tag it's a no-op. Safe to call again here.
     phase1_pull_code
     restore_admin_config
+    require_docker_engine
     phase2_update_containers
     phase3_apply_release_artifacts
     phase4_finalize
