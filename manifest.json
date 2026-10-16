@@ -1,6 +1,6 @@
 {
-  "version": "261012",
-  "generated": "2026-10-13T16:36:15Z",
+  "version": "261017",
+  "generated": "2026-10-16T10:44:41Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -30,8 +30,8 @@
     "admin/2/org_signature_delete.cfm": "10b7b6b507f7e62abc404a9fefccf5a3d08803fb0b191dd3af86e4d9c2a58798",
     "admin/2/inc/org_signature_write_files.cfm": "2e2ccacb929684f3eed114173e55ea43398db395bd1a7b899eab4d57e7d01bf8",
     "admin/2/inc/signature_regen_map.cfm": "71202ddcbcaca3b1bdf1cfe7f0216eb72639e90851580642336631c687acf739",
-    "admin/2/view_linkguard.cfm": "37d70ed8097d3c78a971b042ef50f80918f86e3823ed7a409a64e80b5c456bc9",
+    "admin/2/view_linkguard.cfm": "ad33c281c8000c2dd2762c7aed28cafc4f4d3da398f65297c624c2112bcc5d50",
     "admin/2/inc/linkguard_write_and_reload.cfm": "4a6028464a7cc1e278b2b453da12b2b9b2cc22160eb9bbdd0a753415c3a12cc4"
   },
-  "fingerprint": "a979b482d86c7372214ef4cd9d16b833518eb28f164d0c93ecb132d3e4400381"
+  "fingerprint": "027280e460fe31b58ca0b34f2af3665d7d13068939e9f36aa3df6e82393f2001"
 }
