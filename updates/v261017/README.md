@@ -23,6 +23,8 @@ goes. Upgrade recommended for all installs.
   see the original address it leads to. Nothing is fetched, and expired links
   can still be decoded. A **Check this URL** button then shows how Link Guard
   treats it.
+- **Refresh feeds now (Pro).** The Link Guard page can pull the URLhaus and
+  OpenPhish lists immediately instead of waiting for the refresh interval.
 - **Link Guard's Recent activity shows where a clean link landed (Pro).** When
   a link redirected to another site, its Detail reads
   `redirects to <host>`.
