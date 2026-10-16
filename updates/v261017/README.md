@@ -1,0 +1,87 @@
+# Hermes SEG v261017
+
+## Synopsis
+
+Upgrades no longer undo your settings. Until now, every upgrade put a set of
+admin-managed settings back to their defaults (DNS Resolver overrides, DMARC,
+banners, the IPS whitelist, antispam and antivirus settings and more) until
+each page was saved again. This release keeps them. Link Guard (Pro) also
+catches more phishing links and can show where any protected link really
+goes. Upgrade recommended for all installs.
+
+**This release needs Docker Engine 25.0 or newer.** See Upgrading.
+
+## New features
+
+- **Link Guard follows redirects that happen inside a page (Pro).** Some
+  phishing links point at a harmless-looking page that sends the browser on
+  to the real phishing site. With **Follow redirects** on, Link Guard now
+  follows those too, and blocks the link when the final site is known to be
+  malicious.
+- **Decode a link (Pro).** A new card on the Link Guard page: paste a
+  protected link from an email, even one wrapped by another mail scanner, to
+  see the original address it leads to. Nothing is fetched, and expired links
+  can still be decoded. A **Check this URL** button then shows how Link Guard
+  treats it.
+- **Link Guard's Recent activity shows where a clean link landed (Pro).** When
+  a link redirected to another site, its Detail reads
+  `redirects to <host>`.
+
+## Bug fixes
+
+### All installs
+
+- **Upgrades reset admin settings to their defaults.** Affected: DNS Resolver
+  local records and forwarders, DMARC Settings, external banners, disclaimers
+  and signatures, IPS (including the whitelist), Antispam and Antivirus
+  Settings, malware feeds, ARC, DKIM and SPF settings, Dovecot, scheduled
+  tasks, `security.conf` and the LDAP configuration. They are now kept,
+  starting with this upgrade. If a release has to change one of these files
+  in the same place you did, the release's version is kept and the upgrade
+  log names the page to save again (#361).
+- **The LDAP health check wrote about 60,000 log lines a day** into the
+  System Logs database. It now runs every minute instead of every 10 seconds,
+  without slowing startup (#367).
+- **Link Guard's Check a URL said it does not follow redirects.** It does,
+  when Follow redirects is on; the text is corrected.
+- The unused quarantine digest pages, replaced by real-time quarantine
+  notifications in an earlier release, are removed (#180).
+
+### Installs migrated from legacy
+
+- **Old portal password data is removed.** The legacy version stored each
+  user's portal password as a hash, along with password-reset codes, in a
+  table Hermes no longer uses. The upgrade deletes those columns, so they no
+  longer sit in the database and its backups.
+
+## Upgrading
+
+**Before.** Check your Docker version:
+
+```bash
+docker version --format '{{.Server.Version}}'
+```
+
+If it is below 25.0, upgrade Docker first. If you upgrade Hermes anyway, the
+update stops before changing any container and asks you to upgrade Docker;
+run it again afterwards.
+
+Take a backup or snapshot.
+
+**Upgrade.** Run from your Hermes install directory
+(`/opt/Hermes-Secure-Email-Gateway` here; replace it with your own if you
+cloned elsewhere):
+
+```bash
+cd /opt/Hermes-Secure-Email-Gateway
+sudo ./scripts/system_update_docker.sh v261017
+```
+
+**After.** Nothing to re-save. The upgrade log has a **Restore admin-owned
+settings** section: if it lists a file as kept at the release default, save
+the page it names once.
+
+**Link Guard (Pro), only if it applies to you:** following redirects now
+loads each page once, the way other link scanners do. If users report that a
+one-time link (a password reset or sign-in link) says it was already used,
+add that sender's domain to the Link Guard allowlist.
