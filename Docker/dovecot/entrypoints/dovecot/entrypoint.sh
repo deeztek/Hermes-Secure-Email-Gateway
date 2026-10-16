@@ -25,7 +25,10 @@ echo "Startup complete - starting Dovecot"
 DOVECOT_PID=$!
 
 # Tail logs to stdout for docker logs visibility
-tail -F /logs/dovecot.log /logs/dovecot-info.log &
+# -n 0: follow from the end. /logs is persisted, so plain -F replayed the last
+# 10 lines on every start with fresh docker timestamps: old Fatals looked like
+# they had just happened (#315).
+tail -n 0 -F /logs/dovecot.log /logs/dovecot-info.log &
 TAIL_PID=$!
 
 # Handle signals to shut down cleanly
