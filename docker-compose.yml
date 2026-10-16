@@ -860,7 +860,9 @@ services:
       TZ: ${TIMEZONE}
     healthcheck:
       test: ["CMD", "/usr/local/bin/ldapsearch", "-x", "-H", "ldap://localhost:389", "-b", "", "-s", "base", "(objectclass=*)"]
-      interval: 10s
+      # 60s, not 10s: every check is an anonymous bind + search that slapd
+      # logs as 7 lines, ~60,000 a day into the Syslog database at 10s (#367).
+      interval: 60s
       timeout: 5s
       retries: 5
       start_period: 15s
