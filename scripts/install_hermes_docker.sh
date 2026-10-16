@@ -11,7 +11,7 @@
 #
 # Prerequisites:
 #   - Linux host (any distribution)
-#   - Docker Engine 24.0+
+#   - Docker Engine 25.0+
 #   - Docker Compose v2
 #   - Git
 #   - Minimum 4GB RAM, 50GB disk
@@ -1324,6 +1324,11 @@ preflight_checks() {
     fi
     DOCKER_VERSION=$(docker --version | grep -oP '\d+\.\d+' | head -1)
     log "Docker version: $DOCKER_VERSION"
+    # 25.0+: docker-compose.yml uses healthcheck start_interval (#367), which
+    # older engines do not understand.
+    if (( ${DOCKER_VERSION%%.*} < 25 )); then
+        error "Docker Engine 25.0 or newer is required (found ${DOCKER_VERSION}). Upgrade Docker and run the installer again."
+    fi
 
     # Check Docker Compose
     if ! docker compose version &> /dev/null; then

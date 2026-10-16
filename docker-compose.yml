@@ -866,6 +866,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+      # Checks every 5s until healthy (within start_period), so the services
+      # that wait for LDAP to be healthy do not wait a full interval at start.
+      # Needs Docker Engine 25.0+.
+      start_interval: 5s
     volumes:
       - ldap_data:/var/lib/ldap
       - ldap_logs:/var/log

@@ -73,7 +73,7 @@ A new machine or VM. The legacy one stays untouched, which is your fallback.
 | Disk | 120 GB for the OS and images, plus the four storage tiers |
 | Network | Outbound to the container registry, and outbound UDP/TCP 53 to the root servers |
 
-Install Docker Engine 24.0 or later and Compose v2.
+Install Docker Engine 25.0 or later and Compose v2.
 
 See [Storage topology](storage-topology.md) for sizing the four data tiers. For
 a small gateway they can share one disk.

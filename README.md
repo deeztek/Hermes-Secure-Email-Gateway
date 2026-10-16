@@ -236,8 +236,8 @@ See the canonical reference at [docs.deeztek.com &middot; Storage Topology (5 ti
 
 | Item | Recommendation |
 |---|---|
-| Host OS | Any Linux distribution capable of running Docker Engine 24.0+ and Compose v2. **Tested reference: Ubuntu 24.04 Server.** |
-| Docker | Engine 24.0+ |
+| Host OS | Any Linux distribution capable of running Docker Engine 25.0+ and Compose v2. **Tested reference: Ubuntu 24.04 Server.** |
+| Docker | Engine 25.0+ |
 | Docker Compose | v2 |
 | CPU | 4 vCPUs minimum, more for higher mail volume |
 | RAM | 8 GB minimum, 16 GB+ recommended for production |
