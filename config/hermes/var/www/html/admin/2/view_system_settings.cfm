@@ -777,7 +777,7 @@ a, a:hover{
             <div class="mb-3">
                 <label class="form-label"><strong>Telemetry</strong></label>
                 <div class="alert alert-warning">
-                    <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Telemetry sends anonymized data to our servers in order to improve Hermes SEG and our services. <strong>We do NOT share or sell this data!!</strong> The data is strictly used for internal purposes. We appreciate leaving it enabled. For a detailed explanation of the data we collect, please <a href="https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/system-settings" target="_blank">click here</a>.</p>
+                    <p class="mb-0"><i class="icon fas fa-exclamation-triangle"></i>Telemetry sends a short daily report to our servers to help us improve Hermes SEG and our services: a unique system ID, counts of recipients, domains and messages, and the version, build, time zone, edition and certificate type. It never includes email addresses, domain names or message content. <strong>We do NOT share or sell this data!!</strong> The data is strictly used for internal purposes. We appreciate leaving it enabled. For a detailed explanation of the data we collect, please <a href="https://docs.deeztek.com/books/hermes-seg-administrator-guide/page/system-settings" target="_blank">click here</a>.</p>
                 </div>
                 <select class="form-control" name="telemetry" style="width: 100%;" id="telemetry">
                     <cfif #get_telemetry.value# is "1">

@@ -31,7 +31,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
     
     <cfquery name="getdomainsspecified" datasource="hermes">
       
-        select count(recipient) as domainsspecified from recipients where domain = '1' and status = '' or status is null
+        select count(recipient) as domainsspecified from recipients where domain = '1' and (status = '' or status is null)
       </cfquery>
     
     <cfquery name="getdomainsany" datasource="hermes">
@@ -142,133 +142,47 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 </cfif>
 
             
-      <!--- GENERATE CUSTOMTRANS --->
-    <cfinclude template="generate_customtrans.cfm">
-            
-            
-    <!--- GENERATE/ENCRYPT TELEMETRY WITH PUBLIC KEY STARTS HERE --->
-    <cffile action = "write"
-    file = "/opt/hermes/tmp/#customtrans3#_telemetryfile"
-    output = "#theUuid##chr(64)##recipients##chr(64)##domainsspecified##chr(64)##domainsany##chr(64)##virtual##chr(64)##getversion.value##chr(64)##getbuild.value##chr(64)##gettimezone.value##chr(64)##edition##chr(64)##ConsoleCertificate##chr(64)##SmtpCertificate##chr(64)##CleanMessages##chr(64)##SpamMessages##chr(64)##VirusMessages#" addnewline="no">
-      
-    
-      <cftry> 
-    
-      <cfexecute name = "/usr/bin/openssl"
-        arguments="rsautl -encrypt -inkey /opt/hermes/ssl/public.pem -pubin -in /opt/hermes/tmp/#customtrans3#_telemetryfile -out /opt/hermes/tmp/#customtrans3#_telemetryfile.ssl"
-        timeout = "60">
-        </cfexecute>
-        
-        <cfcatch type="any">
-     
-            <cfset m="/inc/check_system_update.cfm: Error running /usr/bin/openssl">
-            <cfinclude template="error.cfm">
-            <cfabort>
-    
-    
-        </cfcatch>
-        </cftry>
-    
-    <!--- GENERATE/ENCRYPT TELEMETRY WITH PUBLIC KEY ENDS HERE --->
-    
-    <cftry>
-    
-    <!--- POST TO TELEMETRY SERVER STARTS HERE --->
-    
-    <CFHTTP METHOD="Post" URL="https://updates.deeztek.com/telemetry.cfm" timeout="60">
-          
-      <CFHTTPPARAM TYPE="File"
-              NAME="#customtrans3#_telemetryfile.ssl"
-              FILE="/opt/hermes/tmp/#customtrans3#_telemetryfile.ssl">
-              
-      <CFHTTPPARAM TYPE="Formfield"
-              VALUE="#customtrans3#"
-              NAME="customtrans">
-              
-      </CFHTTP>
-      
-      <cfcatch type="any">
-    
-    <!--- Disabling catching errors --->
-    <!---
-        <cfif #cfcatch.message# contains "invalid call of the function listGetAt">
-        
-        <cfoutput>
-          <cfset m="/inc/check_system_update.cfm: Error reaching server. Error was: #cfcatch.message#. Ensure updates.deeztek.com is accessible via ports 80 and 443 with no SSL interception.">
-        </cfoutput>
-          <cfinclude template="error.cfm">
-          <cfabort>
-        
-        <!-- /CFIF cfcatch.message -->
-        </cfif>
-        
-    --->
-        </cfcatch>
-        
-        
-        </cftry>
-    
-    
-    
-          <!--- POST TO TELEMETRY SERVER ENDS HERE --->
-          
-         <!--- PARSE HTTP STATUS CODE STARTS HERE --->
-    
-          <cfif #cfhttp.status_code# EQ "200">
-    
-          <!--- DELETE /opt/hermes/tmp/#form.customtrans#_telemetryfile --->
-           <cfset telemetryfile="/opt/hermes/tmp/#customtrans3#_telemetryfile">
-          <cfif fileExists(telemetryfile)>
-          
-          <cffile action = "delete" file = "#telemetryfile#">
-          
-          <!--- /CFIF fileExists(telemetryfile)> --->
-          </cfif>
-          
-          <!--- DELETE /opt/hermes/tmp/#form.customtrans#_telemetryfile.ssl --->
-          <cfset telemetryfile_ssl="/opt/hermes/tmp/#customtrans3#_telemetryfile.ssl">
-          <cfif fileExists(telemetryfile_ssl)>
-          
-          <cffile action = "delete" file = "#telemetryfile_ssl#">
-          
-          <!--- /CFIF fileExists(telemetryfile_ssl)> --->
-          </cfif>
-    
-     
-         <cfelse>
-    
-     <!--- DELETE /opt/hermes/tmp/#form.customtrans#_telemetryfile --->
-     <cfset updatefile="/opt/hermes/tmp/#customtrans3#_telemetryfile">
-     <cfif fileExists(updatefile)>
-     
-     <cffile action = "delete" file = "#updatefile#">
-     
-     <!-- /CFIF fileExists(updatefile)> -->
-     </cfif>
-     
-     <!--- DELETE /opt/hermes/tmp/#form.customtrans#_telemetryfile.ssl --->
-     <cfset updatefile_ssl="/opt/hermes/tmp/#customtrans3#_telemetryfile.ssl">
-     <cfif fileExists(updatefile_ssl)>
-     
-     <cffile action = "delete" file = "#updatefile_ssl#">
-     
-     <!-- /CFIF fileExists(updatefile_ssl)> -->
-     </cfif>
-      
-    <!--- Disabling error page --->
-    <!---
-    <cfoutput>
-      <cfset m="/inc/send_telemetry.cfm: HTTP Status Code: #cfhttp.statuscode#">
-    </cfoutput>
-    
-      <cfinclude template="error.cfm">
-    
-      <cfabort>  
-    
---->
-    
-          <!--- /CFIF #cfhttp.status_code# --->
-          </cfif>
+<!--- ENCRYPT AND SEND.
+     Receiver: https://telemetry.hermesseg.io/ (dedicated host; the old
+     updates.deeztek.com endpoint is defunct). The wire format is unchanged:
+     one RSA block encrypted with /opt/hermes/ssl/public.pem, posted as a file
+     field named <token>_telemetryfile.ssl plus a customtrans field.
+
+     Failures are logged to the hermes log and never stop the nightly job
+     that includes this file. Before this, every failure was silent, so a
+     broken receiver (an expired certificate) went unnoticed for weeks. The
+     unencrypted payload is deleted whatever happens. --->
+<cfinclude template="generate_customtrans.cfm">
+<cfset telemetryPlain = "/opt/hermes/tmp/#customtrans3#_telemetryfile">
+<cfset telemetryEnc = "/opt/hermes/tmp/#customtrans3#_telemetryfile.ssl">
+<cftry>
+    <cffile action="write" file="#telemetryPlain#" output="#theUuid##chr(64)##recipients##chr(64)##domainsspecified##chr(64)##domainsany##chr(64)##virtual##chr(64)##getversion.value##chr(64)##getbuild.value##chr(64)##gettimezone.value##chr(64)##edition##chr(64)##ConsoleCertificate##chr(64)##SmtpCertificate##chr(64)##CleanMessages##chr(64)##SpamMessages##chr(64)##VirusMessages#" addnewline="no">
+
+    <cfexecute name="/usr/bin/openssl"
+        arguments="rsautl -encrypt -inkey /opt/hermes/ssl/public.pem -pubin -in #telemetryPlain# -out #telemetryEnc#"
+        timeout="60">
+    </cfexecute>
+    <cfif NOT FileExists(telemetryEnc)>
+        <cfthrow message="openssl produced no encrypted file">
+    </cfif>
+
+    <cfhttp method="post" url="https://telemetry.hermesseg.io/" timeout="60" throwonerror="false" result="telemetryResult">
+        <cfhttpparam type="file" name="#customtrans3#_telemetryfile.ssl" file="#telemetryEnc#">
+        <cfhttpparam type="formfield" name="customtrans" value="#customtrans3#">
+    </cfhttp>
+
+    <cfif NOT (IsDefined("telemetryResult.status_code") AND telemetryResult.status_code EQ 200)>
+        <cflog file="hermes" type="warning"
+               text="send_telemetry: telemetry.hermesseg.io did not accept the report: #IsDefined('telemetryResult.statuscode') ? telemetryResult.statuscode : 'no response'# #Left(IsDefined('telemetryResult.errordetail') ? telemetryResult.errordetail : '', 200)#">
+    </cfif>
+    <cfcatch type="any">
+        <cflog file="hermes" type="warning" text="send_telemetry: not sent: #cfcatch.message#">
+    </cfcatch>
+    <cffinally>
+        <cfif FileExists(telemetryPlain)><cffile action="delete" file="#telemetryPlain#"></cfif>
+        <cfif FileExists(telemetryEnc)><cffile action="delete" file="#telemetryEnc#"></cfif>
+    </cffinally>
+</cftry>
 
 <!--- /CFIF #checktelemetry.value# is "1" --->
 </cfif>

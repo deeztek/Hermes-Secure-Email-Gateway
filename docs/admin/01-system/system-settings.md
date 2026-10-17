@@ -42,7 +42,7 @@ straight `UPDATE … WHERE parameter = '<key>'`.
 | General | `serial` | empty | Pro Edition serial; set via the **Add Serial Number** modal |
 | General | `users` | `9999` | Set to `9999` automatically when a serial activates (legacy seat-cap field, no longer enforced) |
 | General | `daily_update_check` | `2` (Disable) | `1` = enable, `2` = disable; controls the auto-update poll |
-| General | `telemetry` | `1` (Enable) | `1` = enable, `2` = disable; anonymised usage data |
+| General | `telemetry` | `1` (Enable) | `1` = enable, `2` = disable; daily usage report (see Daily Update Check / Telemetry) |
 | General | `accepted` | `1` | Legacy AGPL acceptance flag; not surfaced in the UI |
 | Release stamp | `version_no` | `Docker` | Sentinel that marks this as a Docker install |
 | Release stamp | `build_no` | `v260119` | Current release tag |
@@ -168,9 +168,23 @@ RSA-encrypted payload.
 
 Two boolean (1 = enable, 2 = disable) selects. Daily Update Check is
 the toggle for the auto-update poll that watches for new releases.
-Telemetry is the anonymised usage-data feed; the in-card warning
-callout links to the public privacy doc. Defaults are: Telemetry =
-enabled, Daily Update Check = disabled.
+Defaults are: Telemetry = enabled, Daily Update Check = disabled.
+
+**What telemetry sends.** Once a day, as part of the nightly maintenance
+job, Hermes sends a short report to `https://telemetry.hermesseg.io/`:
+
+- a unique system ID for the installation;
+- counts of internal recipients, domains and virtual recipients (never the
+  addresses or domain names themselves);
+- the Hermes version, build, time zone and edition;
+- whether the built-in certificate is used for the console and for SMTP
+  (never the certificate itself);
+- counts of clean, spam and virus messages (never the messages themselves).
+
+The report is encrypted before it is sent. It is not shared or sold and is
+used only to improve Hermes SEG and our services. If a report cannot be
+sent, the reason is written to the Hermes log (`hermes.log`) and nothing
+else is affected. Set Telemetry to **Disable** to stop it.
 
 ### Save flow
 

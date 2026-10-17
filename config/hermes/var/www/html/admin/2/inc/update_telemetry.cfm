@@ -13,7 +13,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
 <!--- UPDATE TELEMETRY --->
 
 <cfquery name="updatetelemetry" datasource="hermes">
-update system_settings set value='#form.telemetry#' where parameter='telemetry'
+update system_settings set value=<cfqueryparam value="#form.telemetry#" cfsqltype="cf_sql_varchar" maxlength="1"> where parameter='telemetry'
 </cfquery>
 
 

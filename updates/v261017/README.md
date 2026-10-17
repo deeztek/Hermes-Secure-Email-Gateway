@@ -44,6 +44,12 @@ goes. Upgrade recommended for all installs.
 - **The LDAP health check wrote about 60,000 log lines a day** into the
   System Logs database. It now runs every minute instead of every 10 seconds,
   without slowing startup (#367).
+- **Telemetry stopped reaching us in late August.** Its server
+  (`updates.deeztek.com`) is retired; reports now go to the dedicated
+  `telemetry.hermesseg.io`. A failed report is now written to the Hermes log
+  instead of failing silently, the unencrypted report file is always deleted,
+  and the domain count in the report is corrected. The System Settings page
+  and the documentation now list exactly what is sent.
 - **The mail filter's daily maintenance logged "cannot write to
   .../bayes_journal: Permission denied".** Spam filtering and learning were
   not affected; the maintenance job can now do its part (#357).

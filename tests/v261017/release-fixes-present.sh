@@ -57,4 +57,9 @@ docker exec hermes_linkguard grep -q 'redirects to %s' /opt/linkguard/app/verdic
 check $w/admin/2/view_linkguard.cfm 'value="decode_link"' "Decode a link card present"
 check $w/admin/2/view_linkguard.cfm 'value="refresh_feeds"' "Refresh feeds now button present"
 
+# Telemetry: dedicated receiver, failures logged, count fixed
+check $w/admin/2/inc/send_telemetry.cfm 'https://telemetry.hermesseg.io/' "telemetry posts to telemetry.hermesseg.io"
+check $w/admin/2/inc/send_telemetry.cfm 'cffinally' "telemetry deletes its temp files whatever happens"
+check $w/admin/2/inc/send_telemetry.cfm "(status = '' or status is null)" "telemetry domain count fixed"
+
 done_check
