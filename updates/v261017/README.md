@@ -54,6 +54,9 @@ goes. Upgrade recommended for all installs.
   startup.** Their log lines were reaching System Logs regardless (#365).
 - **Link Guard's Check a URL said it does not follow redirects.** It does,
   when Follow redirects is on; the text is corrected.
+- **RBL Configuration now points to where a trusted server is exempted.**
+  The legacy "RBL whitelist" (IP & Network Override) lives on as **Network
+  Block/Allow**; the RBL page now says so and links to it.
 - The unused quarantine digest pages, replaced by real-time quarantine
   notifications in an earlier release, are removed (#180).
 

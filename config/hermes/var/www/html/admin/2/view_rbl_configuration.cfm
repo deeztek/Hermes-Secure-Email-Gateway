@@ -173,6 +173,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <p class="mb-1"><strong>Block List (DNSBL):</strong> DNS-based blacklists that identify known spam sources (e.g., <code>zen.spamhaus.org</code>, <code>bl.spamcop.net</code>). Matches add to the spam score.</p>
       <p class="mb-1"><strong>Allow List (DNSWL):</strong> DNS-based whitelists that identify trusted senders (e.g., <code>list.dnswl.org</code>). Matches subtract from the spam score.</p>
       <p class="mb-1"><strong>Weight:</strong> Controls how much each list contributes to the overall DNSBL score. The combined score is compared against the DNSBL Threshold configured in Perimeter Checks.</p>
+      <p class="mb-1"><strong>Exempting a trusted server:</strong> to let a specific IP address or network skip these RBL checks (for example a partner server listed by mistake), add it as <strong>Allow</strong> under <a href="view_network_block_allow.cfm">Network Block/Allow</a>. That page replaces the legacy <em>RBL whitelist</em> (IP &amp; Network Override).</p>
       <p class="mb-0"><strong>Return Code Filtering:</strong> Postfix supports filtering by DNS return code using <code>hostname=127.x.x.x</code> syntax (e.g., <code>bl.mailspike.net=127.0.0.[10;11;12]</code>). This restricts matches to specific return codes published by the list.</p>
     </div>
     <form method="post" autocomplete="off">
