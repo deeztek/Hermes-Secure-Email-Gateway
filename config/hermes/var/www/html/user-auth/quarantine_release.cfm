@@ -63,7 +63,7 @@ See GitHub issue #180
     <cfabort>
 </cfif>
 
-<!--- Token is valid — look up the quarantine details --->
+<!--- Token is valid: look up the quarantine details --->
 <cfquery name="getmsg" datasource="hermes">
     SELECT m.mail_id, m.secret_id, m.quar_loc, m.subject,
            ma_rcpt.email AS recipient_email,
@@ -85,6 +85,13 @@ See GitHub issue #180
     <cfabort>
 </cfif>
 
+<!--- Amavis stores addresses in maddr.email as VARBINARY, so these come back
+     as binary. Comparing or encoding binary throws ("can't compare complex
+     object types as simple value"), which used to fire AFTER the release had
+     run: the page showed "Message Released" and "Release Failed" together. --->
+<cfset rcptEmail = isBinary(getmsg.recipient_email) ? charsetEncode(getmsg.recipient_email, "utf-8") : getmsg.recipient_email>
+<cfset fromEmail = isBinary(getmsg.from_email) ? charsetEncode(getmsg.from_email, "utf-8") : getmsg.from_email>
+
 <!--- Check if quarantine file still exists --->
 <cfset quarFile = "/mnt/data/amavis/" & getmsg.quar_loc>
 
@@ -100,44 +107,50 @@ See GitHub issue #180
 <!--- Validate inputs contain only safe characters before passing to shell --->
 <cfif REFind("[^A-Za-z0-9\-\_\.\/\@\+]", getmsg.quar_loc) GT 0
    OR REFind("[^A-Za-z0-9\-\_]", getmsg.secret_id) GT 0
-   OR REFind("[^A-Za-z0-9\-\_\.\@\+]", getmsg.recipient_email) GT 0>
+   OR REFind("[^A-Za-z0-9\-\_\.\@\+]", rcptEmail) GT 0>
     <div class="card">
         <div class="card-header error"><div class="icon">&#10060;</div><h2>Release Failed</h2></div>
         <div class="card-body"><p>Invalid message data. Please release this message from the User Portal.</p></div>
     </div>
     <cfabort>
 </cfif>
+<!--- Decide first, render after: nothing is printed inside the try, so an
+     error can never leave a half-printed success card above a failure. --->
+<cfset releaseStatus = "error">
 <cftry>
     <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getmsg.secret_id# #getmsg.recipient_email#"
+        arguments="exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getmsg.secret_id# #rcptEmail#"
         timeout="60"
         variable="releaseOutput"
         errorVariable="releaseError">
     </cfexecute>
-
-    <cfset allOutput = releaseOutput & " " & releaseError>
-    <cfif FindNoCase("250", allOutput)>
-        <div class="card">
-            <div class="card-header success"><div class="icon">&#9989;</div><h2>Message Released</h2></div>
-            <div class="card-body">
-                <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(getmsg.from_email EQ "" ? "unknown sender" : getmsg.from_email)#</cfoutput></strong> has been released to your mailbox.</p>
-                <p>It should arrive within a few minutes.</p>
-            </div>
-        </div>
-    <cfelse>
-        <div class="card">
-            <div class="card-header error"><div class="icon">&#10060;</div><h2>Release Failed</h2></div>
-            <div class="card-body"><p>The message could not be released. It may have already been released or the quarantine file is no longer available.</p></div>
-        </div>
-    </cfif>
-
+    <cfset releaseStatus = FindNoCase("250", releaseOutput & " " & releaseError) ? "released" : "failed">
 <cfcatch type="any">
-    <div class="card">
-        <div class="card-header error"><div class="icon">&#10060;</div><h2>Release Failed</h2></div>
-        <div class="card-body"><p>An error occurred while attempting to release this message. Please try releasing it from the <a href="https://<cfoutput><cfquery name="getportal2" datasource="hermes">SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'</cfquery>#getportal2.value2#</cfoutput>/users/2/view_message_history.cfm">User Portal</a>.</p></div>
-    </div>
+    <cflog file="hermes" type="error" text="quarantine_release: amavisd-release failed: #cfcatch.message#">
+    <cfset releaseStatus = "error">
 </cfcatch>
 </cftry>
+
+<cfif releaseStatus EQ "released">
+    <div class="card">
+        <div class="card-header success"><div class="icon">&#9989;</div><h2>Message Released</h2></div>
+        <div class="card-body">
+            <p>The message <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong> from <strong><cfoutput>#encodeForHTML(fromEmail EQ "" ? "unknown sender" : fromEmail)#</cfoutput></strong> has been released to your mailbox.</p>
+            <p>It should arrive within a few minutes.</p>
+        </div>
+    </div>
+<cfelseif releaseStatus EQ "failed">
+    <div class="card">
+        <div class="card-header error"><div class="icon">&#10060;</div><h2>Release Failed</h2></div>
+        <div class="card-body"><p>The message could not be released. It may have already been released or the quarantine file is no longer available.</p></div>
+    </div>
+<cfelse>
+    <cfquery name="getportal2" datasource="hermes">SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'</cfquery>
+    <div class="card">
+        <div class="card-header error"><div class="icon">&#10060;</div><h2>Release Failed</h2></div>
+        <div class="card-body"><p>An error occurred while attempting to release this message. Please try releasing it from the <a href="https://<cfoutput>#encodeForHTMLAttribute(getportal2.value2)#</cfoutput>/users/2/view_message_history.cfm">User Portal</a>.</p></div>
+    </div>
+</cfif>
 
 </body>
 </html>

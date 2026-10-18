@@ -44,6 +44,10 @@ goes. Upgrade recommended for all installs.
 - **The LDAP health check wrote about 60,000 log lines a day** into the
   System Logs database. It now runs every minute instead of every 10 seconds,
   without slowing startup (#367).
+- **Releasing a message from a quarantine notification showed both "Message
+  Released" and "Release Failed".** The message was released; the error came
+  from displaying the sender's address afterwards. The page now shows only
+  the real outcome.
 - **Telemetry stopped reaching us in late August.** Its server
   (`updates.deeztek.com`) is retired; reports now go to the dedicated
   `telemetry.hermesseg.io`. A failed report is now written to the Hermes log
