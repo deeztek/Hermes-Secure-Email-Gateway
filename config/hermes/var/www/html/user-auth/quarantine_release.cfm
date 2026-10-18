@@ -3,6 +3,11 @@ Hermes SEG - Tokenized Quarantine Message Release
 Public endpoint (no Authelia login required).
 Validates HMAC-SHA256 token and releases the quarantined message.
 See GitHub issue #180
+
+Opening the link (GET) only SHOWS the message and a Release button; the
+release happens on the button's POST. Mail-security scanners in front of a
+recipient's mailbox open links in incoming mail automatically, and a release
+on GET let them release quarantined messages nobody chose to release.
 --->
 <!DOCTYPE html>
 <html lang="en">
@@ -32,8 +37,11 @@ See GitHub issue #180
 </div>
 
 <cfparam name="url.token" default="">
+<cfparam name="form.token" default="">
+<cfset isReleasePost = (cgi.request_method EQ "POST")>
+<cfset releaseToken = Trim(isReleasePost ? form.token : url.token)>
 
-<cfif url.token EQ "">
+<cfif releaseToken EQ "">
     <div class="card">
         <div class="card-header error"><div class="icon">&#10060;</div><h2>Invalid Request</h2></div>
         <div class="card-body"><p>No release token was provided.</p></div>
@@ -45,7 +53,7 @@ See GitHub issue #180
 <cfinclude template="/schedule/inc/quarantine_token.cfm">
 
 <!--- Validate the token --->
-<cfset tokenResult = validateQuarantineReleaseToken(url.token)>
+<cfset tokenResult = validateQuarantineReleaseToken(releaseToken)>
 
 <cfif NOT tokenResult.valid>
     <div class="card">
@@ -114,6 +122,25 @@ See GitHub issue #180
     </div>
     <cfabort>
 </cfif>
+<!--- GET: confirm only. The release itself needs the button's POST. --->
+<cfif NOT isReleasePost>
+    <div class="card">
+        <div class="card-header info"><div class="icon">&#9993;</div><h2>Release Quarantined Message?</h2></div>
+        <div class="card-body">
+            <p>Subject: <strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong></p>
+            <p>From: <strong><cfoutput>#encodeForHTML(fromEmail EQ "" ? "unknown sender" : fromEmail)#</cfoutput></strong></p>
+            <p>Only release it if you recognise the sender and expected this message.</p>
+            <form method="post" action="quarantine_release.cfm">
+                <input type="hidden" name="token" value="<cfoutput>#encodeForHTMLAttribute(releaseToken)#</cfoutput>">
+                <button type="submit" style="background:#28a745;color:#fff;border:0;border-radius:4px;padding:10px 20px;font-size:16px;cursor:pointer;">Release message</button>
+            </form>
+        </div>
+    </div>
+    </body>
+    </html>
+    <cfabort>
+</cfif>
+
 <!--- Decide first, render after: nothing is printed inside the try, so an
      error can never leave a half-printed success card above a failure. --->
 <cfset releaseStatus = "error">

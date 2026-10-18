@@ -60,6 +60,7 @@ check $w/admin/2/view_linkguard.cfm 'value="refresh_feeds"' "Refresh feeds now b
 # Quarantine release page: binary addresses converted, render after the outcome
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'charsetEncode(getmsg.from_email' "quarantine release converts binary sender address"
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'releaseStatus EQ "released"' "quarantine release renders only the real outcome"
+check config/hermes/var/www/html/user-auth/quarantine_release.cfm '<cfif NOT isReleasePost>' "opening a release link only confirms; the release needs the button"
 
 # Telemetry: dedicated receiver, failures logged, count fixed
 check $w/admin/2/inc/send_telemetry.cfm 'https://telemetry.hermesseg.io/' "telemetry posts to telemetry.hermesseg.io"

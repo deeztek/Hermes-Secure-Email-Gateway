@@ -25,6 +25,7 @@ Change these so the upgrade has something to keep (#361):
 | Link Guard: **Refresh feeds now** | "Feed refresh started"; two fresh `feed ... refreshed` lines in `docker logs hermes_linkguard` |
 | Link Guard: click a link that redirects (e.g. a marketing click-tracking link) | Its Recent activity row's Detail reads `redirects to <host>` |
 | `docker logs hermes_dmarc 2>&1 \| grep -c 'error during parsing'` after a restart | 0 (#365) |
+| Quarantine a test message, then open the release link from its notification | A confirmation page (subject, sender, **Release message**); the message is NOT released until the button is pressed; then only "Message Released" |
 | Sign in to the Hermes admin console and to `/ciphermail` | Both reach their dashboards |
 | `sudo HERMES_TEST_HOST=1 tests/run.sh` | All releases' checks pass |
 

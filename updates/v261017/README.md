@@ -48,6 +48,11 @@ goes. Upgrade recommended for all installs.
   Released" and "Release Failed".** The message was released; the error came
   from displaying the sender's address afterwards. The page now shows only
   the real outcome.
+- **The release link in a quarantine notification released the message as
+  soon as it was opened.** Mail-security services in front of some mailboxes
+  open links in incoming mail automatically to scan them, which could release
+  a message nobody chose to release. The link now shows the message's subject
+  and sender with a **Release message** button; only the button releases it.
 - **Telemetry stopped reaching us in late August.** Its server
   (`updates.deeztek.com`) is retired; reports now go to the dedicated
   `telemetry.hermesseg.io`. A failed report is now written to the Hermes log
