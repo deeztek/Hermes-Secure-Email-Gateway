@@ -3817,6 +3817,14 @@ start over with a fresh IP.
     cd ${HERMES_ROOT}
     ./scripts/install_hermes_docker.sh    # pick option [2] when prompted
 
+TELEMETRY
+---------
+Telemetry is ENABLED. Once a day Hermes sends a short usage report to
+https://telemetry.hermesseg.io/: a unique system ID, counts of recipients,
+domains and messages, and the version, build, time zone, edition and
+certificate type. It never includes email addresses, domain names or message
+content. To turn it off: System > System Settings > Telemetry > Disable.
+
 LOG FILES
 ---------
 Install log:        ${LOG_FILE}
@@ -3881,6 +3889,12 @@ EOF
     echo ""
     echo -e "    Eight tiers (containers, DBs, mail chain, LDAP/Authelia, Ofelia,"
     echo -e "    fail2ban). PASS/WARN/FAIL per check; exit 0 = clean."
+    echo ""
+    echo -e "  ${CYAN}+----------------------------------------------------------------------+${NC}"
+    echo -e "  ${CYAN}|${NC} ${BOLD}TELEMETRY${NC} is enabled: daily usage report, no addresses or content ${CYAN}|${NC}"
+    echo -e "  ${CYAN}+----------------------------------------------------------------------+${NC}"
+    echo -e "    What is sent and how to turn it off: see TELEMETRY in the summary file,"
+    echo -e "    or System > System Settings > Telemetry."
     echo ""
     echo -e "  ${BOLD}${GREEN}+----------------------------------------------------------------------+${NC}"
     echo -e "  ${BOLD}${GREEN}|${NC} ${BOLD}GETTING STARTED GUIDE${NC} -- full post-install walkthrough            ${BOLD}${GREEN}|${NC}"

@@ -52,8 +52,9 @@ goes. Upgrade recommended for all installs.
   (`updates.deeztek.com`) is retired; reports now go to the dedicated
   `telemetry.hermesseg.io`. A failed report is now written to the Hermes log
   instead of failing silently, the unencrypted report file is always deleted,
-  and the domain count in the report is corrected. The System Settings page
-  and the documentation now list exactly what is sent.
+  and the domain count in the report is corrected. The System Settings page,
+  the documentation and the installer's final summary now say exactly what
+  is sent and how to turn it off.
 - **The mail filter's daily maintenance logged "cannot write to
   .../bayes_journal: Permission denied".** Spam filtering and learning were
   not affected; the maintenance job can now do its part (#357).

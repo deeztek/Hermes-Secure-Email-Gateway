@@ -131,6 +131,7 @@ The install script sets `myhostname` from what you typed at the FQDN prompt, but
 - **Postmaster address**: where bounce messages and admin notifications go
 - **Admin email**: where alerts (license, system events) get delivered, including notification of a failed scheduled job
 - **Time zone**: affects log timestamps and report scheduling
+- **Telemetry**: enabled by default. Once a day Hermes sends a short usage report (a unique system ID, counts of recipients, domains and messages, version, build, time zone, edition and certificate type; never addresses, domain names or message content). Set it to **Disable** here if you prefer not to send it.
 
 ---
 
