@@ -39,6 +39,10 @@ SENSITIVE_PATHS=(
     "*hibernate.cfg.xml"
     "*dovecot-sql*.conf"
     "*cloudflare-token.conf"
+    # Service-host copies (licence server code, keys, DB passwords). Already in
+    # .gitignore; listed here so a forced `git add -f` is blocked too.
+    "hermes-servers/*"
+    "license-server/*"
 )
 
 # Get list of staged files
