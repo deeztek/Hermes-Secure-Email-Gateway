@@ -3891,7 +3891,7 @@ EOF
     echo -e "    fail2ban). PASS/WARN/FAIL per check; exit 0 = clean."
     echo ""
     echo -e "  ${CYAN}+----------------------------------------------------------------------+${NC}"
-    echo -e "  ${CYAN}|${NC} ${BOLD}TELEMETRY${NC} is enabled: daily usage report, no addresses or content ${CYAN}|${NC}"
+    echo -e "  ${CYAN}|${NC} ${BOLD}TELEMETRY${NC} is enabled: daily usage report, no addresses or content    ${CYAN}|${NC}"
     echo -e "  ${CYAN}+----------------------------------------------------------------------+${NC}"
     echo -e "    What is sent and how to turn it off: see TELEMETRY in the summary file,"
     echo -e "    or System > System Settings > Telemetry."
