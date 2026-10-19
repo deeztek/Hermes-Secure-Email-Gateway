@@ -100,6 +100,16 @@ on GET let them release quarantined messages nobody chose to release.
 <cfset rcptEmail = isBinary(getmsg.recipient_email) ? charsetEncode(getmsg.recipient_email, "utf-8") : getmsg.recipient_email>
 <cfset fromEmail = isBinary(getmsg.from_email) ? charsetEncode(getmsg.from_email, "utf-8") : getmsg.from_email>
 
+<!--- Blocked without a quarantine copy (e.g. local-network spam above the
+      quarantine cutoff): nothing was ever kept, so nothing can be released. --->
+<cfif Len(Trim(toString(getmsg.quar_loc))) EQ 0>
+    <div class="card">
+        <div class="card-header info"><div class="icon">&#8505;</div><h2>Not Kept in Quarantine</h2></div>
+        <div class="card-body"><p>This message (<strong><cfoutput>#encodeForHTML(getmsg.subject)#</cfoutput></strong>) was blocked without keeping a copy, so it cannot be released.</p></div>
+    </div>
+    <cfabort>
+</cfif>
+
 <!--- Check if quarantine file still exists --->
 <cfset quarFile = "/mnt/data/amavis/" & getmsg.quar_loc>
 

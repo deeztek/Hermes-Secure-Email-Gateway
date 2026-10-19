@@ -1303,7 +1303,7 @@ phase6_prune_images() {
     # alone because this cannot know what it means.
     local versions keep_list
     versions=$(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-        | grep -E '/hermes-[a-z_]+:v[0-9]{6}$' \
+        | grep -E '/hermes-[a-z_-]+:v[0-9]{6}$' \
         | sed 's/.*:v/v/' \
         | sort -u)
 
@@ -1322,7 +1322,7 @@ phase6_prune_images() {
         fi
 
         for img in $(docker images --format '{{.Repository}}:{{.Tag}}' 2>/dev/null \
-                     | grep -E "/hermes-[a-z_]+:${ver}$"); do
+                     | grep -E "/hermes-[a-z_-]+:${ver}$"); do
             if docker rmi "$img" >> "$LOG_FILE" 2>&1; then
                 log "    removed ${img}"
                 removed=$(( removed + 1 ))

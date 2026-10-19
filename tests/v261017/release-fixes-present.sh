@@ -61,6 +61,11 @@ check $w/admin/2/view_linkguard.cfm 'value="refresh_feeds"' "Refresh feeds now b
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'charsetEncode(getmsg.from_email' "quarantine release converts binary sender address"
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'releaseStatus EQ "released"' "quarantine release renders only the real outcome"
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm '<cfif NOT isReleasePost>' "opening a release link only confirms; the release needs the button"
+check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'Not Kept in Quarantine' "release page explains a message blocked without a copy"
+check config/hermes/var/www/html/schedule/quarantine_notify.cfm "m.quar_loc IS NOT NULL AND m.quar_loc <> ''" "no notification for a message blocked without a copy"
+
+# #340 image cleanup covers hyphenated image names (body-milter, mail-filter, postfix-dkim)
+check scripts/system_update_docker.sh "/hermes-\[a-z_-\]+:v" "image cleanup matches hyphenated Hermes image names (#340)"
 
 # Telemetry: dedicated receiver, failures logged, count fixed
 check $w/admin/2/inc/send_telemetry.cfm 'https://telemetry.hermesseg.io/' "telemetry posts to telemetry.hermesseg.io"

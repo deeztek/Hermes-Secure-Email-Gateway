@@ -47,6 +47,16 @@ Upgrade recommended for all installs.
   open links in incoming mail automatically to scan them, which could release
   a message nobody chose to release. The link now shows the message's subject
   and sender with a **Release message** button; only the button releases it.
+- **A quarantine notification could offer a release link for a message that
+  was never kept.** Some blocked messages (for example spam from your own
+  network scoring far above the threshold) are dropped without a quarantine
+  copy; the link then wrongly said "Already Released". Those messages no
+  longer get a notification, and an older link says the message was not
+  kept.
+- **Upgrades did not clean up old Postfix, mail filter and body milter
+  images.** The image cleanup added in an earlier release missed these three,
+  so they kept a copy for every release. This upgrade removes all but the
+  newest two (#340).
 - **Telemetry improvements.** Reports now go to a dedicated server,
   `telemetry.hermesseg.io`. A report that cannot be sent is written to the
   Hermes log, the report file is always deleted afterwards, and the domain

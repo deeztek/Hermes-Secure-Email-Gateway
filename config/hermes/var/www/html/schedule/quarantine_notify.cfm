@@ -37,6 +37,23 @@ See GitHub issue #180
 <cfset notifyWindowDays = 7>
 
 <!--- Find quarantined messages that haven't been notified yet AND are recent --->
+<!--- Step 0: blocked but NOT kept. Amavis records the block (ds B/D) even when
+      it stores no quarantine copy, e.g. spam from the local network scoring
+      above the quarantine cutoff. A release link for such a message can only
+      fail, so mark it skipped (2) instead of notifying. The 2-minute age keeps
+      a message whose quarantine location is still being written from being
+      skipped by mistake; Step 1 only picks messages that have a copy. --->
+<cfquery datasource="hermes">
+    UPDATE msgrcpt mr
+    INNER JOIN msgs m ON m.mail_id = mr.mail_id
+    SET mr.notification_sent = 2
+    WHERE mr.ds IN ('B', 'D')
+      AND mr.notification_sent = 0
+      AND (m.quar_loc IS NULL OR m.quar_loc = '')
+      AND m.time_num < (UNIX_TIMESTAMP() - 120)
+      AND m.time_num >= (UNIX_TIMESTAMP() - (86400 * <cfqueryparam value="#notifyWindowDays#" cfsqltype="cf_sql_integer">))
+</cfquery>
+
 <!--- Step 1: Get pending mail_ids from msgrcpt (uses idx_msgrcpt_notify index),
       joined to msgs for the age filter (msgs_idx_time_num). --->
 <cfquery name="getPendingIds" datasource="hermes">
@@ -45,6 +62,7 @@ See GitHub issue #180
     INNER JOIN msgs m ON m.mail_id = mr.mail_id
     WHERE mr.ds IN ('B', 'D')
       AND mr.notification_sent = 0
+      AND m.quar_loc IS NOT NULL AND m.quar_loc <> ''
       AND m.time_num >= (UNIX_TIMESTAMP() - (86400 * <cfqueryparam value="#notifyWindowDays#" cfsqltype="cf_sql_integer">))
     LIMIT 100
 </cfquery>
