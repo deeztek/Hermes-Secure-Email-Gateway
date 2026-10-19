@@ -20,12 +20,12 @@ Change these so the upgrade has something to keep (#361):
 | Upgrade log, **Restore admin-owned settings** section | Lists restored/merged counts; none of the four files listed as kept at the release default (#361) |
 | Upgrade log, Phase 6 (image cleanup) | Only the newest two releases' Hermes images remain: `docker images --format '{{.Repository}}:{{.Tag}}' \| grep hermes- \| sort` (#340) |
 | SAN rebuild: delete one row from `mailbox_sans` (DBeaver or `docker exec hermes_db_server mariadb`), then `docker exec hermes_commandbox curl -s http://localhost:8888/schedule/acme_validate_ip.cfm` | The row is back (#319; needs a mailbox domain) |
-| Link Guard: **Check a URL** with the in-page-redirect test link from the internal runbook | malicious / block, Decided by: Redirect destination |
+| Link Guard: **Check a URL** with the detection test link from the internal runbook | malicious / block, Decided by: Redirect destination |
 | Link Guard: **Decode a link** with a protected link from a test message | Shows the original address |
 | Link Guard: **Refresh feeds now** | "Feed refresh started"; two fresh `feed ... refreshed` lines in `docker logs hermes_linkguard` |
 | Link Guard: click a link that redirects (e.g. a marketing click-tracking link) | Its Recent activity row's Detail reads `redirects to <host>` |
 | `docker logs hermes_dmarc 2>&1 \| grep -c 'error during parsing'` after a restart | 0 (#365) |
-| Quarantine a test message, then open the release link from its notification | A confirmation page (subject, sender, **Release message**); the message is NOT released until the button is pressed; then only "Message Released" |
+| Open the notification sent by `quarantine-notification-sent.sh` (its NOTE line names the mailbox and subject), then its release link | A confirmation page (subject, sender, **Release message**); the message is NOT released until the button is pressed; then only "Message Released" |
 | Sign in to the Hermes admin console and to `/ciphermail` | Both reach their dashboards |
 | `sudo HERMES_TEST_HOST=1 tests/run.sh` | All releases' checks pass |
 

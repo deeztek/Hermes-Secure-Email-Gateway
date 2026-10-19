@@ -47,13 +47,13 @@ for svc in opendmarc mail_filter; do
         || pass "$svc mysql.conf selector valid (#365)"
 done
 
-# Link Guard engine (in-page redirects, decode, clean-redirect detail)
+# Link Guard engine (detection update, decode, activity detail)
 docker exec hermes_linkguard grep -q 'follow_page_peek' /opt/linkguard/app/verdict.py 2>/dev/null \
-    && pass "Link Guard follows in-page redirects" || fail "Link Guard engine lacks in-page redirect following"
+    && pass "Link Guard detection update present" || fail "Link Guard engine lacks the detection update"
 docker exec hermes_linkguard grep -q 'api/decode' /opt/linkguard/app/server.py 2>/dev/null \
     && pass "Link Guard decode API present" || fail "Link Guard engine lacks /api/decode"
 docker exec hermes_linkguard grep -q 'redirects to %s' /opt/linkguard/app/verdict.py 2>/dev/null \
-    && pass "Link Guard records where clean links land" || fail "Link Guard engine lacks the clean-redirect Detail"
+    && pass "Link Guard activity detail present" || fail "Link Guard engine lacks the activity detail update"
 check $w/admin/2/view_linkguard.cfm 'value="decode_link"' "Decode a link card present"
 check $w/admin/2/view_linkguard.cfm 'value="refresh_feeds"' "Refresh feeds now button present"
 

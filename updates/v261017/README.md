@@ -6,18 +6,15 @@ Upgrades no longer undo your settings. Until now, every upgrade put a set of
 admin-managed settings back to their defaults (DNS Resolver overrides, DMARC,
 banners, the IPS whitelist, antispam and antivirus settings and more) until
 each page was saved again. This release keeps them. Link Guard (Pro) also
-catches more phishing links and can show where any protected link really
-goes. Upgrade recommended for all installs.
+gets improved detection and can show where any protected link really goes.
+Upgrade recommended for all installs.
 
 **This release needs Docker Engine 25.0 or newer.** See Upgrading.
 
 ## New features
 
-- **Link Guard follows redirects that happen inside a page (Pro).** Some
-  phishing links point at a harmless-looking page that sends the browser on
-  to the real phishing site. With **Follow redirects** on, Link Guard now
-  follows those too, and blocks the link when the final site is known to be
-  malicious.
+- **Improved Link Guard detection (Pro).** Link Guard catches more phishing
+  links.
 - **Decode a link (Pro).** A new card on the Link Guard page: paste a
   protected link from an email, even one wrapped by another mail scanner, to
   see the original address it leads to. Nothing is fetched, and expired links
@@ -25,9 +22,6 @@ goes. Upgrade recommended for all installs.
   treats it.
 - **Refresh feeds now (Pro).** The Link Guard page can pull the URLhaus and
   OpenPhish lists immediately instead of waiting for the refresh interval.
-- **Link Guard's Recent activity shows where a clean link landed (Pro).** When
-  a link redirected to another site, its Detail reads
-  `redirects to <host>`.
 
 ## Bug fixes
 
@@ -53,13 +47,12 @@ goes. Upgrade recommended for all installs.
   open links in incoming mail automatically to scan them, which could release
   a message nobody chose to release. The link now shows the message's subject
   and sender with a **Release message** button; only the button releases it.
-- **Telemetry stopped reaching us in late August.** Its server
-  (`updates.deeztek.com`) is retired; reports now go to the dedicated
-  `telemetry.hermesseg.io`. A failed report is now written to the Hermes log
-  instead of failing silently, the unencrypted report file is always deleted,
-  and the domain count in the report is corrected. The System Settings page,
-  the documentation and the installer's final summary now say exactly what
-  is sent and how to turn it off.
+- **Telemetry improvements.** Reports now go to a dedicated server,
+  `telemetry.hermesseg.io`. A report that cannot be sent is written to the
+  Hermes log, the report file is always deleted afterwards, and the domain
+  count in the report is corrected. The System Settings page, the
+  documentation and the installer's final summary now say exactly what is
+  sent and how to turn it off.
 - **The mail filter's daily maintenance logged "cannot write to
   .../bayes_journal: Permission denied".** Spam filtering and learning were
   not affected; the maintenance job can now do its part (#357).
@@ -68,8 +61,6 @@ goes. Upgrade recommended for all installs.
   (#315).
 - **OpenDMARC and the mail filter logged an rsyslog parsing warning at
   startup.** Their log lines were reaching System Logs regardless (#365).
-- **Link Guard's Check a URL said it does not follow redirects.** It does,
-  when Follow redirects is on; the text is corrected.
 - **RBL Configuration now points to where a trusted server is exempted.**
   The legacy "RBL whitelist" (IP & Network Override) lives on as **Network
   Block/Allow**; the RBL page now says so and links to it.
@@ -110,7 +101,8 @@ sudo ./scripts/system_update_docker.sh v261017
 settings** section: if it lists a file as kept at the release default, save
 the page it names once.
 
-**Link Guard (Pro), only if it applies to you:** following redirects now
-loads each page once, the way other link scanners do. If users report that a
-one-time link (a password reset or sign-in link) says it was already used,
-add that sender's domain to the Link Guard allowlist.
+**Link Guard (Pro), only if it applies to you:** with **Follow redirects**
+on, Link Guard now opens each link's page once while checking it, the way
+other link scanners do. If users report that a one-time link (a password
+reset or sign-in link) says it was already used, add that sender's domain to
+the Link Guard allowlist.
