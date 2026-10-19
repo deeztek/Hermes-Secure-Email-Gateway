@@ -47,6 +47,12 @@ Upgrade recommended for all installs.
   open links in incoming mail automatically to scan them, which could release
   a message nobody chose to release. The link now shows the message's subject
   and sender with a **Release message** button; only the button releases it.
+- **Pro features could stay off after a one-time license check failure
+  (Pro).** A single failed license check turns off Link Guard, disclaimers
+  and organizational signatures, and they stayed off even after the next
+  check succeeded, until each page was saved again. They now come back by
+  themselves on the next successful check, including on installs where this
+  already happened.
 - **A quarantine notification could offer a release link for a message that
   was never kept.** Some blocked messages (for example spam from your own
   network scoring far above the threshold) are dropped without a quarantine

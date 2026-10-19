@@ -64,6 +64,11 @@ check config/hermes/var/www/html/user-auth/quarantine_release.cfm '<cfif NOT isR
 check config/hermes/var/www/html/user-auth/quarantine_release.cfm 'Not Kept in Quarantine' "release page explains a message blocked without a copy"
 check config/hermes/var/www/html/schedule/quarantine_notify.cfm "m.quar_loc IS NOT NULL AND m.quar_loc <> ''" "no notification for a message blocked without a copy"
 
+# Pro features torn down by a one-off licence failure come back on the next VALID
+check $w/admin/2/inc/pro_milter_heal.cfm 'healMapEmpty' "Pro milter heal present"
+check $w/admin/2/inc/setsession.cfm 'pro_milter_heal.cfm' "login rebuilds torn-down Pro maps"
+check $w/schedule/message_cleanup.cfm 'pro_milter_heal.cfm' "daily cleanup rebuilds torn-down Pro maps"
+
 # #340 image cleanup covers hyphenated image names (body-milter, mail-filter, postfix-dkim)
 check scripts/system_update_docker.sh "/hermes-\[a-z_-\]+:v" "image cleanup matches hyphenated Hermes image names (#340)"
 

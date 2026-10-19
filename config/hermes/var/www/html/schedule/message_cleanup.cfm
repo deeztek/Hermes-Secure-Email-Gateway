@@ -31,6 +31,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfinclude template="retention_policy_functions.cfm">
 <cfif NOT isRetentionEnabled()>
     <cfinclude template="/admin/2/inc/pro_milter_enforce.cfm">
+<cfelse>
+    <!--- Valid license: rebuild any Pro map a past teardown left empty. --->
+    <cfmodule template="/admin/2/inc/pro_milter_heal.cfm">
 </cfif>
 
 <cfexecute name="/opt/hermes/scripts/disk_space_alert.sh"

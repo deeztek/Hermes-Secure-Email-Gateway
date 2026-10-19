@@ -26,6 +26,7 @@ Change these so the upgrade has something to keep (#361):
 | Link Guard: click a link that redirects (e.g. a marketing click-tracking link) | Its Recent activity row's Detail reads `redirects to <host>` |
 | `docker logs hermes_dmarc 2>&1 \| grep -c 'error during parsing'` after a restart | 0 (#365) |
 | Open the notification sent by `quarantine-notification-sent.sh` (its NOTE line names the mailbox and subject), then its release link | A confirmation page (subject, sender, **Release message**); the message is NOT released until the button is pressed; then only "Message Released" |
+| Pro VM with Link Guard on: `docker exec hermes_commandbox sh -c ': > /etc/hermes/body_milter/linkguard/linkguard_by_recipient_domain'`, then sign in to the admin console | `grep -cv '^#' /etc/hermes/body_milter/linkguard/linkguard_by_recipient_domain` inside `hermes_body_milter` is back to 1 or more, without saving the Link Guard page |
 | Sign in to the Hermes admin console and to `/ciphermail` | Both reach their dashboards |
 | `sudo HERMES_TEST_HOST=1 tests/run.sh` | All releases' checks pass |
 

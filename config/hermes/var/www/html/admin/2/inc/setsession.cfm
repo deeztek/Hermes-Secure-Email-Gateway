@@ -258,4 +258,8 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
      minting), so in-flight links keep resolving and age out via the token TTL. --->
 <cfif ListFindNoCase("REVOKED,EXPIRED,INVALID", session.license)>
     <cfinclude template="pro_milter_enforce.cfm">
+<cfelseif session.license EQ "VALID">
+    <!--- Undo a teardown that turned out to be a one-off (an INVALID followed by
+         VALID on the next check), and maps torn down before this existed. --->
+    <cfmodule template="pro_milter_heal.cfm">
 </cfif>
