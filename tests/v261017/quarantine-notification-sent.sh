@@ -23,6 +23,8 @@ rcpt="${QTEST_RCPT:-}"
 [[ -n "$rcpt" ]] || rcpt="$(db "SELECT recipient FROM recipients WHERE recipient LIKE '%_@_%' ORDER BY id LIMIT 1")"
 [[ -n "$rcpt" ]] || skip "no recipients on this install"
 [[ "$rcpt" =~ $addr_re ]] || { fail "unexpected recipient address: $rcpt"; done_check; }
+[[ "$(db "SELECT COUNT(*) FROM recipients WHERE recipient = '$rcpt'")" != "0" ]] \
+    || { fail "$rcpt is not a Hermes recipient (Relay Recipients or Mailboxes); notifications only go to recipients"; done_check; }
 from="${QTEST_FROM:-quarantine-test@${rcpt#*@}}"
 [[ "$from" =~ $addr_re ]] || { fail "unexpected sender address: $from"; done_check; }
 
@@ -77,7 +79,8 @@ else
 fi
 
 # Ofelia runs the notifier every minute; run it now instead of waiting.
-docker exec hermes_commandbox curl -s http://localhost:8888/schedule/quarantine_notify.cfm >/dev/null
+docker exec hermes_commandbox curl -s -m 120 http://localhost:8888/schedule/quarantine_notify.cfm >/dev/null \
+    || echo "  NOTE  notifier call did not finish within 120s; waiting for the scheduled run"
 flag() { db "SELECT mr.notification_sent FROM msgrcpt mr JOIN msgs m ON m.mail_id = mr.mail_id WHERE m.subject = '$subj' LIMIT 1"; }
 notified() { [[ "$(flag)" == "1" ]]; }
 if wait_for 90 notified; then
