@@ -431,6 +431,38 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Hybrid domains created before v261026 have no certificate binding
+     (#371): converting relay recipients to mailboxes set type='hybrid' but
+     never created the mailbox_domains row, so the domain never got its
+     autoconfig./autodiscover. names. Create the binding the way adding a
+     mailbox domain does, then sync the SANs; the scheduled SAN validation
+     verifies DNS, issues the certificate and updates nginx. Idempotent:
+     domains that already have a binding are skipped. --->
+<cfset blockName = "hybrid-domain-cert-binding-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfquery name="unboundHybrid" datasource="hermes">
+            SELECT d.domain
+            FROM domains d
+            LEFT JOIN mailbox_domains md ON md.domain = d.domain
+            WHERE d.type = 'hybrid' AND md.id IS NULL
+        </cfquery>
+        <cfset ensureBindingDomains = ValueList(unboundHybrid.domain)>
+        <cfinclude template="/admin/2/inc/ensure_mailbox_cert_binding.cfm">
+        <cfif ensureBindingCreated GT 0>
+            <cfinclude template="/admin/2/inc/sync_mailbox_sans.cfm">
+        </cfif>
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (bindings created: " & ensureBindingCreated & ")")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
 

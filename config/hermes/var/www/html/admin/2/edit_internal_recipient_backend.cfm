@@ -924,6 +924,23 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                        AND (type IS NULL OR type NOT IN ('mailbox', 'hybrid'))
                 </cfquery>
 
+                <!--- A domain hosting mailboxes needs a certificate binding,
+                     like a newly added mailbox domain, or it never gets its
+                     autoconfig./autodiscover. names (#371). Create any missing
+                     binding and sync the SANs; the scheduled SAN validation
+                     then verifies DNS, issues the certificate and updates
+                     nginx. --->
+                <cfquery name="convDomains" datasource="hermes">
+                    SELECT DISTINCT SUBSTRING_INDEX(recipient, '@', -1) AS domain
+                      FROM recipients
+                     WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                </cfquery>
+                <cfset ensureBindingDomains = ValueList(convDomains.domain)>
+                <cfinclude template="inc/ensure_mailbox_cert_binding.cfm">
+                <cfif ensureBindingCreated GT 0>
+                    <cfinclude template="inc/sync_mailbox_sans.cfm">
+                </cfif>
+
                 <!--- The TLS policy map is keyed by destination, and clearing
                      backend_tls above has to be reflected in it. --->
                 <cfset datasource = "hermes">
