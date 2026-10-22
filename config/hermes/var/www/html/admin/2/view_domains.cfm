@@ -353,6 +353,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               #encodeForHTML(domain)#
               <cfif type EQ "hybrid">
                 <br><span class="badge bg-info text-dark" title="Some recipients on this domain have mailboxes on this server; the rest are relayed to the destination below.">Hybrid</span>
+                <br><a href="view_mailbox_domains.cfm" class="small">Mailbox settings: Mailbox Domains</a>
               </cfif>
             </td>
             <td>

@@ -79,7 +79,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Get all mailbox-hosting domains joined with cert binding + DKIM status --->
 <cfquery name="getmailboxdomains" datasource="hermes">
-  SELECT d.id AS domain_id, d.domain,
+  SELECT d.id AS domain_id, d.domain, d.type AS domain_type,
          d.default_quota_mb, d.catchall_mailbox,
          d.nextcloud_enabled, d.nextcloud_group,
          d.enforce_mfa,
@@ -113,7 +113,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     WHERE mailbox_domain = '1'
     GROUP BY SUBSTRING_INDEX(subdomain, '.', -2)
   ) sanstats ON sanstats.san_domain = d.domain
-  WHERE d.type = 'mailbox'
+  <!--- Hybrid domains (relay domains that also host mailboxes, #290) are
+       listed here too so their mailbox settings (org details, signatures,
+       quota, Nextcloud, MFA, certificate) can be edited. They are deleted
+       from Relay Domains, not here. --->
+  WHERE d.type IN ('mailbox', 'hybrid')
   ORDER BY d.domain ASC
 </cfquery>
 
@@ -447,7 +451,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <tbody>
         <cfoutput query="getmailboxdomains">
           <tr>
-            <td><strong>#encodeForHTML(domain)#</strong></td>
+            <td><strong>#encodeForHTML(domain)#</strong><cfif domain_type EQ "hybrid"><br><span class="badge bg-info text-dark" title="Some recipients on this domain have mailboxes on this server; the rest are relayed. Delete or change relaying on Relay Domains.">Hybrid</span></cfif></td>
             <td>
               <cfif Len(cert_friendly_name)>
                 <a href="view_system_certificates.cfm" title="View certificate details">#encodeForHTML(cert_friendly_name)#</a>
@@ -526,10 +530,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <a href="edit_domain_dkim.cfm?id=#domain_id#" class="btn btn-sm btn-secondary" title="DKIM Keys">
                 <i class="fas fa-lock"></i>
               </a>
+              <cfif domain_type NEQ "hybrid">
               <button type="button" class="btn btn-sm btn-danger" title="Delete"
                 onclick="openDeleteModal(#domain_id#, '#encodeForJavaScript(domain)#');">
                 <i class="fas fa-trash-alt"></i>
               </button>
+              </cfif>
             </td>
           </tr>
         </cfoutput>
@@ -622,7 +628,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   <input type="number" class="form-control" name="default_quota_gb" id="edit_default_quota_gb" min="0.5" max="1024" step="0.5" required>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-6" id="edit_catchall_wrap">
                 <div class="mb-3">
                   <label class="form-label"><strong>Catch-All Mailbox</strong></label>
                   <input type="text" class="form-control" name="catchall_mailbox" id="edit_catchall_mailbox" placeholder="postmaster@example.com">
@@ -806,6 +812,8 @@ function openEditModal(mailboxDomainId) {
       document.getElementById('edit_domain_name').value = data.domain;
       document.getElementById('edit_default_quota_gb').value = (data.default_quota_mb / 1024).toFixed(2).replace(/\.?0+$/, '');
       document.getElementById('edit_catchall_mailbox').value = data.catchall_mailbox || '';
+      // No catch-all on a hybrid domain: it would capture the relayed users' mail too.
+      document.getElementById('edit_catchall_wrap').style.display = (data.type === 'hybrid') ? 'none' : '';
       document.getElementById('edit_nextcloud_enabled').checked = (data.nextcloud_enabled == 1);
       document.getElementById('edit_enforce_mfa').checked = (data.enforce_mfa == 1);
       // #226 org info + per-domain user-portal signature toggle

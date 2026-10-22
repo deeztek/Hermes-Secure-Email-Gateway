@@ -20,12 +20,18 @@ re-validation).
 </cfif>
 
 <cfquery name="getCurrent" datasource="hermes">
-  SELECT d.id, d.domain, md.mailbox_certificate
+  SELECT d.id, d.domain, d.type, md.mailbox_certificate
   FROM domains d
   LEFT JOIN mailbox_domains md ON md.domain = d.domain
   WHERE d.id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.domain_id#">
-  AND d.type = 'mailbox'
+  AND d.type IN ('mailbox', 'hybrid')
 </cfquery>
+
+<!--- Hybrid domains (#290) never get a catch-all: an @domain catch-all is
+     applied before relaying, so it would capture the relayed users' mail. --->
+<cfif getCurrent.recordcount EQ 1 AND getCurrent.type EQ "hybrid">
+  <cfset form.catchall_mailbox = "">
+</cfif>
 <cfif getCurrent.recordcount EQ 0>
   <cfset session.m = 20>
   <cflocation url="view_mailbox_domains.cfm" addtoken="no">

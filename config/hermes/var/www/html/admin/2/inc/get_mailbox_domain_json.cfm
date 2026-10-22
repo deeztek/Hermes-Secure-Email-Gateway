@@ -16,7 +16,7 @@ Used by view_mailbox_domains.cfm edit modal.
 </cfif>
 
 <cfquery name="getdomain" datasource="hermes">
-  SELECT d.id, d.domain,
+  SELECT d.id, d.domain, d.type,
          d.default_quota_mb, d.catchall_mailbox,
          d.nextcloud_enabled, d.nextcloud_group,
          d.enforce_mfa,
@@ -29,7 +29,7 @@ Used by view_mailbox_domains.cfm edit modal.
   LEFT JOIN mailbox_domains md ON md.domain = d.domain
   LEFT JOIN system_certificates sc ON sc.id = md.mailbox_certificate
   WHERE d.id = <cfqueryparam cfsqltype="cf_sql_integer" value="#form.id#">
-  AND d.type = 'mailbox'
+  AND d.type IN ('mailbox', 'hybrid')
 </cfquery>
 
 <cfif getdomain.recordcount EQ 0>
@@ -40,6 +40,7 @@ Used by view_mailbox_domains.cfm edit modal.
 <cfset resp = {
   "id"                    = getdomain.id,
   "domain"                = getdomain.domain,
+  "type"                  = getdomain.type,
   "cert_id"               = getdomain.mailbox_certificate,
   "cert_type"             = getdomain.cert_type,
   "cert_friendly_name"    = getdomain.cert_friendly_name,
