@@ -1419,7 +1419,8 @@ else
     # Generate a new password
     NEXTCLOUD_PASS=$(openssl rand -base64 32 | tr -d '/+=' | head -c 32)
     echo -n "$NEXTCLOUD_PASS" > "${CREDS_DIR}/nextcloud_mysql_password"
-    chmod 600 "${CREDS_DIR}/nextcloud_mysql_password"
+    # 0644, not 0600: Nextcloud reads its Docker secrets as www-data (v261022).
+    chmod 644 "${CREDS_DIR}/nextcloud_mysql_password"
     log "Generated new Nextcloud database password"
 fi
 
@@ -1662,6 +1663,11 @@ chown -R root:root "${HERMES_ROOT}/config/postfix-dkim/etc/postfix/" 2>/dev/null
 chown -R root:root "${HERMES_ROOT}/config/mail_filter/etc/amavis/" 2>/dev/null || true
 chmod 600 "${HERMES_ROOT}/config/hermes/opt/hermes/keys/"* 2>/dev/null || true
 chmod 600 "${HERMES_ROOT}/config/hermes/opt/hermes/creds/"* 2>/dev/null || true
+# Nextcloud reads its five Docker secrets (bind mounts of these files) as
+# www-data on every request, so they must stay world-readable, as the
+# installer writes them. At 0600 Nextcloud cannot reach its database or
+# Redis (v261022). Lock the creds/ directory instead if needed (chmod 700).
+chmod 644 "${HERMES_ROOT}/config/hermes/opt/hermes/creds/"nextcloud_* 2>/dev/null || true
 
 log "Permissions set"
 
