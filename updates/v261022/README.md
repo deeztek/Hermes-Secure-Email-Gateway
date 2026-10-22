@@ -2,13 +2,26 @@
 
 ## Synopsis
 
-Security release. **Upgrade all installs as soon as possible.**
+> **Critical security release. Upgrade every install now.**
+> A vulnerability in PHP lets an unauthenticated attacker run code on the
+> server. In Hermes it is reachable from the internet through the bundled
+> Nextcloud (`/nc/`), without signing in.
 
 On October 21, 2026, CISA warned of critical vulnerabilities in PHP that
 allow unauthenticated remote code execution on any PHP installation serving
-web requests. In Hermes, PHP runs inside the bundled Nextcloud, which is
-reachable from the internet at `/nc/` and handles requests before any sign-in.
-This release moves Nextcloud to an image with the fixed PHP.
+web requests. In Hermes, PHP runs inside the bundled Nextcloud, which handles
+requests before any sign-in. This release moves Nextcloud to an image with the
+fixed PHP.
+
+**If you cannot upgrade today**, stop Nextcloud until you can. This closes
+the exposure; webmail, files, calendar and contacts are unavailable meanwhile:
+
+```bash
+cd /opt/Hermes-Secure-Email-Gateway
+sudo docker compose stop hermes_nextcloud
+```
+
+The upgrade starts it again.
 
 It also fixes Nextcloud on installs migrated from the legacy version, where
 Nextcloud could not read its own database and cache credentials.
