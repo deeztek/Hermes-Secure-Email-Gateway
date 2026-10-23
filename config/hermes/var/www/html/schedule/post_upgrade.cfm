@@ -438,7 +438,8 @@ legitimate state it accumulated later.
      mailbox domain does, then sync the SANs; the scheduled SAN validation
      verifies DNS, issues the certificate and updates nginx. Idempotent:
      domains that already have a binding are skipped. --->
-<cfset blockName = "hybrid-domain-cert-binding-v1">
+<!--- v2: also re-points a binding whose certificate no longer exists. --->
+<cfset blockName = "hybrid-domain-cert-binding-v2">
 <cfset arrayAppend(migrationsAttempted, blockName)>
 <cfif hasRun(blockName)>
     <cfset arrayAppend(migrationsSkipped, blockName)>
@@ -448,7 +449,8 @@ legitimate state it accumulated later.
             SELECT d.domain
             FROM domains d
             LEFT JOIN mailbox_domains md ON md.domain = d.domain
-            WHERE d.type = 'hybrid' AND md.id IS NULL
+            LEFT JOIN system_certificates sc ON sc.id = md.mailbox_certificate
+            WHERE d.type = 'hybrid' AND (md.id IS NULL OR sc.id IS NULL)
         </cfquery>
         <cfset ensureBindingDomains = ValueList(unboundHybrid.domain)>
         <cfinclude template="/admin/2/inc/ensure_mailbox_cert_binding.cfm">

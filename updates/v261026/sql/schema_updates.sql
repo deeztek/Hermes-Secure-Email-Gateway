@@ -1,7 +1,7 @@
 -- =====================================================================
 -- Hermes SEG v261026 schema updates
 -- Idempotent. The certificate binding for existing hybrid domains (#371) is
--- created by schedule/post_upgrade.cfm (block hybrid-domain-cert-binding-v1).
+-- created by schedule/post_upgrade.cfm (block hybrid-domain-cert-binding-v2).
 -- =====================================================================
 
 -- ---------------------------------------------------------------------

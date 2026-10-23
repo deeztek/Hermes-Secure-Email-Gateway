@@ -17,7 +17,7 @@ check $w/admin/2/view_mailbox_domains.cfm "d.type IN ('mailbox', 'hybrid')" "Ema
 check $w/admin/2/inc/mailbox_domain_edit_action.cfm "d.type IN ('mailbox', 'hybrid')" "hybrid domains editable (#371)"
 check $w/admin/2/inc/mailbox_domain_delete_action.cfm "AND type = 'mailbox'" "hybrid domains cannot be deleted from Email Server > Domains (#371)"
 check $w/admin/2/edit_internal_recipient_backend.cfm "ensure_mailbox_cert_binding.cfm" "conversion creates the certificate binding (#371)"
-check $w/schedule/post_upgrade.cfm "hybrid-domain-cert-binding-v1" "upgrade repairs existing hybrid domains (#371)"
+check $w/schedule/post_upgrade.cfm "hybrid-domain-cert-binding-v2" "upgrade repairs existing hybrid domains (#371)"
 
 # URLhaus Auth-Key (abuse.ch retired keyless downloads)
 n="$(db "SELECT COUNT(*) FROM malware_feeds_config c JOIN malware_feed_urls u ON u.feed_id=c.id WHERE c.section_name='urlhaus' AND c.api_key_1_name='auth_key' AND c.integrity_check='disabled' AND u.url_value LIKE 'https://urlhaus-api.abuse.ch/v2/files/exports/%auth_key%/urlhaus_clamav.ndb'")"

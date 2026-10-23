@@ -17,7 +17,9 @@ to mailboxes made domains hybrid without creating the row.
 Input:  ensureBindingDomains  comma-separated domain names
 Output: ensureBindingCreated  number of bindings created
 
-Domains that already have a binding are left alone. The caller runs
+Domains whose binding points at an existing certificate are left alone. A
+binding row that points at a certificate which no longer exists (a leftover
+from earlier certificate work) counts as missing and is re-pointed. The caller runs
 sync_mailbox_sans.cfm afterwards when ensureBindingCreated > 0; the scheduled
 SAN validation (schedule/acme_validate_ip.cfm) then verifies DNS, issues the
 certificate and regenerates nginx, as for a newly added mailbox domain.
@@ -31,12 +33,13 @@ certificate and regenerates nginx, as for a newly added mailbox domain.
     <cfif NOT Len(ebDomain)><cfcontinue></cfif>
 
     <cfquery name="ebDomainRow" datasource="hermes">
-        SELECT d.id
+        SELECT d.id, md.id AS binding_id
         FROM domains d
         LEFT JOIN mailbox_domains md ON md.domain = d.domain
+        LEFT JOIN system_certificates sc ON sc.id = md.mailbox_certificate
         WHERE d.domain = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ebDomain#">
           AND d.type IN ('mailbox', 'hybrid')
-          AND md.id IS NULL
+          AND (md.id IS NULL OR sc.id IS NULL)
     </cfquery>
     <cfif ebDomainRow.recordcount EQ 0><cfcontinue></cfif>
 
@@ -65,12 +68,20 @@ certificate and regenerates nginx, as for a newly added mailbox domain.
         <cfset ebCertId = ebCertResult.GENERATED_KEY>
     </cfif>
 
-    <cfquery datasource="hermes">
-        INSERT INTO mailbox_domains (domain, mailbox_certificate)
-        VALUES (
-            <cfqueryparam cfsqltype="cf_sql_varchar" value="#ebDomain#">,
-            <cfqueryparam cfsqltype="cf_sql_integer" value="#ebCertId#">
-        )
-    </cfquery>
+    <cfif Len(ebDomainRow.binding_id)>
+        <cfquery datasource="hermes">
+            UPDATE mailbox_domains
+               SET mailbox_certificate = <cfqueryparam cfsqltype="cf_sql_integer" value="#ebCertId#">
+             WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#ebDomainRow.binding_id#">
+        </cfquery>
+    <cfelse>
+        <cfquery datasource="hermes">
+            INSERT INTO mailbox_domains (domain, mailbox_certificate)
+            VALUES (
+                <cfqueryparam cfsqltype="cf_sql_varchar" value="#ebDomain#">,
+                <cfqueryparam cfsqltype="cf_sql_integer" value="#ebCertId#">
+            )
+        </cfquery>
+    </cfif>
     <cfset ensureBindingCreated = ensureBindingCreated + 1>
 </cfloop>
