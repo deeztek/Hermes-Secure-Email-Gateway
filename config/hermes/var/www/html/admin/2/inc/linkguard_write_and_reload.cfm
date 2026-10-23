@@ -116,10 +116,18 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
 
 <!--- abused / redirector hosts (operator-managed, seeded) --->
 <cfquery name="abused" datasource="hermes">
-    SELECT host FROM linkguard_abused_hosts WHERE enabled = 1 ORDER BY host
+    SELECT host, note FROM linkguard_abused_hosts WHERE enabled = 1 ORDER BY host
 </cfquery>
 <cfset abusedList = []>
-<cfloop query="abused"><cfset ArrayAppend(abusedList, LCase(Trim(abused.host)))></cfloop>
+<!--- A row's note is the reason users see in the warning; 'baseline' marks the
+     seeded rows and keeps the generic wording. --->
+<cfset abusedNotes = {}>
+<cfloop query="abused">
+    <cfset ArrayAppend(abusedList, LCase(Trim(abused.host)))>
+    <cfif Len(Trim(abused.note)) AND LCase(Trim(abused.note)) NEQ "baseline">
+        <cfset abusedNotes[LCase(Trim(abused.host))] = Trim(abused.note)>
+    </cfif>
+</cfloop>
 
 <!--- ---------- 1. body_milter config ---------- --->
 <cfset lgDir = "/etc/hermes/body_milter/linkguard">
@@ -189,7 +197,8 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
     "scope_domains": scopeList,
     "url_allow": allowList,
     "url_block": blockList,
-    "abused_hosts": abusedList
+    "abused_hosts": abusedList,
+    "abused_host_notes": abusedNotes
 }>
 <!--- The container lowercases top-level keys on load, so SerializeJSON's
      uppercasing is harmless. --->

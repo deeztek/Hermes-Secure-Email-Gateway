@@ -481,6 +481,20 @@ SELECT s.host, 'baseline' FROM (
 ) AS s
 WHERE NOT EXISTS (SELECT 1 FROM (SELECT 1 FROM `linkguard_abused_hosts` LIMIT 1) AS _g);
 
+-- Remote-access tools (v261026): their cloud tenants and signed clients are
+-- sent as links to take over a victim's PC. The note is the reason users see
+-- in the Link Guard warning. INSERT IGNORE keeps an existing row as it is.
+INSERT IGNORE INTO `linkguard_abused_hosts` (`host`,`note`) VALUES
+  ('screenconnect.com','Remote-access tool (abused to take over PCs)'),
+  ('anydesk.com','Remote-access tool (abused to take over PCs)'),
+  ('teamviewer.com','Remote-access tool (abused to take over PCs)'),
+  ('splashtop.com','Remote-access tool (abused to take over PCs)'),
+  ('atera.com','Remote-access tool (abused to take over PCs)'),
+  ('rustdesk.com','Remote-access tool (abused to take over PCs)'),
+  ('supremocontrol.com','Remote-access tool (abused to take over PCs)'),
+  ('remoteutilities.com','Remote-access tool (abused to take over PCs)'),
+  ('netsupportsoftware.com','Remote-access tool (abused to take over PCs)');
+
 -- -------- dkim_bypass                          [truncate] --------
 CREATE TABLE IF NOT EXISTS `dkim_bypass` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

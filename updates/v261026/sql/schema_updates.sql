@@ -31,6 +31,22 @@ INSERT INTO parameters2 (parameter, value2, module, active, applied)
   WHERE NOT EXISTS (SELECT 1 FROM parameters2 WHERE module = 'linkguard' AND parameter = 'urlhaus_auth_key');
 
 -- ---------------------------------------------------------------------
+-- 3. Link Guard: remote-access tool hosts in the abused-host list, with the
+-- reason users see in the warning. INSERT IGNORE keeps an existing row.
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT IGNORE INTO linkguard_abused_hosts (host, note) VALUES
+  ('screenconnect.com','Remote-access tool (abused to take over PCs)'),
+  ('anydesk.com','Remote-access tool (abused to take over PCs)'),
+  ('teamviewer.com','Remote-access tool (abused to take over PCs)'),
+  ('splashtop.com','Remote-access tool (abused to take over PCs)'),
+  ('atera.com','Remote-access tool (abused to take over PCs)'),
+  ('rustdesk.com','Remote-access tool (abused to take over PCs)'),
+  ('supremocontrol.com','Remote-access tool (abused to take over PCs)'),
+  ('remoteutilities.com','Remote-access tool (abused to take over PCs)'),
+  ('netsupportsoftware.com','Remote-access tool (abused to take over PCs)');
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

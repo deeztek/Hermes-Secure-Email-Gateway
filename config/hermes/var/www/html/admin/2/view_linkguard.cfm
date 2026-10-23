@@ -835,7 +835,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
     <table id="lgHosts" class="table table-bordered table-hover table-striped" style="width:100%">
       <thead><tr>
         <th style="width:40px" class="text-center"><input type="checkbox" onclick="lgHostSelectAll(this)" title="Select all"></th>
-        <th>Host</th><th>Note</th>
+        <th>Host</th><th>Reason <small class="text-muted fw-normal">(shown in the warning)</small></th>
       </tr></thead>
       <tbody>
         <cfloop query="abusedQ">
@@ -1029,8 +1029,8 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
         <div class="mb-3"><label class="form-label">Host</label>
           <input type="text" class="form-control" id="lgHostName" name="host" placeholder="badhost.example">
           <small class="text-muted">Bare host only (covers subdomains). No scheme, no path, no wildcards.</small></div>
-        <div class="mb-3"><label class="form-label">Note <small class="text-muted">(optional)</small></label>
-          <input type="text" class="form-control" id="lgHostNote" name="note"></div>
+        <div class="mb-3"><label class="form-label">Reason <small class="text-muted">(optional, shown to users in the warning)</small></label>
+          <input type="text" class="form-control" id="lgHostNote" name="note" placeholder="e.g. Remote-access tool (abused to take over PCs)"></div>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Add host</button></div>
     </form>

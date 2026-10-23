@@ -27,6 +27,10 @@ n="$(db "SELECT COUNT(*) FROM parameters2 WHERE module='linkguard' AND parameter
 check $w/admin/2/inc/generate_malware_feeds_configuration.cfm "feedMissingKey" "a feed with an empty required key is written disabled"
 check $w/admin/2/view_malware_feeds.cfm "URLhaus needs an Auth-Key" "Malware Feeds explains the URLhaus key"
 check $w/admin/2/view_linkguard.cfm "urlhaus_auth_key" "Link Guard page edits the URLhaus key"
+n="$(db "SELECT COUNT(*) FROM linkguard_abused_hosts WHERE host IN ('screenconnect.com','anydesk.com','teamviewer.com','splashtop.com','atera.com','rustdesk.com','supremocontrol.com','remoteutilities.com','netsupportsoftware.com')")"
+[[ "$n" =~ ^[0-9]+$ && "$n" -ge 1 ]] && pass "Link Guard: remote-access tool hosts in the abused-host list ($n)" \
+    || fail "Link Guard: remote-access tool hosts missing from the abused-host list"
+check $w/admin/2/inc/linkguard_write_and_reload.cfm "abused_host_notes" "abused-host reasons pushed to the engine"
 check config/mail_filter/etc/fangfrisch/fangfrisch.conf "auth.abuse.ch\|Auth-Key" "shipped fangfrisch.conf explains the URLhaus key"
 
 # Link Guard engine (image): keyed URLhaus export, detection update
