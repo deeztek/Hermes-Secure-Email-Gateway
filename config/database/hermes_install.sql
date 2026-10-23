@@ -1217,7 +1217,7 @@ CREATE TABLE IF NOT EXISTS `malware_feeds_config` (
 
 -- 10 row(s) for `malware_feeds_config`
 INSERT IGNORE INTO `malware_feeds_config` VALUES (1,'sanesecurity','SaneSecurity',1,1,'https://ftp.swin.edu.au/sanesecurity/','1h','10M',NULL,NULL,NULL,NULL,NULL,'SaneSecurity ClamAV signatures (built-in feed)',10);
-INSERT IGNORE INTO `malware_feeds_config` VALUES (2,'urlhaus','URLhaus',1,1,NULL,NULL,'10MB','disabled','auth_key',NULL,NULL,NULL,'URLhaus malicious URL signatures. Needs a free abuse.ch Auth-Key as Key 1 (auth_key): sign up at https://auth.abuse.ch/ with an X, Google, LinkedIn or GitHub account.',20);
+INSERT IGNORE INTO `malware_feeds_config` VALUES (2,'urlhaus','URLhaus',1,1,NULL,NULL,'20MB','disabled','auth_key',NULL,NULL,NULL,'URLhaus malicious URL signatures. Needs a free abuse.ch Auth-Key as Key 1 (auth_key): sign up at https://auth.abuse.ch/ with an X, Google, LinkedIn or GitHub account.',20);
 -- URLhaus retired its keyless downloads (HTTP 410) in 2026; the ClamAV export needs the Auth-Key
 -- in the path. Its published checksums are wrong, hence integrity_check=disabled above.
 INSERT IGNORE INTO `malware_feed_urls` (`feed_id`,`url_key`,`url_value`,`enabled`,`filename_override`,`sort_order`)

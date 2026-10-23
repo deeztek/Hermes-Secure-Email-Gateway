@@ -14,6 +14,11 @@
 UPDATE malware_feeds_config
    SET api_key_1_name = 'auth_key'
  WHERE section_name = 'urlhaus' AND (api_key_1_name IS NULL OR api_key_1_name = '');
+-- The keyed export is about 9 MB and growing; the shipped 10MB limit would
+-- soon reject it. Raise only the shipped default, keep an admin's own value.
+UPDATE malware_feeds_config
+   SET max_size = '20MB'
+ WHERE section_name = 'urlhaus' AND (max_size IS NULL OR max_size IN ('', '10MB'));
 UPDATE malware_feeds_config
    SET integrity_check = 'disabled',
        description = 'URLhaus malicious URL signatures. Needs a free abuse.ch Auth-Key as Key 1 (auth_key): sign up at https://auth.abuse.ch/ with an X, Google, LinkedIn or GitHub account.'
