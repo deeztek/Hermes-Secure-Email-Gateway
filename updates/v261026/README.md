@@ -39,7 +39,7 @@ you enter once on each page that uses URLhaus (see Upgrading). Link Guard
   certificate check verifies them, issues the certificate and serves them,
   as for any mailbox domain.
 
-- **URLhaus stopped updating.** abuse.ch retired its free keyless
+- **URLhaus stopped updating (#372).** abuse.ch retired its free keyless
   downloads, so the URLhaus ClamAV signatures (Malware Feeds) and Link
   Guard's URLhaus feed failed with "HTTP Error 410: Gone". Both now use
   abuse.ch's new export with an Auth-Key, which is free. Until a key is
