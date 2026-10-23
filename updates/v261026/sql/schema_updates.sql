@@ -19,7 +19,7 @@ UPDATE malware_feeds_config
        description = 'URLhaus malicious URL signatures. Needs a free abuse.ch Auth-Key as Key 1 (auth_key): sign up at https://auth.abuse.ch/ with an X, Google, LinkedIn or GitHub account.'
  WHERE section_name = 'urlhaus';
 INSERT IGNORE INTO malware_feed_urls (feed_id, url_key, url_value, enabled, filename_override, sort_order)
-  SELECT id, 'urlhaus', 'https://urlhaus-api.abuse.ch/v2/files/exports/${auth_key}/urlhaus_clamav.ndb', 1, 'urlhaus.ndb', 10
+  SELECT id, 'urlhaus', CONCAT('https://urlhaus-api.abuse.ch/v2/files/exports/$', '{auth_key}/urlhaus_clamav.ndb'), 1, 'urlhaus.ndb', 10
     FROM malware_feeds_config WHERE section_name = 'urlhaus';
 
 -- ---------------------------------------------------------------------

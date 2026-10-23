@@ -1221,7 +1221,7 @@ INSERT IGNORE INTO `malware_feeds_config` VALUES (2,'urlhaus','URLhaus',1,1,NULL
 -- URLhaus retired its keyless downloads (HTTP 410) in 2026; the ClamAV export needs the Auth-Key
 -- in the path. Its published checksums are wrong, hence integrity_check=disabled above.
 INSERT IGNORE INTO `malware_feed_urls` (`feed_id`,`url_key`,`url_value`,`enabled`,`filename_override`,`sort_order`)
-  SELECT `id`,'urlhaus','https://urlhaus-api.abuse.ch/v2/files/exports/${auth_key}/urlhaus_clamav.ndb',1,'urlhaus.ndb',10 FROM `malware_feeds_config` WHERE `section_name`='urlhaus';
+  SELECT `id`,'urlhaus',CONCAT('https://urlhaus-api.abuse.ch/v2/files/exports/$', '{auth_key}/urlhaus_clamav.ndb'),1,'urlhaus.ndb',10 FROM `malware_feeds_config` WHERE `section_name`='urlhaus';
 INSERT IGNORE INTO `malware_feeds_config` VALUES (3,'malwarepatrol','MalwarePatrol',1,1,NULL,NULL,NULL,NULL,'receipt','','product','','MalwarePatrol commercial feed (requires receipt and product ID)',30);
 INSERT IGNORE INTO `malware_feeds_config` VALUES (4,'malwareexpert','MalwareExpert',0,1,'https://signatures.malware.expert','1d','20M',NULL,'serial_key',NULL,NULL,NULL,'MalwareExpert commercial feed (requires serial key)',40);
 INSERT IGNORE INTO `malware_feeds_config` VALUES (5,'securiteinfo','SecuriteInfo',0,1,NULL,NULL,NULL,NULL,'customer_id',NULL,NULL,NULL,'SecuriteInfo commercial feed (requires customer ID)',50);
