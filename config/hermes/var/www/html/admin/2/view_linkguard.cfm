@@ -501,7 +501,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset defaultBaseUrl = "https://" & consoleHost & "/lg/">
 
 <!--- reputation source rows (defined outside cfoutput) --->
-<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Needs a free abuse.ch Auth-Key; bulk list refreshed on your interval"},
+<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Free with an abuse.ch Auth-Key; bulk list refreshed on your interval"},
                     {"k":"openphish","n":"OpenPhish","lim":"Bulk list; refreshed on your interval (fair use)"} ]>
 <cfset repApis  = [ {"k":"gsb","n":"Google Safe Browsing","set":gsbSet,"lim":"Free tier ~10,000 URLs/day"},
                     {"k":"vt","n":"VirusTotal","set":vtSet,"lim":"Free tier 4/min, 500/day"} ]>
