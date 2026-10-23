@@ -97,25 +97,31 @@ only the in-stack container.
              ******** placeholder keeps the stored key untouched. --->
         <cfcase value="save_apikey">
             <cfset prov = LCase(Trim(form.provider))>
-            <cfif ListFindNoCase("gsb,vt", prov)>
+            <cfif ListFindNoCase("gsb,vt,urlhaus", prov)>
                 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
-                <cfset fld = prov & "_api_key">
+                <!--- URLhaus: an Auth-Key for a free feed (its on/off switch is the
+                     feed toggle); gsb/vt: a provider key that also enables it. --->
+                <cfset fld = (prov EQ "urlhaus") ? "urlhaus_auth_key" : prov & "_api_key">
                 <cfif StructKeyExists(form,'api_key') AND form.api_key NEQ "********">
                     <cfif Len(Trim(form.api_key))>
                         <cfquery datasource="hermes">
                             UPDATE parameters2 SET value2 = <cfqueryparam value="#Encrypt(Trim(form.api_key), authkey, 'AES', 'Base64')#" cfsqltype="cf_sql_varchar">
                             WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#fld#" cfsqltype="cf_sql_varchar">
                         </cfquery>
+                        <cfif prov NEQ "urlhaus">
                         <cfquery datasource="hermes">
                             UPDATE parameters2 SET value2 = '1' WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#prov#_enabled" cfsqltype="cf_sql_varchar">
                         </cfquery>
+                        </cfif>
                     <cfelse>
                         <cfquery datasource="hermes">
                             UPDATE parameters2 SET value2 = '' WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#fld#" cfsqltype="cf_sql_varchar">
                         </cfquery>
+                        <cfif prov NEQ "urlhaus">
                         <cfquery datasource="hermes">
                             UPDATE parameters2 SET value2 = '0' WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#prov#_enabled" cfsqltype="cf_sql_varchar">
                         </cfquery>
+                        </cfif>
                     </cfif>
                     <cfinclude template="./inc/linkguard_write_and_reload.cfm">
                 </cfif>
@@ -431,7 +437,7 @@ only the in-stack container.
 function lgToggleSecret(id, btn){var f=document.getElementById(id);if(f.type==='password'){f.type='text';btn.innerHTML='<i class="fa fa-eye-slash"></i>';}else{f.type='password';btn.innerHTML='<i class="fa fa-eye"></i>';}}
 function lgSelectAllDomains(master){document.querySelectorAll('.lg-dom-cb').forEach(function(cb){if(!cb.disabled){cb.checked=master.checked;}});}
 function lgProtectAllToggle(cb){var dis=cb.checked;document.querySelectorAll('.lg-dom-cb').forEach(function(x){x.disabled=dis;});var sa=document.getElementById('lgSelectAll');if(sa){sa.disabled=dis;}}
-function lgOpenKey(provider,label,hasKey){document.getElementById('lgKeyProvider').value=provider;document.getElementById('lgKeyModalLabel').textContent='API key: '+label;var f=document.getElementById('lgKeyField');f.value=hasKey?'********':'';f.type='password';new bootstrap.Modal(document.getElementById('lgKeyModal')).show();}
+function lgOpenKey(provider,label,hasKey){document.getElementById('lgKeyProvider').value=provider;document.getElementById('lgKeyNoteApi').style.display=(provider==='urlhaus')?'none':'';document.getElementById('lgKeyNoteUrlhaus').style.display=(provider==='urlhaus')?'':'none';document.getElementById('lgKeyModalLabel').textContent='API key: '+label;var f=document.getElementById('lgKeyField');f.value=hasKey?'********':'';f.type='password';new bootstrap.Modal(document.getElementById('lgKeyModal')).show();}
 function lgOpenRule(id,type,pattern,note){document.getElementById('lgRuleId').value=id||'';document.getElementById('lgRuleAction').value=id?'edit_rule':'add_rule';document.getElementById('lgRuleModalLabel').textContent=id?'Edit URL rule':'Add URL rule';document.getElementById('lgRuleType').value=type||'allow';document.getElementById('lgRulePattern').value=pattern||'';document.getElementById('lgRuleNote').value=note||'';new bootstrap.Modal(document.getElementById('lgRuleModal')).show();}
 function lgRuleSelectAll(master){document.querySelectorAll('.lg-rule-cb').forEach(function(cb){cb.checked=master.checked;});}
 function lgHostSelectAll(master){document.querySelectorAll('.lg-host-cb').forEach(function(cb){cb.checked=master.checked;});}
@@ -487,6 +493,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset gv = function(k,d){ return (StructKeyExists(S,k) AND Len(S[k])) ? S[k] : d; }>
 <cfset gsbSet = (StructKeyExists(S,"gsb_api_key") AND Len(S["gsb_api_key"]))>
 <cfset vtSet  = (StructKeyExists(S,"vt_api_key") AND Len(S["vt_api_key"]))>
+<cfset urlhausSet = (StructKeyExists(S,"urlhaus_auth_key") AND Len(S["urlhaus_auth_key"]))>
 
 <!--- Redirect base URL defaults to this console's host (parameters2 console.host) --->
 <cfquery name="chQ" datasource="hermes">SELECT value2 FROM parameters2 WHERE parameter='console.host' AND module='console'</cfquery>
@@ -494,7 +501,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset defaultBaseUrl = "https://" & consoleHost & "/lg/">
 
 <!--- reputation source rows (defined outside cfoutput) --->
-<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Bulk list; refreshed on your interval (fair use)"},
+<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Needs a free abuse.ch Auth-Key; bulk list refreshed on your interval"},
                     {"k":"openphish","n":"OpenPhish","lim":"Bulk list; refreshed on your interval (fair use)"} ]>
 <cfset repApis  = [ {"k":"gsb","n":"Google Safe Browsing","set":gsbSet,"lim":"Free tier ~10,000 URLs/day"},
                     {"k":"vt","n":"VirusTotal","set":vtSet,"lim":"Free tier 4/min, 500/day"} ]>
@@ -680,7 +687,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
   <div class="card-header"><h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Reputation sources</h3></div>
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-      <p class="text-muted mb-0">Checked at click time, on top of the structural heuristics, with results cached. Free feeds need no key; the two API providers offer free tiers and only run once you add a key and enable them. Free feeds refresh on the <strong>Feed refresh (min)</strong> interval.</p>
+      <p class="text-muted mb-0">Checked at click time, on top of the structural heuristics, with results cached. OpenPhish needs no key. <strong>URLhaus needs a free Auth-Key</strong> from abuse.ch: sign up at <a href="https://auth.abuse.ch/" target="_blank" rel="noopener">auth.abuse.ch</a>, which only accepts an X, Google, LinkedIn or GitHub account, then enter the key with the URLhaus <strong>Edit</strong> button below. The two API providers offer free tiers and only run once you add a key and enable them. Free feeds refresh on the <strong>Feed refresh (min)</strong> interval.</p>
       <form method="post" action="view_linkguard.cfm" class="flex-shrink-0">
         <input type="hidden" name="lg_action" value="refresh_feeds">
         <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-sync-alt me-1"></i>Refresh feeds now</button>
@@ -703,11 +710,12 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
             <td><span class="badge bg-secondary">Free feed</span></td>
             <td>
               <cfif NOT fEnabled><span class="badge bg-secondary">disabled</span>
+              <cfelseif fd.k EQ "urlhaus" AND NOT urlhausSet><span class="badge bg-warning text-dark">needs Auth-Key</span>
               <cfelseif StructKeyExists(feedStat, fd.k)><span class="badge bg-success">#(IsNull(feedStat[fd.k].entry_count)?'?':feedStat[fd.k].entry_count)# entries</span> <small class="text-muted">#feedStat[fd.k].last_status#</small>
               <cfelse><span class="badge bg-success">enabled</span> <small class="text-muted">awaiting first refresh</small></cfif>
             </td>
             <td><small class="text-muted">#fd.lim#</small></td>
-            <td class="text-end"><span class="text-muted">-</span></td>
+            <td class="text-end"><cfif fd.k EQ "urlhaus"><button type="button" class="btn btn-sm btn-primary" onclick="lgOpenKey('urlhaus','URLhaus Auth-Key',#(urlhausSet?'true':'false')#)"><i class="fas fa-key me-1"></i>Edit</button><cfelse><span class="text-muted">-</span></cfif></td>
           </tr>
         </cfloop>
         <!--- API providers --->
@@ -984,7 +992,8 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
           <input type="password" class="form-control" id="lgKeyField" name="api_key" autocomplete="off">
           <button class="btn btn-outline-secondary" type="button" onclick="lgToggleSecret('lgKeyField',this)"><i class="fa fa-eye"></i></button>
         </div>
-        <small class="text-muted">Entering a key enables this provider. Leave the masked <code>********</code> to keep the stored key; clear the field to disable the provider and remove its key.</small>
+        <small class="text-muted" id="lgKeyNoteApi">Entering a key enables this provider. Leave the masked <code>********</code> to keep the stored key; clear the field to disable the provider and remove its key.</small>
+        <small class="text-muted" id="lgKeyNoteUrlhaus" style="display:none;">A free Auth-Key from <a href="https://auth.abuse.ch/" target="_blank" rel="noopener">auth.abuse.ch</a> (sign-in needs an X, Google, LinkedIn or GitHub account). The URLhaus feed downloads only with a key; switch it on or off with its toggle. Leave the masked <code>********</code> to keep the stored key; clear the field to remove it.</small>
       </div>
       <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-primary">Save key</button></div>
     </form>

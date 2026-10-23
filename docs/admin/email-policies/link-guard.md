@@ -83,12 +83,19 @@ Every click is logged (recipient domain, URL hash, resolved host, verdict, sourc
 | 3 | **Verdict cache** | cached result | Avoids re-running heuristics / re-hitting external APIs |
 | 4 | **Open-redirect extraction** | escalate | Embedded target in an open-redirect param / nested URL is resolved and inherits its verdict (no fetch) |
 | 5 | **Local feeds** | malicious | URLhaus / OpenPhish, stored in SQLite; only ever escalate |
-| 6 | **Heuristics** | suspicious | Lookalike/punycode, IP-literal host, `@` in authority, known shorteners, excessive subdomains, **abused cloud-storage/redirector hosts** |
+| 6 | **Heuristics** | suspicious | Lookalike/punycode, IP-literal host, `@` in authority, known shorteners, excessive subdomains, **abused cloud-storage/redirector hosts**, **a UUID as a host label**, **ad click-trackers carrying another site's URL** |
 | 7 | **GSB / VirusTotal** | malicious | Optional, admin-supplied keys; string-reputation lookups, cached. Also escalates a warn-tier (step 6) link to a **hard block** when flagged |
 | 8 | **Guarded redirect-follow** | escalate | **Optional** (admin toggle): follow the `30x` chain under SSRF guards, verdict the final destination; also runs proactively on a step-6 warn so a malicious destination becomes a hard block |
 | 9 | **Default** | clean | Nothing flagged it |
 
 **Steps 1–7 never fetch the target URL** — every reputation check sends the URL only as a *string* (Google Safe Browsing, VirusTotal). The **only** layer that makes an outbound request is the optional **guarded redirect-follow** (step 8), and only when an admin enables it; every hop is SSRF-fenced (see [Redirect detection](#redirect-detection) below). Local feeds only ever escalate a link to malicious; they never auto-allow.
+
+Two heuristics target links built to dodge reputation checks, both **suspicious** (warn), never a block:
+
+- **A UUID as a host label** (`38a7d9ed-d5fb-4af3-a3bd-3de01b0efa33.example.de`). Phishing kits on wildcard DNS mint one such subdomain per victim, so the exact URL is never on a feed. Legitimate sites do not put a UUID in the host name of a link sent by email.
+- **An ad click-tracker carrying another site's URL** (`ad.doubleclick.net/ddm/trackclk/...;?https://other-site`, `googleadservices.com/pagead/aclk?...adurl=...`, `dartsearch.net`). These forward the browser to whatever URL is embedded, so the link shows the ad network's reputation while landing on the attacker's page. Real marketing mail tracks clicks through the sender's own email provider. A tracker link with no embedded URL is not flagged.
+
+Because the open-redirect step (4) checks the embedded target with the same heuristics, a tracker link that embeds a UUID host is flagged for both reasons.
 
 URL shorteners are flagged **suspicious** (warn), not blocked — a shortener hides its real destination, which is exactly what time-of-click protection exists to surface. The warning interstitial shows the resolved host so the user can make an informed choice. The shortener set is a curated list of **generic, anyone-shortens-anything** services (referenced from the maintained [`PeterDaveHello/url-shorteners`](https://github.com/PeterDaveHello/url-shorteners) list); **branded** corporate shorteners (`aka.ms`, `amzn.to`, `a.co`, `adobe.ly`, …) are deliberately **excluded** so legitimate branded short links don't warn-fatigue users. When `follow_redirects` is enabled, the real destination of *any* shortener is resolved regardless. VirusTotal requires **≥2 vendors** flagging a URL before it counts as malicious, to cut false positives.
 
@@ -191,7 +198,8 @@ Settings live in the `parameters2` table under `module = 'linkguard'` (not `syst
 | `cache_ttl_clean_hours` | `24` | Verdict cache lifetime — clean |
 | `cache_ttl_suspicious_hours` | `6` | Verdict cache lifetime — suspicious |
 | `cache_ttl_malicious_hours` | `168` | Verdict cache lifetime — malicious |
-| `feed_urlhaus_enabled` | `1` | Pull the URLhaus blocklist feed |
+| `feed_urlhaus_enabled` | `1` | Pull the URLhaus blocklist feed (needs `urlhaus_auth_key`) |
+| `urlhaus_auth_key` | empty | URLhaus (abuse.ch) Auth-Key, stored encrypted; without it the URLhaus feed is skipped |
 | `feed_openphish_enabled` | `1` | Pull the OpenPhish blocklist feed |
 | `feed_refresh_minutes` | `60` | Feed refresh interval |
 | `gsb_enabled` / `gsb_api_key` | `0` / — | Google Safe Browsing lookups (optional key) |
@@ -206,7 +214,17 @@ Two additional console-managed lists drive the verdict pipeline:
 
 ## Reputation feeds and optional API lookups
 
-- **URLhaus** and **OpenPhish** are pulled on the `feed_refresh_minutes` interval into the container's SQLite store and matched as exact URL-hash lookups (a phishing URL on a shared host blocks only that URL, not the whole host).
+- **URLhaus** and **OpenPhish** are pulled on the `feed_refresh_minutes` interval into the container's SQLite store and matched as exact URL-hash lookups (a phishing URL on a shared host blocks only that URL, not the whole host). OpenPhish needs no key. **URLhaus needs a free Auth-Key** (see below); until one is entered, its row shows **needs Auth-Key** and the feed is skipped.
+
+### Setting up URLhaus
+
+abuse.ch, which runs URLhaus, retired its keyless downloads in 2026 (they answer `410 Gone`). The feed is still free but needs an Auth-Key:
+
+1. Sign in at [auth.abuse.ch](https://auth.abuse.ch/). It only accepts an **X, Google, LinkedIn or GitHub** account; there is no email sign-up.
+2. Create an Auth-Key there.
+3. On **Email Policies > Link Guard**, in **Reputation sources**, click **Edit** on the URLhaus row, paste the key and save. Link Guard then downloads URLhaus' recent-URLs export (`https://urlhaus-api.abuse.ch/v2/files/exports/<key>/recent.csv`) and keeps the URLs marked online. Click **Refresh feeds now** to fetch it immediately.
+
+The key is never shown in the feed status or logs. Link Guard's key is separate from the URLhaus key on [Malware Feeds](../04-content-checks/malware-feeds.md#urlhaus-auth-key) (ClamAV signatures); you can use the same key in both or create one for each.
 - **Google Safe Browsing** and **VirusTotal** are off by default; enable each and supply an API key to add a string-reputation layer. Results are cached per the cache-TTL settings to limit API calls.
 
 ### Setting up VirusTotal and Google Safe Browsing

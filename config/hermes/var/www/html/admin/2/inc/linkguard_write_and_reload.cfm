@@ -95,6 +95,7 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
 }>
 <cfset gsbKey = decKey(getC("gsb_api_key", ""))>
 <cfset vtKey  = decKey(getC("vt_api_key", ""))>
+<cfset urlhausKey = decKey(getC("urlhaus_auth_key", ""))>
 
 <!--- scope domains (enabled) --->
 <cfquery name="doms" datasource="hermes">
@@ -179,6 +180,7 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
     "vt_enabled": (getC("vt_enabled","0") EQ "1"),
     "gsb_api_key": gsbKey,
     "vt_api_key": vtKey,
+    "urlhaus_auth_key": urlhausKey,
     "brand_name": "Hermes Secure Email Gateway",
     "support_contact": ""
 }>

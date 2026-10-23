@@ -7,6 +7,15 @@ domains) are now handled like mailbox domains where it matters: their
 mailbox settings can be edited, and their mail clients can configure
 themselves automatically.
 
+The URLhaus feeds work again. abuse.ch now requires a free Auth-Key, which
+you enter once on each page that uses URLhaus (see Upgrading). Link Guard
+(Pro) also gets improved detection.
+
+## New features
+
+- **Improved Link Guard detection (Pro).** Link Guard catches more
+  phishing links.
+
 ## Bug fixes
 
 ### All installs
@@ -30,6 +39,14 @@ themselves automatically.
   certificate check verifies them, issues the certificate and serves them,
   as for any mailbox domain.
 
+- **URLhaus stopped updating.** abuse.ch retired its free keyless
+  downloads, so the URLhaus ClamAV signatures (Malware Feeds) and Link
+  Guard's URLhaus feed failed with "HTTP Error 410: Gone". Both now use
+  abuse.ch's new export with an Auth-Key, which is free. Until a key is
+  entered, each page says the feed needs one and skips it instead of
+  failing. Any malware feed whose required key is empty is now skipped
+  rather than breaking the whole signature refresh.
+
 ## Upgrading
 
 **Before.** Take a backup or snapshot.
@@ -43,7 +60,19 @@ cd /opt/Hermes-Secure-Email-Gateway
 sudo ./scripts/system_update_docker.sh v261026
 ```
 
-**After.** If you have hybrid domains, open **Email Server > Domains**:
+**After.** To restore URLhaus, get a free Auth-Key: sign in at
+[auth.abuse.ch](https://auth.abuse.ch/) (it only accepts an X, Google,
+LinkedIn or GitHub account; there is no email sign-up) and create a key.
+Then enter it:
+
+- **Content Checks > Malware Feeds**: Edit on the URLhaus feed, key as
+  **Key 1 Value**.
+- **Email Policies > Link Guard** (Pro): Edit on the URLhaus row under
+  Reputation sources.
+
+The two are separate settings; the same key works in both.
+
+If you have hybrid domains, open **Email Server > Domains**:
 each is listed with the **Hybrid** badge. Fill in its organization details
 if you use organizational signatures. For automatic mail client setup,
 create DNS records for `autoconfig.<domain>` and `autodiscover.<domain>`
