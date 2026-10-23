@@ -52,6 +52,17 @@ INSERT IGNORE INTO linkguard_abused_hosts (host, note) VALUES
   ('netsupportsoftware.com','Remote-access tool (abused to take over PCs)');
 
 -- ---------------------------------------------------------------------
+-- 4. Hybrid domains (#371): a domain converted from relay has no mailbox
+-- default quota, which broke Email Server > Domains and new mailboxes on it.
+-- Give it 5 GB, the Add Mailbox Domain default; conversion now sets the
+-- quota chosen at conversion time.
+-- FRESH-INSTALL: n/a  repairs data only a pre-existing install can have (converted domains)
+-- ---------------------------------------------------------------------
+UPDATE domains
+   SET default_quota_mb = 5120
+ WHERE type = 'hybrid' AND (default_quota_mb IS NULL OR default_quota_mb = 0);
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

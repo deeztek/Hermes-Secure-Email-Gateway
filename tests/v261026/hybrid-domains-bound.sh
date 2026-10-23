@@ -15,4 +15,8 @@ nosan="$(db "SELECT GROUP_CONCAT(d.domain) FROM domains d WHERE d.type='hybrid' 
 [[ -z "$nosan" || "$nosan" == "NULL" ]] && pass "all hybrid domains have SAN rows (autoconfig/autodiscover)" \
     || fail "hybrid domain(s) without SAN rows: $nosan"
 
+noquota="$(db "SELECT GROUP_CONCAT(domain) FROM domains WHERE type='hybrid' AND (default_quota_mb IS NULL OR default_quota_mb = 0)")"
+[[ -z "$noquota" || "$noquota" == "NULL" ]] && pass "all hybrid domains have a default quota" \
+    || fail "hybrid domain(s) without a default quota: $noquota"
+
 done_check

@@ -924,6 +924,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                        AND (type IS NULL OR type NOT IN ('mailbox', 'hybrid'))
                 </cfquery>
 
+                <!--- A relay domain has no mailbox defaults. Give a newly hybrid
+                     domain the quota chosen for this conversion as its default,
+                     so Add Mailbox and Email Server > Domains work for it (#371). --->
+                <cfquery datasource="hermes">
+                    UPDATE domains
+                       SET default_quota_mb = <cfqueryparam value="#Round(builtin_quota_gb * 1024)#" cfsqltype="cf_sql_integer">
+                     WHERE type = 'hybrid'
+                       AND (default_quota_mb IS NULL OR default_quota_mb = 0)
+                       AND domain IN (
+                             SELECT DISTINCT SUBSTRING_INDEX(recipient, '@', -1)
+                               FROM recipients
+                              WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                           )
+                </cfquery>
+
                 <!--- A domain hosting mailboxes needs a certificate binding,
                      like a newly added mailbox domain, or it never gets its
                      autoconfig./autodiscover. names (#371). Create any missing

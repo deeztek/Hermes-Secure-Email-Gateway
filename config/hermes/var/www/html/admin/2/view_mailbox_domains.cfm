@@ -487,7 +487,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <br><small class="text-muted">0/#san_total# SANs</small>
               </cfif>
             </td>
-            <td><cfset quotaGb = default_quota_mb / 1024><cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB</td>
+            <td><cfif IsNumeric(default_quota_mb) AND default_quota_mb GT 0><cfset quotaGb = default_quota_mb / 1024><cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB<cfelse><span class="text-muted">Not set</span></cfif></td>
             <td>
               <cfif Len(catchall_mailbox)>
                 #encodeForHTML(catchall_mailbox)#
@@ -810,7 +810,8 @@ function openEditModal(mailboxDomainId) {
         return;
       }
       document.getElementById('edit_domain_name').value = data.domain;
-      document.getElementById('edit_default_quota_gb').value = (data.default_quota_mb / 1024).toFixed(2).replace(/\.?0+$/, '');
+      // A converted (hybrid) domain may have no default quota yet: offer 5 GB, as the Add form does.
+      document.getElementById('edit_default_quota_gb').value = (data.default_quota_mb > 0) ? (data.default_quota_mb / 1024).toFixed(2).replace(/\.?0+$/, '') : '5';
       document.getElementById('edit_catchall_mailbox').value = data.catchall_mailbox || '';
       // No catch-all on a hybrid domain: it would capture the relayed users' mail too.
       document.getElementById('edit_catchall_wrap').style.display = (data.type === 'hybrid') ? 'none' : '';
