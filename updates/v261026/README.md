@@ -72,6 +72,10 @@ Then enter it:
 
 The two are separate settings; the same key works in both.
 
+If you use Link Guard (Pro), open **Email Policies > Link Guard** and click
+**Save & Reload** once after upgrading, so Link Guard picks up its new
+remote-access tool hosts.
+
 If you have hybrid domains, open **Email Server > Domains**:
 each is listed with the **Hybrid** badge. Fill in its organization details
 if you use organizational signatures. For automatic mail client setup,
