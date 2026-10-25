@@ -25,6 +25,10 @@ template = {
           placeholder: "Jane Smith" },
         { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
+        { name: "show_org_name",  label: "Show company name", type: "checkbox", default: true },
+        { name: "org_name", autoFill: true,       label: "Company name",  type: "text",  default: "{{org.name}}",
+          placeholder: "Acme Inc.",
+          showIf: "show_org_name" },
 
         { name: "logo_url",       label: "Logo",          type: "image", default: "",
           help: "Upload a small logo to show inline above the name (PNG, JPG, GIF, or SVG, up to 1 MB). Leave blank for a logo-less layout." },
@@ -89,6 +93,9 @@ template = {
 <div style="font-size:17px;font-weight:bold;color:##111;">#fields.user_name#</div>
 <cfif Len(Trim(fields.user_title))>
 <div style="color:##555;">#fields.user_title#</div>
+</cfif>
+<cfif fields.show_org_name AND Len(Trim(fields.org_name))>
+<div style="color:##555;">#fields.org_name#</div>
 </cfif>
 <div style="border-top:2px solid #fields.accent_color#;margin:8px 0;width:80px;"></div>
 <cfset contactBits = []>

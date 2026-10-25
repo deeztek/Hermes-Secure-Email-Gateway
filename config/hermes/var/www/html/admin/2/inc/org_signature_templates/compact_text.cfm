@@ -2,7 +2,7 @@
 ORGANIZATIONAL SIGNATURE TEMPLATE: Compact Text (#226 Phase 2A)
 
 Layout:
-  Name | Title
+  Name | Title | Company
   Phone | Email | Website
   Address (optional)
   --
@@ -25,6 +25,10 @@ template = {
           placeholder: "Jane Smith" },
         { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
+        { name: "show_org_name",  label: "Show company name", type: "checkbox", default: true },
+        { name: "org_name", autoFill: true,       label: "Company name",  type: "text",  default: "{{org.name}}",
+          placeholder: "Acme Inc.",
+          showIf: "show_org_name" },
 
         { name: "show_phone",     label: "Show phone",    type: "checkbox", default: true },
         { name: "user_phone", autoFill: true,     label: "Phone",         type: "text",  default: "{{user.phone}}",
@@ -59,6 +63,7 @@ template = {
 <cfset firstLineBits = []>
 <cfif Len(Trim(fields.user_name))><cfset ArrayAppend(firstLineBits, '<strong>' & fields.user_name & '</strong>')></cfif>
 <cfif Len(Trim(fields.user_title))><cfset ArrayAppend(firstLineBits, fields.user_title)></cfif>
+<cfif fields.show_org_name AND Len(Trim(fields.org_name))><cfset ArrayAppend(firstLineBits, fields.org_name)></cfif>
 <cfif ArrayLen(firstLineBits)>
 <div>#ArrayToList(firstLineBits, ' | ')#</div>
 </cfif>

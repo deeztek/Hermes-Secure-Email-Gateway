@@ -26,6 +26,10 @@ template = {
           placeholder: "Jane Smith" },
         { name: "user_title", autoFill: true,     label: "Title",         type: "text",  default: "{{user.title}}",
           placeholder: "Director of Engineering" },
+        { name: "show_org_name",  label: "Show company name", type: "checkbox", default: true },
+        { name: "org_name", autoFill: true,       label: "Company name",  type: "text",  default: "{{org.name}}",
+          placeholder: "Acme Inc.",
+          showIf: "show_org_name" },
 
         { name: "logo_url",       label: "Logo",          type: "image", default: "",
           help: "Upload a logo (PNG, JPG, GIF, or SVG, up to 1 MB). Leave blank to render without a logo." },
@@ -95,6 +99,9 @@ template = {
 <div style="font-size:17px;font-weight:bold;color:##111;">#fields.user_name#</div>
 <cfif Len(Trim(fields.user_title))>
 <div style="color:##555;margin:2px 0 10px 0;">#fields.user_title#</div>
+</cfif>
+<cfif fields.show_org_name AND Len(Trim(fields.org_name))>
+<div style="color:##555;">#fields.org_name#</div>
 </cfif>
 <cfif fields.show_phone AND Len(Trim(fields.user_phone))>
 <div style="margin:3px 0;"><span style="color:#fields.accent_color#;font-weight:bold;">P</span> &nbsp;#fields.user_phone#</div>

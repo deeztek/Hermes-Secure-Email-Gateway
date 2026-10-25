@@ -656,7 +656,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  Organization Information (#226)
                  Per-domain metadata used by Pro signature placeholder
                  substitution: {{org.name}}, {{org.phone}}, {{org.address}},
-                 {{org.website}}, {{org.logo}}. Pro-only feature; inputs are
+                 {{org.website}}. Pro-only feature; inputs are
                  disabled in Community with an upsell badge.
                  ============================================================ --->
             <hr>
@@ -670,7 +670,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               </cfif>
             </h6>
             <cfif isPro>
-              <p class="form-text text-muted mb-3"><i class="fas fa-info-circle me-1"></i> Used by signature placeholders <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code>, <code>{{org.website}}</code>, <code>{{org.logo}}</code>. All fields optional.</p>
+              <p class="form-text text-muted mb-3"><i class="fas fa-info-circle me-1"></i> Used by signature placeholders <code>{{org.name}}</code>, <code>{{org.phone}}</code>, <code>{{org.address}}</code> and <code>{{org.website}}</code>. All fields optional.</p>
             <cfelse>
               <div class="alert alert-warning py-2 mb-3 small">
                 <i class="fas fa-star text-warning me-1"></i>
