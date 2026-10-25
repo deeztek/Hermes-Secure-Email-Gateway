@@ -6,9 +6,18 @@
 > recipients on a hybrid domain (a domain with both relayed recipients and
 > local mailboxes) is rejected. Mailboxes on the domain are not affected.
 
-This release fixes that. It also adds the organization name to the
-organizational signature templates, and an upgrade now refreshes Link
-Guard (Pro) without a manual save.
+This release fixes that. For Pro it also adds a **Test** button for Link
+Guard's API keys and the organization name to organizational signatures,
+and the upgrade now refreshes Link Guard without a manual save.
+
+## New features
+
+- **Test a Link Guard API key (Pro).** Saving a Google Safe Browsing or
+  VirusTotal key did not check it, and a wrong key went unnoticed because
+  Link Guard skips a provider whose lookups fail. **Email Policies > Link
+  Guard > Reputation sources** now has a **Test** button on each provider
+  with a key. It sends one request and reports whether the key works, was
+  refused, is over its quota, or the provider could not be reached.
 
 ## Bug fixes
 

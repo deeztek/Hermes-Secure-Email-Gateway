@@ -130,6 +130,70 @@ only the in-stack container.
             <cflocation url="view_linkguard.cfm" addtoken="false">
         </cfcase>
 
+        <!--- Test a provider's saved API key with one live request. Saving a key
+             does not check it, and the engine fails open on a lookup error (the
+             link just gets no verdict from that provider), so a wrong key went
+             unnoticed. Google: a lookup of Google's Safe Browsing test page.
+             VirusTotal: a report request for a well-known URL (404 = key fine,
+             URL unknown). Costs one lookup against the provider's quota. --->
+        <cfcase value="test_apikey">
+            <cfset prov = LCase(Trim(form.provider))>
+            <cfif NOT ListFindNoCase("gsb,vt", prov)>
+                <cflocation url="view_linkguard.cfm" addtoken="false">
+            </cfif>
+            <cfset provName = (prov EQ "gsb") ? "Google Safe Browsing" : "VirusTotal">
+            <cfquery name="tkRow" datasource="hermes">
+                SELECT value2 FROM parameters2
+                WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#prov#_api_key" cfsqltype="cf_sql_varchar">
+            </cfquery>
+            <cfset testKey = "">
+            <cfif tkRow.recordcount AND Len(tkRow.value2)>
+                <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
+                <cftry>
+                    <cfset testKey = Decrypt(tkRow.value2, authkey, "AES", "Base64")>
+                <cfcatch type="any"><cfset testKey = ""></cfcatch>
+                </cftry>
+            </cfif>
+            <cfset session.m = 1>
+            <cfif NOT Len(testKey)>
+                <cfset session.alerttype = "warning">
+                <cfset session.alertmsg = provName & ": no API key saved. Click Edit to add one.">
+                <cflocation url="view_linkguard.cfm" addtoken="false">
+            </cfif>
+            <cfif prov EQ "gsb">
+                <!--- Literal JSON: SerializeJSON can upper-case struct keys, and
+                     Google's field names are case-sensitive. --->
+                <cfset tBody = '{"client":{"clientId":"hermes-linkguard","clientVersion":"1.0"},"threatInfo":{"threatTypes":["MALWARE","SOCIAL_ENGINEERING"],"platformTypes":["ANY_PLATFORM"],"threatEntryTypes":["URL"],"threatEntries":[{"url":"https://testsafebrowsing.appspot.com/s/phishing.html"}]}}'>
+                <cfhttp method="post" url="https://safebrowsing.googleapis.com/v4/threatMatches:find?key=#URLEncodedFormat(testKey)#" timeout="15" result="tr">
+                    <cfhttpparam type="header" name="Content-Type" value="application/json">
+                    <cfhttpparam type="body" value="#tBody#">
+                </cfhttp>
+            <cfelse>
+                <cfset tId = Replace(Replace(Replace(ToBase64("http://www.google.com/"), "+", "-", "all"), "/", "_", "all"), "=", "", "all")>
+                <cfhttp method="get" url="https://www.virustotal.com/api/v3/urls/#tId#" timeout="15" result="tr">
+                    <cfhttpparam type="header" name="x-apikey" value="#testKey#">
+                </cfhttp>
+            </cfif>
+            <cfset tCode = IsDefined("tr.statuscode") ? Left(tr.statuscode, 3) : "">
+            <cfif tCode EQ "200" OR (prov EQ "vt" AND tCode EQ "404")>
+                <cfset session.alerttype = "success">
+                <cfset session.alertmsg = provName & ": the API key works.">
+                <cfif prov EQ "gsb" AND FindNoCase("threatType", tr.filecontent)>
+                    <cfset session.alertmsg = session.alertmsg & " Google's test phishing page was reported as a threat.">
+                </cfif>
+            <cfelseif tCode EQ "429">
+                <cfset session.alerttype = "warning">
+                <cfset session.alertmsg = provName & ": the key is valid but over its quota (HTTP 429). Lookups resume when the quota resets.">
+            <cfelseif ListFind("400,401,403", tCode)>
+                <cfset session.alerttype = "danger">
+                <cfset session.alertmsg = provName & ": the API key was refused (HTTP " & tCode & ")." & ((prov EQ "gsb") ? " Check the key, and that the Safe Browsing API is enabled in its Google Cloud project." : " Check the key.")>
+            <cfelse>
+                <cfset session.alerttype = "danger">
+                <cfset session.alertmsg = provName & ": could not reach the provider (" & (Len(tCode) ? "HTTP " & tCode : "no response") & "). Check this server's outbound Internet access.">
+            </cfif>
+            <cflocation url="view_linkguard.cfm" addtoken="false">
+        </cfcase>
+
         <!--- Toggle a free local feed (urlhaus / openphish). --->
         <cfcase value="toggle_feed">
             <cfif ListFindNoCase("urlhaus,openphish", form.feed)>
@@ -736,7 +800,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
               <cfelse><span class="badge bg-secondary">disabled</span></cfif>
             </td>
             <td><small class="text-muted">#ap.lim#</small></td>
-            <td class="text-end"><button type="button" class="btn btn-sm btn-primary" onclick="lgOpenKey('#ap.k#','#JSStringFormat(ap.n)#',#(ap.set?'true':'false')#)"><i class="fas fa-key me-1"></i>Edit</button></td>
+            <td class="text-end"><cfif ap.set><form method="post" action="view_linkguard.cfm" style="display:inline;"><input type="hidden" name="lg_action" value="test_apikey"><input type="hidden" name="provider" value="#ap.k#"><button type="submit" class="btn btn-sm btn-outline-primary me-1" title="Send one test request with the saved key (uses one lookup)"><i class="fas fa-vial me-1"></i>Test</button></form></cfif><button type="button" class="btn btn-sm btn-primary" onclick="lgOpenKey('#ap.k#','#JSStringFormat(ap.n)#',#(ap.set?'true':'false')#)"><i class="fas fa-key me-1"></i>Edit</button></td>
           </tr>
         </cfloop>
       </tbody>

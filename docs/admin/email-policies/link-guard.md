@@ -238,6 +238,8 @@ Both are **optional** — Link Guard works without them (admin lists + feeds + h
 
 **Where to enter keys:** Link Guard page → **Reputation sources** → the provider's **Edit key** button. Entering a key auto-enables the provider; clearing it disables and wipes the stored key.
 
+**Check a key:** once a key is saved, click **Test** on the provider's row. Saving a key does not check it, and Link Guard skips a provider whose lookups fail rather than blocking mail, so a wrong key otherwise goes unnoticed. The test sends one request with the saved key (it counts against the provider's quota) and reports one of: the key works; the key was refused (wrong key, or for Google, the Safe Browsing API is not enabled in the key's Google Cloud project); the key is over its quota; or the provider could not be reached.
+
 **VirusTotal (recommended):**
 
 1. Create a free account at [virustotal.com](https://www.virustotal.com/) and sign in.

@@ -17,6 +17,7 @@ for t in banner_with_logo compact_text modern_card promo_footer two_column_pro w
     check $w/admin/2/inc/org_signature_templates/$t.cfm "{{org.name}}" "organizational signature $t shows the company name (#375)"
 done
 check $w/schedule/post_upgrade.cfm "linkguard-config" "upgrade refreshes the Link Guard engine config (#374)"
+check $w/admin/2/view_linkguard.cfm "test_apikey" "Link Guard API keys can be tested"
 grep -q "{{org.logo}}" $w/admin/2/view_mailbox_domains.cfm \
     && fail "Email Server > Domains still advertises {{org.logo}} (#375)" \
     || pass "Email Server > Domains no longer advertises {{org.logo}} (#375)"
