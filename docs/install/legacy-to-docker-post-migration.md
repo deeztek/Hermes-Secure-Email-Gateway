@@ -533,10 +533,10 @@ elsewhere).
 
    ```bash
    cp config/certbot/conf/cli.ini config/certbot/conf/cli.ini.pre-docker
-   sed -i -E '/^(deploy-hook|renew-hook|pre-hook|post-hook) *=/d' config/certbot/conf/cli.ini
+   sed -i -E '/^[[:space:]]*(deploy|renew|pre|post)[-_]hook[[:space:]]*=/d' config/certbot/conf/cli.ini
 
    cp config/certbot/conf/renewal/<cert-name>.conf config/certbot/conf/renewal/<cert-name>.conf.pre-docker
-   sed -i -E '/^(deploy_hook|renew_hook|pre_hook|post_hook) *=/d; s#= /var/www/html(,?)$#= /var/www/certbot\1#' config/certbot/conf/renewal/<cert-name>.conf
+   sed -i -E '/^[[:space:]]*(deploy|renew|pre|post)[-_]hook[[:space:]]*=/d; s#=[[:space:]]*/var/www/html(,?)[[:space:]]*$#= /var/www/certbot\1#' config/certbot/conf/renewal/<cert-name>.conf
    ```
 
    Check the result. No line may mention `hook` or `systemctl`, and every
