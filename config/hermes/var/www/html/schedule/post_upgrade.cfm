@@ -253,6 +253,28 @@ every existing install without requiring anyone to notice.
 </cfcatch>
 </cftry>
 
+<!--- Link Guard engine config (#374). The engine reads config.json, which is
+     only written when the admin saves Link Guard, so rows a release's
+     schema_updates.sql adds (v261026: the remote-access abused hosts and
+     their reasons) did nothing until the next save. Rewritten here only when
+     Link Guard is live, i.e. its scope map is non-empty: an install that
+     never applied it, or a lapsed Pro install whose maps were torn down, is
+     left alone. --->
+<cftry>
+    <cfset lgScopeMap = "/etc/hermes/body_milter/linkguard/linkguard_by_recipient_domain">
+    <cfif FileExists(lgScopeMap) AND Len(Trim(FileRead(lgScopeMap, "utf-8")))>
+        <cfinclude template="/admin/2/inc/linkguard_write_and_reload.cfm">
+        <cfif session.linkguardApplySuccess>
+            <cfset arrayAppend(repairsRun, "linkguard-config")>
+        <cfelse>
+            <cfset arrayAppend(repairErrors, "linkguard-config: " & session.linkguardApplyError)>
+        </cfif>
+    </cfif>
+<cfcatch type="any">
+    <cfset arrayAppend(repairErrors, "linkguard-config: " & cfcatch.message)>
+</cfcatch>
+</cftry>
+
 <!---
 ====================================================================
 SECTION 2: ONE-TIME MIGRATIONS (guarded by the migrations table)

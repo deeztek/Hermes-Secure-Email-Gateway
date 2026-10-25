@@ -6,8 +6,9 @@
 > recipients on a hybrid domain (a domain with both relayed recipients and
 > local mailboxes) is rejected. Mailboxes on the domain are not affected.
 
-This release fixes that, and adds the organization name to the
-organizational signature templates.
+This release fixes that. It also adds the organization name to the
+organizational signature templates, and an upgrade now refreshes Link
+Guard (Pro) without a manual save.
 
 ## Bug fixes
 
@@ -24,6 +25,10 @@ organizational signature templates.
 
 ### Pro
 
+- **New Link Guard entries waited for a manual save (#374).** Link Guard
+  only picked up entries an upgrade added (such as the v261026 remote-access
+  tool hosts) after an admin clicked **Save & Reload**. The upgrade now
+  refreshes Link Guard itself whenever Link Guard is in use.
 - **Organizational signatures had no organization name (#375).** The
   organization name entered on **Email Server > Domains** was never shown,
   because no signature template had a field for it. Every template now has a
@@ -63,4 +68,5 @@ sudo ./scripts/system_update_docker.sh v261027
   Policies > Org Signatures** and click **Save**. A signature
   shows the company name only after it is saved again.
 - If you upgrade from a release before v261026, also follow the v261026
-  notes: re-save Link Guard and add the URLhaus Auth-Key.
+  notes: add the URLhaus Auth-Key. Link Guard no longer needs the manual
+  save.
