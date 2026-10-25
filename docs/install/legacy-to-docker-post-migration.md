@@ -635,8 +635,10 @@ cd /opt/Hermes-Secure-Email-Gateway
 tar -tzf "$B" | grep -E '^opt/hermes/(CA|HermesExternalCACerts|\.gnupg)/' | cut -d/ -f1-3 | sort -u
 ```
 
-Restore whichever of them that lists. Existing files are never overwritten,
-and the temporary copy is deleted because it holds private keys:
+This shows which of the three folders the backup holds. Then run the block
+below as is, without editing it: it restores every folder the backup holds and
+skips any it does not. Existing files are never overwritten, and the temporary
+copy is deleted because it holds private keys:
 
 ```bash
 mkdir -p /tmp/legacy-opt
