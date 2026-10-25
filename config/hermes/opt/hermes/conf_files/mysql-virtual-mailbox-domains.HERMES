@@ -2,4 +2,10 @@ hosts = hermes_db_server
 dbname = hermes
 user = HERMES-USERNAME
 password = HERMES-PASSWORD
-query = SELECT 1 from mailbox_domains where domain='%s'
+# Hybrid domains are left out. A hybrid domain also has a mailbox_domains row
+# (its certificate binding, #371), but its mail runs through the relay path:
+# relay recipients to the downstream server, converted mailboxes by their
+# per-recipient lmtp route. Listed here it would become mailbox-only, and
+# Postfix would reject every relay recipient as "User unknown in virtual
+# mailbox table".
+query = SELECT 1 FROM mailbox_domains md WHERE md.domain='%s' AND NOT EXISTS (SELECT 1 FROM domains d WHERE d.domain = md.domain AND d.type = 'hybrid')
