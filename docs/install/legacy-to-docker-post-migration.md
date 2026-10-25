@@ -224,6 +224,17 @@ private window so an old login session is not reused.
    **admin email** are real addresses, not the `@domain.tld` placeholders. These
    are where system alerts and scheduled-job failure notifications go; a
    placeholder means those are never delivered and nothing tells you.
+7. Sidebar → **System → Server Setup**. Check that **Mail Server Hostname** is
+   the gateway's mail name (for example `mail.example.com`), then click
+   **Save**, even if it is already correct. Until this page is saved, Postfix
+   can still greet other mail servers as the template's `hermes.domain.tld`.
+   Confirm from your Hermes install directory:
+
+   ```bash
+   docker exec hermes_postfix_dkim postconf myhostname
+   ```
+
+   It must print your mail name, not `hermes.domain.tld`.
 
 ## 3. Regenerate mail authentication and filtering
 
