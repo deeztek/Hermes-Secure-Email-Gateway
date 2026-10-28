@@ -164,13 +164,17 @@ only the in-stack container.
                 <!--- Literal JSON: SerializeJSON can upper-case struct keys, and
                      Google's field names are case-sensitive. --->
                 <cfset tBody = '{"client":{"clientId":"hermes-linkguard","clientVersion":"1.0"},"threatInfo":{"threatTypes":["MALWARE","SOCIAL_ENGINEERING"],"platformTypes":["ANY_PLATFORM"],"threatEntryTypes":["URL"],"threatEntries":[{"url":"https://testsafebrowsing.appspot.com/s/phishing.html"}]}}'>
-                <cfhttp method="post" url="https://safebrowsing.googleapis.com/v4/threatMatches:find?key=#URLEncodedFormat(testKey)#" timeout="15" result="tr">
+                <!--- encodeurl="false": with Lucee's default URL encoding, a test with a
+                     wrong key got HTTP 404 instead of Google's 400, so the
+                     "threatMatches:find" path was not reaching Google as written.
+                     The key is already encoded. --->
+                <cfhttp method="post" url="https://safebrowsing.googleapis.com/v4/threatMatches:find?key=#URLEncodedFormat(testKey)#" encodeurl="false" timeout="15" result="tr">
                     <cfhttpparam type="header" name="Content-Type" value="application/json">
                     <cfhttpparam type="body" value="#tBody#">
                 </cfhttp>
             <cfelse>
                 <cfset tId = Replace(Replace(Replace(ToBase64("http://www.google.com/"), "+", "-", "all"), "/", "_", "all"), "=", "", "all")>
-                <cfhttp method="get" url="https://www.virustotal.com/api/v3/urls/#tId#" timeout="15" result="tr">
+                <cfhttp method="get" url="https://www.virustotal.com/api/v3/urls/#tId#" encodeurl="false" timeout="15" result="tr">
                     <cfhttpparam type="header" name="x-apikey" value="#testKey#">
                 </cfhttp>
             </cfif>
