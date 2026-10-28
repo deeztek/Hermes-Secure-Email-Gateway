@@ -932,9 +932,10 @@ CREATE TABLE IF NOT EXISTS `intrusion_prevention_jails` (
   UNIQUE KEY `jail_name` (`jail_name`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
--- 2 row(s) for `intrusion_prevention_jails`
+-- 3 row(s) for `intrusion_prevention_jails`
 INSERT IGNORE INTO `intrusion_prevention_jails` VALUES (1,'dovecot','Mail Server (Dovecot)','Protects against brute force attacks on mail server authentication','dovecot','hermes-iptables-dovecot','/remotelogs/dovecot/dovecot-info.log',NULL,5,86400,1800,1,1,'2026-01-23 12:22:58','2026-01-23 13:55:14');
 INSERT IGNORE INTO `intrusion_prevention_jails` VALUES (2,'authelia','SSO Portal (Authelia)','Protects against brute force attacks on Single Sign-On portal','authelia-auth','hermes-iptables-authelia','/remotelogs/authelia/authelia.log','http,https,9091',5,86400,1800,1,1,'2026-01-23 12:22:58','2026-01-23 13:55:14');
+INSERT INTO `intrusion_prevention_jails` (jail_name, display_name, description, filter_name, action_name, logpath, port, maxretry, findtime, bantime, enabled, config_synced) SELECT 'postfix','Mail Server (Postfix SMTP)','Protects against brute force attacks on SMTP authentication','postfix[mode=auth]','hermes-iptables-postfix','/remotelogs/postfix_dkim/mail.log tail',NULL,5,86400,1800,1,1 WHERE NOT EXISTS (SELECT 1 FROM `intrusion_prevention_jails` WHERE jail_name = 'postfix');
 
 -- -------- intrusion_prevention_settings        [seed] --------
 CREATE TABLE IF NOT EXISTS `intrusion_prevention_settings` (

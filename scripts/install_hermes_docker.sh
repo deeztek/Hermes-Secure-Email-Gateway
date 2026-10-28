@@ -1073,6 +1073,13 @@ provision_mount_dirs() {
     # this races against Authelia/Dovecot creating their own log files.
     touch "${DATA_MOUNT}/authelia/logs/authelia.log"
     touch "${DATA_MOUNT}/dovecot/logs/dovecot-info.log"
+    # rsyslog in hermes_postfix_dkim drops to syslog (uid 101, group adm) and
+    # cannot append to a root-owned file, so this one is handed over.
+    if [[ ! -e "${DATA_MOUNT}/postfix_dkim/logs/mail.log" ]]; then
+        touch "${DATA_MOUNT}/postfix_dkim/logs/mail.log"
+        chown 101:4 "${DATA_MOUNT}/postfix_dkim/logs/mail.log"
+        chmod 0640 "${DATA_MOUNT}/postfix_dkim/logs/mail.log"
+    fi
 
     log "Storage subdirectories provisioned"
 }

@@ -694,6 +694,7 @@ services:
       - ./config/fail2ban/scripts/detect-iptables-backend.sh:/custom-cont-init.d/10-detect-iptables-backend:ro
       - dovecot_logs:/remotelogs/dovecot:ro
       - authelia_logs:/remotelogs/authelia:ro
+      - postfix_dkim_logs:/remotelogs/postfix_dkim:ro
       - ./config/hermes/opt/hermes:/opt/hermes:ro
     restart: always
     # Note: networks and extra_hosts removed - not compatible with network_mode: host

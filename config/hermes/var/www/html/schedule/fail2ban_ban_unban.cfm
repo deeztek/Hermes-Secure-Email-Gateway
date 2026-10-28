@@ -37,6 +37,19 @@
 
 <cfif apply EQ 1>
 
+    <!--- A jail that shares a source with another (postfix and dovecot are both
+         MAILSERVER) names itself; only jails that exist are accepted. --->
+    <cfset jailOverride = "">
+    <cfif StructKeyExists(url, "jail") AND Len(Trim(url.jail))>
+        <cfquery name="checkJail" datasource="hermes">
+            SELECT jail_name FROM intrusion_prevention_jails
+            WHERE jail_name = <cfqueryparam value="#Trim(url.jail)#" cfsqltype="cf_sql_varchar">
+        </cfquery>
+        <cfif checkJail.recordcount EQ 1>
+            <cfset jailOverride = checkJail.jail_name>
+        </cfif>
+    </cfif>
+
     <cfif url.action is "BAN">
 
         <!--- Determine jail from source --->
@@ -46,6 +59,9 @@
             <cfset theJail = "authelia">
         <cfelse>
             <cfset theJail = "">
+        </cfif>
+        <cfif Len(jailOverride)>
+            <cfset theJail = jailOverride>
         </cfif>
 
         <!--- Check if IP already exists in database for this jail --->
@@ -90,6 +106,9 @@
             <cfset theJail = "authelia">
         <cfelse>
             <cfset theJail = "">
+        </cfif>
+        <cfif Len(jailOverride)>
+            <cfset theJail = jailOverride>
         </cfif>
 
         <!--- Delete ban record from database for this specific jail --->

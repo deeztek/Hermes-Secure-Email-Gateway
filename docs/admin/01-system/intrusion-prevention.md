@@ -54,20 +54,23 @@ Two facts are worth pinning down before anything else:
 
 - The configuration UI is replaced by the standard "Pro feature required" panel.
 - Jail toggles in `intrusion_prevention_jails.enabled` and the master `intrusion_prevention_settings.enabled` switch default to disabled on a fresh install.
-- The jail.local on disk reflects whatever the seed gave you; nothing rewrites it without an admin clicking through the page.
+- The jail.local on disk reflects whatever the seed gave you; nothing rewrites it without an admin clicking through the page, except the one-time `intrusion-prevention-jails` repair in `schedule/post_upgrade.cfm`, which regenerates it on the upgrade to v261027 so the new `postfix` jail starts.
 
 > **Operational consequence.** Stopping `hermes_fail2ban` to "turn off IPS on Community" is the wrong move. The container is needed for the schema, the include scripts, and the manual-unban API path. Leave it running; disable IPS through the UI when the page becomes accessible, or leave the seeded jails disabled.
 
-## The two seeded jails
+## The seeded jails
 
 | Jail name | Display name | Log scanned | Filter | Action | Default thresholds |
 |---|---|---|---|---|---|
 | `dovecot` | Mail Server (Dovecot) | `/remotelogs/dovecot/dovecot-info.log` | `dovecot` (upstream Fail2ban filter) | `hermes-iptables-dovecot` | maxretry 5 / findtime 86400 (1 day) / bantime 1800 (30 min) |
 | `authelia` | SSO Portal (Authelia) | `/remotelogs/authelia/authelia.log` | `authelia-auth` (Hermes-shipped) | `hermes-iptables-authelia` | maxretry 5 / findtime 86400 / bantime 1800 |
+| `postfix` | Mail Server (Postfix SMTP) | `/remotelogs/postfix_dkim/mail.log` (read from the end: `tail`) | `postfix[mode=auth]` (upstream Fail2ban filter, SASL failures only) | `hermes-iptables-postfix` | maxretry 5 / findtime 86400 / bantime 1800 |
 
-Both rows are seeded into `intrusion_prevention_jails` on install (see [hermes_install.sql](../../../config/database/hermes_install.sql) lines 845-846). Adding a third jail is a schema-row plus filter/action insertion exercise — there is no UI for it. The two-jail set covers the two real attack surfaces in Hermes: SMTP/IMAP login brute force and the web-console SSO login. Postfix's own brute-force protection (smtpd anvil rate limits) is the first line of defense for SMTP submission; this jail catches what gets past anvil.
+All three rows are seeded into `intrusion_prevention_jails` on install by [hermes_install.sql](../../../config/database/hermes_install.sql). Adding another jail is a schema-row plus filter/action insertion exercise; there is no UI for it. The three jails cover the real attack surfaces: IMAP/POP3 logins, SMTP logins, and the web-console SSO login.
 
-The dovecot jail covers the `dovecot-info.log` line for failed authentication, not the Postfix auth log. SMTP-AUTH attempts terminate against Dovecot SASL — Postfix proxies SASL through Dovecot — so the dovecot filter sees both IMAP/POP and SMTP-AUTH failures from the same surface.
+The `postfix` jail was added in v261027 (#383). Before that, failed SMTP logins (587, 465, 25) were watched by nothing: Postfix hands SASL to Dovecot's auth service, but Dovecot does not log those failures in `dovecot-info.log` (only its IMAP/POP3 login processes do), so the `dovecot` jail never saw them. One test server logged 635 failed SMTP logins in four days with no ban. `mail.log` is not rotated, so the jail reads it from the end (`tail`) rather than parsing the whole file at start.
+
+Bans from `postfix` and `dovecot` are both recorded with source `MAILSERVER`. The `postfix` action passes its jail name to `hermes-api-notify.sh`, which forwards it to `schedule/fail2ban_ban_unban.cfm`; the endpoint accepts it only when it names a row in `intrusion_prevention_jails`. Without a jail name, `MAILSERVER` still maps to `dovecot`.
 
 ## Database schema
 

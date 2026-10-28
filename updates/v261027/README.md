@@ -9,10 +9,18 @@
 This release fixes that, stops Nextcloud Mail from tagging mail as
 "Important", and shows the full HTML signature on mail sent as plain text
 (for example from iPhone Mail). For Pro it also adds a **Test** button for
-Link Guard's API keys and the organization name to organizational
-signatures, and the upgrade refreshes Link Guard without a manual save.
+Link Guard's API keys, blocking of password guessing against SMTP logins,
+and the organization name to organizational signatures, and the upgrade refreshes Link Guard without a manual save.
 
 ## New features
+
+- **IPS covers SMTP logins (Pro, #383).** IPS
+  watched IMAP/POP3 and web logins only, so failed logins on SMTP (ports
+  587, 465 and 25), where most password guessing happens, were never
+  blocked. A new **Mail Server (Postfix SMTP)** jail blocks an address
+  after 5 failed SMTP logins in a day, for 30 minutes, like the other two
+  jails. It appears in **System > IPS** with the others, and the upgrade
+  turns it on.
 
 - **Test a Link Guard API key (Pro, #377).** Saving a Google Safe Browsing or
   VirusTotal key did not check it, and a wrong key went unnoticed because

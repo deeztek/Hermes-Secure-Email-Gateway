@@ -53,6 +53,18 @@ SELECT r.recipient, r.recipient, d.id
    AND NOT EXISTS (SELECT 1 FROM mailbox_aliases a WHERE LOWER(a.alias_address) = LOWER(r.recipient));
 
 -- ---------------------------------------------------------------------
+-- 3. Intrusion Prevention jail for SMTP logins. Failed SASL logins on
+-- 587/465/25 were watched by nothing (DEV: 635 in four days). Marked not
+-- synced; post_upgrade.cfm regenerates jail.local, which clears the flag.
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT INTO intrusion_prevention_jails
+  (jail_name, display_name, description, filter_name, action_name, logpath, port, maxretry, findtime, bantime, enabled, config_synced)
+SELECT 'postfix', 'Mail Server (Postfix SMTP)', 'Protects against brute force attacks on SMTP authentication',
+       'postfix[mode=auth]', 'hermes-iptables-postfix', '/remotelogs/postfix_dkim/mail.log tail', NULL, 5, 86400, 1800, 1, 0
+ WHERE NOT EXISTS (SELECT 1 FROM intrusion_prevention_jails WHERE jail_name = 'postfix');
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

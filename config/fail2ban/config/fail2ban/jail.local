@@ -28,3 +28,13 @@ maxretry = 5
 findtime = 1d
 bantime = 1800
 action = hermes-iptables-authelia
+
+[postfix]
+# SMTP authentication protection (submission, smtps, smtpd)
+enabled = true
+filter = postfix[mode=auth]
+logpath = /remotelogs/postfix_dkim/mail.log tail
+maxretry = 5
+findtime = 1d
+bantime = 1800
+action = hermes-iptables-postfix

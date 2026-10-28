@@ -275,6 +275,33 @@ every existing install without requiring anyone to notice.
 </cfcatch>
 </cftry>
 
+<!--- Intrusion Prevention jail.local. It is written only when the admin
+     clicks Apply, so the postfix jail v261027's schema_updates.sql adds
+     (marked not synced) watched nothing until then. The upgrade also
+     restores the admin's previous jail.local after the checkout, which
+     drops the [postfix] section the release ships. Regenerated here while
+     that row is still not synced; the generator marks every jail synced,
+     so this runs once. --->
+<cftry>
+    <cfquery name="ipsUnsynced" datasource="hermes">
+        SELECT 1 FROM intrusion_prevention_jails
+        WHERE jail_name = 'postfix' AND config_synced = 0
+    </cfquery>
+    <cfif ipsUnsynced.recordcount>
+        <cfset request.generateQuiet = true>
+        <cfinclude template="/admin/2/inc/intrusion_prevention_generate_config.cfm">
+        <cfset request.generateQuiet = false>
+        <cfif ipSyncSuccess>
+            <cfset arrayAppend(repairsRun, "intrusion-prevention-jails")>
+        <cfelse>
+            <cfset arrayAppend(repairErrors, "intrusion-prevention-jails: " & ipSyncError)>
+        </cfif>
+    </cfif>
+<cfcatch type="any">
+    <cfset arrayAppend(repairErrors, "intrusion-prevention-jails: " & cfcatch.message)>
+</cfcatch>
+</cftry>
+
 <!---
 ====================================================================
 SECTION 2: ONE-TIME MIGRATIONS (guarded by the migrations table)

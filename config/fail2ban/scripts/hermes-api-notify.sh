@@ -3,10 +3,11 @@
 # Called by fail2ban actions to record bans/unbans in the Hermes database.
 # Blocking itself is done by iptables (fail2ban's native mechanism).
 #
-# Usage: hermes-api-notify.sh <ACTION> <IP> <SOURCE>
+# Usage: hermes-api-notify.sh <ACTION> <IP> <SOURCE> [JAIL]
 #   ACTION: BAN or UNBAN
 #   IP: The IP address being banned/unbanned
 #   SOURCE: MAILSERVER, SSO, or ADMIN
+#   JAIL: optional; names the jail when its source alone doesn't (postfix)
 #
 # This container uses network_mode: host, so Docker DNS names are not
 # available. The CommandBox address comes from HERMES_COMMANDBOX_IP (set in
@@ -15,6 +16,7 @@
 ACTION=$1
 IP=$2
 SOURCE=$3
+JAIL=$4
 TYPE=AUTOMATIC
 DATE=$(date)
 LOG=/scripts/api-notify.log
@@ -35,5 +37,6 @@ RESULT=$(curl -s -G -w "\nHTTP_CODE:%{http_code}" "http://${COMMANDBOX_IP}:8888/
     --data-urlencode "action=$ACTION" \
     --data-urlencode "ip=$IP" \
     --data-urlencode "type=$TYPE" \
-    --data-urlencode "source=$SOURCE" 2>&1)
-echo "[$DATE] $ACTION $IP ($SOURCE): ${RESULT}" >> "$LOG"
+    --data-urlencode "source=$SOURCE" \
+    --data-urlencode "jail=$JAIL" 2>&1)
+echo "[$DATE] $ACTION $IP ($SOURCE${JAIL:+/$JAIL}): ${RESULT}" >> "$LOG"
