@@ -78,6 +78,9 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
   person's name and title. The domain's help text no longer lists
   `{{org.logo}}`, which was never filled in; a logo is added through each
   signature's own **Logo** field, as before.
+- **An org signature could be filled in before choosing its domain (#382).**
+  The save was then refused with "A domain is required". Templates can now
+  only be chosen once a domain is selected.
 
 ## Upgrading
 

@@ -46,6 +46,10 @@ exactly what save_org_signature_action.cfm will store.
 }
 .template-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
 .template-card.is-selected { border-color: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,0.15); }
+/* Locked until a domain is chosen: the save requires one, and filling in a
+   template first only to have the save refused lost the admin's work. */
+#templateGallery.locked .template-card { opacity: 0.45; cursor: not-allowed; }
+#templateGallery.locked .template-card:hover { transform: none; box-shadow: none; }
 .template-card .thumb-wrap {
     background: #f8f9fa; border-bottom: 1px solid #e5e7eb;
     padding: 12px; text-align: center; min-height: 160px;
@@ -299,6 +303,9 @@ exactly what save_org_signature_action.cfm will store.
             <span class="text-muted small" id="templateSelectedLabel"></span>
         </div>
         <div class="card-body">
+            <div class="alert alert-warning py-2" id="templateLockNote" style="display:none;">
+                <i class="fas fa-hand-point-up me-1"></i> Select a <strong>Domain</strong> above first, then choose a template.
+            </div>
             <div class="row g-3" id="templateGallery">
                 <cfoutput>
                 <cfloop array="#allTemplates#" index="t">
@@ -424,7 +431,18 @@ function repopulateDeptSelect(domainId) {
 }
 document.getElementById('form_domain_id').addEventListener('change', function () {
     repopulateDeptSelect(this.value);
+    this.classList.remove('is-invalid');
+    updateGalleryLock();
 });
+
+// The domain is required to save, so the template gallery (and Save) stay
+// locked until one is chosen.
+function updateGalleryLock() {
+    const locked = !document.getElementById('form_domain_id').value;
+    document.getElementById('templateGallery').classList.toggle('locked', locked);
+    document.getElementById('templateLockNote').style.display = locked ? '' : 'none';
+    document.getElementById('btnSave').disabled = locked || !activeTemplateKey;
+}
 // Set whenever existingRow has a template_key - covers both DB-loaded
 // edit mode and form-restore-after-save-failure (where original mode
 // could have been Add or Edit). The auto-select / field pre-fill below
@@ -755,6 +773,13 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('templateGallery').addEventListener('click', function (ev) {
         const card = ev.target.closest('.template-card');
         if (!card) return;
+        const domSel = document.getElementById('form_domain_id');
+        if (!domSel.value) {
+            domSel.classList.add('is-invalid');
+            domSel.scrollIntoView({behavior: 'smooth', block: 'center'});
+            domSel.focus({preventScroll: true});
+            return;
+        }
         captureCurrentFields();
         selectTemplate(card.dataset.templateKey);
     });
@@ -907,6 +932,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (INITIAL_TEMPLATE_KEY) {
         selectTemplate(INITIAL_TEMPLATE_KEY);
     }
+    updateGalleryLock();
 });
 </script>
 
