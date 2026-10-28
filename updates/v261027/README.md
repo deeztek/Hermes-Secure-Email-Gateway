@@ -14,14 +14,14 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
 
 ## New features
 
-- **Test a Link Guard API key (Pro).** Saving a Google Safe Browsing or
+- **Test a Link Guard API key (Pro, #377).** Saving a Google Safe Browsing or
   VirusTotal key did not check it, and a wrong key went unnoticed because
   Link Guard skips a provider whose lookups fail. **Email Policies > Link
   Guard > Reputation sources** now has a **Test** button on each provider
   with a key. It sends one request and reports whether the key works, was
   refused, is over its quota, or the provider could not be reached.
 
-- **Signatures in mail sent as plain text.** Phone mail apps such as iPhone
+- **Signatures in mail sent as plain text (#378).** Phone mail apps such as iPhone
   Mail send plain text unless formatting is used, so recipients saw the
   plain-text version of the signature: no logo, colors or buttons. When a
   signature is added to a plain-text message, Hermes now also gives the
@@ -43,7 +43,7 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
   certificate binding stays, so mail clients still configure themselves
   automatically.
 
-- **Mail marked "Important" in mail clients.** Nextcloud Mail's automatic
+- **Mail marked "Important" in mail clients (#379).** Nextcloud Mail's automatic
   importance classification, on by default, tagged most incoming mail with
   the IMAP keyword Thunderbird and other clients show as "Important". Hermes
   now turns it off for new mailboxes, and the upgrade turns it off for
