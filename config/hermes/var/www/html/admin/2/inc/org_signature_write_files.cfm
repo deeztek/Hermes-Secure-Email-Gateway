@@ -131,6 +131,12 @@ Idempotent: safe to call repeatedly; always wipes the dir first.
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "<br\s*/?>",        Chr(10), "all")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "</p>|</li>",       Chr(10), "all")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "<[^>]+>",          "",      "all")>
+    <!--- Plain-text cleanup: lines left holding only indentation (image-only
+         links, table markup) are emptied, HTML entities become characters
+         (a literal "&nbsp;&mdash;&nbsp;" reached recipients), then blank runs
+         collapse. --->
+    <cfset orgSigPlain = ReReplace(orgSigPlain, "[ \t]+(\r?\n)", "\1", "all")>
+    <cfset orgSigPlain = ReplaceList(orgSigPlain, "&nbsp;,&mdash;,&ndash;,&raquo;,&laquo;,&lt;,&gt;,&quot;,&amp;", " ,#Chr(8212)#,#Chr(8211)#,#Chr(187)#,#Chr(171)#,<,>,"",&")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "(\r?\n){3,}",      Chr(10) & Chr(10), "all")>
     <cfset orgSigPlain = Trim(orgSigPlain)>
 

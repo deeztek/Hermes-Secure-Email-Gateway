@@ -28,7 +28,11 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
   message an HTML version, so the full signature is shown. The plain-text
   version is kept for clients that prefer it. Signed and encrypted messages
   are left unchanged. The plain-text signature now also keeps link targets,
-  for example "Book a meeting: https://...".
+  for example "Book a meeting: https://...", and plain-text signatures and
+  disclaimers no longer contain runs of blank lines or HTML codes such as
+  "&nbsp;&mdash;". In the HTML signature, a multi-line organization address
+  keeps its line breaks, and names or titles containing "&" or "<" show as
+  typed.
 
 ## Bug fixes
 
@@ -109,9 +113,10 @@ sudo ./scripts/system_update_docker.sh v261027
 
 **After.**
 
-- If you use organizational signatures (Pro), open each one under **Email
-  Policies > Org Signatures** and click **Save**. A signature
-  shows the company name only after it is saved again.
+- If you use organizational signatures or disclaimers (Pro), open each one
+  under **Email Policies > Org Signatures** and **Email Policies >
+  Disclaimers** and click **Save**. Their new company name and cleaner
+  plain-text version take effect only after they are saved again.
 - If you upgrade from a release before v261026, also follow the v261026
   notes: add the URLhaus Auth-Key. Link Guard no longer needs the manual
   save.

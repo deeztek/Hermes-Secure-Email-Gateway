@@ -183,6 +183,12 @@ raw body_html from the editor. See GH issue #235 for the rationale.
 <cfset renderedText = ReReplaceNoCase(renderedHtml, "<br\s*/?>", Chr(10), "all")>
 <cfset renderedText = ReReplaceNoCase(renderedText, "</p>|</li>|</tr>|</td>|</div>", Chr(10), "all")>
 <cfset renderedText = ReReplaceNoCase(renderedText, "<[^>]+>", "", "all")>
+<!--- Plain-text cleanup: lines left holding only indentation (image-only
+     links, table markup) are emptied, HTML entities become characters
+     (a literal "&nbsp;&mdash;&nbsp;" reached recipients), then blank runs
+     collapse. --->
+<cfset renderedText = ReReplace(renderedText, "[ \t]+(\r?\n)", "\1", "all")>
+<cfset renderedText = ReplaceList(renderedText, "&nbsp;,&mdash;,&ndash;,&raquo;,&laquo;,&lt;,&gt;,&quot;,&amp;", " ,#Chr(8212)#,#Chr(8211)#,#Chr(187)#,#Chr(171)#,<,>,"",&")>
 <cfset renderedText = ReReplaceNoCase(renderedText, "(\r?\n){2,}", Chr(10), "all")>
 <cfset renderedText = Trim(renderedText)>
 

@@ -601,7 +601,7 @@ class Modifier:
     # data dict.
     PLACEHOLDER_RE = re.compile(r'\{\{\s*([a-z][a-z0-9_]*)\.([a-z][a-z0-9_]*)\s*\}\}', re.IGNORECASE)
 
-    def _substitute_placeholders(self, text: str, data: dict) -> str:
+    def _substitute_placeholders(self, text: str, data: dict, html: bool = False) -> str:
         """Replace {{namespace.field}} tokens in text with values from
         data. Tokens whose key is missing in data resolve to empty
         string so missing personal-info fields render as blank rather
@@ -609,14 +609,22 @@ class Modifier:
 
         Case-insensitive match; data keys are expected lowercase
         'namespace.field' format (the CFML resolver writes them that
-        way)."""
+        way).
+
+        html=True for an HTML body: values are escaped, so an "&" or "<"
+        in a name or title is shown as typed rather than read as markup,
+        and line breaks (a multi-line org address) become <br>, which
+        HTML would otherwise show as a single space."""
         if not text or '{{' not in text:
             return text
 
         def repl(m: 're.Match') -> str:
             key = (m.group(1) + '.' + m.group(2)).lower()
             val = data.get(key, '')
-            return val if isinstance(val, str) else str(val)
+            val = val if isinstance(val, str) else str(val)
+            if html:
+                val = html_escape(val, quote=True).replace('\r\n', '\n').replace('\n', '<br>')
+            return val
 
         return self.PLACEHOLDER_RE.sub(repl, text)
 
@@ -996,7 +1004,7 @@ class SignatureModifier(Modifier):
         # the regenerated data file).
         sender_data = self.data_map.lookup(ctx.sender)
         txt_sig = self._substitute_placeholders(txt_sig, sender_data)
-        html_sig = self._substitute_placeholders(html_sig, sender_data)
+        html_sig = self._substitute_placeholders(html_sig, sender_data, html=True)
 
         # Drop now-empty contact lines. The CFML template's <cfif> gates
         # only see the literal {{user.mobile}} string at admin save time

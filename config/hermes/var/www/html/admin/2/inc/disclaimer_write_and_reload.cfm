@@ -116,6 +116,14 @@ session.disclaimerApplyError holds the error message if false.
         <cfset txt = body_text>
     </cfif>
 
+    <!--- Disclaimers saved before v261027 stored body_text uncleaned. --->
+    <!--- Plain-text cleanup: lines left holding only indentation (image-only
+         links, table markup) are emptied, HTML entities become characters
+         (a literal "&nbsp;&mdash;&nbsp;" reached recipients), then blank runs
+         collapse. --->
+    <cfset txt = ReReplace(txt, "[ \t]+(\r?\n)", "\1", "all")>
+    <cfset txt = ReplaceList(txt, "&nbsp;,&mdash;,&ndash;,&raquo;,&laquo;,&lt;,&gt;,&quot;,&amp;", " ,#Chr(8212)#,#Chr(8211)#,#Chr(187)#,#Chr(171)#,<,>,"",&")>
+    <cfset txt = Trim(ReReplace(txt, "(\r?\n){3,}", Chr(10) & Chr(10), "all"))>
     <cfset txtOut = txt & Chr(10)>
 
     <!--- Create the per-disclaimer subdirectory + images/ subdirectory. --->
