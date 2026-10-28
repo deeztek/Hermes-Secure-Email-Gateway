@@ -734,10 +734,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  second mailboxes row for it. Reject the whole batch rather
                  than silently skipping part of it, so the admin knows what
                  they selected. --->
+            <!--- Only a mailbox that is already delivered here has nothing to
+                 do: routed to the built-in server, or on a mailbox-only domain
+                 whose default is the built-in server. A mailbox on a hybrid
+                 domain without a route (created with Add Mailbox before
+                 v261027) receives nothing, and Built-in is how it gets its
+                 route; it is routed below without being provisioned again. --->
             <cfquery name="alreadyMailbox" datasource="hermes">
-                SELECT recipient FROM recipients
-                 WHERE id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
-                   AND recipient_type = 'mailbox'
+                SELECT r.recipient FROM recipients r
+                  LEFT JOIN domains d ON d.domain = SUBSTRING_INDEX(r.recipient, '@', -1)
+                 WHERE r.id IN (<cfqueryparam value="#ArrayToList(validIds)#" cfsqltype="cf_sql_integer" list="true">)
+                   AND r.recipient_type = 'mailbox'
+                   AND (r.backend_server = 'hermes_dovecot' OR d.type = 'mailbox')
             </cfquery>
 
             <cfif alreadyMailbox.recordcount GTE 1>
@@ -749,7 +757,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                  guard below reads it and a guard has to run before anything is
                  written. --->
             <cfquery name="toConvert" datasource="hermes">
-                SELECT id, recipient, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
+                SELECT id, recipient, recipient_type, policy_id, pdf_enabled, smime_enabled, pgp_enabled,
                        digital_sign, auth_type, remoteauth_domain, enforce_mfa,
                        SUBSTRING_INDEX(recipient, '@', -1) AS recipient_domain
                   FROM recipients
@@ -886,8 +894,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                         </cfloop>
                     </cfif>
 
-                    <cfset provisionMode = "convert">
-                    <cfinclude template="inc/mailbox_provision_core.cfm">
+                    <!--- Already a mailbox (only possible here when it has no
+                         route, see alreadyMailbox): the exemption above and the
+                         route below are all it needs. --->
+                    <cfif toConvert.recipient_type NEQ "mailbox">
+                        <cfset provisionMode = "convert">
+                        <cfinclude template="inc/mailbox_provision_core.cfm">
+                    </cfif>
 
                     <cfset convertedCount = convertedCount + 1>
                 </cfloop>

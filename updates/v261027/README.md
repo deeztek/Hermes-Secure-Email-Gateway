@@ -43,6 +43,14 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
   certificate binding stays, so mail clients still configure themselves
   automatically.
 
+- **Mailboxes added on a hybrid domain received nothing (#381).** Add
+  Mailbox never gave a mailbox on a hybrid domain its route to this server,
+  so its mail went to the domain's provider ("Not delivered here"), and
+  **Email Delivery > Built-in** refused to fix it. In v261026 such mailboxes
+  worked only as a side effect of the problem fixed above. Add Mailbox now
+  routes them, including an exemption from a domain catch-all; Built-in
+  routes an existing one; and the upgrade routes the ones already created.
+
 - **Users locked themselves out when enabling 2FA (#380).** Clicking **Enable 2FA**
   in the user portal signed the user out at once, and finishing enrollment
   needs a verification email. Users who had not opened their email first

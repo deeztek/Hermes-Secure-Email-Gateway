@@ -32,4 +32,8 @@ for d in $hybrids; do
     fi
 done
 
+unrouted="$(db "SELECT GROUP_CONCAT(r.recipient) FROM recipients r JOIN domains d ON d.domain = SUBSTRING_INDEX(r.recipient, '@', -1) WHERE d.type='hybrid' AND r.recipient_type='mailbox' AND (r.backend_server IS NULL OR r.backend_server='')")"
+[[ -z "$unrouted" || "$unrouted" == "NULL" ]] && pass "every mailbox on a hybrid domain has a route" \
+    || fail "mailbox(es) on a hybrid domain with no route (receive nothing): $unrouted"
+
 done_check

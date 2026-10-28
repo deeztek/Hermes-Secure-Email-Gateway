@@ -70,7 +70,7 @@ Requires form variables:
 
 <!--- LOOK UP THE DOMAIN --->
 <cfquery name="getDomain" datasource="hermes">
-    SELECT id, domain, default_quota_mb FROM domains
+    SELECT id, domain, default_quota_mb, type FROM domains
     WHERE id = <cfqueryparam value="#form.domain_id#" cfsqltype="cf_sql_integer">
     AND type IN ('mailbox', 'hybrid')
 </cfquery>
@@ -374,6 +374,54 @@ Requires form variables:
      ==================================================================== --->
 <cfset provisionMode = "create">
 <cfinclude template="mailbox_provision_core.cfm">
+
+<!--- A hybrid domain's mail goes to its default (the provider) unless a
+     recipient has its own route, so a mailbox added here received nothing.
+     Converting a relay recipient sets the route; this does the same, the way
+     edit_internal_recipient_backend.cfm does: lmtp to the built-in server,
+     and, if a domain catch-all would rewrite the address before Postfix picks
+     a route, an entry pointing the address at itself (system = '3', as a
+     conversion writes it). An address with its own entry is left alone. --->
+<cfif getDomain.type EQ "hybrid">
+    <cfquery datasource="hermes">
+        UPDATE recipients
+           SET backend_transport = 'lmtp',
+               backend_server    = 'hermes_dovecot',
+               backend_port      = 24,
+               backend_tls       = NULL
+         WHERE recipient = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
+    </cfquery>
+    <cfquery name="hybOwnEntry" datasource="hermes">
+        SELECT (SELECT COUNT(*) FROM virtual_recipients WHERE LOWER(virtual_address) = <cfqueryparam value="#LCase(recipientEmail)#" cfsqltype="cf_sql_varchar">)
+             + (SELECT COUNT(*) FROM mailbox_aliases WHERE LOWER(alias_address) = <cfqueryparam value="#LCase(recipientEmail)#" cfsqltype="cf_sql_varchar">) AS n
+    </cfquery>
+    <cfif Val(hybOwnEntry.n) EQ 0>
+        <cfquery name="hybCatchAll" datasource="hermes">
+            SELECT 'virtual' AS src FROM virtual_recipients
+             WHERE LOWER(virtual_address) = <cfqueryparam value="@#LCase(getDomain.domain)#" cfsqltype="cf_sql_varchar">
+            UNION ALL
+            SELECT 'alias' AS src FROM mailbox_aliases
+             WHERE LOWER(alias_address) = <cfqueryparam value="@#LCase(getDomain.domain)#" cfsqltype="cf_sql_varchar">
+               AND delivers_to <> 'discard:silently'
+        </cfquery>
+        <cfif hybCatchAll.recordcount GTE 1>
+            <cfif hybCatchAll.src EQ "virtual">
+                <cfquery datasource="hermes">
+                    INSERT INTO virtual_recipients (virtual_address, maps, system)
+                    VALUES (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">, '3')
+                </cfquery>
+            <cfelse>
+                <cfquery datasource="hermes">
+                    INSERT INTO mailbox_aliases (alias_address, delivers_to, domain_id)
+                    VALUES (<cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">,
+                            <cfqueryparam value="#getDomain.id#" cfsqltype="cf_sql_integer">)
+                </cfquery>
+            </cfif>
+        </cfif>
+    </cfif>
+</cfif>
 
 <!--- SUCCESS --->
 <cfset session.m = 1>
