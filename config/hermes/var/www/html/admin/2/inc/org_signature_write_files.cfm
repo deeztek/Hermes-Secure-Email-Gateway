@@ -100,7 +100,35 @@ Idempotent: safe to call repeatedly; always wipes the dir first.
 
     <!--- Auto-derive plain-text part. Same regex chain as the Personal
          Sig pipeline so behavior is consistent. --->
-    <cfset orgSigPlain = ReReplaceNoCase(orgSigRewritten, "<br\s*/?>",        Chr(10), "all")>
+    <!--- Links first: stripping the tags dropped every link target, so a
+         call-to-action button ("Book a meeting") reached plain-text mail as
+         bare words. Write it as "label: URL". Links whose text is already
+         the address (email, website) and mailto: links keep only their
+         text; image-only links (empty text) stay dropped. --->
+    <cfset orgSigPlain = orgSigRewritten>
+    <cfset orgSigLinkRe = "<a\s[^>]*href\s*=\s*[""']([^""']*)[""'][^>]*>([\s\S]*?)</a>">
+    <cfset orgSigLinkPos = 1>
+    <cfloop condition="true">
+        <cfset orgSigLink = ReFindNoCase(orgSigLinkRe, orgSigPlain, orgSigLinkPos, true)>
+        <cfif orgSigLink.pos[1] EQ 0><cfbreak></cfif>
+        <cfset orgSigHref  = Trim(Replace(Mid(orgSigPlain, orgSigLink.pos[2], orgSigLink.len[2]), "&amp;", "&", "all"))>
+        <cfset orgSigLabel = Mid(orgSigPlain, orgSigLink.pos[3], orgSigLink.len[3])>
+        <cfset orgSigText  = ReReplace(orgSigLabel, "<[^>]+>", "", "all")>
+        <cfset orgSigText  = Trim(ReReplace(ReplaceList(orgSigText, "&raquo;,&nbsp;,&amp;", " , ,&"), "\s+", " ", "all"))>
+        <cfif Len(orgSigText) AND Len(orgSigHref)
+              AND NOT ReFindNoCase("^mailto:", orgSigHref)
+              AND NOT FindNoCase(ReReplaceNoCase(orgSigText, "^https?://", ""), orgSigHref)>
+            <cfset orgSigRepl = orgSigText & ": " & orgSigHref>
+        <cfelse>
+            <cfset orgSigRepl = orgSigLabel>
+        </cfif>
+        <cfset orgSigPlain = Left(orgSigPlain, orgSigLink.pos[1] - 1) & orgSigRepl
+            & Mid(orgSigPlain, orgSigLink.pos[1] + orgSigLink.len[1], Len(orgSigPlain))>
+        <cfset orgSigLinkPos = orgSigLink.pos[1] + Len(orgSigRepl)>
+        <cfif orgSigLinkPos GT Len(orgSigPlain)><cfbreak></cfif>
+    </cfloop>
+
+    <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "<br\s*/?>",        Chr(10), "all")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "</p>|</li>",       Chr(10), "all")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "<[^>]+>",          "",      "all")>
     <cfset orgSigPlain = ReReplaceNoCase(orgSigPlain,     "(\r?\n){3,}",      Chr(10) & Chr(10), "all")>

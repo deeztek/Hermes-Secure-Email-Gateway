@@ -6,9 +6,11 @@
 > recipients on a hybrid domain (a domain with both relayed recipients and
 > local mailboxes) is rejected. Mailboxes on the domain are not affected.
 
-This release fixes that. For Pro it also adds a **Test** button for Link
-Guard's API keys and the organization name to organizational signatures,
-and the upgrade now refreshes Link Guard without a manual save.
+This release fixes that, stops Nextcloud Mail from tagging mail as
+"Important", and shows the full HTML signature on mail sent as plain text
+(for example from iPhone Mail). For Pro it also adds a **Test** button for
+Link Guard's API keys and the organization name to organizational
+signatures, and the upgrade refreshes Link Guard without a manual save.
 
 ## New features
 
@@ -18,6 +20,15 @@ and the upgrade now refreshes Link Guard without a manual save.
   Guard > Reputation sources** now has a **Test** button on each provider
   with a key. It sends one request and reports whether the key works, was
   refused, is over its quota, or the provider could not be reached.
+
+- **Signatures in mail sent as plain text.** Phone mail apps such as iPhone
+  Mail send plain text unless formatting is used, so recipients saw the
+  plain-text version of the signature: no logo, colors or buttons. When a
+  signature is added to a plain-text message, Hermes now also gives the
+  message an HTML version, so the full signature is shown. The plain-text
+  version is kept for clients that prefer it. Signed and encrypted messages
+  are left unchanged. The plain-text signature now also keeps link targets,
+  for example "Book a meeting: https://...".
 
 ## Bug fixes
 
@@ -31,6 +42,14 @@ and the upgrade now refreshes Link Guard without a manual save.
   mailbox-only list, and the upgrade applies this to existing installs. The
   certificate binding stays, so mail clients still configure themselves
   automatically.
+
+- **Mail marked "Important" in mail clients.** Nextcloud Mail's automatic
+  importance classification, on by default, tagged most incoming mail with
+  the IMAP keyword Thunderbird and other clients show as "Important". Hermes
+  now turns it off for new mailboxes, and the upgrade turns it off for
+  existing ones (unless a user chose a setting) and removes the tags it
+  already set, from every folder. Thunderbird drops the red tags after it
+  resyncs a folder; **Folder Properties > Repair Folder** forces it.
 
 ### Pro
 

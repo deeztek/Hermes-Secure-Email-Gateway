@@ -108,7 +108,11 @@ Sets after execution:
                 fileWrite(provScript,
                     chr(35) & "!/bin/bash" & chr(10) &
                     'docker exec -e OC_PASS="' & ncProvisionPassword & '" -u www-data hermes_nextcloud php /var/www/html/occ user:add --password-from-env --display-name="' & ncProvisionDisplayName & '" -- "' & ncProvisionUser & '" 2>&1' & chr(10) &
-                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10),
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10) &
+                    '## Nextcloud Mail tags messages it deems important with $label1, which' & chr(10) &
+                    '## every IMAP client shows as "Important". Off unless the user chose.' & chr(10) &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" mail tag-classified-messages >/dev/null 2>&1 || ' &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" mail tag-classified-messages false 2>&1' & chr(10),
                     "utf-8");
             </cfscript>
             <cfexecute name="/bin/chmod" arguments="+x #provScript#" timeout="10" />

@@ -106,6 +106,7 @@ import sys
 import threading
 import time
 import traceback
+from html import escape as html_escape
 from email import encoders, message_from_bytes, policy as email_policy
 from email.message import Message
 from email.mime.image import MIMEImage
@@ -347,6 +348,11 @@ class MessageContext:
         # unchanged.
         self.image_attachments: List[Tuple[str, str]] = []
         self._was_wrapped: bool = False
+        # Set when a modifier changes the top-level Content-Type itself
+        # (SignatureModifier turning a plain-text message into
+        # multipart/alternative); eom() then syncs the header as it does
+        # after a multipart/related wrap.
+        self._top_ct_changed: bool = False
 
     @property
     def sender_domain(self) -> str:
@@ -1011,16 +1017,93 @@ class SignatureModifier(Modifier):
         html_sig = '<div style="margin-top:24px;">' + html_sig + '</div>'
 
         msg = ctx.email_message()
+        converted = self._add_html_alternative(ctx, msg)
         plain_n, html_n = self._append_to_parts(msg, txt_sig, html_sig)
         if plain_n or html_n:
             ctx.modified = True
-            log.info('signature applied: sender=%s option=%s plain=%d html=%d direction=%s',
-                     ctx.sender, option, plain_n, html_n, ctx.direction)
+            log.info('signature applied: sender=%s option=%s plain=%d html=%d direction=%s%s',
+                     ctx.sender, option, plain_n, html_n, ctx.direction,
+                     ' (html part added to plain-text message)' if converted else '')
             if html_n:
                 self._queue_cid_images(ctx, option_dir, html_sig)
         else:
             log.info('signature: no text/plain or text/html parts to modify (sender=%s)',
                      ctx.sender)
+
+    # Runs on escaped text, so a URL ends at &lt; / &gt; as well as at
+    # whitespace ("<https://...>" is common in plain-text mail).
+    URL_RE = re.compile(r'(https?://(?:(?!&gt;|&lt;)[^\s<>"])+)')
+
+    def _add_html_alternative(self, ctx: MessageContext, msg: Message) -> bool:
+        """Give a plain-text-only message an HTML version, so the HTML
+        signature (logo, colors, links) is what recipients see.
+
+        Phone clients (iPhone Mail without formatting, among others) send
+        text/plain only, and the signature then went out as its plain-text
+        rendering. The plain part is kept as is (it still gets the plain
+        signature); a text/html alternative is added holding the same text,
+        escaped, with line breaks and clickable URLs.
+
+        Only for a message with no text/html anywhere, whose body is the
+        whole message or the first part of a multipart/mixed (attachments).
+        Signed and encrypted messages never get here (skip_on_signed /
+        skip_on_pgp_inline). Returns True if the message was changed."""
+        for part in msg.walk():
+            if part.get_content_type() == 'text/html':
+                return False
+        if not msg.is_multipart():
+            if msg.get_content_type() != 'text/plain':
+                return False
+            target = msg
+        elif msg.get_content_type() == 'multipart/mixed':
+            first = next(iter(msg.iter_parts()), None)
+            if (first is None or first.get_content_type() != 'text/plain'
+                    or first.get_content_disposition() == 'attachment'):
+                return False
+            target = first
+        else:
+            return False
+        try:
+            text = target.get_content()
+        except Exception:
+            log.warning('signature: cannot read plain body for html conversion:\n%s',
+                        traceback.format_exc())
+            return False
+        if str(target.get_param('format', '')).lower() == 'flowed':
+            text = self._unflow(text, str(target.get_param('delsp', '')).lower() == 'yes')
+        body = html_escape(text.replace('\r\n', '\n'), quote=False)
+        body = self.URL_RE.sub(r'<a href="\1">\1</a>', body).replace('\n', '<br>\n')
+        html_doc = ('<html><head><meta charset="utf-8"></head><body>'
+                    '<div style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">'
+                    + body + '</div></body></html>')
+        try:
+            target.make_alternative()
+            target.add_alternative(html_doc, subtype='html')
+        except Exception:
+            log.warning('signature: html conversion failed:\n%s', traceback.format_exc())
+            return False
+        if target is msg:
+            ctx._top_ct_changed = True
+        return True
+
+    @staticmethod
+    def _unflow(text: str, delsp: bool) -> str:
+        """Undo RFC 3676 format=flowed: a line ending in a space continues
+        on the next line (the space dropped too when delsp=yes); a leading
+        space is stuffing. The '-- ' signature separator is not flowed."""
+        out = []
+        buf = ''
+        for line in text.replace('\r\n', '\n').split('\n'):
+            if line.startswith(' '):
+                line = line[1:]
+            if line.endswith(' ') and line != '-- ':
+                buf += line[:-1] if delsp else line
+            else:
+                out.append(buf + line)
+                buf = ''
+        if buf:
+            out.append(buf)
+        return '\n'.join(out)
 
     # _append_to_parts and _inject_html mirror DisclaimerModifier's; the
     # behavior is identical so we just delegate (cleaner refactor would
@@ -1981,7 +2064,7 @@ class HermesBodyMilter(Milter.Base):
                     # matches our new body. Also ensure MIME-Version is
                     # present, and clear top-level Content-Transfer-
                     # Encoding (multipart can't have one at the root).
-                    if ctx._was_wrapped:
+                    if ctx._was_wrapped or ctx._top_ct_changed:
                         wrapped = ctx.email_message()
                         new_ct = wrapped.get('Content-Type')
                         if new_ct:
@@ -1996,8 +2079,9 @@ class HermesBodyMilter(Milter.Base):
                                 self.chgheader('Content-Transfer-Encoding', 1, '')
                             except Exception:
                                 pass
-                        log.info('wrapped as multipart/related (images=%d)',
-                                 len(ctx.image_attachments))
+                        if ctx._was_wrapped:
+                            log.info('wrapped as multipart/related (images=%d)',
+                                     len(ctx.image_attachments))
                     else:
                         # Single-part path: _force_base64_encoding on a
                         # text/* leaf that IS the whole message modifies

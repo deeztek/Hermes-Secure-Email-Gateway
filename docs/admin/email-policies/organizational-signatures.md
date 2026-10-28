@@ -213,6 +213,12 @@ Per-template image fields use the **same data: → cid: pipeline** as user-paste
 
 `{{org.logo_url}}` is **not** cid: extracted — it's a raw URL substituted into the html as-is. Use it for hosted-elsewhere logos (your CDN, your website). Use the per-template **image** field for cid:-attached inline logos when you want them to render even in MUAs that block external images.
 
+## Mail sent as plain text
+
+Some mail apps send plain text only: iPhone Mail does unless the message uses formatting. Such a message has no HTML version to put the HTML signature in. The body milter therefore adds one: the message becomes `multipart/alternative`, with the original plain-text part (which gets the plain-text signature) and a new HTML part holding the same text, with line breaks and clickable links, followed by the HTML signature. Recipients' mail clients show the HTML version. This applies to Personal and Organizational signatures alike, only when the message has no HTML part at all, and never to signed or encrypted mail (see below). The milter log line reads `signature applied: ... (html part added to plain-text message)`.
+
+In the plain-text signature, a link whose text is not already its address is written as `text: URL`, for example `Book a meeting: https://...`, so the target is not lost.
+
 ## Behavior with S/MIME, PGP, DKIM-signed mail
 
 Identical to Disclaimers — same skip rules in the same Modifier base class. Pre-signed envelopes, PGP inline, and pre-existing DKIM-Signature headers all cause the body milter to leave the message untouched.

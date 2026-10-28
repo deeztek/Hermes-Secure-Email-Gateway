@@ -453,6 +453,55 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Nextcloud Mail's importance classifier is on by default. It tags the
+     messages it deems important with the IMAP keyword $label1, which
+     Thunderbird and other clients show as "Important", so mailboxes filled
+     up with red "Important" mail. New mailboxes now get it off at
+     provisioning (nextcloud_provision_user.cfm); this turns it off once for
+     existing ones. Only where the user has no setting: `occ user:setting`
+     without a value exits 1 when unset, so a user who turned it on keeps it.
+     The $label1 tags it already set are removed from every folder of every
+     active mailbox: people do not set Thunderbird's "Important" tag on
+     purpose in practice, and the classifier marked nearly everything. --->
+<cfset blockName = "nextcloud-mail-importance-tagging-off-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfquery name="ncTagUsers" datasource="hermes">
+            SELECT username, nextcloud_enabled FROM mailboxes
+            WHERE active = 1
+            ORDER BY username
+        </cfquery>
+        <cfif ncTagUsers.recordcount GT 0>
+            <cfset ncTagScript = "/opt/hermes/tmp/pu_" & Replace(CreateUUID(), "-", "", "ALL") & "_nc_tagging.sh">
+            <cfset ncTagBody = "##!/bin/bash" & chr(10)>
+            <cfset ncOcc = "docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting ">
+            <cfloop query="ncTagUsers">
+                <cfif ncTagUsers.nextcloud_enabled EQ 1>
+                    <cfset ncTagBody &= ncOcc & """" & ncTagUsers.username & """ mail tag-classified-messages >/dev/null 2>&1 || "
+                        & ncOcc & """" & ncTagUsers.username & """ mail tag-classified-messages false >/dev/null 2>&1" & chr(10)>
+                </cfif>
+                <cfset ncTagBody &= "docker exec hermes_dovecot doveadm flags remove -u """ & ncTagUsers.username & """ '$label1' mailbox '*' ALL >/dev/null 2>&1" & chr(10)>
+            </cfloop>
+            <!--- Two occ calls per mailbox take a second or two each, which on
+                 a large install would outlast this page's request timeout and
+                 cut off the blocks after it. Run detached (timeout 0 = do not
+                 wait); the script deletes itself when done. --->
+            <cfset ncTagBody &= "rm -f ""$0""" & chr(10)>
+            <cffile action="write" file="#ncTagScript#" output="#ncTagBody#" addnewline="no">
+            <cfexecute name="/bin/chmod" arguments="+x #ncTagScript#" timeout="10" />
+            <cfexecute name="#ncTagScript#" timeout="0" />
+        </cfif>
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (started in the background for " & ncTagUsers.recordcount & " mailboxes)")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Hybrid domains created before v261026 have no certificate binding
      (#371): converting relay recipients to mailboxes set type='hybrid' but
      never created the mailbox_domains row, so the domain never got its

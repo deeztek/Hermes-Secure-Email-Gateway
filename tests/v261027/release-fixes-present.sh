@@ -18,6 +18,14 @@ for t in banner_with_logo compact_text modern_card promo_footer two_column_pro w
 done
 check $w/schedule/post_upgrade.cfm "linkguard-config" "upgrade refreshes the Link Guard engine config (#374)"
 check $w/admin/2/view_linkguard.cfm "test_apikey" "Link Guard API keys can be tested"
+check $w/admin/2/inc/org_signature_write_files.cfm "orgSigLinkRe" "plain-text org signatures keep link targets"
+check $w/admin/2/inc/nextcloud_provision_user.cfm "tag-classified-messages" "new mailboxes: Nextcloud Mail importance tagging off"
+check $w/schedule/post_upgrade.cfm "nextcloud-mail-importance-tagging-off-v1" "upgrade turns importance tagging off and clears its tags"
+if docker ps --format '{{.Names}}' | grep -qx hermes_body_milter; then
+    docker exec hermes_body_milter grep -q "_add_html_alternative" /usr/local/bin/hermes-body-milter 2>/dev/null \
+        && pass "body milter adds an HTML version to plain-text signed mail" \
+        || fail "body milter image predates the plain-text signature fix"
+fi
 grep -q "{{org.logo}}" $w/admin/2/view_mailbox_domains.cfm \
     && fail "Email Server > Domains still advertises {{org.logo}} (#375)" \
     || pass "Email Server > Domains no longer advertises {{org.logo}} (#375)"
