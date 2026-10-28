@@ -64,11 +64,11 @@ Two facts are worth pinning down before anything else:
 |---|---|---|---|---|---|
 | `dovecot` | Mail Server (Dovecot) | `/remotelogs/dovecot/dovecot-info.log` | `dovecot` (upstream Fail2ban filter) | `hermes-iptables-dovecot` | maxretry 5 / findtime 86400 (1 day) / bantime 1800 (30 min) |
 | `authelia` | SSO Portal (Authelia) | `/remotelogs/authelia/authelia.log` | `authelia-auth` (Hermes-shipped) | `hermes-iptables-authelia` | maxretry 5 / findtime 86400 / bantime 1800 |
-| `postfix` | Mail Server (Postfix SMTP) | `/remotelogs/postfix_dkim/mail.log` (read from the end: `tail`) | `postfix[mode=auth]` (upstream Fail2ban filter, SASL failures only) | `hermes-iptables-postfix` | maxretry 5 / findtime 86400 / bantime 1800 |
+| `postfix` | Mail Server (Postfix SMTP) | `/remotelogs/postfix_dkim/mail.log` (from its end: `tail`) | `postfix[mode=auth]` (upstream Fail2ban filter, SASL failures only) | `hermes-iptables-postfix` | maxretry 5 / findtime 86400 / bantime 1800 |
 
 All three rows are seeded into `intrusion_prevention_jails` on install by [hermes_install.sql](../../../config/database/hermes_install.sql). Adding another jail is a schema-row plus filter/action insertion exercise; there is no UI for it. The three jails cover the real attack surfaces: IMAP/POP3 logins, SMTP logins, and the web-console SSO login.
 
-The `postfix` jail was added in v261027 (#383). Before that, failed SMTP logins (587, 465, 25) were watched by nothing: Postfix hands SASL to Dovecot's auth service, but Dovecot does not log those failures in `dovecot-info.log` (only its IMAP/POP3 login processes do), so the `dovecot` jail never saw them. One test server logged 635 failed SMTP logins in four days with no ban. `mail.log` is not rotated, so the jail reads it from the end (`tail`) rather than parsing the whole file at start.
+The `postfix` jail was added in v261027 (#383). Before that, failed SMTP logins (587, 465, 25) were watched by nothing: Postfix hands SASL to Dovecot's auth service, but Dovecot does not log those failures in `dovecot-info.log` (only its IMAP/POP3 login processes do), so the `dovecot` jail never saw them. One test server logged 635 failed SMTP logins with no ban. The jail starts reading `mail.log` at its end (`tail`), so failures from before the jail started are not counted. `rotate_service_logs.sh` truncates the file in place once a day, which fail2ban follows without a restart.
 
 Bans from `postfix` and `dovecot` are both recorded with source `MAILSERVER`. The `postfix` action passes its jail name to `hermes-api-notify.sh`, which forwards it to `schedule/fail2ban_ban_unban.cfm`; the endpoint accepts it only when it names a row in `intrusion_prevention_jails`. Without a jail name, `MAILSERVER` still maps to `dovecot`.
 

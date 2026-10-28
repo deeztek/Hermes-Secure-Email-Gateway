@@ -54,7 +54,7 @@ SELECT r.recipient, r.recipient, d.id
 
 -- ---------------------------------------------------------------------
 -- 3. Intrusion Prevention jail for SMTP logins. Failed SASL logins on
--- 587/465/25 were watched by nothing (DEV: 635 in four days). Marked not
+-- 587/465/25 were watched by nothing (a test server: 635, none banned). Marked not
 -- synced; post_upgrade.cfm regenerates jail.local, which clears the flag.
 -- FRESH-INSTALL: covered-by config/database/hermes_install.sql
 -- ---------------------------------------------------------------------
