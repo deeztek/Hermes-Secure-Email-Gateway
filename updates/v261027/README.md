@@ -43,6 +43,12 @@ signatures, and the upgrade refreshes Link Guard without a manual save.
   certificate binding stays, so mail clients still configure themselves
   automatically.
 
+- **Users locked themselves out when enabling 2FA (#380).** Clicking **Enable 2FA**
+  in the user portal signed the user out at once, and finishing enrollment
+  needs a verification email. Users who had not opened their email first
+  could not read it and were locked out. The button now opens a warning
+  that says so, and only **Enable 2FA and sign out** in that window enables
+  2FA, confirming that the user's email is already open elsewhere.
 - **Mail marked "Important" in mail clients (#379).** Nextcloud Mail's automatic
   importance classification, on by default, tagged most incoming mail with
   the IMAP keyword Thunderbird and other clients show as "Important". Hermes

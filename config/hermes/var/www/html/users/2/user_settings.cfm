@@ -731,13 +731,10 @@ $(document).ready(function() {
                             </ol>
                         </div>
                     </cfif>
-                    <form method="post" action="user_settings.cfm">
-                        <input type="hidden" name="action" value="toggle_mfa">
-                        <input type="hidden" name="mfa_setting" value="enable">
-                        <button type="submit" class="btn btn-warning btn-lg">
-                            <i class="fas fa-shield-alt me-1"></i> Enable 2FA now
-                        </button>
-                    </form>
+                    <cfset mfaShowEnableModal = true>
+                    <button type="button" class="btn btn-warning btn-lg" data-bs-toggle="modal" data-bs-target="#mfaEnableModal">
+                        <i class="fas fa-shield-alt me-1"></i> Enable 2FA now
+                    </button>
                     <cfif NOT isRelayUser>
                         <p class="form-text text-muted mt-2 mb-0"><small>Make sure Webmail is open in another tab <em>before</em> clicking Enable.</small></p>
                     </cfif>
@@ -798,13 +795,10 @@ $(document).ready(function() {
                             </ol>
                         </cfif>
                     </div>
-                    <form method="post" action="user_settings.cfm">
-                        <input type="hidden" name="action" value="toggle_mfa">
-                        <input type="hidden" name="mfa_setting" value="enable">
-                        <button type="submit" class="btn btn-success btn-lg">
-                            <i class="fas fa-shield-alt me-1"></i> Enable 2FA
-                        </button>
-                    </form>
+                    <cfset mfaShowEnableModal = true>
+                    <button type="button" class="btn btn-success btn-lg" data-bs-toggle="modal" data-bs-target="#mfaEnableModal">
+                        <i class="fas fa-shield-alt me-1"></i> Enable 2FA
+                    </button>
                     <cfif NOT isRelayUser>
                         <p class="form-text text-muted mt-2 mb-0"><small>Make sure Webmail is open in another tab <em>before</em> clicking Enable.</small></p>
                     </cfif>
@@ -1002,6 +996,51 @@ $(document).ready(function() {
       </div>
     </div>
   </main>
+
+<!--- Enable 2FA confirmation. Enabling signs the user out at once, and
+     finishing enrollment needs the verification email Authelia sends. Users
+     skipped the instructions, could not read that email (their Webmail is
+     behind the same sign-in) and locked themselves out. The Enable buttons
+     open this modal; only its button submits toggle_mfa, and clicking it is
+     the user's confirmation that their email is already open elsewhere. --->
+<cfif IsDefined("mfaShowEnableModal")>
+<cfoutput>
+<div class="modal fade" id="mfaEnableModal" tabindex="-1" aria-labelledby="mfaEnableModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="mfaEnableModalLabel"><i class="fas fa-shield-alt me-2"></i>Enable Two-Factor Authentication</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cancel"></button>
+      </div>
+      <div class="modal-body">
+        <div class="callout callout-danger mb-3">
+          <h4 class="text-danger mb-2"><i class="fas fa-exclamation-triangle me-2"></i>WARNING</h4>
+          <p class="mb-2">To enable 2FA, <strong>your email must already be open somewhere else</strong> before you continue.</p>
+          <p class="mb-2">You will be <strong>signed out immediately</strong>. To finish setting up 2FA you must open a verification email sent to <strong>#EncodeForHTML(session.email)#</strong>.</p>
+          <p class="mb-0"><strong>If you cannot read that email, you will be locked out of your account</strong> until your administrator helps you.</p>
+        </div>
+        <cfif NOT isRelayUser>
+          <p class="mb-3">Your email is not open yet? Open Webmail in a new tab first, and keep that tab open:<br>
+            <a href="/users/2/preload_nc_login.cfm" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm mt-2"><i class="fas fa-envelope-open-text me-1"></i>Open Webmail in a new tab</a>
+          </p>
+        <cfelse>
+          <p class="mb-3">Open your email in your usual mail program now, before you continue.</p>
+        </cfif>
+        <p class="mb-0 small text-muted">By clicking <strong>Enable 2FA and sign out</strong>, I confirm that my email is already open in another tab or app and that I can read new messages there.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="user_settings.cfm" class="d-inline">
+          <input type="hidden" name="action" value="toggle_mfa">
+          <input type="hidden" name="mfa_setting" value="enable">
+          <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt me-1"></i>Enable 2FA and sign out</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+</cfoutput>
+</cfif>
 
 <cfinclude template="./inc/main_footer.cfm" />
 

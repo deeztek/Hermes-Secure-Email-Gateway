@@ -101,12 +101,13 @@ If you've never set up 2FA on any service before, **TOTP is the easiest place to
 ### Setting up TOTP step by step
 
 1. Install an authenticator app on your phone if you don't already have one — Google Authenticator, Microsoft Authenticator, and Authy are all free.
-2. On this page, in the Two-Factor Authentication card, click **Enable 2FA**. (If you're a mailbox user, the page recommends opening **Webmail** in another browser tab first — you'll need it in a minute to read a verification email.)
-3. The system signs you out and sends you back to the sign-in page. Sign in again with your password.
-4. After signing in, you're walked through registering a device. Click **Register your first device** and pick **One-Time Password**.
-5. A verification email is sent to your mailbox to confirm it's really you. Open it (in your Webmail tab) and click the link inside.
-6. A QR code appears on the screen. Open your authenticator app, tap the "+" or "Add account" button, point your phone's camera at the QR code, and the app captures it.
-7. The app now starts showing a 6-digit code that changes every 30 seconds. Type the current code into the field on the website and submit.
+2. **Open your email first, and keep it open.** Setting up 2FA sends you a verification email, and you will be signed out before it arrives. If you can't read that email, you're locked out until your administrator helps. Mailbox users: open **Webmail** in another browser tab. Otherwise, open your usual mail program.
+3. On this page, in the Two-Factor Authentication card, click **Enable 2FA**. A warning window opens. Click **Enable 2FA and sign out** to confirm that your email is already open, or **Cancel**.
+4. The system signs you out and sends you back to the sign-in page. Sign in again with your password.
+5. After signing in, you're walked through registering a device. Click **Register your first device** and pick **One-Time Password**.
+6. A verification email is sent to your mailbox to confirm it's really you. Open it (in your Webmail tab) and click the link inside.
+7. A QR code appears on the screen. Open your authenticator app, tap the "+" or "Add account" button, point your phone's camera at the QR code, and the app captures it.
+8. The app now starts showing a 6-digit code that changes every 30 seconds. Type the current code into the field on the website and submit.
 
 You're done. From now on, every time you sign in to the portal, after typing your password you'll be asked for the current code from the app.
 

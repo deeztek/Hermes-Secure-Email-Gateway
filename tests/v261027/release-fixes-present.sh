@@ -26,6 +26,7 @@ if docker ps --format '{{.Names}}' | grep -qx hermes_body_milter; then
         && pass "body milter adds an HTML version to plain-text signed mail" \
         || fail "body milter image predates the plain-text signature fix"
 fi
+check $w/users/2/user_settings.cfm "mfaEnableModal" "user portal: Enable 2FA asks for confirmation first"
 grep -q "{{org.logo}}" $w/admin/2/view_mailbox_domains.cfm \
     && fail "Email Server > Domains still advertises {{org.logo}} (#375)" \
     || pass "Email Server > Domains no longer advertises {{org.logo}} (#375)"
