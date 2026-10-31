@@ -117,3 +117,82 @@ function auth_passdb_lookup(req)
     db_close(env, conn)
     return dovecot.auth.PASSDB_RESULT_PASSWORD_MISMATCH, "no matching app password"
 end
+
+-- ===== userdb lua (#342) ==================================================
+--
+-- The userdb lives in this script, not in a `userdb sql` block. Loading
+-- luasql.mysql next to Dovecot's own SQL driver in one auth-worker process
+-- corrupted the heap whenever Dovecot's pooled userdb connection went stale
+-- (idle timeout or a DB restart): the worker crashed, LMTP returned 451 and
+-- doveadm returned "User lookup failed". With both lookups here, the process
+-- loads one MySQL library and every lookup opens a fresh connection, so there
+-- is no pooled connection to go stale.
+--
+-- The fields below are the same ones the old sql_query returned.
+
+local function split_user(user)
+    local username, domain = string.match(user, "^(.*)@([^@]*)$")
+    if not username then
+        return user, ""
+    end
+    return username, domain
+end
+
+function auth_userdb_lookup(req)
+    local env, conn, err = db_connect()
+    if not conn then
+        req:log_error("userdb: DB connect failed: " .. tostring(err))
+        db_close(env, conn)
+        return dovecot.auth.USERDB_RESULT_INTERNAL_FAILURE, "db connect failed"
+    end
+
+    local cur, qerr = conn:execute(string.format(
+        "SELECT quota FROM mailboxes WHERE username = '%s' AND active = '1'",
+        conn:escape(req.user)))
+    if not cur then
+        req:log_error("userdb: query failed: " .. tostring(qerr))
+        db_close(env, conn)
+        return dovecot.auth.USERDB_RESULT_INTERNAL_FAILURE, "db query failed"
+    end
+
+    local row = cur:fetch({}, "a")
+    cur:close()
+    db_close(env, conn)
+
+    if not row then
+        return dovecot.auth.USERDB_RESULT_USER_UNKNOWN, "no such mailbox"
+    end
+
+    local username, domain = split_user(req.user)
+    local home = "/srv/mail/" .. domain .. "/" .. username
+    return dovecot.auth.USERDB_RESULT_OK, {
+        home       = home,
+        mail       = "maildir:" .. home,
+        uid        = "1000",
+        gid        = "1000",
+        quota_rule = "*:bytes=" .. tostring(row.quota)
+    }
+end
+
+-- Used by doveadm -A and anything else that lists users. Same set as the
+-- old sql_iterate_query (all mailboxes, active or not).
+function auth_userdb_iterate()
+    local users = {}
+    local env, conn, err = db_connect()
+    if not conn then
+        db_close(env, conn)
+        return users
+    end
+
+    local cur = conn:execute("SELECT username FROM mailboxes")
+    if cur then
+        local row = cur:fetch({}, "a")
+        while row do
+            table.insert(users, row.username)
+            row = cur:fetch({}, "a")
+        end
+        cur:close()
+    end
+    db_close(env, conn)
+    return users
+end
