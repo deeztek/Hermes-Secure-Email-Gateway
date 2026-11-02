@@ -462,3 +462,6 @@ timeout = "240">
      currently mean, so Relay Networks is caught up. --->
 <cfset aliasStampConsumer = "Relay Networks">
 <cfinclude template="alias_stamp_applied.cfm">
+
+<!--- CipherMail has its own Postfix size limit; keep it in step (#396). --->
+<cfinclude template="sync_ciphermail_size_limit.cfm">
