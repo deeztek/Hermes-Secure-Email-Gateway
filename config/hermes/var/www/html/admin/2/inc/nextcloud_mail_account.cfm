@@ -251,3 +251,33 @@ Sets after execution:
     </cftry>
 
 </cfif>
+
+<!--- Importance classifier off for the accounts just (re)created. Since
+     Mail 5.7 it is a per-account flag, oc_mail_accounts.classification_enabled,
+     and `occ mail:account:create` has no option for it, so every account
+     starts with it on and tags mail it deems important with $label1, which
+     IMAP clients show as "Important". The old per-user setting
+     `mail tag-classified-messages` is no longer read. Users can turn it
+     back on in the account's settings in Mail. --->
+<cfif ncMailResult EQ "success" AND ListFindNoCase("create,update", ncMailAction)>
+    <cftry>
+        <cfinclude template="generate_customtrans.cfm">
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncClassDbUser" charset="utf-8">
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncClassDbPass" charset="utf-8">
+        <cfset _classScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_mail_classify_off.sh">
+        <cfscript>
+            fileWrite(_classScript,
+                chr(35) & "!/bin/bash" & chr(10) &
+                "docker exec hermes_db_server mariadb -u """ & Trim(ncClassDbUser) & """ -p""" & Trim(ncClassDbPass) & """ nextcloud -e """ &
+                "UPDATE oc_mail_accounts SET classification_enabled = 0 WHERE user_id='" & ncMailUser & "';" &
+                """ 2>&1" & chr(10),
+                "utf-8");
+        </cfscript>
+        <cfexecute name="/bin/chmod" arguments="+x #_classScript#" timeout="10" />
+        <cfexecute name="#_classScript#" variable="_classResult" timeout="30" />
+        <cftry><cffile action="delete" file="#_classScript#"><cfcatch type="any"></cfcatch></cftry>
+    <cfcatch type="any">
+        <!--- Not fatal: the account works, it just keeps the classifier on. --->
+    </cfcatch>
+    </cftry>
+</cfif>

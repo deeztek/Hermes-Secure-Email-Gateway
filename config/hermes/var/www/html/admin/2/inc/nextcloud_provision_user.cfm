@@ -111,6 +111,9 @@ Sets after execution:
                     'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" settings email "' & ncProvisionEmail & '" 2>&1' & chr(10) &
                     '## Nextcloud Mail tags messages it deems important with $label1, which' & chr(10) &
                     '## every IMAP client shows as "Important". Off unless the user chose.' & chr(10) &
+                    '## Mail before 5.7 reads this; 5.7+ uses a per-account flag that' & chr(10) &
+                    '## nextcloud_mail_account.cfm clears when it creates the account.' & chr(10) &
+                    'docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set mail importance_classification_default --value=false --type=boolean >/dev/null 2>&1' & chr(10) &
                     'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" mail tag-classified-messages >/dev/null 2>&1 || ' &
                     'docker exec -u www-data hermes_nextcloud php /var/www/html/occ user:setting "' & ncProvisionUser & '" mail tag-classified-messages false 2>&1' & chr(10),
                     "utf-8");

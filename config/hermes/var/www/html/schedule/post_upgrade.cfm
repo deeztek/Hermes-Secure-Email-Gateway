@@ -529,6 +529,49 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- v1 above set the per-user setting, which Mail 5.7 and later no longer
+     read: the classifier is now switched by a per-account column,
+     oc_mail_accounts.classification_enabled, that every account created by
+     `occ mail:account:create` starts with on. So mail kept getting tagged
+     $label1 after v1 cleared it. This turns the column off for every
+     account, makes off Mail's default for accounts created later in its own
+     UI, and clears the tags again. New accounts get it off at creation
+     (nextcloud_mail_account.cfm). --->
+<cfset blockName = "nextcloud-mail-importance-tagging-off-v2">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfquery name="ncTagUsers2" datasource="hermes">
+            SELECT username FROM mailboxes
+            WHERE active = 1
+            ORDER BY username
+        </cfquery>
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_username" variable="ncTagDbUser" charset="utf-8">
+        <cffile action="read" file="/opt/hermes/creds/nextcloud_mysql_password" variable="ncTagDbPass" charset="utf-8">
+        <cfset ncTagScript2 = "/opt/hermes/tmp/pu_" & Replace(CreateUUID(), "-", "", "ALL") & "_nc_tagging2.sh">
+        <cfset ncTagBody2 = "##!/bin/bash" & chr(10)>
+        <cfset ncTagBody2 &= "docker exec hermes_db_server mariadb -u """ & Trim(ncTagDbUser) & """ -p""" & Trim(ncTagDbPass)
+            & """ nextcloud -e ""UPDATE oc_mail_accounts SET classification_enabled = 0;"" >/dev/null 2>&1" & chr(10)>
+        <cfset ncTagBody2 &= "docker exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:set mail importance_classification_default --value=false --type=boolean >/dev/null 2>&1" & chr(10)>
+        <cfloop query="ncTagUsers2">
+            <cfset ncTagBody2 &= "docker exec hermes_dovecot doveadm flags remove -u """ & ncTagUsers2.username & """ '$label1' mailbox '*' ALL >/dev/null 2>&1" & chr(10)>
+        </cfloop>
+        <!--- Detached for the same reason as v1: one doveadm call per
+             mailbox can outlast this page's request timeout. --->
+        <cfset ncTagBody2 &= "rm -f ""$0""" & chr(10)>
+        <cffile action="write" file="#ncTagScript2#" output="#ncTagBody2#" addnewline="no">
+        <cfexecute name="/bin/chmod" arguments="+x #ncTagScript2#" timeout="10" />
+        <cfexecute name="#ncTagScript2#" timeout="0" />
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (started in the background for " & ncTagUsers2.recordcount & " mailboxes)")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Hybrid domains created before v261026 have no certificate binding
      (#371): converting relay recipients to mailboxes set type='hybrid' but
      never created the mailbox_domains row, so the domain never got its

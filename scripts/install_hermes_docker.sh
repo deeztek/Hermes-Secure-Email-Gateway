@@ -4647,6 +4647,15 @@ run_phase2_db_init() {
                 || log "    WARNING: $app install failed (may already be installed)"
         done
 
+        # Mail's importance classifier tags mail with $label1, which IMAP
+        # clients show as "Important". Off by default for accounts created in
+        # Mail's own UI; accounts Hermes creates are switched off per account
+        # by nextcloud_mail_account.cfm.
+        docker exec -u www-data hermes_nextcloud php /var/www/html/occ \
+            config:app:set mail importance_classification_default --value=false --type=boolean >> "$LOG_FILE" 2>&1 \
+            && log "  Mail importance classification off by default" \
+            || log "  WARNING: Failed to set Mail importance classification default"
+
         # Enable core apps that ship with NC.
         # - twofactor_totp: ships with NC but NOT enabled by default. Required
         #   for the local NC admin TOTP enforcement (#262). Without it,
