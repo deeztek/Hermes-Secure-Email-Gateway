@@ -2435,8 +2435,8 @@ CREATE TABLE IF NOT EXISTS `spam_settings` (
 INSERT IGNORE INTO `spam_settings` VALUES (1,'user_portal','https://smtp.domain.tld/users',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (2,'sa_spam_modifies_subj','1',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (3,'sa_spam_subject_tag','[SUSPECTED SPAM]',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (4,'final_virus_destiny','D_BOUNCE',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
-INSERT IGNORE INTO `spam_settings` VALUES (5,'final_banned_destiny','D_BOUNCE',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (4,'final_virus_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
+INSERT IGNORE INTO `spam_settings` VALUES (5,'final_banned_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (6,'final_spam_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (7,'final_bad_header_destiny','D_DISCARD',NULL,NULL,NULL,NULL,NULL,NULL,1,1,0);
 INSERT IGNORE INTO `spam_settings` VALUES (1460,'BAYES_99','3.6',NULL,NULL,NULL,NULL,'Bayes spam probability is 99 to 100%',1,1,1,0);

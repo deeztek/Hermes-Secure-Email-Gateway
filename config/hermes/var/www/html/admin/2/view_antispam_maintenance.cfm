@@ -349,6 +349,15 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </div>
     <div class="card-body">
       <p class="text-muted mb-3">Choose what happens to messages that match each filter category.</p>
+      <div class="alert alert-warning small">
+        <i class="fas fa-exclamation-triangle me-2"></i>
+        <strong>Quarantine Only is recommended.</strong> Filtering runs after
+        Hermes has accepted the message, so <strong>Quarantine &amp; Send DSN</strong>
+        sends a bounce to the envelope sender. On spam, phishing and viruses
+        that sender is usually forged, so the bounce goes to an innocent
+        third party (backscatter) and can get this server listed on
+        blocklists. Messages are quarantined either way.
+      </div>
       <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label"><strong>Virus Messages</strong></label>
