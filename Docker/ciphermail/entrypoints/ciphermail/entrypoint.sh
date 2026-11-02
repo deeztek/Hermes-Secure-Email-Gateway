@@ -18,19 +18,6 @@ cp /etc/nsswitch.conf /var/spool/postfix/etc/nsswitch.conf
 cp /etc/services /var/spool/postfix/etc/services
 cp /etc/hosts /var/spool/postfix/etc/hosts
 
-# Message size limit from Perimeter Checks (#396). Written by
-# sync_ciphermail_size_limit.cfm; /etc/postfix is not a volume, so it is
-# re-applied on every start. Missing or empty file: image defaults (10 MB).
-SIZE_FILE=/opt/hermes/config/ciphermail_size_limit
-if [ -s "$SIZE_FILE" ]; then
-    BEFORE=$(tr -dc '0-9' < "$SIZE_FILE")
-    if [ -n "$BEFORE" ] && [ "$BEFORE" -gt 0 ]; then
-        echo "Setting message size limit to $BEFORE bytes..."
-        postconf -e "djigzo_before_filter_message_size_limit=$BEFORE" \
-            "djigzo_calculated_after_filter_message_size_limit=$((BEFORE * 3))"
-    fi
-fi
-
 # Start Postfix
 echo "Starting Postfix..."
 postfix start

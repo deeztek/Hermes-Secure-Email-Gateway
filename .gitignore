@@ -353,6 +353,3 @@ config/hermes/opt/hermes/sa-bayes/*
 config/mail_filter/sa-bayes/*
 !config/mail_filter/sa-bayes/.gitkeep
 
-
-# Per-host CipherMail size limit, written by sync_ciphermail_size_limit.cfm (#396)
-config/hermes/opt/hermes/config/ciphermail_size_limit

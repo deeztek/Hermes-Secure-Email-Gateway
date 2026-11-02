@@ -6,10 +6,13 @@
 # service type  private unpriv  chroot  wakeup  maxproc command + args
 #               (yes)   (yes)   (yes)   (never) (100)
 # ==========================================================================
+# #396: message size is enforced once, at Hermes's edge (Perimeter Checks).
+# Internal hops are unlimited (0) so they never bounce mail Hermes accepted.
 smtp      inet  n       -       -       -       -       smtpd
-            -o message_size_limit=${djigzo_before_filter_message_size_limit}
+            -o message_size_limit=0
 pickup    fifo  n       -       -       60      1       pickup
 cleanup   unix  n       -       -       -       0       cleanup
+            -o message_size_limit=0
 qmgr      fifo  n       -       n       300     1       qmgr
 tlsmgr    unix  -       -       -       1000?   1       tlsmgr
 rewrite   unix  -       -       -       -       -       trivial-rewrite
@@ -51,6 +54,7 @@ djigzo unix -       -       n       -       4      smtp
 # cleanup for reinject so we can set the hopcount_limit differently for the reinjection port
 cleanup_reinject unix  n       -       -       -       0       cleanup
             -o hopcount_limit=100
+            -o message_size_limit=0
 
 # injection port for mail handled by the back-end
 127.0.0.1:10026 inet  n       -       -       -       10      smtpd
@@ -65,6 +69,7 @@ cleanup_reinject unix  n       -       -       -       0       cleanup
             -o smtpd_authorized_xforward_hosts=127.0.0.0/8
             -o smtpd_authorized_xclient_hosts=127.0.0.0/8
             -o cleanup_service_name=cleanup_reinject
+            -o message_size_limit=0
 
 # injection port for mail sent by web gui
 127.0.0.1:10027 inet  n       -       -       -       10      smtpd

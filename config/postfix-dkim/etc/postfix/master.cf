@@ -143,8 +143,11 @@ policy-spf  unix  -       n       n       -       -       spawn
 
 
 # cleanup for reinject so we can set the hopcount_limit differently for the reinjection port
+# #396: no size limit on the reinjection path (here and :10026). Size is
+# enforced once, on the way in; CipherMail encryption/signing grows a message.
 cleanup_reinject unix  n       -       -       -       0       cleanup
             -o hopcount_limit=100
+            -o message_size_limit=0
 
 # CipherMail (djigzo) re-injection port. Post-content-filter mail arrives here
 # from the ciphermail container, so this listener MUST bind on the Docker
@@ -166,6 +169,7 @@ cleanup_reinject unix  n       -       -       -       0       cleanup
             -o smtpd_authorized_xclient_hosts=127.0.0.0/8
             -o cleanup_service_name=cleanup_reinject
             -o smtpd_milters=inet:localhost:8892,inet:hermes_openarc:8893
+            -o message_size_limit=0
 
 # Injection port for mail composed in the CipherMail (djigzo) web GUI. Same
 # cross-container reachability requirement as :10026. Uses the primary
