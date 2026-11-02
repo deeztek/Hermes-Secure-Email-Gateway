@@ -102,6 +102,9 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <cfreturn res>
     </cfcatch>
   </cftry>
+  <!--- Lucee can leave either variable null (seen when dig ran long). --->
+  <cfif IsNull(out)><cfset out = ""></cfif>
+  <cfif IsNull(err)><cfset err = ""></cfif>
 
   <!--- Rule 2: stderr is a failure, never data. --->
   <cfif Len(Trim(err))>

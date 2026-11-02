@@ -107,8 +107,6 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
     </cfif>
 
 
-       <cfset session.theUser = getHttpRequestData().headers["remote-user"]>  
-
       <!--- CHECK FOR REMOTE-USER HEADER --->
       <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "remote-user" )>
 
