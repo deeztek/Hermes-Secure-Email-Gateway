@@ -97,10 +97,10 @@ only the in-stack container.
              ******** placeholder keeps the stored key untouched. --->
         <cfcase value="save_apikey">
             <cfset prov = LCase(Trim(form.provider))>
-            <cfif ListFindNoCase("gsb,vt,urlhaus", prov)>
+            <cfif ListFindNoCase("webrisk,gsb,vt,urlhaus", prov)>
                 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
                 <!--- URLhaus: an Auth-Key for a free feed (its on/off switch is the
-                     feed toggle); gsb/vt: a provider key that also enables it. --->
+                     feed toggle); webrisk/gsb/vt: a provider key that also enables it. --->
                 <cfset fld = (prov EQ "urlhaus") ? "urlhaus_auth_key" : prov & "_api_key">
                 <cfif StructKeyExists(form,'api_key') AND form.api_key NEQ "********">
                     <cfif Len(Trim(form.api_key))>
@@ -133,15 +133,16 @@ only the in-stack container.
         <!--- Test a provider's saved API key with one live request. Saving a key
              does not check it, and the engine fails open on a lookup error (the
              link just gets no verdict from that provider), so a wrong key went
-             unnoticed. Google: a lookup of Google's Safe Browsing test page.
+             unnoticed. Google (Web Risk, Safe Browsing): a lookup of Google's test page.
              VirusTotal: a report request for a well-known URL (404 = key fine,
              URL unknown). Costs one lookup against the provider's quota. --->
         <cfcase value="test_apikey">
             <cfset prov = LCase(Trim(form.provider))>
-            <cfif NOT ListFindNoCase("gsb,vt", prov)>
+            <cfif NOT ListFindNoCase("webrisk,gsb,vt", prov)>
                 <cflocation url="view_linkguard.cfm" addtoken="false">
             </cfif>
-            <cfset provName = (prov EQ "gsb") ? "Google Safe Browsing" : "VirusTotal">
+            <cfset provNames = {"webrisk":"Google Web Risk","gsb":"Google Safe Browsing","vt":"VirusTotal"}>
+            <cfset provName = provNames[prov]>
             <cfquery name="tkRow" datasource="hermes">
                 SELECT value2 FROM parameters2
                 WHERE module = 'linkguard' AND parameter = <cfqueryparam value="#prov#_api_key" cfsqltype="cf_sql_varchar">
@@ -160,7 +161,12 @@ only the in-stack container.
                 <cfset session.alertmsg = provName & ": no API key saved. Click Edit to add one.">
                 <cflocation url="view_linkguard.cfm" addtoken="false">
             </cfif>
-            <cfif prov EQ "gsb">
+            <cfif prov EQ "webrisk">
+                <!--- encodeurl="false" for the same reason as Safe Browsing below:
+                     the colon in "uris:search" must reach Google as written. --->
+                <cfhttp method="get" url="https://webrisk.googleapis.com/v1/uris:search?threatTypes=MALWARE&uri=http%3A%2F%2Ftestsafebrowsing.appspot.com%2Fs%2Fmalware.html&key=#URLEncodedFormat(testKey)#" encodeurl="false" timeout="15" result="tr">
+                </cfhttp>
+            <cfelseif prov EQ "gsb">
                 <!--- Literal JSON: SerializeJSON can upper-case struct keys, and
                      Google's field names are case-sensitive. --->
                 <cfset tBody = '{"client":{"clientId":"hermes-linkguard","clientVersion":"1.0"},"threatInfo":{"threatTypes":["MALWARE","SOCIAL_ENGINEERING"],"platformTypes":["ANY_PLATFORM"],"threatEntryTypes":["URL"],"threatEntries":[{"url":"https://testsafebrowsing.appspot.com/s/phishing.html"}]}}'>
@@ -182,15 +188,15 @@ only the in-stack container.
             <cfif tCode EQ "200" OR (prov EQ "vt" AND tCode EQ "404")>
                 <cfset session.alerttype = "success">
                 <cfset session.alertmsg = provName & ": the API key works.">
-                <cfif prov EQ "gsb" AND FindNoCase("threatType", tr.filecontent)>
-                    <cfset session.alertmsg = session.alertmsg & " Google's test phishing page was reported as a threat.">
+                <cfif ListFind("webrisk,gsb", prov) AND FindNoCase("threatType", tr.filecontent)>
+                    <cfset session.alertmsg = session.alertmsg & " Google's test page was reported as a threat.">
                 </cfif>
             <cfelseif tCode EQ "429">
                 <cfset session.alerttype = "warning">
                 <cfset session.alertmsg = provName & ": the key is valid but over its quota (HTTP 429). Lookups resume when the quota resets.">
             <cfelseif ListFind("400,401,403", tCode)>
                 <cfset session.alerttype = "danger">
-                <cfset session.alertmsg = provName & ": the API key was refused (HTTP " & tCode & ")." & ((prov EQ "gsb") ? " Check the key, and that the Safe Browsing API is enabled in its Google Cloud project." : " Check the key.")>
+                <cfset session.alertmsg = provName & ": the API key was refused (HTTP " & tCode & ")." & ((prov EQ "webrisk") ? " Check the key, and that the Web Risk API and billing are enabled in its Google Cloud project." : ((prov EQ "gsb") ? " Check the key, and that the Safe Browsing API is enabled in its Google Cloud project." : " Check the key."))>
             <cfelse>
                 <cfset session.alerttype = "danger">
                 <cfset session.alertmsg = provName & ": could not reach the provider (" & (Len(tCode) ? "HTTP " & tCode : "no response") & "). Check this server's outbound Internet access.">
@@ -211,10 +217,10 @@ only the in-stack container.
             <cflocation url="view_linkguard.cfm" addtoken="false">
         </cfcase>
 
-        <!--- Toggle an API provider (gsb / vt). Cannot enable without a key. --->
+        <!--- Toggle an API provider (webrisk / gsb / vt). Cannot enable without a key. --->
         <cfcase value="toggle_api">
             <cfset prov = LCase(Trim(form.provider))>
-            <cfif ListFindNoCase("gsb,vt", prov)>
+            <cfif ListFindNoCase("webrisk,gsb,vt", prov)>
                 <cfquery name="cur" datasource="hermes">
                     SELECT
                         MAX(CASE WHEN parameter = <cfqueryparam value="#prov#_enabled" cfsqltype="cf_sql_varchar"> THEN value2 END) AS en,
@@ -559,6 +565,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset S = {}>
 <cfloop query="ss"><cfset S[ss.parameter] = (IsNull(ss.value2) ? "" : ss.value2)></cfloop>
 <cfset gv = function(k,d){ return (StructKeyExists(S,k) AND Len(S[k])) ? S[k] : d; }>
+<cfset webriskSet = (StructKeyExists(S,"webrisk_api_key") AND Len(S["webrisk_api_key"]))>
 <cfset gsbSet = (StructKeyExists(S,"gsb_api_key") AND Len(S["gsb_api_key"]))>
 <cfset vtSet  = (StructKeyExists(S,"vt_api_key") AND Len(S["vt_api_key"]))>
 <cfset urlhausSet = (StructKeyExists(S,"urlhaus_auth_key") AND Len(S["urlhaus_auth_key"]))>
@@ -569,10 +576,11 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset defaultBaseUrl = "https://" & consoleHost & "/lg/">
 
 <!--- reputation source rows (defined outside cfoutput) --->
-<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Free with an abuse.ch Auth-Key; bulk list refreshed on your interval"},
-                    {"k":"openphish","n":"OpenPhish","lim":"Bulk list; refreshed on your interval (fair use)"} ]>
-<cfset repApis  = [ {"k":"gsb","n":"Google Safe Browsing","set":gsbSet,"lim":"Free tier ~10,000 URLs/day"},
-                    {"k":"vt","n":"VirusTotal","set":vtSet,"lim":"Free tier 4/min, 500/day"} ]>
+<cfset repFeeds = [ {"k":"urlhaus","n":"URLhaus (abuse.ch)","lim":"Free with an abuse.ch Auth-Key; bulk list refreshed on your interval. Commercial use may need a paid subscription.","terms":"https://abuse.ch/terms-of-use/"},
+                    {"k":"openphish","n":"OpenPhish","lim":"Bulk list; refreshed on your interval (fair use)","terms":""} ]>
+<cfset repApis  = [ {"k":"webrisk","n":"Google Web Risk","set":webriskSet,"lim":"Google's option for commercial use. 100,000 lookups/month free, then paid. Needs Google Cloud billing.","terms":"https://cloud.google.com/web-risk/pricing"},
+                    {"k":"gsb","n":"Google Safe Browsing","set":gsbSet,"lim":"Free tier ~10,000 URLs/day. Non-commercial use only.","terms":"https://developers.google.com/safe-browsing/v4"},
+                    {"k":"vt","n":"VirusTotal","set":vtSet,"lim":"Free tier 4/min, 500/day. Not for commercial products or business workflows.","terms":"https://docs.virustotal.com/reference/public-vs-premium-api"} ]>
 
 <!--- protected domains: current set + hosted-domain union (relay + mailbox) --->
 <cfquery name="protQ" datasource="hermes">SELECT domain FROM linkguard_domains WHERE enabled = 1</cfquery>
@@ -627,7 +635,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
 <cfset StructDelete(session,"lgDecode")><cfset StructDelete(session,"lgDecodeIn")><cfset StructDelete(session,"lgDecodeErr")>
 
 <!--- render helpers for the Check + Activity views --->
-<cfset srcLabel = { "admin":"Admin rule", "local":"Local feed (URLhaus / OpenPhish)", "heuristic":"Structural heuristic", "gsb":"Google Safe Browsing", "vt":"VirusTotal", "none":"Default (no source flagged it)", "scheme":"Unsupported address type", "redirect":"Redirect destination", "combined":"Combined weak signals" }>
+<cfset srcLabel = { "admin":"Admin rule", "local":"Local feed (URLhaus / OpenPhish)", "heuristic":"Structural heuristic", "webrisk":"Google Web Risk", "gsb":"Google Safe Browsing", "vt":"VirusTotal", "none":"Default (no source flagged it)", "scheme":"Unsupported address type", "redirect":"Redirect destination", "combined":"Combined weak signals" }>
 <cfset srcOf = function(s){ var x = LCase(Trim(arguments.s)); return StructKeyExists(srcLabel, x) ? srcLabel[x] : arguments.s; }>
 <cfset vBadge = function(v){ var x = LCase(Trim(arguments.v)); return (x EQ 'clean') ? 'success' : ((x EQ 'suspicious') ? 'warning text-dark' : ((x EQ 'malicious') ? 'danger' : 'secondary')); }>
 <cfset aBadge = function(a){ var x = LCase(Trim(arguments.a)); return (x EQ 'redirected' OR x EQ 'proceeded') ? 'success' : ((x EQ 'warned') ? 'warning text-dark' : ((x EQ 'blocked') ? 'danger' : 'secondary')); }>
@@ -755,7 +763,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
   <div class="card-header"><h3 class="card-title"><i class="fas fa-shield-alt me-2"></i>Reputation sources</h3></div>
   <div class="card-body">
     <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
-      <p class="text-muted mb-0">Checked at click time, on top of the structural heuristics, with results cached. OpenPhish needs no key. <strong>URLhaus needs a free Auth-Key</strong> from abuse.ch: sign up at <a href="https://auth.abuse.ch/" target="_blank" rel="noopener">auth.abuse.ch</a>, which only accepts an X, Google, LinkedIn or GitHub account, then enter the key with the URLhaus <strong>Edit</strong> button below. The two API providers offer free tiers and only run once you add a key and enable them. Free feeds refresh on the <strong>Feed refresh (min)</strong> interval.</p>
+      <p class="text-muted mb-0">Checked at click time, on top of the structural heuristics, with results cached. OpenPhish needs no key. <strong>URLhaus needs a free Auth-Key</strong> from abuse.ch: sign up at <a href="https://auth.abuse.ch/" target="_blank" rel="noopener">auth.abuse.ch</a>, which only accepts an X, Google, LinkedIn or GitHub account, then enter the key with the URLhaus <strong>Edit</strong> button below. The API providers offer free tiers and only run once you add a key and enable them. Which keys you use is your decision, and following each provider's terms is your responsibility: see the <strong>Terms</strong> link on each row. Free feeds refresh on the <strong>Feed refresh (min)</strong> interval.</p>
       <form method="post" action="view_linkguard.cfm" class="flex-shrink-0">
         <input type="hidden" name="lg_action" value="refresh_feeds">
         <button type="submit" class="btn btn-sm btn-outline-primary"><i class="fas fa-sync-alt me-1"></i>Refresh feeds now</button>
@@ -782,7 +790,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
               <cfelseif StructKeyExists(feedStat, fd.k)><span class="badge bg-success">#(IsNull(feedStat[fd.k].entry_count)?'?':feedStat[fd.k].entry_count)# entries</span> <small class="text-muted">#feedStat[fd.k].last_status#</small>
               <cfelse><span class="badge bg-success">enabled</span> <small class="text-muted">awaiting first refresh</small></cfif>
             </td>
-            <td><small class="text-muted">#fd.lim#</small></td>
+            <td><small class="text-muted">#fd.lim#<cfif Len(fd.terms)> <a href="#fd.terms#" target="_blank" rel="noopener">Terms</a></cfif></small></td>
             <td class="text-end"><cfif fd.k EQ "urlhaus"><button type="button" class="btn btn-sm btn-primary" onclick="lgOpenKey('urlhaus','URLhaus Auth-Key',#(urlhausSet?'true':'false')#)"><i class="fas fa-key me-1"></i>Edit</button><cfelse><span class="text-muted">-</span></cfif></td>
           </tr>
         </cfloop>
@@ -803,7 +811,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
               <cfelseif aEnabled><span class="badge bg-success">enabled</span>
               <cfelse><span class="badge bg-secondary">disabled</span></cfif>
             </td>
-            <td><small class="text-muted">#ap.lim#</small></td>
+            <td><small class="text-muted">#ap.lim# <a href="#ap.terms#" target="_blank" rel="noopener">Terms</a></small></td>
             <td class="text-end"><cfif ap.set><form method="post" action="view_linkguard.cfm" style="display:inline;"><input type="hidden" name="lg_action" value="test_apikey"><input type="hidden" name="provider" value="#ap.k#"><button type="submit" class="btn btn-sm btn-outline-primary me-1" title="Send one test request with the saved key (uses one lookup)"><i class="fas fa-vial me-1"></i>Test</button></form></cfif><button type="button" class="btn btn-sm btn-primary" onclick="lgOpenKey('#ap.k#','#JSStringFormat(ap.n)#',#(ap.set?'true':'false')#)"><i class="fas fa-key me-1"></i>Edit</button></td>
           </tr>
         </cfloop>
@@ -1119,7 +1127,7 @@ $(function(){ $('#lgRules').DataTable({dom:'lfrtip', order:[[1,'asc']], columnDe
           <p>Clear the <strong>entire</strong> verdict cache? Every protected link will be re-evaluated from scratch on its next click.</p>
           <div class="alert alert-warning mb-2">
             <i class="fas fa-exclamation-triangle me-1"></i>
-            This also drops cached <strong>Google Safe Browsing</strong> and <strong>VirusTotal</strong> results, so those links get <strong>re-queried against the provider APIs</strong> &mdash; consuming additional lookups against your daily / rate-limit quota.
+            This also drops cached <strong>Google Web Risk</strong>, <strong>Google Safe Browsing</strong> and <strong>VirusTotal</strong> results, so those links get <strong>re-queried against the provider APIs</strong> &mdash; consuming additional lookups against your daily / rate-limit quota.
           </div>
           <p class="mb-0 text-muted">You don't normally need this &mdash; removing a host or changing a rule already clears the affected cache automatically. Use this only to force a full re-check.</p>
         </div>

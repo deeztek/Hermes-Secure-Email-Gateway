@@ -84,11 +84,11 @@ Every click is logged (recipient domain, URL hash, resolved host, verdict, sourc
 | 4 | **Open-redirect extraction** | escalate | Embedded target in an open-redirect param / nested URL is resolved and inherits its verdict (no fetch) |
 | 5 | **Local feeds** | malicious | URLhaus / OpenPhish, stored in SQLite; only ever escalate |
 | 6 | **Heuristics** | suspicious | Lookalike/punycode, IP-literal host, `@` in authority, known shorteners, excessive subdomains, **abused cloud-storage/redirector hosts**, **a UUID as a host label**, **ad click-trackers carrying another site's URL**, **direct links to executables/installers**, **remote-access tool hosts** |
-| 7 | **GSB / VirusTotal** | malicious | Optional, admin-supplied keys; string-reputation lookups, cached. Also escalates a warn-tier (step 6) link to a **hard block** when flagged |
+| 7 | **Web Risk / GSB / VirusTotal** | malicious | Optional, admin-supplied keys; string-reputation lookups, cached. Also escalates a warn-tier (step 6) link to a **hard block** when flagged |
 | 8 | **Guarded redirect-follow** | escalate | **Optional** (admin toggle): follow the `30x` chain under SSRF guards, verdict the final destination; also runs proactively on a step-6 warn so a malicious destination becomes a hard block |
 | 9 | **Default** | clean | Nothing flagged it |
 
-**Steps 1–7 never fetch the target URL** — every reputation check sends the URL only as a *string* (Google Safe Browsing, VirusTotal). The **only** layer that makes an outbound request is the optional **guarded redirect-follow** (step 8), and only when an admin enables it; every hop is SSRF-fenced (see [Redirect detection](#redirect-detection) below). Local feeds only ever escalate a link to malicious; they never auto-allow.
+**Steps 1 to 7 never fetch the target URL**: every reputation check sends the URL only as a *string* (Google Web Risk, Google Safe Browsing, VirusTotal). The **only** layer that makes an outbound request is the optional **guarded redirect-follow** (step 8), and only when an admin enables it; every hop is SSRF-fenced (see [Redirect detection](#redirect-detection) below). Local feeds only ever escalate a link to malicious; they never auto-allow.
 
 Two heuristics target links built to dodge reputation checks, both **suspicious** (warn), never a block:
 
@@ -207,6 +207,7 @@ Settings live in the `parameters2` table under `module = 'linkguard'` (not `syst
 | `urlhaus_auth_key` | empty | URLhaus (abuse.ch) Auth-Key, stored encrypted; without it the URLhaus feed is skipped |
 | `feed_openphish_enabled` | `1` | Pull the OpenPhish blocklist feed |
 | `feed_refresh_minutes` | `60` | Feed refresh interval |
+| `webrisk_enabled` / `webrisk_api_key` | `0` / empty | Google Web Risk lookups (optional key) |
 | `gsb_enabled` / `gsb_api_key` | `0` / — | Google Safe Browsing lookups (optional key) |
 | `vt_enabled` / `vt_api_key` | `0` / — | VirusTotal lookups (optional key) |
 | `clicks_retention_days` | `90` | Click-log retention for reporting |
@@ -230,17 +231,36 @@ abuse.ch, which runs URLhaus, retired its keyless downloads in 2026 (they answer
 3. On **Email Policies > Link Guard**, in **Reputation sources**, click **Edit** on the URLhaus row, paste the key and save. Link Guard then downloads URLhaus' recent-URLs export (`https://urlhaus-api.abuse.ch/v2/files/exports/<key>/recent.csv`) and keeps the URLs marked online. Click **Refresh feeds now** to fetch it immediately.
 
 The key is never shown in the feed status or logs. Link Guard's key is separate from the URLhaus key on [Malware Feeds](../04-content-checks/malware-feeds.md#urlhaus-auth-key) (ClamAV signatures); you can use the same key in both or create one for each.
-- **Google Safe Browsing** and **VirusTotal** are off by default; enable each and supply an API key to add a string-reputation layer. Results are cached per the cache-TTL settings to limit API calls.
+- **Google Web Risk**, **Google Safe Browsing** and **VirusTotal** are off by default; enable each and supply an API key to add a string-reputation layer. Results are cached per the cache-TTL settings to limit API calls.
 
-### Setting up VirusTotal and Google Safe Browsing
+### Setting up Google Web Risk, Google Safe Browsing and VirusTotal
 
-Both are **optional** — Link Guard works without them (admin lists + feeds + heuristics + redirect-following). They add a malicious-verdict layer that checks the URL **as a string** against the provider (the target is never fetched). Each is enabled the moment you save its key (no Save & Reload), and a malicious result will **escalate even a warn-tier link to a hard block**.
+**Important:** which keys you use is your decision, and following each provider's terms is your responsibility. Free tiers often exclude business use:
+
+| Provider | Free tier | Business use | Terms |
+|---|---|---|---|
+| Google Web Risk | 100,000 lookups/month, then $0.50 per 1,000. Needs Google Cloud billing. | Google's option for commercial use | [Pricing](https://cloud.google.com/web-risk/pricing) |
+| Google Safe Browsing | About 10,000 URLs/day | Non-commercial use only | [Safe Browsing](https://developers.google.com/safe-browsing/v4) |
+| VirusTotal | 4/minute, 500/day | Free key is not for commercial products or business workflows | [Public vs Premium API](https://docs.virustotal.com/reference/public-vs-premium-api) |
+| URLhaus (abuse.ch) | Free with an Auth-Key | Commercial use may need a paid subscription | [abuse.ch terms](https://abuse.ch/terms-of-use/) |
+
+Web Risk is the recommended main check: it is built for lookups at click time, and its free limit suits most sites. VirusTotal's free limits are too low to be the main check on a busy site, but it works as a second opinion. Link Guard queries the enabled providers in this order: Web Risk, Safe Browsing, VirusTotal.
+
+All are **optional**: Link Guard works without them (admin lists + feeds + heuristics + redirect-following). They add a malicious-verdict layer that checks the URL **as a string** against the provider (the target is never fetched). Each is enabled the moment you save its key (no Save & Reload), and a malicious result will **escalate even a warn-tier link to a hard block**.
 
 **Where to enter keys:** Link Guard page → **Reputation sources** → the provider's **Edit key** button. Entering a key auto-enables the provider; clearing it disables and wipes the stored key.
 
 **Check a key:** once a key is saved, click **Test** on the provider's row. Saving a key does not check it, and Link Guard skips a provider whose lookups fail rather than blocking mail, so a wrong key otherwise goes unnoticed. The test sends one request with the saved key (it counts against the provider's quota) and reports one of: the key works; the key was refused (wrong key, or for Google, the Safe Browsing API is not enabled in the key's Google Cloud project); the key is over its quota; or the provider could not be reached.
 
-**VirusTotal (recommended):**
+**Google Web Risk (recommended):**
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/), create (or pick) a project, and make sure **billing** is enabled on it. Google requires this even if you stay inside the free tier.
+2. **APIs & Services > Library**, search **"Web Risk API"**, then click **Enable**.
+3. **APIs & Services > Credentials > Create credentials > API key**, and copy it.
+4. Paste it into **Link Guard > Reputation sources > Google Web Risk > Edit**.
+5. Click **Test** on the row. To avoid surprise charges, set a budget alert in Google Cloud.
+
+**VirusTotal:**
 
 1. Create a free account at [virustotal.com](https://www.virustotal.com/) and sign in.
 2. Open your profile menu → **API key**, and copy it.
@@ -253,9 +273,9 @@ Both are **optional** — Link Guard works without them (admin lists + feeds + h
 2. **APIs & Services → Library →** search **"Safe Browsing API" → Enable**.
 3. **APIs & Services → Credentials → Create credentials → API key**, and copy it.
 4. Paste it into Link Guard → Google Safe Browsing → Edit key.
-5. ⚠️ **Commercial-use caveat:** the Safe Browsing **Lookup API v4** that Link Guard uses is **free but designated non-commercial only by Google, and is deprecated** in favour of the paid **Web Risk API** for commercial use. Review Google's [usage terms](https://developers.google.com/safe-browsing/v4/usage-limits) for your deployment. If you only want one reputation provider, **VirusTotal is the simpler choice**; Web Risk support may be added later.
+5. **Commercial use:** Google designates the Safe Browsing API as non-commercial only. For commercial use, use **Google Web Risk** above.
 
-**Privacy:** with either provider enabled, the clicked URL string is sent to that provider's API for the lookup. Nothing else leaves Link Guard.
+**Privacy:** with any of these providers enabled, the clicked URL string is sent to that provider's API for the lookup. Nothing else leaves Link Guard.
 
 ## Branded interstitials
 

@@ -19,6 +19,21 @@ SELECT 'check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf', '
  WHERE NOT EXISTS (SELECT 1 FROM parameters WHERE parameter = 'check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf');
 
 -- ---------------------------------------------------------------------
+-- 2. Link Guard: Google Web Risk provider (#385). Off until an admin adds a
+-- key, like the other reputation providers.
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+INSERT INTO `parameters2` (`parameter`,`value2`,`module`,`active`,`applied`)
+SELECT 'webrisk_enabled','0','linkguard',1,1
+  FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM `parameters2` WHERE `module`='linkguard' AND `parameter`='webrisk_enabled');
+
+INSERT INTO `parameters2` (`parameter`,`value2`,`module`,`active`,`applied`)
+SELECT 'webrisk_api_key','','linkguard',1,1
+  FROM DUAL
+ WHERE NOT EXISTS (SELECT 1 FROM `parameters2` WHERE `module`='linkguard' AND `parameter`='webrisk_api_key');
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

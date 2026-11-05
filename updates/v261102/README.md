@@ -18,6 +18,15 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   for **10 minutes**, so a mailbox created just after a failed attempt receives
   no mail until then. See [Recipient Delivery: VERIFY](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/02-email-relay/domains.md#recipient-delivery-verify).
 
+- **Google Web Risk for Link Guard (Pro, #385).** Link Guard can now use Google
+  Web Risk, Google's option for commercial use, for click-time URL checks: 100,000
+  lookups a month free, then paid, with Google Cloud billing enabled. Add a key
+  under **Email Policies > Link Guard > Reputation sources**. The console and docs
+  now also show each provider's limits and terms: Google Safe Browsing and the
+  free VirusTotal key are not licensed for business use, and abuse.ch may need a
+  paid subscription for it. Which keys you use, and following their terms, is your
+  responsibility.
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling

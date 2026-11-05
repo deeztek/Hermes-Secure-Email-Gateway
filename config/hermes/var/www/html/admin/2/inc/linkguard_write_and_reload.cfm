@@ -87,12 +87,13 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
 <cfloop query="ss"><cfset cfg[ss.parameter] = (IsNull(ss.value2) ? "" : ss.value2)></cfloop>
 <cfset getC = function(k, d) { return (StructKeyExists(cfg, k) AND Len(cfg[k])) ? cfg[k] : d; }>
 
-<!--- decrypt GSB/VT API keys (stored AES/Base64 with hermes.key) --->
+<!--- decrypt Web Risk/GSB/VT API keys (stored AES/Base64 with hermes.key) --->
 <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="authkey">
 <cfset decKey = function(enc) {
     if (NOT Len(Trim(enc))) return "";
     try { return Decrypt(enc, authkey, "AES", "Base64"); } catch (any e) { return ""; }
 }>
+<cfset webriskKey = decKey(getC("webrisk_api_key", ""))>
 <cfset gsbKey = decKey(getC("gsb_api_key", ""))>
 <cfset vtKey  = decKey(getC("vt_api_key", ""))>
 <cfset urlhausKey = decKey(getC("urlhaus_auth_key", ""))>
@@ -184,8 +185,10 @@ Sets session.linkguardApplySuccess (boolean) and session.linkguardApplyError.
     "clicks_retention_days": Val(getC("clicks_retention_days","90")),
     "feed_urlhaus_enabled": (getC("feed_urlhaus_enabled","1") EQ "1"),
     "feed_openphish_enabled": (getC("feed_openphish_enabled","1") EQ "1"),
+    "webrisk_enabled": (getC("webrisk_enabled","0") EQ "1"),
     "gsb_enabled": (getC("gsb_enabled","0") EQ "1"),
     "vt_enabled": (getC("vt_enabled","0") EQ "1"),
+    "webrisk_api_key": webriskKey,
     "gsb_api_key": gsbKey,
     "vt_api_key": vtKey,
     "urlhaus_auth_key": urlhausKey,
