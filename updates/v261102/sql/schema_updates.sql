@@ -34,6 +34,21 @@ SELECT 'webrisk_api_key','','linkguard',1,1
  WHERE NOT EXISTS (SELECT 1 FROM `parameters2` WHERE `module`='linkguard' AND `parameter`='webrisk_api_key');
 
 -- ---------------------------------------------------------------------
+-- 3. Attachment Hash Blocklist (#386).
+-- FRESH-INSTALL: covered-by config/database/hermes_install.sql
+-- ---------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `attachment_hash_blocklist` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `sha256` char(64) NOT NULL,
+  `file_size` bigint(20) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `source` varchar(32) NOT NULL DEFAULT 'admin',
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_attachment_hash_sha256` (`sha256`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

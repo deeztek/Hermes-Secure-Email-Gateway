@@ -27,6 +27,10 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   paid subscription for it. Which keys you use, and following their terms, is your
   responsibility.
 
+- **Attachment Hash Blocklist (#386).** Block a known-bad attachment by its
+  SHA-256 hash under **Content Checks > Hash Blocklist**, including
+  inside archives. Matches follow your **Virus Messages** setting.
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling

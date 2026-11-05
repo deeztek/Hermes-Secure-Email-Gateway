@@ -109,6 +109,18 @@ CREATE TABLE IF NOT EXISTS `arc_sign` (
   UNIQUE KEY `uk_domain` (`domain`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- -------- attachment_hash_blocklist            [truncate] --------
+CREATE TABLE IF NOT EXISTS `attachment_hash_blocklist` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `sha256` char(64) NOT NULL,
+  `file_size` bigint(20) DEFAULT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `source` varchar(32) NOT NULL DEFAULT 'admin',
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uq_attachment_hash_sha256` (`sha256`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- bcc_maps                             [truncate] --------
 CREATE TABLE IF NOT EXISTS `bcc_maps` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
