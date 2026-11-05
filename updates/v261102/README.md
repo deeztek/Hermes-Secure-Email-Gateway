@@ -19,8 +19,9 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   no mail until then. See [Recipient Delivery: VERIFY](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/02-email-relay/domains.md#recipient-delivery-verify).
 
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
-  virus and banned-file mail without bouncing it, and the console warns about
-  backscatter under **Message Handling Policies**.
+  virus, banned-file, spam and bad-header mail without sending a notice to the
+  sender, and the console warns about backscatter under **Message Handling
+  Policies**. Existing installs keep their settings; see Upgrading.
 
 ## Bug fixes
 
@@ -46,6 +47,12 @@ Back up first, then run the standard upgrade:
 sudo ./scripts/system_update_docker.sh v261102
 ```
 
+- The upgrade does not change your Message Handling Policies. If any are set to
+  **Quarantine & Send DSN**, we recommend **Quarantine Only**: go to **Content
+  Checks > Antispam Settings > Message Handling Policies** and set **Virus
+  Messages**, **Banned File Messages**, **Spam Messages** and **Bad-Header
+  Messages** to **Quarantine Only**. Messages are quarantined either way, and
+  Hermes stops sending notices to forged senders.
 - No domain changes to VERIFY during the upgrade. Before you switch a domain,
   confirm its destination server refuses unknown recipients at `RCPT TO`.
 - Senders in Relay Networks skip VERIFY, and a catch-all on the domain makes
