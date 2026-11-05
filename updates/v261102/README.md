@@ -31,6 +31,13 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   SHA-256 hash under **Content Checks > Hash Blocklist**, including
   inside archives. Matches follow your **Virus Messages** setting.
 
+- **Nextcloud file scanning (#384).** Files uploaded to Nextcloud, including Talk
+  attachments, are now scanned by the ClamAV engine Hermes already runs, and
+  infected uploads are refused. Infected files already in storage are logged, not
+  deleted, and uploads are refused while ClamAV is unreachable. You can change
+  both in `security.conf`. Files over 25 MB are not fully scanned. See
+  [Nextcloud File Scanning](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/03-email-server/nextcloud-file-scanning.md).
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling
@@ -66,6 +73,8 @@ sudo ./scripts/system_update_docker.sh v261102
   Messages**, **Banned File Messages**, **Spam Messages** and **Bad-Header
   Messages** to **Quarantine Only**. Messages are quarantined either way, and
   Hermes stops sending notices to forged senders.
+- The upgrade installs the Nextcloud **Antivirus for files** app. Its background
+  scan then works through existing files, which adds some load on ClamAV at first.
 - No domain changes to VERIFY during the upgrade. Before you switch a domain,
   confirm its destination server refuses unknown recipients at `RCPT TO`.
 - Senders in Relay Networks skip VERIFY, and a catch-all on the domain makes

@@ -606,6 +606,24 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Scan Nextcloud uploads with Hermes's ClamAV (#384). Reads its two switches
+     from security.conf. Detached: installing an app can outlast this page's
+     request timeout. --->
+<cfset blockName = "nextcloud-files-antivirus-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfexecute name="/opt/hermes/scripts/nextcloud_antivirus_apply.sh" timeout="0" />
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (started in the background)")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
 

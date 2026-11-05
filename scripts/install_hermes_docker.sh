@@ -4647,6 +4647,11 @@ run_phase2_db_init() {
                 || log "    WARNING: $app install failed (may already be installed)"
         done
 
+        # Scan uploads with Hermes's ClamAV (#384).
+        bash "$HERMES_ROOT/config/hermes/opt/hermes/scripts/nextcloud_antivirus_apply.sh" >> "$LOG_FILE" 2>&1 \
+            && log "  Nextcloud file scanning configured" \
+            || log "  WARNING: Failed to configure Nextcloud file scanning"
+
         # Mail's importance classifier tags mail with $label1, which IMAP
         # clients show as "Important". Off by default for accounts created in
         # Mail's own UI; accounts Hermes creates are switched off per account
