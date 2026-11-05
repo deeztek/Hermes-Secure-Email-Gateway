@@ -248,9 +248,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <div class="mb-3" id="add_recipient_delivery_group">
             <label class="form-label"><strong>Recipient Delivery</strong></label>
             <select class="form-select" name="recipient_delivery">
-              <option value="OK" selected>ANY</option>
+              <option value="VERIFY" selected>VERIFY (Recommended)</option>
               <option value="">SPECIFIED</option>
+              <option value="OK">ANY (Catch-all)</option>
             </select>
+            <div class="form-text">
+              <strong>VERIFY</strong> asks the destination server whether each recipient exists
+              before accepting the message, and refuses unknown addresses. The destination
+              server must reject unknown recipients during the SMTP conversation.
+              <strong>SPECIFIED</strong> accepts only recipients listed in Hermes.
+              <strong>ANY</strong> accepts mail for every address at the domain, so mail to
+              addresses that don't exist bounces back to the (often forged) sender.
+            </div>
           </div>
         </div>
       </div>
@@ -369,6 +378,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <td>
               <cfif recipient_status is "OK">
                 <span class="badge bg-info">Any</span>
+              <cfelseif recipient_status is "VERIFY">
+                <span class="badge bg-success">Verify</span>
               <cfelse>
                 <span class="badge bg-secondary">Specified</span>
               </cfif>
@@ -458,9 +469,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <div class="mb-3" id="edit_recipient_delivery_group">
                   <label class="form-label"><strong>Recipient Delivery</strong></label>
                   <select class="form-select" name="recipient_delivery" id="edit_recipient_delivery">
-                    <option value="OK">ANY</option>
+                    <option value="VERIFY">VERIFY (Recommended)</option>
                     <option value="">SPECIFIED</option>
+                    <option value="OK">ANY (Catch-all)</option>
                   </select>
+                  <div class="form-text">
+                    VERIFY refuses unknown recipients by asking the destination server.
+                    ANY accepts every address, so unknown ones bounce to the sender.
+                  </div>
                 </div>
               </div>
               <div class="col-md-6" id="edit_destination_group">

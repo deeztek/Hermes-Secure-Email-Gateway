@@ -37,7 +37,12 @@ Expects: form.domain_name, form.delivery_method, form.recipient_delivery,
   <cflocation url="view_domains.cfm" addtoken="no">
 </cfif>
 
-<cfparam name="form.recipient_delivery" default="OK">
+<!--- VERIFY by default (#393): ANY is a catch-all and turns unknown
+     recipients into bounces. Anything unrecognized is treated as VERIFY. --->
+<cfparam name="form.recipient_delivery" default="VERIFY">
+<cfif NOT ListFind("OK,VERIFY", form.recipient_delivery) AND form.recipient_delivery NEQ "">
+  <cfset form.recipient_delivery = "VERIFY">
+</cfif>
 <cfparam name="form.destination_address" default="smtp.#domain_name#">
 <cfparam name="form.destination_port" default="25">
 <cfparam name="form.destination_mx" default="NO">

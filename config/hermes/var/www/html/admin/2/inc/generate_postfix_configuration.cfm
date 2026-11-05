@@ -153,6 +153,23 @@ timeout="10" />
     </cfif>
 </cfif>
 
+<!--- Recipient Delivery VERIFY (#393). The restriction points at
+     mysql-verify-recipients.cf, which the installer or the v261102 upgrade
+     script renders. A check_recipient_access whose map file is missing makes
+     Postfix defer ALL incoming mail, so the row is enabled only when the file
+     is there. Missing file: VERIFY domains behave like ANY until it exists. --->
+<cfset verifyMapUsable = FileExists("/etc/postfix/mysql-verify-recipients.cf")>
+<cfquery datasource="hermes">
+    UPDATE parameters
+    SET enabled = <cfqueryparam value="#verifyMapUsable ? 1 : 0#" cfsqltype="cf_sql_integer">
+    WHERE parameter = 'check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf'
+      AND parent_name = 'smtpd_recipient_restrictions' AND child = '1'
+</cfquery>
+<cfif NOT verifyMapUsable>
+    <cflog file="hermes" type="warning"
+           text="generate_postfix_configuration: /etc/postfix/mysql-verify-recipients.cf missing; Recipient Delivery VERIFY is off (domains set to VERIFY accept any recipient)">
+</cfif>
+
 <cfquery name="getparents" datasource="hermes">
   select distinct(parameter), parent_name, description, child, editable, enabled, conf_file from parameters where enabled='1' and child = '2' and module='postfix'
   </cfquery>

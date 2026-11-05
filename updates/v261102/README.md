@@ -1,0 +1,52 @@
+# Hermes SEG v261102
+
+## Synopsis
+
+This release adds **VERIFY** recipient delivery, which refuses mail for unknown
+recipients during the SMTP conversation instead of accepting it and bouncing it
+later. It also stops the Dovecot authentication crash after idle periods, stops
+Nextcloud Mail from adding its "Important" label, and fixes large messages
+bouncing after Hermes had accepted them. Upgrading is recommended.
+
+## New features
+
+- **Recipient Delivery: VERIFY (#393).** Hermes now asks the destination server
+  whether a recipient exists and refuses unknown recipients with `550`, without
+  keeping a recipient list. This stops backscatter from catch-all relay domains.
+  It is the new default for added domains. Existing domains keep their setting;
+  change them under **Email Relay > Domains**. A refused address stays refused
+  for **10 minutes**, so a mailbox created just after a failed attempt receives
+  no mail until then. See [Recipient Delivery: VERIFY](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/02-email-relay/domains.md#recipient-delivery-verify).
+
+- **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
+  virus and banned-file mail without bouncing it, and the console warns about
+  backscatter under **Message Handling Policies**.
+
+## Bug fixes
+
+- **Dovecot authentication could crash after being idle (#342).**
+
+- **Nextcloud Mail kept adding the "Important" label (#379).** The label is now
+  turned off for each mail account, and the upgrade removes it from existing mail.
+
+- **Large messages could bounce after Hermes accepted them (#396).** Internal
+  mail hops had smaller size limits than the edge. The limit in Perimeter Checks
+  now applies once, at the edge.
+
+- **The admin console showed a raw error when the login header was missing.** It
+  now shows an error page.
+
+- **The network alias refresh could fail when a DNS lookup returned nothing.**
+
+## Upgrading
+
+Back up first, then run the standard upgrade:
+
+```bash
+sudo ./scripts/system_update_docker.sh v261102
+```
+
+- No domain changes to VERIFY during the upgrade. Before you switch a domain,
+  confirm its destination server refuses unknown recipients at `RCPT TO`.
+- Senders in Relay Networks skip VERIFY, and a catch-all on the domain makes
+  every address pass.

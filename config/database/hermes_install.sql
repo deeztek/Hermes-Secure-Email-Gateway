@@ -1582,6 +1582,7 @@ INSERT IGNORE INTO `parameters` VALUES (477, 'smtp relay', NULL, NULL, NULL, NUL
 -- unique key on anything else, so nothing dedupes and nothing fails loudly.
 -- scripts/check_fresh_install_parity.sh now fails the commit if this moves back up.
 INSERT IGNORE INTO `parameters` (`parameter`, `name`, `module`, `editable`, `conf_file`, `description`, `parent`, `parent_name`, `child`, `order1`, `enabled`, `applied`, `action`) VALUES ('check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf', 'Internal Only Recipients Access Check', 'postfix', 0, 'main.cf', 'Rejects mail from outside your own domains to aliases marked Reachable By: internal only', NULL, 'smtpd_recipient_restrictions', 1, 1.150, 1, 1, 'NONE');
+INSERT IGNORE INTO `parameters` (`parameter`, `name`, `module`, `editable`, `conf_file`, `description`, `parent`, `parent_name`, `child`, `order1`, `enabled`, `applied`, `action`) SELECT 'check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf', 'Verify Recipients Access Check', 'postfix', 0, 'main.cf', 'Recipient Delivery VERIFY: asks the destination server whether a recipient exists before accepting mail (#393)', NULL, 'smtpd_recipient_restrictions', 1, 2.500, 1, 1, 'NONE' FROM DUAL WHERE NOT EXISTS (SELECT 1 FROM `parameters` WHERE `parameter` = 'check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf');
 
 -- -------- parameters2                          [scrub] --------
 CREATE TABLE IF NOT EXISTS `parameters2` (

@@ -57,7 +57,15 @@ Expects: form.domain_id, form.domain_name, form.delivery_method, form.recipient_
   </cfif>
 
   <!--- Validate recipient delivery --->
-  <cfparam name="form.recipient_delivery" default="OK">
+  <!--- OK = ANY, '' = SPECIFIED, VERIFY = ask the destination (#393).
+       Missing or unrecognized: keep what the domain has now. --->
+  <cfif NOT StructKeyExists(form, "recipient_delivery")
+        OR (NOT ListFind("OK,VERIFY", form.recipient_delivery) AND form.recipient_delivery NEQ "")>
+    <cfquery name="getCurrentDelivery" datasource="hermes">
+      SELECT status FROM recipients WHERE id = <cfqueryparam value="#theRecipientID#" cfsqltype="cf_sql_integer">
+    </cfquery>
+    <cfset form.recipient_delivery = getCurrentDelivery.status>
+  </cfif>
   <cfparam name="form.destination_mx" default="NO">
   <cfparam name="form.destination_authentication" default="NO">
 

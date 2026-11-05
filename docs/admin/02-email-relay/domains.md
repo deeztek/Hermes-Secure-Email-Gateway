@@ -150,7 +150,7 @@ save, and the cascade always runs to completion.
 | `domains` | One row per relay domain | `type` column gates which admin page edits the row (`relay`, NULL/empty = relay; anything else = managed elsewhere). `id`, `transport_id`, `senders_id`, `recipients_id` are the join keys. |
 | `transport` | One row per domain delivery target | `transport` column holds the Postfix-formatted string (`smtp:[host]:port` or `smtp:host:port` for MX-lookup mode, or `discard:Discard Email Silently`). `authentication = YES` toggles per-domain SASL. `authentication_username` / `authentication_password` are AES/Base64 encrypted with `/opt/hermes/keys/hermes.key`. |
 | `senders` | One row per domain (sender = domain, action = `OK`) | Used by Postfix `smtpd_sender_restrictions` to recognise the domain as a known sender. |
-| `recipients` | One row per domain (recipient = `@domain`, `domain='1'`) | `status = OK` = accept mail for any address (recipient_delivery = ANY). `status = ''` = require an entry in [Relay Recipients](relay-recipients.md) (recipient_delivery = SPECIFIED). The default `spam_policies` policy is attached so Amavis applies SVF filtering. |
+| `recipients` | One row per domain (recipient = `@domain`, `domain='1'`) | `status = OK` = accept mail for any address (recipient_delivery = ANY). `status = ''` = require an entry in [Relay Recipients](relay-recipients.md) (recipient_delivery = SPECIFIED). `status = VERIFY` = ask the destination server at SMTP time (recipient_delivery = VERIFY). The default `spam_policies` policy is attached so Amavis applies SVF filtering. |
 | `tls_policies` | Optional, one row per domain | Auto-managed: created with `method=encrypt` when **Enforce TLS** is on and Auth is YES; removed when either is turned off. Manually-added policies (different `description`) are untouched. |
 | `dkim_sign` | Optional, one or more rows per domain | DKIM keys live separately; managed under the per-row **DKIM Keys** button (`edit_domain_dkim.cfm`). DKIM badge in the table reports `Active` / `Disabled` / `None` based on `enabled = '1'` counts. |
 
@@ -162,7 +162,7 @@ save, and the cascade always runs to completion.
 |---|---|---|
 | **Domain Name** | (empty) | Trimmed, lower-cased, validated by the email-trick. Uniqueness checked against `domains.domain` — duplicates rejected with error 12. Stored as-is on the row. |
 | **Delivery Method** | `SMTP (Recommended)` | `smtp` forwards via the destination address; `discard` writes `discard:Discard Email Silently` into the transport row and accepts mail only to drop it. Useful for honeypot or sunset domains. |
-| **Recipient Delivery** | `ANY` | `OK` = accept any recipient at the domain. `""` = SPECIFIED — only addresses listed under [Relay Recipients](relay-recipients.md) are accepted; everything else is rejected at SMTP time with `relay_recipient_maps`. |
+| **Recipient Delivery** | `VERIFY (Recommended)` | `VERIFY` = ask the destination server whether each recipient exists and refuse unknown ones at SMTP time; see [Recipient Delivery: VERIFY](#recipient-delivery-verify). `""` = SPECIFIED: only addresses listed under [Relay Recipients](relay-recipients.md) are accepted; everything else is rejected at SMTP time with `relay_recipient_maps`. `OK` = ANY (Catch-all): accept any recipient at the domain. Unknown recipients are then accepted and bounced later, which sends backscatter to forged senders. |
 | **Destination Address** | `smtp.<domain>` (placeholder) | FQDN or IP of the downstream MX/smarthost. Lower-cased. Required when method = `smtp`. |
 | **Port** | `25` | Free-text but validated as integer. No range cap on this page (vs. Relay Host's explicit 1–65535) but Postfix will reject out-of-range. |
 | **MX Lookup** | `NO` | `NO` writes a bracketed transport `smtp:[host]:port` (Postfix skips MX, connects directly). `YES` writes unbracketed `smtp:host:port` (Postfix resolves MX records). MX mode is **automatically forced off** when Auth = YES, because authenticated submission with MX rotation rarely makes sense. |
@@ -183,7 +183,7 @@ and page-size choices persist across reloads). Columns:
 | Destination | `transport.destination` | Dash for discard rows |
 | Port | `transport.port` | Dash for discard |
 | MX | `transport.mx` | Dash for discard |
-| Recipients | `recipients.status` | `Any` (info) when `OK`, `Specified` (secondary) otherwise |
+| Recipients | `recipients.status` | `Any` (info) when `OK`, `Verify` (success) when `VERIFY`, `Specified` (secondary) otherwise |
 | Auth | `transport.authentication` | `YES` (warning) or `NO` (secondary) |
 | DKIM | aggregated from `dkim_sign` | `Active` when any enabled key, `Disabled` when keys exist but all disabled, `None` when no keys |
 | TLS | derived from `tls_policies.domain` join | `YES` (success) when a policy exists for the domain, `NO` (secondary) otherwise |
@@ -253,6 +253,46 @@ transport (typical for outbound mail to arbitrary recipients).
 > mutually exclusive, but the consolidated SASL generator handles
 > both cleanly, so the constraint was relaxed. The alert is kept
 > in case a future tightening reintroduces the rule.
+
+## Recipient Delivery: VERIFY
+
+With **VERIFY**, Hermes checks each recipient with the destination server
+before accepting the message. It opens a connection, offers the recipient,
+and disconnects without sending a message. If the destination refuses the
+recipient, Hermes refuses the message during the SMTP conversation with
+`550`, so Hermes never accepts it and never sends a bounce. You don't have
+to keep a recipient list on Hermes.
+
+The destination server must refuse unknown recipients at `RCPT TO`. If it
+accepts every address and bounces later, VERIFY accepts every address too.
+
+### Timing
+
+| Situation | What the sender sees |
+|---|---|
+| First message to an address | A wait of a few seconds while Hermes checks |
+| Address checked and valid | No wait. The result is reused for up to 7 days, then rechecked in the background. |
+| Address checked and refused | `550` for the next **10 minutes**, without a new check |
+| Address refused more than 10 minutes ago | A new check, with the same few seconds' wait |
+| Destination server unreachable or answering with a temporary error | A temporary error, and the sender retries later |
+
+**Important:** a `550` is permanent, and the sender does not retry it. If
+you create a mailbox or alias for an address that was refused in the last
+10 minutes, mail sent to it is still refused until those 10 minutes pass.
+When you create an address and test it right away after a failed attempt,
+wait 10 minutes before you send the test.
+
+An address that is removed from the destination server can keep passing the
+check for up to 7 days. Mail to it is accepted and bounced, the same as with
+**ANY**.
+
+### What can affect the result
+
+- **Catch-all:** a catch-all on the domain ([Virtual Recipients](virtual-recipients.md)) makes every address pass, because the check follows the alias.
+- **Relay Networks:** senders in [Relay Networks](relay-networks.md) skip this check, along with the other recipient checks.
+- **Authenticated senders:** users logged in over SMTP skip this check too.
+- **Destination errors:** any permanent error from the destination during the check refuses the message, even if the reason has nothing to do with the recipient. The check uses the null sender (`<>`), which mail servers must accept for bounces. A destination that refuses the null sender can't use VERIFY, because every recipient fails. If real recipients are refused, look at the destination's reply in the mail log.
+- **Hybrid domains:** a local mailbox is checked against Hermes, and a relay recipient is checked against the destination server.
 
 ## Discard delivery
 

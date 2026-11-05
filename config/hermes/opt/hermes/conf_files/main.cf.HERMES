@@ -24,8 +24,21 @@ transport_maps = mysql:/etc/postfix/mysql-transport.cf
 relay_domains = mysql:/etc/postfix/mysql-domains.cf
 recipient_delimiter =
 smtpd_helo_required = yes
-smtpd_recipient_restrictions = permit_mynetworks, check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf, check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf, reject_unauth_destination, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain
+smtpd_recipient_restrictions = permit_mynetworks, check_recipient_access mysql:/etc/postfix/mysql-discard-recipients.cf, check_recipient_access mysql:/etc/postfix/mysql-internal-only-recipients.cf, reject_unauth_destination, check_recipient_access mysql:/etc/postfix/mysql-verify-recipients.cf, check_sender_access mysql:/etc/postfix/mysql-senders.cf, reject_invalid_hostname, reject_unauth_pipelining, reject_non_fqdn_sender, reject_unknown_sender_domain, reject_non_fqdn_recipient, reject_unknown_recipient_domain
 smtpd_data_restrictions = reject_unauth_pipelining
+# Recipient Delivery VERIFY (#393): unknown recipients on VERIFY domains are
+# refused at RCPT time with 550 instead of bouncing after acceptance.
+# A failed probe EXPIRES after 10 minutes rather than only being refreshed: a
+# refresh still answers from the old failure while it re-probes, and a 550 is
+# permanent, so that one message would be lost. An expired entry is probed
+# fresh and the client waits a few seconds for the real answer.
+# Probes use the null sender: the default double-bounce@$myorigin does not
+# exist downstream, and a server that checks senders refuses it, which fails
+# the probe and rejects a valid recipient.
+unverified_recipient_reject_code = 550
+address_verify_negative_expire_time = 10m
+address_verify_negative_refresh_time = 10m
+address_verify_sender = <>
 header_checks = regexp:/etc/postfix/regexp_header_checks
 body_checks = pcre:/etc/postfix/body_checks
 content_filter = amavis:[hermes_mail_filter]:10021
