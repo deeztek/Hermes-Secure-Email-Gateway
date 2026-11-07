@@ -118,6 +118,68 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <p class="mb-0">The source password is stored encrypted and deleted when the import finishes or is stopped. Check that the mailbox quota can hold the source account before you start.</p>
 </div>
 
+<!-- Troubleshooting Commands (collapsible, same pattern as Intrusion Prevention) -->
+<div class="card card-outline card-secondary mb-4">
+    <div class="card-header">
+        <h3 class="card-title">
+            <button type="button" class="btn btn-sm btn-outline-secondary me-2" id="toggleMiTroubleshoot" title="Expand">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+            <i class="fas fa-terminal"></i> Troubleshooting Commands
+        </h3>
+    </div>
+    <div class="collapse" id="miTroubleshoot">
+        <div class="card-body">
+        <p class="mb-2">Run these commands on the Docker host. Replace <code>user@domain.tld</code> with the Hermes mailbox and <code>imap.domain.tld</code> with the source server.</p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40%;">Command</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>docker top hermes_dovecot | grep -E 'hermes_mail_import|mail_import_run'</code></td>
+                        <td>Show import processes. A running import has a <code>mail_import_run.sh work</code> line and a <code>doveadm</code> line. Nothing printed means no import is running</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_dovecot sh -c 'cat /logs/mail_import/*.progress'</code></td>
+                        <td>Show the message counts of a running import, refreshed every minute</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_dovecot sh -c 'tail -n 50 /logs/mail_import/*.log'</code></td>
+                        <td>Show doveadm output of a running import. The file is removed once the result is recorded under <strong>Recent Runs</strong></td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_dovecot doveadm mailbox status -u user@domain.tld messages '*'</code></td>
+                        <td>Show the message count of each folder in the Hermes mailbox</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_dovecot doveadm quota get -u user@domain.tld</code></td>
+                        <td>Show quota usage and limit of the Hermes mailbox, in KB</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_dovecot timeout 5 bash -c '&lt;/dev/tcp/imap.domain.tld/993' &amp;&amp; echo open</code></td>
+                        <td>Check that Hermes can reach the source server. Use <code>143</code> for STARTTLS or no encryption</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker logs hermes_ofelia --tail 100 | grep mail-import</code></td>
+                        <td>Check that the scheduler runs <code>hermes-mail-import</code> every minute</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_commandbox curl --silent http://localhost:8888/schedule/mail_import.cfm</code></td>
+                        <td>Run the scheduler once now, without waiting for the next minute</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted mt-2 mb-0"><small><i class="fas fa-info-circle"></i> <strong>Note:</strong> The error of a failed run is shown under <strong>Recent Runs</strong> and in the failure e-mail sent to the administrator.</small></p>
+        </div>
+    </div>
+</div>
+
 <cfquery name="getJobs" datasource="hermes">
   SELECT j.id, j.mailbox_id, j.source_host, j.source_port, j.source_ssl, j.verify_cert, j.source_username,
          j.exclude_folders, j.folder_prefix, j.imapc_features, j.since_days, j.max_message_mb, j.io_timeout,
@@ -515,6 +577,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   }, 30000);
 
   $(document).ready(function() {
+    // Troubleshooting Commands collapsible (chevron down/up)
+    $('#toggleMiTroubleshoot').on('click', function() { $('#miTroubleshoot').collapse('toggle'); });
+    $('#miTroubleshoot').on('shown.bs.collapse', function() {
+      $('#toggleMiTroubleshoot').find('i').removeClass('fa-chevron-down').addClass('fa-chevron-up');
+      $('#toggleMiTroubleshoot').attr('title', 'Collapse');
+    });
+    $('#miTroubleshoot').on('hidden.bs.collapse', function() {
+      $('#toggleMiTroubleshoot').find('i').removeClass('fa-chevron-up').addClass('fa-chevron-down');
+      $('#toggleMiTroubleshoot').attr('title', 'Expand');
+    });
     $('#importTable').DataTable({
       "order": [],
       "pageLength": 25,
