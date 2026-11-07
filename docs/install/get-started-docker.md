@@ -341,8 +341,20 @@ Beyond the gateway itself, DNS is what makes mail actually arrive. The install s
 | `A` for the mail hostname | Hermes public IP | Resolves the MX target |
 | Reverse DNS (PTR) for the IP | The mail hostname | Outbound deliverability; most receivers reject mismatched PTR |
 | `SPF` for each sending domain | Includes Hermes IP | Authenticates outbound; reduces spam-folder rate |
+| `SPF` for the mail hostname | TXT at the mail hostname: `v=spf1 a -all` | Lets bounce notices reach Gmail and other strict receivers |
 | `DKIM` selector → public key | Generated under Content Checks → DKIM Settings | Cryptographic signing of outbound |
 | `DMARC` policy | TXT at `_dmarc.example.com` | Defines what receivers do with SPF/DKIM failures |
+
+**Important:** The SPF record on the mail hostname is separate from the SPF record on your domains, and listing the mail hostname in a domain's record does not replace it. A bounce notice has an empty sender, so receivers check the name the server introduces itself with instead of your domain. Without a record on that name, Gmail refuses the bounce with `550 5.7.26` and the sender is never told their message failed. Normal mail is not affected.
+
+To find the mail hostname and check for a record, run the first command on the Hermes host, then run the second with the name it prints in place of `mail.example.com`:
+
+```bash
+docker exec hermes_postfix_dkim postconf -h myhostname
+dig +short TXT mail.example.com
+```
+
+The second command should print `"v=spf1 a -all"`. The `a` allows the IP address in the mail hostname's `A` record, so the hostname needs that `A` record too.
 
 ### Antispam Settings (Pyzor / Razor / Bayes) *(all topologies)*
 **Page**: Content Checks → **Antispam Settings** (both the on/off switches and the one-time actions)

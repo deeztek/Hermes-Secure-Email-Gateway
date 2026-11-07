@@ -165,13 +165,22 @@ function auth_userdb_lookup(req)
 
     local username, domain = split_user(req.user)
     local home = "/srv/mail/" .. domain .. "/" .. username
-    return dovecot.auth.USERDB_RESULT_OK, {
-        home       = home,
-        mail       = "maildir:" .. home,
-        uid        = "1000",
-        gid        = "1000",
-        quota_rule = "*:bytes=" .. tostring(row.quota)
+    local fields = {
+        home = home,
+        mail = "maildir:" .. home,
+        uid  = "1000",
+        gid  = "1000"
     }
+
+    -- Dovecot 2.4 replaced quota_rule with quota_storage_size (#397). It
+    -- ignores quota_rule without complaint, so a limit sent the old way is
+    -- never applied. No field, or 0, means unlimited.
+    local quota = tonumber(row.quota)
+    if quota and quota > 0 then
+        fields.quota_storage_size = string.format("%.0fB", quota)
+    end
+
+    return dovecot.auth.USERDB_RESULT_OK, fields
 end
 
 -- Used by doveadm -A and anything else that lists users. Same set as the

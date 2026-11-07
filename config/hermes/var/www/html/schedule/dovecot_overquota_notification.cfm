@@ -78,7 +78,7 @@
 
           <p>
 
-            Your mailbox <b>(jsmith@example.com)</b> has reached <b>100%</b> usage. You will no longer be able to send or receive e-mail until you bring the usage below 100% by deleting unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>0.02 GB</b> of storage quota. If you need additional storage please contact to your Administrator.
+            Your mailbox <b>(#url.user#)</b> has reached <b>100%</b> usage. You will no longer be able to send or receive e-mail until you bring the usage below 100% by deleting unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>0.02 GB</b> of storage quota. If you need additional storage please contact your Administrator.
 
         
      </p>
@@ -92,7 +92,7 @@
 
 
          <cfmailparam
-         file="/opt/hermes/email/hermes_top_banner_email.png"
+         file="/var/www/html/dist/img/hermes_logo_new_orange2.png"
          contentid="hermeslogo"
          disposition="inline"
          />
@@ -152,7 +152,7 @@
           <h2>Mailbox Quota Notification for #getuserdetails.name#</h2>
     
           <p>
-            Your mailbox <b>(#url.user#)</b> has reached <b>#url.percent#%</b> usage. Once your mailbox reaches 100% usage you will no longer be able to send or receive e-mail. Please delete unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>#Numberformat (mailboxsize, '____.__')# GB</b> of storage quota. If you need additional storage please contact to your Administrator.
+            Your mailbox <b>(#url.user#)</b> has reached <b>#Abs(Val(url.percent))#%</b> usage. Once your mailbox reaches 100% usage you will no longer be able to send or receive e-mail. Please delete unnecessary messages from your mailbox including the <b>Trash</b> folder. Your mailbox has <b>#Numberformat (mailboxsize, '____.__')# GB</b> of storage quota. If you need additional storage please contact your Administrator.
  
        
     </p>
@@ -167,7 +167,7 @@
 
 
         <cfmailparam
-        file="/opt/hermes/email/hermes_top_banner_email.png"
+        file="/var/www/html/dist/img/hermes_logo_new_orange2.png"
         contentid="hermeslogo"
         disposition="inline"
         />
@@ -244,7 +244,7 @@ table.bottomBorder td, table.bottomBorder th { border-bottom:1px dotted black;pa
 
 
     <cfmailparam
-    file="/opt/hermes/email/hermes_top_banner_email.png"
+    file="/var/www/html/dist/img/hermes_logo_new_orange2.png"
     contentid="hermeslogo"
     disposition="inline"
     />

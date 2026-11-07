@@ -45,6 +45,12 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
 
 ## Bug fixes
 
+- **Mailbox quotas were not being enforced (#397).** The limit set on a mailbox
+  stopped reaching Dovecot when Hermes moved to Dovecot 2.4, so mailboxes could
+  grow past it and quota warnings were not sent. Limits now apply again. The
+  quota warning e-mails also no longer show a sample address or a plus sign in
+  the percentage.
+
 - **Dovecot authentication could crash after being idle (#342).**
 
 - **Nextcloud Mail kept adding the "Important" label (#379).** The label is now
@@ -73,6 +79,15 @@ sudo ./scripts/system_update_docker.sh v261102
   Messages**, **Banned File Messages**, **Spam Messages** and **Bad-Header
   Messages** to **Quarantine Only**. Messages are quarantined either way, and
   Hermes stops sending notices to forged senders.
+- **Mailbox quotas are enforced again after the upgrade (#397).** A mailbox
+  already over its limit stops accepting new mail. Before upgrading, run
+  `docker exec hermes_dovecot doveadm quota get -A` to list each mailbox's usage
+  in KB, compare it with the **Quota** column under **Email Server > Mailboxes**,
+  and raise any quota that is too low.
+- **Publish an SPF record on your mail hostname if it does not have one.** With
+  quotas enforced, mail to a full mailbox is bounced to the sender, and Gmail
+  refuses bounces from a hostname with no SPF record. See
+  [DNS for Mail Flow](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/install/get-started-docker.md#dns-for-mail-flow-all-topologies).
 - The upgrade installs the Nextcloud **Antivirus for files** app. Its background
   scan then works through existing files, which adds some load on ClamAV at first.
 - No domain changes to VERIFY during the upgrade. Before you switch a domain,
