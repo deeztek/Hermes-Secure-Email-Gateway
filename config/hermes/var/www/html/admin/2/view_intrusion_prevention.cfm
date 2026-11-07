@@ -851,6 +851,37 @@ $(document).ready(function() {
             </table>
         </div>
 
+        <p class="mt-3 mb-2"><strong>Ban and Unban from the Command Line</strong> <small class="text-muted">(replace <code>203.0.113.10</code> with the IP address)</small></p>
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 40%;">Command</th>
+                        <th>Description</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>docker exec hermes_fail2ban fail2ban-client banned 203.0.113.10</code></td>
+                        <td>Show which jails currently ban the IP</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_fail2ban fail2ban-client set dovecot banip 203.0.113.10</code></td>
+                        <td>Ban the IP in one enabled jail: <code>dovecot</code>, <code>postfix</code> or <code>authelia</code></td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_fail2ban fail2ban-client set dovecot unbanip 203.0.113.10</code></td>
+                        <td>Unban the IP from one jail</td>
+                    </tr>
+                    <tr>
+                        <td><code>docker exec hermes_fail2ban fail2ban-client unban 203.0.113.10</code></td>
+                        <td>Unban the IP from every jail, for example when the Hermes console is unreachable</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="text-muted mt-2 mb-0"><small><i class="fas fa-info-circle"></i> <strong>Note:</strong> Command line bans and unbans are recorded in Hermes and show in the banned list as automatic bans. A ban expires after the jail's ban time. To keep an IP from being banned, add it to the whitelist on this page.</small></p>
+
         <p class="mt-3 mb-2"><strong>iptables Commands</strong> <small class="text-muted">(use the command that matches your system's iptables backend)</small></p>
         <div class="table-responsive">
             <table class="table table-sm table-bordered mb-0">
