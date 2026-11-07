@@ -986,6 +986,47 @@ INSERT IGNORE INTO `intrusion_prevention_whitelist` (`id`, `ip_cidr`, `descripti
 INSERT IGNORE INTO `intrusion_prevention_whitelist` (`id`, `ip_cidr`, `description`, `created_at`) VALUES (4,'127.0.0.1/8','Localhost IPv4','2026-01-23 12:36:54');
 
 -- keywords: classified `drop` (omitted entirely; schema_updates.sql may also DROP IF EXISTS)
+-- -------- mail_import_jobs, mail_import_runs (#356) --------
+CREATE TABLE IF NOT EXISTS `mail_import_jobs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `mailbox_id` int(11) NOT NULL,
+  `source_host` varchar(255) NOT NULL,
+  `source_port` int(11) NOT NULL DEFAULT 993,
+  `source_ssl` varchar(16) NOT NULL DEFAULT 'imaps',
+  `verify_cert` tinyint(3) NOT NULL DEFAULT 1,
+  `source_username` varchar(255) NOT NULL,
+  `source_password` text DEFAULT NULL,
+  `exclude_folders` text DEFAULT NULL,
+  `folder_prefix` varchar(100) DEFAULT NULL,
+  `imapc_features` varchar(255) DEFAULT NULL,
+  `since_days` int(11) NOT NULL DEFAULT 0,
+  `max_message_mb` int(11) NOT NULL DEFAULT 0,
+  `io_timeout` int(11) NOT NULL DEFAULT 600,
+  `mode` varchar(16) NOT NULL DEFAULT 'once',
+  `interval_minutes` int(11) NOT NULL DEFAULT 60,
+  `status` varchar(16) NOT NULL DEFAULT 'queued',
+  `next_run_at` datetime DEFAULT NULL,
+  `last_error` text DEFAULT NULL,
+  `created_at` datetime DEFAULT current_timestamp(),
+  PRIMARY KEY (`id`),
+  KEY `idx_mail_import_jobs_status` (`status`,`next_run_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+CREATE TABLE IF NOT EXISTS `mail_import_runs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `job_id` int(11) NOT NULL,
+  `token` char(32) NOT NULL,
+  `started_at` datetime DEFAULT NULL,
+  `ended_at` datetime DEFAULT NULL,
+  `exit_code` int(11) DEFAULT NULL,
+  `messages_before` bigint(20) DEFAULT NULL,
+  `messages_after` bigint(20) DEFAULT NULL,
+  `error_text` text DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `idx_mail_import_runs_job` (`job_id`),
+  KEY `idx_mail_import_runs_open` (`ended_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- mailbox_aliases                      [truncate] --------
 CREATE TABLE IF NOT EXISTS `mailbox_aliases` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -1440,6 +1481,18 @@ SELECT '[job-exec "hermes-directory-sync"]',
        'hermes_commandbox', NULL, NULL, NULL, NULL, 'hermes', 1, 1
 WHERE NOT EXISTS (
   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-directory-sync"]'
+);
+
+-- #356 Mail Import. One shared job starts due imports and records results.
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `image`, `user`, `volume`, `network`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec "hermes-mail-import"]',
+       'Starts due Mail Import jobs and records the result of finished ones.',
+       '@every 1m',
+       '/usr/bin/curl --silent http://localhost:8888/schedule/mail_import.cfm',
+       'hermes_commandbox', NULL, NULL, NULL, NULL, 'hermes', 1, 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-mail-import"]'
 );
 
 -- -------- org_signatures                       [truncate] --------

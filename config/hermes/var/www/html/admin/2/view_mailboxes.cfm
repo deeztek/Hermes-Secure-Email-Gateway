@@ -82,6 +82,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfinclude template="./inc/delete_mailbox_action.cfm">
 <cfelseif action is "rotate_nc_password">
   <cfinclude template="./inc/rotate_nc_password_action.cfm">
+<cfelseif action is "sync_nextcloud_mail">
+  <cfinclude template="./inc/sync_nextcloud_mail_action.cfm">
 <cfelseif action is "resend_mobile_setup">
   <cfinclude template="./inc/admin_resend_mobile_setup_action.cfm">
 </cfif>
@@ -210,6 +212,28 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Rotation Failed</h4>
     <p class="mb-0">Could not rotate the NC internal password. <cfif StructKeyExists(session, "rotateNcError")><cfoutput>Details: #HTMLEditFormat(session.rotateNcError)#</cfoutput><cfset session.rotateNcError = ""></cfif></p>
+  </div>
+<cfelseif m EQ 56>
+  <div class="alert alert-warning alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-exclamation-triangle"></i> Not Applicable</h4>
+    This mailbox does not have Nextcloud enabled, so there is no Nextcloud Mail account to sync.
+  </div>
+<cfelseif m EQ 57>
+  <cfset syncedNcUser = StructKeyExists(session, "syncNcUser") ? session.syncNcUser : "">
+  <cfset session.syncNcUser = "">
+  <div class="alert alert-success alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-check"></i> Nextcloud Mail Sync Started</h4>
+    <p class="mb-0">Sync started for <strong><cfoutput>#HTMLEditFormat(syncedNcUser)#</cfoutput></strong>. It runs in the background and can take a while on a large mailbox. Reload Nextcloud Mail to see new folders.</p>
+  </div>
+<cfelseif m EQ 58>
+  <cfset syncedNcUser = StructKeyExists(session, "syncNcUser") ? session.syncNcUser : "">
+  <cfset session.syncNcUser = "">
+  <div class="alert alert-danger alert-dismissible">
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <h4><i class="icon fa fa-ban"></i> Sync Failed</h4>
+    <p class="mb-0">No Nextcloud Mail account was found for <strong><cfoutput>#HTMLEditFormat(syncedNcUser)#</cfoutput></strong>, or Nextcloud could not be reached.</p>
   </div>
 <cfelseif m EQ 60>
   <cfset sendAsTarget = StructKeyExists(session, "sendAsTarget") ? session.sendAsTarget : "">
@@ -601,6 +625,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <li><a class="dropdown-item" href="view_mailbox_app_passwords.cfm?mailbox_id=#id#"><i class="fas fa-key me-2"></i>Manage App Passwords</a></li>
                 <li><a class="dropdown-item" href="##" onclick="confirmResendMobileSetup(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-mobile-alt me-2"></i>Send Mobile Setup Profile</a></li>
                 <cfif Val(mb_nextcloud) EQ 1>
+                  <li><a class="dropdown-item" href="##" onclick="syncNextcloudMail(#id#); return false;"><i class="fas fa-rotate me-2"></i>Sync Nextcloud Mail</a></li>
                   <li><a class="dropdown-item" href="##" onclick="confirmRotateNcPassword(#id#, '#JSStringFormat(username)#'); return false;"><i class="fas fa-sync-alt me-2"></i>Rotate NC Internal Password</a></li>
                 </cfif>
                 <li><hr class="dropdown-divider"></li>
@@ -1302,6 +1327,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </div>
 </div>
 
+<!--- SYNC NEXTCLOUD MAIL (#356). Posted by the row action; no form in the table cell. --->
+<form method="post" action="view_mailboxes.cfm" id="syncNcMailForm">
+  <input type="hidden" name="action" value="sync_nextcloud_mail">
+  <input type="hidden" name="sync_mailbox_id" id="syncNcMailboxId">
+</form>
+
 <!--- ROTATE NC INTERNAL PASSWORD CONFIRMATION MODAL (#197 Phase 1) --->
 <div class="modal fade" id="rotateNcPasswordModal" tabindex="-1">
   <div class="modal-dialog">
@@ -1693,6 +1724,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   }
 
   // Confirm rotate NC internal password (#197 Phase 1)
+  function syncNextcloudMail(mailboxId) {
+    $('#syncNcMailboxId').val(mailboxId);
+    $('#syncNcMailForm').submit();
+  }
+
   function confirmRotateNcPassword(mailboxId, email) {
     $('#rotateNcMailboxId').val(mailboxId);
     $('#rotateNcMailboxEmail').text(email);

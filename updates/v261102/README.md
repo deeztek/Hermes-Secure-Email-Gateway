@@ -38,6 +38,13 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   both in `security.conf`. Files over 25 MB are not fully scanned. See
   [Nextcloud File Scanning](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/03-email-server/nextcloud-file-scanning.md).
 
+- **Mail Import (#356).** Copy mail from another IMAP server into a Hermes
+  mailbox under **Email Server > Mail Import**, once or repeatedly until cutover.
+  Mail already in the Hermes mailbox is kept. A new **Sync Nextcloud Mail** action
+  under **Email Server > Mailboxes** shows imported folders in Nextcloud Mail
+  straight away. See
+  [Mail Import](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/03-email-server/mail-import.md).
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling

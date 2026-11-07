@@ -408,6 +408,14 @@ and DAV/IMAP go through app passwords. This admin action lets the
 admin re-randomize on demand without touching the user's actual
 credentials.
 
+## Sync Nextcloud Mail
+
+Available when the mailbox has Nextcloud enabled. Click **Actions > Sync
+Nextcloud Mail** to refresh the mailbox's folders in Nextcloud Mail now, for
+example after a [Mail Import](mail-import.md). It runs in the background and
+changes no passwords. Without it, Nextcloud Mail refreshes on its own within 15
+minutes to a few hours, depending on how recently the user opened it.
+
 ## Delete
 
 Cascading delete that mirrors the create pipeline in reverse, with
