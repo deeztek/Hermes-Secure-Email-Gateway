@@ -45,6 +45,9 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
   straight away. See
   [Mail Import](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/admin/03-email-server/mail-import.md).
 
+- **Quota usage on the Mailboxes page (#398).** The **Quota** column now shows
+  usage, limit and percentage for each mailbox, and turns red at 90%.
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling

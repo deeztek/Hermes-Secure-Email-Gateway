@@ -198,7 +198,7 @@ columns:
 | Display Name | `mailboxes.name` | |
 | Send As | correlated subquery on `sender_login_maps` | One chip per granted address. Self-rows are excluded, since every mailbox has one and it is not an alternate identity. See [Send As modal](#send-as-modal) |
 | Domain | join on `domains.domain` | |
-| Quota | `mailboxes.quota / 1024 / 1024 / 1024` | Rendered in GB |
+| Quota | `quota2.bytes` and `mailboxes.quota` | Usage, limit and percentage, for example `2.3 GB of 5 GB (47%)`. Red at 90% or more. Sorts by percentage |
 | Auth | `recipients.auth_type` | `LOCAL` badge or `REMOTE` badge (tooltip shows `remoteauth_domain`) |
 | 2FA | LDAP `cn=two_factor` + `enforce_mfa` | Two independent pills — see [Two-pill 2FA column](#two-pill-2fa-column) |
 | Policy | `spam_policies.policy_name` | |

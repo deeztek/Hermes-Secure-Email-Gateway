@@ -369,6 +369,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="getMailboxes" datasource="hermes">
     SELECT m.id, m.username, m.name, m.quota, m.active, m.created, m.modified, m.domain_id,
            m.nextcloud_enabled AS mb_nextcloud,
+           COALESCE(q.bytes, 0) AS used_bytes,
            d.domain, d.default_quota_mb, d.type AS domain_type,
            COALESCE(dt.transport, '') AS domain_transport,
            /* Where this mailbox's mail actually goes, decided once here so the
@@ -407,6 +408,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     FROM mailboxes m
     INNER JOIN domains d ON m.domain_id = d.id AND d.type IN ('mailbox', 'hybrid')
     LEFT JOIN transport dt ON dt.id = d.transport_id
+    LEFT JOIN quota2 q ON q.username = m.username
     LEFT JOIN recipients r ON r.recipient = m.username
     LEFT JOIN spam_policies sp ON sp.policy_id = r.policy_id
     LEFT JOIN user_settings us ON us.email = m.username
@@ -605,6 +607,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <tbody>
         <cfoutput query="getMailboxes">
         <cfset quotaGb = quota / 1024 / 1024 / 1024>
+        <cfset usedGb = Val(used_bytes) / 1024 / 1024 / 1024>
+        <cfset quotaPct = quota GT 0 ? Round(Val(used_bytes) / quota * 100) : 0>
         <cfset hasPendingJobs = StructKeyExists(pendingJobMap, username)>
         <cfset recipientLdapUser = ldap_username NEQ "" ? LCase(ldap_username) : LCase(username)>
         <cfset isTwoFactor = twoFactorMembers CONTAINS "cn=#recipientLdapUser#,ou=users,dc=hermes,dc=local">
@@ -736,12 +740,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <div class="small text-muted"><em>this mailbox receives nothing</em></div>
             </cfif>
           </td>
-          <td>
+          <td data-order="#quotaPct#" class="#quotaPct GTE 90 ? 'text-danger' : ''#">
+            #NumberFormat(usedGb, usedGb GTE 1 ? "0.0" : "0.00")# GB of
             <cfif quotaGb GTE 1>
               <cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB
             <cfelse>
               #NumberFormat(quotaGb, "0.00")# GB
             </cfif>
+            (#quotaPct#%)
           </td>
           <!--- The RemoteAuth connection was only in a title attribute, so
                 which directory a mailbox authenticates against was invisible
