@@ -1,6 +1,6 @@
 {
-  "version": "261027",
-  "generated": "2026-10-28T14:49:18Z",
+  "version": "261102",
+  "generated": "2026-11-07T10:59:29Z",
   "algorithm": "SHA-256",
   "templates": {
     "schedule/retention_policy_functions.cfm": "18527175ddad3b44df375e6731eb90b63342a8bd7c8990b8f3cd43160f15a1e2",
@@ -16,7 +16,7 @@
     "admin/2/inc/pro_milter_enforce.cfm": "3b98719e9be752e3707586567dbd1e99862916f6278a03a1653b1887abbea3ed",
     "admin/2/view_remoteauth.cfm": "9c2457d95f68e04091e60dc3d2539a8e1bfcd4d16c7ea671edf9fbfcbb5558f6",
     "admin/2/edit_remoteauth_mapping.cfm": "f06a9efc320ac9668002e9dc04fc22bf8f71daf90902464af266090be35944e2",
-    "admin/2/view_intrusion_prevention.cfm": "3fb7ba6c2e852e224ef8c32b5b416e0d4e3b6b7c776cda648b9f73acff3f51ec",
+    "admin/2/view_intrusion_prevention.cfm": "16b24fb8b59b60b9ff2d86e8f8b646c7ccd728ad92c5077a88240b7194ccf1bf",
     "admin/2/view_console_firewall.cfm": "23b8de82283ee91f730503f6fa4fb50ec41de30ec9a8f99d7cacbcd7eac4bf8b",
     "admin/2/view_system_certificates.cfm": "8c34f13b9d0e9cad8cc9c239c6befad2aaa6112ab5b1d5ba6d2950744a31ae51",
     "admin/2/view_disclaimers.cfm": "e19606583321b2dfff7fec238e4e301d1be61f1b3191a233c026d38e6bfb1692",
@@ -30,8 +30,8 @@
     "admin/2/org_signature_delete.cfm": "10b7b6b507f7e62abc404a9fefccf5a3d08803fb0b191dd3af86e4d9c2a58798",
     "admin/2/inc/org_signature_write_files.cfm": "04f70f944b2aedc372870012a2841f05e6f5a57d9a0fd13ddaad8d50df44b8f2",
     "admin/2/inc/signature_regen_map.cfm": "71202ddcbcaca3b1bdf1cfe7f0216eb72639e90851580642336631c687acf739",
-    "admin/2/view_linkguard.cfm": "7467d71e738974d07471afc4fa378bb94a535002986ebc83066854056534d66e",
-    "admin/2/inc/linkguard_write_and_reload.cfm": "d1c83b7211e09d84a6f3496ab1caa6543c3ad16ac63d3e4cf5a4461c42ec3306"
+    "admin/2/view_linkguard.cfm": "64bf0f7a2a879b28c0e74474c00e0165faa52ef94c1225ce739c7bed44e65527",
+    "admin/2/inc/linkguard_write_and_reload.cfm": "3f1a2115ac258798b5d315cd1c2e9f552d6e6ac0e0461648e0d14b44f7f6f43a"
   },
-  "fingerprint": "21c5d38e084f96548bbf33d28064ee77d2ee9dbabab438a358cf2deed8133c29"
+  "fingerprint": "c56e8b55115134386383e2e51ea496ff9c714fa3549c5276a8712ddaedd3ad5b"
 }

@@ -1,5 +1,22 @@
 # Hermes SEG v261102
 
+> **Before you upgrade, check these four items.** Details are under
+> [Upgrading](#upgrading).
+>
+> 1. **Mailbox quotas are enforced again.** A mailbox already over its limit
+>    stops accepting mail after the upgrade. Run
+>    `docker exec hermes_dovecot doveadm quota get -A` first and raise any quota
+>    that is below the mailbox's usage.
+> 2. **Publish an SPF record on your mail hostname.** Mail to a full mailbox is
+>    now bounced, and Gmail refuses bounces from a hostname without SPF. Add a
+>    TXT record `v=spf1 a -all` on the hostname from
+>    `docker exec hermes_postfix_dkim postconf -h myhostname`.
+> 3. **Stop sending notices to forged senders.** If any Message Handling Policy is
+>    set to **Quarantine & Send DSN**, change it to **Quarantine Only**. The
+>    upgrade does not change it for you.
+> 4. **Nextcloud is upgraded from 33 to 34.** Back up first. Nextcloud is
+>    unavailable for a few minutes while it upgrades.
+
 ## Synopsis
 
 This release adds **VERIFY** recipient delivery, which refuses mail for unknown
@@ -107,9 +124,9 @@ sudo ./scripts/system_update_docker.sh v261102
   quotas enforced, mail to a full mailbox is bounced to the sender, and Gmail
   refuses bounces from a hostname with no SPF record. See
   [DNS for Mail Flow](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/install/get-started-docker.md#dns-for-mail-flow-all-topologies).
-- Nextcloud is upgraded from 33 to 34.0.5, which adds a few minutes. If
-  Nextcloud is on an older version, the upgrade leaves it unchanged and says so
-  in its log.
+- Nextcloud is upgraded from 33 to 34.0.5, which adds a few minutes, and
+  Nextcloud is unavailable while it runs. If Nextcloud is on an older version,
+  the upgrade leaves it unchanged and says so in its log.
 - The upgrade installs the Nextcloud **Antivirus for files** app. Its background
   scan then works through existing files, which adds some load on ClamAV at first.
 - No domain changes to VERIFY during the upgrade. Before you switch a domain,
