@@ -624,6 +624,60 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Nextcloud theming (#399). The installer's logo mount pointed at a host
+     path that does not exist and it reset the background to Nextcloud's blue
+     default image, so existing installs never got the Hermes logo or colors.
+     Each is applied only while it is still Nextcloud's default, so a logo or
+     background an admin chose is kept. Marked complete only once the logo is
+     in place, so a missing /img mount is retried on the next run. --->
+<cfset blockName = "nextcloud-theming-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfset ncThemeDone = []>
+        <cfset ncLogoMime = "">
+        <cfset ncBgMime = "">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:get theming logoMime"
+            variable="ncLogoMime" errorVariable="ncThemeErr" timeout="60" />
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:get theming backgroundMime"
+            variable="ncBgMime" errorVariable="ncThemeErr" timeout="60" />
+
+        <cfif NOT Len(Trim(ncBgMime))>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background_color ##343A40"
+                variable="ncThemeOut" errorVariable="ncThemeErr" timeout="60" />
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background backgroundColor"
+                variable="ncThemeOut" errorVariable="ncThemeErr" timeout="60" />
+            <cfset arrayAppend(ncThemeDone, "background")>
+        </cfif>
+
+        <cfif NOT Len(Trim(ncLogoMime))>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png"
+                variable="ncThemeOut" errorVariable="ncThemeErr" timeout="60" />
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ config:app:get theming logoMime"
+                variable="ncLogoMime" errorVariable="ncThemeErr" timeout="60" />
+            <cfset arrayAppend(ncThemeDone, "logo")>
+        </cfif>
+
+        <cfif Len(Trim(ncLogoMime))>
+            <cfset markComplete(blockName)>
+            <cfset arrayAppend(migrationsApplied, blockName & " (" & (ArrayLen(ncThemeDone) ? ArrayToList(ncThemeDone, ", ") : "already set") & ")")>
+        <cfelse>
+            <cfset arrayAppend(migrationErrors, blockName & ": logo not applied; check that /img in hermes_nextcloud holds hermes_logo_new_orange2.png. " & Left(Trim(ncThemeErr), 300))>
+        </cfif>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
 

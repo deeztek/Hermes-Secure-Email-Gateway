@@ -4687,18 +4687,31 @@ run_phase2_db_init() {
                 || log "    WARNING: Failed to disable $app"
         done
 
-        # Theming
+        # Theming (#399). The logo is read from /img, the repo's dist/img
+        # mounted read-only. "background backgroundColor" shows background_color
+        # instead of an image; "background --reset" would restore Nextcloud's
+        # default blue image. post_upgrade.cfm applies the same to upgrades.
         log "  Configuring Nextcloud theming..."
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config name "Hermes SEG" >> "$LOG_FILE" 2>&1 || true
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config logo /img/hermes_logo_new_orange2.png >> "$LOG_FILE" 2>&1 || true
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config slogan "Secure Email Gateway and Server" >> "$LOG_FILE" 2>&1 || true
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config primary_color '#343A40' >> "$LOG_FILE" 2>&1 || true
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background_color '#343A40' >> "$LOG_FILE" 2>&1 || true
-        docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config background --reset >> "$LOG_FILE" 2>&1 || true
+        local nc_theme_failed=0
+        nc_theme() {
+            docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config "$@" >> "$LOG_FILE" 2>&1 \
+                || { log "    WARNING: theming:config $1 failed"; nc_theme_failed=1; }
+        }
+        nc_theme name "Hermes SEG"
+        nc_theme logo /img/hermes_logo_new_orange2.png
+        nc_theme slogan "Secure Email Gateway and Server"
+        nc_theme primary_color '#343A40'
+        nc_theme background_color '#343A40'
+        nc_theme background backgroundColor
         if [[ -n "$NC_HOSTNAME" ]]; then
-            docker exec -u www-data hermes_nextcloud php /var/www/html/occ theming:config url "https://${NC_HOSTNAME}" >> "$LOG_FILE" 2>&1 || true
+            nc_theme url "https://${NC_HOSTNAME}"
         fi
-        log "  Theming configured"
+        unset -f nc_theme
+        if (( nc_theme_failed )); then
+            log "  Theming partly applied (see $LOG_FILE)"
+        else
+            log "  Theming configured"
+        fi
 
         # Cross-domain isolation. Every occ call wrapped with `|| log "WARNING..."`
         # so a transient failure on any single one doesn't kill the install

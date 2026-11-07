@@ -746,7 +746,7 @@ services:
     # No host ports exposed — Nginx proxies to port 80 internally at /nc/
     volumes:
       - nextcloud:/var/www/html
-      - /var/www/html/dist/img:/img
+      - ./config/hermes/var/www/html/dist/img:/img:ro #Hermes logo for Nextcloud theming (#399)
       - ./config/hermes/opt/hermes:/opt/hermes #Shared volume for app password crypto, creds, and temp files
     environment:
       - TZ=${TIMEZONE}

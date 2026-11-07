@@ -6,7 +6,8 @@ This release adds **VERIFY** recipient delivery, which refuses mail for unknown
 recipients during the SMTP conversation instead of accepting it and bouncing it
 later. It also stops the Dovecot authentication crash after idle periods, stops
 Nextcloud Mail from adding its "Important" label, and fixes large messages
-bouncing after Hermes had accepted them. Upgrading is recommended.
+bouncing after Hermes had accepted them. Nextcloud moves to 34.0.5. Upgrading
+is recommended.
 
 ## New features
 
@@ -48,6 +49,9 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
 - **Quota usage on the Mailboxes page (#398).** The **Quota** column now shows
   usage, limit and percentage for each mailbox, and turns red at 90%.
 
+- **Nextcloud 34.** Nextcloud moves from 33 to 34.0.5. The upgrade raises it
+  automatically.
+
 - **Amavis destinies default to Quarantine Only (#395).** New installs quarantine
   virus, banned-file, spam and bad-header mail without sending a notice to the
   sender, and the console warns about backscatter under **Message Handling
@@ -69,6 +73,11 @@ bouncing after Hermes had accepted them. Upgrading is recommended.
 - **Large messages could bounce after Hermes accepted them (#396).** Internal
   mail hops had smaller size limits than the edge. The limit in Perimeter Checks
   now applies once, at the edge.
+
+- **Nextcloud showed its default logo and blue theme (#399).** The Hermes logo
+  was not reachable inside Nextcloud, and the background was reset to
+  Nextcloud's default image. New installs and upgrades now get the Hermes logo
+  and colors. A logo or background you set yourself is kept.
 
 - **The admin console showed a raw error when the login header was missing.** It
   now shows an error page.
@@ -98,6 +107,9 @@ sudo ./scripts/system_update_docker.sh v261102
   quotas enforced, mail to a full mailbox is bounced to the sender, and Gmail
   refuses bounces from a hostname with no SPF record. See
   [DNS for Mail Flow](https://github.com/deeztek/Hermes-Secure-Email-Gateway/blob/main/docs/install/get-started-docker.md#dns-for-mail-flow-all-topologies).
+- Nextcloud is upgraded from 33 to 34.0.5, which adds a few minutes. If
+  Nextcloud is on an older version, the upgrade leaves it unchanged and says so
+  in its log.
 - The upgrade installs the Nextcloud **Antivirus for files** app. Its background
   scan then works through existing files, which adds some load on ClamAV at first.
 - No domain changes to VERIFY during the upgrade. Before you switch a domain,
