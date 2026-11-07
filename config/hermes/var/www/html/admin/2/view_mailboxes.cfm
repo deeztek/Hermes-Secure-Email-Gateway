@@ -741,7 +741,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             </cfif>
           </td>
           <td data-order="#quotaPct#" class="#quotaPct GTE 90 ? 'text-danger' : ''#">
-            #NumberFormat(usedGb, usedGb GTE 1 ? "0.0" : "0.00")# GB of
+            <!--- Under 1 GB in MB, so a small mailbox does not read as 0.00 GB --->
+            <cfif usedGb GTE 1>#NumberFormat(usedGb, "0.0")# GB<cfelse>#NumberFormat(usedGb * 1024, "0.0")# MB</cfif> of
             <cfif quotaGb GTE 1>
               <cfif quotaGb EQ Int(quotaGb)>#Int(quotaGb)#<cfelse>#NumberFormat(quotaGb, "0.0")#</cfif> GB
             <cfelse>
