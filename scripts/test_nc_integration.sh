@@ -223,7 +223,8 @@ fi
 
 # theming:config url should match the current console host (Hermes UI sets
 # this via edit_console_settings.cfm).
-THEMING_URL=$(occ theming:config url 2>/dev/null | tr -d '[:space:]')
+# occ prints a sentence ("... url is currently set to <url>"); keep only the URL.
+THEMING_URL=$(occ theming:config url 2>/dev/null | sed -n 's/.*set to //p' | tr -d '[:space:]')
 if [[ -n "$THEMING_URL" ]]; then
     pass "Theming URL set: $THEMING_URL"
 else
@@ -254,10 +255,15 @@ section "Recent error log (last 200 lines)"
 # nextcloud.log. A few WARN-level entries are normal; sustained errors
 # are not.
 LOG_PATH=/var/www/html/data/nextcloud.log
+# grep -c prints 0 AND exits 1 when nothing matches, so an outer `|| echo 0`
+# produced "0\n0". Swallow the exit status inside the container instead, and
+# default to 0 only if docker exec itself returned nothing.
 ERROR_COUNT=$(docker exec hermes_nextcloud sh -c \
-    "tail -200 $LOG_PATH 2>/dev/null | grep -c '\"level\":3'" 2>/dev/null || echo 0)
+    "tail -200 $LOG_PATH 2>/dev/null | grep -c '\"level\":3' || true" 2>/dev/null)
 FATAL_COUNT=$(docker exec hermes_nextcloud sh -c \
-    "tail -200 $LOG_PATH 2>/dev/null | grep -c '\"level\":4'" 2>/dev/null || echo 0)
+    "tail -200 $LOG_PATH 2>/dev/null | grep -c '\"level\":4' || true" 2>/dev/null)
+[[ "$ERROR_COUNT" =~ ^[0-9]+$ ]] || ERROR_COUNT=0
+[[ "$FATAL_COUNT" =~ ^[0-9]+$ ]] || FATAL_COUNT=0
 
 if [[ "$ERROR_COUNT" -eq 0 && "$FATAL_COUNT" -eq 0 ]]; then
     pass "No ERROR or FATAL entries in last 200 log lines"
