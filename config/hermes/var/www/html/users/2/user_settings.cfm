@@ -241,27 +241,10 @@ $(document).ready(function() {
             <cfinclude template="/user-auth/inc/ldap_modify_user_password.cfm">
 
             <cfif ldapPasswordModified>
-                <!--- Sync NC local password for DAV auth --->
-                <cfquery name="checkNcEnabledPwd" datasource="hermes">
-                    SELECT nextcloud_enabled FROM mailboxes
-                    WHERE username = <cfqueryparam value="#session.email#" cfsqltype="cf_sql_varchar">
-                </cfquery>
-                <cfif checkNcEnabledPwd.recordcount GTE 1 AND Val(checkNcEnabledPwd.nextcloud_enabled) EQ 1>
-                    <cftry>
-                        <cfinclude template="../../admin/2/inc/generate_customtrans.cfm">
-                        <cfset ncPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_pwd_update.sh">
-                        <cfscript>
-                            fileWrite(ncPwdScript,
-                                chr(35) & "!/bin/bash" & chr(10) &
-                                'docker exec -e OC_PASS="' & trim(form.newpassword) & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & session.email & '" 2>&1' & chr(10),
-                                "utf-8");
-                        </cfscript>
-                        <cfexecute name="/bin/chmod" arguments="+x #ncPwdScript#" timeout="10" />
-                        <cfexecute name="#ncPwdScript#" variable="ncPwdResult" errorVariable="ncPwdError" timeout="30" />
-                        <cftry><cffile action="delete" file="#ncPwdScript#"><cfcatch type="any"></cfcatch></cftry>
-                    <cfcatch type="any"></cfcatch>
-                    </cftry>
-                </cfif>
+                <!--- No Nextcloud step on a password change (#197 follow-up): Nextcloud's
+                     local password must stay random and never match the user's own,
+                     because DAV accepts it with Basic Auth, outside Authelia and 2FA.
+                     NC Mail uses the "Hermes System" app password and is unaffected. --->
 
                 <cfinclude template="./inc/send_changed_password_email.cfm">
                 <cfset session.pwdMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Your Password was changed successfully. Please ensure you use the new password to login from now on">

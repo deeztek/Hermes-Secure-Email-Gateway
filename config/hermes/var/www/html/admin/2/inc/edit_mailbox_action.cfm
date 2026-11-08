@@ -461,41 +461,16 @@ Does NOT change: email address (immutable), domain, auth_type, encryption settin
 
         <cfset session.passwordChanged = true>
 
-        <!--- Sync the Nextcloud app password with the new LDAP password.
-             Regenerates the "Hermes System" token so DAV clients continue
-             working with the updated credentials. --->
-        <cfquery name="checkNcEnabled" datasource="hermes">
-            SELECT nextcloud_enabled FROM mailboxes
-            WHERE username = <cfqueryparam value="#getMailbox.username#" cfsqltype="cf_sql_varchar">
-        </cfquery>
-        <cfif checkNcEnabled.recordcount GTE 1 AND Val(checkNcEnabled.nextcloud_enabled) EQ 1>
-            <!--- Update NC local password for DAV auth --->
-            <cftry>
-                <cfinclude template="generate_customtrans.cfm">
-                <cfset ncPwdScript = "/opt/hermes/tmp/" & customtrans3 & "_nc_pwd_update.sh">
-                <cfscript>
-                    fileWrite(ncPwdScript,
-                        chr(35) & "!/bin/bash" & chr(10) &
-                        'docker exec -e OC_PASS="' & trim(form.edit_password) & '" -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env "' & getMailbox.username & '" 2>&1' & chr(10),
-                        "utf-8");
-                </cfscript>
-                <cfexecute name="/bin/chmod" arguments="+x #ncPwdScript#" timeout="10" />
-                <cfexecute name="#ncPwdScript#" variable="ncPwdResult" errorVariable="ncPwdError" timeout="30" />
-                <cftry><cffile action="delete" file="#ncPwdScript#"><cfcatch type="any"></cfcatch></cftry>
-            <cfcatch type="any"></cfcatch>
-            </cftry>
-
-            <!--- Recreate NC Mail account with new password --->
-            <cftry>
-                <cfset ncMailAction = "update">
-                <cfset ncMailUser = getMailbox.username>
-                <cfset ncMailName = getMailbox.name>
-                <cfset ncMailEmail = getMailbox.username>
-                <cfset ncMailPassword = trim(form.edit_password)>
-                <cfinclude template="nextcloud_mail_account.cfm">
-            <cfcatch type="any"></cfcatch>
-            </cftry>
-        </cfif>
+        <!--- No Nextcloud step on a password change (#197 follow-up).
+             Nextcloud's local password must stay random and never match the
+             user's own: DAV accepts it with Basic Auth, so setting it to the
+             login password let that password reach files, calendar and
+             contacts without Authelia or 2FA. NC Mail is unaffected by a
+             password change because it signs in with the "Hermes System"
+             app password, the only credential Dovecot accepts. This block
+             used to reset the local password to the new one and rebuild the
+             NC Mail account with it; the rebuild always failed on a missing
+             column, which is the only reason NC Mail kept working. --->
     </cfif>
 </cfif>
 

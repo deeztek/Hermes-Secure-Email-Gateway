@@ -710,6 +710,51 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Nextcloud local passwords back to random (#197 follow-up). Until this
+     release every password change or reset also set the user's Nextcloud
+     local password to the new login password, so that password worked for
+     DAV with Basic Auth, outside Authelia and 2FA. Give every
+     Nextcloud-enabled mailbox a fresh random one, as the Rotate action does.
+     Nothing uses it: NC Mail signs in with the "Hermes System" app password,
+     clients with their own app passwords, and the web login goes through
+     OIDC. Users whose accounts have no local password (remote auth) make
+     occ fail harmlessly. --->
+<cfset blockName = "nextcloud-local-password-random-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfquery name="ncRandUsers" datasource="hermes">
+            SELECT username FROM mailboxes
+            WHERE nextcloud_enabled = 1
+            ORDER BY username
+        </cfquery>
+        <cfset ncRandAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789">
+        <cfset ncRandScript = "/opt/hermes/tmp/pu_" & Replace(CreateUUID(), "-", "", "ALL") & "_nc_local_pw.sh">
+        <cfset ncRandBody = "##!/bin/bash" & chr(10)>
+        <cfloop query="ncRandUsers">
+            <cfif REFind("^[A-Za-z0-9._%+@-]+$", ncRandUsers.username)>
+                <cfset ncRandPw = "">
+                <cfloop from="1" to="30" index="ncRandIdx">
+                    <cfset ncRandPw &= Mid(ncRandAlphabet, RandRange(1, Len(ncRandAlphabet), "SHA1PRNG"), 1)>
+                </cfloop>
+                <cfset ncRandBody &= "docker exec -e OC_PASS=""" & ncRandPw & """ -u www-data hermes_nextcloud php /var/www/html/occ user:resetpassword --password-from-env """ & ncRandUsers.username & """ >/dev/null 2>&1" & chr(10)>
+            </cfif>
+        </cfloop>
+        <!--- Detached, like the Mail tagging blocks: one occ call per user can
+             outlast this page's request timeout. The script removes itself. --->
+        <cfset ncRandBody &= "rm -f ""$0""" & chr(10)>
+        <cffile action="write" file="#ncRandScript#" output="#ncRandBody#" addnewline="no">
+        <cfexecute name="/bin/chmod" arguments="700 #ncRandScript#" timeout="10" />
+        <cfexecute name="#ncRandScript#" timeout="0" />
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (started in the background for " & ncRandUsers.recordcount & " mailboxes)")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
 
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
