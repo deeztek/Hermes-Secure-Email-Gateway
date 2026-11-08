@@ -281,3 +281,30 @@ Sets after execution:
     </cfcatch>
     </cftry>
 </cfif>
+
+<!--- Default tags for the accounts just (re)created (#400).
+     `occ mail:account:create` does not create the five default tags
+     (Important, Work, Personal, To Do, Later) that Mail's own setup does,
+     and every sync that finds new mail then logs "Could not find important
+     tag" as an ERROR. Tags belong to the Nextcloud user, so repairing one of
+     the user's accounts is enough; mail:repair:tags only adds missing ones. --->
+<cfif ncMailResult EQ "success" AND ListFindNoCase("create,update", ncMailAction)>
+    <cftry>
+        <cfset _tagAccounts = "">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ mail:account:export #ncMailUser# --output=json"
+            variable="_tagAccounts" timeout="30" />
+        <cfif IsJSON(Trim(_tagAccounts))>
+            <cfset _tagList = DeserializeJSON(Trim(_tagAccounts))>
+            <cfif IsArray(_tagList) AND ArrayLen(_tagList) AND IsStruct(_tagList[1]) AND StructKeyExists(_tagList[1], "id") AND IsNumeric(_tagList[1].id)>
+                <cfexecute name="/usr/local/bin/docker"
+                    arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ mail:repair:tags #Int(_tagList[1].id)#"
+                    variable="_tagResult" timeout="30" />
+            </cfif>
+        </cfif>
+    <cfcatch type="any">
+        <!--- Not fatal: the account works; syncs log the missing tag until
+             the post-upgrade repair or a manual `occ mail:repair:tags`. --->
+    </cfcatch>
+    </cftry>
+</cfif>

@@ -678,6 +678,39 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Nextcloud Mail default tags (#400). `occ mail:account:create` saves the
+     account without its five default tags (Important, Work, Personal, To Do,
+     Later); only Mail's own setup creates them. Every sync that finds new
+     mail then looks up the Important tag, fails, and logs an ERROR, so
+     nextcloud.log fills with "Could not find important tag". mail:repair:tags
+     adds only the tags that are missing, so running it on every account is
+     safe. New accounts get them at creation (nextcloud_mail_account.cfm). --->
+<cfset blockName = "nextcloud-mail-default-tags-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfset ncRepairOut = "">
+        <cfset ncRepairErr = "">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ mail:repair:tags"
+            variable="ncRepairOut" errorVariable="ncRepairErr" timeout="300" />
+        <!--- "Patched default tags for N", or "No accounts exist" on an
+             install with no Nextcloud Mail accounts yet. --->
+        <cfif FindNoCase("Patched default tags", ncRepairOut) OR FindNoCase("No accounts exist", ncRepairOut)>
+            <cfset markComplete(blockName)>
+            <cfset arrayAppend(migrationsApplied, blockName & " (" & Trim(ListLast(Trim(ncRepairOut), chr(10))) & ")")>
+        <cfelse>
+            <cfset arrayAppend(migrationErrors, blockName & ": occ mail:repair:tags did not finish. " & Left(Trim(ncRepairOut & " " & ncRepairErr), 300))>
+        </cfif>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
+
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
 
