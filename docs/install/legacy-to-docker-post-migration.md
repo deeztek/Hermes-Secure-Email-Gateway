@@ -852,6 +852,28 @@ recipient, which fails on a migrated install before it with
 > Do not send users a password-reset announcement of your own before their
 > accounts exist; until then the reset cannot find them.
 
+### 12.2 After upgrading: re-enter the relay host password
+
+Only if the legacy server sent outgoing mail through a relay host that
+requires authentication.
+
+Before **v261107**, a migrated gateway was missing the database entry that
+holds the relay host password. The first time **Email Relay → Relay Host** was
+opened, the console moved the legacy credentials into the new storage, kept the
+username, and lost the password. Outgoing mail then went to the relay host
+without a password, and a relay that requires one rejects or defers it. The
+upgrade to v261107 or later adds the missing entry, but it cannot recover a
+password that was already lost.
+
+1. Sidebar → **Email Relay → Relay Host**.
+2. Confirm **Relay Host Requires Authentication** is ticked and **Relay Host
+   Username** is filled in.
+3. Enter the password in **Relay Host Password** and click **Save Settings**.
+4. Send a test message to an outside address and check that it is delivered.
+
+Relay domains whose destination requires authentication (**Email Relay →
+Domains**) keep their credentials with the domain and are not affected.
+
 ## 13. Schedule backups
 
 The legacy server's backup schedule does not carry over, and a migrated

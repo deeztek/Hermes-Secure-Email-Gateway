@@ -157,7 +157,17 @@ SELECT id FROM parameters WHERE parameter='smtp_tls_security_level' AND child = 
         WHERE id='#get_smtp_sasl_password_maps_id.id#'
         </cfquery>
 
-        <!--- Encrypt and store credentials in system_settings --->
+        <!--- Encrypt and store credentials in system_settings. The rows are
+             created first if missing: an UPDATE of a missing row silently
+             dropped the credential on installs older than v260612. --->
+        <cfloop list="relay_host_username,relay_host_password" index="_relayParam">
+          <cfquery datasource="hermes">
+            INSERT INTO system_settings (parameter, value)
+            SELECT <cfqueryparam cfsqltype="cf_sql_varchar" value="#_relayParam#">, ''
+            FROM DUAL
+            WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = <cfqueryparam cfsqltype="cf_sql_varchar" value="#_relayParam#">)
+          </cfquery>
+        </cfloop>
         <cffile action="read" file="/opt/hermes/keys/hermes.key" variable="theKey">
         <cfset encryptedRelayUsername = encrypt(form.relayhost_username, theKey, "AES", "Base64")>
         <cfset encryptedRelayPassword = encrypt(form.relayhost_password, theKey, "AES", "Base64")>

@@ -28,7 +28,7 @@
         "sessionCookieHTTPOnly":true,
         "openbrowser":false,
         "debug":true,
-        "cfengine":"lucee@5.3.5+96",
+        "cfengine":"lucee@6.2.9+4",
         "serverHomeDirectory":"/serverhome"
     }
 }

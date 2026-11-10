@@ -18,6 +18,7 @@ You should have received a copy of the Hermes Secure Email Gateway Pro Edition L
  <cffile action = "write"
  file = "/opt/hermes/keys/hermes.key"
  output = "#authkey#"
+ addnewline = "no"
  mode = "600">
  
  <!-- READ SECRET KEY -->

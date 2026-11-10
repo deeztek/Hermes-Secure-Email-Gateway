@@ -19,8 +19,7 @@ RUN apt-get update && \
     haveged \
     gnupg \
     dmidecode \
-    openjdk-11-jre \
-    openjdk-11-jre-headless \
+    openjdk-21-jre-headless \
     dumb-init
 
 #Copy docker binary from docker:dind image on dockerhub
@@ -46,6 +45,35 @@ RUN apt-get update && \
     export DEBIAN_FRONTEND=noninteractive && \
     apt-get install -y apt-transport-https \
     commandbox
+
+#Bake the CFML engine into CommandBox's artifacts cache (#402).
+#With an exact version in server.json, CommandBox skips the ForgeBox lookup and
+#deploys from this cache, so a host never downloads the engine at first start.
+#The engine is fetched with curl: CommandBox 6.3.5's own downloader gets 403
+#from downloads.ortussolutions.com (seen on DEV and on the build host, where
+#curl gets the same file). The SHA-256 pins the exact file that was tested.
+#LUCEE_VERSION MUST match "cfengine" (lucee@<version>) in
+#config/hermes/var/www/html/server.json; tests/v261107 checks that they agree.
+ARG LUCEE_VERSION=6.2.9+4
+ARG LUCEE_ZIP_VERSION=6.2.9.4
+ARG LUCEE_SHA256=a751602dc76d7ef975da5735d894ca3682c3e6b45a8a6080e4d1ada5cb533197
+RUN mkdir -p "/root/.CommandBox/artifacts/lucee/${LUCEE_VERSION}" && \
+    curl -fsSL -o "/root/.CommandBox/artifacts/lucee/${LUCEE_VERSION}/lucee.zip" \
+        "https://downloads.ortussolutions.com/lucee/lucee/${LUCEE_ZIP_VERSION}/cf-engine-${LUCEE_ZIP_VERSION}.zip" && \
+    echo "${LUCEE_SHA256}  /root/.CommandBox/artifacts/lucee/${LUCEE_VERSION}/lucee.zip" | sha256sum -c -
+
+#JDBC driver bundle for the datasources (#402). Every Application.cfc pins
+#com.mysql.jdbc 5.1.40, which Lucee 6.2 does not ship (it bundles Connector/J
+#9.x as com.mysql.cj) and would otherwise fetch from update.lucee.org at first
+#start. entrypoint.sh copies it into the server home before the server starts.
+#Kept outside /opt/hermes, which is bind-mounted over at run time. The SHA-256
+#matches the jar on Maven Central (its published SHA-1 also checked).
+ARG MYSQL_JDBC_VERSION=5.1.40
+ARG MYSQL_JDBC_SHA256=27a80bf2e36d9d08d1be93f70d3124633a6952fe3b95833306905dcba6bfe96d
+RUN mkdir -p /opt/lucee-bundles && \
+    curl -fsSL -o "/opt/lucee-bundles/com.mysql.jdbc-${MYSQL_JDBC_VERSION}.jar" \
+        "https://repo1.maven.org/maven2/mysql/mysql-connector-java/${MYSQL_JDBC_VERSION}/mysql-connector-java-${MYSQL_JDBC_VERSION}.jar" && \
+    echo "${MYSQL_JDBC_SHA256}  /opt/lucee-bundles/com.mysql.jdbc-${MYSQL_JDBC_VERSION}.jar" | sha256sum -c -
 
 #Entrypoint
 COPY entrypoints/commandbox/entrypoint.sh /

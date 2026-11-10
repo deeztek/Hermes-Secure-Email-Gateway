@@ -1808,16 +1808,17 @@ generate_secrets() {
     # once, rather than adding a 34th guard. The index.cfm self-heal stays as a
     # fallback for a deleted file or a partial restore.
     #
-    # Byte-identical to what the CFML writes: generateSecretKey("AES", 256) is
-    # 32 random bytes base64-encoded to 44 characters, and cffile appends a
-    # newline, which is the 45-byte file observed on a healthy install.
-    # `openssl rand -base64 32` produces exactly that.
+    # Same key format as the CFML: generateSecretKey("AES", 256) is 32 random
+    # bytes base64-encoded to 44 characters. Written WITHOUT a trailing newline
+    # (v261107, #402): Lucee 6.2 includes the newline when decoding the key, so
+    # a 45-byte file gives a different key than Lucee 5 used. The upgrade
+    # pre-script 40-hermes-key-trailing-newline.sh strips it on existing installs.
     #
     # Guarded with -s (missing OR empty), never overwritten: this key decrypts
     # everything already stored, so replacing it on an existing install would
     # silently orphan every encrypted credential in the database.
     if [[ ! -s "${SECRETS_DIR}/hermes.key" ]]; then
-        openssl rand -base64 32 > "${SECRETS_DIR}/hermes.key"
+        openssl rand -base64 32 | tr -d '\n' > "${SECRETS_DIR}/hermes.key"
         chmod 600 "${SECRETS_DIR}/hermes.key"
         log "  + hermes.key (AES-256, credential encryption)"
     else

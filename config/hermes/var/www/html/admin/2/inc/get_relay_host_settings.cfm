@@ -62,6 +62,18 @@ SELECT parameter FROM parameters WHERE parent_name='smtp_sasl_auth_enable' AND c
     <cfset relayhost_authenticate = 0>
 </cfif>
 
+<!--- Both rows must exist before anything writes them: the writes are UPDATEs,
+     and an UPDATE of a missing row silently drops the value. Installs older
+     than v260612 were never given these rows (fixed in v261107). --->
+<cfloop list="relay_host_username,relay_host_password" index="_relayParam">
+  <cfquery datasource="hermes">
+    INSERT INTO system_settings (parameter, value)
+    SELECT <cfqueryparam cfsqltype="cf_sql_varchar" value="#_relayParam#">, ''
+    FROM DUAL
+    WHERE NOT EXISTS (SELECT 1 FROM system_settings WHERE parameter = <cfqueryparam cfsqltype="cf_sql_varchar" value="#_relayParam#">)
+  </cfquery>
+</cfloop>
+
 <!--- Get relay host username and password (encrypted in system_settings) --->
 <cfquery name="getRelayCreds" datasource="hermes">
   SELECT parameter, value FROM system_settings
