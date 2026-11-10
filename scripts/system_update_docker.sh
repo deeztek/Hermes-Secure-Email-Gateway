@@ -468,21 +468,46 @@ nc_upgrade_if_needed() {
         background:cron \
         >> "$LOG_FILE" 2>&1 || warn "    could not set background job mode (see $LOG_FILE)"
 
-    # Extract versionstring without depending on host jq.
+    # Read the status again: the settings above give Nextcloud a few more
+    # seconds to settle after the container came up.
+    status_json="$(docker exec hermes_nextcloud php occ status --output=json 2>&1 || true)"
+
+    # Pending upgrade work. The official image's entrypoint upgrades the CORE
+    # on start, so the version can already match while APPS (Mail, ...) still
+    # wait for `occ upgrade`; occ then prints "require upgrade" instead of
+    # plain JSON. Treat either signal as "run occ upgrade".
+    local pending_upgrade=0
+    if grep -q 'require upgrade' <<< "$status_json" \
+        || grep -q '"needsDbUpgrade":true' <<< "$status_json"; then
+        pending_upgrade=1
+    fi
+
+    # Extract versionstring without depending on host jq. `|| true`: under
+    # set -e -o pipefail a non-matching grep here used to end the whole update
+    # silently, skipping the rest of Phase 4 and Phase 5.
     local live_nc
     live_nc="$(echo "$status_json" | grep -oE '"versionstring":"[^"]+"' \
-        | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+        | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true)"
 
     if [[ -z "$live_nc" ]]; then
-        warn "Could not parse versionstring from occ status output -- skipping NC upgrade detection."
-        return 0
+        if (( pending_upgrade )); then
+            warn "  occ status gave no version, but Nextcloud reports a pending upgrade; running occ upgrade."
+            live_nc="unknown"
+        else
+            warn "Could not parse versionstring from occ status output -- skipping NC upgrade detection."
+            warn "If a release included an NC bump, run manually: docker exec -u www-data hermes_nextcloud php /var/www/html/occ upgrade"
+            return 0
+        fi
     fi
 
     # Match prefix: NC sometimes appends a build segment (e.g. live=30.0.15.1
     # vs declared=30.0.15). Prefix-match is the same rule test_nc_integration.sh uses.
-    if [[ "$live_nc" == "$declared_nc"* ]]; then
+    if [[ "$live_nc" == "$declared_nc"* ]] && (( ! pending_upgrade )); then
         log "  Live NC version '${live_nc}' matches declared '${declared_nc}' ✓"
         return 0
+    fi
+    if [[ "$live_nc" == "$declared_nc"* ]]; then
+        log "  Live NC version '${live_nc}' matches declared '${declared_nc}', but apps still need upgrading."
     fi
 
     # ------------------------------------------------------------------
@@ -567,10 +592,11 @@ nc_upgrade_if_needed() {
     # Verify post-upgrade state.
     local post_status post_needsdb post_maint new_live_nc
     post_status="$(docker exec hermes_nextcloud php occ status --output=json 2>/dev/null || true)"
-    post_needsdb="$(echo "$post_status" | grep -oE '"needsDbUpgrade":(true|false)' | head -1 | cut -d: -f2)"
-    post_maint="$(echo "$post_status" | grep -oE '"maintenance":(true|false)' | head -1 | cut -d: -f2)"
+    # `|| true` on each: a non-matching grep must not end the update (set -e).
+    post_needsdb="$(echo "$post_status" | grep -oE '"needsDbUpgrade":(true|false)' | head -1 | cut -d: -f2 || true)"
+    post_maint="$(echo "$post_status" | grep -oE '"maintenance":(true|false)' | head -1 | cut -d: -f2 || true)"
     new_live_nc="$(echo "$post_status" | grep -oE '"versionstring":"[^"]+"' \
-        | head -1 | sed 's/.*"\([^"]*\)"$/\1/')"
+        | head -1 | sed 's/.*"\([^"]*\)"$/\1/' || true)"
 
     if [[ "$post_needsdb" == "true" ]]; then
         fatal "Post-upgrade: NC still reports needsDbUpgrade=true. Investigate before continuing."
