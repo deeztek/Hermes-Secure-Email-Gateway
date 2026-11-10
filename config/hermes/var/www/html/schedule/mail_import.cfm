@@ -223,9 +223,14 @@
     <cfset ArrayAppend(lines, "SINCE_DAYS=" & Val(dueJobs.since_days))>
     <cfset ArrayAppend(lines, "MAX_MB=" & Val(dueJobs.max_message_mb))>
     <cfset ArrayAppend(lines, "TIMEOUT=" & Val(dueJobs.io_timeout))>
-    <!--- Dovecot expands %{...} in these two values, so a literal % is doubled. --->
-    <cfset ArrayAppend(lines, "USER=" & Replace(dueJobs.source_username, "%", "%%", "all"))>
-    <cfset ArrayAppend(lines, "PASS=" & Replace(sourcePass, "%", "%%", "all"))>
+    <!--- Keys the runner's per-job incremental state (what was already imported). --->
+    <cfset ArrayAppend(lines, "JOB=" & Val(dueJobs.id))>
+    <!--- Dovecot 2.4 expands %{...} in these two values. Only "%{" is special:
+         "%%{" gives a literal "%{", and any other % is passed through as is.
+         So escape "%{" alone; doubling every % sent a wrong password whenever
+         it contained one. Tested against 2.4.5. --->
+    <cfset ArrayAppend(lines, "USER=" & Replace(dueJobs.source_username, "%{", "%%{", "all"))>
+    <cfset ArrayAppend(lines, "PASS=" & Replace(sourcePass, "%{", "%%{", "all"))>
     <cfloop list="#dueJobs.exclude_folders#" delimiters="#Chr(10)##Chr(13)#" index="excludeFolder">
       <cfif Len(Trim(excludeFolder))>
         <cfset ArrayAppend(lines, "EXCLUDE=" & Trim(excludeFolder))>

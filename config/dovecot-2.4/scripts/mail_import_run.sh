@@ -21,7 +21,8 @@
 #
 # It arrives on stdin, never as an argument, and is written to a mode 600 file
 # read by `imapc_password = <file`. That form needs no quoting, but Dovecot 2.4
-# still expands %{...} in the value, so the caller doubles every % first.
+# still expands %{...} in the value, so the caller turns every "%{" into "%%{"
+# (a literal "%{"). Any other % is taken literally and must not be doubled.
 # The job directory is removed when the worker exits, and by `alive` if the
 # container restarted and killed the worker before it could clean up.
 #
@@ -36,11 +37,30 @@
 #   vacation replies are unaffected.
 # - no-metadata: an import does not copy IMAP METADATA, so do not ask for it.
 #
-# WHY sync -1R AND NOT backup
+# WHY import AND NOT sync OR backup
 #
 # `doveadm backup` reverts changes in the destination, which would delete mail
-# already delivered to the Hermes mailbox. `sync -1` keeps them. A repeat run
-# copies only what is new.
+# already delivered to the Hermes mailbox. `doveadm sync -1R` (used before
+# v261107) treats each target folder as a replica of ONE source folder: it
+# copies the source's UIDVALIDITY onto it. A second source account with a
+# folder of the same name (INBOX, Sent, Trash...) then has a different
+# UIDVALIDITY, dsync sees a conflict and copies nothing from it. Importing a
+# second account into a mailbox lost almost all of its mail that way.
+#
+# `doveadm import` copies messages into same-named folders whatever is already
+# there, but is not incremental by itself. So this runner keeps, per job and
+# per source folder, the source UIDVALIDITY and the highest UID already
+# imported ($STATE/state/<key>):
+#
+# - Folder with state and the same UIDVALIDITY: import only UIDs above the
+#   recorded one. Mail deleted in Hermes is not brought back.
+# - Folder without state (first run, a new folder, or the source reset its
+#   UIDVALIDITY): import only the messages whose Message-ID is not already in
+#   the target folder. That keeps a first run from duplicating mail that is
+#   already there, including mail copied by the old sync-based runner.
+#
+# The upper UID is fixed when the folder is listed, so mail arriving during the
+# import is picked up by the next run, not copied twice.
 
 set -u
 
@@ -72,14 +92,14 @@ need() {
 
 start_job() {
     local host="" port="" ssl="" verify="yes" target="" quota="0" features=""
-    local prefix="" since_days="0" max_mb="0" timeout="600" line key val version
+    local prefix="" since_days="0" max_mb="0" timeout="600" job="0" line key val version
 
     umask 077
     mkdir -p "$BASE"
     mkdir -p "$STATE"
     chmod 755 "$STATE"
     mkdir "$dir" || exit 65
-    : > "$dir/args"
+    : > "$dir/excludes"
 
     while IFS= read -r line || [[ -n "$line" ]]; do
         key="${line%%=*}"
@@ -96,9 +116,10 @@ start_job() {
             SINCE_DAYS) since_days="$val" ;;
             MAX_MB)     max_mb="$val" ;;
             TIMEOUT)    timeout="$val" ;;
+            JOB)        job="$val" ;;
             USER)       printf '%s' "$val" > "$dir/user" ;;
             PASS)       printf '%s' "$val" > "$dir/pw" ;;
-            EXCLUDE)    printf -- '-x\n%s\n' "$val" >> "$dir/args" ;;
+            EXCLUDE)    printf '%s\n' "$val" >> "$dir/excludes" ;;
         esac
     done
 
@@ -113,6 +134,7 @@ start_job() {
     need SINCE_DAYS "$since_days" '^[0-9]+$'
     need MAX_MB "$max_mb" '^[0-9]+$'
     need TIMEOUT "$timeout" '^[0-9]+$'
+    need JOB "$job" '^[0-9]+$'
 
     if [[ ! -s "$dir/user" || ! -s "$dir/pw" ]]; then
         echo "missing credentials"
@@ -145,13 +167,19 @@ start_job() {
         fi
     } > "$dir/job.conf"
 
-    printf -- '-T\n%s\n' "$timeout" >> "$dir/args"
+    # The source filters, as doveadm search terms added to every import.
+    : > "$dir/filter"
     if [[ "$since_days" != "0" ]]; then
-        printf -- '-t\n%s\n' "$(date -d "-$since_days days" +%s)" >> "$dir/args"
+        printf 'SINCE\n%s\n' "$(date -d "-$since_days days" +%Y-%m-%d)" >> "$dir/filter"
     fi
     if [[ "$max_mb" != "0" ]]; then
-        printf -- '-I\n%sM\n' "$max_mb" >> "$dir/args"
+        printf 'SMALLER\n%s\n' "$(( max_mb * 1048576 + 1 ))" >> "$dir/filter"
     fi
+    printf '%s' "$timeout" > "$dir/timeout"
+
+    # Incremental state is per job and per source: a new job, or a job edited
+    # to point somewhere else, starts again from the Message-ID comparison.
+    printf '%s-%s' "$job" "$(printf '%s|%s|%s|%s|%s' "$host" "$port" "$(< "$dir/user")" "$prefix" "$target" | sha256sum | cut -c1-16)" > "$dir/statekey"
 
     printf '%s' "$target" > "$dir/target"
     printf '%s' "$quota" > "$dir/quota"
@@ -187,10 +215,146 @@ watch_progress() {
     done
 }
 
+# True when a source folder matches an Exclude Folders line. A line matches the
+# folder itself and everything below it; "*" is the only wildcard.
+is_excluded() {
+    local name="$1" ex pat
+    for ex in "${excludes[@]}"; do
+        [[ -z "$ex" ]] && continue
+        pat=$(printf '%s' "$ex" | sed 's/[][?\\]/\\&/g')
+        # shellcheck disable=SC2053
+        if [[ "$name" == $pat || "$name" == $pat/* ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Turn sorted UIDs on stdin into IMAP sets of at most 200 ranges, one per line,
+# so no single doveadm argument gets too long.
+uid_sets() {
+    awk 'function flush() { if (s != "") { r = (s == e) ? s : s ":" e; set = (set == "") ? r : set "," r; n++ }
+                            if (n >= 200) { print set; set = ""; n = 0 } }
+         { u = $1 + 0; if (s != "" && u == e + 1) { e = u } else { flush(); s = u; e = u } }
+         END { flush(); if (set != "") print set }'
+}
+
+# Message-IDs in a target folder, one per line (empty if it does not exist).
+target_ids() {
+    doveadm -f tab fetch -u "$1" 'hdr.message-id' mailbox "$2" 2> /dev/null \
+        | tail -n +2 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -v '^$'
+}
+
+# Import one UID set from one source folder. "User lookup failed" is the
+# auth-worker dropping an idle database connection (#342): retried, not fatal.
+import_set() {
+    local target="$1" conf="$2" log="$3" timeout="$4" name="$5" set="$6" attempt rc=1
+    for attempt in 1 2 3; do
+        doveadm -c "$conf" -o "imapc_cmd_timeout=${timeout}s" \
+            import -u "$target" imapc: "" mailbox "$name" UID "$set" "${filter[@]}" >> "$log" 2>&1
+        rc=$?
+        if [[ $rc -ne 0 ]] && tail -n 5 "$log" | grep -q 'User lookup failed'; then
+            sleep 15
+            continue
+        fi
+        break
+    done
+    return $rc
+}
+
+import_all() {
+    local target="$1" conf="$2" log="$3" statefile="$4" timeout="$5"
+    local src="doveadm -c $conf -o mail_driver=imapc -o mail_path="
+    local header line name uidv uidnext top prev_v prev_top set rc=0 frc
+    local -a cols
+    local -A col state_v state_top
+    local newstate="$statefile.tmp"
+
+    # Previous state: uidvalidity <TAB> last uid <TAB> folder
+    if [[ -f "$statefile" ]]; then
+        while IFS=$'\t' read -r uidv top name; do
+            [[ -n "$name" ]] || continue
+            state_v["$name"]="$uidv"
+            state_top["$name"]="$top"
+        done < "$statefile"
+    fi
+
+    # One listing of every source folder. Columns come back in doveadm's own
+    # order, so they are looked up by the header.
+    local listing
+    listing=$($src -f tab mailbox status -u "$target" 'messages uidnext uidvalidity' '*' 2>> "$log")
+    if [[ -z "$listing" ]]; then
+        echo "Could not list the source folders." >> "$log"
+        return 75
+    fi
+    header=$(head -n 1 <<< "$listing")
+    IFS=$'\t' read -r -a cols <<< "$header"
+    for i in "${!cols[@]}"; do col["${cols[$i]}"]=$i; done
+
+    : > "$newstate"
+    chmod 600 "$newstate"
+    while IFS= read -r line; do
+        IFS=$'\t' read -r -a f <<< "$line"
+        name="${f[${col[mailbox]}]}"
+        uidv="${f[${col[uidvalidity]}]}"
+        uidnext="${f[${col[uidnext]}]}"
+        [[ -n "$name" && "$uidv" =~ ^[0-9]+$ && "$uidnext" =~ ^[0-9]+$ ]] || continue
+        is_excluded "$name" && continue
+        top=$(( uidnext - 1 ))
+        prev_v="${state_v[$name]:-}"
+        prev_top="${state_top[$name]:-0}"
+        frc=0
+
+        if (( top < 1 )); then
+            :
+        elif [[ "$prev_v" == "$uidv" ]]; then
+            # Incremental: only what arrived since the last run.
+            if (( top > prev_top )); then
+                import_set "$target" "$conf" "$log" "$timeout" "$name" "$(( prev_top + 1 )):$top" || frc=$?
+            fi
+        else
+            # First run for this folder: everything whose Message-ID the target
+            # folder does not already have. Messages with no Message-ID are
+            # always taken.
+            while IFS= read -r set; do
+                [[ -n "$set" ]] || continue
+                import_set "$target" "$conf" "$log" "$timeout" "$name" "$set" || { frc=$?; break; }
+            done < <(
+                $src -f tab fetch -u "$target" 'uid hdr.message-id' mailbox "$name" UID "1:$top" 2>> "$log" \
+                    | tail -n +2 \
+                    | awk -F'\t' 'function emit() { gsub(/^[ \t]+|[ \t]+$/, "", id)
+                                                    if (uid != "" && (id == "" || !(id in have))) print uid }
+                                  FILENAME == ARGV[1] { have[$0] = 1; next }
+                                  # A folded header (common from Exchange) puts the
+                                  # ID on its own line: it belongs to the message above.
+                                  /^[0-9]+\t/ { emit(); uid = $1 + 0; id = substr($0, index($0, "\t") + 1)
+                                                if (uid < 1) uid = ""; next }
+                                  { id = id " " $0 }
+                                  END { emit() }' \
+                          <(target_ids "$target" "$name") - \
+                    | sort -n | uid_sets
+            )
+        fi
+
+        if [[ $frc -eq 0 ]]; then
+            printf '%s\t%s\t%s\n' "$uidv" "$top" "$name" >> "$newstate"
+        else
+            rc=$frc
+            # Keep the old state for this folder, so the next run retries it.
+            if [[ -n "$prev_v" ]]; then
+                printf '%s\t%s\t%s\n' "$prev_v" "$prev_top" "$name" >> "$newstate"
+            fi
+        fi
+    done < <(tail -n +2 <<< "$listing")
+
+    mv "$newstate" "$statefile"
+    return $rc
+}
+
 work_job() {
     local log="$STATE/$token.log" conf="$dir/job.conf"
-    local target quota before after rc=1 attempt stats size source_total watcher reason=""
-    local -a args
+    local target quota before after rc=0 stats size source_total watcher reason=""
+    local timeout statefile
 
     trap 'rm -rf "$dir"; rm -f "$pidfile" "$progressfile"' EXIT
     echo $$ > "$pidfile"
@@ -198,7 +362,11 @@ work_job() {
     : > "$log"
     chmod 644 "$log"
 
-    mapfile -t args < "$dir/args"
+    mapfile -t filter < "$dir/filter"
+    mapfile -t excludes < "$dir/excludes"
+    timeout=$(< "$dir/timeout")
+    mkdir -p "$STATE/state"
+    statefile="$STATE/state/$(< "$dir/statekey")"
     target=$(< "$dir/target")
     quota=$(< "$dir/quota")
     before=$(count_messages "$target")
@@ -219,18 +387,8 @@ work_job() {
     watch_progress "$target" "$before" "$source_total" &
     watcher=$!
 
-    # Exit 2 means the mailbox changed during the sync and it should be run
-    # again. "User lookup failed" is the auth-worker dropping an idle database
-    # connection (#342). Neither is a real failure on the first attempt.
-    for attempt in 1 2 3; do
-        doveadm -c "$conf" sync -1R "${args[@]}" -u "$target" imapc: >> "$log" 2>&1
-        rc=$?
-        if [[ $rc -eq 2 ]] || { [[ $rc -ne 0 ]] && tail -n 5 "$log" | grep -q 'User lookup failed'; }; then
-            sleep 15
-            continue
-        fi
-        break
-    done
+    import_all "$target" "$conf" "$log" "$statefile" "$timeout"
+    rc=$?
 
     kill "$watcher" 2> /dev/null
     after=$(count_messages "$target")
