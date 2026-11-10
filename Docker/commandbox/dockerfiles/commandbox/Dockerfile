@@ -46,6 +46,11 @@ RUN apt-get update && \
     apt-get install -y apt-transport-https \
     commandbox
 
+#Run CommandBox once so its first-run setup (unpacking its own runtime into
+#/root/.CommandBox) happens at build time, not on every new container's first
+#start. /root/.CommandBox is not a volume, so the result ships in the image.
+RUN box version
+
 #Bake the CFML engine into CommandBox's artifacts cache (#402).
 #With an exact version in server.json, CommandBox skips the ForgeBox lookup and
 #deploys from this cache, so a host never downloads the engine at first start.

@@ -48,13 +48,13 @@ Upgrading is recommended.
   duplicating anything or bringing back messages deleted in Hermes. Run an
   affected job again to copy what it missed; mail already there is not copied
   twice.
-- **Relay host: authentication credentials are saved on older installs.** On
+- **Relay host: authentication credentials are saved on older installs (#404).** On
   installs that started before v260612, saving a relay host with
   authentication kept the username but dropped the password, so outgoing mail
   through the relay went without credentials. The upgrade adds what was
   missing. If you use a relay host with authentication, open **Relay Host**
   after upgrading, enter the password again and save.
-- **Updater no longer stops partway when Nextcloud apps need upgrading.** If
+- **Updater no longer stops partway when Nextcloud apps need upgrading (#403).** If
   Nextcloud's own version was already current but one of its apps (such as
   Mail) still needed upgrading, the updater could end without an error after
   "Applying Nextcloud settings", skipping its remaining steps. It now runs the
