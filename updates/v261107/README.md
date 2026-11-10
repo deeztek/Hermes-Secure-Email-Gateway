@@ -12,13 +12,12 @@ Upgrading is recommended.
 ## New features
 
 - **Lucee 6.2 on Java 21 (#402).** The admin console and user portal now run on
-  Lucee 6.2, the current long-term-support release, on Java 21. Lucee 5
-  reached end of life at the end of 2025. The engine and its database driver
-  are now part of the image, so the console no longer downloads anything when
-  it starts. The upgrade also adjusts the format of the key file that protects
-  stored credentials, so relay host, domain and malware feed credentials and
-  other saved secrets stay readable on the new engine. A copy of the original
-  is kept as `keys/hermes.key.pre-v261107`.
+  Lucee 6.2, the current long-term-support release, on Java 21. The engine
+  and its database driver are now part of the image, so the console no longer
+  downloads anything when it starts. The upgrade also adjusts the format of
+  the key file that protects stored credentials, so relay host, domain and
+  malware feed credentials and other saved secrets stay readable on the new
+  engine. A copy of the original is kept as `keys/hermes.key.pre-v261107`.
 
 - **Authelia 4.39.28.** Authentication moves from 4.39.16 to 4.39.28, the
   latest patch release of 4.39.
