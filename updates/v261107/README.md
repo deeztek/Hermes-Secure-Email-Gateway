@@ -64,6 +64,13 @@ Upgrading is recommended.
   **Provision them** used the same list. Both now cover relay recipients only.
   The upgrade also removes the relay role from mailboxes that were converted
   from relay recipients before v260929 and still had it.
+- **Signatures and disclaimers on mail to colleagues (#407).** Personal and
+  organizational signatures and disclaimers were left off mail sent to anyone
+  on a domain Hermes handles, including relay domains whose mail goes on to
+  another server. A message to both a colleague and an outside recipient
+  went without a signature for everyone. Mail sent by a signed-in user,
+  from Nextcloud Mail, or by a server under **Relay Networks** now gets them
+  for every recipient.
 - **Mailboxes: small mailboxes no longer show 0.00 GB.** The **Quota** column
   under **Email Server > Mailboxes** shows usage below 1 GB in MB, for example
   `0.3 MB of 5 GB (0%)`. From 1 GB up it shows GB as before.

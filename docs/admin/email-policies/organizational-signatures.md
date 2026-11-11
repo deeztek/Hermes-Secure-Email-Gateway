@@ -229,6 +229,10 @@ See [disclaimers.md "Behavior with S/MIME, PGP, and DKIM-signed mail"](disclaime
 
 No dedup — every outbound gets a fresh signature, including replies inside a long thread. Same industry-norm pattern Disclaimers uses; same rationale (compliance, self-contained messages, predictability). See [disclaimers.md "Reply-chain handling"](disclaimers.md#reply-chain-handling--no-dedup-by-design).
 
+## Internal mail
+
+Signatures follow the same rules as disclaimers for mail to recipients on domains Hermes accepts mail for, including relay domains. Mail from a signed-in user, Nextcloud Mail, or a server under **Relay Networks** gets the signature; other mail claiming a local sender does not. See [disclaimers.md "Internal-only mail"](disclaimers.md#internal-only-mail). Before v261107 (#407) the signature was skipped whenever any recipient was on one of these domains.
+
 ## Failure semantics
 
 Same graceful-degradation contract as Disclaimers (`milter_default_action = accept`). If the milter container is down, if the map file is unreadable, if the modifier raises an exception, if substitution blows up — **mail flows unmodified**. Worst case is a missed signature; mail never gets dropped.

@@ -180,6 +180,10 @@ timeout="10" />
     output = ""
     addNewLine = "no">
 
+<!--- The rendered mynetworks list, kept for the body milter (#407). Empty if
+     the directive is disabled. --->
+<cfset bodyMilterTrustedNetworks = "">
+
 <cfloop query="getparents">
 
   <!---
@@ -221,6 +225,10 @@ timeout="10" />
     file = "/opt/hermes/tmp/#customtrans3#_postconf.sh"
     output = '/usr/sbin/postconf -e "#getparents.parameter# = #ValueList(getchildren.parameter,", ")#"'
     addNewLine = "yes">
+
+    <cfif getparents.parameter EQ "mynetworks">
+        <cfset bodyMilterTrustedNetworks = ValueList(getchildren.parameter, ",")>
+    </cfif>
 
     </cfloop>
 
@@ -334,6 +342,30 @@ file = "/opt/hermes/tmp/#customtrans3#_postconf.sh">
 <cfquery name="updateparams" datasource="hermes">
 update parameters set applied='1', action='NONE' where applied = '2'
 </cfquery>
+
+<!--- BODY MILTER TRUSTED NETWORKS (#407). The body milter adds signatures and
+     disclaimers to mail between local addresses only when Postfix trusts the
+     client to relay: a SASL login, or a client in mynetworks (Nextcloud Mail
+     and Relay Networks send on port 25 without a login). It cannot read
+     main.cf, so it gets the same list here, one entry per line, written only
+     after Postfix accepted it. Written to a temp file and renamed so the
+     milter never reads half a file. A failure is logged, not fatal: the milter
+     then trusts only logged-in senders. --->
+<cftry>
+    <cfset bmtnLines = "">
+    <cfloop list="#bodyMilterTrustedNetworks#" index="bmtnEntry">
+        <cfif Len(Trim(bmtnEntry))>
+            <cfset bmtnLines &= Trim(bmtnEntry) & chr(10)>
+        </cfif>
+    </cfloop>
+    <cfset bmtnPath = "/etc/hermes/body_milter/trusted_networks">
+    <cffile action="write" file="#bmtnPath#.tmp" output="#bmtnLines#" addnewline="no" charset="utf-8">
+    <cffile action="rename" source="#bmtnPath#.tmp" destination="#bmtnPath#" nameconflict="overwrite">
+<cfcatch type="any">
+    <cflog file="hermes" type="warning"
+           text="generate_postfix_configuration: could not write the body milter trusted networks list: #cfcatch.message#">
+</cfcatch>
+</cftry>
 
 <!--- ============================================== --->
 <!--- REGENERATE POSTFIX mysql-*.cf FROM TEMPLATES --->

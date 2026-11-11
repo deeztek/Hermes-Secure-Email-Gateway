@@ -175,7 +175,17 @@ Rows with `enabled = 0` are skipped entirely on regen — no files written, no m
 
 ## Internal-only mail
 
-v1 does **not** suppress disclaimers for internal-only mail (sender + all recipients in `@local_domains`). Domain disclaimers will be applied to internal mail in the same domain. If this is a problem for your install, file a feature request to add an internal-only bypass.
+Mail from a Hermes user to a recipient on a domain Hermes accepts mail for (a mailbox domain, a hybrid domain, or a relay domain whose mail Hermes passes to another server) gets the disclaimer too, as long as it came from a sender Postfix already trusts to send through Hermes:
+
+- a user who signed in, or sent through the submission ports (587 or 465)
+- Nextcloud Mail
+- a server listed under **Relay Networks**
+
+Messages with both internal and external recipients get it as well.
+
+Mail from anywhere else that claims a local sender for a local recipient does **not** get the disclaimer. Anyone on the internet can send that, so it is not trusted to carry your organization's text.
+
+Before v261107 (#407), disclaimers were skipped on all of this mail, including messages that also went to external recipients.
 
 ## Why a separate milter and not an amavis hook
 

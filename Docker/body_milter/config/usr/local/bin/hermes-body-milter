@@ -97,6 +97,7 @@ Postfix-side configuration (in main.cf)
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -203,6 +204,72 @@ class LocalDomains:
 
 
 local_domains = LocalDomains(LOCAL_DOMAINS_FILE)
+
+
+# ---------------------------------------------------------------------------
+# Trusted client networks (#407): Postfix's mynetworks, as rendered by the
+# console (generate_postfix_configuration.cfm) into the milter's config dir,
+# one entry per line. A client here may relay through Postfix without a
+# login, so it is as trusted as a logged-in sender. Entries that are not an
+# IP address or CIDR (hostnames, maps) are ignored. A missing file trusts no
+# network: then only logged-in and submission senders are trusted.
+# ---------------------------------------------------------------------------
+
+TRUSTED_NETWORKS_FILE = os.path.join(CONFIG_ROOT, 'trusted_networks')
+
+
+class TrustedNetworks:
+    def __init__(self, path: str):
+        self.path = path
+        self._nets: list = []
+        self._key = ()          # never a real key, so the first call loads and logs
+        self._lock = threading.Lock()
+
+    def refresh(self):
+        try:
+            st = os.stat(self.path)
+            key = (st.st_mtime_ns, st.st_size, st.st_ino)
+        except OSError:
+            key = None
+        with self._lock:
+            if key == self._key:
+                return
+            nets = []
+            if key is not None:
+                try:
+                    with open(self.path, 'r') as f:
+                        for line in f:
+                            entry = line.strip().replace('[', '').replace(']', '')
+                            if not entry or entry.startswith('#'):
+                                continue
+                            try:
+                                nets.append(ipaddress.ip_network(entry, strict=False))
+                            except ValueError:
+                                continue
+                except IOError as e:
+                    log.warning('cannot load trusted networks from %s: %s', self.path, e)
+                    return
+            self._nets = nets
+            self._key = key
+            if key is None:
+                log.info('trusted networks: %s not found, trusting logged-in senders only', self.path)
+            else:
+                log.info('trusted networks: %d entries from %s', len(nets), self.path)
+
+    def contains(self, addr: str) -> bool:
+        self.refresh()
+        if not addr:
+            return False
+        try:
+            ip = ipaddress.ip_address(addr)
+        except ValueError:
+            return False
+        if getattr(ip, 'ipv4_mapped', None):
+            ip = ip.ipv4_mapped
+        return any(ip.version == n.version and ip in n for n in self._nets)
+
+
+trusted_networks = TrustedNetworks(TRUSTED_NETWORKS_FILE)
 
 
 # ---------------------------------------------------------------------------
@@ -331,8 +398,15 @@ class SenderDataMap:
 
 class MessageContext:
     def __init__(self, sender: str, recipients: List[str],
-                 raw_headers: bytes, body_bytes: bytes):
+                 raw_headers: bytes, body_bytes: bytes,
+                 trusted_sender: bool = False):
         self.sender = sender.lower()
+        # True when Postfix trusts the client to relay: submission (Postfix
+        # sets daemon_name=ORIGINATING on 587/465), a SASL login, or a client
+        # in mynetworks (Nextcloud Mail, Relay Networks). Only then do
+        # outbound modifiers run on 'internal' mail (#407): on port 25 anyone
+        # else can forge a local sender to a local recipient.
+        self.trusted_sender = trusted_sender
         self.recipients = [r.lower() for r in recipients]
         self.raw_headers = self._unfold(raw_headers)
         self.body_bytes = body_bytes
@@ -569,9 +643,16 @@ class Modifier:
         """Return True if this modifier wants to run on this message.
         Direction filter is applied first; subclasses extend with their
         own conditions (e.g. sender-map lookup, recipient checks)."""
-        if self.direction != 'both' and ctx.direction != self.direction:
-            return False
-        return True
+        if self.direction == 'both' or ctx.direction == self.direction:
+            return True
+        # Mail from a local sender to at least one local recipient is
+        # 'internal'. Before #407 the outbound modifiers (signature,
+        # disclaimer, Link Guard restore) skipped it, so a user's signature
+        # was missing for colleagues on a relay domain, and for EVERY
+        # recipient of a message that also went to a colleague. They now run
+        # on internal mail from a trusted (submitted or authenticated) sender.
+        return (self.direction == 'outbound' and ctx.direction == 'internal'
+                and ctx.trusted_sender)
 
     def standard_skip_check(self, ctx: MessageContext) -> Optional[str]:
         """Returns None to proceed; a reason string to skip with logging."""
@@ -1996,6 +2077,27 @@ class HermesBodyMilter(Milter.Base):
         # (new) when #230 wrapping changes Content-Type or adds
         # MIME-Version.
         self._header_names: set = set()
+        # Postfix macros (#407): {daemon_name} is sent at connect
+        # (milter_connect_macros), {auth_authen} with MAIL FROM
+        # (milter_mail_macros). Both are Postfix defaults.
+        self._daemon_name = ''
+        self._auth_authen = ''
+        self._client_ip = ''
+
+    def _symval(self, name: str) -> str:
+        try:
+            v = self.getsymval(name)
+        except Exception:
+            return ''
+        return v.strip() if isinstance(v, str) else ''
+
+    @Milter.noreply
+    def connect(self, IPname, family, hostaddr):
+        self._daemon_name = self._symval('{daemon_name}')
+        # (ip, port) for IPv4, (ip, port, flow, scope) for IPv6
+        if isinstance(hostaddr, tuple) and hostaddr:
+            self._client_ip = str(hostaddr[0])
+        return Milter.CONTINUE
 
     @staticmethod
     def _strip_brackets(addr: str) -> str:
@@ -2004,6 +2106,9 @@ class HermesBodyMilter(Milter.Base):
     @Milter.noreply
     def envfrom(self, mailfrom, *unused):
         self._sender = self._strip_brackets(mailfrom)
+        self._auth_authen = self._symval('{auth_authen}')
+        if not self._daemon_name:
+            self._daemon_name = self._symval('{daemon_name}')
         self._recipients = []
         self._raw_headers = bytearray()
         self._body_chunks = []
@@ -2041,6 +2146,9 @@ class HermesBodyMilter(Milter.Base):
                 recipients=self._recipients,
                 raw_headers=bytes(self._raw_headers),
                 body_bytes=b''.join(self._body_chunks),
+                trusted_sender=(self._daemon_name == 'ORIGINATING'
+                                or bool(self._auth_authen)
+                                or trusted_networks.contains(self._client_ip)),
             )
 
             for mod in MODIFIERS:
