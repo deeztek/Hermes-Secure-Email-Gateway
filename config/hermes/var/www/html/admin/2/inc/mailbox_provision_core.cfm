@@ -369,7 +369,16 @@ credential). Everything else is the same work in the same order.
 
         <!--- ===== 4d. DOMAIN GROUP MEMBERSHIP =====
              Add user to NC group for their domain (cross-domain isolation
-             relies on this). Verify by SELECT on oc_group_user. --->
+             relies on this). Verify by SELECT on oc_group_user.
+             Create the group first: only Add Mailbox Domain used to, so a
+             relay domain made hybrid by converting recipients never got one
+             and every adduser here failed (#408). group:add on a group that
+             already exists only reports so. --->
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:add #getDomain.domain#"
+            variable="ncGroupCreateResult"
+            errorVariable="ncGroupCreateError"
+            timeout="30" />
         <cfexecute name="/usr/local/bin/docker"
             arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:adduser #getDomain.domain# #recipientEmail#"
             variable="ncGroupAddResult"

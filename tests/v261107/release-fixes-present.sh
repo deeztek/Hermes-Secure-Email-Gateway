@@ -46,6 +46,11 @@ for fn in admin/2/view_internal_recipients.cfm:1 admin/2/inc/recipient_portal_ac
 done
 check $w/schedule/post_upgrade.cfm "relay-group-stale-mailbox-members-v1" "upgrade removes mailboxes from cn=relays (#406)"
 
+# #408: hybrid domains get their Nextcloud group
+check $w/admin/2/inc/mailbox_provision_core.cfm 'occ group:add #getDomain.domain#' "mailbox provisioning creates the domain's Nextcloud group (#408)"
+check $w/admin/2/inc/mailbox_domain_edit_action.cfm 'occ group:add #getCurrent.domain#' "Edit Domain ensures the Nextcloud group exists (#408)"
+check $w/schedule/post_upgrade.cfm "nextcloud-domain-groups-v1" "upgrade creates missing Nextcloud domain groups (#408)"
+
 # Mailboxes quota column: usage under 1 GB in MB
 check $w/admin/2/view_mailboxes.cfm 'usedGb \* 1024' "Mailboxes shows usage under 1 GB in MB"
 

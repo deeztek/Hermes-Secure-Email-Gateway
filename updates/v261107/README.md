@@ -71,6 +71,11 @@ Upgrading is recommended.
   went without a signature for everyone. Mail sent by a signed-in user,
   from Nextcloud Mail, or by a server under **Relay Networks** now gets them
   for every recipient.
+- **Nextcloud: mailboxes on hybrid domains are kept to their own domain
+  (#408).** A relay domain that gained mailboxes by converting relay
+  recipients got no Nextcloud group, so its users were not separated from
+  other domains in Nextcloud. Converting and adding mailboxes now create the
+  group, and the upgrade creates it for existing domains and adds their users.
 - **Mailboxes: small mailboxes no longer show 0.00 GB.** The **Quota** column
   under **Email Server > Mailboxes** shows usage below 1 GB in MB, for example
   `0.3 MB of 5 GB (0%)`. From 1 GB up it shows GB as before.

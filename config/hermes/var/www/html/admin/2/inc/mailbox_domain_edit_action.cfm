@@ -176,6 +176,22 @@ re-validation).
   </cfquery>
 </cfif>
 
+<!--- Nextcloud group for the domain (#408). Add Mailbox Domain creates it, but
+     a domain made hybrid by converting relay recipients never had one. Turning
+     Nextcloud on here makes sure it exists; existing members are untouched. --->
+<cfif ncEnabled EQ 1>
+    <cftry>
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec -u www-data hermes_nextcloud php /var/www/html/occ group:add #getCurrent.domain#"
+            variable="ncGroupResult"
+            errorVariable="ncGroupError"
+            timeout="30" />
+    <cfcatch type="any">
+        <!--- Non-fatal: group may already exist or NC not ready --->
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Re-sync mailbox_sans so cert bindings and subdomains match the edit --->
 <cfinclude template="./sync_mailbox_sans.cfm">
 

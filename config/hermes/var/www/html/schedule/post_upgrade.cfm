@@ -756,6 +756,53 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Nextcloud domain groups (#408). Only Add Mailbox Domain created a domain's
+     Nextcloud group, so a relay domain made hybrid by converting recipients
+     had none, every group:adduser for its users failed, and those users sat
+     outside the per-domain group that keeps domains apart. Create the group
+     for every domain with Nextcloud-enabled mailboxes and add each of them.
+     Both occ calls only report when the group or membership already exists.
+     Detached, like the block above: one occ call per user can outlast this
+     request. --->
+<cfset blockName = "nextcloud-domain-groups-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfquery name="ncGroupUsers" datasource="hermes">
+            SELECT d.domain, m.username
+            FROM mailboxes m
+            JOIN domains d ON d.id = m.domain_id
+            WHERE m.nextcloud_enabled = 1
+            ORDER BY d.domain, m.username
+        </cfquery>
+        <cfset ncGroupScript = "/opt/hermes/tmp/pu_" & Replace(CreateUUID(), "-", "", "ALL") & "_nc_domain_groups.sh">
+        <cfset ncGroupBody = "##!/bin/bash" & chr(10)>
+        <cfset ncGroupLast = "">
+        <cfset ncGroupDomains = 0>
+        <cfloop query="ncGroupUsers">
+            <cfif REFind("^[A-Za-z0-9.-]+$", ncGroupUsers.domain) AND REFind("^[A-Za-z0-9._%+@-]+$", ncGroupUsers.username)>
+                <cfif ncGroupUsers.domain NEQ ncGroupLast>
+                    <cfset ncGroupBody &= "docker exec -u www-data hermes_nextcloud php /var/www/html/occ group:add """ & ncGroupUsers.domain & """ >/dev/null 2>&1" & chr(10)>
+                    <cfset ncGroupLast = ncGroupUsers.domain>
+                    <cfset ncGroupDomains = ncGroupDomains + 1>
+                </cfif>
+                <cfset ncGroupBody &= "docker exec -u www-data hermes_nextcloud php /var/www/html/occ group:adduser """ & ncGroupUsers.domain & """ """ & ncGroupUsers.username & """ >/dev/null 2>&1" & chr(10)>
+            </cfif>
+        </cfloop>
+        <cfset ncGroupBody &= "rm -f ""$0""" & chr(10)>
+        <cffile action="write" file="#ncGroupScript#" output="#ncGroupBody#" addnewline="no">
+        <cfexecute name="/bin/chmod" arguments="700 #ncGroupScript#" timeout="10" />
+        <cfexecute name="#ncGroupScript#" timeout="0" />
+        <cfset markComplete(blockName)>
+        <cfset arrayAppend(migrationsApplied, blockName & " (started in the background for " & ncGroupUsers.recordcount & " mailboxes in " & ncGroupDomains & " domains)")>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Mailbox and shared users left in cn=relays (#406). Before v260929
      (#290), converting a relay recipient to a mailbox did not take it out of
      cn=relays, so the account kept both roles. Remove every cn=relays member
