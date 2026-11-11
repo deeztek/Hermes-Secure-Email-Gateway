@@ -494,8 +494,14 @@ a, a:hover{
       <cfset portalRelayMembers = "">
   </cfcatch>
   </cftry>
+  <!--- The same recipients the table lists. Mailbox and shared recipients
+       belong to cn=mailboxes, so counting them reported every mailbox as
+       missing a portal account. --->
   <cfquery name="portalAllRecipients" datasource="hermes">
-      SELECT recipient FROM recipients WHERE recipient NOT LIKE '@%'
+      SELECT recipient FROM recipients
+      WHERE recipient NOT LIKE '@%'
+        AND domain IS NULL
+        AND (recipient_type = 'relay' OR recipient_type IS NULL)
   </cfquery>
   <cfset portalMembersLC = LCase(portalRelayMembers)>
   <cfset portalMissingCount = 0>

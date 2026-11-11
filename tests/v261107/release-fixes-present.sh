@@ -36,6 +36,16 @@ for p in relay_host_username relay_host_password; do
         && pass "system_settings has $p" || fail "system_settings is missing $p"
 done
 
+# #406: the "without a portal account" banner and Provision count relay
+# recipients only, and the upgrade clears mailboxes out of cn=relays
+for fn in admin/2/view_internal_recipients.cfm:1 admin/2/inc/recipient_portal_accounts_action.cfm:2; do
+    f=${fn%:*} want=${fn##*:}
+    [[ "$(grep -c "recipient_type = 'relay' OR recipient_type IS NULL" "$w/$f" 2>/dev/null)" -ge "$want" ]] \
+        && pass "$f counts relay recipients only (#406)" \
+        || fail "$f counts mailboxes as relay recipients (#406)"
+done
+check $w/schedule/post_upgrade.cfm "relay-group-stale-mailbox-members-v1" "upgrade removes mailboxes from cn=relays (#406)"
+
 # Mailboxes quota column: usage under 1 GB in MB
 check $w/admin/2/view_mailboxes.cfm 'usedGb \* 1024' "Mailboxes shows usage under 1 GB in MB"
 

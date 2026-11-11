@@ -756,6 +756,57 @@ legitimate state it accumulated later.
     </cftry>
 </cfif>
 
+<!--- Mailbox and shared users left in cn=relays (#406). Before v260929
+     (#290), converting a relay recipient to a mailbox did not take it out of
+     cn=relays, so the account kept both roles. Remove every cn=relays member
+     whose recipient is now a mailbox or shared mailbox. Real relay recipients
+     are not touched. Marked complete only when the group could be read. --->
+<cfset blockName = "relay-group-stale-mailbox-members-v1">
+<cfset arrayAppend(migrationsAttempted, blockName)>
+<cfif hasRun(blockName)>
+    <cfset arrayAppend(migrationsSkipped, blockName)>
+<cfelse>
+    <cftry>
+        <cfset staleRelayOut = "">
+        <cfset staleRelayErr = "">
+        <cfexecute name="/usr/local/bin/docker"
+            arguments="exec hermes_ldap ldapsearch -Y EXTERNAL -H ldapi://%2Fvar%2Frun%2Fslapd%2Fldapi -o ldif-wrap=no -b 'cn=relays,ou=groups,dc=hermes,dc=local' -LLL member"
+            variable="staleRelayOut" errorVariable="staleRelayErr" timeout="60" />
+        <cfif NOT FindNoCase("dn: cn=relays,", staleRelayOut)>
+            <cfset arrayAppend(migrationErrors, blockName & ": could not read cn=relays. " & Left(Trim(staleRelayErr), 300))>
+        <cfelse>
+            <cfset staleRelayMembers = LCase(staleRelayOut)>
+            <cfquery name="staleRelayCandidates" datasource="hermes">
+                SELECT recipient FROM recipients
+                WHERE recipient_type IN ('mailbox', 'shared')
+                ORDER BY recipient
+            </cfquery>
+            <cfset staleRelayRemoved = 0>
+            <cfset staleRelayFailed = 0>
+            <cfloop query="staleRelayCandidates">
+                <cfif Find("member: cn=" & LCase(staleRelayCandidates.recipient) & ",ou=users,", staleRelayMembers)>
+                    <cfset ldapUsername = LCase(staleRelayCandidates.recipient)>
+                    <cfinclude template="../admin/2/inc/ldap_remove_user_groups_relay.cfm">
+                    <cfif relayGroupRemoved>
+                        <cfset staleRelayRemoved = staleRelayRemoved + 1>
+                    <cfelse>
+                        <cfset staleRelayFailed = staleRelayFailed + 1>
+                    </cfif>
+                </cfif>
+            </cfloop>
+            <cfif staleRelayFailed EQ 0>
+                <cfset markComplete(blockName)>
+                <cfset arrayAppend(migrationsApplied, blockName & " (" & staleRelayRemoved & " removed from cn=relays)")>
+            <cfelse>
+                <cfset arrayAppend(migrationErrors, blockName & ": " & staleRelayFailed & " could not be removed from cn=relays; " & staleRelayRemoved & " were. Runs again on the next upgrade.")>
+            </cfif>
+        </cfif>
+    <cfcatch type="any">
+        <cfset arrayAppend(migrationErrors, blockName & ": " & cfcatch.message)>
+    </cfcatch>
+    </cftry>
+</cfif>
+
 <!--- Build response --->
 <cfset elapsedMs = getTickCount() - startTickCount>
 

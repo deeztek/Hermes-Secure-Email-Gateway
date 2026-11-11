@@ -72,6 +72,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         FROM recipients
         WHERE id IN (<cfqueryparam value="#portalIds#" cfsqltype="cf_sql_integer" list="true">)
           AND recipient NOT LIKE '@%'
+          AND domain IS NULL
+          AND (recipient_type = 'relay' OR recipient_type IS NULL)
         ORDER BY recipient
     </cfquery>
 <cfelse>
@@ -79,6 +81,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         SELECT recipient, auth_type, remoteauth_domain
         FROM recipients
         WHERE recipient NOT LIKE '@%'
+          AND domain IS NULL
+          AND (recipient_type = 'relay' OR recipient_type IS NULL)
         ORDER BY recipient
     </cfquery>
 </cfif>

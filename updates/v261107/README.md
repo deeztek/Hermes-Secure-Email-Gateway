@@ -58,6 +58,12 @@ Upgrading is recommended.
   Mail) still needed upgrading, the updater could end without an error after
   "Applying Nextcloud settings", skipping its remaining steps. It now runs the
   Nextcloud upgrade in that case and carries on to the end.
+- **Relay Recipients: no false "without a portal account" warning (#406).**
+  The warning counted mailboxes as relay recipients, so it reported
+  recipients without a portal account when every relay recipient had one.
+  **Provision them** used the same list. Both now cover relay recipients only.
+  The upgrade also removes the relay role from mailboxes that were converted
+  from relay recipients before v260929 and still had it.
 - **Mailboxes: small mailboxes no longer show 0.00 GB.** The **Quota** column
   under **Email Server > Mailboxes** shows usage below 1 GB in MB, for example
   `0.3 MB of 5 GB (0%)`. From 1 GB up it shows GB as before.
