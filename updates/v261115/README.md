@@ -14,6 +14,11 @@
   recipient that hit this, open its Edit Mail Delivery page and save it with
   Built-in Email Server again.
 
+- **The console comes back on its own after a reboot (#409).** If the web
+  server started before the console was ready, it stopped but its container
+  still showed as running, so the console and user portal stayed unreachable
+  until it was restarted by hand. It now retries until the console is up.
+
 ## Upgrading
 
 <!-- TODO at release cut. -->

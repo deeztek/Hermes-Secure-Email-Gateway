@@ -36,14 +36,12 @@ chmod 0775 /var/log
 echo "Starting Ryslog"
 /usr/sbin/rsyslogd
 
+# nginx is the container's process (under dumb-init). If it exits, for
+# example because an upstream such as hermes_commandbox is not resolvable
+# yet after a reboot, the container exits with it and restart: always
+# retries. It used to fall through to tail -f /dev/null, which kept a
+# dead nginx container Up forever (#409).
 echo "Starting Nginx"
-nginx -g 'daemon off;'
-
-echo "Startup Complete"
-
-
-#Output to Docker logs and Keep Container Alive
-exec tail -f /dev/null
-#exec tail -f /var/log/syslog
+exec nginx -g 'daemon off;'
 
    fi
