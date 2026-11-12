@@ -631,7 +631,10 @@ credential). Everything else is the same work in the same order.
 </cfif>
 
 <!--- 8. QUEUE PGP KEYRING GENERATION (background) --->
-<cfif form.pgp_enabled EQ "1">
+<!--- Skipped on a conversion, the same as step 7: a conversion mints no keys.
+     An existing keyring is untouched and a new one can be generated afterwards
+     as usual. The convert caller never sets form.pgp_encryption. --->
+<cfif form.pgp_enabled EQ "1" AND provisionMode NEQ "convert">
     <cfquery name="getNewRecipientId2" datasource="hermes">
         SELECT id FROM recipients WHERE recipient = <cfqueryparam value="#recipientEmail#" cfsqltype="cf_sql_varchar">
     </cfquery>
