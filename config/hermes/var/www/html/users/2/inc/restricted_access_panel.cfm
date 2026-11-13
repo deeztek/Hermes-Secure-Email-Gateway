@@ -66,7 +66,7 @@ the main content area.
                complete Authelia's identity verification. --->
           <div class="alert alert-warning mb-3">
             <p class="mb-2"><strong>Your administrator requires Two-Factor Authentication (2FA) on your account.</strong></p>
-            <p class="mb-0">Until you enable 2FA, your portal access is limited to <strong>Account Settings</strong>, <strong>My App Passwords</strong>, <strong>Set Up Your Devices</strong>, and <strong>Webmail &amp; Apps</strong>. Other sections (Notification Settings, Sender Filters, Message History, Mail Filters, Vacation Auto-Reply, Shared Folders) unlock automatically once you're enrolled.</p>
+            <p class="mb-0">Until you enable 2FA, your portal access is limited to <strong>Account Settings</strong>, <strong>My App Passwords</strong>, <strong>Set Up Your Devices</strong>, and <strong>Webmail &amp; Apps</strong>. Other sections (Notification Settings, Sender Filters, Message History, Mail Filters, Vacation Auto-Reply, Forwarding, Shared Folders) unlock automatically once you're enrolled.</p>
           </div>
 
           <h5 class="mb-2">How to enable 2FA &mdash; follow these steps in order</h5>

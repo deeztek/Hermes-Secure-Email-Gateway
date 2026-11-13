@@ -151,6 +151,9 @@ RE_PGP_ENCRYPTED = re.compile(
 )
 RE_PGP_INLINE = re.compile(rb'-----BEGIN PGP (SIGNED MESSAGE|MESSAGE)-----')
 RE_DKIM_HEADER = re.compile(rb'^DKIM-Signature\s*:', re.I | re.M)
+# Added by Dovecot's Sieve (Pigeonhole) to every message it redirects
+# (Forwarding, a Mail Filters redirect, an admin global rule). See #411.
+RE_SIEVE_REDIRECTED = re.compile(rb'^X-Sieve-Redirected-From\s*:', re.I | re.M)
 
 
 log = logging.getLogger('hermes_body_milter')
@@ -412,6 +415,12 @@ class MessageContext:
         self.body_bytes = body_bytes
         self.modified = False
         self.direction = self._detect_direction()
+        # A Sieve redirect re-submits a message that already went through
+        # this milter on its way into the mailbox. Honoured only from a
+        # trusted client (Dovecot is in mynetworks), so a sender on the
+        # Internet cannot add the header to escape the banner or Link Guard.
+        self.sieve_redirected = bool(
+            trusted_sender and RE_SIEVE_REDIRECTED.search(self.raw_headers))
         # Lazy-parsed full MIME message (built only if a modifier asks)
         self._email_msg: Optional[Message] = None
         # #230: per-message inline image queue. Modifiers call
@@ -643,6 +652,12 @@ class Modifier:
         """Return True if this modifier wants to run on this message.
         Direction filter is applied first; subclasses extend with their
         own conditions (e.g. sender-map lookup, recipient checks)."""
+        # A Sieve-redirected message (#411) was fully processed on its first
+        # pass. Running again would add a second signature, disclaimer or
+        # external banner, and Link Guard restore would strip the rewritten
+        # links from the forwarded copy. Pass it through unchanged.
+        if getattr(ctx, 'sieve_redirected', False):
+            return False
         if self.direction == 'both' or ctx.direction == self.direction:
             return True
         # Mail from a local sender to at least one local recipient is
@@ -2150,6 +2165,10 @@ class HermesBodyMilter(Milter.Base):
                                 or bool(self._auth_authen)
                                 or trusted_networks.contains(self._client_ip)),
             )
+
+            if ctx.sieve_redirected:
+                log.info('sieve redirect, passed through unchanged (sender=%s, direction=%s)',
+                         ctx.sender, ctx.direction)
 
             for mod in MODIFIERS:
                 try:

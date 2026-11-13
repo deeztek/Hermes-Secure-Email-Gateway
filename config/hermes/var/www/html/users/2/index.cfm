@@ -430,6 +430,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     <i class="fas fa-paper-plane me-2"></i>Vacation Auto-Reply
                 </a>
             </div>
+            <div class="col-md-4 col-sm-6 mb-3">
+                <a href="view_forwarding.cfm" class="btn btn-outline-primary btn-block w-100">
+                    <i class="fas fa-share me-2"></i>Forwarding
+                </a>
+            </div>
             <cfif quickLinksSharingEnabled>
             <div class="col-md-4 col-sm-6 mb-3">
                 <a href="view_shared_folders.cfm" class="btn btn-outline-primary btn-block w-100">

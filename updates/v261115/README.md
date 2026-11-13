@@ -11,6 +11,9 @@
   keeping a copy in their own mailbox by default. Turning the copy off sends
   mail to the other mailbox instead, and the page warns before saving that.
   Forwards to a mailbox that is later deleted are removed automatically.
+  It is also on the dashboard's Quick Links. Forwarded copies pass through
+  unchanged, without a second signature, disclaimer or external-sender
+  banner, and keep their Link Guard links.
   Administrators can do the same under Content Checks > BCC Maps.
 - **Mail Filters: All messages and Keep (#411).** Filters in the user
   console now have an **All messages** condition and a **Keep (deliver
