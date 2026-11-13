@@ -4,6 +4,16 @@
 
 <!-- TODO at release cut: 2-3 sentences on what this release is and whether to upgrade. -->
 
+## New features
+
+- **Users can forward a copy of their mail to another mailbox (#411).** Mail
+  Filters in the user console now have an **All messages** condition and a
+  **Keep (deliver normally)** action. A filter with All messages, Redirect and
+  Keep delivers each message to both mailboxes. Redirect on its own still
+  sends mail to the other mailbox instead, and the console warns before
+  saving a filter that would take all mail out of the mailbox. Administrators
+  can do the same under Content Checks > BCC Maps.
+
 ## Bug fixes
 
 - **Converting a relay recipient with PGP enabled to a mailbox no longer fails (#410).**

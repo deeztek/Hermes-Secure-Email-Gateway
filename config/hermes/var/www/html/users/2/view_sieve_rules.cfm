@@ -287,8 +287,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfelseif getAllConds.condition_field EQ "cc">Cc
                 <cfelseif getAllConds.condition_field EQ "bcc">Bcc
                 <cfelseif getAllConds.condition_field EQ "size">Size
+                <cfelseif getAllConds.condition_field EQ "all">All messages
                 </cfif>
-                <cfif getAllConds.condition_field EQ "size">
+                <cfif getAllConds.condition_field EQ "all">
+                <cfelseif getAllConds.condition_field EQ "size">
                   <cfif getAllConds.condition_type EQ "over">over<cfelse>under</cfif> #HTMLEditFormat(getAllConds.condition_value)#
                 <cfelse>
                   <cfif getAllConds.condition_type EQ "is">is exactly
@@ -315,6 +317,8 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                   <span class="badge bg-warning text-dark">Redirect to</span> #HTMLEditFormat(getAllActs.action_value)#
                 <cfelseif getAllActs.action_type EQ "flag_seen">
                   <span class="badge bg-secondary">Mark read</span>
+                <cfelseif getAllActs.action_type EQ "keep">
+                  <span class="badge bg-success">Keep</span>
                 </cfif>
                 <cfset actCount++>
               </cfif>
@@ -378,6 +382,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
               <button type="button" class="btn btn-sm btn-outline-primary" onclick="addActionRow()"><i class="fas fa-plus"></i> Add Action</button>
             </div>
             <div class="card-body" id="actionsContainer">
+            </div>
+            <div class="card-footer small text-muted">
+              <i class="fas fa-info-circle me-1"></i><strong>Redirect</strong> sends the message to the other address <strong>instead of</strong> this mailbox.
+              To forward a copy and still receive the message here, add a second action: <strong>Keep (deliver normally)</strong>.
             </div>
           </div>
 
@@ -448,14 +456,30 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     });
 
     // Confirm before submitting any filter that includes a "Delete silently" action
+    // and any "All messages" filter that takes mail out of this mailbox
     $('#ruleForm').on('submit', function(e) {
-      var hasDiscard = false;
+      var hasAll = false, hasDiscard = false, hasRedirect = false, hasKeep = false;
+      $('.condition-row').each(function() {
+        var idx = $(this).data('idx');
+        if ($(this).find('[name="cond_field_' + idx + '"]').val() === 'all') hasAll = true;
+      });
       $('.action-row').each(function() {
         var idx = $(this).data('idx');
-        if ($(this).find('[name="act_type_' + idx + '"]').val() === 'discard') hasDiscard = true;
+        var v = $(this).find('[name="act_type_' + idx + '"]').val();
+        if (v === 'discard') hasDiscard = true;
+        if (v === 'redirect') hasRedirect = true;
+        if (v === 'keep') hasKeep = true;
       });
-      if (hasDiscard) {
-        if (!confirm('WARNING: This filter will permanently DELETE matching messages without keeping a copy. Deleted messages cannot be recovered. Are you sure?')) {
+      var needConfirm = null;
+      if (hasAll && hasDiscard) {
+        needConfirm = 'WARNING: This filter will permanently DELETE EVERY incoming message. Nothing will reach your inbox and deleted messages cannot be recovered. Are you absolutely sure?';
+      } else if (hasDiscard) {
+        needConfirm = 'WARNING: This filter will permanently DELETE matching messages without keeping a copy. Deleted messages cannot be recovered. Are you sure?';
+      } else if (hasAll && hasRedirect && !hasKeep) {
+        needConfirm = 'WARNING: This filter will send EVERY incoming message to the redirect address INSTEAD of this mailbox. You will stop receiving mail here. To keep a copy here as well, cancel and add the action "Keep (deliver normally)". Continue anyway?';
+      }
+      if (needConfirm) {
+        if (!confirm(needConfirm)) {
           e.preventDefault();
           e.stopImmediatePropagation();
           // html_head.cfm's global submit hook already showed the preloader
@@ -481,6 +505,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     html += '<option value="cc">Cc</option>';
     html += '<option value="bcc">Bcc</option>';
     html += '<option value="size">Size</option>';
+    html += '<option value="all">All messages</option>';
     html += '</select></div>';
     html += '<div class="col-md-3"><label class="form-label small mb-1">Match</label>';
     html += '<select class="form-control form-control-sm" name="cond_type_' + idx + '">';
@@ -511,6 +536,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     html += '<option value="discard">Delete silently</option>';
     html += '<option value="redirect">Redirect to address</option>';
     html += '<option value="flag_seen">Mark as read</option>';
+    html += '<option value="keep">Keep (deliver normally)</option>';
     html += '</select></div>';
     html += '<div class="col-md-7">';
     html += '<label class="form-label small mb-1 act-value-label">Folder name</label>';
@@ -587,6 +613,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     var field = $row.find('[name="cond_field_' + idx + '"]').val();
     var $type = $row.find('[name="cond_type_' + idx + '"]');
     var $value = $row.find('[name="cond_value_' + idx + '"]');
+    if (field === 'all') {
+      $type.prop('disabled', true).hide();
+      $value.prop('disabled', true).hide();
+      return;
+    }
+    $type.prop('disabled', false).show();
+    $value.prop('disabled', false).show();
     if (field === 'size') {
       $type.html('<option value="over">Is over</option><option value="under">Is under</option>');
       $value.attr('placeholder', 'e.g., 10M');
