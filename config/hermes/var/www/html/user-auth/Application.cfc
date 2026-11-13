@@ -49,6 +49,17 @@
 
        --->
 
+      <!--- SECURITY (GHSA-wwxm-p5f2-q6xm, GHSA-rgx7-j3qv-h2gm, GHSA-h2c7-jjqq-j49j):
+           /user-auth/ is public (no Authelia). Files under inc/ are include
+           fragments that trust variables set by their caller; requested
+           directly, Lucee fills those variables from the URL. Nothing calls
+           them directly, so refuse every request for one. --->
+      <cfif REFindNoCase("[/\\]inc[/\\]", Arguments.targetPage)>
+          <cfheader statuscode="404" statustext="Not Found">
+          <cfcontent reset="true" type="text/plain">
+          <cfabort>
+      </cfif>
+
       <cfinclude template="#Arguments.targetPage#" />
       <cfreturn />
 

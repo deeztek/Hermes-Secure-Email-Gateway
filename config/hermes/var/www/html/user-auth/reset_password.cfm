@@ -166,8 +166,23 @@ URL Parameters:
         <cflocation url="forgot_password.cfm" addtoken="no">
     </cfif>
 
-    <!--- UPDATE PASSWORD IN LDAP --->
-    <cfset ldapUsername = validateToken.ldap_username>
+    <!--- SECURITY (GHSA-rgx7-j3qv-h2gm): do not trust user_type or
+         ldap_username from the token row. Look the account up in LDAP again
+         by the row's e-mail and refuse unless it is the same account and it
+         is a relay or mailbox user, never an administrator. --->
+    <cfset userEmail = LCase(Trim(validateToken.email))>
+    <cfinclude template="inc/ldap_get_user_groups.cfm">
+    <cfif NOT ldapUserFound OR ldapUsername EQ ""
+          OR CompareNoCase(ldapUsername, validateToken.ldap_username) NEQ 0>
+        <cfset session.reason = 15>
+        <cflocation url="forgot_password.cfm" addtoken="no">
+    </cfif>
+    <cfif isAdmin OR NOT (isRelay OR isMailbox)>
+        <cfset session.reason = 10>
+        <cflocation url="forgot_password.cfm" addtoken="no">
+    </cfif>
+
+    <!--- UPDATE PASSWORD IN LDAP (ldapUsername now comes from LDAP) --->
     <cfset newPassword = form.new_password>
 
     <!--- All users are in ou=users - role is determined by group membership --->

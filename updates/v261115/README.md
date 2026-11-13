@@ -2,7 +2,29 @@
 
 ## Synopsis
 
-<!-- TODO at release cut: 2-3 sentences on what this release is and whether to upgrade. -->
+Security release. Upgrade as soon as possible.
+
+<!-- TODO at release cut: rest of the synopsis. -->
+
+## Security fixes
+
+Fixes vulnerabilities affecting v261107 and earlier, reported by
+furkank1337. Details are in the advisories.
+
+- **Critical:** unauthenticated LDAP password change through the password
+  reset pages
+  ([GHSA-wwxm-p5f2-q6xm](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-wwxm-p5f2-q6xm)).
+- **Critical:** unauthenticated password reset tokens for other accounts
+  ([GHSA-rgx7-j3qv-h2gm](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-rgx7-j3qv-h2gm)).
+- **Critical:** a signed-in mailbox user could run commands through a shared
+  folder name
+  ([GHSA-jcj6-qrjh-qp2m](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-jcj6-qrjh-qp2m)).
+- **Medium:** HTML injection into the password reset notice sent to
+  administrators
+  ([GHSA-h2c7-jjqq-j49j](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-h2c7-jjqq-j49j)).
+
+<!-- GHSA-jmx7-r446-76pg (Nextcloud password script) was already fixed in
+     v261107 by #401; credit it in that advisory, not here. -->
 
 ## New features
 

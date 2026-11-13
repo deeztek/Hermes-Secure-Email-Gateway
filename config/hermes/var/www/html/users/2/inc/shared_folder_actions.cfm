@@ -52,6 +52,32 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset folderPath = Trim(form.folder_path)>
         <cfset sharedWith = Trim(form.shared_with_username)>
 
+        <!--- SECURITY (GHSA-jcj6-qrjh-qp2m): the folder must be one of the
+             user's real folders, as Dovecot lists them. Anything else is
+             refused before it is stored or written into the ACL script. --->
+        <cfset sfFolderOk = false>
+        <cftry>
+            <cfexecute name="/usr/local/bin/docker"
+                arguments="exec hermes_dovecot doveadm mailbox list -u #session.email#"
+                variable="sfFolderList"
+                errorVariable="sfFolderErr"
+                timeout="30" />
+            <cfloop list="#sfFolderList#" index="sfFolder" delimiters="#Chr(10)##Chr(13)#">
+                <cfif Compare(Trim(sfFolder), folderPath) EQ 0>
+                    <cfset sfFolderOk = true>
+                    <cfbreak>
+                </cfif>
+            </cfloop>
+        <cfcatch type="any">
+            <cfset sfFolderOk = false>
+        </cfcatch>
+        </cftry>
+        <cfif NOT sfFolderOk>
+            <cfset session.sfMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>That folder was not found in your mailbox.">
+            <cfset session.sfMessageType = "danger">
+            <cflocation url="view_shared_folders.cfm" addtoken="no">
+        </cfif>
+
         <!--- Cannot share with yourself --->
         <cfif sharedWith EQ session.email>
             <cfset session.sfMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>You cannot share a folder with yourself.">

@@ -80,6 +80,18 @@ the same folder retries the sync.
 </cfif>
 <cfset aclFilePath = aclMailDirPath & "/dovecot-acl">
 
+<!--- SECURITY (GHSA-jcj6-qrjh-qp2m): the path is written into a bash script
+     inside double quotes and a nested sh -c single-quoted string. Refuse any
+     path containing a quote, backtick, dollar sign, backslash or control
+     character, so a folder name can never break out and run commands. The
+     check sits here, not only in the caller, so every caller is covered. --->
+<cfset aclBadChars = "'""`$\">
+<cfloop from="0" to="31" index="aclCharCode">
+    <cfset aclBadChars = aclBadChars & chr(aclCharCode)>
+</cfloop>
+<cfset aclBadChars = aclBadChars & chr(127)>
+<cfset aclPathSafe = (FindOneOf(aclBadChars, aclMailDirPath) EQ 0)>
+
 <!--- Pull all shares of THIS folder from the source of truth. --->
 <cfquery name="qUserAclPerms" datasource="hermes">
     SELECT shared_with_username, can_read, can_write, can_delete, can_insert
@@ -110,6 +122,7 @@ the same folder retries the sync.
 
 <cfinclude template="generate_customtrans.cfm">
 
+<cfif aclPathSafe>
 <cftry>
     <cfset aclScriptPath = "/opt/hermes/tmp/" & customtrans3 & "_sync_user_folder_acl.sh">
 
@@ -132,3 +145,4 @@ docker exec -i hermes_dovecot sh -c "mkdir -p '#aclMailDirPath#' && cat > '#aclF
     <!--- Non-fatal: DB state remains correct. --->
 </cfcatch>
 </cftry>
+</cfif>

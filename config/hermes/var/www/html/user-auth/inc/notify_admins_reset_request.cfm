@@ -32,6 +32,9 @@ This is used when:
 2. Any user type requests a reset and admin notification is configured
 --->
 
+<!--- SECURITY (GHSA-h2c7-jjqq-j49j): userEmail and ldapUsername are
+     encoded below because this body is type="html". --->
+
 <!--- GET POSTMASTER EMAIL FOR FROM ADDRESS --->
 <cfquery name="getPostmaster" datasource="hermes">
     SELECT parameter, value FROM system_settings WHERE parameter='postmaster'
@@ -84,8 +87,8 @@ This is used when:
 <p>A <strong>#userTypeDisplay#</strong> has requested a password reset and requires administrator assistance.</p>
 
 <table border="0" cellpadding="8" style="background-color: ##f8f9fa; border-radius: 5px; margin: 20px 0;">
-<tr><td><strong>User Email:</strong></td><td>#userEmail#</td></tr>
-<tr><td><strong>LDAP Username:</strong></td><td>#ldapUsername#</td></tr>
+<tr><td><strong>User Email:</strong></td><td>#EncodeForHTML(userEmail)#</td></tr>
+<tr><td><strong>LDAP Username:</strong></td><td>#EncodeForHTML(ldapUsername)#</td></tr>
 <tr><td><strong>User Type:</strong></td><td>#userTypeDisplay#</td></tr>
 <tr><td><strong>Requested At:</strong></td><td>#DateFormat(Now(), "yyyy-mm-dd")# #TimeFormat(Now(), "HH:mm:ss")#</td></tr>
 </table>
