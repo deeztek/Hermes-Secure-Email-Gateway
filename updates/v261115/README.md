@@ -34,6 +34,10 @@
   in the content filter container, so spam scoring has used the rules that
   shipped with SpamAssassin itself. Rules now update daily and when the
   container starts, and Amavis switches to them straight away.
+- **A deleted mailbox that was converted from a relay recipient can be added
+  again.** Deleting it left behind the entry that kept the address out of the
+  domain catch-all, so Add Mailbox reported that the address already
+  existed, and mail for it still skipped the catch-all.
 - **Reverting a mailbox to a relay recipient now removes its vacation
   auto-reply setting.** It was left behind.
 

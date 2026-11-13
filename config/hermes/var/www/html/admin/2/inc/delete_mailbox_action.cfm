@@ -300,6 +300,21 @@ Removes a mailbox user from all systems:
     </cfquery>
 </cfif>
 
+<!--- 4a. THE CATCH-ALL EXEMPTION a relay-recipient conversion created
+     (virtual_recipients, system = '3'), the same row Revert to Relay
+     Recipient removes. Left behind, it blocked re-adding the address (Add
+     Mailbox treats any virtual_recipients row as a duplicate) and kept the
+     address out of the domain catch-all. system = '3' is only ever written by
+     the conversion, so an entry made by hand is never touched. Kept on a
+     conversion to shared: the address still receives here. --->
+<cfif NOT convertToShared>
+    <cfquery datasource="hermes">
+        DELETE FROM virtual_recipients
+         WHERE LOWER(virtual_address) = <cfqueryparam value="#LCase(recipient)#" cfsqltype="cf_sql_varchar">
+           AND system = '3'
+    </cfquery>
+</cfif>
+
 <!--- 4b. DELETE BCC MAP ENTRIES referencing this mailbox (as watched address
      OR as BCC destination). Postfix reads bcc_maps via MySQL lookup tables
      (mysql-*-bcc-maps.cf) so no postmap regeneration is required - lookups
