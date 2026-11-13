@@ -37,8 +37,10 @@ if [ ! -f "/var/lib/fangfrisch/db.sqlite" ]; then
       /bin/su -c "/usr/bin/fangfrisch --conf /etc/fangfrisch/fangfrisch.conf initdb" -s /bin/bash clamav
    fi
 
-echo "Enabling Spamassasin Automatic Updates"
-sed -i 's/CRON=0/CRON=1/g' /etc/cron.daily/spamassassin
+# SpamAssassin rule updates are done by /usr/local/bin/hermes-sa-update (#412),
+# run below and by the Ofelia job hermes-sa-update. Debian's
+# /etc/cron.daily/spamassassin is left at CRON=0: in this container it sees
+# /run/systemd/, tries to convert itself to a systemd timer and never updates.
 
 echo "Starting Syslog"
 /usr/sbin/rsyslogd
@@ -61,6 +63,17 @@ chown root:root /etc/amavis/conf.d/* 2>/dev/null || true
 
 echo "Starting Amavis"
 service amavis start
+
+# /var/lib/spamassassin is not a volume, so a new container starts on the
+# rules shipped with the package. Bring them current in the background once
+# amavis is up; retried in case the network or DNS is not ready yet.
+echo "Scheduling SpamAssassin rule update"
+(
+    for attempt in 1 2 3; do
+        sleep 60
+        /usr/local/bin/hermes-sa-update && break
+    done
+) &
 
 echo "Startup Complete"
 

@@ -1,0 +1,72 @@
+#!/bin/bash
+#
+# hermes-sa-update - SpamAssassin rule update for hermes_mail_filter (#412)
+#
+# Replaces Debian's /etc/cron.daily/spamassassin, which never updates
+# anything in this container: the Ubuntu base image ships /run/systemd/, so
+# the script tries to convert itself to a systemd timer and exits 0. Even
+# when it does run, spamassassin-maint only reloads amavis when spamd is
+# running, which it never is here, so amavis would keep the old rules.
+#
+# Run by the Ofelia job hermes-sa-update and once at container start
+# (entrypoint.sh). Safe to run at any time; concurrent runs are skipped.
+#
+# sa-update exit codes: 0 = updates installed, 1 = no updates available,
+# anything else = failure (the installed rules are left as they were).
+#
+# Exit: 0 = up to date (updated and reloaded, or nothing new)
+#       1 = failed (logged)
+
+set -u
+
+GPGHOME=/var/lib/spamassassin/sa-update-keys
+LOCK=/run/hermes-sa-update.lock
+
+log() {
+    echo "hermes-sa-update: $*"
+    logger -t hermes-sa-update -p mail.notice -- "$*" 2>/dev/null || true
+}
+
+as_spamd() {
+    runuser -u debian-spamd -- env -i LANG="${LANG:-C.UTF-8}" PATH="$PATH" "$@"
+}
+
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    log "another run is in progress, skipping"
+    exit 0
+fi
+
+umask 022
+
+as_spamd sa-update --gpghomedir "$GPGHOME"
+rc=$?
+case "$rc" in
+    0) log "rule updates installed" ;;
+    1) log "no rule updates available"; exit 0 ;;
+    *) log "sa-update failed (exit $rc), installed rules unchanged"; exit 1 ;;
+esac
+
+# Rule2XSBody is loaded (sa-compile.pre), so rebuild the compiled rules to
+# match the new ruleset. Same steps and permission fix as spamassassin-maint.
+if command -v sa-compile >/dev/null 2>&1 && command -v re2c >/dev/null 2>&1; then
+    if as_spamd sa-compile --quiet >/dev/null 2>&1; then
+        runuser -u debian-spamd -- chmod -R go-w,go+rX /var/lib/spamassassin/compiled
+    else
+        log "sa-compile failed, continuing with uncompiled rules"
+    fi
+fi
+
+if ! as_spamd spamassassin --lint >/dev/null 2>&1; then
+    log "spamassassin --lint failed after the update, amavis NOT reloaded (run 'spamassassin --lint -D' as debian-spamd to see why)"
+    exit 1
+fi
+
+if /etc/init.d/amavis force-reload >/dev/null 2>&1; then
+    log "amavis reloaded with the new rules"
+else
+    log "amavis force-reload failed"
+    exit 1
+fi
+
+exit 0

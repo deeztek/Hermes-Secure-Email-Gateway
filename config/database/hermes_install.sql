@@ -1495,6 +1495,19 @@ WHERE NOT EXISTS (
   SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-mail-import"]'
 );
 
+-- #412 SpamAssassin rule updates. Debian's cron.daily job never runs in the
+-- mail_filter container, so updates are scheduled here instead.
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `image`, `user`, `volume`, `network`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec "hermes-sa-update"]',
+       'Downloads SpamAssassin rule updates and reloads Amavis when there are new rules.',
+       '0 15 04 * * *',
+       '/usr/local/bin/hermes-sa-update',
+       'hermes_mail_filter', NULL, NULL, NULL, NULL, 'antispam', 1, 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-sa-update"]'
+);
+
 -- -------- org_signatures                       [truncate] --------
 CREATE TABLE IF NOT EXISTS `org_signatures` (
   `id` int(11) NOT NULL AUTO_INCREMENT,

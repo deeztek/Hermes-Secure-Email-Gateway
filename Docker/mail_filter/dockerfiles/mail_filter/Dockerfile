@@ -103,6 +103,10 @@ RUN if [ "$WITH_DCC" = "true" ]; then \
 
 COPY config/etc/fangfrisch/fangfrisch.conf /etc/fangfrisch/fangfrisch.conf
 COPY config/usr/local/bin/setup-clamav-sigs /usr/local/bin/setup-clamav-sigs
+# SpamAssassin rule updates (#412): run by the Ofelia job hermes-sa-update and
+# once at container start. Debian's cron.daily/spamassassin stays disabled.
+COPY config/usr/local/bin/hermes-sa-update /usr/local/bin/hermes-sa-update
+RUN chmod 755 /usr/local/bin/hermes-sa-update
 # Fangfrisch cron.d removed - now managed via Ofelia scheduled job
 
 #Entrypoint

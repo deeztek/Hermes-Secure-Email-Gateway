@@ -20,6 +20,22 @@ CREATE TABLE IF NOT EXISTS `user_forwarding` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- ---------------------------------------------------------------------
+-- SpamAssassin rule updates (#412). Debian's cron.daily job never runs in
+-- the mail_filter container; hermes-sa-update replaces it.
+-- FRESH-INSTALL: n/a  hermes_install.sql seeds the row
+-- ---------------------------------------------------------------------
+INSERT INTO `ofelia_jobs`
+  (`job_name`, `description`, `schedule`, `command`, `container`, `image`, `user`, `volume`, `network`, `type`, `active`, `no_overlap`)
+SELECT '[job-exec "hermes-sa-update"]',
+       'Downloads SpamAssassin rule updates and reloads Amavis when there are new rules.',
+       '0 15 04 * * *',
+       '/usr/local/bin/hermes-sa-update',
+       'hermes_mail_filter', NULL, NULL, NULL, NULL, 'antispam', 1, 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM `ofelia_jobs` WHERE `job_name` = '[job-exec "hermes-sa-update"]'
+);
+
+-- ---------------------------------------------------------------------
 -- Version stamp -- MUST be the last statement (advances build_no so
 -- the update orchestrator records this release as applied).
 -- FRESH-INSTALL: n/a  the installer sets build_no directly for a fresh install

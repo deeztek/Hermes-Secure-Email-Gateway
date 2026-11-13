@@ -27,6 +27,10 @@
   certificates; a keyring can be generated afterwards as usual. To finish a
   recipient that hit this, open its Edit Mail Delivery page and save it with
   Built-in Email Server again.
+- **SpamAssassin rules now update (#412).** The daily rule update never ran
+  in the content filter container, so spam scoring has used the rules that
+  shipped with SpamAssassin itself. Rules now update daily and when the
+  container starts, and Amavis switches to them straight away.
 - **Reverting a mailbox to a relay recipient now removes its vacation
   auto-reply setting.** It was left behind.
 
@@ -37,4 +41,9 @@
 
 ## Upgrading
 
-<!-- TODO at release cut. -->
+<!-- TODO at release cut: command and backup line. -->
+
+- **Spam scores will change.** Within a few minutes of the upgrade the content
+  filter moves to the current SpamAssassin ruleset (#412). Watch the
+  quarantine and spam tagging for the first days, and adjust policy
+  thresholds if needed.
