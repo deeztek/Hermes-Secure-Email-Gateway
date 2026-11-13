@@ -62,7 +62,10 @@ if ! as_spamd spamassassin --lint >/dev/null 2>&1; then
     exit 1
 fi
 
-if /etc/init.d/amavis force-reload >/dev/null 2>&1; then
+# 9>&- : the restarted amavisd is a long-lived daemon. Without closing the
+# lock descriptor it inherits fd 9 and holds the lock forever, so every
+# later run reports "another run is in progress" and skips.
+if /etc/init.d/amavis force-reload 9>&- >/dev/null 2>&1; then
     log "amavis reloaded with the new rules"
 else
     log "amavis force-reload failed"
