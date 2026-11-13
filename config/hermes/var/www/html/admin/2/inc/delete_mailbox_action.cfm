@@ -460,6 +460,13 @@ Removes a mailbox user from all systems:
 <cfcatch type="any"></cfcatch>
 </cftry>
 
+<!--- Forwarding (#411): this mailbox's own setting, and other users'
+     forwards to it unless the address keeps receiving as a shared mailbox.
+     After the mailbox row, so the regenerated scripts no longer see it. --->
+<cfset fwdCleanupAddress = recipient>
+<cfset fwdCleanupInbound = NOT convertToShared>
+<cfinclude template="forwarding_cleanup.cfm">
+
 <!--- SUCCESS --->
 <cfset session.m = convertToShared ? 62 : 3>
 <cfif convertToShared><cfset session.sharedConvertedAddr = recipient></cfif>

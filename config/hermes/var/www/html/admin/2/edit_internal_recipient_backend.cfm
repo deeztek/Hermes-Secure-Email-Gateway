@@ -631,7 +631,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 </cfquery>
                 <cftry>
                     <cfquery datasource="hermes">
-                        DELETE FROM user_vacation WHERE email = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
+                        DELETE FROM user_vacation WHERE username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
                     </cfquery>
                 <cfcatch type="any"></cfcatch>
                 </cftry>
@@ -658,6 +658,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                 <cfquery datasource="hermes">
                     DELETE FROM mailboxes WHERE username = <cfqueryparam value="#revertAddr#" cfsqltype="cf_sql_varchar">
                 </cfquery>
+
+                <!--- Forwarding (#411): its own setting, and other users'
+                     forwards to it, after the mailbox row is gone. --->
+                <cfset fwdCleanupAddress = revertAddr>
+                <cfset fwdCleanupInbound = true>
+                <cfinclude template="inc/forwarding_cleanup.cfm">
 
                 <!--- The maildir, same path and method delete_mailbox_action.cfm
                      uses. Non-fatal: a missing directory is the end state we

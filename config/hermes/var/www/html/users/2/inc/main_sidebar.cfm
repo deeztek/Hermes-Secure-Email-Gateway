@@ -108,6 +108,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <p><strong>Vacation Auto-Reply</strong></p>
           </a>
         </li>
+        <li class="nav-item">
+          <a href="view_forwarding.cfm" class="nav-link">
+            <i class="nav-icon fas fa-share"></i>
+            <p><strong>Forwarding</strong></p>
+          </a>
+        </li>
         <cfif sidebarSignaturesEnabled>
         <li class="nav-item">
           <a href="view_signature.cfm" class="nav-link">

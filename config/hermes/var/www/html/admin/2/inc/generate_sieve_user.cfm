@@ -44,6 +44,7 @@ Requires: sieveUsername variable to be set before including.
 <cfset needsImap4flags = false>
 <cfset needsReject = false>
 <cfset needsVacation = false>
+<cfset needsCopy = false>
 
 <cfloop query="allActions">
     <cfif action_type EQ "fileinto">
@@ -54,6 +55,30 @@ Requires: sieveUsername variable to be set before including.
         <cfset needsReject = true>
     </cfif>
 </cfloop>
+
+<!--- Forwarding (#411): one row per user in user_forwarding. Joined to
+     mailboxes so a forward to a mailbox that no longer exists is never
+     written, even if its row was somehow left behind. --->
+<cfset forwardActive = false>
+<cfset forwardTo = "">
+<cfset forwardKeepCopy = true>
+<cfquery name="getForwarding" datasource="hermes">
+    SELECT f.forward_to, f.keep_copy
+    FROM user_forwarding f
+    INNER JOIN mailboxes mb ON mb.username = f.forward_to
+    WHERE f.username = <cfqueryparam value="#sieveUsername#" cfsqltype="cf_sql_varchar">
+      AND f.enabled = 1
+      AND f.forward_to IS NOT NULL
+      AND f.forward_to <> f.username
+</cfquery>
+<cfif getForwarding.recordcount GTE 1>
+    <cfset forwardActive = true>
+    <cfset forwardTo = getForwarding.forward_to>
+    <cfset forwardKeepCopy = (Val(getForwarding.keep_copy) EQ 1)>
+    <cfif forwardKeepCopy>
+        <cfset needsCopy = true>
+    </cfif>
+</cfif>
 
 <!--- Vacation auto-reply: load row from user_vacation if active.
      Active = enabled=1 AND (start_date NULL OR <= today)
@@ -157,6 +182,7 @@ Requires: sieveUsername variable to be set before including.
 </cfif>
 <cfif needsImap4flags><cfset ArrayAppend(requires, '"imap4flags"')></cfif>
 <cfif needsReject><cfset ArrayAppend(requires, '"reject"')></cfif>
+<cfif needsCopy><cfset ArrayAppend(requires, '"copy"')></cfif>
 <cfif needsVacation>
     <cfset ArrayAppend(requires, '"vacation"')>
     <!--- "date" extension provides currentdate test for time-window checks.
@@ -171,6 +197,28 @@ Requires: sieveUsername variable to be set before including.
 
 <cfif ArrayLen(requires) GT 0>
     <cfset ArrayAppend(sieveLines, 'require [#ArrayToList(requires, ", ")#];')>
+    <cfset ArrayAppend(sieveLines, "")>
+</cfif>
+
+<!--- Forwarding block (#411). First in the script so it applies to every
+     message that reaches the mailbox, before vacation and the user's filters.
+
+     Keep a copy: redirect :copy leaves the implicit keep in place, so the
+     message is still delivered here and the user's own filters still decide
+     which folder it lands in.
+
+     No copy: a plain redirect cancels the implicit keep, and stop makes sure
+     no later fileinto or keep puts the message back in this mailbox. Vacation
+     replies and the user's filters therefore do not run for these messages.
+     The global sieve_before script has already run and is unaffected. --->
+<cfif forwardActive>
+    <cfset ArrayAppend(sieveLines, "## Forwarding")>
+    <cfif forwardKeepCopy>
+        <cfset ArrayAppend(sieveLines, 'redirect :copy "#sieveEscape(forwardTo)#";')>
+    <cfelse>
+        <cfset ArrayAppend(sieveLines, 'redirect "#sieveEscape(forwardTo)#";')>
+        <cfset ArrayAppend(sieveLines, "stop;")>
+    </cfif>
     <cfset ArrayAppend(sieveLines, "")>
 </cfif>
 

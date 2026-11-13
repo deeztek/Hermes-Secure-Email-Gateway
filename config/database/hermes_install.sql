@@ -3280,6 +3280,18 @@ CREATE TABLE IF NOT EXISTS `user_signatures` (
   UNIQUE KEY `uniq_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+-- -------- user_forwarding                      [truncate] --------
+CREATE TABLE IF NOT EXISTS `user_forwarding` (
+  `username` varchar(255) NOT NULL,
+  `enabled` tinyint(3) NOT NULL DEFAULT 0,
+  `forward_to` varchar(255) DEFAULT NULL,
+  `keep_copy` tinyint(3) NOT NULL DEFAULT 1,
+  `created_at` datetime DEFAULT current_timestamp(),
+  `modified_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  PRIMARY KEY (`username`),
+  KEY `idx_forward_to` (`forward_to`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
 -- -------- user_vacation                        [truncate] --------
 CREATE TABLE IF NOT EXISTS `user_vacation` (
   `username` varchar(255) NOT NULL,
