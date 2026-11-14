@@ -68,6 +68,18 @@ with raw occ output so silent failures are diagnosable.
 <cfset ncAppPasswordTokenId = "">
 <cfset ncAppPasswordResult = "skipped">
 <cfset ncAppPasswordError = "">
+
+<!--- SECURITY: the user name and the label are written into bash scripts
+     below (inside double quotes and SQL single quotes). Refuse anything
+     outside a strict allowlist before any script is built, whoever the
+     caller is (user console, admin console, mobile setup). --->
+<cfif ncAppPasswordAction NEQ ""
+      AND (REFindNoCase("^[a-z0-9._+-]+@[a-z0-9-]+(\.[a-z0-9-]+)+$", ncAppPasswordUser) EQ 0
+           OR REFind("^[A-Za-z0-9 ._()@+-]{1,100}$", ncAppPasswordName) EQ 0)>
+    <cfset ncAppPasswordAction = "">
+    <cfset ncAppPasswordResult = "error">
+    <cfset ncAppPasswordError = "Invalid user name or label. Labels may contain letters, digits, spaces and . _ ( ) @ + - only.">
+</cfif>
 <cfset ncAppPasswordDebugLog = "/opt/hermes/tmp/nc_app_password_debug.log">
 
 <cfif ncAppPasswordAction NEQ "" AND ncAppPasswordUser NEQ "">

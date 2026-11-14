@@ -104,7 +104,7 @@ facing explanation that this UI corresponds to.
   <div class="alert alert-danger alert-dismissible">
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     <h4><i class="icon fa fa-ban"></i> Error</h4>
-    Label is required and must be 100 characters or less.
+    Label is required, must be 100 characters or less, and may contain letters, digits, spaces and . _ ( ) @ + - only.
   </div>
 <cfelseif m EQ 12>
   <div class="alert alert-danger alert-dismissible">

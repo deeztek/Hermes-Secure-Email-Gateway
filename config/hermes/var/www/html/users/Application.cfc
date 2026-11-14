@@ -28,6 +28,10 @@
        //Define POP4 Component
         <cfset This.componentpaths["/pop"]= "/var/www/html/cfc/pop4" />
 
+        <!--- Password change logic (AuthService.cfc) lives outside the web
+             root; this mapping is never reachable by URL. --->
+        <cfset This.mappings["/hermesauth"] = "/opt/hermes/cfml" />
+
         <cffunction name="onRequest">
        <cfargument name="targetPage" type="String" required=true />
 
@@ -76,7 +80,18 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
 
      <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "cookie" )>
 
-     <cfset theCookie = getHttpRequestData().headers["cookie"]>
+     <!--- SECURITY: only the Authelia session cookie is forwarded, and only
+          if it is a plain token. The raw Cookie header is attacker-controlled
+          and must never reach a command line. --->
+     <cfset theCookie = "">
+     <cfif StructKeyExists(cookie, "hermes_session") AND REFind("^[A-Za-z0-9._~-]{1,512}$", cookie["hermes_session"]) GT 0>
+         <cfset theCookie = "hermes_session=" & cookie["hermes_session"]>
+     </cfif>
+     <cfif theCookie EQ "">
+         <cfset m="Application.cfc: session cookie missing or malformed">
+         <cfinclude template="/user-auth/error.cfm">
+         <cfabort>
+     </cfif>
 
      <!--- DEBUG BELOW --->
 

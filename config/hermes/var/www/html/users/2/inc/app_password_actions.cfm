@@ -41,7 +41,9 @@ revoke (Phase 1b — also deletes the NC oc_authtoken row):
     <cfparam name="form.label" default="">
     <cfset labelTrim = Trim(form.label)>
 
-    <cfif labelTrim EQ "" OR Len(labelTrim) GT 100>
+    <!--- SECURITY: same allowlist as nextcloud_app_password.cfm, which
+         writes the label into a bash script --->
+    <cfif labelTrim EQ "" OR Len(labelTrim) GT 100 OR REFind("^[A-Za-z0-9 ._()@+-]{1,100}$", labelTrim) EQ 0>
         <cfset session.m = 11>
         <cflocation url="view_app_passwords.cfm" addtoken="no">
     </cfif>
