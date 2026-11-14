@@ -353,7 +353,7 @@ Requires: sieveUsername variable to be set before including.
         <cfcontinue>
     </cfif>
 
-    <cfset ArrayAppend(sieveLines, "## Rule: #getUserRules.rule_name#")>
+    <cfset ArrayAppend(sieveLines, "## Rule: #sieveComment(getUserRules.rule_name)#")>
 
     <cfif hasAllCondition OR ArrayLen(condArr) EQ 0>
         <cfloop array="#actArr#" index="a">

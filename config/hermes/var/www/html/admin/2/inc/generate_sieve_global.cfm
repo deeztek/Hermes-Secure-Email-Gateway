@@ -113,7 +113,7 @@ sievec via Docker exec.
         <cfcontinue>
     </cfif>
 
-    <cfset ArrayAppend(sieveLines, "## Rule: #getGlobalRules.rule_name#")>
+    <cfset ArrayAppend(sieveLines, "## Rule: #sieveComment(getGlobalRules.rule_name)#")>
 
     <cfif hasAllCondition OR ArrayLen(condArr) EQ 0>
         <!--- Unconditional actions --->

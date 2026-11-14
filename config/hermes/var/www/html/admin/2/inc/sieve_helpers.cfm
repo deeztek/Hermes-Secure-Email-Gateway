@@ -14,6 +14,14 @@ from database rows. Used by both global and user generators.
     <cfreturn s>
 </cffunction>
 
+<!--- SECURITY: text placed in a "# ..." comment line. A line break would end
+     the comment and turn the rest into live Sieve, so every control character
+     (CR, LF, tab, NUL...) becomes a space. --->
+<cffunction name="sieveComment" returntype="string" output="false">
+    <cfargument name="val" type="string" required="true">
+    <cfreturn Trim(REReplace(arguments.val, "[[:cntrl:]]", " ", "all"))>
+</cffunction>
+
 <cffunction name="buildSieveCondition" returntype="string" output="false">
     <cfargument name="cfield" type="string" required="true">
     <cfargument name="ctype" type="string" required="true">
@@ -31,6 +39,11 @@ from database rows. Used by both global and user generators.
             <cfreturn "">
         </cfif>
         <cfset headerName = trim(Left(arguments.cvalue, colonPos - 1))>
+        <!--- SECURITY: the header name is printed inside quotes; only a valid
+             header field name (letters, digits, hyphen) is accepted --->
+        <cfif REFind("^[A-Za-z0-9-]{1,76}$", headerName) EQ 0>
+            <cfreturn "">
+        </cfif>
         <cfset headerValue = sieveEscape(trim(Mid(arguments.cvalue, colonPos + 1, Len(arguments.cvalue))))>
         <cfif arguments.ctype EQ "is">
             <cfreturn 'header :is "#headerName#" "#headerValue#"'>
@@ -66,10 +79,16 @@ from database rows. Used by both global and user generators.
             <cfreturn 'not header :contains "Subject" "#v#"'>
         </cfif>
     <cfelseif arguments.cfield EQ "size">
+        <!--- SECURITY: printed bare, so only a number with an optional
+             K / M / G quantifier (RFC 5228) is accepted --->
+        <cfset var sizeVal = UCase(Trim(arguments.cvalue))>
+        <cfif REFind("^[0-9]{1,12}[KMG]?$", sizeVal) EQ 0>
+            <cfreturn "">
+        </cfif>
         <cfif arguments.ctype EQ "over">
-            <cfreturn 'size :over #arguments.cvalue#'>
+            <cfreturn 'size :over #sizeVal#'>
         <cfelseif arguments.ctype EQ "under">
-            <cfreturn 'size :under #arguments.cvalue#'>
+            <cfreturn 'size :under #sizeVal#'>
         </cfif>
     </cfif>
 

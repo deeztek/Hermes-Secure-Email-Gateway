@@ -39,6 +39,10 @@ Scoped to session.email.
      redirects would re-trigger banner injection / chain breakage at
      forward time and are blocked. --->
 <cfset USER_ALLOWED_ACTIONS = "fileinto,discard,keep,flag_seen,redirect">
+<!--- SECURITY: the fields and match types the user console offers. Anything
+     else (e.g. a forged "header" condition) is dropped server side. --->
+<cfset USER_ALLOWED_FIELDS = "subject,from,to,cc,bcc,size,all">
+<cfset USER_ALLOWED_CTYPES = "contains,is,not_contains,over,under">
 
 <cffunction name="validatePayload" returntype="string" output="false">
     <cfset var condFields = formArray("cond_field_", "cond_count")>
@@ -167,6 +171,9 @@ Scoped to session.email.
                 <cfset var t = (i LTE ArrayLen(condTypes)) ? trim(condTypes[i]) : "contains">
                 <cfset var v = (i LTE ArrayLen(condValues)) ? trim(condValues[i]) : "">
                 <cfif f EQ "">
+                    <cfcontinue>
+                </cfif>
+                <cfif NOT ListFindNoCase(USER_ALLOWED_FIELDS, f) OR (f NEQ "all" AND NOT ListFindNoCase(USER_ALLOWED_CTYPES, t))>
                     <cfcontinue>
                 </cfif>
                 <cfif f NEQ "all" AND v EQ "">
