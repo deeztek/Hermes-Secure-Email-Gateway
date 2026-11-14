@@ -127,12 +127,23 @@ select value2 from parameters2 where module = 'console' and parameter = 'console
 
      <cfif IsStruct( reqData ) AND StructKeyExists( reqData, "Headers" ) AND IsStruct( reqData.Headers ) AND StructKeyExists( reqData.Headers , "cookie" )>
 
-     <!--- SECURITY: only the Authelia session cookie is forwarded, and only
-          if it is a plain token. The raw Cookie header is attacker-controlled
-          and must never reach a command line. --->
      <cfset theCookie = "">
-     <cfif StructKeyExists(cookie, "hermes_session") AND REFind("^[A-Za-z0-9._~-]{1,512}$", cookie["hermes_session"]) GT 0>
-         <cfset theCookie = "hermes_session=" & cookie["hermes_session"]>
+     <!--- Rebuild the Cookie header from the browser's cookies, keeping only
+          well-formed pairs: a token name, and a value of printable ASCII with
+          no space or semicolon (Authelia session values contain characters
+          such as $ ! %). Control characters, which could inject an extra
+          header, never pass. Whatever the Authelia cookie is called (it
+          follows Authelia's running configuration, not the database), it
+          passes through. --->
+     <cfset cookiePairs = []>
+     <cfloop list="#reqData.Headers['cookie']#" delimiters=";" index="cookiePair">
+         <cfset cookiePair = Trim(cookiePair)>
+         <cfif REFind("^[A-Za-z0-9_.-]{1,128}=[!-:<-~]{1,4096}$", cookiePair) GT 0>
+             <cfset ArrayAppend(cookiePairs, cookiePair)>
+         </cfif>
+     </cfloop>
+     <cfif ArrayLen(cookiePairs) GT 0 AND Len(ArrayToList(cookiePairs, "; ")) LE 8192>
+         <cfset theCookie = ArrayToList(cookiePairs, "; ")>
      </cfif>
      <cfif theCookie EQ "">
          <cfset m="Application.cfc: session cookie missing or malformed">
@@ -148,8 +159,11 @@ the url: https://#ConsoleHost#</cfoutput>
     --->
 
        
+         <!--- Arguments as an array: each element reaches curl as exactly one
+              argument, with no quote parsing and no shell, so nothing in a
+              cookie value can become a separate option. --->
          <cfexecute name="/usr/bin/curl"
-         arguments="-X 'GET' -k 'https://#ConsoleHost#/api/verify' -H 'accept: */*' -H 'X-Original-URL: https://#ConsoleHost#/admin/' -H 'Cookie: #theCookie#'"
+         arguments="#['-X', 'GET', '-k', 'https://' & ConsoleHost & '/api/verify', '-H', 'accept: */*', '-H', 'X-Original-URL: https://' & ConsoleHost & '/admin/', '-H', 'Cookie: ' & theCookie]#"
          variable="curlresult"
          timeout="10" />
 

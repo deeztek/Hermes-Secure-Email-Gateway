@@ -31,6 +31,12 @@
        <cfset This.loginstorage="session" />
        <cfset This.requestTimeout=createTimeSpan(0,1,0,0) />
 
+       <!--- Password reset logic lives outside the web root, in
+            /opt/hermes/cfml/AuthService.cfc. An Application.cfc mapping is
+            never reachable by URL: Lucee resolves the requested file before
+            it reads this file. --->
+       <cfset This.mappings["/hermesauth"] = "/opt/hermes/cfml" />
+
       
 	<cffunction name="onRequest">
        <cfargument name="targetPage" type="String" required=true />
@@ -50,11 +56,12 @@
        --->
 
       <!--- SECURITY (GHSA-wwxm-p5f2-q6xm, GHSA-rgx7-j3qv-h2gm, GHSA-h2c7-jjqq-j49j):
-           /user-auth/ is public (no Authelia). Files under inc/ are include
-           fragments that trust variables set by their caller; requested
-           directly, Lucee fills those variables from the URL. Nothing calls
-           them directly, so refuse every request for one. --->
-      <cfif REFindNoCase("[/\\]inc[/\\]", Arguments.targetPage)>
+           /user-auth/ is public (no Authelia), so it serves ONLY the pages
+           listed here. Everything else, including any file added later,
+           answers 404. Included files (error.cfm, inc/html_head.cfm) are not
+           requests and are unaffected. --->
+      <cfset _publicPages = "/user-auth/index.cfm,/user-auth/forgot_password.cfm,/user-auth/reset_password.cfm,/user-auth/quarantine_release.cfm">
+      <cfif NOT ListFind(_publicPages, LCase(Arguments.targetPage))>
           <cfheader statuscode="404" statustext="Not Found">
           <cfcontent reset="true" type="text/plain">
           <cfabort>

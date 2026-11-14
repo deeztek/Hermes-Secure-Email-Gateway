@@ -50,6 +50,21 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     </cfif>
 </cfif>
 
+<cfparam name="form.ft" default="">
+<cfparam name="url.new" default="">
+
+<!--- The "Check Your Email" screen stays up on refresh for 15 minutes;
+     "Use a different email address" (?new=1) clears it --->
+<cfif url.new EQ "1">
+    <cfset StructDelete(session, "forgotSentAt")>
+    <cflocation url="forgot_password.cfm" addtoken="no">
+</cfif>
+<cfif reason EQ "0" AND StructKeyExists(session, "forgotSentAt") AND IsDate(session.forgotSentAt)
+      AND DateDiff("n", session.forgotSentAt, Now()) LT 15>
+    <cfset reason = "3">
+</cfif>
+<cfset authSvc = createObject("component", "hermesauth.AuthService").init()>
+
 <!--- GET CAPTCHA SETTINGS --->
 <cfquery name="getCaptchaSettings" datasource="hermes">
     SELECT parameter, value FROM system_settings
@@ -80,6 +95,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- PROCESS FORM SUBMISSION --->
 <cfif action is "requestreset">
+
+    <!--- ONE-TIME FORM TOKEN: deleted on every submission, valid or not, so
+         a refresh, back button or scripted replay never re-runs the request --->
+    <cfif NOT authSvc.consumeFormToken("forgot_password", form.ft)>
+        <cfset session.reason = 20>
+        <cflocation url="forgot_password.cfm" addtoken="no">
+    </cfif>
 
     <!--- HONEYPOT CHECK (bots fill hidden fields) --->
     <!--- Field name intentionally obscure to avoid browser autofill --->
@@ -217,69 +239,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cflocation url="forgot_password.cfm" addtoken="no">
     </cfif>
 
-    <!--- LOOK UP USER IN LDAP --->
-    <cfset userEmail = LCase(Trim(form.email))>
-    <cfinclude template="./inc/ldap_get_user_groups.cfm">
-
-    <!--- CHECK IF USER WAS FOUND --->
-    <cfif NOT ldapUserFound>
-        <!--- Don't reveal if user exists or not for security --->
-        <cfset session.reason = 3>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-
-    <!--- CHECK IF USER IS REMOTE AUTH (password managed externally) --->
-    <cfquery name="checkRemoteAuth" datasource="hermes">
-        SELECT auth_type FROM recipients WHERE recipient = <cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">
-    </cfquery>
-    <cfif checkRemoteAuth.recordcount GT 0 AND checkRemoteAuth.auth_type EQ "remote">
-        <!--- Remote auth users cannot reset password here - show same generic message for security --->
-        <cfset session.reason = 3>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-
-    <!--- DETERMINE USER TYPE AND HANDLE ACCORDINGLY --->
-    <cfif isRelay>
-        <!--- RELAY USER: Send token via email --->
-        <cfset userType = "relay">
-        <cfset notificationMethod = "email">
-        <cfset tokenRecipient = userEmail>
-        <cfinclude template="./inc/process_password_reset_request.cfm">
-
-    <cfelseif isMailbox>
-        <!--- MAILBOX USER: Check for verified secondary email --->
-        <cfset userType = "mailbox">
-
-        <!--- Get user settings --->
-        <cfquery name="getUserSettings" datasource="hermes">
-            SELECT secondary_email, secondary_email_verified
-            FROM user_settings
-            WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#userEmail#">
-        </cfquery>
-
-        <cfif getUserSettings.recordcount EQ 1 AND getUserSettings.secondary_email NEQ "" AND getUserSettings.secondary_email_verified EQ 1>
-            <!--- Send to verified secondary email --->
-            <cfset notificationMethod = "email">
-            <cfset tokenRecipient = getUserSettings.secondary_email>
-            <cfinclude template="./inc/process_password_reset_request.cfm">
-
-        <cfelse>
-            <!--- No self-service available, notify admin --->
-            <cfset notificationMethod = "admin">
-            <cfinclude template="./inc/process_password_reset_request.cfm">
-        </cfif>
-
-    <cfelseif isAdmin>
-        <!--- ADMIN USER: Self-service password reset disabled for security --->
-        <!--- Admins must use another admin or direct LDAP access to reset password --->
-        <cfset session.reason = 10>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-
-    <cfelse>
-        <!--- User exists in LDAP but not in any recognized group --->
-        <cfset session.reason = 7>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
+    <!--- SECURITY (GHSA-rgx7-j3qv-h2gm): the service works out the account,
+         its type and where the link goes, from LDAP and the database. The
+         page always shows the same message, so it never reveals whether an
+         account exists, is an administrator, or was rate limited. --->
+    <cfset authSvc.requestReset(form.email)>
+    <cfset session.forgotSentAt = Now()>
+    <cfset session.reason = 3>
+    <cflocation url="forgot_password.cfm" addtoken="no">
 
 </cfif>
 
@@ -343,11 +310,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfset session.reason = 0>
     </cfif>
 
-    <cfif reason is "3">
-        <div class="alert alert-success alert-dismissible">
+    <cfif reason is "20">
+        <div class="alert alert-warning alert-dismissible">
             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-            <i class="icon fa fa-check"></i>
-            If an account exists with that email address, password reset instructions have been sent. Please check your email. <strong>You may close this window.</strong>
+            <i class="icon fas fa-exclamation-triangle"></i>
+            This form expired or was already submitted. Please fill it in again.
         </div>
         <cfset session.reason = 0>
     </cfif>
@@ -432,12 +399,26 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
         <div class="card-body">
 
+            <cfif reason is "3">
+            <!--- RESULT SCREEN: no form, so nothing to resubmit --->
+            <cfset session.reason = 0>
+            <div class="text-center">
+                <i class="fas fa-envelope-open-text fa-3x text-success mb-3"></i>
+                <h4>Check Your Email</h4>
+                <p>If an account exists with that email address, password reset instructions are on their way. The link is valid for 15 minutes.</p>
+                <p class="text-muted small">No email after a few minutes? Check your spam folder, or contact your system administrator.</p>
+                <p><strong>You can close this window.</strong></p>
+                <a href="forgot_password.cfm?new=1" class="small">Use a different email address</a>
+            </div>
+            <cfelse>
+
             <h4 class="text-center">Forgot Password</h4>
 
             <p class="text-center">Enter your email address below and click <strong>Reset Password</strong>. If your account exists, you will receive instructions to reset your password.</p>
 
             <form action="forgot_password.cfm" method="post">
                 <input type="hidden" name="action" value="requestreset">
+                <cfoutput><input type="hidden" name="ft" value="#authSvc.issueFormToken('forgot_password')#"></cfoutput>
 
                 <div class="input-group mb-3">
                     <input type="email" name="email" class="form-control" placeholder="Email Address" required>
@@ -512,6 +493,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
                     </div>
                 </div>
             </form>
+            </cfif>
 
 
         </div>

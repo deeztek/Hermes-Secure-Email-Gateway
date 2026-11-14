@@ -77,6 +77,19 @@ $(document).ready(function() {
 <cfparam name="session.mfaMessage" default="">
 <cfparam name="session.mfaMessageType" default="">
 
+<!--- ONE-TIME FORM TOKEN: every form on this page carries the token issued
+     when the page was rendered. It is deleted on every submission, valid or
+     not, so a submission cannot be replayed, resubmitted by refresh or back
+     button, or forged from another site (password change, MFA toggle,
+     recovery email, timezone). --->
+<cfset authSvc = createObject("component", "hermesauth.AuthService").init()>
+<cfparam name="form.ft" default="">
+<cfif StructKeyExists(form, "action") AND NOT authSvc.consumeFormToken("user_settings", form.ft)>
+    <cfset session.message = "<h4><i class='icon fa fa-exclamation-triangle'></i> Please Try Again</h4>This form expired or was already submitted. Nothing was changed.">
+    <cfset session.messageType = "warning">
+    <cflocation url="user_settings.cfm" addtoken="no">
+</cfif>
+
 <!--- PROCESS FORM SUBMISSION --->
 <cfif StructKeyExists(form, "action")>
     <cfif form.action EQ "save_secondary_email">
@@ -130,81 +143,17 @@ $(document).ready(function() {
             <cflocation url="user_settings.cfm" addtoken="no">
         </cfif>
 
-        <!--- STEP 1: GET LDAP USERNAME FOR THIS USER --->
-        <cfquery name="getLdapUsername" datasource="hermes">
-            SELECT ldap_username FROM user_settings WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#session.email#">
-        </cfquery>
-
-        <cfif getLdapUsername.recordcount EQ 1 AND getLdapUsername.ldap_username NEQ "">
-            <cfset ldapUsername = getLdapUsername.ldap_username>
-        <cfelse>
-            <!--- Not in database - query LDAP directly by email --->
-            <cfset userEmail = session.email>
-            <cfinclude template="/user-auth/inc/ldap_get_user_groups.cfm">
-
-            <cfif ldapUserFound AND ldapUsername NEQ "">
-                <!--- Found in LDAP --->
-            <cfelse>
-                <!--- No LDAP user found - cannot change password --->
-                <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>Your account is not configured for password changes. Please contact your system administrator.">
-                <cfset session.pwdMessageType = "danger">
-                <cflocation url="user_settings.cfm" addtoken="no">
-            </cfif>
-        </cfif>
-
-        <!--- STEP 2: VERIFY OLD PASSWORD VIA LDAP BIND --->
-        <cfset ldapOU = "users">
-        <cfset ldapBindDN = "cn=#ldapUsername#,ou=#ldapOU#,dc=hermes,dc=local">
-
-        <cftry>
-            <!--- Generate unique temp filename --->
-            <cfinclude template="/admin/2/inc/generate_customtrans.cfm">
-
-            <!--- Write password to temp file to avoid shell escaping issues --->
-            <cfset tempPwdFile = "/opt/hermes/tmp/#customtrans3#_pwd.txt">
-            <cffile action="write" file="#tempPwdFile#" output="#form.oldpassword#" addNewLine="no">
-
-            <!--- Use ldapwhoami to verify password - binds and returns DN if successful --->
-            <cfexecute name="/usr/local/bin/docker"
-                arguments="exec hermes_ldap ldapwhoami -x -D '#ldapBindDN#' -y /opt/hermes/tmp/#customtrans3#_pwd.txt"
-                variable="ldapWhoamiResult"
-                errorVariable="ldapWhoamiError"
-                timeout="30">
-            </cfexecute>
-
-            <!--- Cleanup temp password file --->
-            <cfif fileExists(tempPwdFile)>
-                <cffile action="delete" file="#tempPwdFile#">
-            </cfif>
-
-            <!--- Check if bind was successful --->
-            <cfif ldapWhoamiResult CONTAINS "dn:" OR ldapWhoamiResult CONTAINS ldapUsername>
-                <!--- Bind was successful - password is correct --->
-                <cfset pwdStep = 2>
-            <cfelse>
-                <!--- Bind failed - check error --->
-                <cfif ldapWhoamiError CONTAINS "Invalid credentials" OR ldapWhoamiError CONTAINS "49">
-                    <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>The Existing Password you entered is incorrect">
-                    <cfset session.pwdMessageType = "danger">
-                    <cflocation url="user_settings.cfm" addtoken="no">
-                <cfelse>
-                    <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>There was a problem verifying your password. Please try again or contact your system administrator.">
-                    <cfset session.pwdMessageType = "danger">
-                    <cflocation url="user_settings.cfm" addtoken="no">
-                </cfif>
-            </cfif>
-
-        <cfcatch type="any">
-            <!--- Cleanup temp password file on error --->
-            <cfif isDefined("tempPwdFile") AND fileExists(tempPwdFile)>
-                <cffile action="delete" file="#tempPwdFile#">
-            </cfif>
-            <!--- LDAP bind failed --->
-            <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>The Existing Password you entered is incorrect">
+        <!--- STEPS 1-2 (GHSA-wwxm-p5f2-q6xm): the account comes from LDAP,
+             through AuthService, by the signed-in identity only. The
+             existing password is verified in step 4, inside
+             changeOwnPassword, immediately before the change. --->
+        <cfset pwdAcct = authSvc.lookupAccount(session.email)>
+        <cfif NOT pwdAcct.found>
+            <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>Your account is not configured for password changes. Please contact your system administrator.">
             <cfset session.pwdMessageType = "danger">
             <cflocation url="user_settings.cfm" addtoken="no">
-        </cfcatch>
-        </cftry>
+        </cfif>
+        <cfset pwdStep = 2>
 
         <!--- STEP 3: CHECK AGAINST HAVEIBEENPWNED (if enabled) --->
         <cfif pwdStep EQ 2>
@@ -237,16 +186,22 @@ $(document).ready(function() {
 
         <!--- STEP 4: CHANGE PASSWORD IN LDAP --->
         <cfif pwdStep EQ 3>
-            <cfset newPassword = form.newpassword>
-            <cfinclude template="/user-auth/inc/ldap_modify_user_password.cfm">
+            <cfset pwdResult = authSvc.changeOwnPassword(session.email, form.oldpassword, form.newpassword)>
 
-            <cfif ldapPasswordModified>
+            <cfif pwdResult.error EQ "oldpassword">
+                <cfset session.pwdMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>The Existing Password you entered is incorrect">
+                <cfset session.pwdMessageType = "danger">
+                <cflocation url="user_settings.cfm" addtoken="no">
+            </cfif>
+
+            <cfif pwdResult.success>
                 <!--- No Nextcloud step on a password change (#197 follow-up): Nextcloud's
                      local password must stay random and never match the user's own,
                      because DAV accepts it with Basic Auth, outside Authelia and 2FA.
                      NC Mail uses the "Hermes System" app password and is unaffected. --->
 
-                <cfinclude template="./inc/send_changed_password_email.cfm">
+                <!--- The "password changed" notice is sent by AuthService
+                     (account address and verified recovery address). --->
                 <cfset session.pwdMessage = "<h4><i class='icon fa fa-check'></i> Success!</h4>Your Password was changed successfully. Please ensure you use the new password to login from now on">
                 <cfset session.pwdMessageType = "success">
                 <cflocation url="user_settings.cfm" addtoken="no">
@@ -290,8 +245,9 @@ $(document).ready(function() {
             <cfset ldapUsername = getLdapUsernameMfa.ldap_username>
         <cfelse>
             <!--- Not in database - query LDAP directly by email --->
-            <cfset userEmail = session.email>
-            <cfinclude template="/user-auth/inc/ldap_get_user_groups.cfm">
+            <cfset mfaAcct = createObject("component", "hermesauth.AuthService").init().lookupAccount(session.email)>
+            <cfset ldapUserFound = mfaAcct.found>
+            <cfset ldapUsername = mfaAcct.cn>
 
             <cfif NOT ldapUserFound OR ldapUsername EQ "">
                 <cfset session.mfaMessage = "<h4><i class='icon fa fa-ban'></i> Oops!</h4>Your account is not configured for 2FA changes. Please contact your system administrator.">
@@ -450,6 +406,8 @@ $(document).ready(function() {
     <div class="content">
       <div class="container-fluid">
 
+        <cfset pageFt = authSvc.issueFormToken("user_settings")>
+
         <!--- DISPLAY RECOVERY EMAIL MESSAGES --->
         <cfif session.message NEQ "">
             <div class="alert alert-<cfoutput>#session.messageType#</cfoutput> alert-dismissible">
@@ -510,6 +468,7 @@ $(document).ready(function() {
 
                 <form action="user_settings.cfm" method="post">
                     <input type="hidden" name="action" value="changepassword">
+                    <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
 
                     <div class="mb-3" id="oldpasswordfield">
                         <label for="oldpassword" class="form-label"><strong>Existing Password</strong></label>
@@ -749,6 +708,7 @@ $(document).ready(function() {
                     </div>
                     <form method="post" action="user_settings.cfm" onsubmit="return confirm('Are you sure you want to disable Two-Factor Authentication? This will make your account less secure.');">
                         <input type="hidden" name="action" value="toggle_mfa">
+                        <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                         <input type="hidden" name="mfa_setting" value="disable">
                         <button type="submit" class="btn btn-outline-danger">
                             <i class="fas fa-shield-alt me-1"></i> Disable 2FA
@@ -833,6 +793,7 @@ $(document).ready(function() {
 
                         <form method="post" action="user_settings.cfm" class="mb-3">
                             <input type="hidden" name="action" value="resend_verification">
+                            <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                             <button type="submit" class="btn btn-warning">
                                 <i class="fas fa-paper-plane me-1"></i> Resend Verification Email
                             </button>
@@ -844,6 +805,7 @@ $(document).ready(function() {
                     <h5>Update Recovery Email</h5>
                     <form method="post" action="user_settings.cfm">
                         <input type="hidden" name="action" value="save_secondary_email">
+                        <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                         <div class="mb-3">
                             <label class="form-label">New Recovery Email Address</label>
                             <input type="email" name="secondary_email" class="form-control" placeholder="Enter new recovery email" required>
@@ -858,6 +820,7 @@ $(document).ready(function() {
 
                     <form method="post" action="user_settings.cfm" onsubmit="return confirm('Are you sure you want to remove your recovery email? You will not be able to reset your password via email.');">
                         <input type="hidden" name="action" value="remove_secondary_email">
+                        <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                         <button type="submit" class="btn btn-outline-danger btn-sm">
                             <i class="fas fa-trash me-1"></i> Remove Recovery Email
                         </button>
@@ -874,6 +837,7 @@ $(document).ready(function() {
 
                     <form method="post" action="user_settings.cfm">
                         <input type="hidden" name="action" value="save_secondary_email">
+                        <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                         <div class="mb-3">
                             <label class="form-label">Recovery Email Address</label>
                             <input type="email" name="secondary_email" class="form-control" placeholder="Enter your recovery email" required>
@@ -908,6 +872,7 @@ $(document).ready(function() {
 
                 <form method="post" action="user_settings.cfm" id="timezoneForm">
                     <input type="hidden" name="action" value="save_timezone">
+                    <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
                     <div class="mb-3">
                         <label for="timezone" class="form-label"><strong>Timezone</strong></label>
                         <select name="timezone" id="timezone" class="form-control" style="width:100%;">
@@ -1015,6 +980,7 @@ $(document).ready(function() {
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <form method="post" action="user_settings.cfm" class="d-inline">
           <input type="hidden" name="action" value="toggle_mfa">
+          <cfoutput><input type="hidden" name="ft" value="#pageFt#"></cfoutput>
           <input type="hidden" name="mfa_setting" value="enable">
           <button type="submit" class="btn btn-danger"><i class="fas fa-sign-out-alt me-1"></i>Enable 2FA and sign out</button>
         </form>

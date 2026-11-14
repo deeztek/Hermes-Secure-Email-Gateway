@@ -88,40 +88,65 @@ URL Parameters:
 <!--- INITIALIZE VARIABLES --->
 <cfparam name="session.reason" default="0">
 <cfparam name="url.token" default="">
+<cfparam name="form.ft" default="">
+<cfset authSvc = createObject("component", "hermesauth.AuthService").init()>
+
+<!--- 1. LINK OPENED FROM THE EMAIL: move the reset token into the session
+     and reload without it, so it leaves the address bar, browser history,
+     Referer headers and access logs. Only a well-formed token is kept. --->
+<cfif url.token NEQ "">
+    <cfset StructDelete(session, "pwResetDoneAt")>
+    <cfif REFind("^[a-f0-9]{64}$", url.token) GT 0>
+        <cfset session.pwResetToken = url.token>
+    <cfelse>
+        <cfset StructDelete(session, "pwResetToken")>
+    </cfif>
+    <cflocation url="reset_password.cfm" addtoken="no">
+</cfif>
+
+<cfset heldToken = "">
+<cfif StructKeyExists(session, "pwResetToken") AND REFind("^[a-f0-9]{64}$", session.pwResetToken) GT 0>
+    <cfset heldToken = session.pwResetToken>
+</cfif>
+
 <cfset reason = session.reason>
 <cfset tokenValid = false>
 <cfset tokenError = "">
+<cfset resetDone = false>
 <cfset resetRequest = "">
 
-<!--- PROCESS PASSWORD CHANGE IF FORM SUBMITTED --->
+<!--- 2. PROCESS THE FORM --->
 <cfif StructKeyExists(form, "action") AND form.action EQ "reset_password">
 
-    <!--- Validate form fields --->
-    <cfif NOT StructKeyExists(form, "token") OR form.token EQ "">
-        <cfset session.reason = 10>
-        <cflocation url="reset_password.cfm?token=#url.token#" addtoken="no">
+    <!--- One-time form token: deleted on every submission, valid or not --->
+    <cfif NOT authSvc.consumeFormToken("reset_password", form.ft)>
+        <cfset session.reason = 20>
+        <cflocation url="reset_password.cfm" addtoken="no">
+    </cfif>
+
+    <cfif heldToken EQ "">
+        <cfset session.reason = 15>
+        <cflocation url="reset_password.cfm" addtoken="no">
     </cfif>
 
     <cfif NOT StructKeyExists(form, "new_password") OR form.new_password EQ "">
         <cfset session.reason = 11>
-        <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+        <cflocation url="reset_password.cfm" addtoken="no">
     </cfif>
 
     <cfif NOT StructKeyExists(form, "confirm_password") OR form.confirm_password EQ "">
         <cfset session.reason = 12>
-        <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+        <cflocation url="reset_password.cfm" addtoken="no">
     </cfif>
 
-    <!--- Check passwords match --->
     <cfif form.new_password NEQ form.confirm_password>
         <cfset session.reason = 13>
-        <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+        <cflocation url="reset_password.cfm" addtoken="no">
     </cfif>
 
-    <!--- Validate password length --->
     <cfif Len(form.new_password) LT 8>
         <cfset session.reason = 14>
-        <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+        <cflocation url="reset_password.cfm" addtoken="no">
     </cfif>
 
     <!--- HIBP CHECK (k-anonymity: only the first 5 hash characters leave the server) --->
@@ -136,7 +161,7 @@ URL Parameters:
         <cfif hibpResult.status_code EQ "200">
             <cfif hibpResult.filecontent CONTAINS rightHash>
                 <cfset session.reason = 18>
-                <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+                <cflocation url="reset_password.cfm" addtoken="no">
             </cfif>
         </cfif>
         <!--- If HIBP is unreachable, continue anyway --->
@@ -145,140 +170,52 @@ URL Parameters:
     </cfcatch>
     </cftry>
 
-    <!--- Validate token again before processing --->
-    <cfquery name="validateToken" datasource="hermes">
-        SELECT id, email, ldap_username, user_type, status, expires_at
-        FROM password_reset_requests
-        WHERE token = <cfqueryparam cfsqltype="cf_sql_varchar" value="#form.token#">
-        AND status = 'pending'
-        AND expires_at > NOW()
-        LIMIT 1
-    </cfquery>
+    <!--- SECURITY (GHSA-rgx7-j3qv-h2gm): the service checks the token,
+         claims it so it can only be used once, takes the account from LDAP
+         (never from the stored row), refuses administrators, sets the
+         password and sends the "password changed" notice. --->
+    <cfset resetResult = authSvc.resetPasswordWithToken(heldToken, form.new_password)>
 
-    <cfif validateToken.recordcount EQ 0>
-        <cfset session.reason = 15>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-
-    <!--- SECURITY: Reject admin password reset tokens --->
-    <cfif validateToken.user_type EQ "admin">
-        <cfset session.reason = 10>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-
-    <!--- SECURITY (GHSA-rgx7-j3qv-h2gm): do not trust user_type or
-         ldap_username from the token row. Look the account up in LDAP again
-         by the row's e-mail and refuse unless it is the same account and it
-         is a relay or mailbox user, never an administrator. --->
-    <cfset userEmail = LCase(Trim(validateToken.email))>
-    <cfinclude template="inc/ldap_get_user_groups.cfm">
-    <cfif NOT ldapUserFound OR ldapUsername EQ ""
-          OR CompareNoCase(ldapUsername, validateToken.ldap_username) NEQ 0>
-        <cfset session.reason = 15>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-    <cfif isAdmin OR NOT (isRelay OR isMailbox)>
-        <cfset session.reason = 10>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-    </cfif>
-
-    <!--- UPDATE PASSWORD IN LDAP (ldapUsername now comes from LDAP) --->
-    <cfset newPassword = form.new_password>
-
-    <!--- All users are in ou=users - role is determined by group membership --->
-    <cfset ldapOU = "users">
-
-    <cfinclude template="inc/ldap_modify_user_password.cfm">
-
-    <!--- Check if LDAP update was successful --->
-    <cfif IsDefined("ldapPasswordModified") AND ldapPasswordModified>
-
-        <!--- No Nextcloud step on a password change (#197 follow-up): Nextcloud's
-             local password must stay random and never match the user's own,
-             because DAV accepts it with Basic Auth, outside Authelia and 2FA.
-             NC Mail uses the "Hermes System" app password and is unaffected. --->
-
-        <!--- Mark request as completed --->
-        <cfquery name="markCompleted" datasource="hermes">
-            UPDATE password_reset_requests
-            SET status = 'completed',
-                completed_at = NOW()
-            WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#validateToken.id#">
-        </cfquery>
-
-        <!--- Expire any other pending requests for this user --->
-        <cfquery name="expireOthers" datasource="hermes">
-            UPDATE password_reset_requests
-            SET status = 'expired'
-            WHERE email = <cfqueryparam cfsqltype="cf_sql_varchar" value="#validateToken.email#">
-            AND status = 'pending'
-            AND id != <cfqueryparam cfsqltype="cf_sql_integer" value="#validateToken.id#">
-        </cfquery>
-
-        <!--- Send password changed notification email --->
-        <cfquery name="getPostmaster" datasource="hermes">
-            SELECT parameter, value FROM system_settings WHERE parameter='postmaster'
-        </cfquery>
-
-        <cfmail from="#getPostmaster.value#" to="#validateToken.email#" server="hermes_postfix_dkim" subject="[Hermes SEG] User Console Password Changed" port="10026" type="html">
-<div align="center" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-<b>*** Please do not reply to this e-mail. This mailbox is not monitored ***</b><br><br>
-
-<img src="cid:hermeslogo" alt="Hermes SEG" style="max-height: 80px; margin-bottom: 10px;"><br>
-<h2 style="color: ##333;">User Console Password Changed</h2>
-
-<p>Someone, presumably you, has changed your Hermes SEG User Console Password.</p>
-
-<p>If you did initiate this change, you can safely ignore this message.</p>
-
-<p>If you <strong>did NOT</strong> initiate this change, please contact your Hermes SEG Administrator immediately as this may indicate an account compromise.</p>
-
-<p style="margin-top: 30px; color: ##6c757d; font-size: 12px;">
-This is an automated message from Hermes SEG.
-</p>
-</div>
-<cfmailparam file="/var/www/html/dist/img/hermes_logo_new_orange2.png" contentid="hermeslogo" disposition="inline" />
-        </cfmail>
-
-        <!--- Redirect to success page --->
+    <cfif resetResult.success>
+        <cfset StructDelete(session, "pwResetToken")>
+        <cfset session.pwResetDoneAt = Now()>
         <cfset session.reason = 16>
-        <cflocation url="forgot_password.cfm" addtoken="no">
-
-    <cfelse>
-        <!--- LDAP update failed --->
+    <cfelseif resetResult.error EQ "password">
+        <cfset session.reason = 14>
+    <cfelseif resetResult.error EQ "ldap">
         <cfset session.reason = 17>
-        <cflocation url="reset_password.cfm?token=#form.token#" addtoken="no">
+    <cfelse>
+        <cfset StructDelete(session, "pwResetToken")>
+        <cfset session.reason = 15>
     </cfif>
+    <cflocation url="reset_password.cfm" addtoken="no">
 
 </cfif>
 
-<!--- VALIDATE TOKEN FROM URL --->
-<cfif url.token NEQ "">
-    <cfquery name="checkToken" datasource="hermes">
-        SELECT id, email, ldap_username, user_type, status, expires_at
-        FROM password_reset_requests
-        WHERE token = <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.token#">
-        LIMIT 1
-    </cfquery>
-
-    <cfif checkToken.recordcount EQ 0>
-        <cfset tokenError = "invalid">
-    <cfelseif checkToken.status NEQ "pending">
-        <cfset tokenError = "used">
-    <cfelseif checkToken.expires_at LT Now()>
-        <cfset tokenError = "expired">
-        <!--- Mark as expired in database --->
-        <cfquery name="markExpired" datasource="hermes">
-            UPDATE password_reset_requests
-            SET status = 'expired'
-            WHERE id = <cfqueryparam cfsqltype="cf_sql_integer" value="#checkToken.id#">
-        </cfquery>
-    <cfelse>
-        <cfset tokenValid = true>
-        <cfset resetRequest = checkToken>
-    </cfif>
-<cfelse>
+<!--- 3. DECIDE WHAT TO SHOW: result screen, error screen, or the form --->
+<!--- A refresh within 15 minutes of a successful reset shows the result
+     screen again rather than "no reset token" --->
+<cfset recentlyDone = StructKeyExists(session, "pwResetDoneAt") AND IsDate(session.pwResetDoneAt)
+                      AND DateDiff("n", session.pwResetDoneAt, Now()) LT 15>
+<cfif reason EQ 16 OR (heldToken EQ "" AND recentlyDone)>
+    <!--- also covers back-and-resubmit after success: the stale form was
+         refused, and the accurate thing to show is the earlier result --->
+    <cfset resetDone = true>
+    <cfset reason = 0>
+    <cfset session.reason = 0>
+<cfelseif reason EQ 15>
+    <cfset tokenError = "gone">
+    <cfset session.reason = 0>
+<cfelseif heldToken EQ "">
     <cfset tokenError = "missing">
+<cfelse>
+    <cfset resetRequest = authSvc.checkResetToken(heldToken)>
+    <cfif resetRequest.valid>
+        <cfset tokenValid = true>
+    <cfelse>
+        <cfset tokenError = resetRequest.error>
+        <cfset StructDelete(session, "pwResetToken")>
+    </cfif>
 </cfif>
 
 <body class="hold-transition login-page">
@@ -331,11 +268,11 @@ This is an automated message from Hermes SEG.
         <cfset session.reason = 0>
     </cfif>
 
-    <cfif reason EQ 15>
-        <div class="alert alert-danger alert-dismissible">
+    <cfif reason EQ 20>
+        <div class="alert alert-warning alert-dismissible">
             <button type="button" class="close" data-dismiss="alert" aria-hidden="true">&times;</button>
-            <h4><i class="icon fa fa-ban"></i> Error</h4>
-            This reset link has expired or already been used. Please request a new one.
+            <h4><i class="icon fa fa-exclamation-triangle"></i> Please Try Again</h4>
+            This form expired or was already submitted. Your password was not changed.
         </div>
         <cfset session.reason = 0>
     </cfif>
@@ -356,6 +293,41 @@ This is an automated message from Hermes SEG.
             This password has appeared in a data breach and cannot be used. Please choose a different password.
         </div>
         <cfset session.reason = 0>
+    </cfif>
+
+    <!--- RESULT SCREEN: password changed. No form, so nothing to resubmit --->
+    <cfif resetDone>
+        <div class="card card-outline card-success">
+            <div class="card-header text-center">
+                <img src="/dist/img/hermes_logo_new_orange2.png" alt="Hermes SEG" class="img-fluid mb-2" style="max-height: 80px;">
+                <h2><b>Hermes</b>&nbsp;SEG</h2>
+            </div>
+            <div class="card-body text-center">
+                <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+                <h4>Password Changed</h4>
+                <p>Your password has been reset. Use your new password the next time you sign in, and update it in any mail apps on your devices.</p>
+                <p class="text-muted small">A confirmation has been sent to your email address.</p>
+                <p class="mb-0"><strong>You can close this window.</strong></p>
+            </div>
+        </div>
+    </cfif>
+
+    <cfif tokenError EQ "gone">
+        <div class="card card-outline card-warning">
+            <div class="card-header text-center">
+                <img src="/dist/img/hermes_logo_new_orange2.png" alt="Hermes SEG" class="img-fluid mb-2" style="max-height: 80px;">
+                <h2><b>Hermes</b>&nbsp;SEG</h2>
+            </div>
+            <div class="card-body">
+                <p class="login-box-msg text-warning">
+                    <i class="fas fa-exclamation-circle"></i> Link No Longer Valid
+                </p>
+                <p class="text-center">This password reset link has expired or has already been used. Your password was not changed.</p>
+                <div class="text-center mt-3">
+                    <a href="forgot_password.cfm" class="btn btn-primary">Request New Reset Link</a>
+                </div>
+            </div>
+        </div>
     </cfif>
 
     <!--- TOKEN ERROR MESSAGES --->
@@ -441,13 +413,13 @@ This is an automated message from Hermes SEG.
             <div class="card-body">
                 <p class="login-box-msg">Reset Your Password</p>
                 <p class="text-center text-muted small">
-                    <cfoutput>Account: #resetRequest.email#</cfoutput>
+                    <cfoutput>Account: #EncodeForHTML(resetRequest.email)#</cfoutput>
                 </p>
 
-                <form action="" method="post">
+                <form action="reset_password.cfm" method="post">
                     <input type="hidden" name="action" value="reset_password">
                     <cfoutput>
-                    <input type="hidden" name="token" value="#url.token#">
+                    <input type="hidden" name="ft" value="#authSvc.issueFormToken('reset_password')#">
                     </cfoutput>
 
                     <div class="input-group mb-3">
