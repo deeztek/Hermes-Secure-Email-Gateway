@@ -71,7 +71,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <!--- TRAIN SPAM MESSAGE PARAMETERS END HERE --->
 
 <cfquery name="getmsg" datasource="hermes">
-    select quar_loc, subject from msgs where mail_id like binary '#getemail.mail_id#' and secret_id like binary '#getemail.secret_id#'
+    select quar_loc, subject from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#"> and secret_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.secret_id)#">
     </cfquery>
     
     
@@ -104,13 +104,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
          <cfif FindNoCase("Learned tokens from", salearnresult)>
                     
         <cfset session.successhammessage=#successhammessage#+1>
-        <cfset session.successhammessage_email= successhammessage_email & "#getmsg.subject# <br>">
+        <cfset session.successhammessage_email= successhammessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
         
         <!--- IF COMMAND OUTPUT DOES NOT CONTAIN Learned Tokens from 1 message(s) THEN TRAIN FAILED --->
         <cfelse>
                     
         <cfset session.failurehammessage=#failurehammessage#+1>
-        <cfset session.failurehammessage_email= failurehammessage_email & "#getmsg.subject# <br>">
+        <cfset session.failurehammessage_email= failurehammessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
                     
         </cfif>
               
@@ -118,7 +118,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelseif NOT fileExists(quarfile)> 
 
     <cfset session.failurehammessage=#failurehammessage#+1>
-    <cfset session.failurehammessage_email= failurehammessage_email & "#getmsg.subject# <br>">
+    <cfset session.failurehammessage_email= failurehammessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
 
     <!--- /CFIF fileExists(quarfile) --->
     </cfif>
@@ -126,7 +126,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelseif #getmsg.recordcount# LT 1>
 
     <cfset session.failurehammessage=#failurehammessage#+1>
-    <cfset session.failurehammessage_email= failurehammessage_email & "#getmsg.subject# <br>">
+    <cfset session.failurehammessage_email= failurehammessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
     
     <!--- /CFIF #getmsg.recordcount# --->
     </cfif>

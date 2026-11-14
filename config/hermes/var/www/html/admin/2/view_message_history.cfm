@@ -744,7 +744,7 @@ id="btn-back-to-top"
     </cfquery>
 
     <cfquery name="getmsgs" datasource="hermes">
-      SELECT msgrcpt.mail_id, msgrcpt.ds, msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgs.archive, msgs.client_addr FROM msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.time_iso between '#startdate#' and '#enddate#'
+      SELECT msgrcpt.mail_id, msgrcpt.ds, msgs.sid, msgs.spam_level, msgs.mail_id, msgs.secret_id, msgs.time_iso, msgs.subject, msgs.from_addr, msgs.content, msgs.archive, msgs.client_addr FROM msgs INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id where msgs.time_iso between <cfqueryparam cfsqltype="cf_sql_varchar" value="#startdate#"> and <cfqueryparam cfsqltype="cf_sql_varchar" value="#enddate#">
       <cfif contentFilterList is not "">
         AND msgs.content IN (
           <cfset ci = 0>
@@ -765,7 +765,7 @@ id="btn-back-to-top"
           </cfloop>
         )
       </cfif>
-      order by msgs.time_iso desc limit #limit#
+      order by msgs.time_iso desc limit <cfqueryparam cfsqltype="cf_sql_integer" value="#limit#">
       </cfquery>
 
   
@@ -1433,7 +1433,7 @@ id="btn-back-to-top"
        <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
         <cfquery name="getemail" datasource="hermes">
-        select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
+        select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
         </cfquery>
 
         <cfif #getemail.recordcount# GTE 1>
@@ -1503,7 +1503,7 @@ id="btn-back-to-top"
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
+  select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1576,7 +1576,7 @@ id="btn-back-to-top"
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
+  select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1648,7 +1648,7 @@ id="btn-back-to-top"
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
+  select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1733,7 +1733,7 @@ id="btn-back-to-top"
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> 
+  select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#"> 
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1819,7 +1819,7 @@ id="btn-back-to-top"
  <cfloop index="i" list="#form.mail_id#" delimiters=",">
 
   <cfquery name="getemail" datasource="hermes">
-  select mail_id, secret_id from msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
+  select mail_id, secret_id from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#i#">
   </cfquery>
 
   <cfif #getemail.recordcount# GTE 1>
@@ -1889,7 +1889,7 @@ id="btn-back-to-top"
                             <label class="form-label">Start Date/Time</label>
                             <div class="input-group" id="startdatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
                                 <cfoutput>
-                                <input type="text" name="startdate" value="#startdate#" class="form-control" data-td-target="##startdatetime"/>
+                                <input type="text" name="startdate" value="#EncodeForHTMLAttribute(startdate)#" class="form-control" data-td-target="##startdatetime"/>
                                 </cfoutput>
                                 <span class="input-group-text" data-td-target="#startdatetime" data-td-toggle="datetimepicker">
                                     <i class="fa fa-calendar"></i>
@@ -1901,7 +1901,7 @@ id="btn-back-to-top"
                             <label class="form-label">End Date/Time</label>
                             <div class="input-group" id="enddatetime" data-td-target-input="nearest" data-td-target-toggle="nearest">
                                 <cfoutput>
-                                <input type="text" name="enddate" value="#enddate#" class="form-control" data-td-target="##enddatetime"/>
+                                <input type="text" name="enddate" value="#EncodeForHTMLAttribute(enddate)#" class="form-control" data-td-target="##enddatetime"/>
                                 </cfoutput>
                                 <span class="input-group-text" data-td-target="#enddatetime" data-td-toggle="datetimepicker">
                                     <i class="fa fa-calendar"></i>
@@ -2023,11 +2023,11 @@ id="btn-back-to-top"
 
 
 
-        <td><input type="checkbox" name="mail_id" value="#mail_id#"></td>
+        <td><input type="checkbox" name="mail_id" value="#EncodeForHTMLAttribute(ToString(mail_id))#"></td>
 
        <td>
 
-        <a href="view_message.cfm?mid=#mail_id#&startdate=#startdate#&enddate=#enddate#&limit=#limit#" class="btn btn-secondary" role="button"><i class="fas fa-search"></i></a>
+        <a href="view_message.cfm?mid=#URLEncodedFormat(ToString(mail_id))#&startdate=#URLEncodedFormat(startdate)#&enddate=#URLEncodedFormat(enddate)#&limit=#URLEncodedFormat(limit)#" class="btn btn-secondary" role="button"><i class="fas fa-search"></i></a>
   
 
             </td>
@@ -2037,23 +2037,23 @@ id="btn-back-to-top"
 
  
 
-            <td>#client_addr#</td>
+            <td>#EncodeForHTML(client_addr)#</td>
 
             <cfquery name="getfromaddr" datasource="hermes">
-              SELECT email as fromAddress FROM maddr where id='#sid#'
+              SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_integer" value="#sid#">
               </cfquery>
 
-            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#getfromaddr.fromAddress#</td>
+            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#EncodeForHTML(getfromaddr.fromAddress)#</td>
 
             <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#htmlEditFormat(from_addr)#</td>
 
             <cfquery name="gettoaddr" datasource="hermes">
-              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id='#mail_id#'
+              SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id=<cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(mail_id)#">
               </cfquery>
 
-<td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#gettoaddr.toAddress#</td>
+<td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#EncodeForHTML(gettoaddr.toAddress)#</td>
 
-            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#subject#</td>
+            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#EncodeForHTML(subject)#</td>
 
             <td>#Numberformat (spam_level, '____.__')#</td>
 
@@ -2061,7 +2061,7 @@ id="btn-back-to-top"
               select content_type, description from msg_content_type where content_type like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#content#">
               </cfquery>
 
-            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#gettype.description#</td>
+            <td style="word-wrap: break-word;min-width: 160px;max-width: 160px;">#EncodeForHTML(gettype.description)#</td>
 
             <cfif #ds# is "P">
             <td>Delivered</td>

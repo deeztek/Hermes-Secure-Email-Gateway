@@ -79,7 +79,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <!--- FORGET MESSAGE PARAMETERS END HERE --->
 
 <cfquery name="getmsg" datasource="hermes">
-    select quar_loc, subject from msgs where mail_id like binary '#getemail.mail_id#' and secret_id like binary '#getemail.secret_id#'
+    select quar_loc, subject from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#"> and secret_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.secret_id)#">
     </cfquery>
     
     
@@ -112,13 +112,13 @@ This file is part of Hermes Secure Email Gateway Community Edition.
          <cfif FindNoCase("Forgot tokens from", salearnresult)>
                     
         <cfset session.successforgetmessage=#successforgetmessage#+1>
-        <cfset session.successforgetmessage_email= successforgetmessage_email & "#getmsg.subject# <br>">
+        <cfset session.successforgetmessage_email= successforgetmessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
         
         <!--- IF COMMAND OUTPUT DOES NOT CONTAIN Forgot Tokens from 1 message(s) THEN TRAIN FAILED --->
         <cfelse>
                     
         <cfset session.failureforgetmessage=#failureforgetmessage#+1>
-        <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#getmsg.subject# <br>">
+        <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
                     
         </cfif>
               
@@ -126,7 +126,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelseif NOT fileExists(quarfile)> 
 
     <cfset session.failureforgetmessage=#failureforgetmessage#+1>
-    <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#getmsg.subject# <br>">
+    <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
 
     <!--- /CFIF fileExists(quarfile) --->
     </cfif>
@@ -134,7 +134,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelseif #getmsg.recordcount# LT 1>
 
     <cfset session.failureforgetmessage=#failureforgetmessage#+1>
-    <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#getmsg.subject# <br>">
+    <cfset session.failureforgetmessage_email= failureforgetmessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
     
     <!--- /CFIF #getmsg.recordcount# --->
     </cfif>

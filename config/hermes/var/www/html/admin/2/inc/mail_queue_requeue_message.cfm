@@ -111,7 +111,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=4>
         <cfset session.successrequeuemessage=#successrequeuemessage#+1>
-        <cfset session.successrequeuemessage_email= #successrequeuemessage_email# & "#i# <br>">
+        <cfset session.successrequeuemessage_email= #successrequeuemessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
      <cfelse>
@@ -119,7 +119,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=4>
         <cfset session.failurerequeuemessage=#failurerequeuemessage#+1>
-        <cfset session.failurerequeuemessage_email= #failurerequeuemessage_email# & "#i# <br>">
+        <cfset session.failurerequeuemessage_email= #failurerequeuemessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
 <!--- /CFIF #requeuemsg# --->

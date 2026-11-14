@@ -148,6 +148,14 @@ textarea{
 </cfif>
 
 <cfparam name = "mailid" default = "">
+<!--- SECURITY: an Amavis mail_id is a short token; anything else is refused
+     before it reaches a query, a file path or the page --->
+<cfif IsDefined("url.mid") AND url.mid NEQ "" AND REFind("^[A-Za-z0-9+/_=-]{1,64}$", url.mid) EQ 0>
+    <cfset m="View Message: url.mid is invalid">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+</cfif>
+
 
 <cfif IsDefined("url.mid") is "True">
 
@@ -174,7 +182,7 @@ textarea{
         FROM msgs
         INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
         INNER JOIN maddr ON msgrcpt.rid = maddr.id
-        WHERE msgs.mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+        WHERE msgs.mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
         AND (
             msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
             OR (
@@ -198,7 +206,7 @@ textarea{
         SELECT msgrcpt.mail_id, msgrcpt.rid, msgs.mail_id, msgs.archive, msgs.quar_loc
         FROM msgs
         INNER JOIN msgrcpt ON msgs.mail_id = msgrcpt.mail_id
-        WHERE msgs.mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+        WHERE msgs.mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
         AND msgrcpt.rid = <cfqueryparam value="#session.owner#" cfsqltype="cf_sql_integer">
     </cfquery>
 </cfif>
@@ -261,7 +269,7 @@ select * from archive_jobs limit 1
 <cfif fileExists(quarfile)>
 
 <cfquery name="getmsgother" datasource="hermes">
-SELECT * FROM msgs where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
+SELECT * FROM msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset popAccount = createObject("component", "pop").init()>
@@ -293,7 +301,7 @@ SELECT email as fromAddress FROM maddr where id=<cfqueryparam cfsqltype="cf_sql_
 </cfquery>
 
 <cfquery name="gettoaddr" datasource="hermes">
-SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id like binary <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
+SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msgrcpt.rid = maddr.id where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset from = "#getfromaddr.fromAddress#">
@@ -335,7 +343,7 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
       --->
 
       <cfoutput>
-      <a href="view_message_history.cfm?startdate=#startdate#&enddate=#enddate#&limit=#limit#" title="Back to Message History" class="btn btn-secondary btn-lg" role="button"><i class="fas fa-reply"></i></a>
+      <a href="view_message_history.cfm?startdate=#URLEncodedFormat(startdate)#&enddate=#URLEncodedFormat(enddate)#&limit=#URLEncodedFormat(limit)#" title="Back to Message History" class="btn btn-secondary btn-lg" role="button"><i class="fas fa-reply"></i></a>
     </cfoutput>
 
     &nbsp;&nbsp;
@@ -389,14 +397,14 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
   <div class="card-body p-0">
     <div class="mailbox-read-info">
       <cfoutput>
-      <h5>#subject# <span class="mailbox-read-time float-end">#date# #time#</span></h5>
+      <h5>#EncodeForHTML(subject)# <span class="mailbox-read-time float-end">#date# #time#</span></h5>
     </div>
     <div class="mailbox-read-info">
-      <h6><strong>From:</strong> #from#</h6>
-      <h6><strong>Return-Path:</strong> #from2#</h6>
-        <h6><strong>To:</strong> #to#</h6>
-        <h6><strong>X-Envelope-To:</strong> #to2#</h6>
-        <h6><strong>CC:</strong> #cc#</h6>
+      <h6><strong>From:</strong> #EncodeForHTML(from)#</h6>
+      <h6><strong>Return-Path:</strong> #EncodeForHTML(from2)#</h6>
+        <h6><strong>To:</strong> #EncodeForHTML(to)#</h6>
+        <h6><strong>X-Envelope-To:</strong> #EncodeForHTML(to2)#</h6>
+        <h6><strong>CC:</strong> #EncodeForHTML(cc)#</h6>
       </cfoutput>
     </div>
  
@@ -407,8 +415,8 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
 <cfif #htmlbody# is "">
 
 <div class="textareacontainer">
-<textarea wrap="physical" rows="25">
-<cfoutput>#textbody#</cfoutput>
+<textarea wrap="physical" rows="25" readonly>
+<cfoutput>#EncodeForHTML(textbody)#</cfoutput>
 </textarea>
 </div>
 
@@ -420,9 +428,16 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
 
       <cfelse>
       </cfif>
+      <cfif htmlbody NEQ "">
+      <!--- SECURITY: the body is sender-controlled HTML. It renders in a
+           sandboxed frame: no scripts, no forms, an opaque origin with no
+           access to this page or the session. --->
       <cfoutput>
-      <p>#htmlbody#</p>
-    </cfoutput>
+      <iframe sandbox="" referrerpolicy="no-referrer" title="Message body"
+        srcdoc="#EncodeForHTMLAttribute(htmlbody)#"
+        style="width: 100%; height: 600px; border: 1px solid ##dee2e6; resize: vertical; background: ##fff;"></iframe>
+      </cfoutput>
+      </cfif>
 
       
     </div>
@@ -434,8 +449,8 @@ SELECT msgrcpt.rid,maddr.email as toAddress FROM msgrcpt INNER JOIN maddr ON msg
 </div>
 
 <div class="textareacontainer">
-<textarea wrap="physical" rows="25">
-<cfoutput>#header#</cfoutput>
+<textarea wrap="physical" rows="25" readonly>
+<cfoutput>#EncodeForHTML(header)#</cfoutput>
 </textarea>
 </div>
 

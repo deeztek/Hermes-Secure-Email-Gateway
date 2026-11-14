@@ -102,10 +102,18 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <cfparam name="mailid" default="">
+<!--- SECURITY: an Amavis mail_id is a short token; anything else is refused
+     before it reaches a query, a file path or the page --->
+<cfif IsDefined("url.mid") AND url.mid NEQ "" AND REFind("^[A-Za-z0-9+/_=-]{1,64}$", url.mid) EQ 0>
+    <cfset m="View Message: url.mid is invalid">
+    <cfinclude template="./inc/error.cfm">
+    <cfabort>
+</cfif>
+
 <cfif IsDefined("url.mid") is "True">
   <cfif url.mid is not "">
     <cfquery name="checkq" datasource="hermes">
-      SELECT archive, quar_loc FROM msgs WHERE mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+      SELECT archive, quar_loc FROM msgs WHERE mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
     </cfquery>
     <cfif checkq.recordcount GTE 1>
       <cfset mailid = url.mid>
@@ -167,7 +175,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Get message metadata from database --->
 <cfquery name="getmsgother" datasource="hermes">
-  SELECT *, sid FROM msgs WHERE mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
+  SELECT *, sid FROM msgs WHERE mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset msgDate = DateFormat(getmsgother.time_iso, "yyyy-mm-dd")>
@@ -180,7 +188,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 <cfquery name="gettoaddr" datasource="hermes">
   SELECT msgrcpt.rid, maddr.email AS toAddress FROM msgrcpt
   INNER JOIN maddr ON msgrcpt.rid = maddr.id
-  WHERE mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
+  WHERE mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#mailid#">
 </cfquery>
 
 <cfset from = getfromaddr.fromAddress>
@@ -310,7 +318,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <!--- Action Buttons --->
       <div class="mb-3">
         <cfoutput>
-        <a href="view_message_history.cfm?startdate=#startdate#&enddate=#enddate#&limit=#limit#" title="Back to Message History" class="btn btn-secondary">
+        <a href="view_message_history.cfm?startdate=#URLEncodedFormat(startdate)#&enddate=#URLEncodedFormat(enddate)#&limit=#URLEncodedFormat(limit)#" title="Back to Message History" class="btn btn-secondary">
           <i class="fas fa-reply"></i> Back
         </a>
         <a href="./inc/download_message.cfm?mid=#URLEncodedFormat(Trim(mailid))#" title="Download Message as EML" class="btn btn-secondary">
@@ -396,12 +404,14 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           <cfif allowMessageContent>
             <cfif htmlbody is "">
               <div class="textareacontainer">
-                <textarea wrap="physical" rows="25" readonly><cfoutput>#textbody#</cfoutput></textarea>
+                <textarea wrap="physical" rows="25" readonly><cfoutput>#EncodeForHTML(textbody)#</cfoutput></textarea>
               </div>
             <cfelse>
-              <div class="msg-body-sandbox">
-                <cfoutput>#htmlbody#</cfoutput>
-              </div>
+              <!--- SECURITY: sender-controlled HTML renders in a sandboxed
+                   frame: no scripts, opaque origin, no access to the console --->
+              <cfoutput><iframe sandbox="" referrerpolicy="no-referrer" title="Message body"
+        srcdoc="#EncodeForHTMLAttribute(htmlbody)#"
+        style="width: 100%; height: 600px; border: 1px solid ##dee2e6; resize: vertical; background: ##fff;"></iframe></cfoutput>
             </cfif>
           <cfelse>
             <div class="alert alert-info mb-0">
@@ -418,7 +428,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </div>
         <div class="card-body">
           <div class="textareacontainer">
-            <textarea wrap="physical" rows="25" readonly><cfoutput>#header#</cfoutput></textarea>
+            <textarea wrap="physical" rows="25" readonly><cfoutput>#EncodeForHTML(header)#</cfoutput></textarea>
           </div>
         </div>
       </div>

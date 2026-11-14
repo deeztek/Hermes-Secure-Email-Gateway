@@ -107,7 +107,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=5>
         <cfset session.successunholdmessage=#successunholdmessage#+1>
-        <cfset session.successunholdmessage_email= #successunholdmessage_email# & "#i# <br>">
+        <cfset session.successunholdmessage_email= #successunholdmessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
      <cfelse>
@@ -115,7 +115,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=5>
         <cfset session.failureunholdmessage=#failureunholdmessage#+1>
-        <cfset session.failureunholdmessage_email= #failureunholdmessage_email# & "#i# <br>">
+        <cfset session.failureunholdmessage_email= #failureunholdmessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
 <!--- /CFIF #unholdmsg# --->

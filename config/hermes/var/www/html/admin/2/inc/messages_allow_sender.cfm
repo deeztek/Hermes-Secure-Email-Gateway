@@ -54,7 +54,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
 <cfquery name="getrid" datasource="hermes">
-    SELECT rid from msgrcpt where mail_id like binary '#theMailId#'
+    SELECT rid from msgrcpt where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(theMailId)#">
     </cfquery>
 
     <cfquery name="gettoaddr" datasource="hermes">
@@ -71,7 +71,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfset recipient = getrecipientid.id>
 
     <cfquery name="getsenderid" datasource="hermes">
-        SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
+        SELECT sid from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(theMailId)#"> and secret_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(theSecretId)#">
         </cfquery>
 
         <cfquery name="getsenderemail" datasource="hermes">
@@ -113,19 +113,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         </cfquery>
 
         <cfset session.successallowsender=#successallowsender#+1>
-        <cfset session.successallowsender_email= successallowsender_email & "#sender# <br>">
+        <cfset session.successallowsender_email= successallowsender_email & "#EncodeForHTML(sender)# <br>">
 
         <cfelseif checkexists.recordcount GTE 1>
 
         <cfset session.failureallowsender=#failureallowsender#+1>
-        <cfset session.failureallowsender_email= failureallowsender_email & "#sender# <br>">
+        <cfset session.failureallowsender_email= failureallowsender_email & "#EncodeForHTML(sender)# <br>">
 
         </cfif>
 
     <cfelseif getrecipientid.recordcount LT 1>
 
         <cfquery name="getsenderid" datasource="hermes">
-            SELECT sid from msgs where mail_id like binary '#theMailId#' and secret_id like binary '#theSecretId#'
+            SELECT sid from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(theMailId)#"> and secret_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(theSecretId)#">
             </cfquery>
 
             <cfquery name="getsenderemail" datasource="hermes">
@@ -135,7 +135,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
             <cfset sender="#getsenderemail.email#">
 
 <cfset session.failureallowsender=#failureallowsender#+1>
-<cfset session.failureinvalidrecipient_email= failureinvalidrecipient_email & "#sender# <br>">
+<cfset session.failureinvalidrecipient_email= failureinvalidrecipient_email & "#EncodeForHTML(sender)# <br>">
 
     </cfif>
 

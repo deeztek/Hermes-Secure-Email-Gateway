@@ -71,11 +71,11 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   </cfif>
 
 <cfquery name="getmsg" datasource="hermes">
-    select quar_loc, subject from msgs where mail_id like binary '#getemail.mail_id#' and secret_id like binary '#getemail.secret_id#'
+    select quar_loc, subject from msgs where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#"> and secret_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.secret_id)#">
     </cfquery>
     
     <cfquery name="getrid" datasource="hermes">
-    select rid from msgrcpt where mail_id like binary '#getemail.mail_id#'
+    select rid from msgrcpt where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#">
     </cfquery>
     
     <cfquery name="getrec" datasource="hermes">
@@ -131,17 +131,17 @@ This file is part of Hermes Secure Email Gateway Community Edition.
          <!--- Check for success: amavisd-release returns "250 2.0.0" on success via docker exec --->
          <cfif FindNoCase("250 2.0.0", release)>
         <cfset session.successreleasemessage=#successreleasemessage#+1>
-        <cfset session.successreleasemessage_email= successreleasemessage_email & "#getmsg.subject# <br>">
+        <cfset session.successreleasemessage_email= successreleasemessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
          <cfelse>
         <cfset session.failurereleasemessage=#failurereleasemessage#+1>
-        <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#getmsg.subject# <br>">
+        <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
          </cfif>
               
     
     <cfelseif NOT fileExists(quarfile)> 
 
     <cfset session.failurereleasemessage=#failurereleasemessage#+1>
-    <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#getmsg.subject# <br>">
+    <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
 
     <!--- /CFIF fileExists(quarfile) --->
     </cfif>
@@ -149,7 +149,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfelseif #getmsg.recordcount# LT 1>
 
     <cfset session.failurereleasemessage=#failurereleasemessage#+1>
-    <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#getmsg.subject# <br>">
+    <cfset session.failurereleasemessage_email= failurereleasemessage_email & "#EncodeForHTML(getmsg.subject)# <br>">
     
     <!--- /CFIF #getmsg.recordcount# --->
     </cfif>

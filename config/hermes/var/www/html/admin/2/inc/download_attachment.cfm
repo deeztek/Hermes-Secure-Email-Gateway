@@ -67,7 +67,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <!--- Look up quarantine file --->
 <cfquery name="checkq" datasource="hermes">
-  SELECT archive, quar_loc FROM msgs WHERE mail_id LIKE BINARY <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
+  SELECT archive, quar_loc FROM msgs WHERE mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#url.mid#">
 </cfquery>
 
 <cfif checkq.recordcount LT 1>

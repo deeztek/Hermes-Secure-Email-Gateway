@@ -110,7 +110,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=6>
         <cfset session.successdeletemessage=#successdeletemessage#+1>
-        <cfset session.successdeletemessage_email= #successdeletemessage_email# & "#i# <br>">
+        <cfset session.successdeletemessage_email= #successdeletemessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
      <cfelse>
@@ -118,7 +118,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
         <cfoutput>
         <cfset session.m=6>
         <cfset session.failuredeletemessage=#failuredeletemessage#+1>
-        <cfset session.failuredeletemessage_email= #failuredeletemessage_email# & "#i# <br>">
+        <cfset session.failuredeletemessage_email= #failuredeletemessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
 <!--- /CFIF #requeuemsg# --->

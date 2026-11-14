@@ -112,7 +112,7 @@ variable="holdmsg">
         <cfoutput>
         <cfset session.m=3>
         <cfset session.successholdmessage=#successholdmessage#+1>
-        <cfset session.successholdmessage_email= #successholdmessage_email# & "#i# <br>">
+        <cfset session.successholdmessage_email= #successholdmessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
      <cfelse>
@@ -120,7 +120,7 @@ variable="holdmsg">
         <cfoutput>
         <cfset session.m=3>
         <cfset session.failureholdmessage=#failureholdmessage#+1>
-        <cfset session.failureholdmessage_email= #failureholdmessage_email# & "#i# <br>">
+        <cfset session.failureholdmessage_email= #failureholdmessage_email# & "#EncodeForHTML(i)# <br>">
     </cfoutput>
 
 <!--- /CFIF #holdmsg# --->
