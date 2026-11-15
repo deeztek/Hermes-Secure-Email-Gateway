@@ -29,7 +29,9 @@ furkank1337. Details are in the advisories.
   single-use forms and a "password changed" notice to the account and its
   recovery address. Message subjects, senders and bodies can no longer run
   script in the portal or console, and filter names and sizes can no longer
-  alter the generated Sieve script.
+  alter the generated Sieve script. Releasing a quarantined message, the
+  console sign-in checks and the web server's handling of unusual addresses
+  were tightened as well.
 
 <!-- GHSA-jmx7-r446-76pg (Nextcloud password script) was already fixed in
      v261107 by #401; credit it in that advisory, not here. -->
