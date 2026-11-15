@@ -1,40 +1,29 @@
 # Hermes SEG v261115
 
+> **Security release: upgrade immediately.** This release fixes critical
+> vulnerabilities, some of which can be exploited without signing in. Every
+> version up to and including v261107 is affected. There is no workaround
+> other than upgrading.
+
 ## Synopsis
 
-Security release. Upgrade as soon as possible. It fixes four reported
-vulnerabilities, two of them reachable without signing in, and hardens the
-password pages, the message viewer and Mail Filters further. It also adds
-Forwarding and an All messages / Keep option to Mail Filters in the user
-console, and makes SpamAssassin rules update again.
+Security release. It fixes several vulnerabilities in the password reset
+pages, the user console and the admin console, and hardens the web server
+configuration. It also adds Forwarding and an All messages / Keep option to
+Mail Filters in the user console, and makes SpamAssassin rules update again.
 
 ## Security fixes
 
-Fixes vulnerabilities affecting v261107 and earlier, reported by
-furkank1337. Details are in the advisories.
+- **Critical:** issues in the password reset pages that could be exploited
+  without signing in.
+- **Critical:** issues that let a signed-in user, or the content of an
+  incoming message, run commands on the gateway.
+- **Medium and lower:** further hardening of the password pages, the message
+  viewer, Mail Filters, quarantine release and the console sign-in checks.
 
-- **Critical:** unauthenticated LDAP password change through the password
-  reset pages
-  ([GHSA-wwxm-p5f2-q6xm](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-wwxm-p5f2-q6xm)).
-- **Critical:** unauthenticated password reset tokens for other accounts
-  ([GHSA-rgx7-j3qv-h2gm](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-rgx7-j3qv-h2gm)).
-- **Critical:** a signed-in mailbox user could run commands through a shared
-  folder name
-  ([GHSA-jcj6-qrjh-qp2m](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-jcj6-qrjh-qp2m)).
-- **Medium:** HTML injection into the password reset notice sent to
-  administrators
-  ([GHSA-h2c7-jjqq-j49j](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-h2c7-jjqq-j49j)).
-
-- **Hardening.** Password reset and change now run outside the web root, with
-  single-use forms and a "password changed" notice to the account and its
-  recovery address. Message subjects, senders and bodies can no longer run
-  script in the portal or console, and filter names and sizes can no longer
-  alter the generated Sieve script. Releasing a quarantined message, the
-  console sign-in checks and the web server's handling of unusual addresses
-  were tightened as well.
-
-<!-- GHSA-jmx7-r446-76pg (Nextcloud password script) was already fixed in
-     v261107 by #401; credit it in that advisory, not here. -->
+Security advisories will be published on the project's GitHub Security page
+once installations have had time to upgrade. Thanks to furkank1337 for
+reporting several of these issues responsibly.
 
 ## New features
 
