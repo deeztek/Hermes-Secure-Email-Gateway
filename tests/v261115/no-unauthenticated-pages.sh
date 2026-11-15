@@ -36,7 +36,7 @@ while IFS= read -r f; do
     else
         [[ "$c" == "404" ]] || { fail "$rel answers $c without a session (want 404)"; bad=1; }
     fi
-done < <(find "$webroot/user-auth" -name '*.cf[mc]' -not -path '*/.*')
+done < <(find "$webroot/user-auth" -name '*.cfm' -not -path '*/.*')
 [[ $bad -eq 0 ]] && pass "/user-auth/: $n files, only the public pages answer"
 
 # removed helpers and spelling variants must stay unreachable
@@ -67,5 +67,14 @@ for area in users admin; do
     done < <(find "$webroot/$area" -name '*.cfm' -not -path '*/.*')
     [[ $bad -eq 0 ]] && pass "/$area/: $n pages, none runs without a session"
 done
+
+# ---- components: never requestable, anywhere ----
+bad=0; n=0
+while IFS= read -r f; do
+    rel="/${f#"$webroot"/}"
+    c="$(code "$rel")"; n=$((n + 1))
+    [[ "$c" == "404" ]] || { fail "$rel answers $c (want 404)"; bad=1; }
+done < <(find "$webroot/user-auth" "$webroot/users" "$webroot/admin" -name '*.cfc' -not -path '*/.*')
+[[ $bad -eq 0 ]] && pass "components (.cfc): $n files, all 404"
 
 done_check
