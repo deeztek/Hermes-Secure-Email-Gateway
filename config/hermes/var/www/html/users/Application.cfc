@@ -206,6 +206,20 @@ the url: https://#ConsoleHost#</cfoutput>
       <!--- Record login (first request of new session only; flag-gated inside) --->
       <cfinclude template="/admin/2/inc/record_login.cfm" />
 
+      <!--- SECURITY: files under /users/2/inc/ are fragments for other pages
+           to include. Requested directly they would skip the checks the
+           including page makes, so only the endpoints the browser really
+           calls (AJAX, form targets, downloads) may be requested. --->
+      <cfset _incPath = LCase(Arguments.targetPage)>
+      <cfif Find("/users/2/inc/", _incPath) EQ 1>
+          <cfset _incAllowed = "/users/2/inc/download_message.cfm,/users/2/inc/get_domain_mailboxes.cfm,/users/2/inc/get_mailbox_folders.cfm,/users/2/inc/get_sieve_rule_json.cfm,/users/2/inc/get_user_addresses.cfm,/users/2/inc/save_signature_action.cfm">
+          <cfif NOT ListFind(_incAllowed, _incPath)>
+              <cfheader statuscode="404" statustext="Not Found">
+              <cfcontent reset="true" type="text/plain">
+              <cfabort>
+          </cfif>
+      </cfif>
+
       <cfinclude template="#Arguments.targetPage#" />
       <cfreturn />
 
