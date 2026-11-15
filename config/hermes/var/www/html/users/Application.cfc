@@ -116,11 +116,14 @@ the url: https://#ConsoleHost#</cfoutput>
               argument, with no quote parsing and no shell, so nothing in a
               cookie value can become a separate option. --->
          <cfexecute name="/usr/bin/curl"
-         arguments="#['-X', 'GET', '-k', 'https://' & ConsoleHost & '/api/verify', '-H', 'accept: */*', '-H', 'X-Original-URL: https://' & ConsoleHost & '/users/', '-H', 'Cookie: ' & theCookie]#"
+         arguments="#['-s', '-o', '/dev/null', '-w', '%{http_code}', '-X', 'GET', '-k', 'https://' & ConsoleHost & '/api/verify', '-H', 'accept: */*', '-H', 'X-Original-URL: https://' & ConsoleHost & '/users/', '-H', 'Cookie: ' & theCookie]#"
          variable="curlresult"
          timeout="10" />
 
-       <cfif #curlresult# is "Unauthorized">
+       <!--- SECURITY: only an explicit 200 from Authelia lets the request in.
+            401 (not signed in), 403 (signed in, no access to this console),
+            an error or a timeout all refuse. --->
+       <cfif Trim(curlresult) NEQ "200">
 
        <cfset m="User Application.cfc: session is unauthorized">
        <cfinclude template="/user-auth/error.cfm">
