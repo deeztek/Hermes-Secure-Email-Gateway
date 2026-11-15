@@ -76,7 +76,8 @@ Sets: getqueue (query), mailqueuelimit (boolean)
     <cfif REFind("^[A-F0-9]", line)>
       <!--- Extract queue ID (first token) --->
       <cfset rawId = trim(ListFirst(line, " "))>
-      <cfset msgStatus = "N/A">
+      <!--- No marker: waiting in the queue (deferred or not yet tried) --->
+      <cfset msgStatus = "QUEUED">
 
       <!--- Check for hold (!) or active (*) markers --->
       <cfif Right(rawId, 1) is "!">
