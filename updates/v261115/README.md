@@ -2,8 +2,8 @@
 
 > **Security release: upgrade immediately.** This release fixes critical
 > vulnerabilities, some of which can be exploited without signing in. Every
-> version up to and including v261107 is affected. There is no workaround
-> other than upgrading.
+> version up to and including v261107 is affected. If you cannot upgrade
+> right away, contact support.
 
 ## Synopsis
 
