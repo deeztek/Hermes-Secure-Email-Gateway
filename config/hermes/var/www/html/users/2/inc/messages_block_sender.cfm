@@ -48,6 +48,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <cfquery name="getrid" datasource="hermes">
     SELECT rid from msgrcpt where mail_id = <cfqueryparam cfsqltype="cf_sql_varchar" value="#ToString(getemail.mail_id)#">
+      AND rid = <cfqueryparam cfsqltype="cf_sql_integer" value="#getemail.rid#"> <!--- the signed-in user's own row --->
     </cfquery>
 
     <cfquery name="gettoaddr" datasource="hermes">

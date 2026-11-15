@@ -89,43 +89,38 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     <cfif fileExists(quarfile)> 
     
 
-        <cffile action="write"
-            file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-            output="docker exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getemail.secret_id# #getrec.email# 2>&1">
-
+        <!--- SECURITY: amavisd-release is called directly with an argument array:
+             no script, no shell. The recipient comes from the message envelope
+             and may legally contain ` | $ &, so every value is also checked
+             against a strict pattern; anything else counts as a failed release. --->
+        <cfset release = "">
+        <cfset relQ = ToString(getmsg.quar_loc)>
+        <cfset relS = ToString(getemail.secret_id)>
+        <!--- not lowercased: amavisd-release only releases to a recipient that
+             matches the original exactly, case included --->
+        <cfset relR = Trim(ToString(getrec.email))>
+        <cfif REFind("^[A-Za-z0-9._/+-]{1,255}$", relQ) GT 0 AND Find("..", relQ) EQ 0
+              AND REFind("^[A-Za-z0-9+/_=-]{1,64}$", relS) GT 0
+              AND REFind("^[A-Za-z0-9._%+=-]{1,64}@[A-Za-z0-9.-]{1,253}$", relR) GT 0
+              AND Left(relR, 1) NEQ "-">
             <cftry>
-
-                <cfexecute name="/bin/chmod"
-                arguments="+x /opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-                timeout="60">
-                </cfexecute>
-
+                <!--- The three values are passed as $1 $2 $3: the shell never parses
+                     them. The shell is only there for 2>&1, because Lucee 6.2 drops
+                     errorVariable (and can throw) when a program writes to stderr,
+                     and amavisd-release reports its result there. --->
+                <cfset relCmd = 'exec /usr/local/bin/docker exec hermes_mail_filter /usr/sbin/amavisd-release "$1" "$2" "$3" 2>&1'>
+                <cfexecute name="/bin/sh"
+                    arguments="#['-c', relCmd, 'amavisd-release', relQ, relS, relR]#"
+                    timeout="240" variable="release" />
             <cfcatch type="any">
-            <cfset m="Messages Release message: There was an error making release script executable">
+            <cflog file="hermes" type="error" text="amavisd-release failed for admin release: #cfcatch.message# #cfcatch.detail#">
+            <cfset m="Messages Release message: There was an error executing amavisd-release: " & EncodeForHTML(Left(cfcatch.message & " " & cfcatch.detail, 300))>
             <cfinclude template="error.cfm">
             <cfabort>
             </cfcatch>
             </cftry>
-
-            <cftry>
-
-                <cfexecute name="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh"
-                timeout="240"
-                variable="release"
-                arguments="">
-                </cfexecute>
-
-            <cfcatch type="any">
-            <cfset m="Messages Release message: There was an error executing amavisd-release">
-            <cfinclude template="error.cfm">
-            <cfabort>
-            </cfcatch>
-            </cftry>
-
-        <!--- DELETE SCRIPT --->
-        <cfif fileExists("/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh")>
-          <cffile action="delete" file="/opt/hermes/tmp/#customtrans3#_amavis_release_message.sh">
         </cfif>
+
         
         
          <!--- Check for success: amavisd-release returns "250 2.0.0" on success via docker exec --->

@@ -155,13 +155,22 @@ on GET let them release quarantined messages nobody chose to release.
      error can never leave a half-printed success card above a failure. --->
 <cfset releaseStatus = "error">
 <cftry>
-    <cfexecute name="/usr/local/bin/docker"
-        arguments="exec hermes_mail_filter /usr/sbin/amavisd-release #getmsg.quar_loc# #getmsg.secret_id# #rcptEmail#"
+    <!--- SECURITY: argument array, so no value can split into extra
+         arguments; each value is also checked against a strict pattern. --->
+    <cfif REFind("^[A-Za-z0-9._/+-]{1,255}$", ToString(getmsg.quar_loc)) EQ 0 OR Find("..", getmsg.quar_loc)
+          OR REFind("^[A-Za-z0-9+/_=-]{1,64}$", ToString(getmsg.secret_id)) EQ 0
+          OR REFind("^[A-Za-z0-9._%+=-]{1,64}@[A-Za-z0-9.-]{1,253}$", rcptEmail) EQ 0 OR Left(rcptEmail, 1) EQ "-">
+        <cfthrow message="quarantine_release: value outside the allowed pattern">
+    </cfif>
+    <!--- values as $1 $2 $3 (never parsed by the shell); the shell is only
+         there to merge stderr, which Lucee 6.2 otherwise mishandles --->
+    <cfset relCmd = 'exec /usr/local/bin/docker exec hermes_mail_filter /usr/sbin/amavisd-release "$1" "$2" "$3" 2>&1'>
+    <cfexecute name="/bin/sh"
+        arguments="#['-c', relCmd, 'amavisd-release', ToString(getmsg.quar_loc), ToString(getmsg.secret_id), rcptEmail]#"
         timeout="60"
-        variable="releaseOutput"
-        errorVariable="releaseError">
+        variable="releaseOutput">
     </cfexecute>
-    <cfset releaseStatus = FindNoCase("250", releaseOutput & " " & releaseError) ? "released" : "failed">
+    <cfset releaseStatus = FindNoCase("250", releaseOutput) ? "released" : "failed">
 <cfcatch type="any">
     <cflog file="hermes" type="error" text="quarantine_release: amavisd-release failed: #cfcatch.message#">
     <cfset releaseStatus = "error">
