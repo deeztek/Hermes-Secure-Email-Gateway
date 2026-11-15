@@ -1,0 +1,4 @@
+# Fingerprints of verified gitleaks false positives (one per line).
+# 0cc73260: a variable assignment in a helper that was restored and later
+# deleted, not a secret. Verified by hand 2026-11-13 and 2026-11-15.
+0cc73260daf6471cf48c731d40bf650de0369315:config/hermes/var/www/html/user-auth/inc/generate_ldap_password.cfm:hermes-password-bare:38
