@@ -1205,6 +1205,30 @@ phase4_finalize() {
         fi
     fi
 
+    # Re-render the nginx vhosts from the updated templates and restart nginx.
+    # Generated vhosts are NOT updated by a template change on disk, so without
+    # this an upgrade's nginx fixes (e.g. v261115's request filtering) only took
+    # effect after someone re-saved Console Settings. regen_nginx_config.cfm was
+    # written for this call (#186) but never wired in. Non-fatal: a failed
+    # render leaves the previous vhosts running.
+    if (( DRY_RUN )); then
+        echo -e "${CYAN}[dry-run]${NC} docker exec hermes_commandbox curl --silent http://localhost:8888/schedule/regen_nginx_config.cfm"
+    else
+        log "Re-rendering nginx vhosts from the updated templates..."
+        local nginx_resp
+        if ! nginx_resp=$(docker exec hermes_commandbox /usr/bin/curl --silent --max-time 300 \
+                              http://localhost:8888/schedule/regen_nginx_config.cfm 2>&1); then
+            warn "nginx re-render failed. Output:"
+            echo "$nginx_resp" | tee -a "$LOG_FILE"
+            warn "Continuing -- re-save Console Settings in the admin console to apply it."
+        elif [[ "$nginx_resp" == *_NGINX_REGEN_OK* ]]; then
+            log "  nginx vhosts re-rendered; nginx restarted ✓"
+        else
+            echo "$nginx_resp" | tee -a "$LOG_FILE"
+            warn "nginx re-render did not confirm success -- re-save Console Settings in the admin console."
+        fi
+    fi
+
     # NCVERSION change detection + automated upgrade (#264).
     # If .env's NCVERSION differs from what NC is currently running,
     # run `occ upgrade` and rehydrate Hermes-required NC apps. This
