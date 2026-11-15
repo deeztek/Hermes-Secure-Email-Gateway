@@ -455,10 +455,27 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       if (data && data.folders) folderList = data.folders;
     });
 
+    loadDomainMailboxes();
+
     // Confirm before submitting any filter that includes a "Delete silently" action
     // and any "All messages" filter that takes mail out of this mailbox
     $('#ruleForm').on('submit', function(e) {
-      var hasAll = false, hasDiscard = false, hasRedirect = false, hasKeep = false;
+      // "Keep a copy in this mailbox" under a Redirect action is saved as a
+      // Keep action, exactly as if it had been added as its own row
+      $('.keepcopy-injected').remove();
+      var wantKeep = false, keepRow = false;
+      $('.action-row').each(function() {
+        var i = $(this).data('idx');
+        var t = $(this).find('[name="act_type_' + i + '"]').val();
+        if (t === 'redirect' && $(this).find('.act-keepcopy input').is(':checked')) wantKeep = true;
+        if (t === 'keep') keepRow = true;
+      });
+      if (wantKeep && !keepRow) {
+        var k = actIdx; actIdx++; $('#actCount').val(actIdx);
+        $(this).append('<input type="hidden" class="keepcopy-injected" name="act_type_' + k + '" value="keep">');
+        $(this).append('<input type="hidden" class="keepcopy-injected" name="act_value_' + k + '" value="">');
+      }
+      var hasAll = false, hasDiscard = false, hasRedirect = false, hasKeep = wantKeep;
       $('.condition-row').each(function() {
         var idx = $(this).data('idx');
         if ($(this).find('[name="cond_field_' + idx + '"]').val() === 'all') hasAll = true;
@@ -476,7 +493,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       } else if (hasDiscard) {
         needConfirm = 'WARNING: This filter will permanently DELETE matching messages without keeping a copy. Deleted messages cannot be recovered. Are you sure?';
       } else if (hasAll && hasRedirect && !hasKeep) {
-        needConfirm = 'WARNING: This filter will send EVERY incoming message to the redirect address INSTEAD of this mailbox. You will stop receiving mail here. To keep a copy here as well, cancel and add the action "Keep (deliver normally)". Continue anyway?';
+        needConfirm = 'WARNING: This filter will send EVERY incoming message to the redirect address INSTEAD of this mailbox. You will stop receiving mail here. To keep a copy here as well, cancel and tick "Keep a copy in this mailbox" under the redirect. Continue anyway?';
       }
       if (needConfirm) {
         if (!confirm(needConfirm)) {
@@ -541,8 +558,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     html += '<div class="col-md-7">';
     html += '<label class="form-label small mb-1 act-value-label">Folder name</label>';
     html += '<select class="form-control form-control-sm act-value-folder" name="act_value_' + idx + '" data-idx="' + idx + '"><option value=""></option></select>';
-    html += '<input type="text" class="form-control form-control-sm act-value-text" name="act_value_text_' + idx + '" maxlength="255" placeholder="e.g., user@domain.com" style="display:none;">';
+    html += '<input type="text" class="form-control form-control-sm act-value-text" name="act_value_text_' + idx + '" maxlength="255" list="domainMailboxes" autocomplete="off" placeholder="e.g., user@domain.com" style="display:none;">';
     html += '<small class="form-text text-muted act-value-hint">Use "/" for nested folders (e.g. "Work/Projects").</small>';
+    html += '<div class="form-check mt-1 act-keepcopy" style="display:none;">';
+    html += '<input class="form-check-input" type="checkbox" id="keepcopy_' + idx + '" checked onchange="syncKeepCopy(this.checked)">';
+    html += '<label class="form-check-label small" for="keepcopy_' + idx + '">Keep a copy in this mailbox</label>';
+    html += '</div>';
     html += '</div>';
     html += '<div class="col-md-1 text-end">';
     html += '<button type="button" class="btn btn-sm btn-outline-danger" title="Remove" onclick="removeActionRow(' + idx + ')"><i class="fas fa-times"></i></button>';
@@ -603,6 +624,32 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     updateActRowUI(idx, act ? act.value : '');
   }
 
+  // Address suggestions for redirect / forward-to: mailboxes on the user's own
+  // domain (the server still checks on save). Built with DOM calls, never HTML.
+  function loadDomainMailboxes() {
+    var dl = document.getElementById('domainMailboxes');
+    if (!dl) {
+      dl = document.createElement('datalist');
+      dl.id = 'domainMailboxes';
+      document.body.appendChild(dl);
+    }
+    $.getJSON('./inc/get_domain_mailboxes.cfm', function(data) {
+      if (!data || !data.mailboxes) return;
+      while (dl.firstChild) dl.removeChild(dl.firstChild);
+      data.mailboxes.forEach(function(m) {
+        var o = document.createElement('option');
+        o.value = m.email;
+        if (m.name) o.label = m.name;
+        dl.appendChild(o);
+      });
+    });
+  }
+
+  // Keep applies to the whole filter, so every Redirect row shows the same setting
+  function syncKeepCopy(checked) {
+    $('.act-keepcopy input').prop('checked', checked);
+  }
+
   function removeActionRow(idx) {
     destroyFolderSelect(idx);
     $('.action-row[data-idx="' + idx + '"]').remove();
@@ -639,6 +686,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
     // Reset names
     $folderSel.attr('name', '');
     $textInput.attr('name', '').prop('required', false);
+
+    // "Keep a copy" only belongs to Redirect; the folder hint only to Move
+    $row.find('.act-keepcopy').toggle(type === 'redirect');
+    $row.find('.act-value-hint').toggle(type === 'fileinto');
 
     if (type === 'fileinto') {
       $label.text('Folder name').show();
@@ -714,7 +765,16 @@ This file is part of Hermes Secure Email Gateway Community Edition.
           addConditionRow();
         }
         if (r.actions && r.actions.length) {
-          r.actions.forEach(function(a) { addActionRow(a); });
+          var hasRedir = false, hasKeepAct = false;
+          r.actions.forEach(function(a) {
+            if (a.type === 'redirect') hasRedir = true;
+            if (a.type === 'keep') hasKeepAct = true;
+          });
+          r.actions.forEach(function(a) {
+            if (hasRedir && a.type === 'keep') return;
+            addActionRow(a);
+          });
+          if (hasRedir) syncKeepCopy(hasKeepAct);
         } else {
           addActionRow();
         }

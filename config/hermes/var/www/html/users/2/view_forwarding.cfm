@@ -178,9 +178,10 @@ This file is part of Hermes Secure Email Gateway Community Edition.
       <div class="form-group mb-3">
         <label for="forward_to"><strong>Forward to</strong></label>
         <cfoutput>
-        <input type="email" class="form-control" id="forward_to" name="forward_to" maxlength="255" placeholder="e.g., user@#HTMLEditFormat(ListLast(session.email, '@'))#" value="#HTMLEditFormat(fTo)#">
+        <input type="email" class="form-control" id="forward_to" name="forward_to" maxlength="255" list="domainMailboxes" autocomplete="off" placeholder="e.g., user@#HTMLEditFormat(ListLast(session.email, '@'))#" value="#HTMLEditFormat(fTo)#">
         </cfoutput>
-        <small class="text-muted">Another mailbox on your domain.</small>
+        <datalist id="domainMailboxes"></datalist>
+        <small class="text-muted">Another mailbox on your domain. Start typing to pick one.</small>
       </div>
 
       <div class="form-check mb-2">
@@ -214,6 +215,19 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 
 <script>
   $(document).ready(function() {
+    // Address suggestions: mailboxes on the user's own domain (the server
+    // still checks on save). Built with DOM calls, never HTML.
+    $.getJSON('./inc/get_domain_mailboxes.cfm', function(data) {
+      var dl = document.getElementById('domainMailboxes');
+      if (!dl || !data || !data.mailboxes) return;
+      data.mailboxes.forEach(function(m) {
+        var o = document.createElement('option');
+        o.value = m.email;
+        if (m.name) o.label = m.name;
+        dl.appendChild(o);
+      });
+    });
+
     $('#forwardingForm').on('submit', function(e) {
       var on = $('#enabledToggle').is(':checked');
       var keep = $('#keep_copy').is(':checked');
