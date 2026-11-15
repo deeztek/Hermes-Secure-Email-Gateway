@@ -519,10 +519,24 @@ Design rules (GHSA-wwxm-p5f2-q6xm, GHSA-rgx7-j3qv-h2gm, GHSA-h2c7-jjqq-j49j):
         <cfif NOT ListFind("relays,mailboxes,admins", arguments.group) OR NOT isSafeDn(arguments.dn)>
             <cfreturn false>
         </cfif>
+        <!--- SECURITY: the admins check fails CLOSED. If LDAP cannot be asked,
+             or does not even return the admins group, treat the account as an
+             administrator, which refuses self-service reset. --->
+        <cfif arguments.group EQ "admins">
+            <cftry>
+                <cfset out = ldapSearch("cn=admins,#variables.GROUPS_BASE#", "(objectClass=*)")>
+            <cfcatch type="any">
+                <cfreturn true>
+            </cfcatch>
+            </cftry>
+            <cfif FindNoCase("dn: cn=admins,#variables.GROUPS_BASE#", out) EQ 0>
+                <cfreturn true>
+            </cfif>
+        </cfif>
         <cftry>
             <cfset out = ldapSearch("cn=#arguments.group#,#variables.GROUPS_BASE#", "(member=#arguments.dn#)")>
         <cfcatch type="any">
-            <cfreturn false>
+            <cfreturn (arguments.group EQ "admins")>
         </cfcatch>
         </cftry>
         <cfreturn FindNoCase("dn: cn=#arguments.group#,#variables.GROUPS_BASE#", out) GT 0>
@@ -533,6 +547,9 @@ Design rules (GHSA-wwxm-p5f2-q6xm, GHSA-rgx7-j3qv-h2gm, GHSA-h2c7-jjqq-j49j):
     <cffunction name="writeSecretFile" access="private" returntype="string" output="false">
         <cfargument name="secret" type="string" required="true">
         <cfset var path = variables.TMP & randomName() & "_pw.txt">
+        <!--- created empty and made owner-only BEFORE the secret is written --->
+        <cfset FileWrite(path, "", "utf-8")>
+        <cfset FileSetAccessMode(path, "600")>
         <cfset FileWrite(path, arguments.secret, "utf-8")>
         <cfreturn path>
     </cffunction>

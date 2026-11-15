@@ -97,6 +97,9 @@ URL Parameters:
 <cfif url.token NEQ "">
     <cfset StructDelete(session, "pwResetDoneAt")>
     <cfif REFind("^[a-f0-9]{64}$", url.token) GT 0>
+        <!--- SECURITY: new session id before the token is parked in it, so a
+             session id planted in the browser beforehand is worthless --->
+        <cfset sessionRotate()>
         <cfset session.pwResetToken = url.token>
     <cfelse>
         <cfset StructDelete(session, "pwResetToken")>

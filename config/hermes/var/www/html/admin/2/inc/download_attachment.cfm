@@ -63,7 +63,12 @@ This file is part of Hermes Secure Email Gateway Community Edition.
 </cfif>
 
 <!--- Sanitize filename (remove path separators) --->
-<cfset safeFilename = ReReplace(url.fn, "[/\\:*?""<>|]", "_", "ALL")>
+<!--- SECURITY: the name comes from the message; keep only safe characters
+     so it cannot break the Content-Disposition header --->
+<cfset safeFilename = Left(ReReplace(url.fn, "[^A-Za-z0-9._ ()-]", "_", "ALL"), 150)>
+<cfif safeFilename EQ "" OR REFind("^\.+$", safeFilename)>
+  <cfset safeFilename = "attachment.bin">
+</cfif>
 
 <!--- Look up quarantine file --->
 <cfquery name="checkq" datasource="hermes">
@@ -127,7 +132,7 @@ This file is part of Hermes Secure Email Gateway Community Edition.
   <cfset is.close()>
 
   <!--- Serve the file --->
-  <cfheader name="Content-Disposition" value="attachment;filename=#safeFilename#">
+  <cfheader name="Content-Disposition" value="attachment; filename=""#safeFilename#""">
   <cfcontent file="#tmpFile#" type="application/octet-stream" deletefile="Yes">
 
   <cfcatch type="any">
