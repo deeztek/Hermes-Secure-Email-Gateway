@@ -13,7 +13,7 @@ REPO_ROOT=$(git rev-parse --show-toplevel)
 # ===========================================
 # LAYER 1: Block sensitive paths (catches what gitleaks misses)
 # ===========================================
-echo "[1/7] Checking for sensitive file paths..."
+echo "[1/8] Checking for sensitive file paths..."
 
 # Define sensitive path patterns (files that should NEVER be committed)
 SENSITIVE_PATHS=(
@@ -95,7 +95,7 @@ echo "      No sensitive paths detected."
 # Catches the dev-dump leak class (real customer domains/emails/IPs, dev hosts)
 # that gitleaks does NOT flag because it isn't a "secret" by shape.
 # ===========================================
-echo "[2/7] Scanning staged content for DEV/customer data..."
+echo "[2/8] Scanning staged content for DEV/customer data..."
 
 # High-confidence signatures only (keep false positives near zero).
 # NOTE: deeztek.com is legitimate (docs/support/license); only .net/.org are dev.
@@ -139,7 +139,7 @@ echo "      No DEV/customer data signatures detected."
 # .gitleaks.toml (e.g. as a "Catches: ..." example) is invisible to Layer 5.
 # This is exactly how a real DB password once shipped to the public repo.
 # ===========================================
-echo "[3/7] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
+echo "[3/8] Checking .gitleaks.toml for real secrets (scanner blind spot)..."
 
 if echo "$STAGED_FILES" | grep -qx ".gitleaks.toml"; then
     # Flag 12+ char alphanumeric tokens that mix UPPER, lower AND digit -- the
@@ -185,7 +185,7 @@ echo "      No real secrets in .gitleaks.toml."
 #
 # Comments are allowed (prose/examples); only live code is blocked.
 # ===========================================
-echo "[4/7] Checking for hardcoded install roots..."
+echo "[4/8] Checking for hardcoded install roots..."
 
 ROOT_PAT='/opt/(hermes-seg|hermes-seg-docker-gl|hermes-seg-container-gl|Hermes-Secure-Email-Gateway)'
 ROOT_HITS=""
@@ -244,7 +244,7 @@ echo "      No hardcoded install roots detected."
 # check kept calling a script removed at #218. See #288.
 #
 # Only runs when one of the two files is actually staged.
-echo "[5/7] Checking generated artifacts against their seed..."
+echo "[5/8] Checking generated artifacts against their seed..."
 
 if echo "$STAGED_FILES" | grep -qxE "config/ofelia/config\.ini|config/database/hermes_install\.sql"; then
     DRIFT_CHECK="$(git rev-parse --show-toplevel)/scripts/check_ofelia_seed_drift.sh"
@@ -287,7 +287,7 @@ fi
 # staged, and only checks the newest release, so it never demands a cleanup of
 # history.
 # ---------------------------------------------------------------------------
-echo "[6/7] Checking install-path parity for staged artifacts..."
+echo "[6/8] Checking install-path parity for staged artifacts..."
 
 if echo "$STAGED_FILES" | grep -qE '^(updates/[^/]+/(scripts/.*\.sh|sql/schema_updates\.sql)|config/database/hermes_install\.sql|scripts/migrate_legacy_to_docker\.sh)$'; then
     if [ -x "$(dirname "$0")/check_fresh_install_parity.sh" ]; then
@@ -317,7 +317,52 @@ else
     echo "      No release artifacts staged - skipped."
 fi
 
-echo "[7/7] Scanning file contents for secrets..."
+# ===========================================
+# Layer 7: request values on command lines / in generated scripts
+# GHSA-jcj6, GHSA-jmx7 and the app-password label RCE were all a request
+# value written into a command line or a generated bash script. Only ADDED
+# lines of staged .cfm/.cfc are checked, so existing code does not block.
+# Heuristic: a value copied into another variable first is not seen; the
+# release security review covers that. A line that is genuinely safe can
+# carry the marker  cmdline-ok: <reason>  (in a CFML comment) to pass.
+# ===========================================
+echo "[7/8] Checking for request values on command lines..."
+
+REQ='(form|url|cookie|cgi|client)\.[A-Za-z_]'
+CMD_HITS=""
+for file in $STAGED_FILES; do
+    case "$file" in *.cfm|*.cfc) ;; *) continue ;; esac
+    added=$(git diff --cached -U0 -- "$file" 2>/dev/null | grep -E '^\+[^+]' | sed 's/^+//' || true)
+    [ -z "$added" ] && continue
+    match=$(printf '%s\n' "$added" \
+        | grep -iE "(arguments=\"[^\"]*#$REQ|cfexecute[^>]*#$REQ|fileWrite\([^)]*$REQ|<cffile[^>]*action=\"(write|append)\"[^>]*#$REQ|chr\(10\)[^;]*&[[:space:]]*$REQ|&[[:space:]]*$REQ[^;]*chr\(10\))" \
+        | grep -v 'cmdline-ok:' | head -3 || true)
+    if [ -n "$match" ]; then
+        CMD_HITS="$CMD_HITS\n  $file:\n$(echo "$match" | sed 's/^/      /')"
+    fi
+done
+
+if [ -n "$CMD_HITS" ]; then
+    echo ""
+    echo "=============================================="
+    echo "  REQUEST VALUE ON A COMMAND LINE - COMMIT BLOCKED"
+    echo "=============================================="
+    echo ""
+    echo "These added lines put a request value (form/url/cookie/cgi) into a"
+    echo "command line or a generated script:"
+    echo -e "$CMD_HITS"
+    echo ""
+    echo "Fix it instead of bypassing:"
+    echo "  - validate against a strict allowlist regex first, or"
+    echo "  - pass arguments as an array: arguments=\"#[ 'a', value ]#\", or"
+    echo "  - write secrets to a temp file and pass the file name"
+    echo "If a line is genuinely safe, add  cmdline-ok: <reason>  to it."
+    echo ""
+    exit 1
+fi
+echo "      No request values on command lines."
+
+echo "[8/8] Scanning file contents for secrets..."
 
 # Check if gitleaks is installed
 if ! command -v gitleaks &> /dev/null; then

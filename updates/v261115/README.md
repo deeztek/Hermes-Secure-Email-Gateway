@@ -2,9 +2,11 @@
 
 ## Synopsis
 
-Security release. Upgrade as soon as possible.
-
-<!-- TODO at release cut: rest of the synopsis. -->
+Security release. Upgrade as soon as possible. It fixes four reported
+vulnerabilities, two of them reachable without signing in, and hardens the
+password pages, the message viewer and Mail Filters further. It also adds
+Forwarding and an All messages / Keep option to Mail Filters in the user
+console, and makes SpamAssassin rules update again.
 
 ## Security fixes
 
@@ -22,6 +24,12 @@ furkank1337. Details are in the advisories.
 - **Medium:** HTML injection into the password reset notice sent to
   administrators
   ([GHSA-h2c7-jjqq-j49j](https://github.com/deeztek/Hermes-Secure-Email-Gateway/security/advisories/GHSA-h2c7-jjqq-j49j)).
+
+- **Hardening.** Password reset and change now run outside the web root, with
+  single-use forms and a "password changed" notice to the account and its
+  recovery address. Message subjects, senders and bodies can no longer run
+  script in the portal or console, and filter names and sizes can no longer
+  alter the generated Sieve script.
 
 <!-- GHSA-jmx7-r446-76pg (Nextcloud password script) was already fixed in
      v261107 by #401; credit it in that advisory, not here. -->
@@ -41,7 +49,11 @@ furkank1337. Details are in the advisories.
   console now have an **All messages** condition and a **Keep (deliver
   normally)** action, so a filter can redirect a copy and still deliver here.
   The console warns before saving a filter that would take all mail out of
-  the mailbox.
+  the mailbox. A Redirect action has a **Keep a copy in this mailbox** box,
+  ticked by default.
+- **Address suggestions (#411).** The Mail Filters redirect address and the
+  Forwarding page suggest the mailboxes on the user's own domain as they
+  type.
 
 ## Bug fixes
 
@@ -63,6 +75,8 @@ furkank1337. Details are in the advisories.
 - **Reverting a mailbox to a relay recipient now removes its vacation
   auto-reply setting.** It was left behind.
 
+- **The Mail Queue shows QUEUED instead of N/A** for messages waiting to be
+  delivered.
 - **The console comes back on its own after a reboot (#409).** If the web
   server started before the console was ready, it stopped but its container
   still showed as running, so the console and user portal stayed unreachable
@@ -70,9 +84,19 @@ furkank1337. Details are in the advisories.
 
 ## Upgrading
 
-<!-- TODO at release cut: command and backup line. -->
+Back up first, then run the standard upgrade:
+
+```bash
+sudo ./scripts/system_update_docker.sh v261115
+```
 
 - **Spam scores will change.** Within a few minutes of the upgrade the content
   filter moves to the current SpamAssassin ruleset (#412). Watch the
   quarantine and spam tagging for the first days, and adjust policy
   thresholds if needed.
+- **A password reset link now opens a page without the token in the address
+  bar**, and a link can be used once. Users who open an old link see "Link
+  Already Used" or "Link No Longer Valid" and can request a new one.
+- **"Password changed" notices** now go to the account address and, if set
+  and verified, to the recovery address, after a reset and after a change in
+  the user console.
