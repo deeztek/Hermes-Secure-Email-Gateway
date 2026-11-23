@@ -2675,7 +2675,7 @@ INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('arc_mode', 
 -- rather than an edit in every consumer query.
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('alias_ipv6_enabled', '0');
 INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('version_no', 'Docker');
-INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v261102');
+INSERT IGNORE INTO `system_settings` (`parameter`, `value`) VALUES ('build_no', 'v261123');
 
 -- -------- system_updates                       [seed] --------
 CREATE TABLE IF NOT EXISTS `system_updates` (
